@@ -1,0 +1,69 @@
+@page "/players/details/{Id:int}"
+@inject IPlayerService PlayerService
+@inject NavigationManager Navigation
+
+<h3>Player Details</h3>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (player is null)
+{
+    <p>Player not found.</p>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-2">Name</dt>
+        <dd class="col-sm-10">@player.Name</dd>
+
+        <dt class="col-sm-2">Overall</dt>
+        <dd class="col-sm-10">@player.Overall</dd>
+
+        <dt class="col-sm-2">Age</dt>
+        <dd class="col-sm-10">@(player.Age?.ToString() ?? "-")</dd>
+
+        <dt class="col-sm-2">Position</dt>
+        <dd class="col-sm-10">@player.Position?.Name</dd>
+    </dl>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")">Edit</button>
+        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/players")">Back</button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Player? player;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            player = await PlayerService.GetAsync(Id);
+            if (player is null)
+            {
+                errorMessage = "Player not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

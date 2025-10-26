@@ -1,0 +1,66 @@
+@page "/teams/details/{Id:guid}"
+@inject ITeamService TeamService
+@inject NavigationManager Navigation
+
+<h3>Team Details</h3>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (team is null)
+{
+    <p>Team not found.</p>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-2">Team Name</dt>
+        <dd class="col-sm-10">@team.TeamName</dd>
+
+        <dt class="col-sm-2">Owner Name</dt>
+        <dd class="col-sm-10">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
+
+        <dt class="col-sm-2">Team Token</dt>
+        <dd class="col-sm-10"><code>@team.TeamToken</code></dd>
+    </dl>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")">Edit</button>
+        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/teams")">Back</button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Team? team;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            team = await TeamService.GetAsync(Id);
+            if (team is null)
+            {
+                errorMessage = "Team not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,207 @@
+@page "/players"
+@inject IPlayerService PlayerService
+@inject IPositionService PositionService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<h3>Players</h3>
+
+<div class="row mb-3 g-2 align-items-end">
+    <div class="col-md-5">
+        <label class="form-label" for="playerSearch">Search</label>
+        <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
+            <input id="playerSearch" class="form-control me-2" placeholder="Search by name" @bind="search" />
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="positionFilter">Position</label>
+        <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnFilterChanged">
+            <option value="">All</option>
+            @foreach (var position in positions)
+            {
+                <option value="@position.PositionId">@position.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-success" @onclick="CreatePlayer">New Player</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (players.Count == 0)
+{
+    <p>No players found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Overall</th>
+                    <th>Age</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var player in players)
+                {
+                    <tr>
+                        <td>@player.Name</td>
+                        <td>@player.Position?.Name</td>
+                        <td>@player.Overall</td>
+                        <td>@(player.Age?.ToString() ?? "-")</td>
+                        <td class="text-end">
+                            <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Details</button>
+                            <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Edit</button>
+                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav aria-label="Players pagination">
+        <ul class="pagination">
+            <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
+                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Previous</button>
+            </li>
+            @for (var page = 1; page <= totalPages; page++)
+            {
+                <li class="page-item @(page == currentPage ? "active" : string.Empty)">
+                    <button class="page-link" @onclick="() => ChangePage(page)">@page</button>
+                </li>
+            }
+            <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Next</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    private const int PageSize = 10;
+    private readonly List<Player> players = new();
+    private readonly List<Position> positions = new();
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private string? search;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private string? selectedPositionId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPositionsAsync();
+        await LoadPlayersAsync();
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            positions.Clear();
+            var items = await PositionService.GetAllAsync();
+            positions.AddRange(items);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnSearchAsync()
+    {
+        currentPage = 1;
+        await LoadPlayersAsync();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs args)
+    {
+        selectedPositionId = args.Value?.ToString();
+        currentPage = 1;
+        await LoadPlayersAsync();
+    }
+
+    private async Task LoadPlayersAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        players.Clear();
+
+        try
+        {
+            short? positionId = null;
+            if (short.TryParse(selectedPositionId, out var parsed))
+            {
+                positionId = parsed;
+            }
+
+            var (items, total) = await PlayerService.SearchAsync(search, positionId, currentPage, PageSize);
+            players.AddRange(items);
+            totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+            if (currentPage > totalPages)
+            {
+                currentPage = totalPages;
+                await LoadPlayersAsync();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Task ChangePage(int page)
+    {
+        if (page < 1 || page == currentPage || page > totalPages)
+        {
+            return Task.CompletedTask;
+        }
+
+        currentPage = page;
+        return LoadPlayersAsync();
+    }
+
+    private void CreatePlayer() => Navigation.NavigateTo("/players/edit");
+
+    private void EditPlayer(int id) => Navigation.NavigateTo($"/players/edit/{id}");
+
+    private void ViewDetails(int id) => Navigation.NavigateTo($"/players/details/{id}");
+
+    private async Task ConfirmDelete(int id)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this player?"))
+        {
+            return;
+        }
+
+        try
+        {
+            await PlayerService.DeleteAsync(id);
+            await LoadPlayersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

@@ -1,5 +1,5 @@
-using Fc25Draft.Web.Data;
-using Fc25Draft.Web.Data.Entities;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
@@ -7,9 +7,9 @@ namespace Fc25Draft.Web.Services;
 
 public class DraftService
 {
-    private readonly AppDbContext _db;
+    private readonly DraftDbContext _db;
 
-    public DraftService(AppDbContext db)
+    public DraftService(DraftDbContext db)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
     }

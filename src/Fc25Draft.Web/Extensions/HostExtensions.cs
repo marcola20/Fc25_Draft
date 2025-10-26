@@ -1,4 +1,4 @@
-using Fc25Draft.Web.Data;
+using Fc25Draft.Infra.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -11,7 +11,7 @@ namespace Fc25Draft.Web.Extensions
             ArgumentNullException.ThrowIfNull(host);
 
             using var scope = host.Services.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
 
             await SeedData.SeedAsync(context, cancellationToken);
         }
