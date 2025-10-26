@@ -1,4 +1,5 @@
 using Fc25Draft.Web.Data;
+using Fc25Draft.Web.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,8 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
 var app = builder.Build();
+
+await app.SeedDatabaseAsync();
 
 if (!app.Environment.IsDevelopment())
 {
