@@ -27,6 +27,22 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+//if (app.Environment.IsDevelopment())
+//{
+//    using var scope = app.Services.CreateScope();
+//    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//    var svc = scope.ServiceProvider.GetRequiredService<DraftService>();
+
+//    var teamOrder = await db.Teams
+//        .OrderBy(t => t.TeamName)
+//        .Select(t => t.TeamId)
+//        .Take(14)
+//        .ToListAsync();
+
+//    if (!await db.Drafts.AnyAsync())
+//        await svc.CreateDraftAsync("FC25 - Draft de Teste", teamOrder, totalRounds: 19, snake: true);
+//}
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
