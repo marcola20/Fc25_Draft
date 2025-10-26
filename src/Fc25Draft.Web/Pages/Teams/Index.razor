@@ -1,0 +1,166 @@
+@page "/teams"
+@inject ITeamService TeamService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<h3>Teams</h3>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
+            <input class="form-control me-2" placeholder="Search by team or owner" @bind="search" />
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+    <div class="col-md-6 text-end">
+        <button class="btn btn-success" @onclick="CreateTeam">New Team</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (teams.Count == 0)
+{
+    <p>No teams found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Team</th>
+                    <th>Owner</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var team in teams)
+                {
+                    <tr>
+                        <td>@team.TeamName</td>
+                        <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
+                        <td class="text-end">
+                            <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Details</button>
+                            <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Edit</button>
+                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav aria-label="Teams pagination">
+        <ul class="pagination">
+            <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
+                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Previous</button>
+            </li>
+            @for (var page = 1; page <= totalPages; page++)
+            {
+                <li class="page-item @(page == currentPage ? "active" : string.Empty)">
+                    <button class="page-link" @onclick="() => ChangePage(page)">@page</button>
+                </li>
+            }
+            <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Next</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    private const int PageSize = 10;
+    private readonly List<Team> teams = new();
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private string? search;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamsAsync();
+    }
+
+    private async Task OnSearchAsync()
+    {
+        currentPage = 1;
+        await LoadTeamsAsync();
+    }
+
+    private async Task LoadTeamsAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        teams.Clear();
+
+        try
+        {
+            var (items, total) = await TeamService.SearchAsync(search, currentPage, PageSize);
+            teams.AddRange(items);
+            totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+            if (currentPage > totalPages)
+            {
+                currentPage = totalPages;
+                await LoadTeamsAsync();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Task ChangePage(int page)
+    {
+        if (page < 1 || page == currentPage || page > totalPages)
+        {
+            return Task.CompletedTask;
+        }
+
+        currentPage = page;
+        return LoadTeamsAsync();
+    }
+
+    private void CreateTeam() => Navigation.NavigateTo("/teams/edit");
+
+    private void EditTeam(Guid id) => Navigation.NavigateTo($"/teams/edit/{id}");
+
+    private void ViewDetails(Guid id) => Navigation.NavigateTo($"/teams/details/{id}");
+
+    private async Task ConfirmDelete(Guid id)
+    {
+        if (!await JSRuntimeConfirm($"Are you sure you want to delete this team?"))
+        {
+            return;
+        }
+
+        try
+        {
+            await TeamService.DeleteAsync(id);
+            await LoadTeamsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task<bool> JSRuntimeConfirm(string message)
+    {
+        return await JSRuntime.InvokeAsync<bool>("confirm", message);
+    }
+}

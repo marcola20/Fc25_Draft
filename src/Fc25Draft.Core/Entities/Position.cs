@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Fc25Draft.Web.Data.Entities
+namespace Fc25Draft.Core.Entities
 {
     public class Position
     {

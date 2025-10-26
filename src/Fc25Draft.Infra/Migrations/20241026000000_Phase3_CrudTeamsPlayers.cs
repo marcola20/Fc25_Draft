@@ -1,18 +1,42 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
-
-namespace Fc25Draft.Web.Migrations
+namespace Fc25Draft.Infra.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Phase3_CrudTeamsPlayers : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Positions",
+                columns: table => new
+                {
+                    PositionId = table.Column<short>(type: "smallint", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Positions", x => x.PositionId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Teams",
+                columns: table => new
+                {
+                    TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TeamName = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    OwnerName = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: true),
+                    TeamToken = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Teams", x => x.TeamId);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Drafts",
                 columns: table => new
@@ -29,30 +53,25 @@ namespace Fc25Draft.Web.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Positions",
+                name: "Players",
                 columns: table => new
                 {
-                    PositionId = table.Column<short>(type: "smallint", nullable: false)
+                    PlayerId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(450)", nullable: false)
+                    Name = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    Age = table.Column<int>(type: "int", nullable: true),
+                    Overall = table.Column<int>(type: "int", nullable: false),
+                    PositionId = table.Column<short>(type: "smallint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Positions", x => x.PositionId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Teams",
-                columns: table => new
-                {
-                    TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TeamName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    OwnerName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    TeamToken = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Teams", x => x.TeamId);
+                    table.PrimaryKey("PK_Players", x => x.PlayerId);
+                    table.ForeignKey(
+                        name: "FK_Players_Positions_PositionId",
+                        column: x => x.PositionId,
+                        principalTable: "Positions",
+                        principalColumn: "PositionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -73,28 +92,6 @@ namespace Fc25Draft.Web.Migrations
                         principalTable: "Drafts",
                         principalColumn: "DraftId",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Players",
-                columns: table => new
-                {
-                    PlayerId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Age = table.Column<int>(type: "int", nullable: true),
-                    Overall = table.Column<int>(type: "int", nullable: false),
-                    PositionId = table.Column<short>(type: "smallint", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Players", x => x.PlayerId);
-                    table.ForeignKey(
-                        name: "FK_Players_Positions_PositionId",
-                        column: x => x.PositionId,
-                        principalTable: "Positions",
-                        principalColumn: "PositionId",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -162,23 +159,6 @@ namespace Fc25Draft.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.InsertData(
-                table: "Positions",
-                columns: new[] { "PositionId", "Name" },
-                values: new object[,]
-                {
-                    { (short)1, "Goleiro" },
-                    { (short)2, "Zagueiro" },
-                    { (short)3, "Lateral/Ala Esquerdo" },
-                    { (short)4, "Lateral/Ala Direito" },
-                    { (short)5, "Volante" },
-                    { (short)6, "Meia Central" },
-                    { (short)7, "Meia Atacante" },
-                    { (short)8, "Ponta/Meia Esquerda" },
-                    { (short)9, "Ponta/Meia Direita" },
-                    { (short)10, "Centroavante" }
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_DraftPicks_DraftId_RoundNumber_PickInRound",
                 table: "DraftPicks",
@@ -201,6 +181,11 @@ namespace Fc25Draft.Web.Migrations
                 column: "TeamId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Players_Name_PositionId",
+                table: "Players",
+                columns: new[] { "Name", "PositionId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Players_PositionId",
                 table: "Players",
                 column: "PositionId");
@@ -215,6 +200,12 @@ namespace Fc25Draft.Web.Migrations
                 name: "IX_TeamRosters_PlayerId",
                 table: "TeamRosters",
                 column: "PlayerId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Teams_TeamName",
+                table: "Teams",
+                column: "TeamName",
                 unique: true);
 
             migrationBuilder.CreateIndex(

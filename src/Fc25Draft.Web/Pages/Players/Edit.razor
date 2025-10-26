@@ -1,0 +1,168 @@
+@page "/players/edit"
+@page "/players/edit/{Id:int}"
+@inject IPlayerService PlayerService
+@inject IPositionService PositionService
+@inject NavigationManager Navigation
+
+<h3>@Title</h3>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm EditContext="editContext" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label" for="playerName">Name</label>
+            <InputText id="playerName" class="form-control" @bind-Value="model.Name" />
+            <ValidationMessage For="() => model.Name" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="playerAge">Age</label>
+            <InputNumber id="playerAge" class="form-control" @bind-Value="model.Age" />
+            <ValidationMessage For="() => model.Age" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="playerOverall">Overall</label>
+            <InputNumber id="playerOverall" class="form-control" @bind-Value="model.Overall" />
+            <ValidationMessage For="() => model.Overall" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="playerPosition">Position</label>
+            <InputSelect id="playerPosition" class="form-select" @bind-Value="model.PositionId">
+                <option value="">Select a position</option>
+                @foreach (var position in positions)
+                {
+                    <option value="@position.PositionId">@position.Name</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => model.PositionId" />
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">Save</button>
+            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancel</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private readonly PlayerFormModel model = new();
+    private EditContext? editContext;
+    private readonly List<Position> positions = new();
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string Title => Id.HasValue ? "Edit Player" : "Create Player";
+
+    protected override async Task OnInitializedAsync()
+    {
+        editContext = new EditContext(model);
+
+        try
+        {
+            var items = await PositionService.GetAllAsync();
+            positions.AddRange(items);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+
+        if (Id.HasValue)
+        {
+            try
+            {
+                var player = await PlayerService.GetAsync(Id.Value);
+                if (player is null)
+                {
+                    errorMessage = "Player not found.";
+                }
+                else
+                {
+                    model.Name = player.Name;
+                    model.Age = player.Age;
+                    model.Overall = player.Overall;
+                    model.PositionId = player.PositionId;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (editContext is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (Id.HasValue)
+            {
+                await PlayerService.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+            }
+            else
+            {
+                await PlayerService.CreateAsync(new PlayerCreateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+            }
+
+            Navigation.NavigateTo("/players");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/players");
+    }
+
+    private sealed class PlayerFormModel
+    {
+        [Required]
+        [StringLength(80, MinimumLength = 2)]
+        public string? Name { get; set; }
+
+        [Range(14, 55, ErrorMessage = "Age must be between 14 and 55.")]
+        public int? Age { get; set; }
+
+        [Required]
+        [Range(0, 99)]
+        public int? Overall { get; set; }
+
+        [Required(ErrorMessage = "Position is required.")]
+        public short? PositionId { get; set; }
+    }
+}
