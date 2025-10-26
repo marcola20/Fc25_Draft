@@ -1,5 +1,6 @@
 using Fc25Draft.Web.Data;
 using Fc25Draft.Web.Extensions;
+using Fc25Draft.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 // Blazor
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddScoped<DraftService>();
 
 var app = builder.Build();
 
