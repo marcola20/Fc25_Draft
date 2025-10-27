@@ -37,7 +37,7 @@ else
                             <strong>@team.Jogadores</strong> jogador@(team.Jogadores == 1 ? string.Empty : "es") cadastrados.
                         </p>
                         <div class="mt-auto">
-                            <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/teams/details/{team.TeamId}")">
+                            <button class="btn btn-primary" @onclick="@(() => Navigation.NavigateTo($"/teams/details/{team.TeamId}"))">
                                 Ver elenco completo
                             </button>
                         </div>
