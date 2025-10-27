@@ -5,6 +5,7 @@ using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +66,40 @@ draftApi.MapPost("/pick", async (DraftStateService draftStateService, DraftPickR
     try
     {
         var state = await draftStateService.MakePickAsync(request.PlayerId, request.Token, ct);
+        return Results.Ok(state);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+draftApi.MapPost("/generate", async (
+    DraftService draftService,
+    DraftStateService draftStateService,
+    IHubContext<DraftHub> hubContext,
+    GenerateDraftRequestDto request,
+    CancellationToken ct) =>
+{
+    if (request is null)
+    {
+        return Results.BadRequest(new { message = "Requisição inválida." });
+    }
+
+    if (request.TotalRounds is < 1 or > 50)
+    {
+        return Results.BadRequest(new { message = "O número de rodadas deve estar entre 1 e 50." });
+    }
+
+    try
+    {
+        await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, ct);
+        var state = await draftStateService.GetStateAsync(ct);
+        await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
         return Results.Ok(state);
     }
     catch (ArgumentException ex)

@@ -144,6 +144,54 @@ public class DraftService
         });
     }
 
+    public async Task<Draft> GenerateDraftAsync(
+        int totalRounds,
+        bool snake = false,
+        CancellationToken ct = default)
+    {
+        if (totalRounds <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(totalRounds), totalRounds, "Total rounds must be greater than zero.");
+        }
+
+        var teamOrder = await _db.Teams
+            .OrderBy(t => t.TeamName)
+            .Select(t => t.TeamId)
+            .ToListAsync(ct);
+
+        if (teamOrder.Count == 0)
+        {
+            throw new InvalidOperationException("Nenhuma equipe cadastrada para gerar o draft.");
+        }
+
+        if (teamOrder.Count != 14)
+        {
+            throw new InvalidOperationException("O draft requer exatamente 14 equipes cadastradas.");
+        }
+
+        await ClearDraftDataAsync(ct);
+
+        var name = $"FC25 Draft - {DateTime.UtcNow:yyyy-MM-dd HH:mm}";
+        return await CreateDraftAsync(name, teamOrder, totalRounds, snake, ct);
+    }
+
+    private async Task ClearDraftDataAsync(CancellationToken ct)
+    {
+        var strategy = _db.Database.CreateExecutionStrategy();
+
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+            await _db.TeamRosters.ExecuteDeleteAsync(ct);
+            await _db.DraftPicks.ExecuteDeleteAsync(ct);
+            await _db.DraftRounds.ExecuteDeleteAsync(ct);
+            await _db.Drafts.ExecuteDeleteAsync(ct);
+
+            await transaction.CommitAsync(ct);
+        });
+    }
+
     public static IReadOnlyList<Guid> GetRoundOrder(IReadOnlyList<Guid> baseOrder, int roundNumber, bool snake)
     {
         ArgumentNullException.ThrowIfNull(baseOrder);
