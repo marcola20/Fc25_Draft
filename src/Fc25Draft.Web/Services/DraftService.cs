@@ -221,7 +221,7 @@ public class DraftService
         }
 
         var draftName = string.IsNullOrWhiteSpace(name)
-            ? $"FC25 Draft - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
+            ? $"DRAFT - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
 
         return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct);
