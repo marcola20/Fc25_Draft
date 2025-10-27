@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Core.Options;
@@ -46,6 +48,7 @@ builder.Services.AddDbContext<DraftDbContext>(options =>
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
+builder.Services.Configure<MarketGenerationOptions>(builder.Configuration.GetSection(MarketGenerationOptions.SectionName));
 
 builder.Services
     .AddAuthentication(options =>
@@ -77,6 +80,7 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
+builder.Services.AddScoped<IMarketService, MarketService>();
 
 var app = builder.Build();
 
@@ -117,6 +121,7 @@ MapDraftEndpoints(api);
 MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
 MapPricingEndpoints(api);
+MapMarketEndpoints(api);
 
 app.Run();
 
@@ -898,6 +903,69 @@ static void MapPricingEndpoints(RouteGroupBuilder api)
                 return Results.BadRequest(new { message = ex.Message });
             }
         });
+}
+
+static void MapMarketEndpoints(RouteGroupBuilder api)
+{
+    var marketApi = api.MapGroup("/market");
+
+    marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
+    {
+        var items = await marketService.GetOpenItemsAsync(ct);
+        return Results.Ok(items);
+    }).AllowAnonymous();
+
+    marketApi.MapGet("/{marketItemId:guid}", async (Guid marketItemId, IMarketService marketService, CancellationToken ct) =>
+    {
+        var items = await marketService.GetOpenItemsAsync(ct);
+        var item = items.FirstOrDefault(i => i.MarketItemId == marketItemId);
+        return item is null ? Results.NotFound() : Results.Ok(item);
+    }).AllowAnonymous();
+
+    var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
+
+    adminMarketApi.MapPost("/generate", async (IMarketService marketService, CancellationToken ct) =>
+    {
+        try
+        {
+            var items = await marketService.GenerateRoundAsync(ct);
+            var dtos = items.Select(ToDto).ToList();
+            return Results.Created("/api/market", dtos);
+        }
+        catch (MarketGenerationConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketGenerationValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    static TransferMarketItemDto ToDto(TransferMarketItem item)
+    {
+        if (item.Player is null)
+        {
+            throw new InvalidOperationException("Jogador não carregado para o item de mercado.");
+        }
+
+        var positionName = item.Player.Position?.Name ?? string.Empty;
+        var age = item.Player.Age ?? 0;
+
+        return new TransferMarketItemDto(
+            item.MarketItemId,
+            item.PlayerId,
+            item.Player.Name,
+            positionName,
+            age,
+            item.Player.Overall,
+            item.PrecoBase,
+            item.PrecoComprarAgora,
+            item.LanceAtual,
+            item.MaiorLanceTeam?.TeamName ?? string.Empty,
+            item.Status,
+            item.DataInicioUtc);
+    }
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
