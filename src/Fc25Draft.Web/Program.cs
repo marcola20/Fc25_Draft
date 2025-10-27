@@ -49,6 +49,7 @@ builder.Services.AddDbContext<DraftDbContext>(options =>
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
 builder.Services.Configure<MarketGenerationOptions>(builder.Configuration.GetSection(MarketGenerationOptions.SectionName));
+builder.Services.Configure<EconomiaOptions>(builder.Configuration.GetSection(EconomiaOptions.SectionName));
 
 builder.Services
     .AddAuthentication(options =>
@@ -83,6 +84,7 @@ builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
 builder.Services.AddScoped<IMarketClosingService, MarketClosingService>();
+builder.Services.AddScoped<IBudgetService, BudgetService>();
 
 var app = builder.Build();
 
@@ -124,6 +126,7 @@ MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
 MapPricingEndpoints(api);
 MapMarketEndpoints(api);
+MapBudgetEndpoints(api);
 
 app.Run();
 
@@ -843,6 +846,218 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
     });
 }
 
+static void MapBudgetEndpoints(RouteGroupBuilder api)
+{
+    var budgetApi = api.MapGroup("/budgets");
+
+    budgetApi.MapGet(
+        "/available",
+        async ([FromQuery] string? token, DraftDbContext db, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            if (!Guid.TryParse(token, out var parsedToken))
+            {
+                return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            var teamId = await db.Teams
+                .AsNoTracking()
+                .Where(t => t.TeamToken == parsedToken)
+                .Select(t => (Guid?)t.TeamId)
+                .FirstOrDefaultAsync(ct);
+
+            if (!teamId.HasValue)
+            {
+                return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            var saldo = await budgetService.GetSaldoAsync(teamId.Value, ct);
+            var bloqueado = await budgetService.GetBloqueadoEmLancesAsync(teamId.Value, ct);
+            var disponivel = saldo - bloqueado;
+
+            return Results.Ok(new BudgetSummaryDto(teamId.Value, saldo, bloqueado, disponivel));
+        })
+        .AllowAnonymous();
+
+    budgetApi.MapGet(
+        "/{teamId:guid}",
+        async (Guid teamId, DraftDbContext db, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "TeamId inválido." });
+            }
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var saldo = await budgetService.GetSaldoAsync(teamId, ct);
+            return Results.Ok(new { teamId, saldo });
+        })
+        .AllowAnonymous();
+
+    var adminBudgetApi = api.MapGroup("/admin/budgets").RequireAuthorization("AdminOnly");
+
+    adminBudgetApi.MapPost(
+        "/adjust",
+        async (BudgetAdjustRequestDto request, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            if (request.TeamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "TeamId é obrigatório." });
+            }
+
+            if (request.Valor <= 0)
+            {
+                return Results.BadRequest(new { message = "Valor deve ser maior que zero." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Origem))
+            {
+                return Results.BadRequest(new { message = "Origem é obrigatória." });
+            }
+
+            var tipo = request.Tipo?.Trim().ToUpperInvariant();
+            if (tipo is not ("CREDIT" or "DEBIT"))
+            {
+                return Results.BadRequest(new { message = "Tipo inválido. Use CREDIT ou DEBIT." });
+            }
+
+            try
+            {
+                await budgetService.RegistrarAjusteAsync(
+                    request.TeamId,
+                    request.Valor,
+                    request.Origem,
+                    request.Descricao,
+                    tipo == "CREDIT",
+                    ct);
+
+                var saldoAtual = await budgetService.GetSaldoAsync(request.TeamId, ct);
+                return Results.Ok(new { teamId = request.TeamId, saldo = saldoAtual });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    adminBudgetApi.MapPost(
+        "/apply-match-reward",
+        async (MatchRewardRequestDto request, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var result = await budgetService.ApplyMatchRewardAsync(request, ct);
+
+                if (!result.AjusteRealizado)
+                {
+                    return Results.Ok(new
+                    {
+                        message = "Sem alteração.",
+                        teamId = result.TeamId,
+                        saldo = result.SaldoAtual
+                    });
+                }
+
+                return Results.Ok(new
+                {
+                    teamId = result.TeamId,
+                    valorAplicado = result.ValorAplicado,
+                    saldo = result.SaldoAtual,
+                    tipo = result.Tipo,
+                    descricao = result.Descricao
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    adminBudgetApi.MapGet(
+        "/ledger",
+        async (
+            [FromQuery] Guid teamId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            DraftDbContext db,
+            CancellationToken ct) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "teamId é obrigatório." });
+            }
+
+            if (page < 1 || pageSize < 1)
+            {
+                return Results.BadRequest(new { message = "Parâmetros de paginação inválidos." });
+            }
+
+            var size = Math.Min(pageSize, 100);
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var query = db.BudgetLedgers
+                .AsNoTracking()
+                .Where(l => l.TeamId == teamId);
+
+            var total = await query.CountAsync(ct);
+
+            var items = await query
+                .OrderByDescending(l => l.DataUtc)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
+                .ToListAsync(ct);
+
+            return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
+        });
+}
+
 static void MapPricingEndpoints(RouteGroupBuilder api)
 {
     var pricingApi = api.MapGroup("/pricing");
@@ -910,6 +1125,81 @@ static void MapPricingEndpoints(RouteGroupBuilder api)
 static void MapMarketEndpoints(RouteGroupBuilder api)
 {
     var marketApi = api.MapGroup("/market");
+
+    marketApi.MapGet(
+        "/history",
+        async ([FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+        {
+            var pageNumber = page < 1 ? 1 : page;
+            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+            var query = db.TransferHistories
+                .AsNoTracking();
+
+            var total = await query.CountAsync(ct);
+
+            var items = await query
+                .OrderByDescending(h => h.DataUtc)
+                .Skip((pageNumber - 1) * size)
+                .Take(size)
+                .Select(h => new TransferHistoryItemDto(
+                    h.DataUtc,
+                    h.PlayerId,
+                    h.Player.Name,
+                    h.Tipo,
+                    h.OrigemTeam != null ? h.OrigemTeam.TeamName : "Mercado Livre",
+                    h.DestinoTeam != null ? h.DestinoTeam.TeamName : null,
+                    h.Valor))
+                .ToListAsync(ct);
+
+            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+        })
+        .AllowAnonymous();
+
+    marketApi.MapGet(
+        "/history/by-team/{teamId:guid}",
+        async (Guid teamId, [FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "teamId é obrigatório." });
+            }
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var pageNumber = page < 1 ? 1 : page;
+            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+            var query = db.TransferHistories
+                .AsNoTracking()
+                .Where(h => h.OrigemTeamId == teamId || h.DestinoTeamId == teamId);
+
+            var total = await query.CountAsync(ct);
+
+            var items = await query
+                .OrderByDescending(h => h.DataUtc)
+                .Skip((pageNumber - 1) * size)
+                .Take(size)
+                .Select(h => new TransferHistoryItemDto(
+                    h.DataUtc,
+                    h.PlayerId,
+                    h.Player.Name,
+                    h.Tipo,
+                    h.OrigemTeam != null ? h.OrigemTeam.TeamName : "Mercado Livre",
+                    h.DestinoTeam != null ? h.DestinoTeam.TeamName : null,
+                    h.Valor))
+                .ToListAsync(ct);
+
+            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+        })
+        .AllowAnonymous();
 
     marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
     {

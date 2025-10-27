@@ -20,6 +20,7 @@ public class DraftDbContext : DbContext
     public DbSet<Bid> Bids => Set<Bid>();
     public DbSet<TeamBudget> TeamBudgets => Set<TeamBudget>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
+    public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

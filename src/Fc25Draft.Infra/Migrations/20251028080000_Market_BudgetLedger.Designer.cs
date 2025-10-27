@@ -4,6 +4,7 @@ using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251028080000_Market_BudgetLedger")]
+    partial class Market_BudgetLedger : Migration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
