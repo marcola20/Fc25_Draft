@@ -1043,9 +1043,10 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
         var items = await query
             .Skip((page - 1) * size)
             .Take(size)
+            .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
             .ToListAsync(ct);
 
-        return Results.Ok(new PagedResult<BudgetLedgerEntryDto>(items, total));
+        return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
     });
 }
 
