@@ -85,6 +85,7 @@ builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
 builder.Services.AddScoped<IMarketClosingService, MarketClosingService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<INegotiationService, NegotiationService>();
 
 var app = builder.Build();
 
@@ -127,6 +128,7 @@ MapTeamEndpoints(api);
 MapPricingEndpoints(api);
 MapMarketEndpoints(api);
 MapBudgetEndpoints(api);
+MapNegotiationEndpoints(api);
 
 app.Run();
 
@@ -981,8 +983,280 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
                         message = "Sem alteração.",
                         teamId = result.TeamId,
                         saldo = result.SaldoAtual
-                    });
-                }
+    });
+}
+
+static void MapNegotiationEndpoints(RouteGroupBuilder api)
+{
+    var negotiationApi = api.MapGroup("/negotiations");
+
+    negotiationApi.MapPost(string.Empty, async (
+        NegotiationCreateDto request,
+        INegotiationService negotiationService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        try
+        {
+            var negotiation = await negotiationService.CreateAsync(request, ct);
+            var dto = ToNegotiationDto(negotiation);
+            return Results.Created($"/api/negotiations/{negotiation.NegotiationId}", dto);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+        catch (NegotiationValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (NegotiationConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    negotiationApi.MapPost("/{negotiationId:guid}/respond", async (
+        Guid negotiationId,
+        NegotiationResponseDto request,
+        INegotiationService negotiationService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        try
+        {
+            var negotiation = await negotiationService.RespondAsync(negotiationId, request, ct);
+            return Results.Ok(ToNegotiationDto(negotiation));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+        catch (NegotiationNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (NegotiationValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (NegotiationConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    negotiationApi.MapPost("/{negotiationId:guid}/cancel", async (
+        Guid negotiationId,
+        NegotiationCancelDto request,
+        DraftDbContext db,
+        INegotiationService negotiationService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        var tokenResult = await ResolveTeamIdForNegotiationsAsync(request.Token, db, ct);
+        if (tokenResult.Error is not null)
+        {
+            return tokenResult.Error;
+        }
+
+        try
+        {
+            await negotiationService.CancelAsync(negotiationId, tokenResult.TeamId, ct);
+            return Results.NoContent();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+        catch (NegotiationNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (NegotiationConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    negotiationApi.MapGet("/active", async (
+        INegotiationService negotiationService,
+        CancellationToken ct) =>
+    {
+        var negotiations = await negotiationService.GetActiveAsync(ct);
+        var dtos = negotiations.Select(ToNegotiationDto).ToList();
+        return Results.Ok(dtos);
+    }).AllowAnonymous();
+
+    var adminNegotiationApi = api.MapGroup("/admin/negotiations").RequireAuthorization("AdminOnly");
+
+    adminNegotiationApi.MapGet(string.Empty, async (
+        [FromQuery] string? status,
+        DraftDbContext db,
+        CancellationToken ct) =>
+    {
+        var normalizedStatus = string.IsNullOrWhiteSpace(status)
+            ? "ALL"
+            : status.Trim().ToUpperInvariant();
+
+        if (normalizedStatus is not ("ALL" or "PENDING" or "ACCEPTED"))
+        {
+            return Results.BadRequest(new { message = "Status inválido." });
+        }
+
+        var query = db.Negotiations
+            .AsNoTracking()
+            .Include(n => n.OrigemTeam)
+            .Include(n => n.DestinoTeam)
+            .Include(n => n.Players)
+                .ThenInclude(p => p.Player)
+            .Include(n => n.Players)
+                .ThenInclude(p => p.Team)
+            .AsQueryable();
+
+        if (normalizedStatus != "ALL")
+        {
+            query = query.Where(n => n.Status == normalizedStatus);
+        }
+
+        var items = await query
+            .OrderByDescending(n => n.DataInicioUtc)
+            .ToListAsync(ct);
+
+        var dtos = items.Select(ToNegotiationDto).ToList();
+        return Results.Ok(dtos);
+    });
+
+    adminNegotiationApi.MapPost("/{negotiationId:guid}/force", async (
+        Guid negotiationId,
+        NegotiationForceActionRequest request,
+        INegotiationService negotiationService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        try
+        {
+            await negotiationService.ForceActionAsync(negotiationId, request.Acao, ct);
+            return Results.Ok();
+        }
+        catch (NegotiationNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (NegotiationValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (NegotiationConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    });
+
+    adminNegotiationApi.MapGet("/history", async (
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        DraftDbContext db,
+        CancellationToken ct) =>
+    {
+        var pageNumber = page < 1 ? 1 : page;
+        var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        var query = db.Negotiations
+            .AsNoTracking()
+            .Include(n => n.OrigemTeam)
+            .Include(n => n.DestinoTeam)
+            .Include(n => n.Players)
+                .ThenInclude(p => p.Player)
+            .Include(n => n.Players)
+                .ThenInclude(p => p.Team)
+            .Where(n => n.Status == "COMPLETED" || n.Status == "REJECTED" || n.Status == "CANCELLED");
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(n => n.DataFechamentoUtc ?? n.DataInicioUtc)
+            .Skip((pageNumber - 1) * size)
+            .Take(size)
+            .ToListAsync(ct);
+
+        var dtos = items.Select(ToNegotiationDto).ToList();
+        return Results.Ok(new PagedResult<NegotiationListDto>(dtos, total));
+    });
+
+    static NegotiationListDto ToNegotiationDto(Negotiation negotiation)
+    {
+        var origemPlayers = negotiation.Players
+            .Where(p => string.Equals(p.Papel, "OFFERED", StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.Player?.Name ?? string.Empty)
+            .OrderBy(name => name)
+            .ToList();
+
+        var destinoPlayers = negotiation.Players
+            .Where(p => string.Equals(p.Papel, "REQUESTED", StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.Player?.Name ?? string.Empty)
+            .OrderBy(name => name)
+            .ToList();
+
+        return new NegotiationListDto(
+            negotiation.NegotiationId,
+            negotiation.Tipo,
+            negotiation.Status,
+            negotiation.OrigemTeam.TeamName,
+            negotiation.DestinoTeam.TeamName,
+            negotiation.ValorOferecido,
+            negotiation.DataInicioUtc,
+            negotiation.DataFechamentoUtc,
+            negotiation.Observacao,
+            origemPlayers,
+            destinoPlayers);
+    }
+
+    static async Task<TokenValidationResult> ResolveTeamIdForNegotiationsAsync(
+        string? token,
+        DraftDbContext db,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new TokenValidationResult(null, Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized));
+        }
+
+        if (!Guid.TryParse(token, out var parsedToken))
+        {
+            return new TokenValidationResult(null, Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized));
+        }
+
+        var teamId = await db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamToken == parsedToken)
+            .Select(t => (Guid?)t.TeamId)
+            .FirstOrDefaultAsync(ct);
+
+        if (!teamId.HasValue)
+        {
+            return new TokenValidationResult(null, Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized));
+        }
+
+        return new TokenValidationResult(teamId.Value, null);
+    }
+}
 
                 return Results.Ok(new
                 {
@@ -1449,6 +1723,8 @@ static string Escape(string? value)
 record PlaceBidRequest(string Token, decimal Valor);
 
 record BuyNowRequest(string Token);
+
+record NegotiationForceActionRequest(string Acao);
 
 readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
 {

@@ -21,6 +21,8 @@ public class DraftDbContext : DbContext
     public DbSet<TeamBudget> TeamBudgets => Set<TeamBudget>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
+    public DbSet<Negotiation> Negotiations => Set<Negotiation>();
+    public DbSet<NegotiationPlayer> NegotiationPlayers => Set<NegotiationPlayer>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
