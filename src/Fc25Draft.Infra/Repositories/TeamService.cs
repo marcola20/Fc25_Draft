@@ -55,7 +55,7 @@ public class TeamService : ITeamService
         var exists = await _db.Teams.AnyAsync(t => t.TeamName == normalizedName);
         if (exists)
         {
-            throw new InvalidOperationException($"Team with name '{normalizedName}' already exists.");
+            throw new InvalidOperationException($"Já existe uma equipe com o nome '{normalizedName}'.");
         }
 
         var entity = new Team
@@ -77,14 +77,14 @@ public class TeamService : ITeamService
         Validate(dto.TeamName, dto.OwnerName);
 
         var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
-                     ?? throw new KeyNotFoundException("Team not found.");
+                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
 
         var normalizedName = dto.TeamName.Trim();
 
         var exists = await _db.Teams.AnyAsync(t => t.TeamId != id && t.TeamName == normalizedName);
         if (exists)
         {
-            throw new InvalidOperationException($"Team with name '{normalizedName}' already exists.");
+            throw new InvalidOperationException($"Já existe uma equipe com o nome '{normalizedName}'.");
         }
 
         entity.TeamName = normalizedName;
@@ -96,7 +96,7 @@ public class TeamService : ITeamService
     public async Task DeleteAsync(Guid id)
     {
         var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
-                     ?? throw new KeyNotFoundException("Team not found.");
+                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
 
         _db.Teams.Remove(entity);
 
@@ -106,7 +106,7 @@ public class TeamService : ITeamService
         }
         catch (DbUpdateException ex)
         {
-            throw new InvalidOperationException("Unable to delete team because it is referenced by other records.", ex);
+            throw new InvalidOperationException("Não foi possível excluir a equipe porque ela está vinculada a outros registros.", ex);
         }
     }
 
@@ -114,18 +114,18 @@ public class TeamService : ITeamService
     {
         if (string.IsNullOrWhiteSpace(teamName))
         {
-            throw new ArgumentException("Team name is required.", nameof(teamName));
+            throw new ArgumentException("O nome da equipe é obrigatório.", nameof(teamName));
         }
 
         var trimmed = teamName.Trim();
         if (trimmed.Length is < 2 or > 80)
         {
-            throw new ArgumentException("Team name must be between 2 and 80 characters.", nameof(teamName));
+            throw new ArgumentException("O nome da equipe deve ter entre 2 e 80 caracteres.", nameof(teamName));
         }
 
         if (!string.IsNullOrWhiteSpace(ownerName) && ownerName.Trim().Length > 80)
         {
-            throw new ArgumentException("Owner name must be at most 80 characters.", nameof(ownerName));
+            throw new ArgumentException("O nome do responsável deve ter no máximo 80 caracteres.", nameof(ownerName));
         }
     }
 

@@ -1,4 +1,42 @@
+using System;
+using System.Collections.Generic;
+
 namespace Fc25Draft.Core.DTOs;
 
 public record TeamCreateDto(string TeamName, string? OwnerName);
+
 public record TeamUpdateDto(string TeamName, string? OwnerName);
+
+public record TeamListItemDto(
+    Guid TeamId,
+    string TeamName,
+    string? OwnerName,
+    int Jogadores);
+
+public record TeamDetailsDto(
+    Guid TeamId,
+    string TeamName,
+    string? OwnerName,
+    Guid TeamToken,
+    int Jogadores);
+
+public record TeamRosterDto(
+    Guid TeamId,
+    string TeamName,
+    string? OwnerName,
+    IReadOnlyList<TeamRosterPlayerDto> Jogadores);
+
+public record TeamRosterPlayerDto(
+    int PlayerId,
+    string Nome,
+    string Posicao,
+    int Overall,
+    int? Idade,
+    DateTime? EscolhidoEm,
+    int? Rodada,
+    int? Escolha);
+
+public record TeamExportDto(
+    string Time,
+    string? Responsavel,
+    int TotalJogadores);

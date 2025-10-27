@@ -1,0 +1,102 @@
+@page "/teams/roster"
+@using System.Linq
+@using Fc25Draft.Core.DTOs
+@inject TeamsApiClient TeamsApiClient
+
+<h3>Elencos das Equipes</h3>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Carregando elencos...</em></p>
+}
+else if (teams.Count == 0)
+{
+    <p>Nenhuma equipe encontrada.</p>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var team in teams)
+        {
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">@team.TeamName</h5>
+                        <small class="text-muted">Responsável: @(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</small>
+                    </div>
+                    <div class="card-body">
+                        @if (team.Jogadores.Count == 0)
+                        {
+                            <p class="mb-0">Nenhum jogador vinculado.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Jogador</th>
+                                            <th>Posição</th>
+                                            <th>Overall</th>
+                                            <th>Rodada</th>
+                                            <th>Escolha</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var player in team.Jogadores.OrderBy(j => j.Rodada).ThenBy(j => j.Escolha))
+                                        {
+                                            <tr>
+                                                <td>@player.Nome</td>
+                                                <td>@player.Posicao</td>
+                                                <td>@player.Overall</td>
+                                                <td>@(player.Rodada?.ToString() ?? "-")</td>
+                                                <td>@(player.Escolha?.ToString() ?? "-")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private readonly List<TeamRosterDto> teams = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRostersAsync();
+    }
+
+    private async Task LoadRostersAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        teams.Clear();
+
+        try
+        {
+            var result = await TeamsApiClient.GetRostersAsync();
+            teams.AddRange(result);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

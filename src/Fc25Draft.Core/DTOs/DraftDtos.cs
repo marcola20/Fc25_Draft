@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Fc25Draft.Core.DTOs;
 
 public record DraftStateDto(
@@ -50,3 +53,47 @@ public record AvailablePlayerDto(
 public record DraftPickRequestDto(int PlayerId, string Token);
 
 public record GenerateDraftRequestDto(int TotalRounds, bool Snake = false);
+
+public record DraftPickResultDto(
+    DraftStateDto State,
+    DraftPickSelectionDto? Selection);
+
+public record DraftPickSelectionDto(
+    Guid DraftId,
+    int Round,
+    int PickInRound,
+    int OverallPick,
+    Guid TeamId,
+    string TeamName,
+    string? TeamOwner,
+    int PlayerId,
+    string PlayerName,
+    short PositionId,
+    string PositionName,
+    string Mensagem,
+    string ShareUrl,
+    string? NextTeamName,
+    string? WhatsappGroupLink);
+
+public record DraftBoardEntryDto(
+    Guid DraftId,
+    int Round,
+    int PickInRound,
+    int OverallPick,
+    Guid TeamId,
+    string TeamName,
+    string? TeamOwner,
+    int? PlayerId,
+    string? PlayerName,
+    short? PositionId,
+    string? PositionName,
+    DateTime? PickedAtUtc);
+
+public record DraftBoardExportDto(
+    int Rodada,
+    int Escolha,
+    string Time,
+    string? Responsavel,
+    string Jogador,
+    string Posicao,
+    string DataHoraUtc);

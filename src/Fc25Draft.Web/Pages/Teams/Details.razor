@@ -1,6 +1,10 @@
 @page "/teams/details/{Id:guid}"
-@inject ITeamService TeamService
+@using Fc25Draft.Core.DTOs
+@inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>Detalhes do Time</h3>
 
@@ -26,18 +30,25 @@ else
         <dt class="col-sm-3">Responsável</dt>
         <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
 
-        <dt class="col-sm-3">Token da Equipe</dt>
-        <dd class="col-sm-9"><code>@team.TeamToken</code></dd>
+        <dt class="col-sm-3">Jogadores</dt>
+        <dd class="col-sm-9">@team.Jogadores</dd>
+
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <dt class="col-sm-3">Token do Time</dt>
+            <dd class="col-sm-9"><code>@team.TeamToken</code></dd>
+        }
     </dl>
 
     <div class="d-flex gap-2">
-        <button class="btn btn-primary"
-                @onclick="@(() => Navigation.NavigateTo($"/teams/edit/{team!.TeamId}"))">
-            Editar
-        </button>
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")">
+                Editar
+            </button>
+        }
 
-        <button class="btn btn-secondary"
-                @onclick="@(() => Navigation.NavigateTo("/teams"))">
+        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/teams")">
             Voltar
         </button>
     </div>
@@ -47,15 +58,41 @@ else
     [Parameter]
     public Guid Id { get; set; }
 
-    private Team? team;
+    private TeamDetailsDto? team;
     private string? errorMessage;
     private bool isLoading = true;
+    private bool authInitialized;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadTeamAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+    }
+
+    private async Task LoadTeamAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
         try
         {
-            team = await TeamService.GetAsync(Id);
+            team = await TeamsApiClient.GetByIdAsync(Id);
             if (team is null)
             {
                 errorMessage = "Time não encontrado.";
@@ -69,5 +106,20 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 }

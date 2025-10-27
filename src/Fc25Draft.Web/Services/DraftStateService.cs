@@ -1,9 +1,12 @@
+using System;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Hubs;
+using Fc25Draft.Web.Security;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Web.Services;
 
@@ -12,15 +15,18 @@ public class DraftStateService
     private readonly DraftDbContext _db;
     private readonly IHubContext<DraftHub> _hubContext;
     private readonly ILogger<DraftStateService> _logger;
+    private readonly SecurityOptions _securityOptions;
 
     public DraftStateService(
         DraftDbContext db,
         IHubContext<DraftHub> hubContext,
-        ILogger<DraftStateService> logger)
+        ILogger<DraftStateService> logger,
+        IOptions<SecurityOptions> securityOptions)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
+        _securityOptions = securityOptions.Value;
     }
 
     public async Task<DraftStateDto> GetStateAsync(CancellationToken ct = default)
@@ -126,7 +132,7 @@ public class DraftStateService
         return players;
     }
 
-    public async Task<DraftStateDto> MakePickAsync(int playerId, string token, CancellationToken ct = default)
+    public async Task<DraftPickResultDto> MakePickAsync(int playerId, string token, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -157,6 +163,7 @@ public class DraftStateService
             }
 
             var player = await _db.Players
+                .Include(p => p.Position)
                 .FirstOrDefaultAsync(p => p.PlayerId == playerId, ct)
                 ?? throw new InvalidOperationException("Jogador não encontrado.");
 
@@ -186,6 +193,8 @@ public class DraftStateService
 
             var state = await GetStateAsync(ct);
 
+            var selection = BuildSelectionInfo(currentPick, player, state);
+
             try
             {
                 await _hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
@@ -195,7 +204,49 @@ public class DraftStateService
                 _logger.LogError(ex, "Falha ao enviar notificação de atualização do draft.");
             }
 
-            return state;
+            return new DraftPickResultDto(state, selection);
         });
+    }
+
+    private DraftPickSelectionDto BuildSelectionInfo(DraftPick pick, Player player, DraftStateDto state)
+    {
+        var nextTeamName = state.DraftCompleted
+            ? "Draft concluído"
+            : string.IsNullOrWhiteSpace(state.CurrentTeamName)
+                ? "A definir"
+                : state.CurrentTeamName!;
+
+        var message = BuildWhatsappMessage(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
+        var shareUrl = BuildWhatsappUrl(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
+
+        var groupLink = string.IsNullOrWhiteSpace(_securityOptions.WhatsappGroupLink)
+            ? null
+            : _securityOptions.WhatsappGroupLink;
+
+        return new DraftPickSelectionDto(
+            pick.DraftId,
+            pick.RoundNumber,
+            pick.PickInRound,
+            pick.OverallPick,
+            pick.TeamId,
+            pick.Team.TeamName,
+            pick.Team.OwnerName,
+            player.PlayerId,
+            player.Name,
+            player.PositionId,
+            player.Position.Name,
+            message,
+            shareUrl,
+            nextTeamName,
+            groupLink);
+    }
+
+    private static string BuildWhatsappMessage(string team, string player, int pick, int round, string nextTeam)
+        => $"O time {team} escolheu {player} com a escolha {pick} da rodada {round}! Próximo a escolher: {nextTeam}.";
+
+    public static string BuildWhatsappUrl(string team, string player, int pick, int round, string nextTeam)
+    {
+        var message = BuildWhatsappMessage(team, player, pick, round, nextTeam);
+        return $"https://wa.me/?text={Uri.EscapeDataString(message)}";
     }
 }
