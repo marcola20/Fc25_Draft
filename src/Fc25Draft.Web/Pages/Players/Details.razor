@@ -1,6 +1,10 @@
 @page "/players/details/{Id:int}"
-@inject IPlayerService PlayerService
+@using Fc25Draft.Core.DTOs
+@inject PlayersApiClient PlayersApiClient
 @inject NavigationManager Navigation
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>Detalhes do Jogador</h3>
 
@@ -20,27 +24,34 @@ else if (player is null)
 else
 {
     <dl class="row">
-        <dt class="col-sm-2">Nome</dt>
-        <dd class="col-sm-10">@player.Name</dd>
+        <dt class="col-sm-3">Nome</dt>
+        <dd class="col-sm-9">@player.Name</dd>
 
-        <dt class="col-sm-2">Overall</dt>
-        <dd class="col-sm-10">@player.Overall</dd>
+        <dt class="col-sm-3">Overall</dt>
+        <dd class="col-sm-9">@player.Overall</dd>
 
-        <dt class="col-sm-2">Idade</dt>
-        <dd class="col-sm-10">@(player.Age?.ToString() ?? "-")</dd>
+        <dt class="col-sm-3">Idade</dt>
+        <dd class="col-sm-9">@(player.Age?.ToString() ?? "-")</dd>
 
-        <dt class="col-sm-2">Posição</dt>
-        <dd class="col-sm-10">@player.Position?.Name</dd>
+        <dt class="col-sm-3">Posição</dt>
+        <dd class="col-sm-9">@player.PositionName</dd>
+
+        <dt class="col-sm-3">Status</dt>
+        <dd class="col-sm-9">@player.Status</dd>
+
+        <dt class="col-sm-3">Time</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(player.TeamName) ? "-" : player.TeamName)</dd>
     </dl>
 
     <div class="d-flex gap-2">
-        <button class="btn btn-primary"
-                @onclick="@(() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}"))">
-            Editar
-        </button>
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")">
+                Editar
+            </button>
+        }
 
-        <button class="btn btn-secondary"
-                @onclick="@(() => Navigation.NavigateTo("/players"))">
+        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/players")">
             Voltar
         </button>
     </div>
@@ -50,15 +61,41 @@ else
     [Parameter]
     public int Id { get; set; }
 
-    private Player? player;
+    private PlayerDetailsDto? player;
     private string? errorMessage;
     private bool isLoading = true;
+    private bool authInitialized;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPlayerAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+    }
+
+    private async Task LoadPlayerAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
         try
         {
-            player = await PlayerService.GetAsync(Id);
+            player = await PlayersApiClient.GetByIdAsync(Id);
             if (player is null)
             {
                 errorMessage = "Jogador não encontrado.";
@@ -72,5 +109,20 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 }

@@ -1,13 +1,19 @@
 @page "/players"
-@inject IPlayerService PlayerService
+@using System
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@inject PlayersApiClient PlayersApiClient
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>Jogadores</h3>
 
 <div class="row mb-3 g-2 align-items-end">
-    <div class="col-md-5">
+    <div class="col-md-4">
         <label class="form-label" for="playerSearch">Pesquisar</label>
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
             <input id="playerSearch" class="form-control me-2" placeholder="Procurar por nome" @bind="search" />
@@ -24,8 +30,22 @@
             }
         </select>
     </div>
-    <div class="col-md-4 text-end">
-        <button class="btn btn-success" @onclick="CreatePlayer">Adicionar Jogador</button>
+    <div class="col-md-2 pt-4">
+        <div class="form-check">
+            <input id="onlyAvailableCheck" class="form-check-input" type="checkbox" checked="@onlyAvailable" @onchange="OnOnlyAvailableChanged" />
+            <label class="form-check-label" for="onlyAvailableCheck">Somente disponíveis</label>
+        </div>
+    </div>
+    <div class="col-md-3 text-md-end">
+        <div class="btn-group" role="group" aria-label="Exportações">
+            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("csv"))">Baixar CSV</button>
+            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("json"))">Baixar JSON</button>
+            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("xlsx"))">Baixar Excel</button>
+        </div>
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <button class="btn btn-success ms-2" @onclick="CreatePlayer">Novo Jogador</button>
+        }
     </div>
 </div>
 
@@ -52,6 +72,8 @@ else
                     <th>Posição</th>
                     <th>Overall</th>
                     <th>Idade</th>
+                    <th>Status</th>
+                    <th>Time</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -60,13 +82,18 @@ else
                 {
                     <tr>
                         <td>@player.Name</td>
-                        <td>@player.Position?.Name</td>
+                        <td>@player.PositionName</td>
                         <td>@player.Overall</td>
                         <td>@(player.Age?.ToString() ?? "-")</td>
+                        <td>@player.Status</td>
+                        <td>@(string.IsNullOrWhiteSpace(player.TeamName) ? "-" : player.TeamName)</td>
                         <td class="text-end">
                             <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Detalhes</button>
-                            <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Editar</button>
-                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Excluir</button>
+                            @if (AdminAuth.IsAuthenticated)
+                            {
+                                <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Editar</button>
+                                <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Excluir</button>
+                            }
                         </td>
                     </tr>
                 }
@@ -94,7 +121,7 @@ else
 
 @code {
     private const int PageSize = 10;
-    private readonly List<Player> players = new();
+    private readonly List<PlayerListItemDto> players = new();
     private readonly List<Position> positions = new();
     private int currentPage = 1;
     private int totalPages = 1;
@@ -102,11 +129,30 @@ else
     private string? errorMessage;
     private bool isLoading = true;
     private string? selectedPositionId;
+    private bool onlyAvailable;
+    private bool authInitialized;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadPositionsAsync();
         await LoadPlayersAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
     }
 
     private async Task LoadPositionsAsync()
@@ -136,6 +182,24 @@ else
         await LoadPlayersAsync();
     }
 
+    private async Task OnOnlyAvailableChanged(ChangeEventArgs args)
+    {
+        if (args.Value is bool boolean)
+        {
+            onlyAvailable = boolean;
+        }
+        else if (bool.TryParse(args.Value?.ToString(), out var parsed))
+        {
+            onlyAvailable = parsed;
+        }
+        else
+        {
+            onlyAvailable = false;
+        }
+        currentPage = 1;
+        await LoadPlayersAsync();
+    }
+
     private async Task LoadPlayersAsync()
     {
         isLoading = true;
@@ -150,9 +214,9 @@ else
                 positionId = parsed;
             }
 
-            var (items, total) = await PlayerService.SearchAsync(search, positionId, currentPage, PageSize);
-            players.AddRange(items);
-            totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+            var result = await PlayersApiClient.GetAsync(search, positionId, onlyAvailable, currentPage, PageSize);
+            players.AddRange(result.Items);
+            totalPages = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
             if (currentPage > totalPages)
             {
                 currentPage = totalPages;
@@ -170,25 +234,49 @@ else
         }
     }
 
-    private Task ChangePage(int page)
+    private async Task ChangePage(int page)
     {
         if (page < 1 || page == currentPage || page > totalPages)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         currentPage = page;
-        return LoadPlayersAsync();
+        await LoadPlayersAsync();
     }
 
-    private void CreatePlayer() => Navigation.NavigateTo("/players/edit");
+    private void CreatePlayer()
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para adicionar jogadores.";
+            return;
+        }
 
-    private void EditPlayer(int id) => Navigation.NavigateTo($"/players/edit/{id}");
+        Navigation.NavigateTo("/players/edit");
+    }
+
+    private void EditPlayer(int id)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para editar jogadores.";
+            return;
+        }
+
+        Navigation.NavigateTo($"/players/edit/{id}");
+    }
 
     private void ViewDetails(int id) => Navigation.NavigateTo($"/players/details/{id}");
 
     private async Task ConfirmDelete(int id)
     {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para excluir jogadores.";
+            return;
+        }
+
         if (!await JSRuntime.InvokeAsync<bool>("confirm", "Tem certeza de que deseja excluir este jogador?"))
         {
             return;
@@ -196,12 +284,40 @@ else
 
         try
         {
-            await PlayerService.DeleteAsync(id);
+            await PlayersApiClient.DeleteAsync(id);
             await LoadPlayersAsync();
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
         }
+    }
+
+    private void DownloadExport(string format)
+    {
+        var path = format switch
+        {
+            "csv" => "api/players/export/csv",
+            "json" => "api/players/export/json",
+            "xlsx" => "api/players/export/xlsx",
+            _ => "api/players/export/csv"
+        };
+
+        Navigation.NavigateTo(path, forceLoad: true);
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 }

@@ -79,7 +79,7 @@ public class PlayerService : IPlayerService
         Validate(dto);
 
         var entity = await _db.Players.FirstOrDefaultAsync(p => p.PlayerId == id)
-                     ?? throw new KeyNotFoundException("Player not found.");
+                     ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
         await EnsurePositionExists(dto.PositionId);
 
@@ -94,7 +94,7 @@ public class PlayerService : IPlayerService
     public async Task DeleteAsync(int id)
     {
         var entity = await _db.Players.FirstOrDefaultAsync(p => p.PlayerId == id)
-                     ?? throw new KeyNotFoundException("Player not found.");
+                     ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
         _db.Players.Remove(entity);
         await _db.SaveChangesAsync();
@@ -114,28 +114,28 @@ public class PlayerService : IPlayerService
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new ArgumentException("Player name is required.", nameof(name));
+            throw new ArgumentException("O nome do jogador é obrigatório.", nameof(name));
         }
 
         var trimmed = name.Trim();
         if (trimmed.Length is < 2 or > 80)
         {
-            throw new ArgumentException("Player name must be between 2 and 80 characters.", nameof(name));
+            throw new ArgumentException("O nome do jogador deve ter entre 2 e 80 caracteres.", nameof(name));
         }
 
         if (overall is < 0 or > 99)
         {
-            throw new ArgumentException("Overall must be between 0 and 99.", nameof(overall));
+            throw new ArgumentException("O overall deve estar entre 0 e 99.", nameof(overall));
         }
 
         if (age is < 14 or > 55)
         {
-            throw new ArgumentException("Age must be between 14 and 55 when specified.", nameof(age));
+            throw new ArgumentException("A idade deve estar entre 14 e 55 anos quando informada.", nameof(age));
         }
 
         if (positionId <= 0)
         {
-            throw new ArgumentException("Position is required.", nameof(positionId));
+            throw new ArgumentException("A posição é obrigatória.", nameof(positionId));
         }
     }
 
@@ -144,7 +144,7 @@ public class PlayerService : IPlayerService
         var exists = await _db.Positions.AnyAsync(p => p.PositionId == positionId);
         if (!exists)
         {
-            throw new InvalidOperationException("Invalid position.");
+            throw new InvalidOperationException("Posição inválida.");
         }
     }
 }

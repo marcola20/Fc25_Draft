@@ -1,19 +1,31 @@
 @page "/teams"
-@inject ITeamService TeamService
+@using System
+@using Fc25Draft.Core.DTOs
+@inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>Equipes</h3>
 
-<div class="row mb-3">
+<div class="row mb-3 g-2 align-items-end">
     <div class="col-md-6">
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
             <input class="form-control me-2" placeholder="Pesquisar por equipe ou responsável" @bind="search" />
             <button type="submit" class="btn btn-primary">Buscar</button>
         </form>
     </div>
-    <div class="col-md-6 text-end">
-        <button class="btn btn-success" @onclick="CreateTeam">Nova Equipe</button>
+    <div class="col-md-6 text-md-end">
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-secondary" @onclick="DownloadTeamsJson">Baixar JSON</button>
+            <button class="btn btn-outline-secondary" @onclick="NavigateToRosters">Ver Elencos</button>
+        </div>
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <button class="btn btn-success ms-2" @onclick="CreateTeam">Nova Equipe</button>
+        }
     </div>
 </div>
 
@@ -38,6 +50,7 @@ else
                 <tr>
                     <th>Equipe</th>
                     <th>Responsável</th>
+                    <th>Jogadores</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -47,10 +60,14 @@ else
                     <tr>
                         <td>@team.TeamName</td>
                         <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
+                        <td>@team.Jogadores</td>
                         <td class="text-end">
                             <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Detalhes</button>
-                            <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Editar</button>
-                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Excluir</button>
+                            @if (AdminAuth.IsAuthenticated)
+                            {
+                                <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Editar</button>
+                                <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Excluir</button>
+                            }
                         </td>
                     </tr>
                 }
@@ -78,16 +95,34 @@ else
 
 @code {
     private const int PageSize = 10;
-    private readonly List<Team> teams = new();
+    private readonly List<TeamListItemDto> teams = new();
     private int currentPage = 1;
     private int totalPages = 1;
     private string? search;
     private string? errorMessage;
     private bool isLoading;
+    private bool authInitialized;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadTeamsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
     }
 
     private async Task OnSearchAsync()
@@ -104,9 +139,9 @@ else
 
         try
         {
-            var (items, total) = await TeamService.SearchAsync(search, currentPage, PageSize);
-            teams.AddRange(items);
-            totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+            var result = await TeamsApiClient.GetAsync(search, currentPage, PageSize);
+            teams.AddRange(result.Items);
+            totalPages = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
             if (currentPage > totalPages)
             {
                 currentPage = totalPages;
@@ -124,33 +159,57 @@ else
         }
     }
 
-    private Task ChangePage(int page)
+    private async Task ChangePage(int page)
     {
         if (page < 1 || page == currentPage || page > totalPages)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         currentPage = page;
-        return LoadTeamsAsync();
+        await LoadTeamsAsync();
     }
 
-    private void CreateTeam() => Navigation.NavigateTo("/teams/edit");
+    private void CreateTeam()
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para adicionar equipes.";
+            return;
+        }
 
-    private void EditTeam(Guid id) => Navigation.NavigateTo($"/teams/edit/{id}");
+        Navigation.NavigateTo("/teams/edit");
+    }
+
+    private void EditTeam(Guid id)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para editar equipes.";
+            return;
+        }
+
+        Navigation.NavigateTo($"/teams/edit/{id}");
+    }
 
     private void ViewDetails(Guid id) => Navigation.NavigateTo($"/teams/details/{id}");
 
     private async Task ConfirmDelete(Guid id)
     {
-        if (!await JSRuntimeConfirm("Tem certeza de que deseja excluir esta equipe?"))
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para excluir equipes.";
+            return;
+        }
+
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Tem certeza de que deseja excluir esta equipe?"))
         {
             return;
         }
 
         try
         {
-            await TeamService.DeleteAsync(id);
+            await TeamsApiClient.DeleteAsync(id);
             await LoadTeamsAsync();
         }
         catch (Exception ex)
@@ -159,8 +218,22 @@ else
         }
     }
 
-    private async Task<bool> JSRuntimeConfirm(string message)
+    private void DownloadTeamsJson() => Navigation.NavigateTo("api/teams/export/json", forceLoad: true);
+
+    private void NavigateToRosters() => Navigation.NavigateTo("/teams/roster");
+
+    private void OnAuthenticationChanged()
     {
-        return await JSRuntime.InvokeAsync<bool>("confirm", message);
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 }

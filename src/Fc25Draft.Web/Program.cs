@@ -1,10 +1,17 @@
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
+using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,12 +26,33 @@ builder.Services.AddDbContext<DraftDbContext>(opt =>
        .EnableDetailedErrors(builder.Environment.IsDevelopment())
 );
 
+builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
+
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = AdminTokenAuthenticationHandler.SchemeName;
+        options.DefaultChallengeScheme = AdminTokenAuthenticationHandler.SchemeName;
+    })
+    .AddScheme<AuthenticationSchemeOptions, AdminTokenAuthenticationHandler>(
+        AdminTokenAuthenticationHandler.SchemeName,
+        _ => { });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<DraftService>();
 builder.Services.AddScoped<DraftStateService>();
+builder.Services.AddScoped<AdminAuthService>();
+builder.Services.AddScoped<ApiClientFactory>();
+builder.Services.AddScoped<PlayersApiClient>();
+builder.Services.AddScoped<TeamsApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
@@ -43,73 +71,553 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapHub<DraftHub>("/hubs/draft");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
-app.MapPost("/api/draft/reset", async (DraftService draftService, CancellationToken ct) =>
-{
-    await draftService.ResetDraftAsync(ct);
-    return Results.NoContent();
-});
+var api = app.MapGroup("/api");
 
-var draftApi = app.MapGroup("/api/draft");
-
-draftApi.MapGet("/state", async (DraftStateService draftStateService, CancellationToken ct) =>
-{
-    var state = await draftStateService.GetStateAsync(ct);
-    return Results.Ok(state);
-});
-
-draftApi.MapPost("/pick", async (DraftStateService draftStateService, DraftPickRequestDto request, CancellationToken ct) =>
-{
-    try
-    {
-        var state = await draftStateService.MakePickAsync(request.PlayerId, request.Token, ct);
-        return Results.Ok(state);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.BadRequest(new { message = ex.Message });
-    }
-    catch (InvalidOperationException ex)
-    {
-        return Results.BadRequest(new { message = ex.Message });
-    }
-});
-
-draftApi.MapPost("/generate", async (
-    DraftService draftService,
-    DraftStateService draftStateService,
-    IHubContext<DraftHub> hubContext,
-    GenerateDraftRequestDto request,
-    CancellationToken ct) =>
-{
-    if (request is null)
-    {
-        return Results.BadRequest(new { message = "Requisição inválida." });
-    }
-
-    if (request.TotalRounds is < 1 or > 50)
-    {
-        return Results.BadRequest(new { message = "O número de rodadas deve estar entre 1 e 50." });
-    }
-
-    try
-    {
-        await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, ct);
-        var state = await draftStateService.GetStateAsync(ct);
-        await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
-        return Results.Ok(state);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.BadRequest(new { message = ex.Message });
-    }
-    catch (InvalidOperationException ex)
-    {
-        return Results.BadRequest(new { message = ex.Message });
-    }
-});
+MapDraftEndpoints(api);
+MapPlayerEndpoints(api);
+MapTeamEndpoints(api);
 
 app.Run();
+
+static void MapDraftEndpoints(RouteGroupBuilder api)
+{
+    var draftApi = api.MapGroup("/draft");
+
+    draftApi.MapGet("/state", async (DraftStateService draftStateService, CancellationToken ct) =>
+    {
+        var state = await draftStateService.GetStateAsync(ct);
+        return Results.Ok(state);
+    });
+
+    draftApi.MapGet("/board", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var draft = await db.Drafts
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        if (draft is null)
+        {
+            return Results.Ok(Array.Empty<DraftBoardEntryDto>());
+        }
+
+        var board = await db.DraftPicks
+            .AsNoTracking()
+            .Where(p => p.DraftId == draft.DraftId)
+            .OrderBy(p => p.OverallPick)
+            .Select(p => new DraftBoardEntryDto(
+                p.DraftId,
+                p.RoundNumber,
+                p.PickInRound,
+                p.OverallPick,
+                p.TeamId,
+                p.Team.TeamName,
+                p.Team.OwnerName,
+                p.PlayerId,
+                p.Player != null ? p.Player.Name : null,
+                p.Player != null ? (short?)p.Player.PositionId : null,
+                p.Player != null ? p.Player.Position.Name : null,
+                p.PickedAtUtc))
+            .ToListAsync(ct);
+
+        return Results.Ok(board);
+    });
+
+    draftApi.MapPost("/pick", async (DraftStateService draftStateService, DraftPickRequestDto request, CancellationToken ct) =>
+    {
+        try
+        {
+            var result = await draftStateService.MakePickAsync(request.PlayerId, request.Token, ct);
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    draftApi.MapGet("/export/board", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var draft = await db.Drafts
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        if (draft is null)
+        {
+            var emptyCsv = BuildDraftBoardCsv(Array.Empty<DraftBoardExportDto>());
+            return Results.File(Encoding.UTF8.GetBytes(emptyCsv), "text/csv", "draft-board.csv");
+        }
+
+        var board = await db.DraftPicks
+            .AsNoTracking()
+            .Where(p => p.DraftId == draft.DraftId)
+            .OrderBy(p => p.OverallPick)
+            .Select(p => new DraftBoardExportDto(
+                p.RoundNumber,
+                p.PickInRound,
+                p.Team.TeamName,
+                p.Team.OwnerName,
+                p.Player != null ? p.Player.Name : string.Empty,
+                p.Player != null ? p.Player.Position.Name : string.Empty,
+                p.PickedAtUtc.HasValue ? p.PickedAtUtc.Value.ToString("u") : string.Empty))
+            .ToListAsync(ct);
+
+        var csv = BuildDraftBoardCsv(board);
+        var bytes = Encoding.UTF8.GetBytes(csv);
+        return Results.File(bytes, "text/csv", "draft-board.csv");
+    });
+
+    var adminDraftApi = api.MapGroup("/admin/draft").RequireAuthorization("AdminOnly");
+
+    adminDraftApi.MapPost("/reset", async (DraftService draftService, CancellationToken ct) =>
+    {
+        await draftService.ResetDraftAsync(ct);
+        return Results.NoContent();
+    });
+
+    adminDraftApi.MapPost("/generate", async (
+        DraftService draftService,
+        DraftStateService draftStateService,
+        IHubContext<DraftHub> hubContext,
+        GenerateDraftRequestDto request,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Requisição inválida." });
+        }
+
+        if (request.TotalRounds is < 1 or > 50)
+        {
+            return Results.BadRequest(new { message = "O número de rodadas deve estar entre 1 e 50." });
+        }
+
+        try
+        {
+            await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, ct);
+            var state = await draftStateService.GetStateAsync(ct);
+            await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+            return Results.Ok(state);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+}
+
+static void MapPlayerEndpoints(RouteGroupBuilder api)
+{
+    var playersApi = api.MapGroup("/players");
+
+    playersApi.MapGet(string.Empty, async (
+        DraftDbContext db,
+        string? q,
+        short? pos,
+        bool? onlyAvailable,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default) =>
+    {
+        var currentPage = Math.Max(1, page);
+        var currentPageSize = pageSize <= 0 ? 10 : pageSize;
+
+        var query = db.Players
+            .AsNoTracking()
+            .Where(p => true);
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = $"%{q.Trim()}%";
+            query = query.Where(p => EF.Functions.Like(p.Name, pattern));
+        }
+
+        if (pos.HasValue)
+        {
+            query = query.Where(p => p.PositionId == pos.Value);
+        }
+
+        if (onlyAvailable is true)
+        {
+            query = query.Where(p => !p.TeamRosters.Any());
+        }
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(p => p.Overall)
+            .ThenBy(p => p.Name)
+            .Skip((currentPage - 1) * currentPageSize)
+            .Take(currentPageSize)
+            .Select(p => new PlayerListItemDto(
+                p.PlayerId,
+                p.Name,
+                p.PositionId,
+                p.Position.Name,
+                p.Overall,
+                p.Age,
+                p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+                p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
+            .ToListAsync(ct);
+
+        return Results.Ok(new PagedResult<PlayerListItemDto>(items, total));
+    });
+
+    playersApi.MapGet("/{id:int}", async (DraftDbContext db, int id, CancellationToken ct = default) =>
+    {
+        var player = await db.Players
+            .AsNoTracking()
+            .Where(p => p.PlayerId == id)
+            .Select(p => new PlayerDetailsDto(
+                p.PlayerId,
+                p.Name,
+                p.PositionId,
+                p.Position.Name,
+                p.Overall,
+                p.Age,
+                p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+                p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
+                p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault()))
+            .FirstOrDefaultAsync(ct);
+
+        return player is null ? Results.NotFound() : Results.Ok(player);
+    });
+
+    playersApi.MapGet("/export/csv", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var players = await LoadPlayerExportAsync(db, ct);
+        var csv = BuildPlayerCsv(players);
+        return Results.File(Encoding.UTF8.GetBytes(csv), "text/csv", "jogadores.csv");
+    });
+
+    playersApi.MapGet("/export/json", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var players = await LoadPlayerExportAsync(db, ct);
+        var json = JsonSerializer.Serialize(players, new JsonSerializerOptions { WriteIndented = true });
+        return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "jogadores.json");
+    });
+
+    playersApi.MapGet("/export/xlsx", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var players = await LoadPlayerExportAsync(db, ct);
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Jogadores");
+        worksheet.Cell(1, 1).Value = "Nome";
+        worksheet.Cell(1, 2).Value = "Posição";
+        worksheet.Cell(1, 3).Value = "Overall";
+        worksheet.Cell(1, 4).Value = "Status";
+        worksheet.Cell(1, 5).Value = "Time";
+
+        for (var i = 0; i < players.Count; i++)
+        {
+            var row = i + 2;
+            var player = players[i];
+            worksheet.Cell(row, 1).Value = player.Nome;
+            worksheet.Cell(row, 2).Value = player.Posicao;
+            worksheet.Cell(row, 3).Value = player.Overall;
+            worksheet.Cell(row, 4).Value = player.Status;
+            worksheet.Cell(row, 5).Value = player.Time ?? string.Empty;
+        }
+
+        worksheet.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        var bytes = stream.ToArray();
+        return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "jogadores.xlsx");
+    });
+
+    var adminPlayersApi = api.MapGroup("/admin/players").RequireAuthorization("AdminOnly");
+
+    adminPlayersApi.MapPost(string.Empty, async (IPlayerService playerService, PlayerCreateDto dto) =>
+    {
+        try
+        {
+            var id = await playerService.CreateAsync(dto);
+            return Results.Created($"/api/players/{id}", new { id });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminPlayersApi.MapPut("/{id:int}", async (IPlayerService playerService, int id, PlayerUpdateDto dto) =>
+    {
+        try
+        {
+            await playerService.UpdateAsync(id, dto);
+            return Results.NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+    });
+
+    adminPlayersApi.MapDelete("/{id:int}", async (IPlayerService playerService, int id) =>
+    {
+        try
+        {
+            await playerService.DeleteAsync(id);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+}
+
+static void MapTeamEndpoints(RouteGroupBuilder api)
+{
+    var teamsApi = api.MapGroup("/teams");
+
+    teamsApi.MapGet(string.Empty, async (
+        DraftDbContext db,
+        string? q,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default) =>
+    {
+        var currentPage = Math.Max(1, page);
+        var currentPageSize = pageSize <= 0 ? 10 : pageSize;
+
+        var query = db.Teams.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = $"%{q.Trim()}%";
+            query = query.Where(t => EF.Functions.Like(t.TeamName, pattern) ||
+                                     (t.OwnerName != null && EF.Functions.Like(t.OwnerName, pattern)));
+        }
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderBy(t => t.TeamName)
+            .Skip((currentPage - 1) * currentPageSize)
+            .Take(currentPageSize)
+            .Select(t => new TeamListItemDto(
+                t.TeamId,
+                t.TeamName,
+                t.OwnerName,
+                t.Roster.Count))
+            .ToListAsync(ct);
+
+        return Results.Ok(new PagedResult<TeamListItemDto>(items, total));
+    });
+
+    teamsApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, CancellationToken ct = default) =>
+    {
+        var team = await db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == id)
+            .Select(t => new TeamDetailsDto(
+                t.TeamId,
+                t.TeamName,
+                t.OwnerName,
+                t.TeamToken,
+                t.Roster.Count))
+            .FirstOrDefaultAsync(ct);
+
+        return team is null ? Results.NotFound() : Results.Ok(team);
+    });
+
+    teamsApi.MapGet("/roster", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var roster = await db.Teams
+            .AsNoTracking()
+            .OrderBy(t => t.TeamName)
+            .Select(t => new TeamRosterDto(
+                t.TeamId,
+                t.TeamName,
+                t.OwnerName,
+                t.Roster
+                    .OrderBy(r => r.Player.Name)
+                    .Select(r => new TeamRosterPlayerDto(
+                        r.PlayerId,
+                        r.Player.Name,
+                        r.Player.Position.Name,
+                        r.Player.Overall,
+                        r.Player.Age,
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => p.PickedAtUtc)
+                            .FirstOrDefault(),
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => (int?)p.RoundNumber)
+                            .FirstOrDefault(),
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => (int?)p.PickInRound)
+                            .FirstOrDefault()))
+                    .ToList()))
+            .ToListAsync(ct);
+
+        return Results.Ok(roster);
+    });
+
+    teamsApi.MapGet("/export/json", async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var roster = await db.Teams
+            .AsNoTracking()
+            .OrderBy(t => t.TeamName)
+            .Select(t => new
+            {
+                t.TeamName,
+                t.OwnerName,
+                Jogadores = t.Roster
+                    .OrderBy(r => r.Player.Name)
+                    .Select(r => new
+                    {
+                        r.Player.Name,
+                        Posicao = r.Player.Position.Name,
+                        r.Player.Overall,
+                        r.Player.Age
+                    })
+                    .ToList()
+            })
+            .ToListAsync(ct);
+
+        var json = JsonSerializer.Serialize(roster, new JsonSerializerOptions { WriteIndented = true });
+        return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "times.json");
+    });
+
+    var adminTeamsApi = api.MapGroup("/admin/teams").RequireAuthorization("AdminOnly");
+
+    adminTeamsApi.MapPost(string.Empty, async (ITeamService teamService, TeamCreateDto dto) =>
+    {
+        try
+        {
+            var id = await teamService.CreateAsync(dto);
+            return Results.Created($"/api/teams/{id}", new { id });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminTeamsApi.MapPut("/{id:guid}", async (ITeamService teamService, Guid id, TeamUpdateDto dto) =>
+    {
+        try
+        {
+            await teamService.UpdateAsync(id, dto);
+            return Results.NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+    });
+
+    adminTeamsApi.MapDelete("/{id:guid}", async (ITeamService teamService, Guid id) =>
+    {
+        try
+        {
+            await teamService.DeleteAsync(id);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+}
+
+static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
+{
+    return await db.Players
+        .AsNoTracking()
+        .OrderBy(p => p.Name)
+        .Select(p => new PlayerExportDto(
+            p.Name,
+            p.Position.Name,
+            p.Overall,
+            p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+            p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
+        .ToListAsync(ct);
+}
+
+static string BuildPlayerCsv(IReadOnlyList<PlayerExportDto> players)
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("Nome;Posição;Overall;Status;Time");
+    foreach (var player in players)
+    {
+        sb.AppendLine($"{Escape(player.Nome)};{Escape(player.Posicao)};{player.Overall};{Escape(player.Status)};{Escape(player.Time)}");
+    }
+
+    return sb.ToString();
+}
+
+static string BuildDraftBoardCsv(IReadOnlyList<DraftBoardExportDto> entries)
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("Rodada;Escolha;Time;Responsável;Jogador;Posição;Data/Hora (UTC)");
+    foreach (var entry in entries)
+    {
+        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{Escape(entry.DataHoraUtc)}");
+    }
+
+    return sb.ToString();
+}
+
+static string Escape(string? value)
+{
+    if (string.IsNullOrEmpty(value))
+    {
+        return string.Empty;
+    }
+
+    var sanitized = value.Replace("\"", "''");
+    return sanitized.Contains(';') ? $"\"{sanitized}\"" : sanitized;
+}

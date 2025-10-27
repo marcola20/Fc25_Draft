@@ -91,16 +91,13 @@ public class DraftService
             var rounds = new List<DraftRound>(totalRounds);
             var picks = new List<DraftPick>(totalRounds * teamOrder.Count);
 
+            var random = Random.Shared;
             var baseOrder = teamOrder.ToArray();
-            var reversedOrder = Array.Empty<Guid>();
-
-            if (snake)
+            Shuffle(baseOrder, random);
+            var reversedOrder = new Guid[baseOrder.Length];
+            for (var i = 0; i < baseOrder.Length; i++)
             {
-                reversedOrder = new Guid[baseOrder.Length];
-                for (var i = 0; i < baseOrder.Length; i++)
-                {
-                    reversedOrder[i] = baseOrder[baseOrder.Length - 1 - i];
-                }
+                reversedOrder[i] = baseOrder[baseOrder.Length - 1 - i];
             }
 
             for (var roundNumber = 1; roundNumber <= totalRounds; roundNumber++)
@@ -111,7 +108,16 @@ public class DraftService
                     RoundNumber = roundNumber
                 });
 
-                var orderForRound = (!snake || roundNumber % 2 != 0) ? baseOrder : reversedOrder;
+                Guid[] orderForRound;
+                if (snake)
+                {
+                    orderForRound = roundNumber % 2 != 0 ? baseOrder : reversedOrder;
+                }
+                else
+                {
+                    orderForRound = baseOrder.ToArray();
+                    Shuffle(orderForRound, random);
+                }
 
                 for (var pickIndex = 0; pickIndex < baseOrder.Length; pickIndex++)
                 {
@@ -208,6 +214,15 @@ public class DraftService
         }
 
         return reversed;
+    }
+
+    private static void Shuffle(Guid[] items, Random random)
+    {
+        for (var i = items.Length - 1; i > 0; i--)
+        {
+            var j = random.Next(i + 1);
+            (items[i], items[j]) = (items[j], items[i]);
+        }
     }
 }
 

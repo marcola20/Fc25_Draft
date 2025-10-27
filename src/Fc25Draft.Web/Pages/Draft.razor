@@ -1,10 +1,13 @@
 @page "/draft"
+@using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Services
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.JSInterop
 @inject DraftStateService DraftStateService
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
 @inject ILogger<Fc25Draft.Web.Pages.Draft> Logger
+@inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
 <h3>Draft</h3>
@@ -15,6 +18,16 @@
         @statusMessage
         <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => statusMessage = null"></button>
     </div>
+    @if (lastSelection is not null)
+    {
+        <div class="mb-3">
+            <button class="btn btn-success" @onclick="CompartilharWhatsappAsync">Compartilhar no WhatsApp</button>
+            @if (!string.IsNullOrEmpty(shareFeedback))
+            {
+                <span class="ms-2 text-muted">@shareFeedback</span>
+            }
+        </div>
+    }
 }
 
 @if (!string.IsNullOrEmpty(connectionError))
@@ -169,6 +182,8 @@ else
     private string tokenInput = string.Empty;
     private string? modalError;
     private bool isSubmittingPick;
+    private DraftPickSelectionDto? lastSelection;
+    private string? shareFeedback;
 
     private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
@@ -300,6 +315,8 @@ else
         tokenInput = string.Empty;
         modalError = null;
         isModalOpen = true;
+        shareFeedback = null;
+        lastSelection = null;
     }
 
     private void CloseModal()
@@ -323,8 +340,10 @@ else
         try
         {
             var result = await DraftStateService.MakePickAsync(selectedPlayer.PlayerId, tokenInput);
-            state = result;
-            statusMessage = "✅ Jogador selecionado com sucesso!";
+            state = result.State;
+            lastSelection = result.Selection;
+            shareFeedback = null;
+            statusMessage = result.Selection?.Mensagem ?? "✅ Jogador selecionado com sucesso!";
             statusCss = "alert-success";
             await LoadPlayersAsync();
             CloseModal();
@@ -332,15 +351,18 @@ else
         catch (InvalidOperationException ex)
         {
             modalError = ex.Message;
+            lastSelection = null;
         }
         catch (ArgumentException ex)
         {
             modalError = ex.Message;
+            lastSelection = null;
         }
         catch (Exception ex)
         {
             modalError = "Ocorreu um erro ao registrar a escolha.";
             Logger.LogError(ex, "Erro inesperado ao confirmar escolha do draft.");
+            lastSelection = null;
         }
         finally
         {
@@ -350,6 +372,36 @@ else
         if (!string.IsNullOrEmpty(modalError))
         {
             statusMessage = null;
+            lastSelection = null;
+        }
+    }
+
+    private async Task CompartilharWhatsappAsync()
+    {
+        if (lastSelection is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var opened = await JSRuntime.InvokeAsync<bool>("fc25Share.openWhatsapp", lastSelection.ShareUrl, lastSelection.WhatsappGroupLink, lastSelection.Mensagem);
+
+            if (opened)
+            {
+                shareFeedback = !string.IsNullOrEmpty(lastSelection.WhatsappGroupLink)
+                    ? "Mensagem copiada! Cole no WhatsApp para concluir o envio."
+                    : "Abrindo WhatsApp...";
+            }
+            else
+            {
+                shareFeedback = "Não foi possível abrir o WhatsApp automaticamente.";
+            }
+        }
+        catch (JSException ex)
+        {
+            shareFeedback = "Não foi possível abrir o WhatsApp automaticamente.";
+            Logger.LogError(ex, "Erro ao compartilhar no WhatsApp.");
         }
     }
 

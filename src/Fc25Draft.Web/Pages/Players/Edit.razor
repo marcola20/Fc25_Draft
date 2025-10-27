@@ -1,8 +1,13 @@
 @page "/players/edit"
 @page "/players/edit/{Id:int}"
-@inject IPlayerService PlayerService
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@inject PlayersApiClient PlayersApiClient
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>@Title</h3>
 
@@ -14,6 +19,11 @@
 @if (isLoading)
 {
     <p><em>Carregando...</em></p>
+}
+else if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">Apenas administradores podem cadastrar ou editar jogadores.</div>
+    <button class="btn btn-secondary" @onclick="Cancel">Voltar</button>
 }
 else
 {
@@ -68,8 +78,14 @@ else
     private string? errorMessage;
     private bool isLoading = true;
     private bool isSaving;
+    private bool authInitialized;
 
-    private string Title => Id.HasValue ? "Editar Jogador" : "Criar Jogador";
+    private string Title => Id.HasValue ? "Editar Jogador" : "Novo Jogador";
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -87,34 +103,56 @@ else
 
         if (Id.HasValue)
         {
-            try
-            {
-                var player = await PlayerService.GetAsync(Id.Value);
-                if (player is null)
-                {
-                    errorMessage = "Jogador não encontrado.";
-                }
-                else
-                {
-                    model.Name = player.Name;
-                    model.Age = player.Age;
-                    model.Overall = player.Overall;
-                    model.PositionId = player.PositionId;
-                }
-            }
-            catch (Exception ex)
-            {
-                errorMessage = ex.Message;
-            }
+            await LoadPlayerAsync(Id.Value);
         }
 
         isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+    }
+
+    private async Task LoadPlayerAsync(int id)
+    {
+        try
+        {
+            var details = await PlayersApiClient.GetByIdAsync(id);
+            if (details is null)
+            {
+                errorMessage = "Jogador não encontrado.";
+                return;
+            }
+
+            model.Name = details.Name;
+            model.Age = details.Age;
+            model.Overall = details.Overall;
+            model.PositionId = details.PositionId;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
     }
 
     private async Task HandleValidSubmit()
     {
         if (editContext is null)
         {
+            return;
+        }
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para salvar alterações.";
             return;
         }
 
@@ -125,11 +163,11 @@ else
         {
             if (Id.HasValue)
             {
-                await PlayerService.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+                await PlayersApiClient.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
             }
             else
             {
-                await PlayerService.CreateAsync(new PlayerCreateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+                await PlayersApiClient.CreateAsync(new PlayerCreateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
             }
 
             Navigation.NavigateTo("/players");
@@ -144,9 +182,21 @@ else
         }
     }
 
-    private void Cancel()
+    private void Cancel() => Navigation.NavigateTo("/players");
+
+    private void OnAuthenticationChanged()
     {
-        Navigation.NavigateTo("/players");
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 
     private sealed class PlayerFormModel

@@ -1,7 +1,11 @@
 @page "/teams/edit"
 @page "/teams/edit/{Id:guid}"
-@inject ITeamService TeamService
+@using Fc25Draft.Core.DTOs
+@inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
+@inject AdminAuthService AdminAuth
+
+@implements IDisposable
 
 <h3>@Title</h3>
 
@@ -13,6 +17,11 @@
 @if (isLoading)
 {
     <p><em>Carregando...</em></p>
+}
+else if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">Apenas administradores podem cadastrar ou editar equipes.</div>
+    <button class="btn btn-secondary" @onclick="Cancel">Voltar</button>
 }
 else
 {
@@ -48,8 +57,14 @@ else
     private string? errorMessage;
     private bool isSaving;
     private bool isLoading = true;
+    private bool authInitialized;
 
-    private string Title => Id.HasValue ? "Editar Time" : "Criar Time";
+    private string Title => Id.HasValue ? "Editar Time" : "Novo Time";
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,32 +72,54 @@ else
 
         if (Id.HasValue)
         {
-            try
-            {
-                var team = await TeamService.GetAsync(Id.Value);
-                if (team is null)
-                {
-                    errorMessage = "Time não encontrado.";
-                }
-                else
-                {
-                    model.TeamName = team.TeamName;
-                    model.OwnerName = team.OwnerName;
-                }
-            }
-            catch (Exception ex)
-            {
-                errorMessage = ex.Message;
-            }
+            await LoadTeamAsync(Id.Value);
         }
 
         isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+    }
+
+    private async Task LoadTeamAsync(Guid id)
+    {
+        try
+        {
+            var details = await TeamsApiClient.GetByIdAsync(id);
+            if (details is null)
+            {
+                errorMessage = "Time não encontrado.";
+                return;
+            }
+
+            model.TeamName = details.TeamName;
+            model.OwnerName = details.OwnerName;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
     }
 
     private async Task HandleValidSubmit()
     {
         if (editContext is null)
         {
+            return;
+        }
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para salvar alterações.";
             return;
         }
 
@@ -93,11 +130,11 @@ else
         {
             if (Id.HasValue)
             {
-                await TeamService.UpdateAsync(Id.Value, new TeamUpdateDto(model.TeamName!, model.OwnerName));
+                await TeamsApiClient.UpdateAsync(Id.Value, new TeamUpdateDto(model.TeamName!, model.OwnerName));
             }
             else
             {
-                await TeamService.CreateAsync(new TeamCreateDto(model.TeamName!, model.OwnerName));
+                await TeamsApiClient.CreateAsync(new TeamCreateDto(model.TeamName!, model.OwnerName));
             }
 
             Navigation.NavigateTo("/teams");
@@ -112,9 +149,21 @@ else
         }
     }
 
-    private void Cancel()
+    private void Cancel() => Navigation.NavigateTo("/teams");
+
+    private void OnAuthenticationChanged()
     {
-        Navigation.NavigateTo("/teams");
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 
     private sealed class TeamFormModel
