@@ -38,11 +38,6 @@
         </div>
     </div>
     <div class="col-md-3 text-md-end">
-        <div class="btn-group" role="group" aria-label="Exportações">
-            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("csv"))">Baixar CSV</button>
-            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("json"))">Baixar JSON</button>
-            <button class="btn btn-outline-secondary" @onclick="@(() => DownloadExport("xlsx"))">Baixar Excel</button>
-        </div>
         @if (AdminAuth.IsAuthenticated)
         {
             <div class="btn-group ms-2" role="group" aria-label="Ações administrativas">
@@ -65,16 +60,29 @@
 </div>
 
 <div class="row mb-3 g-2 align-items-end">
-    <div class="col-md-3 col-lg-2">
-        <label class="form-label" for="overallMin">Overall mínimo</label>
-        <InputNumber id="overallMin" class="form-control" @bind-Value="overallMin" min="0" max="150" />
+    <div class="col-auto">
+        <label class="form-label mb-1" for="overallMin">Overall mínimo</label>
+        <InputNumber id="overallMin"
+                     class="form-control"
+                     style="width: 140px; height: 38px; font-size: 0.95rem;"
+                     @bind-Value="overallMin"
+                     min="70" max="99" />
     </div>
-    <div class="col-md-3 col-lg-2">
-        <label class="form-label" for="overallMax">Overall máximo</label>
-        <InputNumber id="overallMax" class="form-control" @bind-Value="overallMax" min="0" max="150" />
+    <div class="col-auto">
+        <label class="form-label mb-1" for="overallMax">Overall máximo</label>
+        <InputNumber id="overallMax"
+                     class="form-control"
+                     style="width: 140px; height: 38px; font-size: 0.95rem;"
+                     @bind-Value="overallMax"
+                     min="70" max="99" />
     </div>
-    <div class="col-md-3 col-lg-2 pt-md-4">
-        <button type="button" class="btn btn-outline-primary w-100" @onclick="ApplyFiltersAsync">Aplicar filtros</button>
+    <div class="col-auto pt-md-4">
+        <button type="button"
+                class="btn btn-outline-primary"
+                style="height: 40px; padding: 0 18px; font-size: 0.95rem; font-weight: 500;"
+                @onclick="ApplyFiltersAsync">
+            Aplicar filtros
+        </button>
     </div>
 </div>
 

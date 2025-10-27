@@ -18,10 +18,6 @@
         </form>
     </div>
     <div class="col-md-6 text-md-end">
-        <div class="btn-group" role="group">
-            <button class="btn btn-outline-secondary" @onclick="DownloadTeamsJson">Baixar JSON</button>
-            <button class="btn btn-outline-secondary" @onclick="NavigateToRosters">Ver Elencos</button>
-        </div>
         @if (AdminAuth.IsAuthenticated)
         {
             <button class="btn btn-success ms-2" @onclick="CreateTeam">Nova Equipe</button>
