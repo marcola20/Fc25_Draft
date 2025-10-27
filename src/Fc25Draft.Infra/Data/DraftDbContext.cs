@@ -87,6 +87,9 @@ public class DraftDbContext : DbContext
             e.HasKey(x => new { x.DraftId, x.OverallPick });
             e.HasIndex(x => new { x.DraftId, x.RoundNumber, x.PickInRound }).IsUnique();
             e.HasIndex(x => new { x.DraftId, x.TeamId, x.RoundNumber });
+            e.HasIndex(x => x.PlayerId)
+             .IsUnique()
+             .HasFilter("[PlayerId] IS NOT NULL");
             e.HasOne(x => x.Draft)
              .WithMany(d => d.Picks)
              .HasForeignKey(x => x.DraftId)

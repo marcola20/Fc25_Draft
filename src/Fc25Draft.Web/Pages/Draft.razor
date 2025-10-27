@@ -1,0 +1,379 @@
+@page "/draft"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject DraftStateService DraftStateService
+@inject IPositionService PositionService
+@inject NavigationManager Navigation
+@inject ILogger<Fc25Draft.Web.Pages.Draft> Logger
+@implements IAsyncDisposable
+
+<h3>Draft</h3>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @statusCss alert-dismissible fade show" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => statusMessage = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(connectionError))
+{
+    <div class="alert alert-warning" role="alert">@connectionError</div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        @if (isLoadingState)
+        {
+            <p><em>Carregando estado do draft...</em></p>
+        }
+        else if (state is null || !state.HasDraft)
+        {
+            <p class="mb-0">Nenhum draft configurado no momento.</p>
+        }
+        else if (state.DraftCompleted)
+        {
+            <h4 class="mb-2">Draft concluído</h4>
+            <p class="mb-2">Todas as @state.TotalPicks escolhas foram finalizadas.</p>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-success" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-2">
+                <div>
+                    <h4 class="mb-1">Rodada @state.CurrentRound — Escolha @state.CurrentPickInRound</h4>
+                    <p class="mb-0 text-muted">Escolha geral @state.CurrentOverallPick de @state.TotalPicks.</p>
+                </div>
+                <div class="text-lg-end">
+                    <p class="mb-0">É a vez do time <strong>@state.CurrentTeamName</strong>@FormatOwner(state.CurrentTeamOwner).</p>
+                    @if (!string.IsNullOrEmpty(state.NextTeamName))
+                    {
+                        <small class="text-muted">Próximo: @state.NextTeamName@FormatOwner(state.NextTeamOwner).</small>
+                    }
+                </div>
+            </div>
+            <div class="progress mt-3" style="height: 8px;">
+                <div class="progress-bar" role="progressbar" style="width: @GetProgressWidth();" aria-valuenow="@GetProgressValue()" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="row g-3 align-items-end mb-3">
+    <div class="col-md-4">
+        <label for="positionFilter" class="form-label">Posição</label>
+        <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnPositionChanged">
+            <option value="">Todas</option>
+            @foreach (var position in positions)
+            {
+                <option value="@position.PositionId">@position.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label d-block">Atualizar</label>
+        <button class="btn btn-outline-primary" @onclick="LoadPlayersAsync" disabled="@isLoadingPlayers">Atualizar lista</button>
+    </div>
+</div>
+
+@if (isLoadingPlayers)
+{
+    <p><em>Carregando jogadores disponíveis...</em></p>
+}
+else if (availablePlayers.Count == 0)
+{
+    <p>Nenhum jogador disponível para seleção.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Jogador</th>
+                    <th>Posição</th>
+                    <th>Overall</th>
+                    <th>Idade</th>
+                    <th class="text-end">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var player in availablePlayers)
+                {
+                    <tr>
+                        <td>@player.Name</td>
+                        <td>@player.PositionName</td>
+                        <td>@player.Overall</td>
+                        <td>@(player.Age?.ToString() ?? "-")</td>
+                        <td class="text-end">
+                            <button class="btn btn-primary" @onclick="() => OpenModal(player)" disabled="@DisableSelection">Escolher</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (isModalOpen && selectedPlayer is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar escolha</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Confirme a escolha do jogador <strong>@selectedPlayer.Name</strong> (@selectedPlayer.PositionName, Overall @selectedPlayer.Overall).</p>
+                    <div class="mb-3">
+                        <label for="tokenInput" class="form-label">Token do time</label>
+                        <input id="tokenInput" type="password" class="form-control" @bind="tokenInput" autocomplete="one-time-code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(modalError))
+                    {
+                        <div class="alert alert-danger" role="alert">@modalError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSubmittingPick">Cancelar</button>
+                    <button class="btn btn-success" @onclick="ConfirmPickAsync" disabled="@isSubmittingPick">Confirmar escolha</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<Position> positions = new();
+    private readonly List<AvailablePlayerDto> availablePlayers = new();
+    private DraftStateDto? state;
+    private HubConnection? hubConnection;
+    private string? selectedPositionId;
+    private string? statusMessage;
+    private string statusCss = "alert-success";
+    private string? connectionError;
+    private string? errorMessage;
+    private bool isLoadingState = true;
+    private bool isLoadingPlayers = true;
+    private bool isModalOpen;
+    private AvailablePlayerDto? selectedPlayer;
+    private string tokenInput = string.Empty;
+    private string? modalError;
+    private bool isSubmittingPick;
+
+    private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPositionsAsync();
+        await RefreshAsync();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/draft"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On("DraftAtualizado", async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await RefreshAsync();
+                StateHasChanged();
+            });
+        });
+
+        hubConnection.Reconnected += async _ =>
+        {
+            await InvokeAsync(() =>
+            {
+                connectionError = null;
+                StateHasChanged();
+                return Task.CompletedTask;
+            });
+
+            return Task.CompletedTask;
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || hubConnection is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            connectionError = "Não foi possível conectar às atualizações automáticas do draft.";
+            Logger.LogError(ex, "Erro ao iniciar conexão com o hub de draft.");
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            positions.Clear();
+            var items = await PositionService.GetAllAsync();
+            positions.AddRange(items);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar posições.");
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        errorMessage = null;
+        await LoadStateAsync();
+        await LoadPlayersAsync();
+    }
+
+    private async Task LoadStateAsync()
+    {
+        isLoadingState = true;
+        try
+        {
+            state = await DraftStateService.GetStateAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar o estado do draft.");
+        }
+        finally
+        {
+            isLoadingState = false;
+        }
+    }
+
+    private async Task LoadPlayersAsync()
+    {
+        isLoadingPlayers = true;
+        try
+        {
+            availablePlayers.Clear();
+            short? positionId = null;
+            if (short.TryParse(selectedPositionId, out var parsed))
+            {
+                positionId = parsed;
+            }
+
+            var players = await DraftStateService.GetAvailablePlayersAsync(positionId);
+            availablePlayers.AddRange(players);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar jogadores disponíveis.");
+        }
+        finally
+        {
+            isLoadingPlayers = false;
+        }
+    }
+
+    private async Task OnPositionChanged(ChangeEventArgs args)
+    {
+        selectedPositionId = args.Value?.ToString();
+        await LoadPlayersAsync();
+    }
+
+    private void OpenModal(AvailablePlayerDto player)
+    {
+        selectedPlayer = player;
+        tokenInput = string.Empty;
+        modalError = null;
+        isModalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        isModalOpen = false;
+        selectedPlayer = null;
+        tokenInput = string.Empty;
+        modalError = null;
+    }
+
+    private async Task ConfirmPickAsync()
+    {
+        if (selectedPlayer is null)
+        {
+            return;
+        }
+
+        modalError = null;
+        isSubmittingPick = true;
+
+        try
+        {
+            var result = await DraftStateService.MakePickAsync(selectedPlayer.PlayerId, tokenInput);
+            state = result;
+            statusMessage = "✅ Jogador selecionado com sucesso!";
+            statusCss = "alert-success";
+            await LoadPlayersAsync();
+            CloseModal();
+        }
+        catch (InvalidOperationException ex)
+        {
+            modalError = ex.Message;
+        }
+        catch (ArgumentException ex)
+        {
+            modalError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            modalError = "Ocorreu um erro ao registrar a escolha.";
+            Logger.LogError(ex, "Erro inesperado ao confirmar escolha do draft.");
+        }
+        finally
+        {
+            isSubmittingPick = false;
+        }
+
+        if (!string.IsNullOrEmpty(modalError))
+        {
+            statusMessage = null;
+        }
+    }
+
+    private string FormatOwner(string? owner)
+        => string.IsNullOrWhiteSpace(owner) ? string.Empty : $" (responsável: {owner})";
+
+    private int GetProgressValue()
+    {
+        if (state is null || state.TotalPicks == 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Round((double)state.CompletedPicks * 100 / state.TotalPicks);
+    }
+
+    private string GetProgressWidth()
+        => state is null || state.TotalPicks == 0 ? "0%" : $"{GetProgressValue()}%";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
