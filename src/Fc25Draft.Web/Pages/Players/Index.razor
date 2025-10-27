@@ -44,7 +44,21 @@
         </div>
         @if (AdminAuth.IsAuthenticated)
         {
-            <button class="btn btn-success ms-2" @onclick="CreatePlayer">Novo Jogador</button>
+            <div class="btn-group ms-2" role="group" aria-label="Ações administrativas">
+                <button class="btn btn-success" @onclick="CreatePlayer">Novo Jogador</button>
+                <label class="btn btn-outline-success mb-0">
+                    @if (isImporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Importando...</span>
+                    }
+                    else
+                    {
+                        <span>Importar CSV</span>
+                    }
+                    <InputFile @key="importInputKey" OnChange="OnCsvSelected" accept=".csv" class="d-none" disabled="@isImporting" />
+                </label>
+            </div>
         }
     </div>
 </div>
@@ -52,6 +66,27 @@
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(importSuccessMessage))
+{
+    <div class="alert alert-success" role="status">@importSuccessMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(importErrorMessage))
+{
+    <div class="alert alert-warning" role="alert">
+        <p class="mb-1">@importErrorMessage</p>
+        @if (importErrors.Count > 0)
+        {
+            <ul class="mb-0">
+                @foreach (var detail in importErrors)
+                {
+                    <li>@detail</li>
+                }
+            </ul>
+        }
+    </div>
 }
 
 @if (isLoading)
@@ -131,6 +166,11 @@ else
     private string? selectedPositionId;
     private bool onlyAvailable;
     private bool authInitialized;
+    private bool isImporting;
+    private string importInputKey = Guid.NewGuid().ToString();
+    private string? importSuccessMessage;
+    private string? importErrorMessage;
+    private readonly List<string> importErrors = new();
 
     protected override void OnInitialized()
     {
@@ -198,6 +238,64 @@ else
         }
         currentPage = 1;
         await LoadPlayersAsync();
+    }
+
+    private async Task OnCsvSelected(InputFileChangeEventArgs args)
+    {
+        importSuccessMessage = null;
+        importErrorMessage = null;
+        importErrors.Clear();
+
+        var file = args.File;
+
+        if (file is null)
+        {
+            importInputKey = Guid.NewGuid().ToString();
+            return;
+        }
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            importErrorMessage = "Entre como administrador para importar jogadores.";
+            importInputKey = Guid.NewGuid().ToString();
+            return;
+        }
+
+        isImporting = true;
+
+        try
+        {
+            var result = await PlayersApiClient.ImportAsync(file);
+
+            if (result.Imported > 0)
+            {
+                importSuccessMessage = result.Imported == 1
+                    ? "1 jogador importado com sucesso."
+                    : $"{result.Imported} jogadores importados com sucesso.";
+            }
+            else
+            {
+                importSuccessMessage = "Nenhum jogador foi importado.";
+            }
+
+            if (result.Errors.Count > 0)
+            {
+                importErrorMessage = "Algumas linhas não puderam ser importadas:";
+                importErrors.AddRange(result.Errors);
+            }
+
+            await LoadPlayersAsync();
+        }
+        catch (Exception ex)
+        {
+            importErrorMessage = $"Falha ao importar jogadores: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+            importInputKey = Guid.NewGuid().ToString();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadPlayersAsync()

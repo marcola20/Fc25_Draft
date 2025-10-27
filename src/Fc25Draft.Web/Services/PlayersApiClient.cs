@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Fc25Draft.Core.DTOs;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace Fc25Draft.Web.Services;
@@ -89,6 +92,25 @@ public class PlayersApiClient
         var response = await client.DeleteAsync($"api/admin/players/{id}", ct);
         await EnsureSuccessAsync(response);
     }
+
+    public async Task<PlayerImportResultDto> ImportAsync(IBrowserFile file, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(file.OpenReadStream(MaxImportFileSize, ct));
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "text/csv" : file.ContentType;
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(streamContent, "file", file.Name);
+
+        var response = await client.PostAsync("api/admin/players/import", content, ct);
+        await EnsureSuccessAsync(response);
+
+        var result = await response.Content.ReadFromJsonAsync<PlayerImportResultDto>(cancellationToken: ct);
+        return result ?? new PlayerImportResultDto(0, Array.Empty<string>());
+    }
+
+    private const long MaxImportFileSize = 5 * 1024 * 1024;
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {

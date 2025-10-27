@@ -1,3 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
@@ -98,6 +106,126 @@ public class PlayerService : IPlayerService
 
         _db.Players.Remove(entity);
         await _db.SaveChangesAsync();
+    }
+
+    public async Task<PlayerImportResultDto> ImportCsvAsync(Stream csvStream, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(csvStream);
+
+        var errors = new List<string>();
+        var playersToInsert = new List<Player>();
+
+        await using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+
+        var knownPositions = await _db.Positions
+            .Select(p => p.PositionId)
+            .ToListAsync(ct);
+
+        var positionSet = knownPositions.ToHashSet();
+
+        var lineNumber = 0;
+
+        while (!reader.EndOfStream)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var line = await reader.ReadLineAsync();
+            if (line is null)
+            {
+                continue;
+            }
+
+            lineNumber++;
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var parts = line.Split(';');
+
+            if (parts.Length < 4)
+            {
+                errors.Add($"Linha {lineNumber}: formato inválido. Utilize \"Nome;Idade;Overall;PositionId\".");
+                continue;
+            }
+
+            for (var i = 0; i < parts.Length; i++)
+            {
+                parts[i] = parts[i].Trim();
+            }
+
+            if (lineNumber == 1 && parts[0].Equals("name", StringComparison.OrdinalIgnoreCase))
+            {
+                // Linha de cabeçalho
+                continue;
+            }
+
+            var name = parts[0];
+            var ageText = parts[1];
+            var overallText = parts[2];
+            var positionText = parts[3];
+
+            int? age = null;
+            if (!string.IsNullOrEmpty(ageText))
+            {
+                if (int.TryParse(ageText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedAge))
+                {
+                    age = parsedAge;
+                }
+                else
+                {
+                    errors.Add($"Linha {lineNumber}: idade inválida.");
+                    continue;
+                }
+            }
+
+            if (!int.TryParse(overallText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var overall))
+            {
+                errors.Add($"Linha {lineNumber}: overall inválido.");
+                continue;
+            }
+
+            if (!short.TryParse(positionText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var positionId))
+            {
+                errors.Add($"Linha {lineNumber}: posição inválida.");
+                continue;
+            }
+
+            try
+            {
+                Validate(name, age, overall, positionId);
+            }
+            catch (ArgumentException ex)
+            {
+                errors.Add($"Linha {lineNumber}: {ex.Message}");
+                continue;
+            }
+
+            if (!positionSet.Contains(positionId))
+            {
+                errors.Add($"Linha {lineNumber}: posição {positionId} não encontrada.");
+                continue;
+            }
+
+            playersToInsert.Add(new Player
+            {
+                Name = name.Trim(),
+                Age = age,
+                Overall = overall,
+                PositionId = positionId
+            });
+        }
+
+        if (playersToInsert.Count == 0)
+        {
+            return new PlayerImportResultDto(0, errors);
+        }
+
+        await _db.Players.AddRangeAsync(playersToInsert, ct);
+        await _db.SaveChangesAsync(ct);
+
+        return new PlayerImportResultDto(playersToInsert.Count, errors);
     }
 
     private static void Validate(PlayerCreateDto dto)

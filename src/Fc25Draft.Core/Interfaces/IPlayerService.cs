@@ -1,3 +1,6 @@
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 
@@ -10,4 +13,5 @@ public interface IPlayerService
     Task<int> CreateAsync(PlayerCreateDto dto);
     Task UpdateAsync(int id, PlayerUpdateDto dto);
     Task DeleteAsync(int id);
+    Task<PlayerImportResultDto> ImportCsvAsync(Stream csvStream, CancellationToken ct = default);
 }

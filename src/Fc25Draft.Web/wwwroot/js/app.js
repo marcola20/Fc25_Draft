@@ -25,22 +25,24 @@ window.fc25Auth = {
 window.fc25Share = {
     openWhatsapp: function (shareUrl, groupLink, message) {
         try {
+            if (shareUrl) {
+                const shareWindow = window.open(shareUrl, '_blank');
+                if (shareWindow) {
+                    return 'share';
+                }
+            }
+
             if (groupLink) {
                 window.open(groupLink, '_blank');
                 if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && message) {
                     navigator.clipboard.writeText(message).catch(() => { /* noop */ });
                 }
-                return true;
-            }
-
-            if (shareUrl) {
-                window.open(shareUrl, '_blank');
-                return true;
+                return 'fallback';
             }
         } catch {
             // ignorado
         }
 
-        return false;
+        return 'error';
     }
 };

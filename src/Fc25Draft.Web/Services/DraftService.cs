@@ -1,8 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Fc25Draft.Web.Services;
 
@@ -13,30 +14,6 @@ public class DraftService
     public DraftService(DraftDbContext db)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
-    }
-
-    public async Task ResetDraftAsync(CancellationToken ct = default)
-    {
-        var strategy = _db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-
-            await _db.TeamRosters.ExecuteDeleteAsync(ct);
-            await _db.DraftPicks.ExecuteDeleteAsync(ct);
-            await _db.DraftRounds.ExecuteDeleteAsync(ct);
-            await _db.Drafts.ExecuteDeleteAsync(ct);
-
-            await _db.Players.ExecuteDeleteAsync(ct);
-            await _db.Teams.ExecuteDeleteAsync(ct);
-
-            await _db.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('Players', RESEED, 0);", cancellationToken: ct);
-
-            await SeedData.SeedAsync(_db, ct);
-
-            await transaction.CommitAsync(ct);
-        });
     }
 
     public async Task<Draft> CreateDraftAsync(

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Fc25Draft.Core.DTOs;
 
@@ -33,3 +34,5 @@ public record PlayerExportDto(
     int Overall,
     string Status,
     string? Time);
+
+public record PlayerImportResultDto(int Imported, IReadOnlyList<string> Errors);

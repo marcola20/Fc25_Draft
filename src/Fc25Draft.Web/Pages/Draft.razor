@@ -385,18 +385,18 @@ else
 
         try
         {
-            var opened = await JSRuntime.InvokeAsync<bool>("fc25Share.openWhatsapp", lastSelection.ShareUrl, lastSelection.WhatsappGroupLink, lastSelection.Mensagem);
+            var outcome = await JSRuntime.InvokeAsync<string>(
+                "fc25Share.openWhatsapp",
+                lastSelection.ShareUrl,
+                lastSelection.WhatsappGroupLink,
+                lastSelection.Mensagem);
 
-            if (opened)
+            shareFeedback = outcome switch
             {
-                shareFeedback = !string.IsNullOrEmpty(lastSelection.WhatsappGroupLink)
-                    ? "Mensagem copiada! Cole no WhatsApp para concluir o envio."
-                    : "Abrindo WhatsApp...";
-            }
-            else
-            {
-                shareFeedback = "Não foi possível abrir o WhatsApp automaticamente.";
-            }
+                "share" => "Mensagem aberta no WhatsApp! Envie para concluir.",
+                "fallback" => "WhatsApp aberto. Caso a mensagem não apareça automaticamente, cole o texto copiado.",
+                _ => "Não foi possível abrir o WhatsApp automaticamente."
+            };
         }
         catch (JSException ex)
         {
