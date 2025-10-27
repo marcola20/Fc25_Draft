@@ -1,58 +1,52 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Fc25Draft.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Web.Security;
 
-public class AdminTokenAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+public class AdminTokenAuthenticationHandler
+    : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     public const string SchemeName = "AdminToken";
 
     private readonly SecurityOptions _options;
 
-    public AdminTokenAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options,
-                                           ILoggerFactory logger,
-                                           UrlEncoder encoder,
-                                           IOptions<SecurityOptions> securityOptions) : base(options, logger, encoder)
+    public AdminTokenAuthenticationHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        IOptions<SecurityOptions> securityOptions)
+        : base(options, logger, encoder)
     {
         _options = securityOptions.Value;
-        if (Options.TimeProvider == null)
-        {
-            Options.TimeProvider = TimeProvider.System;
-        }
+    }
+
+    protected override async Task InitializeHandlerAsync()
+    {
+        await base.InitializeHandlerAsync();
+        Options.TimeProvider ??= TimeProvider.System;
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (string.IsNullOrWhiteSpace(_options.AdminToken))
-        {
             return Task.FromResult(AuthenticateResult.Fail("Token de administrador não configurado."));
-        }
 
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
-        {
             return Task.FromResult(AuthenticateResult.NoResult());
-        }
 
         var headerValue = authorizationHeader.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerValue))
-        {
             return Task.FromResult(AuthenticateResult.Fail("Cabeçalho de autorização ausente."));
-        }
 
         const string bearerPrefix = "Bearer ";
         if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-        {
             return Task.FromResult(AuthenticateResult.Fail("Formato de autorização inválido."));
-        }
 
         var providedToken = headerValue[bearerPrefix.Length..].Trim();
         if (!string.Equals(providedToken, _options.AdminToken, StringComparison.Ordinal))
-        {
             return Task.FromResult(AuthenticateResult.Fail("Token de administrador inválido."));
-        }
 
         var claims = new[]
         {
