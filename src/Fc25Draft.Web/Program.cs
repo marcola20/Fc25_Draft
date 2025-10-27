@@ -82,6 +82,7 @@ builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
+builder.Services.AddScoped<IMarketClosingService, MarketClosingService>();
 
 var app = builder.Build();
 
@@ -1010,6 +1011,45 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         catch (MarketGenerationValidationException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminMarketApi.MapGet("/close/preview", async (IMarketClosingService closingService, CancellationToken ct) =>
+    {
+        var preview = await closingService.PreviewCloseAsync(ct);
+        return Results.Ok(preview);
+    });
+
+    adminMarketApi.MapPost("/close", async (IMarketClosingService closingService, CancellationToken ct) =>
+    {
+        try
+        {
+            var result = await closingService.CloseRoundAsync(ct);
+            return Results.Ok(result);
+        }
+        catch (TransferMarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    });
+
+    adminMarketApi.MapPost("/{marketItemId:guid}/close", async (
+        Guid marketItemId,
+        IMarketClosingService closingService,
+        CancellationToken ct) =>
+    {
+        try
+        {
+            var result = await closingService.CloseItemAsync(marketItemId, ct);
+            return Results.Ok(result);
+        }
+        catch (TransferMarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (TransferMarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
         }
     });
 
