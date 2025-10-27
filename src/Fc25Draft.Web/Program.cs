@@ -1069,15 +1069,6 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
     }
 }
 
-record PlaceBidRequest(string Token, decimal Valor);
-
-record BuyNowRequest(string Token);
-
-readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
-{
-    public Guid TeamId => TeamIdValue ?? Guid.Empty;
-}
-
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
 {
     var players = await db.Players
@@ -1139,4 +1130,13 @@ static string Escape(string? value)
 
     var sanitized = value.Replace("\"", "''");
     return sanitized.Contains(';') ? $"\"{sanitized}\"" : sanitized;
+}
+
+record PlaceBidRequest(string Token, decimal Valor);
+
+record BuyNowRequest(string Token);
+
+readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
+{
+    public Guid TeamId => TeamIdValue ?? Guid.Empty;
 }
