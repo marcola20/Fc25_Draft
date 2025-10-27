@@ -15,6 +15,7 @@ public class DraftDbContext : DbContext
     public DbSet<DraftRound> DraftRounds => Set<DraftRound>();
     public DbSet<DraftPick> DraftPicks => Set<DraftPick>();
     public DbSet<TeamRoster> TeamRosters => Set<TeamRoster>();
+    public DbSet<AdminToken> AdminTokens => Set<AdminToken>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -118,6 +119,21 @@ public class DraftDbContext : DbContext
             e.HasOne(x => x.Player)
              .WithMany(p => p.TeamRosters)
              .HasForeignKey(x => x.PlayerId);
+        });
+
+        mb.Entity<AdminToken>(e =>
+        {
+            e.ToTable("Token_Administrador");
+            e.HasKey(x => x.AdminTokenId);
+
+            e.Property(x => x.AdminTokenId)
+             .ValueGeneratedOnAdd();
+
+            e.Property(x => x.Token)
+             .IsRequired();
+
+            e.HasIndex(x => x.Token)
+             .IsUnique();
         });
     }
 }

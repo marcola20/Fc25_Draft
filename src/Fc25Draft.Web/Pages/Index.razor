@@ -130,6 +130,64 @@ else if (!string.IsNullOrEmpty(errorMessage))
             return;
         }
 
+        var roundRules = new List<DraftRoundRuleDto>(totalRounds);
+
+        for (var round = 1; round <= totalRounds; round++)
+        {
+            string? minInput;
+            string? maxInput;
+
+            try
+            {
+                minInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall mínimo para a rodada {round}:");
+            }
+            catch (JSException ex)
+            {
+                errorMessage = $"Não foi possível solicitar o overall mínimo da rodada {round}: {ex.Message}";
+                return;
+            }
+
+            if (minInput is null)
+            {
+                return;
+            }
+
+            if (!int.TryParse(minInput, out var overallMin) || overallMin < 0 || overallMin > 150)
+            {
+                errorMessage = $"Informe um overall mínimo válido (0 a 150) para a rodada {round}.";
+                return;
+            }
+
+            try
+            {
+                maxInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall máximo para a rodada {round}:");
+            }
+            catch (JSException ex)
+            {
+                errorMessage = $"Não foi possível solicitar o overall máximo da rodada {round}: {ex.Message}";
+                return;
+            }
+
+            if (maxInput is null)
+            {
+                return;
+            }
+
+            if (!int.TryParse(maxInput, out var overallMax) || overallMax < 0 || overallMax > 150)
+            {
+                errorMessage = $"Informe um overall máximo válido (0 a 150) para a rodada {round}.";
+                return;
+            }
+
+            if (overallMin > overallMax)
+            {
+                errorMessage = $"O overall mínimo não pode ser maior que o máximo na rodada {round}.";
+                return;
+            }
+
+            roundRules.Add(new DraftRoundRuleDto(round, overallMin, overallMax));
+        }
+
         isGenerating = true;
 
         try
@@ -142,7 +200,7 @@ else if (!string.IsNullOrEmpty(errorMessage))
 
             var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
             var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds));
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, RoundRules: roundRules));
 
             if (response.IsSuccessStatusCode)
             {

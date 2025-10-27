@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Fc25Draft.Infra.Data;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Web.Security;
@@ -10,16 +12,16 @@ public class AdminTokenAuthenticationHandler
 {
     public const string SchemeName = "AdminToken";
 
-    private readonly SecurityOptions _options;
+    private readonly DraftDbContext _db;
 
     public AdminTokenAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        IOptions<SecurityOptions> securityOptions)
+        DraftDbContext db)
         : base(options, logger, encoder)
     {
-        _options = securityOptions.Value;
+        _db = db;
     }
 
     protected override async Task InitializeHandlerAsync()
@@ -28,25 +30,29 @@ public class AdminTokenAuthenticationHandler
         Options.TimeProvider ??= TimeProvider.System;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_options.AdminToken))
-            return Task.FromResult(AuthenticateResult.Fail("Token de administrador não configurado."));
-
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
 
         var headerValue = authorizationHeader.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerValue))
-            return Task.FromResult(AuthenticateResult.Fail("Cabeçalho de autorização ausente."));
+            return AuthenticateResult.Fail("Cabeçalho de autorização ausente.");
 
         const string bearerPrefix = "Bearer ";
         if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(AuthenticateResult.Fail("Formato de autorização inválido."));
+            return AuthenticateResult.Fail("Formato de autorização inválido.");
 
         var providedToken = headerValue[bearerPrefix.Length..].Trim();
-        if (!string.Equals(providedToken, _options.AdminToken, StringComparison.Ordinal))
-            return Task.FromResult(AuthenticateResult.Fail("Token de administrador inválido."));
+        if (!Guid.TryParse(providedToken, out var tokenGuid))
+            return AuthenticateResult.Fail("Token de administrador inválido.");
+
+        var tokenExists = await _db.AdminTokens
+            .AsNoTracking()
+            .AnyAsync(t => t.Token == tokenGuid);
+
+        if (!tokenExists)
+            return AuthenticateResult.Fail("Token de administrador inválido.");
 
         var claims = new[]
         {
@@ -58,7 +64,7 @@ public class AdminTokenAuthenticationHandler
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)

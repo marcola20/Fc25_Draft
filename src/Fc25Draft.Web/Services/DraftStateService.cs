@@ -107,6 +107,32 @@ public class DraftStateService
 
     public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(short? positionId, CancellationToken ct = default)
     {
+        var draft = await _db.Drafts
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        if (draft is null)
+        {
+            return Array.Empty<AvailablePlayerDto>();
+        }
+
+        var currentRoundNumber = await _db.DraftPicks
+            .Where(p => p.DraftId == draft.DraftId && p.PlayerId == null)
+            .OrderBy(p => p.OverallPick)
+            .Select(p => (int?)p.RoundNumber)
+            .FirstOrDefaultAsync(ct);
+
+        if (!currentRoundNumber.HasValue)
+        {
+            return Array.Empty<AvailablePlayerDto>();
+        }
+
+        var currentRound = await _db.DraftRounds
+            .AsNoTracking()
+            .Where(r => r.DraftId == draft.DraftId && r.RoundNumber == currentRoundNumber.Value)
+            .Select(r => new { r.OverallMin, r.OverallMax })
+            .FirstOrDefaultAsync(ct);
+
         var query = _db.Players
             .AsNoTracking()
             .Include(p => p.Position)
@@ -115,6 +141,16 @@ public class DraftStateService
         if (positionId.HasValue)
         {
             query = query.Where(p => p.PositionId == positionId.Value);
+        }
+
+        if (currentRound?.OverallMin is int overallMin)
+        {
+            query = query.Where(p => p.Overall >= overallMin);
+        }
+
+        if (currentRound?.OverallMax is int overallMax)
+        {
+            query = query.Where(p => p.Overall <= overallMax);
         }
 
         var players = await query
@@ -157,6 +193,13 @@ public class DraftStateService
                 .FirstOrDefaultAsync(p => p.DraftId == draft.DraftId && p.PlayerId == null, ct)
                 ?? throw new InvalidOperationException("Todas as escolhas já foram realizadas.");
 
+            var roundLimits = await _db.DraftRounds
+                .AsNoTracking()
+                .Where(r => r.DraftId == draft.DraftId && r.RoundNumber == currentPick.RoundNumber)
+                .Select(r => new { r.OverallMin, r.OverallMax })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new InvalidOperationException("Não foi possível localizar as regras da rodada atual.");
+
             if (!Guid.TryParse(normalizedToken, out var providedToken) || providedToken != currentPick.Team.TeamToken)
             {
                 throw new InvalidOperationException("⚠️ Token inválido para este time.");
@@ -166,6 +209,16 @@ public class DraftStateService
                 .Include(p => p.Position)
                 .FirstOrDefaultAsync(p => p.PlayerId == playerId, ct)
                 ?? throw new InvalidOperationException("Jogador não encontrado.");
+
+            if (roundLimits.OverallMin is int overallMin && player.Overall < overallMin)
+            {
+                throw new InvalidOperationException($"❌ Este jogador está abaixo do overall mínimo ({overallMin}) permitido nesta rodada.");
+            }
+
+            if (roundLimits.OverallMax is int overallMax && player.Overall > overallMax)
+            {
+                throw new InvalidOperationException($"❌ Este jogador excede o overall máximo ({overallMax}) permitido nesta rodada.");
+            }
 
             var alreadyChosen = await _db.DraftPicks.AnyAsync(p => p.PlayerId == playerId, ct);
             if (alreadyChosen)

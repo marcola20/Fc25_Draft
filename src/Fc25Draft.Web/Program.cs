@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -204,7 +205,19 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
 
         try
         {
-            await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, ct);
+            IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null;
+            if (request.RoundRules is { Count: > 0 })
+            {
+                var rules = new Dictionary<int, (int? OverallMin, int? OverallMax)>();
+                foreach (var rule in request.RoundRules)
+                {
+                    rules[rule.Round] = (rule.OverallMin, rule.OverallMax);
+                }
+
+                roundRules = rules;
+            }
+
+            await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, ct);
             var state = await draftStateService.GetStateAsync(ct);
             await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
             return Results.Ok(state);
