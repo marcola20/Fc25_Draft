@@ -17,7 +17,19 @@ else if (!string.IsNullOrEmpty(errorMessage))
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
 
-<div class="mb-4">
+<div class="mb-4 d-flex flex-wrap gap-2">
+    <button class="btn btn-primary" @onclick="GenerateDraftAsync" disabled="@isGenerating">
+        @if (isGenerating)
+        {
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span>Gerando...</span>
+        }
+        else
+        {
+            <span>Gerar Draft</span>
+        }
+    </button>
+
     <button class="btn btn-danger" @onclick="ResetDraftAsync" disabled="@isResetting">
         @if (isResetting)
         {
@@ -53,9 +65,104 @@ else if (!string.IsNullOrEmpty(errorMessage))
 </section>
 
 @code {
+    private bool isGenerating;
     private bool isResetting;
     private string? successMessage;
     private string? errorMessage;
+
+    private async Task GenerateDraftAsync()
+    {
+        if (isGenerating)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+
+        string? roundsInput;
+
+        try
+        {
+            roundsInput = await JSRuntime.InvokeAsync<string?>("prompt", "Quantas rodadas o draft deve ter?", "19");
+        }
+        catch (JSException ex)
+        {
+            errorMessage = $"Não foi possível solicitar o número de rodadas: {ex.Message}";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(roundsInput))
+        {
+            return;
+        }
+
+        if (!int.TryParse(roundsInput, out var totalRounds))
+        {
+            errorMessage = "Informe um número válido de rodadas.";
+            return;
+        }
+
+        if (totalRounds is < 1 or > 50)
+        {
+            errorMessage = "O número de rodadas deve estar entre 1 e 50.";
+            return;
+        }
+
+        isGenerating = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var uri = new Uri(new Uri(Navigation.BaseUri), "api/draft/generate");
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds));
+
+            if (response.IsSuccessStatusCode)
+            {
+                DraftStateDto? state = null;
+                try
+                {
+                    state = await response.Content.ReadFromJsonAsync<DraftStateDto>();
+                }
+                catch
+                {
+                    // Ignored - fallback to generic success message.
+                }
+
+                if (state is not null && state.HasDraft)
+                {
+                    var draftName = string.IsNullOrWhiteSpace(state.DraftName) ? "Draft" : state.DraftName;
+                    successMessage = $"{draftName} gerado com {state.TotalRounds} rodadas!";
+                }
+                else
+                {
+                    successMessage = $"Draft gerado com {totalRounds} rodadas!";
+                }
+            }
+            else
+            {
+                ApiErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                }
+                catch
+                {
+                    // ignore, fallback message below
+                }
+
+                errorMessage = error?.Message ?? $"Erro ao gerar o draft: {response.StatusCode}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao gerar o draft: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
 
     private async Task ResetDraftAsync()
     {
@@ -90,4 +197,6 @@ else if (!string.IsNullOrEmpty(errorMessage))
             isResetting = false;
         }
     }
+
+    private sealed record ApiErrorResponse(string? Message);
 }
