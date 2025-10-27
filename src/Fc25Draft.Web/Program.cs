@@ -703,6 +703,46 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         return Results.Ok(roster);
     });
 
+    teamsApi.MapGet("/{id:guid}/roster", async (DraftDbContext db, Guid id, CancellationToken ct) =>
+    {
+        var roster = await db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == id)
+            .Select(t => new TeamRosterDto(
+                t.TeamId,
+                t.TeamName,
+                t.OwnerName,
+                t.Roster
+                    .OrderBy(r => r.Player.Name)
+                    .Select(r => new TeamRosterPlayerDto(
+                        r.PlayerId,
+                        r.Player.Name,
+                        r.Player.Position.Name,
+                        r.Player.Overall,
+                        r.Player.Age,
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => p.PickedAtUtc)
+                            .FirstOrDefault(),
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => (int?)p.RoundNumber)
+                            .FirstOrDefault(),
+                        db.DraftPicks
+                            .Where(p => p.PlayerId == r.PlayerId)
+                            .Select(p => (int?)p.PickInRound)
+                            .FirstOrDefault()))
+                    .ToList()))
+            .FirstOrDefaultAsync(ct);
+
+        if (roster is null)
+        {
+            return Results.NotFound();
+        }
+
+        return Results.Ok(roster);
+    });
+
     teamsApi.MapGet("/export/json", async (DraftDbContext db, CancellationToken ct) =>
     {
         var roster = await db.Teams

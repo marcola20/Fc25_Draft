@@ -62,6 +62,20 @@ public class TeamsApiClient
         return result ?? Array.Empty<TeamRosterDto>();
     }
 
+    public async Task<TeamRosterDto?> GetRosterByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.GetAsync($"api/teams/{id}/roster", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<TeamRosterDto>(cancellationToken: ct);
+    }
+
     public async Task CreateAsync(TeamCreateDto dto, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);

@@ -1,4 +1,5 @@
 @page "/teams/details/{Id:guid}"
+@using System.Linq
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
@@ -41,6 +42,43 @@ else
         }
     </dl>
 
+    <section class="mt-4">
+        <h4>Elenco</h4>
+
+        @if (roster is null)
+        {
+            <p class="text-muted">Não foi possível carregar o elenco da equipe.</p>
+        }
+        else if (roster.Jogadores.Count == 0)
+        {
+            <p class="mb-0">Nenhum jogador vinculado.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Jogador</th>
+                            <th class="text-end">Overall</th>
+                            <th class="text-end">Idade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var player in roster.Jogadores.OrderBy(p => p.Nome))
+                        {
+                            <tr>
+                                <td>@player.Nome</td>
+                                <td class="text-end">@player.Overall</td>
+                                <td class="text-end">@(player.Idade?.ToString() ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
     <div class="d-flex gap-2">
         @if (AdminAuth.IsAuthenticated)
         {
@@ -61,6 +99,7 @@ else
     public Guid Id { get; set; }
 
     private TeamDetailsDto? team;
+    private TeamRosterDto? roster;
     private string? errorMessage;
     private bool isLoading = true;
     private bool authInitialized;
@@ -91,6 +130,7 @@ else
     {
         isLoading = true;
         errorMessage = null;
+        roster = null;
 
         try
         {
@@ -98,7 +138,10 @@ else
             if (team is null)
             {
                 errorMessage = "Time não encontrado.";
+                return;
             }
+
+            roster = await TeamsApiClient.GetRosterByIdAsync(Id);
         }
         catch (Exception ex)
         {
