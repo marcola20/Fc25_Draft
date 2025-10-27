@@ -22,21 +22,24 @@ using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
+//var connectionString =
+//    builder.Configuration.GetConnectionString("DefaultConnection")
+//    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
+//    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
 
+//builder.Services.AddDbContext<DraftDbContext>(opt =>
+//    opt.UseSqlServer(connectionString, sql =>
+//    {
+//        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
+//        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
+//    })
+//       .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+//       .EnableDetailedErrors(builder.Environment.IsDevelopment())
+//);
 
-builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseSqlServer(connectionString, sql =>
-    {
-        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
-        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
-    })
-       .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
-       .EnableDetailedErrors(builder.Environment.IsDevelopment())
-);
+builder.Services.AddDbContext<DraftDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 
