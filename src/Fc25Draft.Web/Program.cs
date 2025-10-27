@@ -81,6 +81,7 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketService, MarketService>();
+builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
 
 var app = builder.Build();
 
@@ -922,6 +923,76 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         return item is null ? Results.NotFound() : Results.Ok(item);
     }).AllowAnonymous();
 
+    marketApi.MapPost("/{marketItemId:guid}/bid", async (
+        Guid marketItemId,
+        PlaceBidRequest request,
+        DraftDbContext db,
+        IMarketTransactionService transactionService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        var tokenResult = await ResolveTeamIdAsync(request.Token, db, ct);
+        if (tokenResult.Error is not null)
+        {
+            return tokenResult.Error;
+        }
+
+        try
+        {
+            var item = await transactionService.PlaceBidAsync(marketItemId, tokenResult.TeamId, request.Valor, ct);
+            return Results.Ok(ToDto(item));
+        }
+        catch (TransferMarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (TransferMarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (TransferMarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    marketApi.MapPost("/{marketItemId:guid}/buy-now", async (
+        Guid marketItemId,
+        BuyNowRequest request,
+        DraftDbContext db,
+        IMarketTransactionService transactionService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        var tokenResult = await ResolveTeamIdAsync(request.Token, db, ct);
+        if (tokenResult.Error is not null)
+        {
+            return tokenResult.Error;
+        }
+
+        try
+        {
+            var item = await transactionService.BuyNowAsync(marketItemId, tokenResult.TeamId, ct);
+            return Results.Ok(ToDto(item));
+        }
+        catch (TransferMarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (TransferMarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
     var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
 
     adminMarketApi.MapPost("/generate", async (IMarketService marketService, CancellationToken ct) =>
@@ -941,6 +1012,32 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = ex.Message });
         }
     });
+
+    static async Task<TokenValidationResult> ResolveTeamIdAsync(string? token, DraftDbContext db, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token obrigatório." }));
+        }
+
+        if (!Guid.TryParse(token, out var parsedToken))
+        {
+            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token inválido." }));
+        }
+
+        var teamId = await db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamToken == parsedToken)
+            .Select(t => (Guid?)t.TeamId)
+            .FirstOrDefaultAsync(ct);
+
+        if (!teamId.HasValue)
+        {
+            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token inválido." }));
+        }
+
+        return new TokenValidationResult(teamId.Value, null);
+    }
 
     static TransferMarketItemDto ToDto(TransferMarketItem item)
     {
@@ -962,10 +1059,20 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             item.PrecoBase,
             item.PrecoComprarAgora,
             item.LanceAtual,
-            item.MaiorLanceTeam?.TeamName ?? string.Empty,
+            item.MaiorLanceTeam?.TeamName,
             item.Status,
-            item.DataInicioUtc);
+            item.DataInicioUtc,
+            item.VencedorTeamId);
     }
+}
+
+record PlaceBidRequest(string Token, decimal Valor);
+
+record BuyNowRequest(string Token);
+
+readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
+{
+    public Guid TeamId => TeamIdValue ?? Guid.Empty;
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)

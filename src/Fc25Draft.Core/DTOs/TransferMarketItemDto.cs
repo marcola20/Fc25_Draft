@@ -12,4 +12,5 @@ public record TransferMarketItemDto(
     decimal? LanceAtual,
     string? MaiorLanceTeamName,
     string Status,
-    DateTime DataInicioUtc);
+    DateTime DataInicioUtc,
+    Guid? VencedorTeamId);
