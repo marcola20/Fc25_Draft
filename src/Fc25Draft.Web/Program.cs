@@ -81,6 +81,7 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketService, MarketService>();
+builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
 
 var app = builder.Build();
 
@@ -922,6 +923,108 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         return item is null ? Results.NotFound() : Results.Ok(item);
     }).AllowAnonymous();
 
+    marketApi.MapPost("/{marketItemId:guid}/bid", async (
+        Guid marketItemId,
+        MarketBidRequest request,
+        DraftDbContext dbContext,
+        IMarketTransactionService transactionService,
+        CancellationToken ct) =>
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.Token))
+        {
+            return Results.Unauthorized(new { message = "Token do time é obrigatório." });
+        }
+
+        if (!Guid.TryParse(request.Token, out var tokenGuid))
+        {
+            return Results.Unauthorized(new { message = "Token inválido." });
+        }
+
+        var team = await dbContext.Teams
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TeamToken == tokenGuid, ct);
+
+        if (team is null)
+        {
+            return Results.Unauthorized(new { message = "Token inválido." });
+        }
+
+        try
+        {
+            var item = await transactionService.PlaceBidAsync(marketItemId, team.TeamId, request.Valor, ct);
+            return Results.Ok(ToDto(item));
+        }
+        catch (MarketItemNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (MarketBidBelowMinimumException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (MarketTeamAlreadyLeadingException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketInsufficientBalanceException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketStateChangedException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    marketApi.MapPost("/{marketItemId:guid}/buy-now", async (
+        Guid marketItemId,
+        MarketBuyNowRequest request,
+        DraftDbContext dbContext,
+        IMarketTransactionService transactionService,
+        CancellationToken ct) =>
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.Token))
+        {
+            return Results.Unauthorized(new { message = "Token do time é obrigatório." });
+        }
+
+        if (!Guid.TryParse(request.Token, out var tokenGuid))
+        {
+            return Results.Unauthorized(new { message = "Token inválido." });
+        }
+
+        var team = await dbContext.Teams
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TeamToken == tokenGuid, ct);
+
+        if (team is null)
+        {
+            return Results.Unauthorized(new { message = "Token inválido." });
+        }
+
+        try
+        {
+            var item = await transactionService.BuyNowAsync(marketItemId, team.TeamId, ct);
+            return Results.Ok(ToDto(item));
+        }
+        catch (MarketItemNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (MarketInsufficientBalanceException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketPlayerUnavailableException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketStateChangedException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
     var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
 
     adminMarketApi.MapPost("/generate", async (IMarketService marketService, CancellationToken ct) =>
@@ -963,10 +1066,15 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             item.PrecoComprarAgora,
             item.LanceAtual,
             item.MaiorLanceTeam?.TeamName ?? string.Empty,
+            item.VencedorTeamId,
             item.Status,
             item.DataInicioUtc);
     }
 }
+
+internal sealed record MarketBidRequest(string Token, decimal Valor);
+
+internal sealed record MarketBuyNowRequest(string Token);
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
 {
