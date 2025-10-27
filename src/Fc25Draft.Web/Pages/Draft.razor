@@ -98,24 +98,24 @@
             }
         </select>
     </div>
-    <div class="col-lg-3">
+    <div class="col-lg-3 d-none d-sm-block">
         <label class="form-label d-block">Atualizar</label>
         <button class="btn btn-outline-primary w-50" @onclick="LoadPlayersAsync" disabled="@isLoadingPlayers">Atualizar lista</button>
     </div>
 </div>
 
-<div class="row g-3 align-items-end mb-4">
-    <div class="col-sm-4 col-md-3 col-lg-2">
+<div class="row g-3 align-items-end mb-4 draft-filter-group">
+    <div class="col-4 col-sm-4 col-md-3 col-lg-2">
         <label class="form-label" for="overallMin">Overall mínimo</label>
         <InputNumber TValue="int?" id="overallMin" class="form-control" min="70" max="99" @bind-Value="overallMin" />
     </div>
-    <div class="col-sm-4 col-md-3 col-lg-2">
+    <div class="col-4 col-sm-4 col-md-3 col-lg-2">
         <label class="form-label" for="overallMax">Overall máximo</label>
         <InputNumber TValue="int?" id="overallMax" class="form-control" min="70" max="99" @bind-Value="overallMax" />
     </div>
-    <div class="col-sm-4 col-md-3 col-lg-2">
-        <label class="form-label d-block">&nbsp;</label>
-        <button type="button" class="btn btn-outline-primary w-80" @onclick="ApplyFiltersAsync" disabled="@isLoadingPlayers">Aplicar filtros</button>
+    <div class="col-4 col-sm-4 col-md-3 col-lg-2 d-flex flex-column justify-content-end gap-2">
+        <label class="form-label d-none d-sm-block">&nbsp;</label>
+        <button type="button" class="btn btn-outline-primary filter-apply-btn w-100" @onclick="ApplyFiltersAsync" disabled="@isLoadingPlayers">Aplicar filtros</button>
     </div>
 </div>
 
