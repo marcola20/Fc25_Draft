@@ -12,8 +12,12 @@ namespace Fc25Draft.Web.Extensions
 
             await db.Database.MigrateAsync(ct);
 
-          
-            await Fc25Draft.Infra.Data.SeedData.SeedAsync(db, ct);
+            await SeedData.SeedAsync(db, ct);
+
+            if (app.Environment.IsDevelopment())
+            {
+                await SeedData.SeedTeamBudgetsAsync(db, ct);
+            }
         }
     }
 }

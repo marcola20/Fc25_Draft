@@ -16,6 +16,10 @@ public class DraftDbContext : DbContext
     public DbSet<DraftPick> DraftPicks => Set<DraftPick>();
     public DbSet<TeamRoster> TeamRosters => Set<TeamRoster>();
     public DbSet<AdminToken> AdminTokens => Set<AdminToken>();
+    public DbSet<TransferMarketItem> TransferMarketItems => Set<TransferMarketItem>();
+    public DbSet<Bid> Bids => Set<Bid>();
+    public DbSet<TeamBudget> TeamBudgets => Set<TeamBudget>();
+    public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -135,5 +139,7 @@ public class DraftDbContext : DbContext
             e.HasIndex(x => x.Token)
              .IsUnique();
         });
+
+        mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);
     }
 }

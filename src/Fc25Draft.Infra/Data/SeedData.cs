@@ -1,3 +1,4 @@
+using System.Linq;
 using Fc25Draft.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,5 +50,43 @@ public static class SeedData
         {
             await context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public static async Task SeedTeamBudgetsAsync(DraftDbContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var teamIds = await context.Teams
+            .AsNoTracking()
+            .Select(t => t.TeamId)
+            .ToListAsync(cancellationToken);
+
+        if (teamIds.Count == 0)
+        {
+            return;
+        }
+
+        var existingBudgetTeamIds = await context.TeamBudgets
+            .AsNoTracking()
+            .Select(b => b.TeamId)
+            .ToListAsync(cancellationToken);
+
+        var missingTeamIds = teamIds.Except(existingBudgetTeamIds).ToList();
+
+        if (missingTeamIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var teamId in missingTeamIds)
+        {
+            context.TeamBudgets.Add(new TeamBudget
+            {
+                TeamId = teamId,
+                Saldo = 50_000_000m
+            });
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 }
