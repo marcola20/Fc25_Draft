@@ -1,16 +1,33 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace Fc25Draft.Infra.Migrations
 {
     /// <inheritdoc />
-    public partial class Phase3_CrudTeamsPlayers : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Drafts",
+                columns: table => new
+                {
+                    DraftId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalTeams = table.Column<int>(type: "int", nullable: false),
+                    TotalRounds = table.Column<int>(type: "int", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Drafts", x => x.DraftId);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Positions",
                 columns: table => new
@@ -38,18 +55,23 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Drafts",
+                name: "DraftRounds",
                 columns: table => new
                 {
                     DraftId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    TotalTeams = table.Column<int>(type: "int", nullable: false),
-                    TotalRounds = table.Column<int>(type: "int", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    RoundNumber = table.Column<int>(type: "int", nullable: false),
+                    OverallMin = table.Column<int>(type: "int", nullable: true),
+                    OverallMax = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Drafts", x => x.DraftId);
+                    table.PrimaryKey("PK_DraftRounds", x => new { x.DraftId, x.RoundNumber });
+                    table.ForeignKey(
+                        name: "FK_DraftRounds_Drafts_DraftId",
+                        column: x => x.DraftId,
+                        principalTable: "Drafts",
+                        principalColumn: "DraftId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -72,26 +94,6 @@ namespace Fc25Draft.Infra.Migrations
                         principalTable: "Positions",
                         principalColumn: "PositionId",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "DraftRounds",
-                columns: table => new
-                {
-                    DraftId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    RoundNumber = table.Column<int>(type: "int", nullable: false),
-                    OverallMin = table.Column<int>(type: "int", nullable: true),
-                    OverallMax = table.Column<int>(type: "int", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DraftRounds", x => new { x.DraftId, x.RoundNumber });
-                    table.ForeignKey(
-                        name: "FK_DraftRounds_Drafts_DraftId",
-                        column: x => x.DraftId,
-                        principalTable: "Drafts",
-                        principalColumn: "DraftId",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -157,6 +159,23 @@ namespace Fc25Draft.Infra.Migrations
                         principalTable: "Teams",
                         principalColumn: "TeamId",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "Positions",
+                columns: new[] { "PositionId", "Name" },
+                values: new object[,]
+                {
+                    { (short)1, "Goleiro" },
+                    { (short)2, "Zagueiro" },
+                    { (short)3, "Lateral/Ala Esquerdo" },
+                    { (short)4, "Lateral/Ala Direito" },
+                    { (short)5, "Volante" },
+                    { (short)6, "Meia Central" },
+                    { (short)7, "Meia Atacante" },
+                    { (short)8, "Meia/Ponta Esquerda" },
+                    { (short)9, "Meia/Ponta Direita" },
+                    { (short)10, "Atacante" }
                 });
 
             migrationBuilder.CreateIndex(

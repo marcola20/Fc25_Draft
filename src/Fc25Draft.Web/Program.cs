@@ -1,20 +1,21 @@
 using Fc25Draft.Core.Interfaces;
-using Fc25Draft.Infra.Data;
+using Fc25Draft.Infra.Data;                 
 using Fc25Draft.Infra.Repositories;
-using Fc25Draft.Web.Extensions;
+using Fc25Draft.Web.Extensions;            
 using Fc25Draft.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DbContext
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+    opt.UseSqlServer(connectionString, sql =>
+            sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
        .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
        .EnableDetailedErrors(builder.Environment.IsDevelopment())
 );
 
-// Blazor
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddScoped<DraftService>();
@@ -31,22 +32,6 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
-
-//if (app.Environment.IsDevelopment())
-//{
-//    using var scope = app.Services.CreateScope();
-//    var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
-//    var svc = scope.ServiceProvider.GetRequiredService<DraftService>();
-
-//    var teamOrder = await db.Teams
-//        .OrderBy(t => t.TeamName)
-//        .Select(t => t.TeamId)
-//        .Take(14)
-//        .ToListAsync();
-
-//    if (!await db.Drafts.AnyAsync())
-//        await svc.CreateDraftAsync("FC25 - Draft de Teste", teamOrder, totalRounds: 19, snake: true);
-//}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

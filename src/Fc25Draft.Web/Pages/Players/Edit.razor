@@ -13,7 +13,7 @@
 
 @if (isLoading)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Carregando...</em></p>
 }
 else
 {
@@ -22,13 +22,13 @@ else
         <ValidationSummary />
 
         <div class="mb-3">
-            <label class="form-label" for="playerName">Name</label>
+            <label class="form-label" for="playerName">Nome</label>
             <InputText id="playerName" class="form-control" @bind-Value="model.Name" />
             <ValidationMessage For="() => model.Name" />
         </div>
 
         <div class="mb-3">
-            <label class="form-label" for="playerAge">Age</label>
+            <label class="form-label" for="playerAge">Idade</label>
             <InputNumber id="playerAge" class="form-control" @bind-Value="model.Age" />
             <ValidationMessage For="() => model.Age" />
         </div>
@@ -40,7 +40,7 @@ else
         </div>
 
         <div class="mb-3">
-            <label class="form-label" for="playerPosition">Position</label>
+            <label class="form-label" for="playerPosition">Posição</label>
             <InputSelect id="playerPosition" class="form-select" @bind-Value="model.PositionId">
                 <option value="">Select a position</option>
                 @foreach (var position in positions)
@@ -52,8 +52,8 @@ else
         </div>
 
         <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit" disabled="@isSaving">Save</button>
-            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">Salvar</button>
+            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancelar</button>
         </div>
     </EditForm>
 }
@@ -69,7 +69,7 @@ else
     private bool isLoading = true;
     private bool isSaving;
 
-    private string Title => Id.HasValue ? "Edit Player" : "Create Player";
+    private string Title => Id.HasValue ? "Editar Jogador" : "Criar Jogador";
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,7 +92,7 @@ else
                 var player = await PlayerService.GetAsync(Id.Value);
                 if (player is null)
                 {
-                    errorMessage = "Player not found.";
+                    errorMessage = "Jogador não encontrado";
                 }
                 else
                 {
@@ -155,14 +155,14 @@ else
         [StringLength(80, MinimumLength = 2)]
         public string? Name { get; set; }
 
-        [Range(14, 55, ErrorMessage = "Age must be between 14 and 55.")]
+        [Range(14, 55, ErrorMessage = "A idade deve estar entre 14 e 55 anos.")]
         public int? Age { get; set; }
 
         [Required]
         [Range(0, 99)]
         public int? Overall { get; set; }
 
-        [Required(ErrorMessage = "Position is required.")]
+        [Required(ErrorMessage = "A posição é obrigatória.")]
         public short? PositionId { get; set; }
     }
 }

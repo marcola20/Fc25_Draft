@@ -12,7 +12,7 @@
 
 @if (isLoading)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Carregando...</em></p>
 }
 else
 {
@@ -21,20 +21,20 @@ else
         <ValidationSummary />
 
         <div class="mb-3">
-            <label class="form-label" for="teamName">Team Name</label>
+            <label class="form-label" for="teamName">Nome do Time</label>
             <InputText id="teamName" class="form-control" @bind-Value="model.TeamName" />
             <ValidationMessage For="() => model.TeamName" />
         </div>
 
         <div class="mb-3">
-            <label class="form-label" for="ownerName">Owner Name</label>
+            <label class="form-label" for="ownerName">Responsável</label>
             <InputText id="ownerName" class="form-control" @bind-Value="model.OwnerName" />
             <ValidationMessage For="() => model.OwnerName" />
         </div>
 
         <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit" disabled="@isSaving">Save</button>
-            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">Salvar</button>
+            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancelar</button>
         </div>
     </EditForm>
 }
@@ -49,7 +49,7 @@ else
     private bool isSaving;
     private bool isLoading = true;
 
-    private string Title => Id.HasValue ? "Edit Team" : "Create Team";
+    private string Title => Id.HasValue ? "Editar Time" : "Criar Time";
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,7 +62,7 @@ else
                 var team = await TeamService.GetAsync(Id.Value);
                 if (team is null)
                 {
-                    errorMessage = "Team not found.";
+                    errorMessage = "Time não encontrado";
                 }
                 else
                 {

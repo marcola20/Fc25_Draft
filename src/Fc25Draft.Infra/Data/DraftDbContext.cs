@@ -8,7 +8,6 @@ public class DraftDbContext : DbContext
     public DraftDbContext(DbContextOptions<DraftDbContext> options) : base(options)
     {
     }
-
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<Player> Players => Set<Player>();
     public DbSet<Team> Teams => Set<Team>();
@@ -22,8 +21,28 @@ public class DraftDbContext : DbContext
         mb.Entity<Position>(e =>
         {
             e.HasKey(x => x.PositionId);
-            e.Property(x => x.Name).IsRequired().HasMaxLength(40);
+
+            e.Property(x => x.PositionId)
+             .ValueGeneratedNever();
+
+            e.Property(x => x.Name)
+             .IsRequired()
+             .HasMaxLength(40);
+
             e.HasIndex(x => x.Name).IsUnique();
+
+            e.HasData(
+                new() { PositionId = 1,  Name = "Goleiro" },
+                new() { PositionId = 2, Name = "Zagueiro" },
+                new() { PositionId = 3, Name = "Lateral/Ala Esquerdo" },
+                new() { PositionId = 4, Name = "Lateral/Ala Direito" },
+                new() { PositionId = 5, Name = "Volante" },
+                new() { PositionId = 6, Name = "Meia Central" },
+                new() { PositionId = 7, Name = "Meia Atacante" },
+                new() { PositionId = 8, Name = "Meia/Ponta Esquerda" },
+                new() { PositionId = 9, Name = "Meia/Ponta Direita" },
+                new() { PositionId = 10, Name = "Atacante" }
+            );
         });
 
         mb.Entity<Player>(e =>

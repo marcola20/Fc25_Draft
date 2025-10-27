@@ -1,19 +1,19 @@
-using Fc25Draft.Infra.Data;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Fc25Draft.Infra.Data;             
+using Microsoft.EntityFrameworkCore;
 
 namespace Fc25Draft.Web.Extensions
 {
     public static class HostExtensions
     {
-        public static async Task SeedDatabaseAsync(this IHost host, CancellationToken cancellationToken = default)
+        public static async Task SeedDatabaseAsync(this WebApplication app, CancellationToken ct = default)
         {
-            ArgumentNullException.ThrowIfNull(host);
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
 
-            using var scope = host.Services.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+            await db.Database.MigrateAsync(ct);
 
-            await SeedData.SeedAsync(context, cancellationToken);
+          
+            await Fc25Draft.Infra.Data.SeedData.SeedAsync(db, ct);
         }
     }
 }
