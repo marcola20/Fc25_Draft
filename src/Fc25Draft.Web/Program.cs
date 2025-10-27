@@ -1080,16 +1080,30 @@ readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
 {
-    return await db.Players
+    var players = await db.Players
         .AsNoTracking()
         .OrderBy(p => p.Name)
+        .Select(p => new
+        {
+            p.Name,
+            Posicao = p.Position.Name,
+            p.Overall,
+            TemTime = p.TeamRosters.Any(),
+            Time = p.TeamRosters
+                .OrderBy(r => r.TeamId)
+                .Select(r => r.Team.TeamName)
+                .FirstOrDefault()
+        })
+        .ToListAsync(ct);
+
+    return players
         .Select(p => new PlayerExportDto(
             p.Name,
-            p.Position.Name,
+            p.Posicao,
             p.Overall,
-            p.TeamRosters.Any() ? "Escolhido" : "Disponível",
-            p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
-        .ToListAsync(ct);
+            p.TemTime ? "Escolhido" : "Disponível",
+            p.Time))
+        .ToList();
 }
 
 static string BuildPlayerCsv(IReadOnlyList<PlayerExportDto> players)
@@ -1110,7 +1124,7 @@ static string BuildDraftBoardCsv(IReadOnlyList<DraftBoardExportDto> entries)
     sb.AppendLine("Rodada;Escolha;Time;Responsável;Jogador;Posição;Data/Hora");
     foreach (var entry in entries)
     {
-        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{{entry.DataHoraUtc.ToLocalTime().ToString(\"dd/MM/yyyy HH:mm:ss\", new System.Globalization.CultureInfo(\"pt-BR\"))}}\r\n");
+        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{Escape(entry.DataHoraUtc)}");
     }
 
     return sb.ToString();
