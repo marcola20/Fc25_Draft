@@ -55,6 +55,19 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Token_Administrador",
+                columns: table => new
+                {
+                    AdminTokenId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Token = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Token_Administrador", x => x.AdminTokenId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "DraftRounds",
                 columns: table => new
                 {
@@ -234,6 +247,12 @@ namespace Fc25Draft.Infra.Migrations
                 table: "Teams",
                 column: "TeamToken",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Token_Administrador_Token",
+                table: "Token_Administrador",
+                column: "Token",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -244,6 +263,9 @@ namespace Fc25Draft.Infra.Migrations
 
             migrationBuilder.DropTable(
                 name: "TeamRosters");
+
+            migrationBuilder.DropTable(
+                name: "Token_Administrador");
 
             migrationBuilder.DropTable(
                 name: "DraftRounds");

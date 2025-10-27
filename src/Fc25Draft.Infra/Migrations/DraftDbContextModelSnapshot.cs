@@ -38,7 +38,7 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("Token")
                         .IsUnique();
 
-                    b.ToTable("Token_Administrador");
+                    b.ToTable("Token_Administrador", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
