@@ -15,7 +15,7 @@
 }
 else if (player is null)
 {
-    <p>Jogador n„o encontrado</p>
+    <p>Jogador n√£o encontrado.</p>
 }
 else
 {
@@ -29,7 +29,7 @@ else
         <dt class="col-sm-2">Idade</dt>
         <dd class="col-sm-10">@(player.Age?.ToString() ?? "-")</dd>
 
-        <dt class="col-sm-2">PosiÁ„o</dt>
+        <dt class="col-sm-2">Posi√ß√£o</dt>
         <dd class="col-sm-10">@player.Position?.Name</dd>
     </dl>
 
@@ -61,7 +61,7 @@ else
             player = await PlayerService.GetAsync(Id);
             if (player is null)
             {
-                errorMessage = "Jogador n„o encontrado.";
+                errorMessage = "Jogador n√£o encontrado.";
             }
         }
         catch (Exception ex)

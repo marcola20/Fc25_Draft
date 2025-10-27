@@ -10,14 +10,14 @@
     <div class="col-md-5">
         <label class="form-label" for="playerSearch">Pesquisar</label>
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por Nome" @bind="search" />
-            <button type="submit" class="btn btn-primary">Procurar</button>
+            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por nome" @bind="search" />
+            <button type="submit" class="btn btn-primary">Buscar</button>
         </form>
     </div>
     <div class="col-md-3">
-        <label class="form-label" for="positionFilter">Posição</label>
+        <label class="form-label" for="positionFilter">PosiÃ§Ã£o</label>
         <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnFilterChanged">
-            <option value="">Todos</option>
+            <option value="">Todas</option>
             @foreach (var position in positions)
             {
                 <option value="@position.PositionId">@position.Name</option>
@@ -49,10 +49,10 @@ else
             <thead>
                 <tr>
                     <th>Nome</th>
-                    <th>Posição</th>
+                    <th>PosiÃ§Ã£o</th>
                     <th>Overall</th>
                     <th>Idade</th>
-                    <th class="text-end">Ações</th>
+                    <th class="text-end">AÃ§Ãµes</th>
                 </tr>
             </thead>
             <tbody>
@@ -66,7 +66,7 @@ else
                         <td class="text-end">
                             <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Detalhes</button>
                             <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Editar</button>
-                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Deletar</button>
+                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Excluir</button>
                         </td>
                     </tr>
                 }
@@ -74,10 +74,10 @@ else
         </table>
     </div>
 
-    <nav aria-label="Players pagination">
+    <nav aria-label="PaginaÃ§Ã£o de jogadores">
         <ul class="pagination">
             <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Previous</button>
+                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
             </li>
             @for (var page = 1; page <= totalPages; page++)
             {
@@ -86,7 +86,7 @@ else
                 </li>
             }
             <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Next</button>
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">PrÃ³ximo</button>
             </li>
         </ul>
     </nav>
@@ -189,7 +189,7 @@ else
 
     private async Task ConfirmDelete(int id)
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirmar", "Tem certeza de que deseja excluir este jogador?"))
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Tem certeza de que deseja excluir este jogador?"))
         {
             return;
         }

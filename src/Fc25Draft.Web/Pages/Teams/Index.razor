@@ -8,7 +8,7 @@
 <div class="row mb-3">
     <div class="col-md-6">
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input class="form-control me-2" placeholder="Pesquisar por equipe ou responsável" @bind="search" />
+            <input class="form-control me-2" placeholder="Pesquisar por equipe ou responsÃ¡vel" @bind="search" />
             <button type="submit" class="btn btn-primary">Buscar</button>
         </form>
     </div>
@@ -37,8 +37,8 @@ else
             <thead>
                 <tr>
                     <th>Equipe</th>
-                    <th>Responsável</th>
-                    <th class="text-end">Ações</th>
+                    <th>ResponsÃ¡vel</th>
+                    <th class="text-end">AÃ§Ãµes</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,7 +58,7 @@ else
         </table>
     </div>
 
-    <nav aria-label="Paginação de equipes">
+    <nav aria-label="PaginaÃ§Ã£o de equipes">
         <ul class="pagination">
             <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
                 <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
@@ -70,7 +70,7 @@ else
                 </li>
             }
             <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">PrÃ³ximo</button>
             </li>
         </ul>
     </nav>

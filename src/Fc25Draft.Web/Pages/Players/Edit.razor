@@ -40,9 +40,9 @@ else
         </div>
 
         <div class="mb-3">
-            <label class="form-label" for="playerPosition">PosiÁ„o</label>
+            <label class="form-label" for="playerPosition">Posi√ß√£o</label>
             <InputSelect id="playerPosition" class="form-select" @bind-Value="model.PositionId">
-                <option value="">Select a position</option>
+                <option value="">Selecione uma posi√ß√£o</option>
                 @foreach (var position in positions)
                 {
                     <option value="@position.PositionId">@position.Name</option>
@@ -92,7 +92,7 @@ else
                 var player = await PlayerService.GetAsync(Id.Value);
                 if (player is null)
                 {
-                    errorMessage = "Jogador n„o encontrado";
+                    errorMessage = "Jogador n√£o encontrado.";
                 }
                 else
                 {
@@ -162,7 +162,7 @@ else
         [Range(0, 99)]
         public int? Overall { get; set; }
 
-        [Required(ErrorMessage = "A posiÁ„o È obrigatÛria.")]
+        [Required(ErrorMessage = "A posi√ß√£o √© obrigat√≥ria.")]
         public short? PositionId { get; set; }
     }
 }

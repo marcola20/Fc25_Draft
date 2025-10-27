@@ -27,7 +27,7 @@ else
         </div>
 
         <div class="mb-3">
-            <label class="form-label" for="ownerName">Respons·vel</label>
+            <label class="form-label" for="ownerName">Respons√°vel</label>
             <InputText id="ownerName" class="form-control" @bind-Value="model.OwnerName" />
             <ValidationMessage For="() => model.OwnerName" />
         </div>
@@ -62,7 +62,7 @@ else
                 var team = await TeamService.GetAsync(Id.Value);
                 if (team is null)
                 {
-                    errorMessage = "Time n„o encontrado";
+                    errorMessage = "Time n√£o encontrado.";
                 }
                 else
                 {
