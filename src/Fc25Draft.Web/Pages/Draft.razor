@@ -109,11 +109,11 @@
         <label class="form-label" for="overallMin">Overall mínimo</label>
         <InputNumber TValue="int?" id="overallMin" class="form-control" min="70" max="99" @bind-Value="overallMin" />
     </div>
-    <div class="col-4 col-sm-4 col-md-3 col-lg-2">
+    <div class="col-5 col-sm-4 col-md-3 col-lg-2">
         <label class="form-label" for="overallMax">Overall máximo</label>
         <InputNumber TValue="int?" id="overallMax" class="form-control" min="70" max="99" @bind-Value="overallMax" />
     </div>
-    <div class="col-4 col-sm-4 col-md-3 col-lg-2 d-flex flex-column justify-content-end gap-2">
+    <div class="col-3 col-sm-4 col-md-3 col-lg-2 d-flex flex-column justify-content-end gap-2">
         <label class="form-label d-none d-sm-block">&nbsp;</label>
         <button type="button" class="btn btn-outline-primary filter-apply-btn w-100" @onclick="ApplyFiltersAsync" disabled="@isLoadingPlayers">Filtrar</button>
     </div>
