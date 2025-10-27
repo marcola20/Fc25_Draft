@@ -959,10 +959,6 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
         });
 
     adminBudgetApi.MapPost(
@@ -1005,20 +1001,9 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
         });
 
-    adminBudgetApi.MapGet(
-        "/ledger",
-        async (
-            [FromQuery] Guid teamId,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20,
-            DraftDbContext db,
-            CancellationToken ct) =>
+    adminBudgetApi.MapGet("/ledger", async ([FromQuery] Guid teamId, DraftDbContext db, CancellationToken ct, [FromQuery] int page = 1, [FromQuery] int pageSize = 20 ) =>
         {
             if (teamId == Guid.Empty)
             {
@@ -1057,7 +1042,6 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
             return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
         });
 }
-
 static void MapPricingEndpoints(RouteGroupBuilder api)
 {
     var pricingApi = api.MapGroup("/pricing");
