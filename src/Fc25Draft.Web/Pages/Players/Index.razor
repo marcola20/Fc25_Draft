@@ -60,28 +60,28 @@
 </div>
 
 <div class="row mb-3 g-2 align-items-end">
-    <div class="col-auto">
+    <div class="col-4 col-sm-auto flex-sm-grow-0 flex-grow-1">
         <label class="form-label mb-1" for="overallMin">Overall mínimo</label>
         <InputNumber id="overallMin"
                      class="form-control"
-                     style="width: 140px; height: 38px; font-size: 0.95rem;"
+                     style="height: 38px; font-size: 0.95rem;"
                      @bind-Value="overallMin"
                      min="70" max="99" />
     </div>
-    <div class="col-auto">
+    <div class="col-4 col-sm-auto flex-sm-grow-0 flex-grow-1">
         <label class="form-label mb-1" for="overallMax">Overall máximo</label>
         <InputNumber id="overallMax"
                      class="form-control"
-                     style="width: 140px; height: 38px; font-size: 0.95rem;"
+                     style="height: 38px; font-size: 0.95rem;"
                      @bind-Value="overallMax"
                      min="70" max="99" />
     </div>
-    <div class="col-auto pt-md-4">
+    <div class="col-4 col-sm-auto pt-md-4">
         <button type="button"
-                class="btn btn-outline-primary"
+                class="btn btn-outline-primary w-100 w-sm-auto"
                 style="height: 40px; padding: 0 18px; font-size: 0.95rem; font-weight: 500;"
                 @onclick="ApplyFiltersAsync">
-            Aplicar filtros
+            Filtrar
         </button>
     </div>
 </div>
