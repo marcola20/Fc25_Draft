@@ -2,6 +2,7 @@
 @using System
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
+@using System.Linq
 @inject PlayersApiClient PlayersApiClient
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
@@ -63,6 +64,20 @@
     </div>
 </div>
 
+<div class="row mb-3 g-2 align-items-end">
+    <div class="col-md-3 col-lg-2">
+        <label class="form-label" for="overallMin">Overall mínimo</label>
+        <InputNumber id="overallMin" class="form-control" @bind-Value="overallMin" min="0" max="150" />
+    </div>
+    <div class="col-md-3 col-lg-2">
+        <label class="form-label" for="overallMax">Overall máximo</label>
+        <InputNumber id="overallMax" class="form-control" @bind-Value="overallMax" min="0" max="150" />
+    </div>
+    <div class="col-md-3 col-lg-2 pt-md-4">
+        <button type="button" class="btn btn-outline-primary w-100" @onclick="ApplyFiltersAsync">Aplicar filtros</button>
+    </div>
+</div>
+
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
@@ -95,10 +110,11 @@
 }
 else if (players.Count == 0)
 {
-    <p>Nenhum jogador encontrado.</p>
+    <p>@GetPlayersSummary()</p>
 }
 else
 {
+    <p class="text-muted">@GetPlayersSummary()</p>
     <div class="table-responsive">
         <table class="table table-striped align-middle">
             <thead>
@@ -136,22 +152,46 @@ else
         </table>
     </div>
 
-    <nav aria-label="Paginação de jogadores">
-        <ul class="pagination">
-            <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
-            </li>
-            @for (var page = 1; page <= totalPages; page++)
-            {
-                <li class="page-item @(page == currentPage ? "active" : string.Empty)">
-                    <button class="page-link" @onclick="() => ChangePage(page)">@(page)</button>
+    @if (totalPages > 1)
+    {
+        var visiblePages = GetVisiblePageNumbers();
+        <nav aria-label="Paginação de jogadores">
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
+                    <button type="button" class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
                 </li>
-            }
-            <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
-            </li>
-        </ul>
-    </nav>
+                @if (visiblePages.Count > 0 && visiblePages[0] > 1)
+                {
+                    <li class="page-item">
+                        <button type="button" class="page-link" @onclick="() => ChangePage(1)">1</button>
+                    </li>
+                    @if (visiblePages[0] > 2)
+                    {
+                        <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                    }
+                }
+                @foreach (var page in visiblePages)
+                {
+                    <li class="page-item @(page == currentPage ? "active" : string.Empty)">
+                        <button type="button" class="page-link" @onclick="() => ChangePage(page)">@(page)</button>
+                    </li>
+                }
+                @if (visiblePages.Count > 0 && visiblePages[visiblePages.Count - 1] < totalPages)
+                {
+                    @if (visiblePages[visiblePages.Count - 1] < totalPages - 1)
+                    {
+                        <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                    }
+                    <li class="page-item">
+                        <button type="button" class="page-link" @onclick="() => ChangePage(totalPages)">@totalPages</button>
+                    </li>
+                }
+                <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
+                    <button type="button" class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
+                </li>
+            </ul>
+        </nav>
+    }
 }
 
 @code {
@@ -160,6 +200,7 @@ else
     private readonly List<Position> positions = new();
     private int currentPage = 1;
     private int totalPages = 1;
+    private int totalPlayers;
     private string? search;
     private string? errorMessage;
     private bool isLoading = true;
@@ -171,6 +212,8 @@ else
     private string? importSuccessMessage;
     private string? importErrorMessage;
     private readonly List<string> importErrors = new();
+    private int? overallMin;
+    private int? overallMax;
 
     protected override void OnInitialized()
     {
@@ -211,15 +254,13 @@ else
 
     private async Task OnSearchAsync()
     {
-        currentPage = 1;
-        await LoadPlayersAsync();
+        await ApplyFiltersAsync();
     }
 
     private async Task OnFilterChanged(ChangeEventArgs args)
     {
         selectedPositionId = args.Value?.ToString();
-        currentPage = 1;
-        await LoadPlayersAsync();
+        await ApplyFiltersAsync();
     }
 
     private async Task OnOnlyAvailableChanged(ChangeEventArgs args)
@@ -236,8 +277,7 @@ else
         {
             onlyAvailable = false;
         }
-        currentPage = 1;
-        await LoadPlayersAsync();
+        await ApplyFiltersAsync();
     }
 
     private async Task OnCsvSelected(InputFileChangeEventArgs args)
@@ -312,9 +352,10 @@ else
                 positionId = parsed;
             }
 
-            var result = await PlayersApiClient.GetAsync(search, positionId, onlyAvailable, currentPage, PageSize);
+            var result = await PlayersApiClient.GetAsync(search, positionId, onlyAvailable, overallMin, overallMax, currentPage, PageSize);
             players.AddRange(result.Items);
-            totalPages = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
+            totalPlayers = result.Total;
+            totalPages = Math.Max(1, (int)Math.Ceiling(totalPlayers / (double)PageSize));
             if (currentPage > totalPages)
             {
                 currentPage = totalPages;
@@ -340,6 +381,12 @@ else
         }
 
         currentPage = page;
+        await LoadPlayersAsync();
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        currentPage = 1;
         await LoadPlayersAsync();
     }
 
@@ -402,6 +449,40 @@ else
         };
 
         Navigation.NavigateTo(path, forceLoad: true);
+    }
+
+    private IReadOnlyList<int> GetVisiblePageNumbers()
+    {
+        const int maxVisiblePages = 5;
+
+        if (totalPages <= maxVisiblePages)
+        {
+            return Enumerable.Range(1, totalPages).ToList();
+        }
+
+        var start = Math.Max(1, currentPage - 2);
+        var end = Math.Min(totalPages, start + maxVisiblePages - 1);
+        start = Math.Max(1, end - maxVisiblePages + 1);
+
+        return Enumerable.Range(start, end - start + 1).ToList();
+    }
+
+    private string GetPlayersSummary()
+    {
+        if (totalPlayers == 0)
+        {
+            return "Nenhum jogador encontrado.";
+        }
+
+        if (players.Count == 0)
+        {
+            return $"Nenhum jogador nesta página. Total de {totalPlayers} jogadores.";
+        }
+
+        var start = (currentPage - 1) * PageSize + 1;
+        var end = Math.Min(totalPlayers, start + players.Count - 1);
+
+        return $"Mostrando {start}-{end} de {totalPlayers} jogadores.";
     }
 
     private void OnAuthenticationChanged()

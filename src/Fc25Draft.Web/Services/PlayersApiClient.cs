@@ -23,6 +23,8 @@ public class PlayersApiClient
         string? search,
         short? positionId,
         bool onlyAvailable,
+        int? overallMin,
+        int? overallMax,
         int page,
         int pageSize,
         CancellationToken ct = default)
@@ -48,6 +50,16 @@ public class PlayersApiClient
         if (onlyAvailable)
         {
             query["onlyAvailable"] = "true";
+        }
+
+        if (overallMin.HasValue)
+        {
+            query["overallMin"] = overallMin.Value.ToString();
+        }
+
+        if (overallMax.HasValue)
+        {
+            query["overallMax"] = overallMax.Value.ToString();
         }
 
         var url = QueryHelpers.AddQueryString("api/players", query);

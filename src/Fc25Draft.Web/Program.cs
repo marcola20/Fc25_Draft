@@ -383,6 +383,8 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
         string? q,
         short? pos,
         bool? onlyAvailable,
+        int? overallMin,
+        int? overallMax,
         int page = 1,
         int pageSize = 10,
         CancellationToken ct = default) =>
@@ -393,6 +395,11 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
         var query = db.Players
             .AsNoTracking()
             .Where(p => true);
+
+        if (overallMin.HasValue && overallMax.HasValue && overallMin > overallMax)
+        {
+            return Results.BadRequest(new { message = "Overall mínimo não pode ser maior que o máximo." });
+        }
 
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -408,6 +415,16 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
         if (onlyAvailable is true)
         {
             query = query.Where(p => !p.TeamRosters.Any());
+        }
+
+        if (overallMin.HasValue)
+        {
+            query = query.Where(p => p.Overall >= overallMin.Value);
+        }
+
+        if (overallMax.HasValue)
+        {
+            query = query.Where(p => p.Overall <= overallMax.Value);
         }
 
         var total = await query.CountAsync(ct);
