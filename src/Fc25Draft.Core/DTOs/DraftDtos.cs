@@ -48,3 +48,5 @@ public record AvailablePlayerDto(
     int? Age);
 
 public record DraftPickRequestDto(int PlayerId, string Token);
+
+public record GenerateDraftRequestDto(int TotalRounds, bool Snake = false);
