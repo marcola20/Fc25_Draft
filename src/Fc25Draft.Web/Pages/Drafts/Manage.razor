@@ -47,7 +47,7 @@ else
                 @foreach (var draft in drafts)
                 {
                     <option value="@draft.DraftId" selected="@(selectedDraftId == draft.DraftId)">
-                        @draft.Name (@draft.CreatedAtUtc.ToLocalTime():g)
+                        @draft.Name
                     </option>
                 }
             }
@@ -68,8 +68,6 @@ else
             <div class="card-body">
                 <h5 class="card-title mb-3">@selectedDraft.Name</h5>
                 <dl class="row mb-0">
-                    <dt class="col-sm-3">Criado em</dt>
-                    <dd class="col-sm-9">@selectedDraft.CreatedAtUtc.ToLocalTime():f</dd>
                     <dt class="col-sm-3">Total de equipes</dt>
                     <dd class="col-sm-9">@selectedDraft.TotalTeams</dd>
                     <dt class="col-sm-3">Total de rodadas</dt>
