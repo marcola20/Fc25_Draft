@@ -4,20 +4,20 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<h3>Players</h3>
+<h3>Jogadores</h3>
 
 <div class="row mb-3 g-2 align-items-end">
     <div class="col-md-5">
-        <label class="form-label" for="playerSearch">Search</label>
+        <label class="form-label" for="playerSearch">Pesquisar</label>
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input id="playerSearch" class="form-control me-2" placeholder="Search by name" @bind="search" />
-            <button type="submit" class="btn btn-primary">Search</button>
+            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por Nome" @bind="search" />
+            <button type="submit" class="btn btn-primary">Procurar</button>
         </form>
     </div>
     <div class="col-md-3">
-        <label class="form-label" for="positionFilter">Position</label>
+        <label class="form-label" for="positionFilter">Posição</label>
         <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnFilterChanged">
-            <option value="">All</option>
+            <option value="">Todos</option>
             @foreach (var position in positions)
             {
                 <option value="@position.PositionId">@position.Name</option>
@@ -25,7 +25,7 @@
         </select>
     </div>
     <div class="col-md-4 text-end">
-        <button class="btn btn-success" @onclick="CreatePlayer">New Player</button>
+        <button class="btn btn-success" @onclick="CreatePlayer">Adicionar Jogador</button>
     </div>
 </div>
 
@@ -36,11 +36,11 @@
 
 @if (isLoading)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Carregando...</em></p>
 }
 else if (players.Count == 0)
 {
-    <p>No players found.</p>
+    <p>Nenhum jogador encontrado.</p>
 }
 else
 {
@@ -48,11 +48,11 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Position</th>
+                    <th>Nome</th>
+                    <th>Posição</th>
                     <th>Overall</th>
-                    <th>Age</th>
-                    <th class="text-end">Actions</th>
+                    <th>Idade</th>
+                    <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,9 +64,9 @@ else
                         <td>@player.Overall</td>
                         <td>@(player.Age?.ToString() ?? "-")</td>
                         <td class="text-end">
-                            <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Details</button>
-                            <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Edit</button>
-                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Delete</button>
+                            <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Detalhes</button>
+                            <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Editar</button>
+                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Deletar</button>
                         </td>
                     </tr>
                 }
@@ -82,7 +82,7 @@ else
             @for (var page = 1; page <= totalPages; page++)
             {
                 <li class="page-item @(page == currentPage ? "active" : string.Empty)">
-                    <button class="page-link" @onclick="() => ChangePage(page)">@page</button>
+                    <button class="page-link" @onclick="() => ChangePage(page)">@(page)</button>
                 </li>
             }
             <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
@@ -189,7 +189,7 @@ else
 
     private async Task ConfirmDelete(int id)
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this player?"))
+        if (!await JSRuntime.InvokeAsync<bool>("confirmar", "Tem certeza de que deseja excluir este jogador?"))
         {
             return;
         }

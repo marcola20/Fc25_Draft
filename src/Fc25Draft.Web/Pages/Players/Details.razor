@@ -2,7 +2,7 @@
 @inject IPlayerService PlayerService
 @inject NavigationManager Navigation
 
-<h3>Player Details</h3>
+<h3>Detalhes do Jogador</h3>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -11,31 +11,38 @@
 
 @if (isLoading)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Carregando...</em></p>
 }
 else if (player is null)
 {
-    <p>Player not found.</p>
+    <p>Jogador não encontrado</p>
 }
 else
 {
     <dl class="row">
-        <dt class="col-sm-2">Name</dt>
+        <dt class="col-sm-2">Nome</dt>
         <dd class="col-sm-10">@player.Name</dd>
 
         <dt class="col-sm-2">Overall</dt>
         <dd class="col-sm-10">@player.Overall</dd>
 
-        <dt class="col-sm-2">Age</dt>
+        <dt class="col-sm-2">Idade</dt>
         <dd class="col-sm-10">@(player.Age?.ToString() ?? "-")</dd>
 
-        <dt class="col-sm-2">Position</dt>
+        <dt class="col-sm-2">Posição</dt>
         <dd class="col-sm-10">@player.Position?.Name</dd>
     </dl>
 
     <div class="d-flex gap-2">
-        <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")">Edit</button>
-        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/players")">Back</button>
+        <button class="btn btn-primary"
+                @onclick="@(() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}"))">
+            Editar
+        </button>
+
+        <button class="btn btn-secondary"
+                @onclick="@(() => Navigation.NavigateTo("/players"))">
+            Voltar
+        </button>
     </div>
 }
 
@@ -54,7 +61,7 @@ else
             player = await PlayerService.GetAsync(Id);
             if (player is null)
             {
-                errorMessage = "Player not found.";
+                errorMessage = "Jogador não encontrado.";
             }
         }
         catch (Exception ex)

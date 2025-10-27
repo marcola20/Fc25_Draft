@@ -3,17 +3,17 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<h3>Teams</h3>
+<h3>Equipes</h3>
 
 <div class="row mb-3">
     <div class="col-md-6">
         <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input class="form-control me-2" placeholder="Search by team or owner" @bind="search" />
-            <button type="submit" class="btn btn-primary">Search</button>
+            <input class="form-control me-2" placeholder="Pesquisar por equipe ou responsável" @bind="search" />
+            <button type="submit" class="btn btn-primary">Buscar</button>
         </form>
     </div>
     <div class="col-md-6 text-end">
-        <button class="btn btn-success" @onclick="CreateTeam">New Team</button>
+        <button class="btn btn-success" @onclick="CreateTeam">Nova Equipe</button>
     </div>
 </div>
 
@@ -24,11 +24,11 @@
 
 @if (isLoading)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Carregando...</em></p>
 }
 else if (teams.Count == 0)
 {
-    <p>No teams found.</p>
+    <p>Nenhuma equipe encontrada.</p>
 }
 else
 {
@@ -36,9 +36,9 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>Team</th>
-                    <th>Owner</th>
-                    <th class="text-end">Actions</th>
+                    <th>Equipe</th>
+                    <th>Responsável</th>
+                    <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -48,9 +48,9 @@ else
                         <td>@team.TeamName</td>
                         <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
                         <td class="text-end">
-                            <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Details</button>
-                            <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Edit</button>
-                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Delete</button>
+                            <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Detalhes</button>
+                            <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Editar</button>
+                            <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Excluir</button>
                         </td>
                     </tr>
                 }
@@ -58,19 +58,19 @@ else
         </table>
     </div>
 
-    <nav aria-label="Teams pagination">
+    <nav aria-label="Paginação de equipes">
         <ul class="pagination">
             <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Previous</button>
+                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
             </li>
             @for (var page = 1; page <= totalPages; page++)
             {
                 <li class="page-item @(page == currentPage ? "active" : string.Empty)">
-                    <button class="page-link" @onclick="() => ChangePage(page)">@page</button>
+                    <button class="page-link" @onclick="() => ChangePage(page)">@(page)</button>
                 </li>
             }
             <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Next</button>
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
             </li>
         </ul>
     </nav>
@@ -143,7 +143,7 @@ else
 
     private async Task ConfirmDelete(Guid id)
     {
-        if (!await JSRuntimeConfirm($"Are you sure you want to delete this team?"))
+        if (!await JSRuntimeConfirm("Tem certeza de que deseja excluir esta equipe?"))
         {
             return;
         }
