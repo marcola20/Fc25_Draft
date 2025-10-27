@@ -106,70 +106,73 @@ else
             <div class="alert alert-secondary mb-4" role="alert">Somente administradores podem adicionar novas rodadas.</div>
         }
 
-        @if (selectedDraft.Rounds.Count == 0)
+        @if (OrderedRounds.Count == 0)
         {
             <p>Nenhuma rodada cadastrada para este draft.</p>
         }
         else
         {
-            @{
-                var orderedRounds = selectedDraft.Rounds.OrderBy(r => r.RoundNumber).ToList();
-                var roundToDisplay = orderedRounds.FirstOrDefault(r => selectedRoundNumber.HasValue && r.RoundNumber == selectedRoundNumber.Value)
-                    ?? orderedRounds.First();
+            @if (RoundToDisplay is not null)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Rodada @RoundToDisplay.RoundNumber</strong>
+                            <span class="ms-2 text-muted">@FormatOverallRange(RoundToDisplay)</span>
+                        </div>
+                        @if (AdminAuth.IsAuthenticated && CanRemoveRound(RoundToDisplay))
+                        {
+                            <button class="btn btn-outline-danger btn-sm"
+                                    @onclick="() => ConfirmRemoveRoundAsync(RoundToDisplay.RoundNumber)"
+                                    disabled="@isProcessing">
+                                Remover rodada
+                            </button>
+                        }
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Escolha</th>
+                                        <th>Time</th>
+                                        <th>Responsável</th>
+                                        <th>Jogador</th>
+                                        <th>Data/Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var pick in RoundToDisplay.Picks.OrderBy(p => p.PickInRound))
+                                    {
+                                        <tr>
+                                            <td>@pick.PickInRound (@pick.OverallPick)</td>
+                                            <td>@pick.TeamName</td>
+                                            <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
+                                            <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
+                                            <td>@(pick.PickedAtUtc.HasValue? pick.PickedAtUtc.Value.ToLocalTime().ToString("g") : "-")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             }
 
             <nav class="mb-3" aria-label="Navegação de rodadas">
                 <ul class="pagination pagination-sm flex-wrap mb-0">
-                    @foreach (var round in orderedRounds)
+                    @foreach (var round in OrderedRounds)
                     {
                         <li class="page-item @(round.RoundNumber == selectedRoundNumber ? "active" : string.Empty)">
-                            <button type="button" class="page-link" @onclick="() => SelectRound(round.RoundNumber)" disabled="@isProcessing">@round.RoundNumber</button>
+                            <button type="button" class="page-link"
+                                    @onclick="() => SelectRound(round.RoundNumber)"
+                                    disabled="@isProcessing">
+                                @round.RoundNumber
+                            </button>
                         </li>
                     }
                 </ul>
             </nav>
-
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>Rodada @roundToDisplay.RoundNumber</strong>
-                        <span class="ms-2 text-muted">@FormatOverallRange(roundToDisplay)</span>
-                    </div>
-                    @if (AdminAuth.IsAuthenticated && CanRemoveRound(roundToDisplay))
-                    {
-                        <button class="btn btn-outline-danger btn-sm" @onclick="() => ConfirmRemoveRoundAsync(roundToDisplay.RoundNumber)" disabled="@isProcessing">
-                            Remover rodada
-                        </button>
-                    }
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Escolha</th>
-                                    <th>Time</th>
-                                    <th>Responsável</th>
-                                    <th>Jogador</th>
-                                    <th>Data/Hora</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var pick in roundToDisplay.Picks.OrderBy(p => p.PickInRound))
-                                {
-                                    <tr>
-                                        <td>@pick.PickInRound (@pick.OverallPick)</td>
-                                        <td>@pick.TeamName</td>
-                                        <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
-                                        <td>@(pick.PickedAtUtc.HasValue ? pick.PickedAtUtc.Value.ToLocalTime().ToString("g") : "-")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         }
     }
 }
@@ -188,6 +191,9 @@ else
     private int? newRoundOverallMax;
     private int? selectedRoundNumber;
 
+    private List<DraftRoundDetailsDto> OrderedRounds = new();
+    private DraftRoundDetailsDto? RoundToDisplay;
+
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
@@ -195,10 +201,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
-        {
-            return;
-        }
+        if (!firstRender) return;
 
         await AdminAuth.EnsureInitializedAsync();
         authInitialized = true;
@@ -234,6 +237,8 @@ else
             selectedDraftId = null;
             isLoadingDetails = false;
             selectedRoundNumber = null;
+            OrderedRounds = new();
+            RoundToDisplay = null;
         }
     }
 
@@ -263,6 +268,7 @@ else
         {
             isLoadingDetails = true;
             errorMessage = null;
+
             var draft = await DraftAdminApiClient.GetDraftAsync(draftId);
             if (draft is null)
             {
@@ -270,6 +276,8 @@ else
                 selectedDraft = null;
                 selectedDraftId = null;
                 selectedRoundNumber = null;
+                OrderedRounds = new();
+                RoundToDisplay = null;
                 return;
             }
 
@@ -281,13 +289,15 @@ else
                 selectedRoundNumber = null;
             }
             else if (!selectedRoundNumber.HasValue ||
-                !draft.Rounds.Any(r => r.RoundNumber == selectedRoundNumber.Value))
+                     !draft.Rounds.Any(r => r.RoundNumber == selectedRoundNumber.Value))
             {
                 selectedRoundNumber = draft.Rounds
                     .OrderBy(r => r.RoundNumber)
                     .First()
                     .RoundNumber;
             }
+
+            RecomputeRounds();
         }
         catch (Exception ex)
         {
@@ -297,6 +307,18 @@ else
         {
             isLoadingDetails = false;
         }
+    }
+
+    private void RecomputeRounds()
+    {
+        OrderedRounds = selectedDraft?.Rounds?
+            .OrderBy(r => r.RoundNumber)
+            .ToList() ?? new();
+
+        RoundToDisplay = OrderedRounds
+            .FirstOrDefault(r => selectedRoundNumber.HasValue &&
+                                 r.RoundNumber == selectedRoundNumber.Value)
+            ?? OrderedRounds.FirstOrDefault();
     }
 
     private async Task OnDraftChanged(ChangeEventArgs args)
@@ -313,10 +335,7 @@ else
 
     private async Task AddRoundAsync()
     {
-        if (!selectedDraftId.HasValue || isProcessing)
-        {
-            return;
-        }
+        if (!selectedDraftId.HasValue || isProcessing) return;
 
         if (!AdminAuth.IsAuthenticated)
         {
@@ -338,7 +357,7 @@ else
             newRoundOverallMax = null;
 
             await LoadDraftsAsync();
-            await LoadDraftDetailsAsync(selectedDraftId.Value);
+            await LoadDraftDetailsAsync(selectedDraftId.Value); 
         }
         catch (Exception ex)
         {
@@ -352,10 +371,7 @@ else
 
     private async Task ConfirmRemoveRoundAsync(int roundNumber)
     {
-        if (!selectedDraftId.HasValue || isProcessing)
-        {
-            return;
-        }
+        if (!selectedDraftId.HasValue || isProcessing) return;
 
         if (!AdminAuth.IsAuthenticated)
         {
@@ -365,10 +381,7 @@ else
         }
 
         var confirm = await JSRuntime.InvokeAsync<bool>("confirm", $"Remover a rodada {roundNumber}? Esta ação não pode ser desfeita.");
-        if (!confirm)
-        {
-            return;
-        }
+        if (!confirm) return;
 
         try
         {
@@ -382,7 +395,7 @@ else
             await LoadDraftsAsync();
             if (selectedDraftId.HasValue)
             {
-                await LoadDraftDetailsAsync(selectedDraftId.Value);
+                await LoadDraftDetailsAsync(selectedDraftId.Value); 
             }
         }
         catch (Exception ex)
@@ -398,14 +411,12 @@ else
     private void SelectRound(int roundNumber)
     {
         selectedRoundNumber = roundNumber;
+        RecomputeRounds();
     }
 
     private bool CanRemoveRound(DraftRoundDetailsDto round)
     {
-        if (!AdminAuth.IsAuthenticated || selectedDraft is null)
-        {
-            return false;
-        }
+        if (!AdminAuth.IsAuthenticated || selectedDraft is null) return false;
 
         var isLastRound = round.RoundNumber == selectedDraft.Rounds.Max(r => r.RoundNumber);
         var hasSelections = round.Picks.Any(p => p.PlayerId.HasValue);
@@ -414,26 +425,11 @@ else
 
     private static string FormatOverallRange(DraftRoundDetailsDto round)
     {
-        if (round.OverallMin is null && round.OverallMax is null)
-        {
-            return "Sem limite de overall";
-        }
+        if (round.OverallMin is null && round.OverallMax is null) return "Sem limite de overall";
 
-        if (round.OverallMin is int min && round.OverallMax is int max)
-        {
-            return $"Overall {min} - {max}";
-        }
-
-        if (round.OverallMin is int minValue)
-        {
-            return $"Overall mínimo {minValue}";
-        }
-
-        if (round.OverallMax is int maxValue)
-        {
-            return $"Overall máximo {maxValue}";
-        }
-
+        if (round.OverallMin is int min && round.OverallMax is int max) return $"Overall {min} - {max}";
+        if (round.OverallMin is int minValue) return $"Overall mínimo {minValue}";
+        if (round.OverallMax is int maxValue) return $"Overall máximo {maxValue}";
         return string.Empty;
     }
 
