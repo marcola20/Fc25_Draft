@@ -1036,7 +1036,7 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
         var query = db.BudgetLedgers
             .AsNoTracking()
             .Where(l => l.TeamId == teamId)
-            .OrderByDescending(l => l.DataRegistroUtc);
+            .OrderByDescending(l => l.DataUtc);
 
         var total = await query.CountAsync(ct);
 
