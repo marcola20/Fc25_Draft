@@ -10,6 +10,7 @@
           <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />
         </ItemGroup>
         <ItemGroup>
+          <PackageReference Include="ClosedXML" Version="0.105.0" />
           <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>

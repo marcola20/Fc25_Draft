@@ -1,5 +1,6 @@
 @page "/players/details/{Id:int}"
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
 @inject PlayersApiClient PlayersApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
@@ -43,18 +44,13 @@ else
         <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(player.TeamName) ? "-" : player.TeamName)</dd>
     </dl>
 
-    <div class="d-flex gap-2">
-        @if (AdminAuth.IsAuthenticated)
-        {
-            <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")">
-                Editar
-            </button>
-        }
+    <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
+        Editar
+    </button>
 
-        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/players")">
-            Voltar
-        </button>
-    </div>
+    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
+        Voltar
+    </button>
 }
 
 @code {

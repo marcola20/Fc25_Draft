@@ -12,15 +12,16 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
 
     private readonly SecurityOptions _options;
 
-    public AdminTokenAuthenticationHandler(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder,
-        ISystemClock clock,
-        IOptions<SecurityOptions> securityOptions)
-        : base(options, logger, encoder, clock)
+    public AdminTokenAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options,
+                                           ILoggerFactory logger,
+                                           UrlEncoder encoder,
+                                           IOptions<SecurityOptions> securityOptions) : base(options, logger, encoder)
     {
         _options = securityOptions.Value;
+        if (Options.TimeProvider == null)
+        {
+            Options.TimeProvider = TimeProvider.System;
+        }
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()

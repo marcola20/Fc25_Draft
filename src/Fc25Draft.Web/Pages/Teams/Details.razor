@@ -1,5 +1,6 @@
 @page "/teams/details/{Id:guid}"
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
@@ -43,15 +44,16 @@ else
     <div class="d-flex gap-2">
         @if (AdminAuth.IsAuthenticated)
         {
-            <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")">
+            <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")'>
                 Editar
             </button>
         }
 
-        <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo("/teams")">
+        <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/teams")'>
             Voltar
         </button>
     </div>
+
 }
 
 @code {
