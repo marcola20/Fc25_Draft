@@ -18,6 +18,7 @@ builder.Services.AddDbContext<DraftDbContext>(opt =>
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<DraftService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
@@ -39,5 +40,11 @@ app.UseRouting();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+app.MapPost("/api/draft/reset", async (DraftService draftService, CancellationToken ct) =>
+{
+    await draftService.ResetDraftAsync(ct);
+    return Results.NoContent();
+});
 
 app.Run();

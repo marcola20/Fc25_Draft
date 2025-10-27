@@ -2,7 +2,7 @@
 @inject ITeamService TeamService
 @inject NavigationManager Navigation
 
-<h3>Deatalhes do Time</h3>
+<h3>Detalhes do Time</h3>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -15,33 +15,31 @@
 }
 else if (team is null)
 {
-    <p>Time n„o encontrado</p>
+    <p>Time n√£o encontrado.</p>
 }
 else
 {
     <dl class="row">
-        <dt class="col-sm-2">Nome do Time</dt>
-        <dd class="col-sm-10">@team.TeamName</dd>
+        <dt class="col-sm-3">Nome do Time</dt>
+        <dd class="col-sm-9">@team.TeamName</dd>
 
-        <dt class="col-sm-2">Nome Presidente</dt>
-        <dd class="col-sm-10">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
+        <dt class="col-sm-3">Respons√°vel</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
 
-        <dt class="col-sm-2">Team Token</dt>
-        <dd class="col-sm-10"><code>@team.TeamToken</code></dd>
+        <dt class="col-sm-3">Token da Equipe</dt>
+        <dd class="col-sm-9"><code>@team.TeamToken</code></dd>
     </dl>
 
     <div class="d-flex gap-2">
-        <div class="d-flex gap-2">
-            <button class="btn btn-primary"
-                    @onclick="@(() => Navigation.NavigateTo($"/teams/edit/{team!.TeamId}"))">
-                Editar
-            </button>
+        <button class="btn btn-primary"
+                @onclick="@(() => Navigation.NavigateTo($"/teams/edit/{team!.TeamId}"))">
+            Editar
+        </button>
 
-            <button class="btn btn-secondary"
-                    @onclick="@(() => Navigation.NavigateTo("/teams"))">
-                Voltar
-            </button>
-        </div>
+        <button class="btn btn-secondary"
+                @onclick="@(() => Navigation.NavigateTo("/teams"))">
+            Voltar
+        </button>
     </div>
 }
 
@@ -60,7 +58,7 @@ else
             team = await TeamService.GetAsync(Id);
             if (team is null)
             {
-                errorMessage = "Time n„o encontrado.";
+                errorMessage = "Time n√£o encontrado.";
             }
         }
         catch (Exception ex)
