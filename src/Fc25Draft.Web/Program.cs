@@ -1013,16 +1013,19 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         }
     });
 
+    static IResult UnauthorizedResult(string message)
+        => Results.Json(new { message }, statusCode: StatusCodes.Status401Unauthorized);
+
     static async Task<TokenValidationResult> ResolveTeamIdAsync(string? token, DraftDbContext db, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token obrigatório." }));
+            return new TokenValidationResult(null, UnauthorizedResult("Token obrigatório."));
         }
 
         if (!Guid.TryParse(token, out var parsedToken))
         {
-            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token inválido." }));
+            return new TokenValidationResult(null, UnauthorizedResult("Token inválido."));
         }
 
         var teamId = await db.Teams
@@ -1033,7 +1036,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
         if (!teamId.HasValue)
         {
-            return new TokenValidationResult(null, Results.Unauthorized(new { message = "Token inválido." }));
+            return new TokenValidationResult(null, UnauthorizedResult("Token inválido."));
         }
 
         return new TokenValidationResult(teamId.Value, null);
