@@ -54,6 +54,7 @@ builder.Services.AddScoped<DraftStateService>();
 builder.Services.AddScoped<AdminAuthService>();
 builder.Services.AddScoped<ApiClientFactory>();
 builder.Services.AddScoped<PlayersApiClient>();
+builder.Services.AddScoped<DraftAdminApiClient>();
 builder.Services.AddScoped<TeamsApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
@@ -181,6 +182,57 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
 
     var adminDraftApi = api.MapGroup("/admin/draft").RequireAuthorization("AdminOnly");
 
+    adminDraftApi.MapGet(string.Empty, async (DraftDbContext db, CancellationToken ct) =>
+    {
+        var drafts = await db.Drafts
+            .AsNoTracking()
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Select(d => new DraftSummaryDto(
+                d.DraftId,
+                d.Name,
+                d.TotalRounds,
+                d.TotalTeams,
+                d.CreatedAtUtc))
+            .ToListAsync(ct);
+
+        return Results.Ok(drafts);
+    });
+
+    adminDraftApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, CancellationToken ct) =>
+    {
+        var draft = await db.Drafts
+            .AsNoTracking()
+            .Where(d => d.DraftId == id)
+            .Select(d => new DraftDetailsDto(
+                d.DraftId,
+                d.Name,
+                d.TotalRounds,
+                d.TotalTeams,
+                d.CreatedAtUtc,
+                d.Rounds
+                    .OrderBy(r => r.RoundNumber)
+                    .Select(r => new DraftRoundDetailsDto(
+                        r.RoundNumber,
+                        r.OverallMin,
+                        r.OverallMax,
+                        r.Picks
+                            .OrderBy(p => p.PickInRound)
+                            .Select(p => new DraftRoundPickDto(
+                                p.PickInRound,
+                                p.OverallPick,
+                                p.TeamId,
+                                p.Team.TeamName,
+                                p.Team.OwnerName,
+                                p.PlayerId,
+                                p.Player != null ? p.Player.Name : null,
+                                p.PickedAtUtc))
+                            .ToList()))
+                    .ToList()))
+            .FirstOrDefaultAsync(ct);
+
+        return draft is null ? Results.NotFound() : Results.Ok(draft);
+    });
+
     adminDraftApi.MapPost("/generate", async (
         DraftService draftService,
         DraftStateService draftStateService,
@@ -218,6 +270,69 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
             return Results.Ok(state);
         }
         catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminDraftApi.MapPost("/{id:guid}/rounds", async (
+        DraftService draftService,
+        DraftStateService draftStateService,
+        IHubContext<DraftHub> hubContext,
+        Guid id,
+        DraftRoundCreateDto? request,
+        CancellationToken ct) =>
+    {
+        try
+        {
+            request ??= new DraftRoundCreateDto(null, null);
+            var round = await draftService.AddRoundAsync(id, request.OverallMin, request.OverallMax, ct);
+            await draftStateService.GetStateAsync(ct);
+            await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+            return Results.Ok(round);
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminDraftApi.MapDelete("/{id:guid}/rounds/{roundNumber:int}", async (
+        DraftService draftService,
+        DraftStateService draftStateService,
+        IHubContext<DraftHub> hubContext,
+        Guid id,
+        int roundNumber,
+        CancellationToken ct) =>
+    {
+        try
+        {
+            await draftService.RemoveRoundAsync(id, roundNumber, ct);
+            await draftStateService.GetStateAsync(ct);
+            await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentOutOfRangeException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
         }

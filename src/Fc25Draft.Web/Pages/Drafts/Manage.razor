@@ -1,0 +1,427 @@
+@page "/drafts/manage"
+@using Fc25Draft.Core.DTOs
+@inject DraftAdminApiClient DraftAdminApiClient
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
+
+@implements IDisposable
+
+<h3>Gerenciar Drafts</h3>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="status">@successMessage</div>
+}
+
+@if (!authInitialized)
+{
+    <p><em>Carregando informações de autenticação...</em></p>
+}
+else if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-info" role="alert">
+        Informe o token de administrador na página inicial para gerenciar os drafts.
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <label class="form-label" for="draftSelector">Draft</label>
+        <select id="draftSelector" class="form-select" @onchange="OnDraftChanged" disabled="@isLoadingDrafts">
+            @if (isLoadingDrafts)
+            {
+                <option>Carregando drafts...</option>
+            }
+            else if (drafts.Count == 0)
+            {
+                <option>Nenhum draft encontrado</option>
+            }
+            else
+            {
+                @foreach (var draft in drafts)
+                {
+                    <option value="@draft.DraftId" selected="@(selectedDraftId == draft.DraftId)">
+                        @draft.Name (@draft.CreatedAtUtc.ToLocalTime():g)
+                    </option>
+                }
+            }
+        </select>
+    </div>
+
+    @if (isLoadingDetails)
+    {
+        <p><em>Carregando detalhes do draft...</em></p>
+    }
+    else if (selectedDraft is null)
+    {
+        <p>Nenhum draft selecionado.</p>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">@selectedDraft.Name</h5>
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Criado em</dt>
+                    <dd class="col-sm-9">@selectedDraft.CreatedAtUtc.ToLocalTime():f</dd>
+                    <dt class="col-sm-3">Total de equipes</dt>
+                    <dd class="col-sm-9">@selectedDraft.TotalTeams</dd>
+                    <dt class="col-sm-3">Total de rodadas</dt>
+                    <dd class="col-sm-9">@selectedDraft.TotalRounds</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Adicionar rodada</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label" for="overallMin">Overall mínimo</label>
+                        <InputNumber<int?> id="overallMin" class="form-control" @bind-Value="newRoundOverallMin" Min="0" Max="150" disabled="@isProcessing" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="overallMax">Overall máximo</label>
+                        <InputNumber<int?> id="overallMax" class="form-control" @bind-Value="newRoundOverallMax" Min="0" Max="150" disabled="@isProcessing" />
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary" @onclick="AddRoundAsync" disabled="@isProcessing">Adicionar rodada</button>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">Os limites são opcionais. Deixe em branco para não restringir o overall.</small>
+            </div>
+        </div>
+
+        @if (selectedDraft.Rounds.Count == 0)
+        {
+            <p>Nenhuma rodada cadastrada para este draft.</p>
+        }
+        else
+        {
+            @foreach (var round in selectedDraft.Rounds.OrderBy(r => r.RoundNumber))
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Rodada @round.RoundNumber</strong>
+                            <span class="ms-2 text-muted">@FormatOverallRange(round)</span>
+                        </div>
+                        @if (CanRemoveRound(round))
+                        {
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => ConfirmRemoveRoundAsync(round.RoundNumber)" disabled="@isProcessing">
+                                Remover rodada
+                            </button>
+                        }
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Escolha</th>
+                                        <th>Time</th>
+                                        <th>Responsável</th>
+                                        <th>Jogador</th>
+                                        <th>Data/Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var pick in round.Picks.OrderBy(p => p.PickInRound))
+                                    {
+                                        <tr>
+                                            <td>@pick.PickInRound (@pick.OverallPick)</td>
+                                            <td>@pick.TeamName</td>
+                                            <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
+                                            <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
+                                            <td>@(pick.PickedAtUtc.HasValue ? pick.PickedAtUtc.Value.ToLocalTime().ToString("g") : "-")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+}
+
+@code {
+    private readonly List<DraftSummaryDto> drafts = new();
+    private DraftDetailsDto? selectedDraft;
+    private Guid? selectedDraftId;
+    private bool authInitialized;
+    private bool isLoadingDrafts = true;
+    private bool isLoadingDetails;
+    private bool isProcessing;
+    private string? errorMessage;
+    private string? successMessage;
+    private int? newRoundOverallMin;
+    private int? newRoundOverallMax;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+
+        if (AdminAuth.IsAuthenticated)
+        {
+            await LoadDraftsAndDetailsAsync();
+        }
+        else
+        {
+            isLoadingDrafts = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadDraftsAndDetailsAsync()
+    {
+        await LoadDraftsAsync();
+
+        Guid? draftId = null;
+
+        if (selectedDraftId.HasValue && drafts.Any(d => d.DraftId == selectedDraftId.Value))
+        {
+            draftId = selectedDraftId.Value;
+        }
+        else if (drafts.Count > 0)
+        {
+            draftId = drafts[0].DraftId;
+        }
+
+        if (draftId.HasValue)
+        {
+            selectedDraftId = draftId.Value;
+            await LoadDraftDetailsAsync(draftId.Value);
+        }
+        else
+        {
+            selectedDraft = null;
+            selectedDraftId = null;
+            isLoadingDetails = false;
+        }
+    }
+
+    private async Task LoadDraftsAsync()
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            drafts.Clear();
+            selectedDraft = null;
+            selectedDraftId = null;
+            return;
+        }
+
+        try
+        {
+            isLoadingDrafts = true;
+            errorMessage = null;
+            var result = await DraftAdminApiClient.GetDraftsAsync();
+            drafts.Clear();
+            drafts.AddRange(result);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingDrafts = false;
+        }
+    }
+
+    private async Task LoadDraftDetailsAsync(Guid draftId)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return;
+        }
+
+        try
+        {
+            isLoadingDetails = true;
+            errorMessage = null;
+            var draft = await DraftAdminApiClient.GetDraftAsync(draftId);
+            if (draft is null)
+            {
+                errorMessage = "Draft não encontrado.";
+                selectedDraft = null;
+                selectedDraftId = null;
+                return;
+            }
+
+            selectedDraft = draft;
+            selectedDraftId = draft.DraftId;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingDetails = false;
+        }
+    }
+
+    private async Task OnDraftChanged(ChangeEventArgs args)
+    {
+        if (Guid.TryParse(args.Value?.ToString(), out var draftId))
+        {
+            selectedDraftId = draftId;
+            errorMessage = null;
+            successMessage = null;
+            await LoadDraftDetailsAsync(draftId);
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddRoundAsync()
+    {
+        if (!selectedDraftId.HasValue || isProcessing)
+        {
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var request = new DraftRoundCreateDto(newRoundOverallMin, newRoundOverallMax);
+            var round = await DraftAdminApiClient.AddRoundAsync(selectedDraftId.Value, request);
+            successMessage = $"Rodada {round.RoundNumber} adicionada com sucesso.";
+            newRoundOverallMin = null;
+            newRoundOverallMax = null;
+
+            await LoadDraftsAsync();
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task ConfirmRemoveRoundAsync(int roundNumber)
+    {
+        if (!selectedDraftId.HasValue || isProcessing)
+        {
+            return;
+        }
+
+        var confirm = await JSRuntime.InvokeAsync<bool>("confirm", $"Remover a rodada {roundNumber}? Esta ação não pode ser desfeita.");
+        if (!confirm)
+        {
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.DeleteRoundAsync(selectedDraftId.Value, roundNumber);
+            successMessage = $"Rodada {roundNumber} removida com sucesso.";
+
+            await LoadDraftsAsync();
+            if (selectedDraftId.HasValue)
+            {
+                await LoadDraftDetailsAsync(selectedDraftId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private bool CanRemoveRound(DraftRoundDetailsDto round)
+    {
+        if (selectedDraft is null)
+        {
+            return false;
+        }
+
+        var isLastRound = round.RoundNumber == selectedDraft.Rounds.Max(r => r.RoundNumber);
+        var hasSelections = round.Picks.Any(p => p.PlayerId.HasValue);
+        return isLastRound && !hasSelections;
+    }
+
+    private static string FormatOverallRange(DraftRoundDetailsDto round)
+    {
+        if (round.OverallMin is null && round.OverallMax is null)
+        {
+            return "Sem limite de overall";
+        }
+
+        if (round.OverallMin is int min && round.OverallMax is int max)
+        {
+            return $"Overall {min} - {max}";
+        }
+
+        if (round.OverallMin is int minValue)
+        {
+            return $"Overall mínimo {minValue}";
+        }
+
+        if (round.OverallMax is int maxValue)
+        {
+            return $"Overall máximo {maxValue}";
+        }
+
+        return string.Empty;
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (AdminAuth.IsAuthenticated)
+            {
+                await LoadDraftsAndDetailsAsync();
+            }
+            else
+            {
+                drafts.Clear();
+                selectedDraft = null;
+                selectedDraftId = null;
+                isLoadingDrafts = false;
+                isLoadingDetails = false;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

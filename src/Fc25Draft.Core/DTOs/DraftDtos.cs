@@ -99,3 +99,36 @@ public record DraftBoardExportDto(
     string Jogador,
     string Posicao,
     string DataHoraUtc);
+
+public record DraftSummaryDto(
+    Guid DraftId,
+    string Name,
+    int TotalRounds,
+    int TotalTeams,
+    DateTime CreatedAtUtc);
+
+public record DraftRoundPickDto(
+    int PickInRound,
+    int OverallPick,
+    Guid TeamId,
+    string TeamName,
+    string? TeamOwner,
+    int? PlayerId,
+    string? PlayerName,
+    DateTime? PickedAtUtc);
+
+public record DraftRoundDetailsDto(
+    int RoundNumber,
+    int? OverallMin,
+    int? OverallMax,
+    IReadOnlyList<DraftRoundPickDto> Picks);
+
+public record DraftDetailsDto(
+    Guid DraftId,
+    string Name,
+    int TotalRounds,
+    int TotalTeams,
+    DateTime CreatedAtUtc,
+    IReadOnlyList<DraftRoundDetailsDto> Rounds);
+
+public record DraftRoundCreateDto(int? OverallMin, int? OverallMax);
