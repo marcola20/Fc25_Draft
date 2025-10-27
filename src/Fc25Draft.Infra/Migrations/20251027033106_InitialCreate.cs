@@ -192,7 +192,9 @@ namespace Fc25Draft.Infra.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_DraftPicks_PlayerId",
                 table: "DraftPicks",
-                column: "PlayerId");
+                column: "PlayerId",
+                unique: true,
+                filter: "[PlayerId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DraftPicks_TeamId",
