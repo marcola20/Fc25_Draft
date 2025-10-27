@@ -49,7 +49,12 @@
                     <p>Informe o token de administrador configurado no servidor.</p>
                     <div class="mb-3">
                         <label class="form-label" for="adminTokenInput">Token</label>
-                        <input id="adminTokenInput" class="form-control" type="password" @bind="adminTokenInput" autocomplete="one-time-code" />
+                        <input id="adminTokenInput"
+                               class="form-control"
+                               type="password"
+                               @bind-value="adminTokenInput"
+                               @bind-value:event="oninput"
+                               autocomplete="one-time-code" />
                     </div>
                     @if (!string.IsNullOrEmpty(adminModalError))
                     {
