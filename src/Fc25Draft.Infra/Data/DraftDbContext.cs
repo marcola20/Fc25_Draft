@@ -33,14 +33,14 @@ public class DraftDbContext : DbContext
 
             e.HasData(
                 new() { PositionId = 1,  Name = "Goleiro" },
-                new() { PositionId = 2, Name = "Zagueiro" },
-                new() { PositionId = 3, Name = "Lateral/Ala Esquerdo" },
-                new() { PositionId = 4, Name = "Lateral/Ala Direito" },
-                new() { PositionId = 5, Name = "Volante" },
-                new() { PositionId = 6, Name = "Meia Central" },
-                new() { PositionId = 7, Name = "Meia Atacante" },
-                new() { PositionId = 8, Name = "Meia/Ponta Esquerda" },
-                new() { PositionId = 9, Name = "Meia/Ponta Direita" },
+                new() { PositionId = 2,  Name = "Zagueiro" },
+                new() { PositionId = 3,  Name = "Lateral/Ala Esquerdo" },
+                new() { PositionId = 4,  Name = "Lateral/Ala Direito" },
+                new() { PositionId = 5,  Name = "Volante" },
+                new() { PositionId = 6,  Name = "Meia Central" },
+                new() { PositionId = 7,  Name = "Meia Atacante" },
+                new() { PositionId = 8,  Name = "Meia/Ponta Esquerda" },
+                new() { PositionId = 9,  Name = "Meia/Ponta Direita" },
                 new() { PositionId = 10, Name = "Atacante" }
             );
         });
