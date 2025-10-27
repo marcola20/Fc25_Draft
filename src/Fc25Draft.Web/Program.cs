@@ -17,14 +17,22 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
+
 
 builder.Services.AddDbContext<DraftDbContext>(opt =>
     opt.UseSqlServer(connectionString, sql =>
-            sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
+    {
+        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
+        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
+    })
        .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
        .EnableDetailedErrors(builder.Environment.IsDevelopment())
 );
@@ -63,6 +71,12 @@ builder.Services.AddScoped<IPositionService, PositionService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 await app.SeedDatabaseAsync();
 
 if (!app.Environment.IsDevelopment())
@@ -70,6 +84,11 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
