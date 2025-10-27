@@ -16,10 +16,16 @@ public static class SeedData
         {
             var positions = new List<Position>
             {
-                new() { PositionId = 1, Name = "GK" },
-                new() { PositionId = 2, Name = "DEF" },
-                new() { PositionId = 3, Name = "MID" },
-                new() { PositionId = 4, Name = "FWD" }
+                new() { PositionId = 1,  Name = "Goleiro" },
+                new() { PositionId = 2,  Name = "Zagueiro" },
+                new() { PositionId = 3,  Name = "Lateral/Ala Esquerdo" },
+                new() { PositionId = 4,  Name = "Lateral/Ala Direito" },
+                new() { PositionId = 5,  Name = "Volante" },
+                new() { PositionId = 6,  Name = "Meia Central" },
+                new() { PositionId = 7,  Name = "Meia Atacante" },
+                new() { PositionId = 8,  Name = "Meia/Ponta Esquerda" },
+                new() { PositionId = 9,  Name = "Meia/Ponta Direita" },
+                new() { PositionId = 10, Name = "Atacante" }
             };
 
             context.Positions.AddRange(positions);
@@ -28,30 +34,38 @@ public static class SeedData
 
         if (!await context.Teams.AnyAsync(cancellationToken))
         {
-            context.Teams.Add(new Team
+            var teams = new (string OwnerName, string TeamName)[]
             {
-                TeamId = Guid.NewGuid(),
-                TeamName = "Falcons City",
-                OwnerName = "Manager 1",
-                TeamToken = Guid.NewGuid()
-            });
-
-            hasChanges = true;
-        }
-
-        if (!await context.Players.AnyAsync(cancellationToken))
-        {
-            var players = new List<Player>
-            {
-                new() { Name = "Alex Keeper", Age = 28, Overall = 81, PositionId = 1 },
-                new() { Name = "Marco Back", Age = 27, Overall = 79, PositionId = 2 },
-                new() { Name = "Davi Center", Age = 24, Overall = 83, PositionId = 3 },
-                new() { Name = "Rui Striker", Age = 26, Overall = 85, PositionId = 4 }
+                ("Renan", "Manaus"),
+                ("João", "Madureira"),
+                ("Pio", "São Bernardo"),
+                ("Mafra", "Volta Redonda"),
+                ("Guilherme", "Corinthians"),
+                ("Kaio", "Santa Cruz"),
+                ("João", "Asa de Arapiraca"),
+                ("Mateuzinho", "Amazonas"),
+                ("Gui Gomes", "Paysandu"),
+                ("Marcola", "Remo"),
+                ("Rafa", "Sousa"),
+                ("Portuga", "Anápolis"),
+                ("L. Felipe", "Coritiba"),
+                ("Raphael", "Mirassol"),
             };
 
-            context.Players.AddRange(players);
+            foreach (var t in teams)
+            {
+                context.Teams.Add(new Team
+                {
+                    TeamId = Guid.NewGuid(),
+                    TeamName = t.TeamName,
+                    OwnerName = t.OwnerName,
+                    TeamToken = Guid.NewGuid() 
+                });
+            }
+
             hasChanges = true;
         }
+
 
         if (hasChanges)
         {
