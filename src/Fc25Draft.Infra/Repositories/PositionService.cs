@@ -17,7 +17,7 @@ public class PositionService : IPositionService
     public async Task<IReadOnlyList<Position>> GetAllAsync()
     {
         return await _db.Positions
-            .OrderBy(p => p.Name)
+            .OrderBy(p => p.PositionId)
             .AsNoTracking()
             .ToListAsync();
     }
