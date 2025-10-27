@@ -81,7 +81,14 @@
 </div>
 
 <div class="row g-3 align-items-end mb-3">
-    <div class="col-md-4">
+    <div class="col-lg-4">
+        <label class="form-label" for="playerSearch">Pesquisar</label>
+        <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
+            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por nome" @bind="searchTerm" />
+            <button type="submit" class="btn btn-primary" disabled="@isLoadingPlayers">Buscar</button>
+        </form>
+    </div>
+    <div class="col-lg-3">
         <label for="positionFilter" class="form-label">Posição</label>
         <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnPositionChanged">
             <option value="">Todas</option>
@@ -91,9 +98,24 @@
             }
         </select>
     </div>
-    <div class="col-md-4">
+    <div class="col-lg-3">
         <label class="form-label d-block">Atualizar</label>
-        <button class="btn btn-outline-primary" @onclick="LoadPlayersAsync" disabled="@isLoadingPlayers">Atualizar lista</button>
+        <button class="btn btn-outline-primary w-100" @onclick="LoadPlayersAsync" disabled="@isLoadingPlayers">Atualizar lista</button>
+    </div>
+</div>
+
+<div class="row g-3 align-items-end mb-4">
+    <div class="col-sm-4 col-md-3 col-lg-2">
+        <label class="form-label" for="overallMin">Overall mínimo</label>
+        <InputNumber TValue="int?" id="overallMin" class="form-control" min="70" max="99" @bind-Value="overallMin" />
+    </div>
+    <div class="col-sm-4 col-md-3 col-lg-2">
+        <label class="form-label" for="overallMax">Overall máximo</label>
+        <InputNumber TValue="int?" id="overallMax" class="form-control" min="70" max="99" @bind-Value="overallMax" />
+    </div>
+    <div class="col-sm-4 col-md-3 col-lg-2">
+        <label class="form-label d-block">&nbsp;</label>
+        <button type="button" class="btn btn-outline-primary w-100" @onclick="ApplyFiltersAsync" disabled="@isLoadingPlayers">Aplicar filtros</button>
     </div>
 </div>
 
@@ -184,6 +206,9 @@ else
     private bool isSubmittingPick;
     private DraftPickSelectionDto? lastSelection;
     private string? shareFeedback;
+    private string searchTerm = string.Empty;
+    private int? overallMin;
+    private int? overallMax;
 
     private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
@@ -279,6 +304,13 @@ else
 
     private async Task LoadPlayersAsync()
     {
+        if (overallMin.HasValue && overallMax.HasValue && overallMin > overallMax)
+        {
+            errorMessage = "Overall mínimo não pode ser maior que o máximo.";
+            return;
+        }
+
+        errorMessage = null;
         isLoadingPlayers = true;
         try
         {
@@ -289,7 +321,11 @@ else
                 positionId = parsed;
             }
 
-            var players = await DraftStateService.GetAvailablePlayersAsync(positionId);
+            var players = await DraftStateService.GetAvailablePlayersAsync(
+                positionId,
+                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
+                overallMin,
+                overallMax);
             availablePlayers.AddRange(players);
         }
         catch (Exception ex)
@@ -306,6 +342,16 @@ else
     private async Task OnPositionChanged(ChangeEventArgs args)
     {
         selectedPositionId = args.Value?.ToString();
+        await LoadPlayersAsync();
+    }
+
+    private async Task OnSearchAsync()
+    {
+        await LoadPlayersAsync();
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
         await LoadPlayersAsync();
     }
 

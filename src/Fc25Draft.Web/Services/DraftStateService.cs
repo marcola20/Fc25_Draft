@@ -105,7 +105,12 @@ public class DraftStateService
             currentPick is null && totalPicks > 0 && completedPicks == totalPicks);
     }
 
-    public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(short? positionId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(
+        short? positionId,
+        string? searchTerm = null,
+        int? overallMinFilter = null,
+        int? overallMaxFilter = null,
+        CancellationToken ct = default)
     {
         var draft = await _db.Drafts
             .OrderByDescending(d => d.CreatedAtUtc)
@@ -143,6 +148,12 @@ public class DraftStateService
             query = query.Where(p => p.PositionId == positionId.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var pattern = $"%{searchTerm.Trim()}%";
+            query = query.Where(p => EF.Functions.Like(p.Name, pattern));
+        }
+
         if (currentRound?.OverallMin is int overallMin)
         {
             query = query.Where(p => p.Overall >= overallMin);
@@ -151,6 +162,16 @@ public class DraftStateService
         if (currentRound?.OverallMax is int overallMax)
         {
             query = query.Where(p => p.Overall <= overallMax);
+        }
+
+        if (overallMinFilter.HasValue)
+        {
+            query = query.Where(p => p.Overall >= overallMinFilter.Value);
+        }
+
+        if (overallMaxFilter.HasValue)
+        {
+            query = query.Where(p => p.Overall <= overallMaxFilter.Value);
         }
 
         var players = await query
