@@ -856,10 +856,10 @@ static string BuildPlayerCsv(IReadOnlyList<PlayerExportDto> players)
 static string BuildDraftBoardCsv(IReadOnlyList<DraftBoardExportDto> entries)
 {
     var sb = new StringBuilder();
-    sb.AppendLine("Rodada;Escolha;Time;Responsável;Jogador;Posição;Data/Hora (UTC)");
+    sb.AppendLine("Rodada;Escolha;Time;Responsável;Jogador;Posição;Data/Hora");
     foreach (var entry in entries)
     {
-        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{Escape(entry.DataHoraUtc)}");
+        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{{entry.DataHoraUtc.ToLocalTime().ToString(\"dd/MM/yyyy HH:mm:ss\", new System.Globalization.CultureInfo(\"pt-BR\"))}}\r\n");
     }
 
     return sb.ToString();
