@@ -19,7 +19,7 @@ public static class SeedData
         ("Marcola", "Remo"),
         ("Rafa", "Sousa"),
         ("Portuga", "Anápolis"),
-        ("L. Felipe", "Coritiba"),
+        ("L. Felipe", "Portuguesa"),
         ("Raphael", "Mirassol"),
     ];
 
