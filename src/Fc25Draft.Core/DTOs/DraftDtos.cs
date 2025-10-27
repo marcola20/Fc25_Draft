@@ -54,7 +54,11 @@ public record DraftPickRequestDto(int PlayerId, string Token);
 
 public record DraftRoundRuleDto(int Round, int? OverallMin, int? OverallMax);
 
-public record GenerateDraftRequestDto(int TotalRounds, bool Snake = false, IReadOnlyList<DraftRoundRuleDto>? RoundRules = null);
+public record GenerateDraftRequestDto(
+    int TotalRounds,
+    bool Snake = false,
+    IReadOnlyList<DraftRoundRuleDto>? RoundRules = null,
+    string? Name = null);
 
 public record DraftPickResultDto(
     DraftStateDto State,

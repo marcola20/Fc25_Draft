@@ -13,6 +13,7 @@ using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -180,7 +181,7 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
         return Results.File(bytes, "text/csv", "draft-board.csv");
     });
 
-    var adminDraftApi = api.MapGroup("/admin/draft").RequireAuthorization("AdminOnly");
+    var adminDraftApi = api.MapGroup("/admin/draft");
 
     adminDraftApi.MapGet(string.Empty, async (DraftDbContext db, CancellationToken ct) =>
     {
@@ -196,7 +197,7 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
             .ToListAsync(ct);
 
         return Results.Ok(drafts);
-    });
+    }).AllowAnonymous();
 
     adminDraftApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, CancellationToken ct) =>
     {
@@ -231,9 +232,11 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
             .FirstOrDefaultAsync(ct);
 
         return draft is null ? Results.NotFound() : Results.Ok(draft);
-    });
+    }).AllowAnonymous();
 
-    adminDraftApi.MapPost("/generate", async (
+    var adminDraftProtectedApi = adminDraftApi.RequireAuthorization("AdminOnly");
+
+    adminDraftProtectedApi.MapPost("/generate", async (
         DraftService draftService,
         DraftStateService draftStateService,
         IHubContext<DraftHub> hubContext,
@@ -264,7 +267,7 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
                 roundRules = rules;
             }
 
-            await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, ct);
+            await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct);
             var state = await draftStateService.GetStateAsync(ct);
             await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
             return Results.Ok(state);
@@ -279,7 +282,7 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
         }
     });
 
-    adminDraftApi.MapPost("/{id:guid}/rounds", async (
+    adminDraftProtectedApi.MapPost("/{id:guid}/rounds", async (
         DraftService draftService,
         DraftStateService draftStateService,
         IHubContext<DraftHub> hubContext,
@@ -313,7 +316,7 @@ static void MapDraftEndpoints(RouteGroupBuilder api)
         }
     });
 
-    adminDraftApi.MapDelete("/{id:guid}/rounds/{roundNumber:int}", async (
+    adminDraftProtectedApi.MapDelete("/{id:guid}/rounds/{roundNumber:int}", async (
         DraftService draftService,
         DraftStateService draftStateService,
         IHubContext<DraftHub> hubContext,

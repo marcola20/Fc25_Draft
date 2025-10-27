@@ -21,7 +21,7 @@ else if (!string.IsNullOrEmpty(errorMessage))
 }
 
 <div class="mb-4 d-flex flex-wrap gap-2">
-    <button class="btn btn-primary" @onclick="GenerateDraftAsync" disabled="@(!AdminAuth.IsAuthenticated || isGenerating)">
+    <button class="btn btn-primary" @onclick="GenerateDraftAsync" disabled="@DisableGenerateButton">
         @if (isGenerating)
         {
             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -34,6 +34,11 @@ else if (!string.IsNullOrEmpty(errorMessage))
     </button>
 
 </div>
+
+@if (AdminAuth.IsAuthenticated && draftState?.HasDraft == true && !draftState.DraftCompleted)
+{
+    <small class="text-muted d-block mb-3">Finalize o draft atual para gerar um novo.</small>
+}
 
 <section class="row g-3">
     <div class="col-md-6">
@@ -61,6 +66,14 @@ else if (!string.IsNullOrEmpty(errorMessage))
     private string? successMessage;
     private string? errorMessage;
     private bool authInitialized;
+    private DraftStateDto? draftState;
+    private bool isLoadingState = true;
+
+    private bool DisableGenerateButton =>
+        !AdminAuth.IsAuthenticated ||
+        isGenerating ||
+        isLoadingState ||
+        (draftState?.HasDraft == true && !draftState.DraftCompleted);
 
     protected override void OnInitialized()
     {
@@ -76,7 +89,36 @@ else if (!string.IsNullOrEmpty(errorMessage))
 
         await AdminAuth.EnsureInitializedAsync();
         authInitialized = true;
+        await LoadDraftStateAsync();
         StateHasChanged();
+    }
+
+    private async Task LoadDraftStateAsync()
+    {
+        isLoadingState = true;
+
+        try
+        {
+            var client = await ApiClientFactory.CreateAsync();
+            var response = await client.GetAsync("api/draft/state");
+
+            if (response.IsSuccessStatusCode)
+            {
+                draftState = await response.Content.ReadFromJsonAsync<DraftStateDto>();
+            }
+            else
+            {
+                draftState = null;
+            }
+        }
+        catch
+        {
+            draftState = null;
+        }
+        finally
+        {
+            isLoadingState = false;
+        }
     }
 
     private async Task GenerateDraftAsync()
@@ -88,6 +130,48 @@ else if (!string.IsNullOrEmpty(errorMessage))
 
         successMessage = null;
         errorMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Entre como administrador para gerar o draft.";
+            return;
+        }
+
+        if (isLoadingState)
+        {
+            await LoadDraftStateAsync();
+        }
+
+        if (draftState?.HasDraft == true && !draftState.DraftCompleted)
+        {
+            errorMessage = "Não é possível gerar um novo draft enquanto o atual não foi concluído.";
+            return;
+        }
+
+        string? nameInput;
+        var defaultName = $"FC25 Draft - {DateTime.Now:yyyy-MM-dd HH:mm}";
+
+        try
+        {
+            nameInput = await JSRuntime.InvokeAsync<string?>("prompt", "Informe o nome do draft:", defaultName);
+        }
+        catch (JSException ex)
+        {
+            errorMessage = $"Não foi possível solicitar o nome do draft: {ex.Message}";
+            return;
+        }
+
+        if (nameInput is null)
+        {
+            return;
+        }
+
+        var draftName = nameInput.Trim();
+        if (string.IsNullOrWhiteSpace(draftName))
+        {
+            errorMessage = "Informe um nome válido para o draft.";
+            return;
+        }
 
         string? roundsInput;
 
@@ -177,18 +261,13 @@ else if (!string.IsNullOrEmpty(errorMessage))
         }
 
         isGenerating = true;
+        var stateUpdated = false;
 
         try
         {
-            if (!AdminAuth.IsAuthenticated)
-            {
-                errorMessage = "Entre como administrador para gerar o draft.";
-                return;
-            }
-
             var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
             var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, RoundRules: roundRules));
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, RoundRules: roundRules, Name: draftName));
 
             if (response.IsSuccessStatusCode)
             {
@@ -199,17 +278,19 @@ else if (!string.IsNullOrEmpty(errorMessage))
                 }
                 catch
                 {
-                    // Ignored - fallback to generic success message.
+                    // Ignorado - o estado será recarregado em seguida.
                 }
 
-                if (state is not null && state.HasDraft)
+                if (state is not null)
                 {
-                    var draftName = string.IsNullOrWhiteSpace(state.DraftName) ? "Draft" : state.DraftName;
-                    successMessage = $"{draftName} gerado com {state.TotalRounds} rodadas!";
+                    draftState = state;
+                    stateUpdated = true;
+                    var responseName = string.IsNullOrWhiteSpace(state.DraftName) ? draftName : state.DraftName;
+                    successMessage = $"{responseName} gerado com {state.TotalRounds} rodadas!";
                 }
                 else
                 {
-                    successMessage = $"Draft gerado com {totalRounds} rodadas!";
+                    successMessage = $"{draftName} gerado com {totalRounds} rodadas!";
                 }
             }
             else
@@ -234,6 +315,21 @@ else if (!string.IsNullOrEmpty(errorMessage))
         finally
         {
             isGenerating = false;
+
+            if (!stateUpdated)
+            {
+                await LoadDraftStateAsync();
+            }
+            else
+            {
+                // Garantir que a flag de carregamento reflita o estado atual
+                isLoadingState = false;
+            }
+        }
+
+        if (!stateUpdated && successMessage is not null)
+        {
+            successMessage = $"{draftName} gerado com {totalRounds} rodadas!";
         }
     }
 
@@ -246,7 +342,11 @@ else if (!string.IsNullOrEmpty(errorMessage))
             return;
         }
 
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(async () =>
+        {
+            await LoadDraftStateAsync();
+            StateHasChanged();
+        });
     }
 
     public void Dispose()

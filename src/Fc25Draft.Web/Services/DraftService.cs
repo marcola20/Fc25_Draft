@@ -177,6 +177,7 @@ public class DraftService
         int totalRounds,
         bool snake = false,
         IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null,
+        string? name = null,
         CancellationToken ct = default)
     {
         if (totalRounds <= 0)
@@ -199,10 +200,33 @@ public class DraftService
             throw new InvalidOperationException("O draft requer exatamente 14 equipes cadastradas.");
         }
 
+        var existingDraft = await _db.Drafts
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        if (existingDraft is not null)
+        {
+            var totalExistingPicks = await _db.DraftPicks
+                .Where(p => p.DraftId == existingDraft.DraftId)
+                .CountAsync(ct);
+
+            var completedExistingPicks = await _db.DraftPicks
+                .Where(p => p.DraftId == existingDraft.DraftId && p.PlayerId != null)
+                .CountAsync(ct);
+
+            if (totalExistingPicks > 0 && completedExistingPicks < totalExistingPicks)
+            {
+                throw new InvalidOperationException("Não é possível gerar um novo draft enquanto o atual não foi concluído.");
+            }
+        }
+
         await ClearDraftDataAsync(ct);
 
-        var name = $"FC25 Draft - {DateTime.UtcNow:yyyy-MM-dd HH:mm}";
-        return await CreateDraftAsync(name, teamOrder, totalRounds, snake, roundRules, ct);
+        var draftName = string.IsNullOrWhiteSpace(name)
+            ? $"FC25 Draft - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
+            : name.Trim();
+
+        return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct);
     }
 
     public async Task<DraftRoundDetailsDto> AddRoundAsync(
