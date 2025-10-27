@@ -74,27 +74,10 @@ else
             </tbody>
         </table>
     </div>
-
-    <nav aria-label="Paginação de equipes">
-        <ul class="pagination">
-            <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
-            </li>
-            @for (var page = 1; page <= totalPages; page++)
-            {
-                <li class="page-item @(page == currentPage ? "active" : string.Empty)">
-                    <button class="page-link" @onclick="() => ChangePage(page)">@(page)</button>
-                </li>
-            }
-            <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
-                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
-            </li>
-        </ul>
-    </nav>
 }
 
 @code {
-    private const int PageSize = 10;
+    private const int PageSize = 14;
     private readonly List<TeamListItemDto> teams = new();
     private int currentPage = 1;
     private int totalPages = 1;
