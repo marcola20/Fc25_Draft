@@ -427,7 +427,7 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = "O arquivo deve ter no máximo 5 MB." });
         }
 
-        await using var stream = file.OpenReadStream(maxCsvSize, ct);
+        await using var stream = file.OpenReadStream();
         var result = await playerService.ImportCsvAsync(stream, ct);
         return Results.Ok(result);
     });
