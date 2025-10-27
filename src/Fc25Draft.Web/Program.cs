@@ -983,6 +983,69 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
                         message = "Sem alteração.",
                         teamId = result.TeamId,
                         saldo = result.SaldoAtual
+                    });
+                }
+
+                return Results.Ok(new
+                {
+                    teamId = result.TeamId,
+                    valorAplicado = result.ValorAplicado,
+                    saldo = result.SaldoAtual,
+                    tipo = result.Tipo,
+                    descricao = result.Descricao
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    adminBudgetApi.MapGet("/ledger", async (
+        [FromQuery] Guid teamId,
+        DraftDbContext db,
+        CancellationToken ct,
+        [FromQuery] int page,
+        [FromQuery] int pageSize) =>
+    {
+        if (teamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "teamId é obrigatório." });
+        }
+
+        if (page < 1 || pageSize < 1)
+        {
+            return Results.BadRequest(new { message = "Parâmetros de paginação inválidos." });
+        }
+
+        var size = Math.Min(pageSize, 100);
+
+        var teamExists = await db.Teams
+            .AsNoTracking()
+            .AnyAsync(t => t.TeamId == teamId, ct);
+
+        if (!teamExists)
+        {
+            return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+        }
+
+        var query = db.BudgetLedgers
+            .AsNoTracking()
+            .Where(l => l.TeamId == teamId)
+            .OrderByDescending(l => l.DataRegistroUtc);
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync(ct);
+
+        return Results.Ok(new PagedResult<BudgetLedgerEntryDto>(items, total));
     });
 }
 
@@ -1258,64 +1321,6 @@ static void MapNegotiationEndpoints(RouteGroupBuilder api)
     }
 }
 
-                return Results.Ok(new
-                {
-                    teamId = result.TeamId,
-                    valorAplicado = result.ValorAplicado,
-                    saldo = result.SaldoAtual,
-                    tipo = result.Tipo,
-                    descricao = result.Descricao
-                });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.NotFound(new { message = ex.Message });
-            }
-            catch (ArgumentException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-        });
-
-    adminBudgetApi.MapGet("/ledger", async ([FromQuery] Guid teamId, DraftDbContext db, CancellationToken ct, [FromQuery] int page = 1, [FromQuery] int pageSize = 20 ) =>
-        {
-            if (teamId == Guid.Empty)
-            {
-                return Results.BadRequest(new { message = "teamId é obrigatório." });
-            }
-
-            if (page < 1 || pageSize < 1)
-            {
-                return Results.BadRequest(new { message = "Parâmetros de paginação inválidos." });
-            }
-
-            var size = Math.Min(pageSize, 100);
-
-            var teamExists = await db.Teams
-                .AsNoTracking()
-                .AnyAsync(t => t.TeamId == teamId, ct);
-
-            if (!teamExists)
-            {
-                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
-            }
-
-            var query = db.BudgetLedgers
-                .AsNoTracking()
-                .Where(l => l.TeamId == teamId);
-
-            var total = await query.CountAsync(ct);
-
-            var items = await query
-                .OrderByDescending(l => l.DataUtc)
-                .Skip((page - 1) * size)
-                .Take(size)
-                .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
-                .ToListAsync(ct);
-
-            return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
-        });
-}
 static void MapPricingEndpoints(RouteGroupBuilder api)
 {
     var pricingApi = api.MapGroup("/pricing");
