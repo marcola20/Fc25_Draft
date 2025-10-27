@@ -220,8 +220,6 @@ public class DraftService
             }
         }
 
-        await ClearDraftDataAsync(ct);
-
         var draftName = string.IsNullOrWhiteSpace(name)
             ? $"FC25 Draft - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
@@ -442,23 +440,6 @@ public class DraftService
             draft.TotalRounds = maxRound.Value - 1;
 
             await _db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-        });
-    }
-
-    private async Task ClearDraftDataAsync(CancellationToken ct)
-    {
-        var strategy = _db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-
-            await _db.TeamRosters.ExecuteDeleteAsync(ct);
-            await _db.DraftPicks.ExecuteDeleteAsync(ct);
-            await _db.DraftRounds.ExecuteDeleteAsync(ct);
-            await _db.Drafts.ExecuteDeleteAsync(ct);
-
             await transaction.CommitAsync(ct);
         });
     }

@@ -136,7 +136,7 @@ public class DraftStateService
         var query = _db.Players
             .AsNoTracking()
             .Include(p => p.Position)
-            .Where(p => !_db.DraftPicks.Any(dp => dp.PlayerId == p.PlayerId));
+            .Where(p => !p.TeamRosters.Any());
 
         if (positionId.HasValue)
         {
