@@ -62,12 +62,8 @@
                     }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseAdminModal" disabled="@isProcessing">Cancelar</button>
-                    <button class="btn btn-primary" @onclick="SubmitAdminTokenAsync" disabled="@isProcessing || string.IsNullOrWhiteSpace(adminTokenInput)">
-                        @if (isProcessing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        }
+                    <button class="btn btn-secondary" @onclick="CloseAdminModal" >Cancelar</button>
+                    <button class="btn btn-primary" @onclick="SubmitAdminTokenAsync">
                         Salvar
                     </button>
                 </div>
@@ -80,7 +76,6 @@
     private bool showAdminModal;
     private string adminTokenInput = string.Empty;
     private string? adminModalError;
-    private bool isProcessing;
     private string? adminBannerMessage;
     private string adminBannerCss = "alert-info";
     private bool authReady;
@@ -120,12 +115,6 @@
 
     private async Task SubmitAdminTokenAsync()
     {
-        if (isProcessing)
-        {
-            return;
-        }
-
-        isProcessing = true;
         adminModalError = null;
 
         try
@@ -144,7 +133,6 @@
         }
         finally
         {
-            isProcessing = false;
         }
     }
 
