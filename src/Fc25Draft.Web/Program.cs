@@ -406,31 +406,31 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
         }
     });
 
-    adminPlayersApi.MapPost("/import", async (HttpRequest request, IPlayerService playerService, CancellationToken ct) =>
-    {
-        if (!request.HasFormContentType)
-        {
-            return Results.BadRequest(new { message = "Envie um arquivo CSV válido." });
-        }
+    //adminPlayersApi.MapPost("/import", async (HttpRequest request, IPlayerService playerService, CancellationToken ct) =>
+    //{
+    //    if (!request.HasFormContentType)
+    //    {
+    //        return Results.BadRequest(new { message = "Envie um arquivo CSV válido." });
+    //    }
 
-        var form = await request.ReadFormAsync(ct);
-        var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+    //    var form = await request.ReadFormAsync(ct);
+    //    var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
 
-        if (file is null || file.Length == 0)
-        {
-            return Results.BadRequest(new { message = "Arquivo CSV não encontrado." });
-        }
+    //    if (file is null || file.Length == 0)
+    //    {
+    //        return Results.BadRequest(new { message = "Arquivo CSV não encontrado." });
+    //    }
 
-        const long maxCsvSize = 5 * 1024 * 1024;
-        if (file.Length > maxCsvSize)
-        {
-            return Results.BadRequest(new { message = "O arquivo deve ter no máximo 5 MB." });
-        }
+    //    const long maxCsvSize = 5 * 1024 * 1024;
+    //    if (file.Length > maxCsvSize)
+    //    {
+    //        return Results.BadRequest(new { message = "O arquivo deve ter no máximo 5 MB." });
+    //    }
 
-        await using var stream = file.OpenReadStream(maxCsvSize, ct);
-        var result = await playerService.ImportCsvAsync(stream, ct);
-        return Results.Ok(result);
-    });
+    //    await using var stream = file.OpenReadStream(maxCsvSize);
+    //    var result = await playerService.ImportCsvAsync(stream, ct);
+    //    return Results.Ok(result);
+    //});
 }
 
 static void MapTeamEndpoints(RouteGroupBuilder api)

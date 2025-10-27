@@ -115,7 +115,7 @@ public class PlayerService : IPlayerService
         var errors = new List<string>();
         var playersToInsert = new List<Player>();
 
-        await using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
 
         var knownPositions = await _db.Positions
             .Select(p => p.PositionId)
