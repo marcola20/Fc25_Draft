@@ -7,7 +7,9 @@ using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Repositories;
+using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
@@ -19,6 +21,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +45,7 @@ builder.Services.AddDbContext<DraftDbContext>(options =>
 
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
+builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
 
 builder.Services
     .AddAuthentication(options =>
@@ -72,6 +76,7 @@ builder.Services.AddScoped<TeamsApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
+builder.Services.AddScoped<IPricingService, PricingService>();
 
 var app = builder.Build();
 
@@ -111,6 +116,7 @@ MapAdminEndpoints(api);
 MapDraftEndpoints(api);
 MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
+MapPricingEndpoints(api);
 
 app.Run();
 
@@ -828,6 +834,70 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = ex.Message });
         }
     });
+}
+
+static void MapPricingEndpoints(RouteGroupBuilder api)
+{
+    var pricingApi = api.MapGroup("/pricing");
+
+    pricingApi.MapGet(
+        "/preview",
+        async (
+            [FromQuery(Name = "pos")] string? positionCode,
+            [FromQuery(Name = "posId")] short? positionId,
+            [FromQuery] int? age,
+            [FromQuery(Name = "ovr")] int? overall,
+            IPricingService pricingService,
+            CancellationToken ct) =>
+        {
+            if (!age.HasValue)
+            {
+                return Results.BadRequest(new { message = "Parâmetro 'age' é obrigatório." });
+            }
+
+            if (!overall.HasValue)
+            {
+                return Results.BadRequest(new { message = "Parâmetro 'ovr' é obrigatório." });
+            }
+
+            if (string.IsNullOrWhiteSpace(positionCode) && !positionId.HasValue)
+            {
+                return Results.BadRequest(new { message = "Informe 'pos' ou 'posId'." });
+            }
+
+            try
+            {
+                var result = await pricingService.CalculateAsync(positionCode, positionId, age.Value, overall.Value, ct);
+                return Results.Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    pricingApi.MapGet(
+        "/preview/{playerId:int}",
+        async (int playerId, IPricingService pricingService, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await pricingService.CalculateForPlayerAsync(playerId, ct);
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound(new { message = $"Jogador {playerId} não encontrado." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
