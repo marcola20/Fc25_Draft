@@ -21,6 +21,10 @@ main {
     align-items: center;
 }
 
+.app-header .access-controls {
+    display: flex;
+}
+
     .top-row ::deep a, .top-row .btn-link {
         white-space: nowrap;
         margin-left: 1.5rem;
@@ -32,7 +36,7 @@ main {
     }
 
 @media (max-width: 640.98px) {
-    .top-row:not(.auth) {
+    .top-row:not(.auth):not(.app-header) {
         display: none;
     }
 
@@ -40,8 +44,16 @@ main {
         justify-content: space-between;
     }
 
+    .app-header {
+        justify-content: flex-start;
+    }
+
     .top-row a, .top-row .btn-link {
         margin-left: 0;
+    }
+
+    .app-header .access-controls {
+        display: none !important;
     }
 }
 
