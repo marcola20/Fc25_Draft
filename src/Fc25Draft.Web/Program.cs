@@ -14,6 +14,7 @@ using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -103,11 +104,19 @@ app.MapFallbackToPage("/_Host");
 
 var api = app.MapGroup("/api");
 
+MapAdminEndpoints(api);
 MapDraftEndpoints(api);
 MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
 
 app.Run();
+
+static void MapAdminEndpoints(RouteGroupBuilder api)
+{
+    var adminApi = api.MapGroup("/admin").RequireAuthorization("AdminOnly");
+
+    adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
+}
 
 static void MapDraftEndpoints(RouteGroupBuilder api)
 {
@@ -609,20 +618,37 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         return Results.Ok(new PagedResult<TeamListItemDto>(items, total));
     });
 
-    teamsApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, CancellationToken ct = default) =>
+    teamsApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, HttpContext httpContext, CancellationToken ct = default) =>
     {
         var team = await db.Teams
             .AsNoTracking()
             .Where(t => t.TeamId == id)
-            .Select(t => new TeamDetailsDto(
+            .Select(t => new
+            {
                 t.TeamId,
                 t.TeamName,
                 t.OwnerName,
                 t.TeamToken,
-                t.Roster.Count))
+                Jogadores = t.Roster.Count
+            })
             .FirstOrDefaultAsync(ct);
 
-        return team is null ? Results.NotFound() : Results.Ok(team);
+        if (team is null)
+        {
+            return Results.NotFound();
+        }
+
+        var includeToken = httpContext.User.IsInRole("Admin");
+        var teamToken = includeToken ? team.TeamToken : Guid.Empty;
+
+        var dto = new TeamDetailsDto(
+            team.TeamId,
+            team.TeamName,
+            team.OwnerName,
+            teamToken,
+            team.Jogadores);
+
+        return Results.Ok(dto);
     });
 
     teamsApi.MapGet("/roster", async (DraftDbContext db, CancellationToken ct) =>

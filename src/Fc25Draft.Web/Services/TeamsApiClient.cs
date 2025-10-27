@@ -40,7 +40,7 @@ public class TeamsApiClient
 
     public async Task<TeamDetailsDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var client = await _clientFactory.CreateAsync();
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         var response = await client.GetAsync($"api/teams/{id}", ct);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
