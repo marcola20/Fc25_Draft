@@ -149,6 +149,7 @@ public class MarketService : IMarketService
                 x.PrecoComprarAgora,
                 x.LanceAtual,
                 x.MaiorLanceTeam != null ? x.MaiorLanceTeam.TeamName : string.Empty,
+                x.VencedorTeamId,
                 x.Status,
                 x.DataInicioUtc))
             .ToListAsync(ct)
