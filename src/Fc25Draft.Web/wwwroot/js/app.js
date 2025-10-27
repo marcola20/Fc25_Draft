@@ -25,19 +25,34 @@ window.fc25Auth = {
 window.fc25Share = {
     openWhatsapp: function (shareUrl, groupLink, message) {
         try {
+            if (groupLink) {
+                let urlToOpen = groupLink;
+
+                if (message) {
+                    try {
+                        const parsedUrl = new URL(groupLink);
+                        parsedUrl.searchParams.set('text', message);
+                        urlToOpen = parsedUrl.toString();
+                    } catch {
+                        // caso a URL não seja válida, mantém o link original
+                    }
+                }
+
+                const groupWindow = window.open(urlToOpen, '_blank');
+                if (groupWindow) {
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && message) {
+                        navigator.clipboard.writeText(message).catch(() => { /* noop */ });
+                    }
+
+                    return 'group';
+                }
+            }
+
             if (shareUrl) {
                 const shareWindow = window.open(shareUrl, '_blank');
                 if (shareWindow) {
                     return 'share';
                 }
-            }
-
-            if (groupLink) {
-                window.open(groupLink, '_blank');
-                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && message) {
-                    navigator.clipboard.writeText(message).catch(() => { /* noop */ });
-                }
-                return 'fallback';
             }
         } catch {
             // ignorado
