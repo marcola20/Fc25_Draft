@@ -82,12 +82,13 @@ else
             <div class="card-body">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-4">
-                        <label class="form-label" for="overallMin">Overall mínimo</label>
-                        <InputNumber<int?> id="overallMin" class="form-control" @bind-Value="newRoundOverallMin" Min="0" Max="150" disabled="@isProcessing" />
+                        <label class="form-label" for="overallMax">Overall minímo</label>
+                        <InputNumber TValue="int?" id="overallMin" class="form-control" @bind-Value="newRoundOverallMin" Min="0" Max="150" disabled="@isProcessing" />
                     </div>
+
                     <div class="col-md-4">
                         <label class="form-label" for="overallMax">Overall máximo</label>
-                        <InputNumber<int?> id="overallMax" class="form-control" @bind-Value="newRoundOverallMax" Min="0" Max="150" disabled="@isProcessing" />
+                        <InputNumber TValue="int?" id="overallMax" class="form-control" @bind-Value="newRoundOverallMax" Min="0" Max="150" disabled="@isProcessing" />
                     </div>
                     <div class="col-md-4">
                         <button class="btn btn-primary" @onclick="AddRoundAsync" disabled="@isProcessing">Adicionar rodada</button>
