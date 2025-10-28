@@ -64,9 +64,18 @@
         collapseNavMenu = !collapseNavMenu;
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
         await AdminAuth.EnsureInitializedAsync();
     }
 

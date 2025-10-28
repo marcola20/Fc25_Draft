@@ -40,6 +40,8 @@ public class AdminAuthService
             return;
         }
 
+        var initializationCompleted = false;
+
         try
         {
             _token = await _jsRuntime.InvokeAsync<string?>("fc25Auth.getToken");
@@ -52,14 +54,31 @@ public class AdminAuthService
                     _token = null;
                 }
             }
+
+            initializationCompleted = true;
         }
         catch (JSException)
         {
             _token = null;
+            initializationCompleted = true;
+        }
+        catch (InvalidOperationException ex) when (IsPrerenderInteropException(ex))
+        {
+            return;
         }
 
-        _initialized = true;
-        AuthenticationChanged?.Invoke();
+        if (initializationCompleted)
+        {
+            _initialized = true;
+            AuthenticationChanged?.Invoke();
+        }
+    }
+
+    private static bool IsPrerenderInteropException(InvalidOperationException ex)
+    {
+        return ex.Message.Contains(
+            "JavaScript interop calls cannot be issued",
+            StringComparison.Ordinal);
     }
 
     public async Task<string?> GetTokenAsync()
