@@ -63,7 +63,7 @@ else
                     <div class="alert alert-success" role="alert">@sellSuccessMessage</div>
                 }
 
-                <EditForm EditContext="sellEditContext" OnValidSubmit="HandleSellAsync">
+                <EditForm EditContext="@sellEditContext" OnValidSubmit="@HandleSellAsync">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -129,7 +129,7 @@ else
                     <div class="alert alert-success" role="alert">@swapSuccessMessage</div>
                 }
 
-                <EditForm EditContext="swapEditContext" OnValidSubmit="HandleSwapAsync">
+                <EditForm EditContext="@swapEditContext" OnValidSubmit="@HandleSwapAsync">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
