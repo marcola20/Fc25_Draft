@@ -11,14 +11,14 @@
         </ItemGroup>
         <ItemGroup>
           <PackageReference Include="ClosedXML" Version="0.105.0" />
-          <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
+          <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
           </PackageReference>
-          <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.6">
+          <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.10">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
           </PackageReference>
-          <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
+          <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.10" />
         </ItemGroup>
 </Project>
