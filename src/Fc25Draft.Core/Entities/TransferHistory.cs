@@ -5,6 +5,7 @@ public class TransferHistory
     public Guid TransferId { get; set; }
     public TransferType Type { get; set; }
     public int PlayerId { get; set; }
+    public Guid PlayerPublicId { get; set; }
     public Guid? FromTeamId { get; set; }
     public Guid? ToTeamId { get; set; }
     public decimal? Amount { get; set; }

@@ -21,6 +21,7 @@ public class DraftDbContext : DbContext
     public DbSet<MarketBid> MarketBids => Set<MarketBid>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
+    public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -54,6 +55,11 @@ public class DraftDbContext : DbContext
         mb.Entity<Player>(e =>
         {
             e.HasKey(x => x.PlayerId);
+            e.Property(x => x.PublicId)
+             .IsRequired()
+             .HasDefaultValueSql("NEWSEQUENTIALID()")
+             .ValueGeneratedOnAdd();
+            e.HasIndex(x => x.PublicId).IsUnique();
             e.Property(x => x.Name).IsRequired().HasMaxLength(80);
             e.Property(x => x.Overall).IsRequired();
             e.Property(x => x.Age);

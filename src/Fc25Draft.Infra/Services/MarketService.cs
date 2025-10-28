@@ -259,6 +259,7 @@ public class MarketService : IMarketService
         {
             TransferId = Guid.NewGuid(),
             PlayerId = player.PlayerId,
+            PlayerPublicId = player.PublicId,
             FromTeamId = null,
             ToTeamId = team.TeamId,
             Amount = item.BuyNowPrice,
@@ -355,6 +356,7 @@ public class MarketService : IMarketService
                     {
                         TransferId = Guid.NewGuid(),
                         PlayerId = item.PlayerId,
+                        PlayerPublicId = item.Player.PublicId,
                         FromTeamId = null,
                         ToTeamId = team.TeamId,
                         Amount = value,

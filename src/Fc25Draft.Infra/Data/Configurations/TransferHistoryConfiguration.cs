@@ -15,8 +15,13 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
         builder.Property(x => x.Notes).HasMaxLength(400);
         builder.Property(x => x.PerformedBy).HasMaxLength(120);
         builder.Property(x => x.PerformedAtUtc).IsRequired();
+        builder.Property(x => x.PlayerPublicId).IsRequired();
 
-        builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+        builder.HasIndex(x => x.PerformedAtUtc).HasDatabaseName("IX_TransferHistories_PerformedAtUtc");
+        builder.HasIndex(x => new { x.FromTeamId, x.PerformedAtUtc }).HasDatabaseName("IX_TransferHistories_FromTeam");
+        builder.HasIndex(x => new { x.ToTeamId, x.PerformedAtUtc }).HasDatabaseName("IX_TransferHistories_ToTeam");
+        builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc }).HasDatabaseName("IX_TransferHistories_Player");
+        builder.HasIndex(x => new { x.PlayerPublicId, x.PerformedAtUtc }).HasDatabaseName("IX_TransferHistories_PlayerPublic");
 
         builder.HasOne(x => x.Player)
             .WithMany()

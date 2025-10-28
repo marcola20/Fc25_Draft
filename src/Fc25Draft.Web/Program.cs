@@ -77,6 +77,7 @@ builder.Services.AddScoped<ApiClientFactory>();
 builder.Services.AddScoped<PlayersApiClient>();
 builder.Services.AddScoped<DraftAdminApiClient>();
 builder.Services.AddScoped<TeamsApiClient>();
+builder.Services.AddScoped<AdminTransferApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
@@ -84,6 +85,8 @@ builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<IAdminTransferService, AdminTransferService>();
+builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
 
 var app = builder.Build();
 
@@ -126,6 +129,8 @@ MapTeamEndpoints(api);
 MapPricingEndpoints(api);
 MapMarketEndpoints(api);
 MapBudgetEndpoints(api);
+MapAdminTransferEndpoints(api);
+MapTransferHistoryEndpoints(api);
 
 app.Run();
 
@@ -698,6 +703,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PublicId,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -733,6 +739,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PublicId,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -1036,6 +1043,247 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
             return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
         });
 }
+
+static void MapAdminTransferEndpoints(RouteGroupBuilder api)
+{
+    var adminTransferApi = api.MapGroup("/admin/transfer").RequireAuthorization("AdminOnly");
+
+    adminTransferApi.MapPost(
+        "/sell",
+        async (HttpContext httpContext, SellRequest request, IAdminTransferService transferService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var token = ExtractAdminToken(httpContext);
+                var result = await transferService.SellAsync(token, request.FromTeamId, request.ToTeamId, request.PlayerIds?.ToArray() ?? Array.Empty<Guid>(), request.Amount, request.Reason ?? string.Empty, ct);
+                return Results.Ok(result);
+            }
+            catch (AdminForbiddenException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (AdminValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (AdminConflictException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Json(new { message = "Os dados foram atualizados por outra operação. Recarregue as informações e tente novamente." }, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+    adminTransferApi.MapPost(
+        "/swap",
+        async (HttpContext httpContext, SwapRequest request, IAdminTransferService transferService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var token = ExtractAdminToken(httpContext);
+                var result = await transferService.SwapAsync(
+                    token,
+                    request.TeamAId,
+                    request.PlayersFromA?.ToArray() ?? Array.Empty<Guid>(),
+                    request.TeamBId,
+                    request.PlayersFromB?.ToArray() ?? Array.Empty<Guid>(),
+                    request.CashAdjustFromAToB,
+                    request.Reason ?? string.Empty,
+                    ct);
+
+                return Results.Ok(result);
+            }
+            catch (AdminForbiddenException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (AdminValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (AdminConflictException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Json(new { message = "Os dados foram atualizados por outra operação. Recarregue as informações e tente novamente." }, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+    adminTransferApi.MapPost(
+        "/move",
+        async (HttpContext httpContext, MoveRequest request, IAdminTransferService transferService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var token = ExtractAdminToken(httpContext);
+                var result = await transferService.MoveAsync(token, request.PlayerId, request.ToTeamId, request.Reason ?? string.Empty, ct);
+                return Results.Ok(result);
+            }
+            catch (AdminForbiddenException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (AdminValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (AdminConflictException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Json(new { message = "Os dados foram atualizados por outra operação. Recarregue as informações e tente novamente." }, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+    var adminTeamsApi = api.MapGroup("/admin/teams").RequireAuthorization("AdminOnly");
+
+    adminTeamsApi.MapPost(
+        "/adjust-budget",
+        async (HttpContext httpContext, AdjustBudgetRequest request, IAdminTransferService transferService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var token = ExtractAdminToken(httpContext);
+                var result = await transferService.AdjustBudgetAsync(token, request.TeamId, request.Delta, request.Reason ?? string.Empty, ct);
+                return Results.Ok(result);
+            }
+            catch (AdminForbiddenException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (AdminValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Json(new { message = "Os dados foram atualizados por outra operação. Recarregue as informações e tente novamente." }, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+    var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
+
+    adminMarketApi.MapPost(
+        "/cancel/{itemId:guid}",
+        async (HttpContext httpContext, Guid itemId, CancelMarketItemRequest request, IAdminTransferService transferService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var token = ExtractAdminToken(httpContext);
+                var result = await transferService.CancelMarketItemAsync(token, itemId, request.Reason ?? string.Empty, ct);
+                return Results.Ok(result);
+            }
+            catch (AdminForbiddenException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (AdminValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (AdminConflictException ex)
+            {
+                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Json(new { message = "Os dados foram atualizados por outra operação. Recarregue as informações e tente novamente." }, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+}
+
+static void MapTransferHistoryEndpoints(RouteGroupBuilder api)
+{
+    var transferApi = api.MapGroup("/transfers");
+
+    transferApi.MapGet(
+        "/history",
+        async (
+            [FromQuery] Guid? teamId,
+            [FromQuery] Guid? playerId,
+            [FromQuery] int? type,
+            [FromQuery(Name = "from")] DateTime? fromUtc,
+            [FromQuery(Name = "to")] DateTime? toUtc,
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            ITransfersQueryService queryService,
+            CancellationToken ct) =>
+        {
+            var currentPage = page > 0 ? page : 1;
+            var currentPageSize = pageSize > 0 ? pageSize : 50;
+
+            try
+            {
+                var filter = new TransfersFilter(teamId, playerId, type, fromUtc, toUtc, currentPage, currentPageSize);
+                var result = await queryService.QueryHistoryAsync(filter, ct);
+                return Results.Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+}
+
+static string ExtractAdminToken(HttpContext httpContext)
+{
+    if (!httpContext.Request.Headers.TryGetValue("Authorization", out var values))
+    {
+        return string.Empty;
+    }
+
+    var headerValue = values.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(headerValue))
+    {
+        return string.Empty;
+    }
+
+    const string prefix = "Bearer ";
+    if (headerValue.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+    {
+        return headerValue[prefix.Length..].Trim();
+    }
+
+    return headerValue.Trim();
+}
+
+internal sealed record SellRequest(Guid FromTeamId, Guid ToTeamId, IReadOnlyCollection<Guid>? PlayerIds, decimal Amount, string? Reason);
+internal sealed record SwapRequest(Guid TeamAId, IReadOnlyCollection<Guid>? PlayersFromA, Guid TeamBId, IReadOnlyCollection<Guid>? PlayersFromB, decimal CashAdjustFromAToB, string? Reason);
+internal sealed record MoveRequest(Guid PlayerId, Guid ToTeamId, string? Reason);
+internal sealed record AdjustBudgetRequest(Guid TeamId, decimal Delta, string? Reason);
+internal sealed record CancelMarketItemRequest(string? Reason);
+internal sealed record TransferHistoryItemDto(DateTime PerformedAtUtc, Guid PlayerId, string PlayerName, string Tipo, string De, string? Para, decimal Valor);
 static void MapPricingEndpoints(RouteGroupBuilder api)
 {
     var pricingApi = api.MapGroup("/pricing");
@@ -1123,7 +1371,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
                 .Select(h => new
                 {
                     h.PerformedAtUtc,
-                    h.PlayerId,
+                    h.PlayerPublicId,
                     PlayerName = h.Player.Name,
                     h.Type,
                     FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
@@ -1135,7 +1383,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             var items = historyRows
                 .Select(h => new TransferHistoryItemDto(
                     h.PerformedAtUtc,
-                    h.PlayerId,
+                    h.PlayerPublicId,
                     h.PlayerName,
                     TranslateTransferType(h.Type),
                     h.FromTeamName ?? "Mercado Livre",
@@ -1181,7 +1429,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
                 .Select(h => new
                 {
                     h.PerformedAtUtc,
-                    h.PlayerId,
+                    h.PlayerPublicId,
                     PlayerName = h.Player.Name,
                     h.Type,
                     FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
@@ -1193,7 +1441,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             var items = historyRows
                 .Select(h => new TransferHistoryItemDto(
                     h.PerformedAtUtc,
-                    h.PlayerId,
+                    h.PlayerPublicId,
                     h.PlayerName,
                     TranslateTransferType(h.Type),
                     h.FromTeamName ?? "Mercado Livre",

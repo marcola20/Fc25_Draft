@@ -41,6 +41,35 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("Token_Administrador", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.AdminActionsLog", b =>
+                {
+                    b.Property<Guid>("ActionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("ActionId");
+
+                    b.HasIndex("ActionType", "CreatedAtUtc")
+                        .HasDatabaseName("IX_AdminActionsLogs_ActionType_CreatedAtUtc");
+
+                    b.ToTable("AdminActionsLog");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.BudgetLedger", b =>
                 {
                     b.Property<Guid>("BudgetLedgerId")
@@ -277,6 +306,11 @@ namespace Fc25Draft.Infra.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PlayerId"));
 
+                    b.Property<Guid>("PublicId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
                     b.Property<int?>("Age")
                         .HasColumnType("int");
 
@@ -301,6 +335,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("PositionId");
 
                     b.HasIndex("Name", "PositionId");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
 
                     b.ToTable("Players");
                 });
@@ -458,6 +495,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("PlayerId")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("PlayerPublicId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ToTeamId")
                         .HasColumnType("uniqueidentifier");
 
@@ -466,11 +506,20 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("TransferId");
 
-                    b.HasIndex("FromTeamId");
+                    b.HasIndex("PerformedAtUtc")
+                        .HasDatabaseName("IX_TransferHistories_PerformedAtUtc");
 
-                    b.HasIndex("ToTeamId");
+                    b.HasIndex("FromTeamId", "PerformedAtUtc")
+                        .HasDatabaseName("IX_TransferHistories_FromTeam");
 
-                    b.HasIndex("PlayerId", "PerformedAtUtc");
+                    b.HasIndex("ToTeamId", "PerformedAtUtc")
+                        .HasDatabaseName("IX_TransferHistories_ToTeam");
+
+                    b.HasIndex("PlayerId", "PerformedAtUtc")
+                        .HasDatabaseName("IX_TransferHistories_Player");
+
+                    b.HasIndex("PlayerPublicId", "PerformedAtUtc")
+                        .HasDatabaseName("IX_TransferHistories_PlayerPublic");
 
                     b.ToTable("TransferHistories");
                 });
