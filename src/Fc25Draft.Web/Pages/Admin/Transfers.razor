@@ -344,27 +344,33 @@ else
                     <ValidationSummary />
 
                     <div class="row g-3">
-                        <div class="col-lg-6">
+                        <div class="col-lg-4">
+                            <label class="form-label" for="move-from-team">Time de origem</label>
+                            <InputSelect id="move-from-team" class="form-select" TValue="Guid" @bind-Value="moveModel.FromTeamId" @bind-Value:after="OnMoveFromTeamChanged">
+                                <option value="@Guid.Empty">Selecione</option>
+                                @foreach (var team in teams)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => moveModel.FromTeamId" />
+                        </div>
+                        <div class="col-lg-4">
                             <label class="form-label" for="move-player">Jogador</label>
                             <InputSelect id="move-player" class="form-select" TValue="Guid" @bind-Value="moveModel.PlayerId" @bind-Value:after="OnMovePlayerChanged">
                                 <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var group in GetPlayersGroupedByTeam())
+                                @foreach (var player in GetPlayersForTeam(moveModel.FromTeamId))
                                 {
-                                    <optgroup label="@group.TeamName">
-                                        @foreach (var player in group.Players)
-                                        {
-                                            <option value="@player.PlayerId">@player.Display</option>
-                                        }
-                                    </optgroup>
+                                    <option value="@player.PlayerId">@player.Name (@player.Position) - OVR @player.Overall</option>
                                 }
                             </InputSelect>
                             <ValidationMessage For="() => moveModel.PlayerId" />
                         </div>
-                        <div class="col-lg-6">
+                        <div class="col-lg-4">
                             <label class="form-label" for="move-team">Time de destino</label>
                             <InputSelect id="move-team" class="form-select" TValue="Guid" @bind-Value="moveModel.ToTeamId">
                                 <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in GetDestinationTeams(GetCurrentTeamForPlayer(moveModel.PlayerId)))
+                                @foreach (var team in GetDestinationTeams(moveModel.FromTeamId))
                                 {
                                     <option value="@team.TeamId">@team.TeamName</option>
                                 }
@@ -684,19 +690,34 @@ else
 
     private void EnsureMoveSelection()
     {
-        if (playersById.Count == 0)
+        if (teams.Count == 0)
+        {
+            moveModel.FromTeamId = Guid.Empty;
+            moveModel.PlayerId = Guid.Empty;
+            moveModel.ToTeamId = Guid.Empty;
+            return;
+        }
+
+        if (moveModel.FromTeamId != Guid.Empty && !teamsById.ContainsKey(moveModel.FromTeamId))
+        {
+            moveModel.FromTeamId = Guid.Empty;
+        }
+
+        if (moveModel.FromTeamId == Guid.Empty)
         {
             moveModel.PlayerId = Guid.Empty;
             moveModel.ToTeamId = Guid.Empty;
             return;
         }
 
-        if (moveModel.PlayerId != Guid.Empty && !playersById.ContainsKey(moveModel.PlayerId))
+        if (moveModel.PlayerId != Guid.Empty
+            && (!playersById.TryGetValue(moveModel.PlayerId, out var player)
+                || player.TeamId != moveModel.FromTeamId))
         {
             moveModel.PlayerId = Guid.Empty;
         }
 
-        if (moveModel.PlayerId == Guid.Empty)
+        if (moveModel.ToTeamId == moveModel.FromTeamId)
         {
             moveModel.ToTeamId = Guid.Empty;
         }
@@ -768,19 +789,56 @@ else
         StateHasChanged();
     }
 
+    private void OnMoveFromTeamChanged()
+    {
+        if (moveModel.FromTeamId == Guid.Empty)
+        {
+            moveModel.PlayerId = Guid.Empty;
+            moveModel.ToTeamId = Guid.Empty;
+            return;
+        }
+
+        if (!teamsById.ContainsKey(moveModel.FromTeamId))
+        {
+            moveModel.FromTeamId = Guid.Empty;
+            moveModel.PlayerId = Guid.Empty;
+            moveModel.ToTeamId = Guid.Empty;
+            return;
+        }
+
+        if (moveModel.PlayerId != Guid.Empty
+            && (!playersById.TryGetValue(moveModel.PlayerId, out var player)
+                || player.TeamId != moveModel.FromTeamId))
+        {
+            moveModel.PlayerId = Guid.Empty;
+        }
+
+        if (moveModel.ToTeamId == moveModel.FromTeamId)
+        {
+            moveModel.ToTeamId = Guid.Empty;
+        }
+    }
+
     private void OnMovePlayerChanged()
     {
         if (moveModel.PlayerId == Guid.Empty)
         {
-            moveModel.ToTeamId = Guid.Empty;
+            return;
         }
-        else
+
+        if (playersById.TryGetValue(moveModel.PlayerId, out var player))
         {
-            var teamId = GetCurrentTeamForPlayer(moveModel.PlayerId);
-            if (moveModel.ToTeamId == teamId)
+            moveModel.FromTeamId = player.TeamId;
+
+            if (moveModel.ToTeamId == moveModel.FromTeamId)
             {
                 moveModel.ToTeamId = Guid.Empty;
             }
+        }
+        else
+        {
+            moveModel.PlayerId = Guid.Empty;
+            moveModel.ToTeamId = Guid.Empty;
         }
     }
 
@@ -967,10 +1025,22 @@ else
 
     private async Task SubmitMoveAsync()
     {
+        if (moveModel.FromTeamId == Guid.Empty)
+        {
+            moveErrorMessage = "Selecione o time de origem.";
+            return;
+        }
+
         var currentTeam = GetCurrentTeamForPlayer(moveModel.PlayerId);
         if (currentTeam == Guid.Empty)
         {
             moveErrorMessage = "Jogador inválido.";
+            return;
+        }
+
+        if (currentTeam != moveModel.FromTeamId)
+        {
+            moveErrorMessage = "Selecione um jogador que pertença ao time de origem.";
             return;
         }
 
@@ -997,6 +1067,7 @@ else
             teamBudgets.Remove(currentTeam);
             teamBudgets.Remove(moveModel.ToTeamId);
 
+            moveModel.FromTeamId = Guid.Empty;
             moveModel.PlayerId = Guid.Empty;
             moveModel.ToTeamId = Guid.Empty;
             moveModel.Reason = string.Empty;
@@ -1083,6 +1154,11 @@ else
     private IEnumerable<TeamRosterInfo> GetDestinationTeams(Guid excludeTeamId)
         => excludeTeamId == Guid.Empty ? teams : teams.Where(t => t.TeamId != excludeTeamId);
 
+    private IReadOnlyList<PlayerInfo> GetPlayersForTeam(Guid teamId)
+        => teamId != Guid.Empty && teamsById.TryGetValue(teamId, out var team)
+            ? team.Players
+            : Array.Empty<PlayerInfo>();
+
     private Guid GetCurrentTeamForPlayer(Guid playerId)
         => playersById.TryGetValue(playerId, out var player)
             ? player.TeamId
@@ -1139,15 +1215,6 @@ else
         preview = isTeamA ? saldo - cashAdjust : saldo + cashAdjust;
         return true;
     }
-
-    private IEnumerable<PlayerGroup> GetPlayersGroupedByTeam()
-        => teams.Select(t => new PlayerGroup(
-            t.TeamId,
-            t.TeamName,
-            t.Players
-                .Select(p => new PlayerDisplay(p.PlayerId, $"{p.Name} ({p.Position})", p.TeamId))
-                .OrderBy(p => p.Display)
-                .ToList()));
 
     private string FormatCurrency(decimal value)
         => value.ToString("C", currencyCulture);
@@ -1261,34 +1328,6 @@ else
         public bool IsSelected { get; set; }
     }
 
-    private sealed class PlayerGroup
-    {
-        public PlayerGroup(Guid teamId, string teamName, IReadOnlyList<PlayerDisplay> players)
-        {
-            TeamId = teamId;
-            TeamName = teamName;
-            Players = players;
-        }
-
-        public Guid TeamId { get; }
-        public string TeamName { get; }
-        public IReadOnlyList<PlayerDisplay> Players { get; }
-    }
-
-    private sealed class PlayerDisplay
-    {
-        public PlayerDisplay(Guid playerId, string display, Guid teamId)
-        {
-            PlayerId = playerId;
-            Display = display;
-            TeamId = teamId;
-        }
-
-        public Guid PlayerId { get; }
-        public string Display { get; }
-        public Guid TeamId { get; }
-    }
-
     private sealed class SwapPreviewItem
     {
         public SwapPreviewItem(Guid playerId, string name, string position, int overall, string badge, string observation)
@@ -1364,6 +1403,9 @@ else
 
     private sealed class MoveFormModel
     {
+        [Required(ErrorMessage = "Time de origem é obrigatório.")]
+        public Guid FromTeamId { get; set; }
+
         [Required(ErrorMessage = "Jogador é obrigatório.")]
         public Guid PlayerId { get; set; }
 

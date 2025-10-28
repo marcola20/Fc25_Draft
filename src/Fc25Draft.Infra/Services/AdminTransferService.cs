@@ -244,6 +244,7 @@ public partial class AdminTransferService
                 ?? throw new KeyNotFoundException($"Time comprador {toTeamId} não encontrado.");
 
             var players = await _dbContext.Players
+                .Include(p => p.TeamRosters)
                 .Where(p => distinctPlayerIds.Contains(p.PlayerGuid))
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
@@ -253,7 +254,7 @@ public partial class AdminTransferService
                 throw new InvalidOperationException("Um ou mais jogadores informados não foram encontrados.");
             }
 
-            if (players.Any(p => p.CurrentTeamId != fromTeamId))
+            if (players.Any(p => !PlayerBelongsToTeam(p, fromTeamId)))
             {
                 throw new InvalidOperationException("Todos os jogadores devem pertencer ao time de origem.");
             }
@@ -458,6 +459,7 @@ public partial class AdminTransferService
 
             var players = playerGuids.Length > 0
                 ? await _dbContext.Players
+                    .Include(p => p.TeamRosters)
                     .Where(p => playerGuids.Contains(p.PlayerGuid))
                     .ToListAsync(ct)
                     .ConfigureAwait(false)
@@ -476,7 +478,7 @@ public partial class AdminTransferService
                 throw new InvalidOperationException("Jogadores de Time A não encontrados.");
             }
 
-            if (playersFromAEntities.Any(p => p.CurrentTeamId != teamAId))
+            if (playersFromAEntities.Any(p => !PlayerBelongsToTeam(p, teamAId)))
             {
                 throw new InvalidOperationException("Todos os jogadores do Time A devem pertencer ao próprio time.");
             }
@@ -489,7 +491,7 @@ public partial class AdminTransferService
                 throw new InvalidOperationException("Jogadores de Time B não encontrados.");
             }
 
-            if (playersFromBEntities.Any(p => p.CurrentTeamId != teamBId))
+            if (playersFromBEntities.Any(p => !PlayerBelongsToTeam(p, teamBId)))
             {
                 throw new InvalidOperationException("Todos os jogadores do Time B devem pertencer ao próprio time.");
             }
@@ -875,5 +877,20 @@ public partial class AdminTransferService
         }
 
         return tokenGuid;
+    }
+
+    private static bool PlayerBelongsToTeam(Player player, Guid teamId)
+    {
+        if (player.CurrentTeamId == teamId)
+        {
+            return true;
+        }
+
+        if (player.TeamRosters is null)
+        {
+            return false;
+        }
+
+        return player.TeamRosters.Any(r => r.TeamId == teamId);
     }
 }
