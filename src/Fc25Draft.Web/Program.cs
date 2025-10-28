@@ -190,11 +190,6 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = "O valor não pode ser negativo." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return Results.BadRequest(new { message = "Motivo é obrigatório." });
-        }
-
         if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
         {
             return errorResult!;
@@ -294,11 +289,6 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = "Um jogador não pode participar pelos dois times." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return Results.BadRequest(new { message = "Motivo é obrigatório." });
-        }
-
         if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
         {
             return errorResult!;
@@ -359,11 +349,6 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
         if (request.ToTeamId == Guid.Empty)
         {
             return Results.BadRequest(new { message = "Time de destino é obrigatório." });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return Results.BadRequest(new { message = "Motivo é obrigatório." });
         }
 
         if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
@@ -1136,11 +1121,6 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = "O ajuste deve ser diferente de zero." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return Results.BadRequest(new { message = "Motivo é obrigatório." });
-        }
-
         if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
         {
             return errorResult!;
@@ -1702,11 +1682,6 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         if (request is null)
         {
             return Results.BadRequest(new { message = "Payload inválido." });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return Results.BadRequest(new { message = "Motivo é obrigatório." });
         }
 
         if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))

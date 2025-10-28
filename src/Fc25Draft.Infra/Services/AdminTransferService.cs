@@ -26,7 +26,7 @@ public partial class AdminTransferService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task AdjustBudgetAsync(string adminToken, Guid teamId, decimal delta, string reason, CancellationToken ct)
+    public async Task AdjustBudgetAsync(string adminToken, Guid teamId, decimal delta, string? reason, CancellationToken ct)
     {
         if (teamId == Guid.Empty)
         {
@@ -38,14 +38,9 @@ public partial class AdminTransferService
             throw new ArgumentException("O ajuste deve ser diferente de zero.", nameof(delta));
         }
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("Informe um motivo para o ajuste.", nameof(reason));
-        }
-
         var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
 
-        var normalizedReason = reason.Trim();
+        var normalizedReason = NormalizeReason(reason);
         var normalizedDelta = decimal.Round(delta, 2, MidpointRounding.AwayFromZero);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -85,20 +80,15 @@ public partial class AdminTransferService
         }
     }
 
-    public async Task CancelMarketItemAsync(string adminToken, Guid itemId, string reason, CancellationToken ct)
+    public async Task CancelMarketItemAsync(string adminToken, Guid itemId, string? reason, CancellationToken ct)
     {
         if (itemId == Guid.Empty)
         {
             throw new ArgumentException("Item inválido.", nameof(itemId));
         }
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("Informe um motivo para o cancelamento.", nameof(reason));
-        }
-
         var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
-        var normalizedReason = reason.Trim();
+        var normalizedReason = NormalizeReason(reason);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -179,7 +169,7 @@ public partial class AdminTransferService
         Guid toTeamId,
         Guid[] playerIds,
         decimal amount,
-        string reason,
+        string? reason,
         CancellationToken ct)
     {
         if (fromTeamId == Guid.Empty)
@@ -218,13 +208,8 @@ public partial class AdminTransferService
             throw new ArgumentException("O valor não pode ser negativo.", nameof(amount));
         }
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("Informe um motivo para a venda.", nameof(reason));
-        }
-
         var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
-        var normalizedReason = reason.Trim();
+        var normalizedReason = NormalizeReason(reason);
         var normalizedAmount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -290,6 +275,7 @@ public partial class AdminTransferService
             }
 
             toTeam.Budget = decimal.Round(toTeam.Budget - normalizedAmount, 2, MidpointRounding.AwayFromZero);
+            fromTeam.Budget = decimal.Round(fromTeam.Budget + normalizedAmount, 2, MidpointRounding.AwayFromZero);
 
             foreach (var player in players)
             {
@@ -379,7 +365,7 @@ public partial class AdminTransferService
         Guid teamBId,
         Guid[]? playersFromB,
         decimal cashAdjustFromAToB,
-        string reason,
+        string? reason,
         CancellationToken ct)
     {
         if (teamAId == Guid.Empty)
@@ -430,13 +416,8 @@ public partial class AdminTransferService
             throw new ArgumentException("Um jogador não pode estar em ambos os lados da troca.");
         }
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("Informe um motivo para a troca.", nameof(reason));
-        }
-
         var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
-        var normalizedReason = reason.Trim();
+        var normalizedReason = NormalizeReason(reason);
         var normalizedCashAdjust = decimal.Round(cashAdjustFromAToB, 2, MidpointRounding.AwayFromZero);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -718,7 +699,7 @@ public partial class AdminTransferService
         string adminToken,
         Guid playerId,
         Guid toTeamId,
-        string reason,
+        string? reason,
         CancellationToken ct)
     {
         if (playerId == Guid.Empty)
@@ -731,13 +712,8 @@ public partial class AdminTransferService
             throw new ArgumentException("Time de destino inválido.", nameof(toTeamId));
         }
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("Informe um motivo para a movimentação.", nameof(reason));
-        }
-
         var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
-        var normalizedReason = reason.Trim();
+        var normalizedReason = NormalizeReason(reason);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -893,4 +869,7 @@ public partial class AdminTransferService
 
         return player.TeamRosters.Any(r => r.TeamId == teamId);
     }
+
+    private static string? NormalizeReason(string? reason)
+        => string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
 }

@@ -912,6 +912,12 @@ else
         swapValidationMessages.Clear(fieldA);
         swapValidationMessages.Clear(fieldB);
 
+        if (swapModel.TeamAId == Guid.Empty && swapModel.TeamBId == Guid.Empty)
+        {
+            swapEditContext.NotifyValidationStateChanged();
+            return;
+        }
+
         if (swapModel.PlayersFromA.Count == 0 && swapModel.PlayersFromB.Count == 0)
         {
             swapValidationMessages.Add(fieldA, "Selecione ao menos um jogador.");
@@ -935,12 +941,15 @@ else
 
         try
         {
+            var reason = string.IsNullOrWhiteSpace(sellModel.Reason)
+                ? null
+                : sellModel.Reason.Trim();
             var request = new AdminSellPlayersRequestDto(
                 sellModel.FromTeamId,
                 sellModel.ToTeamId,
                 sellModel.SelectedPlayerIds.ToArray(),
                 sellModel.Amount,
-                sellModel.Reason!.Trim());
+                reason);
 
             var message = await AdminTransfersApiClient.SellAsync(request);
             sellSuccessMessage = message;
@@ -955,7 +964,7 @@ else
             }
 
             sellModel.Amount = 0m;
-            sellModel.Reason = string.Empty;
+            sellModel.Reason = null;
 
             await LoadDataAsync();
         }
@@ -983,19 +992,24 @@ else
 
         try
         {
+            var reason = string.IsNullOrWhiteSpace(swapModel.Reason)
+                ? null
+                : swapModel.Reason.Trim();
+            var previousTeamA = swapModel.TeamAId;
+            var previousTeamB = swapModel.TeamBId;
             var request = new AdminSwapPlayersRequestDto(
-                swapModel.TeamAId,
+                previousTeamA,
                 swapModel.PlayersFromA.ToArray(),
-                swapModel.TeamBId,
+                previousTeamB,
                 swapModel.PlayersFromB.ToArray(),
                 swapModel.CashAdjustFromAToB,
-                swapModel.Reason!.Trim());
+                reason);
 
             var message = await AdminTransfersApiClient.SwapAsync(request);
             swapSuccessMessage = message;
 
-            teamBudgets.Remove(swapModel.TeamAId);
-            teamBudgets.Remove(swapModel.TeamBId);
+            teamBudgets.Remove(previousTeamA);
+            teamBudgets.Remove(previousTeamB);
 
             swapModel.PlayersFromA.Clear();
             swapModel.PlayersFromB.Clear();
@@ -1009,7 +1023,13 @@ else
             }
 
             swapModel.CashAdjustFromAToB = 0m;
-            swapModel.Reason = string.Empty;
+            swapModel.Reason = null;
+            swapModel.TeamAId = Guid.Empty;
+            swapModel.TeamBId = Guid.Empty;
+            swapTeamAOptions.Clear();
+            swapTeamBOptions.Clear();
+            swapValidationMessages?.Clear();
+            swapEditContext?.NotifyValidationStateChanged();
 
             await LoadDataAsync();
         }
@@ -1056,10 +1076,13 @@ else
 
         try
         {
+            var reason = string.IsNullOrWhiteSpace(moveModel.Reason)
+                ? null
+                : moveModel.Reason.Trim();
             var request = new AdminMovePlayerRequestDto(
                 moveModel.PlayerId,
                 moveModel.ToTeamId,
-                moveModel.Reason!.Trim());
+                reason);
 
             var message = await AdminTransfersApiClient.MoveAsync(request);
             moveSuccessMessage = message;
@@ -1070,7 +1093,7 @@ else
             moveModel.FromTeamId = Guid.Empty;
             moveModel.PlayerId = Guid.Empty;
             moveModel.ToTeamId = Guid.Empty;
-            moveModel.Reason = string.Empty;
+            moveModel.Reason = null;
 
             await LoadDataAsync();
         }
@@ -1098,13 +1121,16 @@ else
 
         try
         {
-            var request = new AdminAdjustBudgetRequestDto(adjustModel.TeamId, adjustModel.Delta, adjustModel.Reason!.Trim());
+            var reason = string.IsNullOrWhiteSpace(adjustModel.Reason)
+                ? null
+                : adjustModel.Reason.Trim();
+            var request = new AdminAdjustBudgetRequestDto(adjustModel.TeamId, adjustModel.Delta, reason);
             var message = await AdminTransfersApiClient.AdjustBudgetAsync(request);
             budgetSuccessMessage = message;
 
             teamBudgets.Remove(adjustModel.TeamId);
             adjustModel.Delta = 0m;
-            adjustModel.Reason = string.Empty;
+            adjustModel.Reason = null;
 
             await LoadDataAsync();
         }
@@ -1132,12 +1158,15 @@ else
 
         try
         {
-            var request = new AdminCancelMarketItemRequestDto(cancelModel.Reason!.Trim());
+            var reason = string.IsNullOrWhiteSpace(cancelModel.Reason)
+                ? null
+                : cancelModel.Reason.Trim();
+            var request = new AdminCancelMarketItemRequestDto(reason);
             var message = await AdminTransfersApiClient.CancelMarketItemAsync(cancelModel.MarketItemId, request);
             cancelSuccessMessage = message;
 
             cancelModel.MarketItemId = Guid.Empty;
-            cancelModel.Reason = string.Empty;
+            cancelModel.Reason = null;
 
             await LoadDataAsync();
         }
@@ -1359,7 +1388,6 @@ else
         [Range(typeof(decimal), "0", "79228162514264337593543950335", ErrorMessage = "O valor não pode ser negativo.")]
         public decimal Amount { get; set; }
 
-        [Required(ErrorMessage = "Motivo é obrigatório.")]
         [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
         public string? Reason { get; set; }
 
@@ -1385,7 +1413,6 @@ else
         [Range(typeof(decimal), "0", "79228162514264337593543950335", ErrorMessage = "O ajuste não pode ser negativo.")]
         public decimal CashAdjustFromAToB { get; set; }
 
-        [Required(ErrorMessage = "Motivo é obrigatório.")]
         [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
         public string? Reason { get; set; }
 
@@ -1412,7 +1439,6 @@ else
         [Required(ErrorMessage = "Time de destino é obrigatório.")]
         public Guid ToTeamId { get; set; }
 
-        [Required(ErrorMessage = "Motivo é obrigatório.")]
         [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
         public string? Reason { get; set; }
     }
@@ -1424,7 +1450,6 @@ else
 
         public decimal Delta { get; set; }
 
-        [Required(ErrorMessage = "Motivo é obrigatório.")]
         [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
         public string? Reason { get; set; }
 
@@ -1447,7 +1472,6 @@ else
         [Required(ErrorMessage = "Selecione um item.")]
         public Guid MarketItemId { get; set; }
 
-        [Required(ErrorMessage = "Motivo é obrigatório.")]
         [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
         public string? Reason { get; set; }
     }
