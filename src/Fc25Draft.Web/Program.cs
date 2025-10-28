@@ -84,6 +84,7 @@ builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<AdminTransferService>();
 
 var app = builder.Build();
 
@@ -843,6 +844,56 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = ex.Message });
         }
     });
+
+    adminTeamsApi.MapPost("/adjust-budget", async (
+        HttpContext httpContext,
+        AdminAdjustBudgetRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.TeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "TeamId é obrigatório." });
+        }
+
+        if (request.Delta == 0m)
+        {
+            return Results.BadRequest(new { message = "O ajuste deve ser diferente de zero." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.AdjustBudgetAsync(adminToken!, request.TeamId, request.Delta, request.Reason, ct);
+            return Results.Ok(new { message = "Orçamento ajustado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
 }
 
 static void MapBudgetEndpoints(RouteGroupBuilder api)
@@ -1315,12 +1366,58 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         return Results.Ok(new { itensFechados = closed });
     });
 
+    adminMarketApi.MapPost("/cancel/{itemId:guid}", async (
+        Guid itemId,
+        AdminCancelMarketItemRequestDto request,
+        HttpContext httpContext,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.CancelMarketItemAsync(adminToken!, itemId, request.Reason, ct);
+            return Results.Ok(new { message = "Item cancelado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
     static string? GetTeamToken(HttpContext context, string? payloadToken)
     {
         var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
         var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
         return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
+
 
     static string TranslateTransferType(TransferType type)
         => type switch
@@ -1332,6 +1429,42 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             TransferType.AdminMove => "Movimentação administrativa",
             _ => type.ToString()
         };
+}
+
+static bool TryGetAdminToken(HttpContext context, out string? adminToken, out IResult? errorResult)
+{
+    adminToken = null;
+    errorResult = null;
+
+    if (!context.Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var headerValue = authorizationHeader.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(headerValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    const string bearerPrefix = "Bearer ";
+    if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var tokenValue = headerValue[bearerPrefix.Length..].Trim();
+    if (string.IsNullOrWhiteSpace(tokenValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    adminToken = tokenValue;
+    return true;
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)

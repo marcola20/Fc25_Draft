@@ -21,6 +21,7 @@ public class DraftDbContext : DbContext
     public DbSet<MarketBid> MarketBids => Set<MarketBid>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
+    public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -145,6 +146,32 @@ public class DraftDbContext : DbContext
 
             e.HasIndex(x => x.Token)
              .IsUnique();
+        });
+
+        mb.Entity<AdminActionsLog>(e =>
+        {
+            e.ToTable("AdminActionsLog");
+            e.HasKey(x => x.ActionId);
+
+            e.Property(x => x.ActionId)
+             .ValueGeneratedNever();
+
+            e.Property(x => x.ActionType)
+             .IsRequired();
+
+            e.Property(x => x.PerformedBy)
+             .IsRequired()
+             .HasMaxLength(120);
+
+            e.Property(x => x.PayloadJson)
+             .IsRequired();
+
+            e.Property(x => x.CreatedAtUtc)
+             .IsRequired();
+
+            e.HasIndex(x => new { x.ActionType, x.CreatedAtUtc })
+             .IsDescending(false, true)
+             .HasDatabaseName("IX_AdminActionsLog_ActionType_CreatedAtUtc");
         });
 
         mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);
