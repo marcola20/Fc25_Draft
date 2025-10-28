@@ -24,7 +24,7 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.CurrentLeaderTeam)
-            .WithMany(t => t.MarketBids)
+            .WithMany(t => t.LeadingMarketItems)
             .HasForeignKey(x => x.CurrentLeaderTeamId)
             .OnDelete(DeleteBehavior.SetNull);
 
