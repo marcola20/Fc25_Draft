@@ -39,14 +39,14 @@ public class BudgetService : IBudgetService
 
     public async Task<decimal> GetBloqueadoEmLancesAsync(Guid teamId, CancellationToken ct)
     {
-        var total = await _dbContext.MarketItems
+        var bloqueado = await _dbContext.Teams
             .AsNoTracking()
-            .Where(i => (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged) && i.CurrentLeaderTeamId == teamId && i.CurrentLeaderAmount != null)
-            .Select(i => (decimal?)i.CurrentLeaderAmount)
-            .SumAsync(ct)
+            .Where(t => t.TeamId == teamId)
+            .Select(t => (decimal?)t.BudgetBlocked)
+            .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-        return decimal.Round(total ?? 0m, 2, MidpointRounding.AwayFromZero);
+        return decimal.Round(bloqueado ?? 0m, 2, MidpointRounding.AwayFromZero);
     }
 
     public async Task<decimal> GetSaldoDisponivelAsync(Guid teamId, CancellationToken ct)
@@ -192,33 +192,32 @@ public class BudgetService : IBudgetService
 
         if (request.TeamId == Guid.Empty)
         {
-            throw new ArgumentException("TeamId inválido.", nameof(request.TeamId));
+            throw new ArgumentException("TeamId é obrigatório.", nameof(request.TeamId));
         }
 
-        var total = CalculateMatchRewardAmount(request);
+        var teamExists = await _dbContext.Teams
+            .AsNoTracking()
+            .AnyAsync(t => t.TeamId == request.TeamId, ct)
+            .ConfigureAwait(false);
 
-        var team = await _dbContext.Teams
-            .FirstOrDefaultAsync(tb => tb.TeamId == request.TeamId, ct)
-            .ConfigureAwait(false)
-            ?? throw new KeyNotFoundException($"Time {request.TeamId} não encontrado.");
-
-        team.Budget += total;
-
-        var ledgerEntry = new BudgetLedger
+        if (!teamExists)
         {
-            BudgetLedgerId = Guid.NewGuid(),
-            TeamId = request.TeamId,
-            DataUtc = _timeProvider.GetUtcNow().UtcDateTime,
-            Tipo = "CREDIT",
-            Origem = "MATCH_REWARD",
-            Valor = total,
-            Descricao = request.Descricao
-        };
+            throw new KeyNotFoundException($"Time {request.TeamId} não encontrado.");
+        }
 
-        await _dbContext.BudgetLedgers.AddAsync(ledgerEntry, ct).ConfigureAwait(false);
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        var descricao = BuildMatchRewardDescription(request);
+        var total = CalculateMatchRewardAmount(request);
+        var tipo = total > 0 ? "CREDIT" : total < 0 ? "DEBIT" : "NONE";
+        var aplicado = total != 0m;
 
-        return new MatchRewardResult(request.TeamId, total);
+        if (aplicado)
+        {
+            await RegistrarAjusteAsync(request.TeamId, Math.Abs(total), "MATCH_REWARD", descricao, total > 0, ct).ConfigureAwait(false);
+        }
+
+        var saldoAtual = await GetSaldoAsync(request.TeamId, ct).ConfigureAwait(false);
+
+        return new MatchRewardResult(request.TeamId, total, saldoAtual, aplicado, tipo, descricao);
     }
 
     private static string NormalizeResultado(string? resultado)
@@ -229,5 +228,19 @@ public class BudgetService : IBudgetService
         }
 
         return resultado.Trim().ToUpperInvariant();
+    }
+
+    private static string BuildMatchRewardDescription(MatchRewardRequestDto request)
+    {
+        var resultado = NormalizeResultado(request.Resultado) switch
+        {
+            "VITORIA" => "Vitória",
+            "EMPATE" => "Empate",
+            "DERROTA" => "Derrota",
+            _ => throw new ArgumentException("Resultado inválido.", nameof(request.Resultado))
+        };
+
+        var cleanSheetValue = request.CleanSheet ? 1 : 0;
+        return $"{resultado}, {request.GolsFeitos} GM, {request.GolsSofridos} GS, CS={cleanSheetValue}";
     }
 }
