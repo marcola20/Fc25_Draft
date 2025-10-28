@@ -29,7 +29,7 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(x => x.WinnerTeam)
-            .WithMany()
+            .WithMany(t => t.WonMarketItems)
             .HasForeignKey(x => x.WinnerTeamId)
             .OnDelete(DeleteBehavior.SetNull);
 
