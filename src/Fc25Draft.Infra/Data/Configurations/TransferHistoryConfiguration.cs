@@ -26,11 +26,11 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
         builder.HasOne(x => x.FromTeam)
             .WithMany()
             .HasForeignKey(x => x.FromTeamId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.ToTeam)
             .WithMany()
             .HasForeignKey(x => x.ToTeamId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }
