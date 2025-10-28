@@ -1116,19 +1116,32 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
             var total = await query.CountAsync(ct);
 
-            var items = await query
+            var historyRows = await query
                 .OrderByDescending(h => h.PerformedAtUtc)
                 .Skip((pageNumber - 1) * size)
                 .Take(size)
+                .Select(h => new
+                {
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    PlayerName = h.Player.Name,
+                    h.Type,
+                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
+                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount
+                })
+                .ToListAsync(ct);
+
+            var items = historyRows
                 .Select(h => new TransferHistoryItemDto(
                     h.PerformedAtUtc,
                     h.PlayerId,
-                    h.Player.Name,
+                    h.PlayerName,
                     TranslateTransferType(h.Type),
-                    h.FromTeam != null ? h.FromTeam.TeamName : "Mercado Livre",
-                    h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.FromTeamName ?? "Mercado Livre",
+                    h.ToTeamName,
                     h.Amount ?? 0m))
-                .ToListAsync(ct);
+                .ToList();
 
             return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
         })
@@ -1161,19 +1174,32 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
             var total = await query.CountAsync(ct);
 
-            var items = await query
+            var historyRows = await query
                 .OrderByDescending(h => h.PerformedAtUtc)
                 .Skip((pageNumber - 1) * size)
                 .Take(size)
+                .Select(h => new
+                {
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    PlayerName = h.Player.Name,
+                    h.Type,
+                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
+                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount
+                })
+                .ToListAsync(ct);
+
+            var items = historyRows
                 .Select(h => new TransferHistoryItemDto(
                     h.PerformedAtUtc,
                     h.PlayerId,
-                    h.Player.Name,
+                    h.PlayerName,
                     TranslateTransferType(h.Type),
-                    h.FromTeam != null ? h.FromTeam.TeamName : "Mercado Livre",
-                    h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.FromTeamName ?? "Mercado Livre",
+                    h.ToTeamName,
                     h.Amount ?? 0m))
-                .ToListAsync(ct);
+                .ToList();
 
             return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
         })
