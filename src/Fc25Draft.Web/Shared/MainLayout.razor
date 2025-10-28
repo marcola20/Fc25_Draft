@@ -38,33 +38,35 @@
 
 @if (showAdminModal)
 {
-    <div class="admin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
-        <div class="admin-modal-container">
-            <div class="modal-header">
-                <h5 id="adminModalTitle" class="modal-title">Entrar como Admin</h5>
-                <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Informe o token de administrador configurado no servidor.</p>
-                <div class="mb-3">
-                    <label class="form-label" for="adminTokenInput">Token</label>
-                    <input id="adminTokenInput"
-                           class="form-control"
-                           type="password"
-                           @bind-value="adminTokenInput"
-                           @bind-value:event="oninput"
-                           autocomplete="one-time-code" />
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Entrar como Admin</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
                 </div>
-                @if (!string.IsNullOrEmpty(adminModalError))
-                {
-                    <div class="alert alert-danger" role="alert">@adminModalError</div>
-                }
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="CloseAdminModal">Cancelar</button>
-                <button type="button" class="btn btn-primary" @onclick="SubmitAdminTokenAsync">
-                    Salvar
-                </button>
+                <div class="modal-body">
+                    <p>Informe o token de administrador configurado no servidor.</p>
+                    <div class="mb-3">
+                        <label class="form-label" for="adminTokenInput">Token</label>
+                        <input id="adminTokenInput"
+                               class="form-control"
+                               type="password"
+                               @bind-value="adminTokenInput"
+                               @bind-value:event="oninput"
+                               autocomplete="one-time-code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(adminModalError))
+                    {
+                        <div class="alert alert-danger" role="alert">@adminModalError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAdminModal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="SubmitAdminTokenAsync">
+                        Salvar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
