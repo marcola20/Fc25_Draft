@@ -21,6 +21,7 @@ public class DraftDbContext : DbContext
     public DbSet<MarketBid> MarketBids => Set<MarketBid>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
+    public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -57,11 +58,16 @@ public class DraftDbContext : DbContext
             e.Property(x => x.Name).IsRequired().HasMaxLength(80);
             e.Property(x => x.Overall).IsRequired();
             e.Property(x => x.Age);
+            e.Property(x => x.PlayerGuid)
+             .IsRequired()
+             .HasDefaultValueSql("NEWSEQUENTIALID()")
+             .ValueGeneratedOnAdd();
             e.HasOne(x => x.Position)
              .WithMany(p => p.Players)
              .HasForeignKey(x => x.PositionId)
              .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.Name, x.PositionId });
+            e.HasIndex(x => x.PlayerGuid).IsUnique();
             e.HasOne(p => p.CurrentTeam)
              .WithMany()
              .HasForeignKey(p => p.CurrentTeamId)
@@ -145,6 +151,32 @@ public class DraftDbContext : DbContext
 
             e.HasIndex(x => x.Token)
              .IsUnique();
+        });
+
+        mb.Entity<AdminActionsLog>(e =>
+        {
+            e.ToTable("AdminActionsLog");
+            e.HasKey(x => x.ActionId);
+
+            e.Property(x => x.ActionId)
+             .ValueGeneratedNever();
+
+            e.Property(x => x.ActionType)
+             .IsRequired();
+
+            e.Property(x => x.PerformedBy)
+             .IsRequired()
+             .HasMaxLength(120);
+
+            e.Property(x => x.PayloadJson)
+             .IsRequired();
+
+            e.Property(x => x.CreatedAtUtc)
+             .IsRequired();
+
+            e.HasIndex(x => new { x.ActionType, x.CreatedAtUtc })
+             .IsDescending(false, true)
+             .HasDatabaseName("IX_AdminActionsLog_ActionType_CreatedAtUtc");
         });
 
         mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);

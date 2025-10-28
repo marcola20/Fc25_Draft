@@ -7,6 +7,7 @@ using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Core.Options;
@@ -84,6 +85,8 @@ builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<AdminTransferService>();
+builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
 
 var app = builder.Build();
 
@@ -125,6 +128,7 @@ MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
 MapPricingEndpoints(api);
 MapMarketEndpoints(api);
+MapTransfersEndpoints(api);
 MapBudgetEndpoints(api);
 
 app.Run();
@@ -134,6 +138,268 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
     var adminApi = api.MapGroup("/admin").RequireAuthorization("AdminOnly");
 
     adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
+
+    var adminTransferApi = adminApi.MapGroup("/transfer");
+
+    adminTransferApi.MapPost("/sell", async (
+        HttpContext httpContext,
+        AdminSellPlayersRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.FromTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de origem é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (request.FromTeamId == request.ToTeamId)
+        {
+            return Results.BadRequest(new { message = "Informe times diferentes para a venda." });
+        }
+
+        if (request.PlayerIds is null || request.PlayerIds.Length == 0)
+        {
+            return Results.BadRequest(new { message = "Selecione ao menos um jogador." });
+        }
+
+        if (request.PlayerIds.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista." });
+        }
+
+        if (request.PlayerIds.Distinct().Count() != request.PlayerIds.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores." });
+        }
+
+        if (request.Amount < 0m)
+        {
+            return Results.BadRequest(new { message = "O valor não pode ser negativo." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.SellAsync(
+                adminToken!,
+                request.FromTeamId,
+                request.ToTeamId,
+                request.PlayerIds,
+                request.Amount,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Venda concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
+    adminTransferApi.MapPost("/swap", async (
+        HttpContext httpContext,
+        AdminSwapPlayersRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.TeamAId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time A é obrigatório." });
+        }
+
+        if (request.TeamBId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time B é obrigatório." });
+        }
+
+        if (request.TeamAId == request.TeamBId)
+        {
+            return Results.BadRequest(new { message = "Informe times diferentes para a troca." });
+        }
+
+        var playersFromA = request.PlayersFromA ?? Array.Empty<Guid>();
+        var playersFromB = request.PlayersFromB ?? Array.Empty<Guid>();
+
+        if (playersFromA.Length == 0 && playersFromB.Length == 0)
+        {
+            return Results.BadRequest(new { message = "Selecione ao menos um jogador para a troca." });
+        }
+
+        if (playersFromA.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista do Time A." });
+        }
+
+        if (playersFromB.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista do Time B." });
+        }
+
+        if (playersFromA.Distinct().Count() != playersFromA.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores do Time A." });
+        }
+
+        if (playersFromB.Distinct().Count() != playersFromB.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores do Time B." });
+        }
+
+        if (playersFromA.Intersect(playersFromB).Any())
+        {
+            return Results.BadRequest(new { message = "Um jogador não pode participar pelos dois times." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.SwapAsync(
+                adminToken!,
+                request.TeamAId,
+                playersFromA,
+                request.TeamBId,
+                playersFromB,
+                request.CashAdjustFromAToB,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Troca concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
+    adminTransferApi.MapPost("/move", async (
+        HttpContext httpContext,
+        AdminMovePlayerRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.PlayerId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Jogador é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.MoveAsync(
+                adminToken!,
+                request.PlayerId,
+                request.ToTeamId,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Movimentação concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
 }
 
 static void MapDraftEndpoints(RouteGroupBuilder api)
@@ -698,6 +964,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -733,6 +1000,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -841,6 +1109,56 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         catch (InvalidOperationException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
+        }
+    });
+
+    adminTeamsApi.MapPost("/adjust-budget", async (
+        HttpContext httpContext,
+        AdminAdjustBudgetRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.TeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "TeamId é obrigatório." });
+        }
+
+        if (request.Delta == 0m)
+        {
+            return Results.BadRequest(new { message = "O ajuste deve ser diferente de zero." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.AdjustBudgetAsync(adminToken!, request.TeamId, request.Delta, request.Reason, ct);
+            return Results.Ok(new { message = "Orçamento ajustado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
         }
     });
 }
@@ -1100,6 +1418,62 @@ static void MapPricingEndpoints(RouteGroupBuilder api)
         });
 }
 
+static void MapTransfersEndpoints(RouteGroupBuilder api)
+{
+    var transfersApi = api.MapGroup("/transfers");
+
+    transfersApi.MapGet("/history", async (
+        [FromQuery] Guid? teamId,
+        [FromQuery] Guid? playerId,
+        [FromQuery] string? type,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        ITransfersQueryService transfersQueryService,
+        CancellationToken ct) =>
+    {
+        TransferType? typeFilter = null;
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var normalizedType = type.Trim();
+            if (Enum.TryParse<TransferType>(normalizedType, ignoreCase: true, out var parsedType))
+            {
+                typeFilter = parsedType;
+            }
+            else if (int.TryParse(normalizedType, out var numericType) && Enum.IsDefined(typeof(TransferType), numericType))
+            {
+                typeFilter = (TransferType)numericType;
+            }
+            else
+            {
+                return Results.BadRequest(new { message = "Tipo de transferência inválido." });
+            }
+        }
+
+        var filter = new TransfersFilter
+        {
+            TeamId = teamId,
+            PlayerId = playerId,
+            Type = typeFilter,
+            FromUtc = from,
+            ToUtc = to,
+            Page = page ?? 1,
+            PageSize = pageSize ?? 20
+        };
+
+        try
+        {
+            var result = await transfersQueryService.QueryHistoryAsync(filter, ct);
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+}
+
 static void MapMarketEndpoints(RouteGroupBuilder api)
 {
     var marketApi = api.MapGroup("/market");
@@ -1137,7 +1511,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
                     h.PerformedAtUtc,
                     h.PlayerId,
                     h.PlayerName,
-                    TranslateTransferType(h.Type),
+                    h.Type.ToDisplayName(),
                     h.FromTeamName ?? "Mercado Livre",
                     h.ToTeamName,
                     h.Amount ?? 0m))
@@ -1195,7 +1569,7 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
                     h.PerformedAtUtc,
                     h.PlayerId,
                     h.PlayerName,
-                    TranslateTransferType(h.Type),
+                    h.Type.ToDisplayName(),
                     h.FromTeamName ?? "Mercado Livre",
                     h.ToTeamName,
                     h.Amount ?? 0m))
@@ -1315,23 +1689,93 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         return Results.Ok(new { itensFechados = closed });
     });
 
+    adminMarketApi.MapPost("/cancel/{itemId:guid}", async (
+        Guid itemId,
+        AdminCancelMarketItemRequestDto request,
+        HttpContext httpContext,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.CancelMarketItemAsync(adminToken!, itemId, request.Reason, ct);
+            return Results.Ok(new { message = "Item cancelado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
     static string? GetTeamToken(HttpContext context, string? payloadToken)
     {
         var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
         var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
         return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
+}
 
-    static string TranslateTransferType(TransferType type)
-        => type switch
-        {
-            TransferType.Auction => "Leilão",
-            TransferType.BuyNow => "Compra imediata",
-            TransferType.Sale => "Venda",
-            TransferType.Swap => "Troca",
-            TransferType.AdminMove => "Movimentação administrativa",
-            _ => type.ToString()
-        };
+static bool TryGetAdminToken(HttpContext context, out string? adminToken, out IResult? errorResult)
+{
+    adminToken = null;
+    errorResult = null;
+
+    if (!context.Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var headerValue = authorizationHeader.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(headerValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    const string bearerPrefix = "Bearer ";
+    if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var tokenValue = headerValue[bearerPrefix.Length..].Trim();
+    if (string.IsNullOrWhiteSpace(tokenValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    adminToken = tokenValue;
+    return true;
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
