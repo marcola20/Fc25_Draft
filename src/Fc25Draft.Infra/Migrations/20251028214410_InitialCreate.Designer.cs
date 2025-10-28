@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    [Migration("20251028040851_InitialCreate")]
+    [Migration("20251028214410_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -24,6 +24,35 @@ namespace Fc25Draft.Infra.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.AdminActionsLog", b =>
+                {
+                    b.Property<Guid>("ActionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("ActionId");
+
+                    b.HasIndex("ActionType", "CreatedAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_AdminActionsLog_ActionType_CreatedAtUtc");
+
+                    b.ToTable("AdminActionsLog", (string)null);
+                });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.AdminToken", b =>
                 {
@@ -294,12 +323,20 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Overall")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("PlayerGuid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
                     b.Property<short>("PositionId")
                         .HasColumnType("smallint");
 
                     b.HasKey("PlayerId");
 
                     b.HasIndex("CurrentTeamId");
+
+                    b.HasIndex("PlayerGuid")
+                        .IsUnique();
 
                     b.HasIndex("PositionId");
 

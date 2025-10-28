@@ -14,6 +14,21 @@ namespace Fc25Draft.Infra.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "AdminActionsLog",
+                columns: table => new
+                {
+                    ActionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ActionType = table.Column<int>(type: "int", nullable: false),
+                    PerformedBy = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
+                    PayloadJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AdminActionsLog", x => x.ActionId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Drafts",
                 columns: table => new
                 {
@@ -134,6 +149,7 @@ namespace Fc25Draft.Infra.Migrations
                 {
                     PlayerId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    PlayerGuid = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "NEWSEQUENTIALID()"),
                     Name = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
                     Age = table.Column<int>(type: "int", nullable: true),
                     Overall = table.Column<int>(type: "int", nullable: false),
@@ -349,6 +365,12 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AdminActionsLog_ActionType_CreatedAtUtc",
+                table: "AdminActionsLog",
+                columns: new[] { "ActionType", "CreatedAtUtc" },
+                descending: new[] { false, true });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_BudgetLedger_TeamId_DataUtc",
                 table: "BudgetLedgers",
                 columns: new[] { "TeamId", "DataUtc" },
@@ -418,6 +440,12 @@ namespace Fc25Draft.Infra.Migrations
                 columns: new[] { "Name", "PositionId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Players_PlayerGuid",
+                table: "Players",
+                column: "PlayerGuid",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Players_PositionId",
                 table: "Players",
                 column: "PositionId");
@@ -471,6 +499,9 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "AdminActionsLog");
+
             migrationBuilder.DropTable(
                 name: "BudgetLedgers");
 

@@ -332,12 +332,12 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("CurrentTeamId");
 
+                    b.HasIndex("PlayerGuid")
+                        .IsUnique();
+
                     b.HasIndex("PositionId");
 
                     b.HasIndex("Name", "PositionId");
-
-                    b.HasIndex("PlayerGuid")
-                        .IsUnique();
 
                     b.ToTable("Players");
                 });
