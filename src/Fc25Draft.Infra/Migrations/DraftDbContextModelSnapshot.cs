@@ -320,6 +320,11 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Overall")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("PlayerGuid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
                     b.Property<short>("PositionId")
                         .HasColumnType("smallint");
 
@@ -330,6 +335,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("PositionId");
 
                     b.HasIndex("Name", "PositionId");
+
+                    b.HasIndex("PlayerGuid")
+                        .IsUnique();
 
                     b.ToTable("Players");
                 });

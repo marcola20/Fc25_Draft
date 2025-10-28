@@ -1,8 +1,11 @@
+using System;
+
 namespace Fc25Draft.Core.Entities;
 
 public class Player
 {
     public int PlayerId { get; set; }
+    public Guid PlayerGuid { get; set; }
     public string Name { get; set; } = null!;
     public int? Age { get; set; }
     public int Overall { get; set; }

@@ -27,6 +27,7 @@ public record TeamRosterDto(
     IReadOnlyList<TeamRosterPlayerDto> Jogadores);
 
 public record TeamRosterPlayerDto(
+    Guid PlayerGuid,
     int PlayerId,
     string Nome,
     string Posicao,

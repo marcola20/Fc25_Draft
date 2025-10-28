@@ -135,6 +135,99 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
     var adminApi = api.MapGroup("/admin").RequireAuthorization("AdminOnly");
 
     adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
+
+    var adminTransferApi = adminApi.MapGroup("/transfer");
+
+    adminTransferApi.MapPost("/sell", async (
+        HttpContext httpContext,
+        AdminSellPlayersRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.FromTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de origem é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (request.FromTeamId == request.ToTeamId)
+        {
+            return Results.BadRequest(new { message = "Informe times diferentes para a venda." });
+        }
+
+        if (request.PlayerIds is null || request.PlayerIds.Length == 0)
+        {
+            return Results.BadRequest(new { message = "Selecione ao menos um jogador." });
+        }
+
+        if (request.PlayerIds.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista." });
+        }
+
+        if (request.PlayerIds.Distinct().Count() != request.PlayerIds.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores." });
+        }
+
+        if (request.Amount < 0m)
+        {
+            return Results.BadRequest(new { message = "O valor não pode ser negativo." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.SellAsync(
+                adminToken!,
+                request.FromTeamId,
+                request.ToTeamId,
+                request.PlayerIds,
+                request.Amount,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Venda concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
 }
 
 static void MapDraftEndpoints(RouteGroupBuilder api)
@@ -699,6 +792,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -734,6 +828,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,

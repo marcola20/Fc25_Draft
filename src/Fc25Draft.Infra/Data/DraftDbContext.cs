@@ -58,11 +58,16 @@ public class DraftDbContext : DbContext
             e.Property(x => x.Name).IsRequired().HasMaxLength(80);
             e.Property(x => x.Overall).IsRequired();
             e.Property(x => x.Age);
+            e.Property(x => x.PlayerGuid)
+             .IsRequired()
+             .HasDefaultValueSql("NEWSEQUENTIALID()")
+             .ValueGeneratedOnAdd();
             e.HasOne(x => x.Position)
              .WithMany(p => p.Players)
              .HasForeignKey(x => x.PositionId)
              .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.Name, x.PositionId });
+            e.HasIndex(x => x.PlayerGuid).IsUnique();
             e.HasOne(p => p.CurrentTeam)
              .WithMany()
              .HasForeignKey(p => p.CurrentTeamId)
