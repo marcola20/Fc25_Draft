@@ -110,12 +110,14 @@ namespace Fc25Draft.Infra.Migrations
                         name: "FK_MarketItems_Teams_CurrentLeaderTeamId",
                         column: x => x.CurrentLeaderTeamId,
                         principalTable: "Teams",
-                        principalColumn: "TeamId");
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_MarketItems_Teams_WinnerTeamId",
                         column: x => x.WinnerTeamId,
                         principalTable: "Teams",
-                        principalColumn: "TeamId");
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(

@@ -550,9 +550,9 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.HasOne("Fc25Draft.Core.Entities.Team", "CurrentLeaderTeam")
-                        .WithMany("MarketBids")
+                        .WithMany("LeadingMarketItems")
                         .HasForeignKey("CurrentLeaderTeamId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
                         .WithMany("MarketItems")
@@ -561,9 +561,9 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.HasOne("Fc25Draft.Core.Entities.Team", "WinnerTeam")
-                        .WithMany()
+                        .WithMany("WonMarketItems")
                         .HasForeignKey("WinnerTeamId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Cycle");
 
@@ -673,7 +673,11 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Navigation("MarketBids");
 
+                    b.Navigation("LeadingMarketItems");
+
                     b.Navigation("Roster");
+
+                    b.Navigation("WonMarketItems");
                 });
 #pragma warning restore 612, 618
         }
