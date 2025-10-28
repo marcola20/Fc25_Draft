@@ -110,6 +110,49 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "BudgetLedgers",
+                columns: table => new
+                {
+                    BudgetLedgerId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    DataUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Tipo = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    Origem = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Valor = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Descricao = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BudgetLedgers", x => x.BudgetLedgerId);
+                    table.CheckConstraint("CK_BudgetLedger_Tipo", "[Tipo] IN ('CREDIT','DEBIT')");
+                    table.CheckConstraint("CK_BudgetLedger_Valor", "[Valor] > 0");
+                    table.ForeignKey(
+                        name: "FK_BudgetLedgers_Teams_TeamId",
+                        column: x => x.TeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TeamBudgets",
+                columns: table => new
+                {
+                    TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Saldo = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TeamBudgets", x => x.TeamId);
+                    table.ForeignKey(
+                        name: "FK_TeamBudgets_Teams_TeamId",
+                        column: x => x.TeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "DraftPicks",
                 columns: table => new
                 {
@@ -174,6 +217,109 @@ namespace Fc25Draft.Infra.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "TransferHistories",
+                columns: table => new
+                {
+                    TransferHistoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PlayerId = table.Column<int>(type: "int", nullable: false),
+                    OrigemTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    DestinoTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    Valor = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Tipo = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    DataUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Observacao = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TransferHistories", x => x.TransferHistoryId);
+                    table.CheckConstraint("CK_TransferHistory_Tipo", "[Tipo] IN ('MARKET_AUCTION','TEAM_SALE','TEAM_TRADE')");
+                    table.ForeignKey(
+                        name: "FK_TransferHistories_Players_PlayerId",
+                        column: x => x.PlayerId,
+                        principalTable: "Players",
+                        principalColumn: "PlayerId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferHistories_Teams_DestinoTeamId",
+                        column: x => x.DestinoTeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferHistories_Teams_OrigemTeamId",
+                        column: x => x.OrigemTeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TransferMarketItems",
+                columns: table => new
+                {
+                    MarketItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PlayerId = table.Column<int>(type: "int", nullable: false),
+                    PrecoBase = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    LanceAtual = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    MaiorLanceTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    PrecoComprarAgora = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    DataInicioUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DataFimUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    VencedorTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TransferMarketItems", x => x.MarketItemId);
+                    table.CheckConstraint("CK_TransferMarketItem_Status", "[Status] IN ('OPEN','SOLD','EXPIRED')");
+                    table.ForeignKey(
+                        name: "FK_TransferMarketItems_Players_PlayerId",
+                        column: x => x.PlayerId,
+                        principalTable: "Players",
+                        principalColumn: "PlayerId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferMarketItems_Teams_MaiorLanceTeamId",
+                        column: x => x.MaiorLanceTeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferMarketItems_Teams_VencedorTeamId",
+                        column: x => x.VencedorTeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Bids",
+                columns: table => new
+                {
+                    BidId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    MarketItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Valor = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    DataUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Bids", x => x.BidId);
+                    table.ForeignKey(
+                        name: "FK_Bids_Teams_TeamId",
+                        column: x => x.TeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Bids_TransferMarketItems_MarketItemId",
+                        column: x => x.MarketItemId,
+                        principalTable: "TransferMarketItems",
+                        principalColumn: "MarketItemId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.InsertData(
                 table: "Positions",
                 columns: new[] { "PositionId", "Name" },
@@ -190,6 +336,22 @@ namespace Fc25Draft.Infra.Migrations
                     { (short)9, "Meia/Ponta Direita" },
                     { (short)10, "Atacante" }
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bid_MarketItemId_DataUtc",
+                table: "Bids",
+                columns: new[] { "MarketItemId", "DataUtc" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bids_TeamId",
+                table: "Bids",
+                column: "TeamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BudgetLedger_TeamId_DataUtc",
+                table: "BudgetLedgers",
+                columns: new[] { "TeamId", "DataUtc" },
+                descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
                 name: "IX_DraftPicks_DraftId_RoundNumber_PickInRound",
@@ -253,19 +415,81 @@ namespace Fc25Draft.Infra.Migrations
                 table: "Token_Administrador",
                 column: "Token",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferHistories_DestinoTeamId",
+                table: "TransferHistories",
+                column: "DestinoTeamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferHistories_OrigemTeamId",
+                table: "TransferHistories",
+                column: "OrigemTeamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferHistories_PlayerId",
+                table: "TransferHistories",
+                column: "PlayerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferHistory_DataUtc",
+                table: "TransferHistories",
+                column: "DataUtc");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferMarketItem_Player_Open",
+                table: "TransferMarketItems",
+                column: "PlayerId",
+                unique: true,
+                filter: "[Status] = 'OPEN'");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferMarketItem_Player_Status",
+                table: "TransferMarketItems",
+                columns: new[] { "PlayerId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferMarketItem_Status",
+                table: "TransferMarketItems",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferMarketItems_MaiorLanceTeamId",
+                table: "TransferMarketItems",
+                column: "MaiorLanceTeamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferMarketItems_VencedorTeamId",
+                table: "TransferMarketItems",
+                column: "VencedorTeamId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "Bids");
+
+            migrationBuilder.DropTable(
+                name: "BudgetLedgers");
+
+            migrationBuilder.DropTable(
                 name: "DraftPicks");
+
+            migrationBuilder.DropTable(
+                name: "TeamBudgets");
 
             migrationBuilder.DropTable(
                 name: "TeamRosters");
 
             migrationBuilder.DropTable(
                 name: "Token_Administrador");
+
+            migrationBuilder.DropTable(
+                name: "TransferHistories");
+
+            migrationBuilder.DropTable(
+                name: "TransferMarketItems");
 
             migrationBuilder.DropTable(
                 name: "DraftRounds");

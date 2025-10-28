@@ -61,24 +61,12 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("BidId");
 
-                    b.HasIndex("MarketItemId", "DataUtc");
-
                     b.HasIndex("TeamId");
 
+                    b.HasIndex("MarketItemId", "DataUtc")
+                        .HasDatabaseName("IX_Bid_MarketItemId_DataUtc");
+
                     b.ToTable("Bids");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamBudget", b =>
-                {
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Saldo")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("TeamId");
-
-                    b.ToTable("TeamBudgets");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.BudgetLedger", b =>
@@ -113,116 +101,14 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasKey("BudgetLedgerId");
 
                     b.HasIndex("TeamId", "DataUtc")
-                        .HasDatabaseName("IX_BudgetLedger_TeamId_DataUtc")
-                        .IsDescending(false, true);
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_BudgetLedger_TeamId_DataUtc");
 
-                    b.ToTable("BudgetLedgers", (string)null, t =>
+                    b.ToTable("BudgetLedgers", t =>
                         {
                             t.HasCheckConstraint("CK_BudgetLedger_Tipo", "[Tipo] IN ('CREDIT','DEBIT')");
+
                             t.HasCheckConstraint("CK_BudgetLedger_Valor", "[Valor] > 0");
-                        });
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
-                {
-                    b.Property<Guid>("TransferHistoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("DataUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("DestinoTeamId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("OrigemTeamId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal>("Valor")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Observacao")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("TransferHistoryId");
-
-                    b.HasIndex("DataUtc");
-
-                    b.HasIndex("DestinoTeamId");
-
-                    b.HasIndex("OrigemTeamId");
-
-                    b.HasIndex("PlayerId");
-
-                    b.ToTable("TransferHistories", (string)null, t =>
-                        {
-                            t.HasCheckConstraint("CK_TransferHistory_Tipo", "[Tipo] IN ('MARKET_AUCTION','TEAM_SALE','TEAM_TRADE')");
-                        });
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferMarketItem", b =>
-                {
-                    b.Property<Guid>("MarketItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("DataFimUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("DataInicioUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("LanceAtual")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<Guid?>("MaiorLanceTeamId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("PrecoBase")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("PrecoComprarAgora")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<Guid?>("VencedorTeamId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("MarketItemId");
-
-                    b.HasIndex("MaiorLanceTeamId");
-
-                    b.HasIndex("PlayerId");
-
-                    b.HasIndex("PlayerId", "Status");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("VencedorTeamId");
-
-                    b.HasIndex("PlayerId")
-                        .IsUnique()
-                        .HasFilter("[Status] = 'OPEN'")
-                        .HasDatabaseName("IX_TransferMarketItem_Player_Open");
-
-                    b.ToTable("TransferMarketItems", (string)null, t =>
-                        {
-                            t.HasCheckConstraint("CK_TransferMarketItem_Status", "[Status] IN ('OPEN','SOLD','EXPIRED')");
                         });
                 });
 
@@ -438,6 +324,19 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("Teams");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamBudget", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Saldo")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("TeamId");
+
+                    b.ToTable("TeamBudgets");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.TeamRoster", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -452,6 +351,110 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.ToTable("TeamRosters");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
+                {
+                    b.Property<Guid>("TransferHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DataUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DestinoTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Observacao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("OrigemTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("TransferHistoryId");
+
+                    b.HasIndex("DataUtc")
+                        .HasDatabaseName("IX_TransferHistory_DataUtc");
+
+                    b.HasIndex("DestinoTeamId");
+
+                    b.HasIndex("OrigemTeamId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("TransferHistories", t =>
+                        {
+                            t.HasCheckConstraint("CK_TransferHistory_Tipo", "[Tipo] IN ('MARKET_AUCTION','TEAM_SALE','TEAM_TRADE')");
+                        });
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferMarketItem", b =>
+                {
+                    b.Property<Guid>("MarketItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("DataFimUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInicioUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("LanceAtual")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("MaiorLanceTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrecoBase")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("PrecoComprarAgora")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("VencedorTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("MarketItemId");
+
+                    b.HasIndex("MaiorLanceTeamId");
+
+                    b.HasIndex("PlayerId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TransferMarketItem_Player_Open")
+                        .HasFilter("[Status] = 'OPEN'");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_TransferMarketItem_Status");
+
+                    b.HasIndex("VencedorTeamId");
+
+                    b.HasIndex("PlayerId", "Status")
+                        .HasDatabaseName("IX_TransferMarketItem_Player_Status");
+
+                    b.ToTable("TransferMarketItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_TransferMarketItem_Status", "[Status] IN ('OPEN','SOLD','EXPIRED')");
+                        });
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Bid", b =>
@@ -482,69 +485,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Team");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamBudget", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
-                        .WithOne()
-                        .HasForeignKey("Fc25Draft.Core.Entities.TeamBudget", "TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Team");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "DestinoTeam")
-                        .WithMany()
-                        .HasForeignKey("DestinoTeamId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "OrigemTeam")
-                        .WithMany()
-                        .HasForeignKey("OrigemTeamId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DestinoTeam");
-
-                    b.Navigation("OrigemTeam");
-
-                    b.Navigation("Player");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferMarketItem", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "MaiorLanceTeam")
-                        .WithMany()
-                        .HasForeignKey("MaiorLanceTeamId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "VencedorTeam")
-                        .WithMany()
-                        .HasForeignKey("VencedorTeamId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Bids");
-
-                    b.Navigation("MaiorLanceTeam");
-
-                    b.Navigation("Player");
-
-                    b.Navigation("VencedorTeam");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftPick", b =>
@@ -603,6 +543,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Position");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamBudget", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithOne()
+                        .HasForeignKey("Fc25Draft.Core.Entities.TeamBudget", "TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.TeamRoster", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
@@ -620,6 +571,56 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Player");
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "DestinoTeam")
+                        .WithMany()
+                        .HasForeignKey("DestinoTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "OrigemTeam")
+                        .WithMany()
+                        .HasForeignKey("OrigemTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinoTeam");
+
+                    b.Navigation("OrigemTeam");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferMarketItem", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "MaiorLanceTeam")
+                        .WithMany()
+                        .HasForeignKey("MaiorLanceTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "VencedorTeam")
+                        .WithMany()
+                        .HasForeignKey("VencedorTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("MaiorLanceTeam");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("VencedorTeam");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
@@ -651,6 +652,11 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("DraftPicks");
 
                     b.Navigation("Roster");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferMarketItem", b =>
+                {
+                    b.Navigation("Bids");
                 });
 #pragma warning restore 612, 618
         }
