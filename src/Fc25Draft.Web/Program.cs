@@ -333,6 +333,70 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
             return Results.NotFound(new { message = ex.Message });
         }
     });
+
+    adminTransferApi.MapPost("/move", async (
+        HttpContext httpContext,
+        AdminMovePlayerRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.PlayerId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Jogador é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Results.BadRequest(new { message = "Motivo é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.MoveAsync(
+                adminToken!,
+                request.PlayerId,
+                request.ToTeamId,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Movimentação concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
 }
 
 static void MapDraftEndpoints(RouteGroupBuilder api)

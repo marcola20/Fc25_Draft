@@ -712,6 +712,146 @@ public partial class AdminTransferService
         }
     }
 
+    public async Task MoveAsync(
+        string adminToken,
+        Guid playerId,
+        Guid toTeamId,
+        string reason,
+        CancellationToken ct)
+    {
+        if (playerId == Guid.Empty)
+        {
+            throw new ArgumentException("Jogador inválido.", nameof(playerId));
+        }
+
+        if (toTeamId == Guid.Empty)
+        {
+            throw new ArgumentException("Time de destino inválido.", nameof(toTeamId));
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Informe um motivo para a movimentação.", nameof(reason));
+        }
+
+        var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
+        var normalizedReason = reason.Trim();
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            var player = await _dbContext.Players
+                .FirstOrDefaultAsync(p => p.PlayerGuid == playerId, ct)
+                .ConfigureAwait(false)
+                ?? throw new KeyNotFoundException("Jogador não encontrado.");
+
+            var fromTeamId = player.CurrentTeamId;
+
+            var toTeamExists = await _dbContext.Teams
+                .AnyAsync(t => t.TeamId == toTeamId, ct)
+                .ConfigureAwait(false);
+
+            if (!toTeamExists)
+            {
+                throw new KeyNotFoundException("Time de destino não encontrado.");
+            }
+
+            var hasActiveListing = await _dbContext.MarketItems
+                .AsNoTracking()
+                .AnyAsync(
+                    i => i.PlayerId == player.PlayerId
+                        && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged),
+                    ct)
+                .ConfigureAwait(false);
+
+            if (hasActiveListing)
+            {
+                throw new InvalidOperationException("Remova o jogador do mercado antes de concluir a movimentação.");
+            }
+
+            var currentToTeamCount = await _dbContext.Players
+                .CountAsync(p => p.CurrentTeamId == toTeamId, ct)
+                .ConfigureAwait(false);
+
+            var finalToTeamCount = currentToTeamCount;
+            if (fromTeamId != toTeamId)
+            {
+                finalToTeamCount += 1;
+            }
+
+            if (finalToTeamCount > 23)
+            {
+                throw new InvalidOperationException("O time de destino excederia o limite de 23 jogadores.");
+            }
+
+            player.CurrentTeamId = toTeamId;
+
+            var rosterEntries = await _dbContext.TeamRosters
+                .Where(r => r.PlayerId == player.PlayerId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            foreach (var entry in rosterEntries)
+            {
+                if (entry.TeamId != toTeamId)
+                {
+                    _dbContext.TeamRosters.Remove(entry);
+                }
+            }
+
+            var hasRosterInToTeam = rosterEntries.Any(e => e.TeamId == toTeamId);
+            if (!hasRosterInToTeam)
+            {
+                await _dbContext.TeamRosters.AddAsync(new TeamRoster
+                {
+                    PlayerId = player.PlayerId,
+                    TeamId = toTeamId
+                }, ct).ConfigureAwait(false);
+            }
+
+            var historyEntry = new TransferHistory
+            {
+                TransferId = Guid.NewGuid(),
+                Type = TransferType.AdminMove,
+                PlayerId = player.PlayerId,
+                FromTeamId = fromTeamId,
+                ToTeamId = toTeamId,
+                Amount = null,
+                Notes = normalizedReason,
+                PerformedBy = adminTokenGuid.ToString(),
+                PerformedAtUtc = now
+            };
+
+            await _dbContext.TransferHistories.AddAsync(historyEntry, ct).ConfigureAwait(false);
+
+            var logEntry = new AdminActionsLog
+            {
+                ActionId = Guid.NewGuid(),
+                ActionType = AdminActionType.MovePlayer,
+                PerformedBy = adminTokenGuid.ToString(),
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    playerId,
+                    fromTeamId,
+                    toTeamId,
+                    reason = normalizedReason
+                }, JsonOptions),
+                CreatedAtUtc = now
+            };
+
+            await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
+            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     private async Task<Guid> EnsureValidAdminTokenAsync(string adminToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(adminToken))

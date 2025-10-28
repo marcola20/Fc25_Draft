@@ -13,3 +13,5 @@ public record AdminSwapPlayersRequestDto(
     Guid[] PlayersFromB,
     decimal CashAdjustFromAToB,
     string Reason);
+
+public record AdminMovePlayerRequestDto(Guid PlayerId, Guid ToTeamId, string Reason);
