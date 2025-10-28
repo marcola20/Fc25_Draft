@@ -48,7 +48,7 @@ builder.Services.AddDbContext<DraftDbContext>(options =>
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
-builder.Services.Configure<MarketGenerationOptions>(builder.Configuration.GetSection(MarketGenerationOptions.SectionName));
+builder.Services.Configure<MarketOptions>(builder.Configuration.GetSection(MarketOptions.SectionName));
 builder.Services.Configure<EconomiaOptions>(builder.Configuration.GetSection(EconomiaOptions.SectionName));
 
 builder.Services
@@ -81,9 +81,8 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
+builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
-builder.Services.AddScoped<IMarketTransactionService, MarketTransactionService>();
-builder.Services.AddScoped<IMarketClosingService, MarketClosingService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 
 var app = builder.Build();
@@ -664,7 +663,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.TeamId,
                 t.TeamName,
                 t.OwnerName,
-                t.TeamToken,
+                t.Token,
                 Jogadores = t.Roster.Count
             })
             .FirstOrDefaultAsync(ct);
@@ -675,7 +674,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         }
 
         var includeToken = httpContext.User.IsInRole("Admin");
-        var teamToken = includeToken ? team.TeamToken : Guid.Empty;
+        var teamToken = includeToken ? team.Token : string.Empty;
 
         var dto = new TeamDetailsDto(
             team.TeamId,
@@ -859,14 +858,9 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
                 return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            if (!Guid.TryParse(token, out var parsedToken))
-            {
-                return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized);
-            }
-
             var teamId = await db.Teams
                 .AsNoTracking()
-                .Where(t => t.TeamToken == parsedToken)
+                .Where(t => t.Token == token.Trim())
                 .Select(t => (Guid?)t.TeamId)
                 .FirstOrDefaultAsync(ct);
 
@@ -1073,7 +1067,7 @@ static void MapPricingEndpoints(RouteGroupBuilder api)
 
             try
             {
-                var result = await pricingService.CalculateAsync(positionCode, positionId, age.Value, overall.Value, ct);
+                var result = await pricingService.CalculateForPositionAsync(positionCode, positionId, age.Value, overall.Value, ct);
                 return Results.Ok(result);
             }
             catch (ArgumentException ex)
@@ -1123,17 +1117,17 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             var total = await query.CountAsync(ct);
 
             var items = await query
-                .OrderByDescending(h => h.DataUtc)
+                .OrderByDescending(h => h.PerformedAtUtc)
                 .Skip((pageNumber - 1) * size)
                 .Take(size)
                 .Select(h => new TransferHistoryItemDto(
-                    h.DataUtc,
+                    h.PerformedAtUtc,
                     h.PlayerId,
                     h.Player.Name,
-                    h.Tipo,
-                    h.OrigemTeam != null ? h.OrigemTeam.TeamName : "Mercado Livre",
-                    h.DestinoTeam != null ? h.DestinoTeam.TeamName : null,
-                    h.Valor))
+                    TranslateTransferType(h.Type),
+                    h.FromTeam != null ? h.FromTeam.TeamName : "Mercado Livre",
+                    h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount ?? 0m))
                 .ToListAsync(ct);
 
             return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
@@ -1163,22 +1157,22 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
             var query = db.TransferHistories
                 .AsNoTracking()
-                .Where(h => h.OrigemTeamId == teamId || h.DestinoTeamId == teamId);
+                .Where(h => h.FromTeamId == teamId || h.ToTeamId == teamId);
 
             var total = await query.CountAsync(ct);
 
             var items = await query
-                .OrderByDescending(h => h.DataUtc)
+                .OrderByDescending(h => h.PerformedAtUtc)
                 .Skip((pageNumber - 1) * size)
                 .Take(size)
                 .Select(h => new TransferHistoryItemDto(
-                    h.DataUtc,
+                    h.PerformedAtUtc,
                     h.PlayerId,
                     h.Player.Name,
-                    h.Tipo,
-                    h.OrigemTeam != null ? h.OrigemTeam.TeamName : "Mercado Livre",
-                    h.DestinoTeam != null ? h.DestinoTeam.TeamName : null,
-                    h.Valor))
+                    TranslateTransferType(h.Type),
+                    h.FromTeam != null ? h.FromTeam.TeamName : "Mercado Livre",
+                    h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount ?? 0m))
                 .ToListAsync(ct);
 
             return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
@@ -1187,200 +1181,131 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
     marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
     {
-        var items = await marketService.GetOpenItemsAsync(ct);
+        await marketService.EnsureCycleAsync(ct);
+        await marketService.CloseExpiredItemsAsync(ct);
+        var items = await marketService.GetActiveItemsAsync(ct);
         return Results.Ok(items);
     }).AllowAnonymous();
 
-    marketApi.MapGet("/{marketItemId:guid}", async (Guid marketItemId, IMarketService marketService, CancellationToken ct) =>
+    marketApi.MapGet("/{itemId:guid}", async (Guid itemId, IMarketService marketService, CancellationToken ct) =>
     {
-        var items = await marketService.GetOpenItemsAsync(ct);
-        var item = items.FirstOrDefault(i => i.MarketItemId == marketItemId);
-        return item is null ? Results.NotFound() : Results.Ok(item);
+        await marketService.CloseExpiredItemsAsync(ct);
+        var item = await marketService.GetItemAsync(itemId, ct);
+        return item is null
+            ? Results.NotFound(new { message = "Item não encontrado." })
+            : Results.Ok(item);
     }).AllowAnonymous();
 
-    marketApi.MapPost("/{marketItemId:guid}/bid", async (
-        Guid marketItemId,
-        PlaceBidRequest request,
-        DraftDbContext db,
-        IMarketTransactionService transactionService,
+    marketApi.MapPost("/{itemId:guid}/bid", async (
+        Guid itemId,
+        MarketBidRequest request,
+        HttpContext context,
+        IMarketService marketService,
         CancellationToken ct) =>
     {
-        if (request is null)
+        var token = GetTeamToken(context, request.TeamToken);
+        if (token is null)
         {
-            return Results.BadRequest(new { message = "Payload inválido." });
-        }
-
-        var tokenResult = await ResolveTeamIdAsync(request.Token, db, ct);
-        if (tokenResult.Error is not null)
-        {
-            return tokenResult.Error;
+            return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
         try
         {
-            var item = await transactionService.PlaceBidAsync(marketItemId, tokenResult.TeamId, request.Valor, ct);
-            return Results.Ok(ToDto(item));
+            var result = await marketService.PlaceBidAsync(itemId, token, request.Amount, ct);
+            return Results.Ok(result);
         }
-        catch (TransferMarketNotFoundException ex)
+        catch (MarketForbiddenException ex)
         {
-            return Results.NotFound(new { message = ex.Message });
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
         }
-        catch (TransferMarketValidationException ex)
+        catch (MarketValidationException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
         }
-        catch (TransferMarketConflictException ex)
+        catch (MarketConflictException ex)
         {
             return Results.Conflict(new { message = ex.Message });
         }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
     }).AllowAnonymous();
 
-    marketApi.MapPost("/{marketItemId:guid}/buy-now", async (
-        Guid marketItemId,
-        BuyNowRequest request,
-        DraftDbContext db,
-        IMarketTransactionService transactionService,
+    marketApi.MapPost("/{itemId:guid}/buy-now", async (
+        Guid itemId,
+        MarketBuyNowRequest request,
+        HttpContext context,
+        IMarketService marketService,
         CancellationToken ct) =>
     {
-        if (request is null)
+        var token = GetTeamToken(context, request.TeamToken);
+        if (token is null)
         {
-            return Results.BadRequest(new { message = "Payload inválido." });
-        }
-
-        var tokenResult = await ResolveTeamIdAsync(request.Token, db, ct);
-        if (tokenResult.Error is not null)
-        {
-            return tokenResult.Error;
+            return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
         try
         {
-            var item = await transactionService.BuyNowAsync(marketItemId, tokenResult.TeamId, ct);
-            return Results.Ok(ToDto(item));
+            var result = await marketService.BuyNowAsync(itemId, token, ct);
+            return Results.Ok(result);
         }
-        catch (TransferMarketNotFoundException ex)
+        catch (MarketForbiddenException ex)
         {
-            return Results.NotFound(new { message = ex.Message });
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
         }
-        catch (TransferMarketConflictException ex)
+        catch (MarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (MarketConflictException ex)
         {
             return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
         }
     }).AllowAnonymous();
 
     var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
 
-    adminMarketApi.MapPost("/generate", async (IMarketService marketService, CancellationToken ct) =>
+    adminMarketApi.MapPost("/refresh", async (IMarketCycleGenerator cycleGenerator, CancellationToken ct) =>
     {
-        try
+        var now = DateTime.UtcNow;
+        var needsNew = await cycleGenerator.NeedsNewCycleAsync(now, ct);
+        if (!needsNew)
         {
-            var items = await marketService.GenerateRoundAsync(ct);
-            var dtos = items.Select(ToDto).ToList();
-            return Results.Created("/api/market", dtos);
+            return Results.Conflict(new { message = "Já existe um ciclo ativo." });
         }
-        catch (MarketGenerationConflictException ex)
-        {
-            return Results.Conflict(new { message = ex.Message });
-        }
-        catch (MarketGenerationValidationException ex)
-        {
-            return Results.BadRequest(new { message = ex.Message });
-        }
+
+        var cycle = await cycleGenerator.CreateNewCycleAsync(now, ct);
+        return Results.Ok(cycle);
     });
 
-    adminMarketApi.MapGet("/close/preview", async (IMarketClosingService closingService, CancellationToken ct) =>
+    adminMarketApi.MapPost("/close-expired", async (IMarketService marketService, CancellationToken ct) =>
     {
-        var preview = await closingService.PreviewCloseAsync(ct);
-        return Results.Ok(preview);
+        var closed = await marketService.CloseExpiredItemsAsync(ct);
+        return Results.Ok(new { itensFechados = closed });
     });
 
-    adminMarketApi.MapPost("/close", async (IMarketClosingService closingService, CancellationToken ct) =>
+    static string? GetTeamToken(HttpContext context, string? payloadToken)
     {
-        try
-        {
-            var result = await closingService.CloseRoundAsync(ct);
-            return Results.Ok(result);
-        }
-        catch (TransferMarketConflictException ex)
-        {
-            return Results.Conflict(new { message = ex.Message });
-        }
-    });
-
-    adminMarketApi.MapPost("/{marketItemId:guid}/close", async (
-        Guid marketItemId,
-        IMarketClosingService closingService,
-        CancellationToken ct) =>
-    {
-        try
-        {
-            var result = await closingService.CloseItemAsync(marketItemId, ct);
-            return Results.Ok(result);
-        }
-        catch (TransferMarketNotFoundException ex)
-        {
-            return Results.NotFound(new { message = ex.Message });
-        }
-        catch (TransferMarketConflictException ex)
-        {
-            return Results.Conflict(new { message = ex.Message });
-        }
-    });
-
-    static IResult UnauthorizedResult(string message)
-        => Results.Json(new { message }, statusCode: StatusCodes.Status401Unauthorized);
-
-    static async Task<TokenValidationResult> ResolveTeamIdAsync(string? token, DraftDbContext db, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return new TokenValidationResult(null, UnauthorizedResult("Token obrigatório."));
-        }
-
-        if (!Guid.TryParse(token, out var parsedToken))
-        {
-            return new TokenValidationResult(null, UnauthorizedResult("Token inválido."));
-        }
-
-        var teamId = await db.Teams
-            .AsNoTracking()
-            .Where(t => t.TeamToken == parsedToken)
-            .Select(t => (Guid?)t.TeamId)
-            .FirstOrDefaultAsync(ct);
-
-        if (!teamId.HasValue)
-        {
-            return new TokenValidationResult(null, UnauthorizedResult("Token inválido."));
-        }
-
-        return new TokenValidationResult(teamId.Value, null);
+        var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
+        var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
+        return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
 
-    static TransferMarketItemDto ToDto(TransferMarketItem item)
-    {
-        if (item.Player is null)
+    static string TranslateTransferType(TransferType type)
+        => type switch
         {
-            throw new InvalidOperationException("Jogador não carregado para o item de mercado.");
-        }
-
-        var positionName = item.Player.Position?.Name ?? string.Empty;
-        var age = item.Player.Age ?? 0;
-
-        return new TransferMarketItemDto(
-            item.MarketItemId,
-            item.PlayerId,
-            item.Player.Name,
-            positionName,
-            age,
-            item.Player.Overall,
-            item.PrecoBase,
-            item.PrecoComprarAgora,
-            item.LanceAtual,
-            item.MaiorLanceTeam?.TeamName,
-            item.Status,
-            item.DataInicioUtc,
-            item.VencedorTeamId);
-    }
+            TransferType.Auction => "Leilão",
+            TransferType.BuyNow => "Compra imediata",
+            TransferType.Sale => "Venda",
+            TransferType.Swap => "Troca",
+            TransferType.AdminMove => "Movimentação administrativa",
+            _ => type.ToString()
+        };
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
@@ -1446,11 +1371,6 @@ static string Escape(string? value)
     return sanitized.Contains(';') ? $"\"{sanitized}\"" : sanitized;
 }
 
-record PlaceBidRequest(string Token, decimal Valor);
+record MarketBidRequest(decimal Amount, string? TeamToken);
 
-record BuyNowRequest(string Token);
-
-readonly record struct TokenValidationResult(Guid? TeamIdValue, IResult? Error)
-{
-    public Guid TeamId => TeamIdValue ?? Guid.Empty;
-}
+record MarketBuyNowRequest(string? TeamToken);

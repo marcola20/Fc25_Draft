@@ -27,30 +27,32 @@ public class BudgetService : IBudgetService
 
     public async Task<decimal> GetSaldoAsync(Guid teamId, CancellationToken ct)
     {
-        var saldo = await _dbContext.TeamBudgets
+        var saldo = await _dbContext.Teams
             .AsNoTracking()
-            .Where(tb => tb.TeamId == teamId)
-            .Select(tb => (decimal?)tb.Saldo)
-            .FirstOrDefaultAsync(ct);
+            .Where(t => t.TeamId == teamId)
+            .Select(t => (decimal?)t.Budget)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
 
         return saldo ?? 0m;
     }
 
     public async Task<decimal> GetBloqueadoEmLancesAsync(Guid teamId, CancellationToken ct)
     {
-        var total = await _dbContext.TransferMarketItems
+        var total = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => i.Status == "OPEN" && i.MaiorLanceTeamId == teamId && i.LanceAtual != null)
-            .Select(i => (decimal?)i.LanceAtual)
-            .SumAsync(ct);
+            .Where(i => (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged) && i.CurrentLeaderTeamId == teamId && i.CurrentLeaderAmount != null)
+            .Select(i => (decimal?)i.CurrentLeaderAmount)
+            .SumAsync(ct)
+            .ConfigureAwait(false);
 
         return decimal.Round(total ?? 0m, 2, MidpointRounding.AwayFromZero);
     }
 
     public async Task<decimal> GetSaldoDisponivelAsync(Guid teamId, CancellationToken ct)
     {
-        var saldo = await GetSaldoAsync(teamId, ct);
-        var bloqueado = await GetBloqueadoEmLancesAsync(teamId, ct);
+        var saldo = await GetSaldoAsync(teamId, ct).ConfigureAwait(false);
+        var bloqueado = await GetBloqueadoEmLancesAsync(teamId, ct).ConfigureAwait(false);
         return saldo - bloqueado;
     }
 
@@ -80,33 +82,24 @@ public class BudgetService : IBudgetService
 
         if (useTransaction)
         {
-            transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+            transaction = await _dbContext.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
         }
 
         try
         {
-            var budget = await _dbContext.TeamBudgets
-                .SingleOrDefaultAsync(tb => tb.TeamId == teamId, ct);
+            var team = await _dbContext.Teams
+                .FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+                .ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Time {teamId} não encontrado.");
 
-            if (budget is null)
+            team.Budget = credito
+                ? team.Budget + normalizedValor
+                : team.Budget - normalizedValor;
+
+            if (team.Budget < 0m)
             {
-                var teamExists = await _dbContext.Teams.AnyAsync(t => t.TeamId == teamId, ct);
-                if (!teamExists)
-                {
-                    throw new KeyNotFoundException($"Time {teamId} não encontrado.");
-                }
-
-                budget = new TeamBudget
-                {
-                    TeamId = teamId,
-                    Saldo = 0m
-                };
-                await _dbContext.TeamBudgets.AddAsync(budget, ct);
+                team.Budget = 0m;
             }
-
-            budget.Saldo = credito
-                ? budget.Saldo + normalizedValor
-                : budget.Saldo - normalizedValor;
 
             var ledgerEntry = new BudgetLedger
             {
@@ -119,19 +112,19 @@ public class BudgetService : IBudgetService
                 Descricao = normalizedDescricao
             };
 
-            await _dbContext.BudgetLedgers.AddAsync(ledgerEntry, ct);
-            await _dbContext.SaveChangesAsync(ct);
+            await _dbContext.BudgetLedgers.AddAsync(ledgerEntry, ct).ConfigureAwait(false);
+            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
             if (transaction is not null)
             {
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
         }
         catch
         {
             if (transaction is not null)
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
             }
 
             throw;
@@ -199,53 +192,42 @@ public class BudgetService : IBudgetService
 
         if (request.TeamId == Guid.Empty)
         {
-            throw new ArgumentException("TeamId é obrigatório.", nameof(request.TeamId));
+            throw new ArgumentException("TeamId inválido.", nameof(request.TeamId));
         }
 
-        var teamExists = await _dbContext.Teams
-            .AsNoTracking()
-            .AnyAsync(t => t.TeamId == request.TeamId, ct);
+        var total = CalculateMatchRewardAmount(request);
 
-        if (!teamExists)
+        var team = await _dbContext.Teams
+            .FirstOrDefaultAsync(tb => tb.TeamId == request.TeamId, ct)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Time {request.TeamId} não encontrado.");
+
+        team.Budget += total;
+
+        var ledgerEntry = new BudgetLedger
         {
-            throw new KeyNotFoundException($"Time {request.TeamId} não encontrado.");
-        }
+            BudgetLedgerId = Guid.NewGuid(),
+            TeamId = request.TeamId,
+            DataUtc = _timeProvider.GetUtcNow().UtcDateTime,
+            Tipo = "CREDIT",
+            Origem = "MATCH_REWARD",
+            Valor = total,
+            Descricao = request.Descricao
+        };
 
-        var amount = CalculateMatchRewardAmount(request);
-        var descricao = BuildMatchRewardDescription(request);
-        var tipo = amount > 0 ? "CREDIT" : amount < 0 ? "DEBIT" : "NONE";
-        var applied = amount != 0m;
+        await _dbContext.BudgetLedgers.AddAsync(ledgerEntry, ct).ConfigureAwait(false);
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        if (applied)
-        {
-            await RegistrarAjusteAsync(request.TeamId, Math.Abs(amount), "MATCH_REWARD", descricao, amount > 0, ct);
-        }
-
-        var saldoAtual = await GetSaldoAsync(request.TeamId, ct);
-        return new MatchRewardResult(request.TeamId, amount, saldoAtual, applied, tipo, descricao);
+        return new MatchRewardResult(request.TeamId, total);
     }
 
     private static string NormalizeResultado(string? resultado)
     {
         if (string.IsNullOrWhiteSpace(resultado))
         {
-            throw new ArgumentException("Resultado é obrigatório.", nameof(resultado));
+            throw new ArgumentException("Resultado obrigatório.", nameof(resultado));
         }
 
         return resultado.Trim().ToUpperInvariant();
-    }
-
-    private static string BuildMatchRewardDescription(MatchRewardRequestDto request)
-    {
-        var resultado = NormalizeResultado(request.Resultado) switch
-        {
-            "VITORIA" => "Vitória",
-            "EMPATE" => "Empate",
-            "DERROTA" => "Derrota",
-            _ => throw new ArgumentException("Resultado inválido.", nameof(request.Resultado))
-        };
-
-        var cleanSheetValue = request.CleanSheet ? 1 : 0;
-        return $"{resultado}, {request.GolsFeitos} GM, {request.GolsSofridos} GS, CS={cleanSheetValue}";
     }
 }

@@ -8,31 +8,29 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
 {
     public void Configure(EntityTypeBuilder<TransferHistory> builder)
     {
-        builder.HasKey(x => x.TransferHistoryId);
+        builder.HasKey(x => x.TransferId);
 
-        builder.Property(x => x.Valor).HasColumnType("decimal(18,2)").IsRequired();
-        builder.Property(x => x.Tipo).IsRequired().HasMaxLength(20);
-        builder.Property(x => x.DataUtc).IsRequired();
+        builder.Property(x => x.Type).HasConversion<int>().IsRequired();
+        builder.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.Notes).HasMaxLength(400);
+        builder.Property(x => x.PerformedBy).HasMaxLength(120);
+        builder.Property(x => x.PerformedAtUtc).IsRequired();
 
-        builder.HasIndex(x => x.DataUtc)
-            .HasDatabaseName("IX_TransferHistory_DataUtc");
+        builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
 
         builder.HasOne(x => x.Player)
             .WithMany()
             .HasForeignKey(x => x.PlayerId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.OrigemTeam)
+        builder.HasOne(x => x.FromTeam)
             .WithMany()
-            .HasForeignKey(x => x.OrigemTeamId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => x.FromTeamId)
+            .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasOne(x => x.DestinoTeam)
+        builder.HasOne(x => x.ToTeam)
             .WithMany()
-            .HasForeignKey(x => x.DestinoTeamId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.ToTable(t =>
-            t.HasCheckConstraint("CK_TransferHistory_Tipo", "[Tipo] IN ('MARKET_AUCTION','TEAM_SALE','TEAM_TRADE')"));
+            .HasForeignKey(x => x.ToTeamId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

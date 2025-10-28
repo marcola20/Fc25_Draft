@@ -16,9 +16,9 @@ public class DraftDbContext : DbContext
     public DbSet<DraftPick> DraftPicks => Set<DraftPick>();
     public DbSet<TeamRoster> TeamRosters => Set<TeamRoster>();
     public DbSet<AdminToken> AdminTokens => Set<AdminToken>();
-    public DbSet<TransferMarketItem> TransferMarketItems => Set<TransferMarketItem>();
-    public DbSet<Bid> Bids => Set<Bid>();
-    public DbSet<TeamBudget> TeamBudgets => Set<TeamBudget>();
+    public DbSet<MarketCycle> MarketCycles => Set<MarketCycle>();
+    public DbSet<MarketItem> MarketItems => Set<MarketItem>();
+    public DbSet<MarketBid> MarketBids => Set<MarketBid>();
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
 
@@ -62,6 +62,10 @@ public class DraftDbContext : DbContext
              .HasForeignKey(x => x.PositionId)
              .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.Name, x.PositionId });
+            e.HasOne(p => p.CurrentTeam)
+             .WithMany()
+             .HasForeignKey(p => p.CurrentTeamId)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         mb.Entity<Team>(e =>
@@ -69,9 +73,11 @@ public class DraftDbContext : DbContext
             e.HasKey(x => x.TeamId);
             e.Property(x => x.TeamName).IsRequired().HasMaxLength(80);
             e.Property(x => x.OwnerName).HasMaxLength(80);
-            e.Property(x => x.TeamToken).IsRequired();
+            e.Property(x => x.Token).IsRequired().HasMaxLength(80);
+            e.Property(x => x.Budget).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            e.Property(x => x.BudgetBlocked).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
             e.HasIndex(x => x.TeamName).IsUnique();
-            e.HasIndex(x => x.TeamToken).IsUnique();
+            e.HasIndex(x => x.Token).IsUnique();
         });
 
         mb.Entity<Draft>(e =>

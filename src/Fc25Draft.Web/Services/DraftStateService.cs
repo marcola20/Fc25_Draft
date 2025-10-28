@@ -221,7 +221,7 @@ public class DraftStateService
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Não foi possível localizar as regras da rodada atual.");
 
-            if (!Guid.TryParse(normalizedToken, out var providedToken) || providedToken != currentPick.Team.TeamToken)
+            if (!string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("⚠️ Token inválido para este time.");
             }

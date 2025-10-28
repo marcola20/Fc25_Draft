@@ -2,25 +2,17 @@ namespace Fc25Draft.Core.Entities;
 
 public class TransferHistory
 {
-    public Guid TransferHistoryId { get; set; }
-
+    public Guid TransferId { get; set; }
+    public TransferType Type { get; set; }
     public int PlayerId { get; set; }
-
-    public Guid? OrigemTeamId { get; set; }
-
-    public Guid? DestinoTeamId { get; set; }
-
-    public decimal Valor { get; set; }
-
-    public string Tipo { get; set; } = string.Empty;
-
-    public DateTime DataUtc { get; set; }
-
-    public string? Observacao { get; set; }
+    public Guid? FromTeamId { get; set; }
+    public Guid? ToTeamId { get; set; }
+    public decimal? Amount { get; set; }
+    public string? Notes { get; set; }
+    public string? PerformedBy { get; set; }
+    public DateTime PerformedAtUtc { get; set; }
 
     public Player Player { get; set; } = null!;
-
-    public Team? OrigemTeam { get; set; }
-
-    public Team? DestinoTeam { get; set; }
+    public Team? FromTeam { get; set; }
+    public Team? ToTeam { get; set; }
 }

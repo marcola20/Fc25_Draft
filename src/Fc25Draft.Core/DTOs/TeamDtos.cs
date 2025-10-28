@@ -17,7 +17,7 @@ public record TeamDetailsDto(
     Guid TeamId,
     string TeamName,
     string? OwnerName,
-    Guid TeamToken,
+    string Token,
     int Jogadores);
 
 public record TeamRosterDto(

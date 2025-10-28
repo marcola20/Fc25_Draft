@@ -1,6 +1,7 @@
-using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,203 +10,139 @@ namespace Fc25Draft.Infra.Services;
 
 public class PricingService : IPricingService
 {
-    private const int MinAge = 16;
-    private const int MaxAge = 45;
-    private const int MinOverall = 60;
-    private const int MaxOverall = 99;
-
     private readonly DraftDbContext _dbContext;
-    private readonly PricingOptions _options;
-    private readonly IReadOnlyDictionary<string, decimal> _positionMultipliers;
-    private readonly IReadOnlyList<PricingAgeMultiplier> _ageMultipliers;
+    private readonly MarketOptions _marketOptions;
 
-    private static readonly IReadOnlyDictionary<short, string> PositionCodeById = new Dictionary<short, string>
+    public PricingService(DraftDbContext dbContext, IOptions<MarketOptions> options)
     {
-        [1] = "GK",
-        [2] = "CB",
-        [3] = "LB",
-        [4] = "RB",
-        [5] = "DM",
-        [6] = "CM",
-        [7] = "AM",
-        [8] = "W",
-        [9] = "W",
-        [10] = "ST"
-    };
-
-    private static readonly IReadOnlyDictionary<string, string> PositionCodeByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Goleiro"] = "GK",
-        ["Zagueiro"] = "CB",
-        ["Lateral/Ala Esquerdo"] = "LB",
-        ["Lateral/Ala Direito"] = "RB",
-        ["Volante"] = "DM",
-        ["Meia Central"] = "CM",
-        ["Meia Atacante"] = "AM",
-        ["Meia/Ponta Esquerda"] = "W",
-        ["Meia/Ponta Direita"] = "W",
-        ["Atacante"] = "ST"
-    };
-
-    public PricingService(DraftDbContext dbContext, IOptions<PricingOptions> options)
-    {
-        _dbContext = dbContext;
-        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
-        var configuredPositionMultipliers = _options.MultiplicadoresPosicao ?? new Dictionary<string, decimal>();
-        _positionMultipliers = new Dictionary<string, decimal>(configuredPositionMultipliers, StringComparer.OrdinalIgnoreCase);
-        var configuredAgeMultipliers = _options.MultiplicadoresIdade ?? new List<PricingAgeMultiplier>();
-        _ageMultipliers = configuredAgeMultipliers.ToList();
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _marketOptions = options.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public async Task<PricingResult> CalculateAsync(string? positionCode, short? positionId, int age, int overall, CancellationToken cancellationToken = default)
+    public PricingResult Calculate(decimal positionWeight, int overall, int age)
     {
-        ValidateAge(age);
-        ValidateOverall(overall);
+        if (overall <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(overall));
+        }
 
-        var code = await ResolvePositionCodeAsync(positionCode, positionId, cancellationToken).ConfigureAwait(false);
-        var positionMultiplier = ResolvePositionMultiplier(code);
-        var ageMultiplier = ResolveAgeMultiplier(age);
+        if (age <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(age));
+        }
 
-        var pOverall = _options.Alpha * (overall - 70) + _options.Beta;
-        var basePrice = RoundToTenth(pOverall * positionMultiplier * ageMultiplier);
-        var initialBid = RoundToTenth(basePrice * _options.PercentualLanceInicial);
-        var buyNow = RoundToTenth(basePrice * _options.PercentualComprarAgora);
+        if (positionWeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(positionWeight));
+        }
 
-        return new PricingResult(basePrice, initialBid, buyNow);
+        var overFactor = Math.Pow(1.08d, overall - 75);
+        var ageFactor = GetAgeFactor(age);
+
+        var rawBasePrice = positionWeight * (decimal)overFactor * ageFactor * _marketOptions.BaseScale;
+        var normalizedBasePrice = Round(rawBasePrice, _marketOptions.MinIncrementStep);
+
+        var minIncrementBase = normalizedBasePrice * _marketOptions.MinIncrementRate;
+        var minIncrement = RoundUp(minIncrementBase, _marketOptions.MinIncrementStep);
+
+        var buyNowBase = normalizedBasePrice * _marketOptions.BuyNowFactor;
+        var buyNow = Round(buyNowBase, _marketOptions.MinIncrementStep);
+
+        return new PricingResult(normalizedBasePrice, minIncrement, buyNow);
     }
 
-    public async Task<PricingResult> CalculateForPlayerAsync(int playerId, CancellationToken cancellationToken = default)
+    public Task<PricingResult> CalculateForPositionAsync(string? positionCode, short? positionId, int age, int overall, CancellationToken ct)
+    {
+        if (!positionId.HasValue && string.IsNullOrWhiteSpace(positionCode))
+        {
+            throw new ArgumentException("Informe o identificador ou código da posição.");
+        }
+
+        var weight = positionId.HasValue
+            ? MarketWeightResolver.GetByPositionId(positionId.Value)
+            : MarketWeightResolver.GetByCode(positionCode!);
+
+        return Task.FromResult(Calculate(weight, overall, age));
+    }
+
+    public async Task<PricingResult> CalculateForPlayerAsync(int playerId, CancellationToken ct)
     {
         var player = await _dbContext.Players
             .AsNoTracking()
-            .Include(p => p.Position)
-            .FirstOrDefaultAsync(p => p.PlayerId == playerId, cancellationToken)
-            .ConfigureAwait(false);
+            .FirstOrDefaultAsync(p => p.PlayerId == playerId, ct)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Jogador {playerId} não encontrado.");
 
-        if (player is null)
-        {
-            throw new KeyNotFoundException($"Jogador não encontrado: {playerId}.");
-        }
-
-        if (player.Age is null)
+        if (!player.Age.HasValue)
         {
             throw new InvalidOperationException($"Jogador {player.Name} não possui idade cadastrada.");
         }
 
-        var positionCode = ResolvePositionCode(player);
-        return await CalculateAsync(positionCode, player.PositionId, player.Age.Value, player.Overall, cancellationToken).ConfigureAwait(false);
+        var weight = MarketWeightResolver.GetByPositionId(player.PositionId);
+        return Calculate(weight, player.Overall, player.Age.Value);
     }
 
-    public decimal RoundToTenth(decimal value)
+    public decimal RoundUp(decimal value, decimal step)
     {
-        return Math.Round(value * 10m, MidpointRounding.AwayFromZero) / 10m;
+        if (step <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(step));
+        }
+
+        if (value <= 0)
+        {
+            return step;
+        }
+
+        var quotient = decimal.Divide(value, step);
+        var rounded = Math.Ceiling(quotient);
+        return rounded * step;
     }
 
-    public decimal NextMinIncrement(decimal currentBid)
+    public decimal Round(decimal value, decimal step)
     {
-        if (currentBid < 0)
+        if (step <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(currentBid));
+            throw new ArgumentOutOfRangeException(nameof(step));
         }
 
-        var fivePercent = currentBid * 0.05m;
-        var roundedUp = Math.Ceiling(fivePercent / 0.1m) * 0.1m;
-        var increment = Math.Max(0.2m, roundedUp);
-        return RoundToTenth(increment);
+        if (value <= 0)
+        {
+            return step;
+        }
+
+        var quotient = decimal.Divide(value, step);
+        var rounded = Math.Round(quotient, MidpointRounding.AwayFromZero);
+        if (rounded == 0)
+        {
+            rounded = 1;
+        }
+
+        return rounded * step;
     }
 
-    private void ValidateAge(int age)
+    private static decimal GetAgeFactor(int age)
     {
-        if (age < MinAge || age > MaxAge)
+        if (age <= 22)
         {
-            throw new ArgumentException($"Idade fora do intervalo permitido ({MinAge}–{MaxAge}).");
-        }
-    }
-
-    private void ValidateOverall(int overall)
-    {
-        if (overall < MinOverall || overall > MaxOverall)
-        {
-            throw new ArgumentException($"Overall fora do intervalo permitido ({MinOverall}–{MaxOverall}).");
-        }
-    }
-
-    private async Task<string> ResolvePositionCodeAsync(string? positionCode, short? positionId, CancellationToken cancellationToken)
-    {
-        if (!string.IsNullOrWhiteSpace(positionCode))
-        {
-            return positionCode.Trim().ToUpperInvariant();
+            return 1.15m;
         }
 
-        if (positionId.HasValue)
+        if (age <= 26)
         {
-            var code = await ResolvePositionCodeAsync(positionId.Value, cancellationToken).ConfigureAwait(false);
-            return code;
+            return 1.10m;
         }
 
-        throw new ArgumentException("Código ou identificador de posição deve ser informado.");
-    }
-
-    private async Task<string> ResolvePositionCodeAsync(short positionId, CancellationToken cancellationToken)
-    {
-        if (PositionCodeById.TryGetValue(positionId, out var code))
+        if (age <= 29)
         {
-            return code;
+            return 1.00m;
         }
 
-        var position = await _dbContext.Positions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.PositionId == positionId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (position is null)
+        if (age <= 32)
         {
-            throw new ArgumentException($"Posição não encontrada para o identificador informado: {positionId}.");
+            return 0.93m;
         }
 
-        if (PositionCodeByName.TryGetValue(position.Name, out code))
-        {
-            return code;
-        }
-
-        throw new ArgumentException($"Posição desconhecida: {position.Name}.");
-    }
-
-    private string ResolvePositionCode(Player player)
-    {
-        if (PositionCodeById.TryGetValue(player.PositionId, out var code))
-        {
-            return code;
-        }
-
-        if (player.Position != null && PositionCodeByName.TryGetValue(player.Position.Name, out code))
-        {
-            return code;
-        }
-
-        throw new ArgumentException($"Posição desconhecida para o jogador: {player.PositionId}.");
-    }
-
-    private decimal ResolvePositionMultiplier(string positionCode)
-    {
-        if (_positionMultipliers.TryGetValue(positionCode, out var multiplier))
-        {
-            return multiplier;
-        }
-
-        throw new ArgumentException($"Posição desconhecida: {positionCode}");
-    }
-
-    private decimal ResolveAgeMultiplier(int age)
-    {
-        foreach (var multiplier in _ageMultipliers)
-        {
-            if (multiplier.Matches(age))
-            {
-                return multiplier.Multiplier;
-            }
-        }
-
-        throw new ArgumentException($"Faixa etária não configurada para idade {age}.");
+        return 0.88m;
     }
 }

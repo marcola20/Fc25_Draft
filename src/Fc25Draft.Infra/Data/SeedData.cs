@@ -39,7 +39,9 @@ public static class SeedData
                     TeamId = Guid.NewGuid(),
                     TeamName = teamName,
                     OwnerName = ownerName,
-                    TeamToken = Guid.NewGuid()
+                    Token = Guid.NewGuid().ToString("N"),
+                    Budget = 50_000_000m,
+                    BudgetBlocked = 0m
                 });
             }
 
@@ -56,35 +58,14 @@ public static class SeedData
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var teamIds = await context.Teams
-            .AsNoTracking()
-            .Select(t => t.TeamId)
-            .ToListAsync(cancellationToken);
+        var teams = await context.Teams.ToListAsync(cancellationToken);
 
-        if (teamIds.Count == 0)
+        foreach (var team in teams)
         {
-            return;
-        }
-
-        var existingBudgetTeamIds = await context.TeamBudgets
-            .AsNoTracking()
-            .Select(b => b.TeamId)
-            .ToListAsync(cancellationToken);
-
-        var missingTeamIds = teamIds.Except(existingBudgetTeamIds).ToList();
-
-        if (missingTeamIds.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var teamId in missingTeamIds)
-        {
-            context.TeamBudgets.Add(new TeamBudget
+            if (team.Budget <= 0m)
             {
-                TeamId = teamId,
-                Saldo = 50_000_000m
-            });
+                team.Budget = 50_000_000m;
+            }
         }
 
         await context.SaveChangesAsync(cancellationToken);
