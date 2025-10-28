@@ -20,7 +20,7 @@ public class MarketBidConfiguration : IEntityTypeConfiguration<MarketBid>
         builder.HasOne(x => x.Team)
             .WithMany(t => t.MarketBids)
             .HasForeignKey(x => x.TeamId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.ItemId, x.CreatedAtUtc });
     }

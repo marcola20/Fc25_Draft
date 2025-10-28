@@ -26,12 +26,12 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
         builder.HasOne(x => x.CurrentLeaderTeam)
             .WithMany(t => t.LeadingMarketItems)
             .HasForeignKey(x => x.CurrentLeaderTeamId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.WinnerTeam)
             .WithMany(t => t.WonMarketItems)
             .HasForeignKey(x => x.WinnerTeamId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.CycleId, x.Status, x.ExpiresAtUtc });
         builder.HasIndex(x => x.PlayerId).HasDatabaseName("IX_MarketItems_Player");
