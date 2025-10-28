@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using Fc25Draft.Core.Entities;
@@ -354,6 +355,347 @@ public partial class AdminTransferService
                     toTeamId,
                     playerIds = distinctPlayerIds,
                     amount = normalizedAmount,
+                    reason = normalizedReason
+                }, JsonOptions),
+                CreatedAtUtc = now
+            };
+
+            await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
+            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task SwapAsync(
+        string adminToken,
+        Guid teamAId,
+        Guid[]? playersFromA,
+        Guid teamBId,
+        Guid[]? playersFromB,
+        decimal cashAdjustFromAToB,
+        string reason,
+        CancellationToken ct)
+    {
+        if (teamAId == Guid.Empty)
+        {
+            throw new ArgumentException("Time A inválido.", nameof(teamAId));
+        }
+
+        if (teamBId == Guid.Empty)
+        {
+            throw new ArgumentException("Time B inválido.", nameof(teamBId));
+        }
+
+        if (teamAId == teamBId)
+        {
+            throw new ArgumentException("Os times devem ser diferentes.");
+        }
+
+        var playersFromAIds = playersFromA ?? Array.Empty<Guid>();
+        var playersFromBIds = playersFromB ?? Array.Empty<Guid>();
+
+        if (playersFromAIds.Length == 0 && playersFromBIds.Length == 0)
+        {
+            throw new ArgumentException("Informe ao menos um jogador na troca.");
+        }
+
+        if (playersFromAIds.Any(id => id == Guid.Empty))
+        {
+            throw new ArgumentException("Jogador inválido na lista do time A.", nameof(playersFromA));
+        }
+
+        if (playersFromBIds.Any(id => id == Guid.Empty))
+        {
+            throw new ArgumentException("Jogador inválido na lista do time B.", nameof(playersFromB));
+        }
+
+        if (playersFromAIds.Distinct().Count() != playersFromAIds.Length)
+        {
+            throw new ArgumentException("Jogadores duplicados em Time A não são permitidos.", nameof(playersFromA));
+        }
+
+        if (playersFromBIds.Distinct().Count() != playersFromBIds.Length)
+        {
+            throw new ArgumentException("Jogadores duplicados em Time B não são permitidos.", nameof(playersFromB));
+        }
+
+        if (playersFromAIds.Intersect(playersFromBIds).Any())
+        {
+            throw new ArgumentException("Um jogador não pode estar em ambos os lados da troca.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Informe um motivo para a troca.", nameof(reason));
+        }
+
+        var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
+        var normalizedReason = reason.Trim();
+        var normalizedCashAdjust = decimal.Round(cashAdjustFromAToB, 2, MidpointRounding.AwayFromZero);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var playerGuids = playersFromAIds.Concat(playersFromBIds).ToArray();
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            var teams = await _dbContext.Teams
+                .Where(t => t.TeamId == teamAId || t.TeamId == teamBId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            var teamA = teams.FirstOrDefault(t => t.TeamId == teamAId)
+                ?? throw new KeyNotFoundException($"Time {teamAId} não encontrado.");
+
+            var teamB = teams.FirstOrDefault(t => t.TeamId == teamBId)
+                ?? throw new KeyNotFoundException($"Time {teamBId} não encontrado.");
+
+            var players = playerGuids.Length > 0
+                ? await _dbContext.Players
+                    .Where(p => playerGuids.Contains(p.PlayerGuid))
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false)
+                : new List<Player>();
+
+            if (players.Count != playerGuids.Length)
+            {
+                throw new InvalidOperationException("Um ou mais jogadores informados não foram encontrados.");
+            }
+
+            var playersFromAEntities = players
+                .Where(p => playersFromAIds.Contains(p.PlayerGuid))
+                .ToList();
+            if (playersFromAEntities.Count != playersFromAIds.Length)
+            {
+                throw new InvalidOperationException("Jogadores de Time A não encontrados.");
+            }
+
+            if (playersFromAEntities.Any(p => p.CurrentTeamId != teamAId))
+            {
+                throw new InvalidOperationException("Todos os jogadores do Time A devem pertencer ao próprio time.");
+            }
+
+            var playersFromBEntities = players
+                .Where(p => playersFromBIds.Contains(p.PlayerGuid))
+                .ToList();
+            if (playersFromBEntities.Count != playersFromBIds.Length)
+            {
+                throw new InvalidOperationException("Jogadores de Time B não encontrados.");
+            }
+
+            if (playersFromBEntities.Any(p => p.CurrentTeamId != teamBId))
+            {
+                throw new InvalidOperationException("Todos os jogadores do Time B devem pertencer ao próprio time.");
+            }
+
+            if (playerGuids.Length > 0)
+            {
+                var playerNumericIds = players.Select(p => p.PlayerId).ToArray();
+
+                var hasActiveListings = await _dbContext.MarketItems
+                    .AsNoTracking()
+                    .AnyAsync(
+                        i => playerNumericIds.Contains(i.PlayerId)
+                            && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged),
+                        ct)
+                    .ConfigureAwait(false);
+
+                if (hasActiveListings)
+                {
+                    throw new InvalidOperationException("Remova os jogadores do mercado antes de concluir a troca.");
+                }
+            }
+
+            var teamAPlayerCount = await _dbContext.Players
+                .CountAsync(p => p.CurrentTeamId == teamAId, ct)
+                .ConfigureAwait(false);
+            var teamBPlayerCount = await _dbContext.Players
+                .CountAsync(p => p.CurrentTeamId == teamBId, ct)
+                .ConfigureAwait(false);
+
+            var teamAFinalCount = teamAPlayerCount - playersFromAIds.Length + playersFromBIds.Length;
+            if (teamAFinalCount > 23)
+            {
+                throw new InvalidOperationException("Time A excederia o limite de 23 jogadores.");
+            }
+
+            var teamBFinalCount = teamBPlayerCount - playersFromBIds.Length + playersFromAIds.Length;
+            if (teamBFinalCount > 23)
+            {
+                throw new InvalidOperationException("Time B excederia o limite de 23 jogadores.");
+            }
+
+            if (normalizedCashAdjust > 0m)
+            {
+                var availableA = decimal.Round(teamA.Budget - teamA.BudgetBlocked, 2, MidpointRounding.AwayFromZero);
+                if (availableA < normalizedCashAdjust)
+                {
+                    throw new InvalidOperationException("Saldo insuficiente no Time A para o ajuste financeiro.");
+                }
+            }
+            else if (normalizedCashAdjust < 0m)
+            {
+                var adjustmentAbs = Math.Abs(normalizedCashAdjust);
+                var availableB = decimal.Round(teamB.Budget - teamB.BudgetBlocked, 2, MidpointRounding.AwayFromZero);
+                if (availableB < adjustmentAbs)
+                {
+                    throw new InvalidOperationException("Saldo insuficiente no Time B para o ajuste financeiro.");
+                }
+            }
+
+            foreach (var player in playersFromAEntities)
+            {
+                player.CurrentTeamId = teamBId;
+            }
+
+            foreach (var player in playersFromBEntities)
+            {
+                player.CurrentTeamId = teamAId;
+            }
+
+            if (playerGuids.Length > 0)
+            {
+                var playerNumericIds = players.Select(p => p.PlayerId).ToArray();
+                var rosterEntries = await _dbContext.TeamRosters
+                    .Where(r => playerNumericIds.Contains(r.PlayerId))
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false);
+
+                var playersFromANumericIds = playersFromAEntities.Select(p => p.PlayerId).ToHashSet();
+                var playersFromBNumericIds = playersFromBEntities.Select(p => p.PlayerId).ToHashSet();
+
+                foreach (var entry in rosterEntries)
+                {
+                    if (playersFromANumericIds.Contains(entry.PlayerId) && entry.TeamId != teamBId)
+                    {
+                        _dbContext.TeamRosters.Remove(entry);
+                    }
+                    else if (playersFromBNumericIds.Contains(entry.PlayerId) && entry.TeamId != teamAId)
+                    {
+                        _dbContext.TeamRosters.Remove(entry);
+                    }
+                }
+
+                var rosterBPlayers = rosterEntries
+                    .Where(e => e.TeamId == teamBId)
+                    .Select(e => e.PlayerId)
+                    .ToHashSet();
+                foreach (var playerId in playersFromANumericIds)
+                {
+                    if (!rosterBPlayers.Contains(playerId))
+                    {
+                        await _dbContext.TeamRosters.AddAsync(new TeamRoster
+                        {
+                            PlayerId = playerId,
+                            TeamId = teamBId
+                        }, ct).ConfigureAwait(false);
+                    }
+                }
+
+                var rosterAPlayers = rosterEntries
+                    .Where(e => e.TeamId == teamAId)
+                    .Select(e => e.PlayerId)
+                    .ToHashSet();
+                foreach (var playerId in playersFromBNumericIds)
+                {
+                    if (!rosterAPlayers.Contains(playerId))
+                    {
+                        await _dbContext.TeamRosters.AddAsync(new TeamRoster
+                        {
+                            PlayerId = playerId,
+                            TeamId = teamAId
+                        }, ct).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            if (normalizedCashAdjust > 0m)
+            {
+                teamA.Budget = decimal.Round(teamA.Budget - normalizedCashAdjust, 2, MidpointRounding.AwayFromZero);
+                teamB.Budget = decimal.Round(teamB.Budget + normalizedCashAdjust, 2, MidpointRounding.AwayFromZero);
+            }
+            else if (normalizedCashAdjust < 0m)
+            {
+                var adjustmentAbs = Math.Abs(normalizedCashAdjust);
+                teamB.Budget = decimal.Round(teamB.Budget - adjustmentAbs, 2, MidpointRounding.AwayFromZero);
+                teamA.Budget = decimal.Round(teamA.Budget + adjustmentAbs, 2, MidpointRounding.AwayFromZero);
+            }
+
+            var culture = CultureInfo.GetCultureInfo("pt-BR");
+            string adjustmentDescription;
+            if (normalizedCashAdjust > 0m)
+            {
+                var formatted = normalizedCashAdjust.ToString("N2", culture);
+                adjustmentDescription = $"Ajuste líquido: +{formatted} para {teamB.TeamName}.";
+            }
+            else if (normalizedCashAdjust < 0m)
+            {
+                var formatted = Math.Abs(normalizedCashAdjust).ToString("N2", culture);
+                adjustmentDescription = $"Ajuste líquido: +{formatted} para {teamA.TeamName}.";
+            }
+            else
+            {
+                adjustmentDescription = "Ajuste líquido: 0,00.";
+            }
+
+            var notes = $"Troca {teamA.TeamName} ({playersFromAIds.Length}) ↔ {teamB.TeamName} ({playersFromBIds.Length}). {adjustmentDescription}";
+
+            var historyEntries = new List<TransferHistory>();
+            foreach (var player in playersFromAEntities)
+            {
+                historyEntries.Add(new TransferHistory
+                {
+                    TransferId = Guid.NewGuid(),
+                    Type = TransferType.Swap,
+                    PlayerId = player.PlayerId,
+                    FromTeamId = teamAId,
+                    ToTeamId = teamBId,
+                    Amount = null,
+                    Notes = notes,
+                    PerformedBy = adminTokenGuid.ToString(),
+                    PerformedAtUtc = now
+                });
+            }
+
+            foreach (var player in playersFromBEntities)
+            {
+                historyEntries.Add(new TransferHistory
+                {
+                    TransferId = Guid.NewGuid(),
+                    Type = TransferType.Swap,
+                    PlayerId = player.PlayerId,
+                    FromTeamId = teamBId,
+                    ToTeamId = teamAId,
+                    Amount = null,
+                    Notes = notes,
+                    PerformedBy = adminTokenGuid.ToString(),
+                    PerformedAtUtc = now
+                });
+            }
+
+            if (historyEntries.Count > 0)
+            {
+                await _dbContext.TransferHistories.AddRangeAsync(historyEntries, ct).ConfigureAwait(false);
+            }
+
+            var logEntry = new AdminActionsLog
+            {
+                ActionId = Guid.NewGuid(),
+                ActionType = AdminActionType.SwapPlayers,
+                PerformedBy = adminTokenGuid.ToString(),
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    teamAId,
+                    playersFromA = playersFromAIds,
+                    teamBId,
+                    playersFromB = playersFromBIds,
+                    cashAdjustFromAToB = normalizedCashAdjust,
                     reason = normalizedReason
                 }, JsonOptions),
                 CreatedAtUtc = now

@@ -4,5 +4,6 @@ public enum AdminActionType
 {
     AdjustBudget = 1,
     CancelMarketItem = 2,
-    SellPlayers = 3
+    SellPlayers = 3,
+    SwapPlayers = 4
 }
