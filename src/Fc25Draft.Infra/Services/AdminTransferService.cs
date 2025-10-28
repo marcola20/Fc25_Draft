@@ -309,7 +309,7 @@ public class AdminTransferService : IAdminTransferService
             _ => "Ajuste líquido: R$ 0,00."
         };
 
-        var notes = $"Troca {teamA.TeamName} ({playersFromA.Count}) ↔ {teamB.TeamName} ({playersFromB.Count}). {liquidText} Motivo: {reason}";
+        var notes = $"Troca {teamA.TeamName} ({playersFromA.Length}) ↔ {teamB.TeamName} ({playersFromB.Length}). {liquidText} Motivo: {reason}";
         var performedBy = NormalizeToken(adminToken);
 
         foreach (var playerId in playersFromA)
