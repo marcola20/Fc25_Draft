@@ -533,7 +533,7 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
                         .WithMany("MarketBids")
                         .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Item");
