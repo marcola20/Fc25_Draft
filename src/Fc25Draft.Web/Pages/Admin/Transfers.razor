@@ -29,19 +29,34 @@ else
 {
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "sell" ? "active" : null)" @onclick="() => SelectTab('sell')">Venda</button>
+            <button type="button" class="nav-link @(selectedTab == "sell" ? "active" : null)"
+                    @onclick='() => SelectTab("sell")'>
+                Venda
+            </button>
         </li>
         <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "swap" ? "active" : null)" @onclick="() => SelectTab('swap')">Troca</button>
+            <button type="button" class="nav-link @(selectedTab == "swap" ? "active" : null)"
+                    @onclick='() => SelectTab("swap")'>
+                Troca
+            </button>
         </li>
         <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "move" ? "active" : null)" @onclick="() => SelectTab('move')">Mover</button>
+            <button type="button" class="nav-link @(selectedTab == "move" ? "active" : null)"
+                    @onclick='() => SelectTab("move")'>
+                Mover
+            </button>
         </li>
         <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "budget" ? "active" : null)" @onclick="() => SelectTab('budget')">Ajustar orçamento</button>
+            <button type="button" class="nav-link @(selectedTab == "budget" ? "active" : null)"
+                    @onclick='() => SelectTab("budget")'>
+                Ajustar orçamento
+            </button>
         </li>
         <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "cancel" ? "active" : null)" @onclick="() => SelectTab('cancel')">Cancelar mercado</button>
+            <button type="button" class="nav-link @(selectedTab == "cancel" ? "active" : null)"
+                    @onclick='() => SelectTab("cancel")'>
+                Cancelar mercado
+            </button>
         </li>
     </ul>
 
