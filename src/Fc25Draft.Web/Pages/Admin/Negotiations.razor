@@ -1,0 +1,1006 @@
+@page "/admin/negociacoes"
+@using System.Globalization
+@using System.Linq
+@inject AdminAuthService AdminAuth
+@inject TeamsApiClient TeamsApiClient
+@inject AdminTransfersApiClient AdminTransfersApiClient
+@inject BudgetsApiClient BudgetsApiClient
+@implements IDisposable
+
+<h3>Negociações (Admin)</h3>
+
+@if (!string.IsNullOrEmpty(globalErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@globalErrorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(globalSuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@globalSuccessMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Carregando dados...</em></p>
+}
+else
+{
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link @(activeTab == AdminNegotiationTab.Sell ? "active" : null)" @onclick="() => SelectTab(AdminNegotiationTab.Sell)">Venda</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link @(activeTab == AdminNegotiationTab.Swap ? "active" : null)" @onclick="() => SelectTab(AdminNegotiationTab.Swap)">Troca</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link @(activeTab == AdminNegotiationTab.Move ? "active" : null)" @onclick="() => SelectTab(AdminNegotiationTab.Move)">Mover</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link @(activeTab == AdminNegotiationTab.AdjustBudget ? "active" : null)" @onclick="() => SelectTab(AdminNegotiationTab.AdjustBudget)">Ajustar orçamento</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link @(activeTab == AdminNegotiationTab.CancelMarket ? "active" : null)" @onclick="() => SelectTab(AdminNegotiationTab.CancelMarket)">Cancelar item</button>
+        </li>
+    </ul>
+
+    @if (!AdminAuth.IsAuthenticated && authInitialized)
+    {
+        <div class="alert alert-warning" role="alert">
+            Informe o token de administrador para executar as operações.
+        </div>
+    }
+
+    <div class="tab-content">
+        @if (activeTab == AdminNegotiationTab.Sell)
+        {
+            <div class="tab-pane fade show active">
+                @if (!string.IsNullOrEmpty(sellErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@sellErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(sellSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@sellSuccessMessage</div>
+                }
+
+                <EditForm EditContext="sellEditContext" OnValidSubmit="HandleSellAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="sellFromTeam">Time vendedor</label>
+                            <InputSelect @bind-Value="sellModel.FromTeamId" @bind-Value:after="OnSellFromTeamChanged" class="form-select" id="sellFromTeam" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => sellModel.FromTeamId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="sellToTeam">Time comprador</label>
+                            <InputSelect @bind-Value="sellModel.ToTeamId" class="form-select" id="sellToTeam" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters.Where(t => t.TeamId != sellModel.FromTeamId))
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => sellModel.ToTeamId" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="sellPlayers">Jogadores</label>
+                            <select id="sellPlayers" class="form-select" multiple @onchange="OnSellPlayersChanged">
+                                @foreach (var player in GetPlayersForTeam(sellModel.FromTeamId))
+                                {
+                                    <option value="@player.PlayerGuid" selected="@sellModel.PlayerIds.Contains(player.PlayerGuid)">@player.Nome (@player.Posicao)</option>
+                                }
+                            </select>
+                            <ValidationMessage For="() => sellModel.PlayerIds" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="sellAmount">Valor total (R$)</label>
+                            <InputDecimalPtBr @bind-Value="sellModel.Amount" class="form-control" id="sellAmount" />
+                            <ValidationMessage For="() => sellModel.Amount" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="sellReason">Motivo</label>
+                            <InputText @bind-Value="sellModel.Reason" class="form-control" id="sellReason" />
+                            <ValidationMessage For="() => sellModel.Reason" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@(!AdminAuth.IsAuthenticated || isSubmittingSell)">@(!isSubmittingSell ? "Confirmar venda" : "Processando...")</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        }
+        else if (activeTab == AdminNegotiationTab.Swap)
+        {
+            <div class="tab-pane fade show active">
+                @if (!string.IsNullOrEmpty(swapErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@swapErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(swapSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@swapSuccessMessage</div>
+                }
+
+                <EditForm EditContext="swapEditContext" OnValidSubmit="HandleSwapAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapTeamA">Time A</label>
+                            <InputSelect @bind-Value="swapModel.TeamAId" @bind-Value:after="OnSwapTeamAChanged" class="form-select" id="swapTeamA" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => swapModel.TeamAId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapTeamB">Time B</label>
+                            <InputSelect @bind-Value="swapModel.TeamBId" @bind-Value:after="OnSwapTeamBChanged" class="form-select" id="swapTeamB" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => swapModel.TeamBId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapPlayersA">Jogadores do Time A</label>
+                            <select id="swapPlayersA" class="form-select" multiple @onchange="OnSwapPlayersAChanged">
+                                @foreach (var player in GetPlayersForTeam(swapModel.TeamAId))
+                                {
+                                    <option value="@player.PlayerGuid" selected="@swapModel.PlayersFromA.Contains(player.PlayerGuid)">@player.Nome (@player.Posicao)</option>
+                                }
+                            </select>
+                            <ValidationMessage For="() => swapModel.PlayersFromA" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapPlayersB">Jogadores do Time B</label>
+                            <select id="swapPlayersB" class="form-select" multiple @onchange="OnSwapPlayersBChanged">
+                                @foreach (var player in GetPlayersForTeam(swapModel.TeamBId))
+                                {
+                                    <option value="@player.PlayerGuid" selected="@swapModel.PlayersFromB.Contains(player.PlayerGuid)">@player.Nome (@player.Posicao)</option>
+                                }
+                            </select>
+                            <ValidationMessage For="() => swapModel.PlayersFromB" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapCash">Ajuste em dinheiro (A → B)</label>
+                            <InputDecimalPtBr @bind-Value="swapModel.CashAdjust" @bind-Value:after="OnSwapCashChanged" class="form-control" id="swapCash" />
+                            <ValidationMessage For="() => swapModel.CashAdjust" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="swapReason">Motivo</label>
+                            <InputText @bind-Value="swapModel.Reason" class="form-control" id="swapReason" />
+                            <ValidationMessage For="() => swapModel.Reason" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@(!AdminAuth.IsAuthenticated || isSubmittingSwap)">@(!isSubmittingSwap ? "Confirmar troca" : "Processando...")</button>
+                        </div>
+                    </div>
+                </EditForm>
+
+                @if (swapPreview is not null)
+                {
+                    <div class="mt-4">
+                        <h5>Prévia da troca</h5>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">@swapPreview.TeamA.TeamName</div>
+                                    <div class="card-body">
+                                        <p>Orçamento após operação: @(swapPreview.TeamA.NewBudget.HasValue ? swapPreview.TeamA.NewBudget.Value.ToString("C", PtBr) : "-")</p>
+                                        <ul class="list-group">
+                                            @foreach (var player in swapPreview.TeamA.Players)
+                                            {
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <span>@player.Nome (@player.Posicao)</span>
+                                                    <span class="badge bg-secondary rounded-pill">@player.Overall</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">@swapPreview.TeamB.TeamName</div>
+                                    <div class="card-body">
+                                        <p>Orçamento após operação: @(swapPreview.TeamB.NewBudget.HasValue ? swapPreview.TeamB.NewBudget.Value.ToString("C", PtBr) : "-")</p>
+                                        <ul class="list-group">
+                                            @foreach (var player in swapPreview.TeamB.Players)
+                                            {
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <span>@player.Nome (@player.Posicao)</span>
+                                                    <span class="badge bg-secondary rounded-pill">@player.Overall</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (activeTab == AdminNegotiationTab.Move)
+        {
+            <div class="tab-pane fade show active">
+                @if (!string.IsNullOrEmpty(moveErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@moveErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(moveSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@moveSuccessMessage</div>
+                }
+
+                <EditForm EditContext="moveEditContext" OnValidSubmit="HandleMoveAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="movePlayer">Jogador</label>
+                            <select id="movePlayer" class="form-select" @onchange="OnMovePlayerChanged">
+                                <option value="">Selecione um jogador</option>
+                                @foreach (var player in GetAllPlayers())
+                                {
+                                    <option value="@player.Id" selected="@(moveModel.PlayerId == player.Id)">@player.Description</option>
+                                }
+                            </select>
+                            <ValidationMessage For="() => moveModel.PlayerId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="moveToTeam">Time de destino</label>
+                            <InputSelect @bind-Value="moveModel.ToTeamId" class="form-select" id="moveToTeam" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => moveModel.ToTeamId" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="moveReason">Motivo</label>
+                            <InputText @bind-Value="moveModel.Reason" class="form-control" id="moveReason" />
+                            <ValidationMessage For="() => moveModel.Reason" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@(!AdminAuth.IsAuthenticated || isSubmittingMove)">@(!isSubmittingMove ? "Mover" : "Processando...")</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        }
+        else if (activeTab == AdminNegotiationTab.AdjustBudget)
+        {
+            <div class="tab-pane fade show active">
+                @if (!string.IsNullOrEmpty(adjustBudgetErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@adjustBudgetErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(adjustBudgetSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@adjustBudgetSuccessMessage</div>
+                }
+
+                <EditForm EditContext="adjustBudgetEditContext" OnValidSubmit="HandleAdjustBudgetAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="adjustTeam">Time</label>
+                            <InputSelect @bind-Value="adjustBudgetModel.TeamId" class="form-select" id="adjustTeam" TValue="Guid?">
+                                <option value="">Selecione um time</option>
+                                @foreach (var team in teamRosters)
+                                {
+                                    <option value="@team.TeamId">@team.TeamName</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => adjustBudgetModel.TeamId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="adjustDelta">Delta (positivo ou negativo)</label>
+                            <InputDecimalPtBr @bind-Value="adjustBudgetModel.Delta" class="form-control" id="adjustDelta" />
+                            <ValidationMessage For="() => adjustBudgetModel.Delta" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="adjustReason">Motivo</label>
+                            <InputTextArea @bind-Value="adjustBudgetModel.Reason" class="form-control" id="adjustReason" />
+                            <ValidationMessage For="() => adjustBudgetModel.Reason" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@(!AdminAuth.IsAuthenticated || isSubmittingAdjustBudget)">@(!isSubmittingAdjustBudget ? "Aplicar" : "Processando...")</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        }
+        else if (activeTab == AdminNegotiationTab.CancelMarket)
+        {
+            <div class="tab-pane fade show active">
+                @if (!string.IsNullOrEmpty(cancelErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@cancelErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(cancelSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@cancelSuccessMessage</div>
+                }
+
+                <EditForm EditContext="cancelEditContext" OnValidSubmit="HandleCancelAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="cancelItem">Item de mercado</label>
+                            <InputSelect @bind-Value="cancelMarketModel.ItemId" class="form-select" id="cancelItem" TValue="Guid?">
+                                <option value="">@(cancelableItems.Count == 0 ? "Nenhum item disponível" : "Selecione um item")</option>
+                                @foreach (var item in cancelableItems)
+                                {
+                                    <option value="@item.ItemId">@item.PlayerName - Lance mínimo @item.BasePrice.ToString("C", PtBr)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => cancelMarketModel.ItemId" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="cancelReason">Motivo</label>
+                            <InputTextArea @bind-Value="cancelMarketModel.Reason" class="form-control" id="cancelReason" />
+                            <ValidationMessage For="() => cancelMarketModel.Reason" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-danger" disabled="@(!AdminAuth.IsAuthenticated || isSubmittingCancel)">@(!isSubmittingCancel ? "Cancelar" : "Processando...")</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo PtBr = new("pt-BR");
+
+    private readonly SellFormModel sellModel = new();
+    private readonly SwapFormModel swapModel = new();
+    private readonly MoveFormModel moveModel = new();
+    private readonly AdjustBudgetFormModel adjustBudgetModel = new();
+    private readonly CancelMarketFormModel cancelMarketModel = new();
+
+    private EditContext? sellEditContext;
+    private EditContext? swapEditContext;
+    private EditContext? moveEditContext;
+    private EditContext? adjustBudgetEditContext;
+    private EditContext? cancelEditContext;
+
+    private readonly List<TeamRosterDto> teamRosters = new();
+    private readonly Dictionary<Guid, decimal> teamBudgets = new();
+    private readonly List<MarketItemDto> cancelableItems = new();
+
+    private string? globalErrorMessage;
+    private string? globalSuccessMessage;
+
+    private string? sellErrorMessage;
+    private string? sellSuccessMessage;
+    private bool isSubmittingSell;
+
+    private string? swapErrorMessage;
+    private string? swapSuccessMessage;
+    private bool isSubmittingSwap;
+    private SwapPreview? swapPreview;
+
+    private string? moveErrorMessage;
+    private string? moveSuccessMessage;
+    private bool isSubmittingMove;
+
+    private string? adjustBudgetErrorMessage;
+    private string? adjustBudgetSuccessMessage;
+    private bool isSubmittingAdjustBudget;
+
+    private string? cancelErrorMessage;
+    private string? cancelSuccessMessage;
+    private bool isSubmittingCancel;
+
+    private bool isLoading = true;
+    private AdminNegotiationTab activeTab = AdminNegotiationTab.Sell;
+    private bool authInitialized;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        sellEditContext = new EditContext(sellModel);
+        swapEditContext = new EditContext(swapModel);
+        moveEditContext = new EditContext(moveModel);
+        adjustBudgetEditContext = new EditContext(adjustBudgetModel);
+        cancelEditContext = new EditContext(cancelMarketModel);
+
+        await LoadDataAsync();
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        StateHasChanged();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        globalErrorMessage = null;
+        globalSuccessMessage = null;
+
+        try
+        {
+            teamRosters.Clear();
+            var rosters = await TeamsApiClient.GetRostersAsync();
+            teamRosters.AddRange(rosters.OrderBy(t => t.TeamName));
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Erro ao carregar elencos: {ex.Message}";
+            return;
+        }
+
+        await LoadBudgetsAsync();
+        await LoadMarketItemsAsync();
+        UpdateSwapPreview();
+    }
+
+    private async Task LoadBudgetsAsync()
+    {
+        teamBudgets.Clear();
+
+        foreach (var team in teamRosters)
+        {
+            try
+            {
+                var saldo = await BudgetsApiClient.GetSaldoAsync(team.TeamId);
+                if (saldo.HasValue)
+                {
+                    teamBudgets[team.TeamId] = saldo.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                globalErrorMessage = $"Não foi possível carregar o orçamento do time {team.TeamName}: {ex.Message}";
+                break;
+            }
+        }
+    }
+
+    private async Task LoadMarketItemsAsync()
+    {
+        cancelableItems.Clear();
+
+        try
+        {
+            var items = await AdminTransfersApiClient.GetActiveMarketItemsAsync();
+            cancelableItems.AddRange(items
+                .Where(CanBeCancelled)
+                .OrderBy(i => i.PlayerName));
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage ??= $"Erro ao carregar itens de mercado: {ex.Message}";
+        }
+    }
+
+    private bool CanBeCancelled(MarketItemDto item)
+        => string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase) && item.CurrentLeaderTeamId is null;
+
+    private IEnumerable<TeamRosterPlayerDto> GetPlayersForTeam(Guid? teamId)
+    {
+        if (!teamId.HasValue || teamId.Value == Guid.Empty)
+        {
+            return Enumerable.Empty<TeamRosterPlayerDto>();
+        }
+
+        return teamRosters.FirstOrDefault(t => t.TeamId == teamId.Value)?.Jogadores ?? Enumerable.Empty<TeamRosterPlayerDto>();
+    }
+
+    private IReadOnlyList<(Guid Id, string Description)> GetAllPlayers()
+    {
+        return teamRosters
+            .SelectMany(t => t.Jogadores.Select(p => (p.PlayerGuid, $"{t.TeamName} - {p.Nome} ({p.Posicao})")))
+            .OrderBy(p => p.Item2)
+            .Select(p => (p.PlayerGuid, p.Item2))
+            .ToList();
+    }
+
+    private decimal? GetBudget(Guid? teamId)
+    {
+        if (!teamId.HasValue || teamId.Value == Guid.Empty)
+        {
+            return null;
+        }
+
+        return teamBudgets.TryGetValue(teamId.Value, out var saldo) ? saldo : null;
+    }
+
+    private void SelectTab(AdminNegotiationTab tab)
+    {
+        activeTab = tab;
+        ClearTabMessages(tab);
+    }
+
+    private void ClearTabMessages(AdminNegotiationTab tab)
+    {
+        switch (tab)
+        {
+            case AdminNegotiationTab.Sell:
+                sellErrorMessage = null;
+                sellSuccessMessage = null;
+                break;
+            case AdminNegotiationTab.Swap:
+                swapErrorMessage = null;
+                swapSuccessMessage = null;
+                break;
+            case AdminNegotiationTab.Move:
+                moveErrorMessage = null;
+                moveSuccessMessage = null;
+                break;
+            case AdminNegotiationTab.AdjustBudget:
+                adjustBudgetErrorMessage = null;
+                adjustBudgetSuccessMessage = null;
+                break;
+            case AdminNegotiationTab.CancelMarket:
+                cancelErrorMessage = null;
+                cancelSuccessMessage = null;
+                break;
+        }
+    }
+
+    private async Task HandleSellAsync()
+    {
+        sellErrorMessage = null;
+        sellSuccessMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            sellErrorMessage = "Token de administrador inválido.";
+            return;
+        }
+
+        isSubmittingSell = true;
+        try
+        {
+            var request = new AdminSellPlayersRequestDto(
+                sellModel.FromTeamId!.Value,
+                sellModel.ToTeamId!.Value,
+                sellModel.PlayerIds.ToArray(),
+                sellModel.Amount ?? 0m,
+                sellModel.Reason!.Trim());
+
+            var message = await AdminTransfersApiClient.SellAsync(request);
+            sellSuccessMessage = message;
+
+            await RefreshAfterOperationAsync();
+            globalSuccessMessage = message;
+            sellModel.PlayerIds.Clear();
+        }
+        catch (Exception ex)
+        {
+            sellErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingSell = false;
+        }
+    }
+
+    private async Task HandleSwapAsync()
+    {
+        swapErrorMessage = null;
+        swapSuccessMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            swapErrorMessage = "Token de administrador inválido.";
+            return;
+        }
+
+        isSubmittingSwap = true;
+        try
+        {
+            var request = new AdminSwapPlayersRequestDto(
+                swapModel.TeamAId!.Value,
+                swapModel.PlayersFromA.ToArray(),
+                swapModel.TeamBId!.Value,
+                swapModel.PlayersFromB.ToArray(),
+                swapModel.CashAdjust ?? 0m,
+                swapModel.Reason!.Trim());
+
+            var message = await AdminTransfersApiClient.SwapAsync(request);
+            swapSuccessMessage = message;
+
+            await RefreshAfterOperationAsync();
+            globalSuccessMessage = message;
+            UpdateSwapPreview();
+        }
+        catch (Exception ex)
+        {
+            swapErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingSwap = false;
+        }
+    }
+
+    private async Task HandleMoveAsync()
+    {
+        moveErrorMessage = null;
+        moveSuccessMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            moveErrorMessage = "Token de administrador inválido.";
+            return;
+        }
+
+        isSubmittingMove = true;
+        try
+        {
+            var request = new AdminMovePlayerRequestDto(
+                moveModel.PlayerId!.Value,
+                moveModel.ToTeamId!.Value,
+                moveModel.Reason!.Trim());
+
+            var message = await AdminTransfersApiClient.MoveAsync(request);
+            moveSuccessMessage = message;
+
+            await RefreshAfterOperationAsync();
+            globalSuccessMessage = message;
+            moveModel.PlayerId = null;
+        }
+        catch (Exception ex)
+        {
+            moveErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingMove = false;
+        }
+    }
+
+    private async Task HandleAdjustBudgetAsync()
+    {
+        adjustBudgetErrorMessage = null;
+        adjustBudgetSuccessMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            adjustBudgetErrorMessage = "Token de administrador inválido.";
+            return;
+        }
+
+        isSubmittingAdjustBudget = true;
+        try
+        {
+            var request = new AdminAdjustBudgetRequestDto(
+                adjustBudgetModel.TeamId!.Value,
+                adjustBudgetModel.Delta!.Value,
+                adjustBudgetModel.Reason!.Trim());
+
+            var message = await AdminTransfersApiClient.AdjustBudgetAsync(request);
+            adjustBudgetSuccessMessage = message;
+
+            await RefreshAfterOperationAsync();
+            globalSuccessMessage = message;
+        }
+        catch (Exception ex)
+        {
+            adjustBudgetErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingAdjustBudget = false;
+        }
+    }
+
+    private async Task HandleCancelAsync()
+    {
+        cancelErrorMessage = null;
+        cancelSuccessMessage = null;
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            cancelErrorMessage = "Token de administrador inválido.";
+            return;
+        }
+
+        isSubmittingCancel = true;
+        try
+        {
+            var request = new AdminCancelMarketItemRequestDto(cancelMarketModel.Reason!.Trim());
+            var message = await AdminTransfersApiClient.CancelMarketItemAsync(cancelMarketModel.ItemId!.Value, request);
+            cancelSuccessMessage = message;
+
+            await RefreshAfterOperationAsync();
+            globalSuccessMessage = message;
+            cancelMarketModel.ItemId = null;
+        }
+        catch (Exception ex)
+        {
+            cancelErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingCancel = false;
+        }
+    }
+
+    private async Task RefreshAfterOperationAsync()
+    {
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    private void OnSellFromTeamChanged(Guid? value)
+    {
+        sellModel.PlayerIds.Clear();
+    }
+
+    private void OnSwapTeamAChanged(Guid? value)
+    {
+        swapModel.PlayersFromA.Clear();
+        UpdateSwapPreview();
+    }
+
+    private void OnSwapTeamBChanged(Guid? value)
+    {
+        swapModel.PlayersFromB.Clear();
+        UpdateSwapPreview();
+    }
+
+    private void OnSwapCashChanged(decimal? value)
+    {
+        UpdateSwapPreview();
+    }
+
+    private void OnSellPlayersChanged(ChangeEventArgs args)
+    {
+        UpdateMultiSelect(args, sellModel.PlayerIds);
+    }
+
+    private void OnSwapPlayersAChanged(ChangeEventArgs args)
+    {
+        UpdateMultiSelect(args, swapModel.PlayersFromA);
+        UpdateSwapPreview();
+    }
+
+    private void OnSwapPlayersBChanged(ChangeEventArgs args)
+    {
+        UpdateMultiSelect(args, swapModel.PlayersFromB);
+        UpdateSwapPreview();
+    }
+
+    private void OnMovePlayerChanged(ChangeEventArgs args)
+    {
+        moveModel.PlayerId = null;
+        if (args.Value is string value && Guid.TryParse(value, out var guid))
+        {
+            moveModel.PlayerId = guid;
+        }
+    }
+
+    private void UpdateMultiSelect(ChangeEventArgs args, List<Guid> target)
+    {
+        target.Clear();
+        switch (args.Value)
+        {
+            case string singleValue when Guid.TryParse(singleValue, out var singleGuid):
+                target.Add(singleGuid);
+                break;
+            case string[] values:
+                foreach (var value in values)
+                {
+                    if (Guid.TryParse(value, out var guid))
+                    {
+                        target.Add(guid);
+                    }
+                }
+                break;
+        }
+    }
+
+    private void UpdateSwapPreview()
+    {
+        if (!swapModel.IsReadyForPreview || swapModel.TeamAId == swapModel.TeamBId)
+        {
+            swapPreview = null;
+            return;
+        }
+
+        var teamA = teamRosters.FirstOrDefault(t => t.TeamId == swapModel.TeamAId);
+        var teamB = teamRosters.FirstOrDefault(t => t.TeamId == swapModel.TeamBId);
+
+        if (teamA is null || teamB is null)
+        {
+            swapPreview = null;
+            return;
+        }
+
+        var cash = swapModel.CashAdjust ?? 0m;
+
+        var teamAPlayers = teamA.Jogadores
+            .Where(p => !swapModel.PlayersFromA.Contains(p.PlayerGuid))
+            .Concat(teamB.Jogadores.Where(p => swapModel.PlayersFromB.Contains(p.PlayerGuid)))
+            .OrderBy(p => p.Nome)
+            .ToList();
+
+        var teamBPlayers = teamB.Jogadores
+            .Where(p => !swapModel.PlayersFromB.Contains(p.PlayerGuid))
+            .Concat(teamA.Jogadores.Where(p => swapModel.PlayersFromA.Contains(p.PlayerGuid)))
+            .OrderBy(p => p.Nome)
+            .ToList();
+
+        var budgetA = GetBudget(teamA.TeamId);
+        var budgetB = GetBudget(teamB.TeamId);
+
+        swapPreview = new SwapPreview(
+            new SwapPreviewTeam(teamA.TeamName, teamAPlayers, budgetA.HasValue ? decimal.Round(budgetA.Value - cash, 2) : null),
+            new SwapPreviewTeam(teamB.TeamName, teamBPlayers, budgetB.HasValue ? decimal.Round(budgetB.Value + cash, 2) : null));
+    }
+
+    private sealed class SellFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Selecione o time vendedor.")]
+        public Guid? FromTeamId { get; set; }
+
+        [Required(ErrorMessage = "Selecione o time comprador.")]
+        public Guid? ToTeamId { get; set; }
+
+        public List<Guid> PlayerIds { get; } = new();
+
+        [Required(ErrorMessage = "Informe o valor total.")]
+        [Range(typeof(decimal), "0", "999999999", ErrorMessage = "Valor inválido.")]
+        public decimal? Amount { get; set; } = 0m;
+
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
+        public string? Reason { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (PlayerIds.Count == 0)
+            {
+                yield return new ValidationResult("Selecione ao menos um jogador.", new[] { nameof(PlayerIds) });
+            }
+
+            if (FromTeamId.HasValue && ToTeamId.HasValue && FromTeamId == ToTeamId)
+            {
+                yield return new ValidationResult("Escolha times diferentes para a venda.", new[] { nameof(ToTeamId) });
+            }
+        }
+    }
+
+    private sealed class SwapFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Selecione o time A.")]
+        public Guid? TeamAId { get; set; }
+
+        [Required(ErrorMessage = "Selecione o time B.")]
+        public Guid? TeamBId { get; set; }
+
+        public List<Guid> PlayersFromA { get; } = new();
+
+        public List<Guid> PlayersFromB { get; } = new();
+
+        [Required(ErrorMessage = "Informe o ajuste em dinheiro (use 0 se não houver).")]
+        public decimal? CashAdjust { get; set; } = 0m;
+
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
+        public string? Reason { get; set; }
+
+        public bool IsReadyForPreview => TeamAId.HasValue && TeamBId.HasValue;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (PlayersFromA.Count == 0 && PlayersFromB.Count == 0)
+            {
+                yield return new ValidationResult("Selecione ao menos um jogador para a troca.", new[] { nameof(PlayersFromA), nameof(PlayersFromB) });
+            }
+
+            if (TeamAId.HasValue && TeamBId.HasValue && TeamAId == TeamBId)
+            {
+                yield return new ValidationResult("Escolha times diferentes.", new[] { nameof(TeamBId) });
+            }
+        }
+    }
+
+    private sealed class MoveFormModel
+    {
+        [Required(ErrorMessage = "Selecione um jogador.")]
+        public Guid? PlayerId { get; set; }
+
+        [Required(ErrorMessage = "Selecione o time de destino.")]
+        public Guid? ToTeamId { get; set; }
+
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
+        public string? Reason { get; set; }
+    }
+
+    private sealed class AdjustBudgetFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Selecione um time.")]
+        public Guid? TeamId { get; set; }
+
+        [Required(ErrorMessage = "Informe o delta.")]
+        public decimal? Delta { get; set; }
+
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
+        public string? Reason { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (Delta.HasValue && Delta.Value == 0m)
+            {
+                yield return new ValidationResult("O ajuste deve ser diferente de zero.", new[] { nameof(Delta) });
+            }
+        }
+    }
+
+    private sealed class CancelMarketFormModel
+    {
+        [Required(ErrorMessage = "Selecione um item.")]
+        public Guid? ItemId { get; set; }
+
+        [Required(ErrorMessage = "Informe o motivo.")]
+        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
+        public string? Reason { get; set; }
+    }
+
+    private sealed record SwapPreview(SwapPreviewTeam TeamA, SwapPreviewTeam TeamB);
+
+    private sealed record SwapPreviewTeam(string TeamName, IReadOnlyList<TeamRosterPlayerDto> Players, decimal? NewBudget);
+
+    private enum AdminNegotiationTab
+    {
+        Sell,
+        Swap,
+        Move,
+        AdjustBudget,
+        CancelMarket
+    }
+}
