@@ -77,6 +77,7 @@ builder.Services.AddScoped<AdminAuthService>();
 builder.Services.AddScoped<ApiClientFactory>();
 builder.Services.AddScoped<PlayersApiClient>();
 builder.Services.AddScoped<DraftAdminApiClient>();
+builder.Services.AddScoped<AdminTransfersApiClient>();
 builder.Services.AddScoped<TeamsApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
