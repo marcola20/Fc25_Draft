@@ -10,7 +10,9 @@
           <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />
         </ItemGroup>
         <ItemGroup>
+          <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="8.0.1" />
           <PackageReference Include="ClosedXML" Version="0.105.0" />
+          <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
           <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
@@ -19,6 +21,6 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
           </PackageReference>
-          <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
+          <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
         </ItemGroup>
 </Project>
