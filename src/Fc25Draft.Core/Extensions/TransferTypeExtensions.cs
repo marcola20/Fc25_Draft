@@ -6,11 +6,9 @@ public static class TransferTypeExtensions
 {
     public static string ToDisplayName(this TransferType type) => type switch
     {
-        TransferType.Auction => "Leilão",
-        TransferType.BuyNow => "Compra imediata",
-        TransferType.Sale => "Venda",
-        TransferType.Swap => "Troca",
-        TransferType.AdminMove => "Movimentação administrativa",
+        TransferType.MarketAuction => "Mercado",
+        TransferType.TeamSale => "Venda entre times",
+        TransferType.TeamTrade => "Troca entre times",
         _ => type.ToString()
     };
 }
