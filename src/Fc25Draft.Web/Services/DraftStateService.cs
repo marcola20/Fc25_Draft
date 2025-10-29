@@ -211,7 +211,9 @@ public class DraftStateService
 
             var currentPick = await _db.DraftPicks
                 .Include(p => p.Team)
-                .FirstOrDefaultAsync(p => p.DraftId == draft.DraftId && p.PlayerId == null, ct)
+                .Where(p => p.DraftId == draft.DraftId && p.PlayerId == null)
+                .OrderBy(p => p.OverallPick)
+                .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Todas as escolhas já foram realizadas.");
 
             var roundLimits = await _db.DraftRounds
