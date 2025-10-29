@@ -262,7 +262,7 @@ public class MarketService : IMarketService
             FromTeamId = null,
             ToTeamId = team.TeamId,
             Amount = item.BuyNowPrice,
-            Type = TransferType.BuyNow,
+            Type = TransferType.MarketAuction,
             Notes = "Compra imediata",
             PerformedBy = "sistema",
             PerformedAtUtc = now
@@ -358,7 +358,7 @@ public class MarketService : IMarketService
                         FromTeamId = null,
                         ToTeamId = team.TeamId,
                         Amount = value,
-                        Type = TransferType.Auction,
+                        Type = TransferType.MarketAuction,
                         Notes = "Leilão encerrado",
                         PerformedBy = "sistema",
                         PerformedAtUtc = now

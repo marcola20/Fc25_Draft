@@ -90,6 +90,7 @@ builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<AdminTransferService>();
 builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
+builder.Services.AddScoped<ITransferHistoryService, TransferHistoryService>();
 
 var app = builder.Build();
 
@@ -1463,104 +1464,70 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
     marketApi.MapGet(
         "/history",
-        async ([FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+        async ([FromQuery] Guid? teamId, [FromQuery] int? take, ITransferHistoryService transferHistoryService) =>
         {
-            var pageNumber = page < 1 ? 1 : page;
-            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+            var size = take ?? 50;
 
-            var query = db.TransferHistories
-                .AsNoTracking();
+            try
+            {
+                var historyItems = teamId.HasValue
+                    ? await transferHistoryService.GetTransfersByTeamAsync(teamId.Value, size)
+                    : await transferHistoryService.GetRecentTransfersAsync(size);
 
-            var total = await query.CountAsync(ct);
+                var response = historyItems
+                    .Select(MapTransferHistoryToDto)
+                    .ToList();
 
-            var historyRows = await query
-                .OrderByDescending(h => h.PerformedAtUtc)
-                .Skip((pageNumber - 1) * size)
-                .Take(size)
-                .Select(h => new
-                {
-                    h.PerformedAtUtc,
-                    h.PlayerId,
-                    PlayerName = h.Player.Name,
-                    h.Type,
-                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
-                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
-                    h.Amount
-                })
-                .ToListAsync(ct);
-
-            var items = historyRows
-                .Select(h => new TransferHistoryItemDto(
-                    h.PerformedAtUtc,
-                    h.PlayerId,
-                    h.PlayerName,
-                    h.Type.ToDisplayName(),
-                    h.FromTeamName ?? "Mercado Livre",
-                    h.ToTeamName,
-                    h.Amount ?? 0m))
-                .ToList();
-
-            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+                return Results.Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
         })
         .AllowAnonymous();
 
-    marketApi.MapGet(
-        "/history/by-team/{teamId:guid}",
-        async (Guid teamId, [FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+    marketApi.MapPost(
+        "/history",
+        async (RegisterTransferHistoryRequestDto request, ITransferHistoryService transferHistoryService) =>
         {
-            if (teamId == Guid.Empty)
+            if (request is null)
             {
-                return Results.BadRequest(new { message = "teamId é obrigatório." });
+                return Results.BadRequest(new { message = "Payload inválido." });
             }
 
-            var teamExists = await db.Teams
-                .AsNoTracking()
-                .AnyAsync(t => t.TeamId == teamId, ct);
-
-            if (!teamExists)
+            var entry = new TransferHistory
             {
-                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+                TransferId = request.TransferId ?? Guid.Empty,
+                PlayerId = request.PlayerId,
+                FromTeamId = request.FromTeamId,
+                ToTeamId = request.ToTeamId,
+                Amount = request.Amount,
+                Type = request.Type,
+                Notes = request.Notes,
+                PerformedBy = request.PerformedBy,
+                PerformedAtUtc = request.PerformedAtUtc ?? default
+            };
+
+            try
+            {
+                await transferHistoryService.RegisterTransferAsync(entry);
+
+                var saved = (await transferHistoryService.GetRecentTransfersAsync(1)).FirstOrDefault(h => h.TransferId == entry.TransferId);
+                var result = saved is not null ? MapTransferHistoryToDto(saved) : MapTransferHistoryToDto(entry);
+
+                return Results.Created($"/api/market/history/{entry.TransferId}", result);
             }
-
-            var pageNumber = page < 1 ? 1 : page;
-            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
-
-            var query = db.TransferHistories
-                .AsNoTracking()
-                .Where(h => h.FromTeamId == teamId || h.ToTeamId == teamId);
-
-            var total = await query.CountAsync(ct);
-
-            var historyRows = await query
-                .OrderByDescending(h => h.PerformedAtUtc)
-                .Skip((pageNumber - 1) * size)
-                .Take(size)
-                .Select(h => new
-                {
-                    h.PerformedAtUtc,
-                    h.PlayerId,
-                    PlayerName = h.Player.Name,
-                    h.Type,
-                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
-                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
-                    h.Amount
-                })
-                .ToListAsync(ct);
-
-            var items = historyRows
-                .Select(h => new TransferHistoryItemDto(
-                    h.PerformedAtUtc,
-                    h.PlayerId,
-                    h.PlayerName,
-                    h.Type.ToDisplayName(),
-                    h.FromTeamName ?? "Mercado Livre",
-                    h.ToTeamName,
-                    h.Amount ?? 0m))
-                .ToList();
-
-            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
         })
-        .AllowAnonymous();
+        .RequireAuthorization("AdminOnly");
 
     marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
     {
@@ -1718,6 +1685,33 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
         return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
+}
+
+static TransferHistoryItemDto MapTransferHistoryToDto(TransferHistory history)
+{
+    if (history is null)
+    {
+        throw new ArgumentNullException(nameof(history));
+    }
+
+    var playerName = history.Player?.Name ?? string.Empty;
+    var fromTeamName = history.FromTeam?.TeamName ?? "Mercado Livre";
+    var toTeamName = history.ToTeam?.TeamName;
+
+    return new TransferHistoryItemDto(
+        history.TransferId,
+        history.PerformedAtUtc,
+        history.PlayerId,
+        playerName,
+        history.FromTeamId,
+        fromTeamName,
+        history.ToTeamId,
+        toTeamName,
+        history.Amount,
+        (int)history.Type,
+        history.Type.ToDisplayName(),
+        history.Notes,
+        history.PerformedBy);
 }
 
 static bool TryGetAdminToken(HttpContext context, out string? adminToken, out IResult? errorResult)

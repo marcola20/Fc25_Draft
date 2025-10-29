@@ -83,12 +83,17 @@ public class TransfersQueryService : ITransfersQueryService
                 h.TransferId,
                 h.PerformedAtUtc,
                 h.Player.PlayerGuid,
+                h.PlayerId,
                 h.Player.Name,
-                h.Type.ToDisplayName(),
+                h.FromTeamId,
                 h.FromTeam != null ? h.FromTeam.TeamName : null,
+                h.ToTeamId,
                 h.ToTeam != null ? h.ToTeam.TeamName : null,
                 h.Amount,
-                h.Notes))
+                (int)h.Type,
+                h.Type.ToDisplayName(),
+                h.Notes,
+                h.PerformedBy))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
