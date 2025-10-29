@@ -108,40 +108,48 @@ namespace Fc25Draft.Infra.Migrations
                     table.PrimaryKey("PK_MarketCycles", x => x.CycleId);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "TransferHistories",
-                columns: table => new
-                {
-                    TransferId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Type = table.Column<int>(type: "int", nullable: false),
-                    PlayerId = table.Column<int>(type: "int", nullable: false),
-                    FromTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    ToTeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
-                    Notes = table.Column<string>(type: "nvarchar(400)", maxLength: 400, nullable: true),
-                    PerformedBy = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: true),
-                    PerformedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TransferHistories", x => x.TransferId);
-                    table.ForeignKey(
-                        name: "FK_TransferHistories_Players_PlayerId",
-                        column: x => x.PlayerId,
-                        principalTable: "Players",
-                        principalColumn: "PlayerId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_TransferHistories_Teams_FromTeamId",
-                        column: x => x.FromTeamId,
-                        principalTable: "Teams",
-                        principalColumn: "TeamId");
-                    table.ForeignKey(
-                        name: "FK_TransferHistories_Teams_ToTeamId",
-                        column: x => x.ToTeamId,
-                        principalTable: "Teams",
-                        principalColumn: "TeamId");
-                });
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'[dbo].[TransferHistories]', 'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[TransferHistories]
+    (
+        [TransferId] uniqueidentifier NOT NULL,
+        [Type] int NOT NULL,
+        [PlayerId] int NOT NULL,
+        [FromTeamId] uniqueidentifier NULL,
+        [ToTeamId] uniqueidentifier NULL,
+        [Amount] decimal(18,2) NULL,
+        [Notes] nvarchar(400) NULL,
+        [PerformedBy] nvarchar(120) NULL,
+        [PerformedAtUtc] datetime2 NOT NULL,
+        CONSTRAINT [PK_TransferHistories] PRIMARY KEY ([TransferId]),
+        CONSTRAINT [FK_TransferHistories_Players_PlayerId] FOREIGN KEY ([PlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_TransferHistories_Teams_FromTeamId] FOREIGN KEY ([FromTeamId]) REFERENCES [Teams]([TeamId]),
+        CONSTRAINT [FK_TransferHistories_Teams_ToTeamId] FOREIGN KEY ([ToTeamId]) REFERENCES [Teams]([TeamId])
+    );
+END
+ELSE
+BEGIN
+    -- Ensure expected foreign keys exist
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TransferHistories_Players_PlayerId'
+    )
+        ALTER TABLE [dbo].[TransferHistories] WITH CHECK ADD CONSTRAINT [FK_TransferHistories_Players_PlayerId]
+            FOREIGN KEY([PlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE NO ACTION;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TransferHistories_Teams_FromTeamId'
+    )
+        ALTER TABLE [dbo].[TransferHistories] WITH CHECK ADD CONSTRAINT [FK_TransferHistories_Teams_FromTeamId]
+            FOREIGN KEY([FromTeamId]) REFERENCES [Teams]([TeamId]);
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TransferHistories_Teams_ToTeamId'
+    )
+        ALTER TABLE [dbo].[TransferHistories] WITH CHECK ADD CONSTRAINT [FK_TransferHistories_Teams_ToTeamId]
+            FOREIGN KEY([ToTeamId]) REFERENCES [Teams]([TeamId]);
+END
+");
 
             migrationBuilder.CreateTable(
                 name: "MarketItems",
@@ -276,20 +284,25 @@ namespace Fc25Draft.Infra.Migrations
                 table: "MarketItems",
                 column: "WinnerTeamId");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_TransferHistories_FromTeamId",
-                table: "TransferHistories",
-                column: "FromTeamId");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'[dbo].[TransferHistories]', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes WHERE name = N'IX_TransferHistories_FromTeamId' AND object_id = OBJECT_ID(N'[dbo].[TransferHistories]')
+    )
+        CREATE INDEX [IX_TransferHistories_FromTeamId] ON [dbo].[TransferHistories]([FromTeamId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_TransferHistories_PlayerId_PerformedAtUtc",
-                table: "TransferHistories",
-                columns: new[] { "PlayerId", "PerformedAtUtc" });
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes WHERE name = N'IX_TransferHistories_PlayerId_PerformedAtUtc' AND object_id = OBJECT_ID(N'[dbo].[TransferHistories]')
+    )
+        CREATE INDEX [IX_TransferHistories_PlayerId_PerformedAtUtc] ON [dbo].[TransferHistories]([PlayerId], [PerformedAtUtc]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_TransferHistories_ToTeamId",
-                table: "TransferHistories",
-                column: "ToTeamId");
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes WHERE name = N'IX_TransferHistories_ToTeamId' AND object_id = OBJECT_ID(N'[dbo].[TransferHistories]')
+    )
+        CREATE INDEX [IX_TransferHistories_ToTeamId] ON [dbo].[TransferHistories]([ToTeamId]);
+END
+");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Players_Teams_CurrentTeamId",
