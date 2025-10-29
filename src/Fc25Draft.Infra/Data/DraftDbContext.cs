@@ -177,6 +177,92 @@ public class DraftDbContext : DbContext
              .HasDatabaseName("IX_AdminActionsLog_ActionType_CreatedAtUtc");
         });
 
-        mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);
+        mb.Entity<MarketCycle>(e =>
+        {
+            e.HasKey(x => x.CycleId);
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.NextCycleAtUtc).IsRequired();
+            e.Property(x => x.Status).IsRequired();
+            e.HasMany(c => c.Items)
+             .WithOne(i => i.Cycle)
+             .HasForeignKey(i => i.CycleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<MarketItem>(e =>
+        {
+            e.HasKey(x => x.ItemId);
+
+            e.Property(x => x.BasePrice).HasColumnType("numeric(18,2)");
+            e.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)");
+            e.Property(x => x.MinIncrement).HasColumnType("numeric(18,2)");
+            e.Property(x => x.CurrentLeaderAmount).HasColumnType("numeric(18,2)");
+
+            e.HasIndex(x => new { x.CycleId, x.Status, x.ExpiresAtUtc });
+            e.HasIndex(x => x.PlayerId).HasDatabaseName("IX_MarketItems_Player");
+
+            e.HasOne(x => x.Player)
+             .WithMany(p => p.MarketItems)
+             .HasForeignKey(x => x.PlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.CurrentLeaderTeam)
+             .WithMany(t => t.LeadingMarketItems)
+             .HasForeignKey(x => x.CurrentLeaderTeamId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.WinnerTeam)
+             .WithMany(t => t.WonMarketItems)
+             .HasForeignKey(x => x.WinnerTeamId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<MarketBid>(e =>
+        {
+            e.HasKey(x => x.BidId);
+            e.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+            e.HasIndex(x => new { x.ItemId, x.CreatedAtUtc });
+            e.HasIndex(x => x.TeamId);
+
+            e.HasOne(x => x.Item)
+             .WithMany(i => i.Bids)
+             .HasForeignKey(x => x.ItemId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Team)
+             .WithMany(t => t.MarketBids)
+             .HasForeignKey(x => x.TeamId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<TransferHistory>(e =>
+        {
+            e.HasKey(x => x.TransferId);
+
+            e.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+            e.Property(x => x.Notes).HasMaxLength(400);
+            e.Property(x => x.PerformedBy).HasMaxLength(120);
+            e.Property(x => x.PerformedAtUtc).IsRequired();
+
+            e.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+
+            e.HasOne(x => x.Player)
+                .WithMany()
+                .HasForeignKey(x => x.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasOne(x => x.FromTeam)
+                .WithMany()
+                .HasForeignKey(x => x.FromTeamId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            e.HasOne(x => x.ToTeam)
+                .WithMany()
+                .HasForeignKey(x => x.ToTeamId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        //mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialPostgres : Migration
+    public partial class InitialPostgres1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -120,16 +120,39 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "BudgetLedgers",
+                columns: table => new
+                {
+                    BudgetLedgerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uuid", nullable: false),
+                    DataUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Tipo = table.Column<string>(type: "text", nullable: false),
+                    Origem = table.Column<string>(type: "text", nullable: false),
+                    Valor = table.Column<decimal>(type: "numeric", nullable: false),
+                    Descricao = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BudgetLedgers", x => x.BudgetLedgerId);
+                    table.ForeignKey(
+                        name: "FK_BudgetLedgers_Teams_TeamId",
+                        column: x => x.TeamId,
+                        principalTable: "Teams",
+                        principalColumn: "TeamId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Players",
                 columns: table => new
                 {
                     PlayerId = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    PlayerGuid = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
                     Age = table.Column<int>(type: "integer", nullable: true),
                     Overall = table.Column<int>(type: "integer", nullable: false),
                     PositionId = table.Column<short>(type: "smallint", nullable: false),
-                    PlayerGuid = table.Column<Guid>(type: "uuid", nullable: false),
                     CurrentTeamId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
@@ -147,31 +170,6 @@ namespace Fc25Draft.Infra.Migrations
                         principalTable: "Teams",
                         principalColumn: "TeamId",
                         onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "BudgetLedgers",
-                columns: table => new
-                {
-                    BudgetLedgerId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TeamId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DataUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    Tipo = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Origem = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Valor = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
-                    Descricao = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_BudgetLedgers", x => x.BudgetLedgerId);
-                    table.ForeignKey(
-                        name: "FK_BudgetLedgers_Teams_TeamId",
-                        column: x => x.TeamId,
-                        principalTable: "Teams",
-                        principalColumn: "TeamId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.CheckConstraint("CK_BudgetLedger_Tipo", "\"Tipo\" IN ('CREDIT','DEBIT')");
-                    table.CheckConstraint("CK_BudgetLedger_Valor", "\"Valor\" > 0");
                 });
 
             migrationBuilder.CreateTable(
@@ -222,16 +220,16 @@ namespace Fc25Draft.Infra.Migrations
                     ItemId = table.Column<Guid>(type: "uuid", nullable: false),
                     CycleId = table.Column<Guid>(type: "uuid", nullable: false),
                     PlayerId = table.Column<int>(type: "integer", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false),
                     BasePrice = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     BuyNowPrice = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     MinIncrement = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
-                    CurrentLeaderAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: true),
-                    CurrentLeaderTeamId = table.Column<Guid>(type: "uuid", nullable: true),
-                    WinnerTeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ExpiresAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
                     CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LastUpdateUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ExpiresAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    CurrentLeaderTeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CurrentLeaderAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: true),
+                    WinnerTeamId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -291,10 +289,10 @@ namespace Fc25Draft.Infra.Migrations
                 columns: table => new
                 {
                     TransferId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Type = table.Column<int>(type: "integer", nullable: false),
                     PlayerId = table.Column<int>(type: "integer", nullable: false),
                     FromTeamId = table.Column<Guid>(type: "uuid", nullable: true),
                     ToTeamId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Type = table.Column<int>(type: "integer", nullable: false),
                     Amount = table.Column<decimal>(type: "numeric(18,2)", nullable: true),
                     Notes = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true),
                     PerformedBy = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
@@ -313,14 +311,12 @@ namespace Fc25Draft.Infra.Migrations
                         name: "FK_TransferHistories_Teams_FromTeamId",
                         column: x => x.FromTeamId,
                         principalTable: "Teams",
-                        principalColumn: "TeamId",
-                        onDelete: ReferentialAction.NoAction);
+                        principalColumn: "TeamId");
                     table.ForeignKey(
                         name: "FK_TransferHistories_Teams_ToTeamId",
                         column: x => x.ToTeamId,
                         principalTable: "Teams",
-                        principalColumn: "TeamId",
-                        onDelete: ReferentialAction.NoAction);
+                        principalColumn: "TeamId");
                 });
 
             migrationBuilder.CreateTable(
@@ -374,10 +370,9 @@ namespace Fc25Draft.Infra.Migrations
                 descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
-                name: "IX_BudgetLedger_TeamId_DataUtc",
+                name: "IX_BudgetLedgers_TeamId",
                 table: "BudgetLedgers",
-                columns: new[] { "TeamId", "DataUtc" },
-                descending: new[] { false, true });
+                column: "TeamId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DraftPicks_DraftId_RoundNumber_PickInRound",
@@ -413,14 +408,14 @@ namespace Fc25Draft.Infra.Migrations
                 column: "TeamId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MarketItems_CycleId_Status_ExpiresAtUtc",
-                table: "MarketItems",
-                columns: new[] { "CycleId", "Status", "ExpiresAtUtc" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_MarketItems_CurrentLeaderTeamId",
                 table: "MarketItems",
                 column: "CurrentLeaderTeamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MarketItems_CycleId_Status_ExpiresAtUtc",
+                table: "MarketItems",
+                columns: new[] { "CycleId", "Status", "ExpiresAtUtc" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_MarketItems_Player",
@@ -497,7 +492,6 @@ namespace Fc25Draft.Infra.Migrations
                 name: "IX_TransferHistories_ToTeamId",
                 table: "TransferHistories",
                 column: "ToTeamId");
-
         }
 
         /// <inheritdoc />
@@ -508,6 +502,9 @@ namespace Fc25Draft.Infra.Migrations
 
             migrationBuilder.DropTable(
                 name: "BudgetLedgers");
+
+            migrationBuilder.DropTable(
+                name: "DraftPicks");
 
             migrationBuilder.DropTable(
                 name: "MarketBids");
@@ -522,10 +519,13 @@ namespace Fc25Draft.Infra.Migrations
                 name: "TransferHistories");
 
             migrationBuilder.DropTable(
+                name: "DraftRounds");
+
+            migrationBuilder.DropTable(
                 name: "MarketItems");
 
             migrationBuilder.DropTable(
-                name: "DraftPicks");
+                name: "Drafts");
 
             migrationBuilder.DropTable(
                 name: "MarketCycles");
@@ -534,16 +534,10 @@ namespace Fc25Draft.Infra.Migrations
                 name: "Players");
 
             migrationBuilder.DropTable(
-                name: "DraftRounds");
-
-            migrationBuilder.DropTable(
-                name: "Teams");
-
-            migrationBuilder.DropTable(
                 name: "Positions");
 
             migrationBuilder.DropTable(
-                name: "Drafts");
+                name: "Teams");
         }
     }
 }

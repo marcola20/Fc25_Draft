@@ -39,8 +39,8 @@ public class BudgetLedgerConfiguration : IEntityTypeConfiguration<BudgetLedger>
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_BudgetLedger_Tipo", '"Tipo" IN (''CREDIT'',''DEBIT'')');
-            t.HasCheckConstraint("CK_BudgetLedger_Valor", '"Valor" > 0');
+            t.HasCheckConstraint("CK_BudgetLedger_Tipo", "\"Tipo\" IN ('CREDIT','DEBIT')");
+            t.HasCheckConstraint("CK_BudgetLedger_Valor", "\"Valor\" > 0");
         });
     }
 }

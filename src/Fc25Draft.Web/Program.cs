@@ -25,21 +25,43 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-
-var connectionString =
+string? rawUrl =
     Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "postgresql://cbfv_user:jPtfDQHuUM7XjkeIiMcWb9yVdae3EvNj@dpg-d40sl0vgi27c73cvknm0-a.oregon-postgres.render.com/cbfv";
 
+string connectionString;
+
+if (rawUrl.StartsWith("postgres://") || rawUrl.StartsWith("postgresql://"))
+{
+    var uri = new Uri(rawUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    var builderPg = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.Trim('/'),
+        Username = userInfo[0],
+        Password = userInfo.Length > 1 ? userInfo[1] : "",
+        SslMode = SslMode.Require
+    };
+    connectionString = builderPg.ToString();
+}
+else
+{
+    connectionString = rawUrl;
+}
+
+builder.Services.AddDbContext<DraftDbContext>(opt =>
+    opt.UseNpgsql(connectionString));
 builder.Services.AddDbContext<DraftDbContext>(options =>
     options
-        .UseNpgsql(connectionString, npgsql =>
-            npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
+        .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
         .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
         .EnableDetailedErrors(builder.Environment.IsDevelopment()));
-
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
