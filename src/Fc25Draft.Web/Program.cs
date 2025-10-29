@@ -28,40 +28,15 @@ using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-string? rawUrl =
-    Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "postgresql://cbfv_user:jPtfDQHuUM7XjkeIiMcWb9yVdae3EvNj@dpg-d40sl0vgi27c73cvknm0-a.oregon-postgres.render.com/cbfv";
+var connectionString = ResolveConnectionString(builder);
 
-string connectionString;
-
-if (rawUrl.StartsWith("postgres://") || rawUrl.StartsWith("postgresql://"))
-{
-    var uri = new Uri(rawUrl);
-    var userInfo = uri.UserInfo.Split(':');
-    var builderPg = new NpgsqlConnectionStringBuilder
-    {
-        Host = uri.Host,
-        Port = uri.Port > 0 ? uri.Port : 5432,
-        Database = uri.AbsolutePath.Trim('/'),
-        Username = userInfo[0],
-        Password = userInfo.Length > 1 ? userInfo[1] : "",
-        SslMode = SslMode.Require
-    };
-    connectionString = builderPg.ToString();
-}
-else
-{
-    connectionString = rawUrl;
-}
-
-builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseNpgsql(connectionString));
 builder.Services.AddDbContext<DraftDbContext>(options =>
     options
         .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
         .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
         .EnableDetailedErrors(builder.Environment.IsDevelopment()));
+
+builder.Services.AddHealthChecks().AddNpgSql(connectionString);
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
@@ -110,8 +85,9 @@ builder.Services.AddScoped<ITransferHistoryService, TransferHistoryService>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
 }
@@ -139,6 +115,7 @@ app.UseAuthorization();
 app.MapHub<DraftHub>("/hubs/draft");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+app.MapHealthChecks("/health");
 
 var api = app.MapGroup("/api");
 
@@ -152,6 +129,51 @@ MapTransfersEndpoints(api);
 MapBudgetEndpoints(api);
 
 app.Run();
+
+static string ResolveConnectionString(WebApplicationBuilder builder)
+{
+    var rawConnectionString =
+        Environment.GetEnvironmentVariable("DATABASE_URL")
+        ?? builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Unable to resolve PostgreSQL connection string.");
+
+    NpgsqlConnectionStringBuilder connectionBuilder;
+
+    if (rawConnectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        rawConnectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(rawConnectionString);
+        var userInfo = uri.UserInfo.Split(':');
+
+        connectionBuilder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = uri.AbsolutePath.Trim('/'),
+            Username = userInfo[0],
+            Password = userInfo.Length > 1 ? userInfo[1] : string.Empty,
+            SslMode = SslMode.Require
+        };
+    }
+    else
+    {
+        connectionBuilder = new NpgsqlConnectionStringBuilder(rawConnectionString);
+    }
+
+    if (!builder.Environment.IsDevelopment())
+    {
+        var host = connectionBuilder.Host;
+
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Localhost database connections are not allowed outside Development.");
+        }
+    }
+
+    return connectionBuilder.ToString();
+}
 
 static void MapAdminEndpoints(RouteGroupBuilder api)
 {
