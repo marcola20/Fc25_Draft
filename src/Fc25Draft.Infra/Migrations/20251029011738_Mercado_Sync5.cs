@@ -41,11 +41,13 @@ namespace Fc25Draft.Infra.Migrations
                 nullable: true);
 
             migrationBuilder.Sql(@"
+                -- Preenche NULL/vazio com GUID
                 UPDATE t
                 SET Token = CONVERT(nvarchar(36), NEWID())
                 FROM dbo.Teams t
                 WHERE t.Token IS NULL OR LTRIM(RTRIM(t.Token)) = '';
 
+                -- Resolve duplicados (mantém o 1º por TeamId)
                 WITH Dups AS (
                   SELECT TeamId, Token,
                          ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Token)) ORDER BY TeamId) AS rn
@@ -56,6 +58,7 @@ namespace Fc25Draft.Infra.Migrations
                 SET Token = CONVERT(nvarchar(36), NEWID())
                 WHERE rn > 1;
 
+                -- DEFAULT para novos registros
                 IF NOT EXISTS (
                   SELECT 1 FROM sys.default_constraints
                   WHERE parent_object_id = OBJECT_ID('dbo.Teams') AND name = 'DF_Teams_Token'
@@ -65,15 +68,28 @@ namespace Fc25Draft.Infra.Migrations
                     DEFAULT (CONVERT(nvarchar(36), NEWID())) FOR Token;
                 END
 
+                -- Torna NOT NULL
                 ALTER TABLE dbo.Teams ALTER COLUMN Token nvarchar(80) NOT NULL;
 
+                -- CHECK para impedir string vazia
+                IF NOT EXISTS (
+                  SELECT 1 FROM sys.check_constraints
+                  WHERE name = 'CK_Teams_Token_NotEmpty'
+                    AND parent_object_id = OBJECT_ID('dbo.Teams')
+                )
+                BEGIN
+                  ALTER TABLE dbo.Teams
+                    ADD CONSTRAINT CK_Teams_Token_NotEmpty
+                    CHECK (Token <> N'');
+                END
+
+                -- Recria índice único SEM filtro (dados já normalizados)
                 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Teams_Token' AND object_id = OBJECT_ID('dbo.Teams'))
                   DROP INDEX IX_Teams_Token ON dbo.Teams;
 
                 CREATE UNIQUE INDEX IX_Teams_Token
-                ON dbo.Teams (Token)
-                WHERE Token IS NOT NULL AND LTRIM(RTRIM(Token)) <> '';
-                ");
+                ON dbo.Teams (Token);
+            ");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "CurrentTeamId",
@@ -113,7 +129,7 @@ namespace Fc25Draft.Infra.Migrations
                     Tipo = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Origem = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Valor = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Descricao = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                    Descricao = table.Column<string>(type: "nvarchar(256)", maxLength: 256), 
                 },
                 constraints: table =>
                 {
@@ -236,7 +252,7 @@ namespace Fc25Draft.Infra.Migrations
                     ItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     TeamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -317,7 +333,6 @@ namespace Fc25Draft.Infra.Migrations
                 onDelete: ReferentialAction.SetNull);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
@@ -345,9 +360,27 @@ namespace Fc25Draft.Infra.Migrations
             migrationBuilder.DropTable(
                 name: "MarketCycles");
 
-            migrationBuilder.DropIndex(
-                name: "IX_Teams_Token",
-                table: "Teams");
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Teams_Token' AND object_id = OBJECT_ID('dbo.Teams'))
+                    DROP INDEX IX_Teams_Token ON dbo.Teams;
+
+                IF EXISTS (
+                  SELECT 1 FROM sys.check_constraints
+                  WHERE name = 'CK_Teams_Token_NotEmpty'
+                    AND parent_object_id = OBJECT_ID('dbo.Teams')
+                )
+                BEGIN
+                  ALTER TABLE dbo.Teams DROP CONSTRAINT CK_Teams_Token_NotEmpty;
+                END
+
+                IF EXISTS (
+                  SELECT 1 FROM sys.default_constraints
+                  WHERE parent_object_id = OBJECT_ID('dbo.Teams') AND name = 'DF_Teams_Token'
+                )
+                BEGIN
+                  ALTER TABLE dbo.Teams DROP CONSTRAINT DF_Teams_Token;
+                END
+            ");
 
             migrationBuilder.DropIndex(
                 name: "IX_Players_CurrentTeamId",
@@ -364,19 +397,6 @@ namespace Fc25Draft.Infra.Migrations
             migrationBuilder.DropColumn(
                 name: "BudgetBlocked",
                 table: "Teams");
-
-            migrationBuilder.Sql(@"
-            IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Teams_Token' AND object_id = OBJECT_ID('dbo.Teams'))
-                DROP INDEX IX_Teams_Token ON dbo.Teams;
-
-            IF EXISTS (
-                SELECT 1 FROM sys.default_constraints
-                WHERE parent_object_id = OBJECT_ID('dbo.Teams') AND name = 'DF_Teams_Token'
-            )
-            BEGIN
-                ALTER TABLE dbo.Teams DROP CONSTRAINT DF_Teams_Token;
-            END
-            ");
 
             migrationBuilder.DropColumn(
                 name: "Token",
