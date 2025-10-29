@@ -15,6 +15,7 @@ using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
+using Fc25Draft.Web.Options;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
 using HealthChecks.NpgSql;
@@ -40,6 +41,7 @@ builder.Services.AddDbContext<DraftDbContext>(options =>
 
 builder.Services.AddHealthChecks().AddNpgSql(connectionString);
 
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
 builder.Services.Configure<MarketOptions>(builder.Configuration.GetSection(MarketOptions.SectionName));

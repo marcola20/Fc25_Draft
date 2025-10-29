@@ -1,5 +1,7 @@
-using Fc25Draft.Infra.Data;             
+using Fc25Draft.Infra.Data;
+using Fc25Draft.Web.Options;             
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Web.Extensions
 {
@@ -9,14 +11,18 @@ namespace Fc25Draft.Web.Extensions
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+            var appOptions = scope.ServiceProvider.GetRequiredService<IOptions<AppOptions>>();
 
             await db.Database.MigrateAsync(ct);
 
-            await SeedData.SeedAsync(db, ct);
-
-            if (app.Environment.IsDevelopment())
+            if (appOptions.Value.EnableDevSeed)
             {
-                await SeedData.SeedTeamBudgetsAsync(db, ct);
+                await SeedData.SeedAsync(db, ct);
+
+                if (app.Environment.IsDevelopment())
+                {
+                    await SeedData.SeedTeamBudgetsAsync(db, ct);
+                }
             }
         }
     }
