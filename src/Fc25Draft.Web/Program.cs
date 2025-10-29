@@ -17,6 +17,7 @@ using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
+using HealthChecks.NpgSql;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
