@@ -38,8 +38,42 @@ namespace Fc25Draft.Infra.Migrations
                 table: "Teams",
                 type: "nvarchar(80)",
                 maxLength: 80,
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
+
+            migrationBuilder.Sql(@"
+                UPDATE t
+                SET Token = CONVERT(nvarchar(36), NEWID())
+                FROM dbo.Teams t
+                WHERE t.Token IS NULL OR LTRIM(RTRIM(t.Token)) = '';
+
+                WITH Dups AS (
+                  SELECT TeamId, Token,
+                         ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Token)) ORDER BY TeamId) AS rn
+                  FROM dbo.Teams
+                  WHERE Token IS NOT NULL AND LTRIM(RTRIM(Token)) <> ''
+                )
+                UPDATE Dups
+                SET Token = CONVERT(nvarchar(36), NEWID())
+                WHERE rn > 1;
+
+                IF NOT EXISTS (
+                  SELECT 1 FROM sys.default_constraints
+                  WHERE parent_object_id = OBJECT_ID('dbo.Teams') AND name = 'DF_Teams_Token'
+                )
+                BEGIN
+                  ALTER TABLE dbo.Teams ADD CONSTRAINT DF_Teams_Token
+                    DEFAULT (CONVERT(nvarchar(36), NEWID())) FOR Token;
+                END
+
+                ALTER TABLE dbo.Teams ALTER COLUMN Token nvarchar(80) NOT NULL;
+
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Teams_Token' AND object_id = OBJECT_ID('dbo.Teams'))
+                  DROP INDEX IX_Teams_Token ON dbo.Teams;
+
+                CREATE UNIQUE INDEX IX_Teams_Token
+                ON dbo.Teams (Token)
+                WHERE Token IS NOT NULL AND LTRIM(RTRIM(Token)) <> '';
+                ");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "CurrentTeamId",
@@ -109,43 +143,43 @@ namespace Fc25Draft.Infra.Migrations
                 });
 
             migrationBuilder.Sql(@"
-IF OBJECT_ID(N'[TransferHistories]', N'U') IS NULL
-BEGIN
-    CREATE TABLE [TransferHistories]
-    (
-        [TransferId] uniqueidentifier NOT NULL,
-        [Type] int NOT NULL,
-        [PlayerId] int NOT NULL,
-        [FromTeamId] uniqueidentifier NULL,
-        [ToTeamId] uniqueidentifier NULL,
-        [Amount] decimal(18,2) NULL,
-        [Notes] nvarchar(400) NULL,
-        [PerformedBy] nvarchar(120) NULL,
-        [PerformedAtUtc] datetime2 NOT NULL,
-        CONSTRAINT [PK_TransferHistories] PRIMARY KEY ([TransferId]),
-        CONSTRAINT [FK_TransferHistories_Players_PlayerId] FOREIGN KEY ([PlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_TransferHistories_Teams_FromTeamId] FOREIGN KEY ([FromTeamId]) REFERENCES [Teams]([TeamId]),
-        CONSTRAINT [FK_TransferHistories_Teams_ToTeamId] FOREIGN KEY ([ToTeamId]) REFERENCES [Teams]([TeamId])
-    );
-END");
+                IF OBJECT_ID(N'[TransferHistories]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [TransferHistories]
+                    (
+                        [TransferId] uniqueidentifier NOT NULL,
+                        [Type] int NOT NULL,
+                        [PlayerId] int NOT NULL,
+                        [FromTeamId] uniqueidentifier NULL,
+                        [ToTeamId] uniqueidentifier NULL,
+                        [Amount] decimal(18,2) NULL,
+                        [Notes] nvarchar(400) NULL,
+                        [PerformedBy] nvarchar(120) NULL,
+                        [PerformedAtUtc] datetime2 NOT NULL,
+                        CONSTRAINT [PK_TransferHistories] PRIMARY KEY ([TransferId]),
+                        CONSTRAINT [FK_TransferHistories_Players_PlayerId] FOREIGN KEY ([PlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE NO ACTION,
+                        CONSTRAINT [FK_TransferHistories_Teams_FromTeamId] FOREIGN KEY ([FromTeamId]) REFERENCES [Teams]([TeamId]),
+                        CONSTRAINT [FK_TransferHistories_Teams_ToTeamId] FOREIGN KEY ([ToTeamId]) REFERENCES [Teams]([TeamId])
+                    );
+                END");
 
             migrationBuilder.Sql(@"
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_FromTeamId' AND object_id = OBJECT_ID('[TransferHistories]'))
-BEGIN
-    CREATE INDEX [IX_TransferHistories_FromTeamId] ON [TransferHistories] ([FromTeamId]);
-END");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_FromTeamId' AND object_id = OBJECT_ID('[TransferHistories]'))
+                BEGIN
+                    CREATE INDEX [IX_TransferHistories_FromTeamId] ON [TransferHistories] ([FromTeamId]);
+                END");
 
             migrationBuilder.Sql(@"
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_PlayerId_PerformedAtUtc' AND object_id = OBJECT_ID('[TransferHistories]'))
-BEGIN
-    CREATE INDEX [IX_TransferHistories_PlayerId_PerformedAtUtc] ON [TransferHistories] ([PlayerId], [PerformedAtUtc]);
-END");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_PlayerId_PerformedAtUtc' AND object_id = OBJECT_ID('[TransferHistories]'))
+                BEGIN
+                    CREATE INDEX [IX_TransferHistories_PlayerId_PerformedAtUtc] ON [TransferHistories] ([PlayerId], [PerformedAtUtc]);
+                END");
 
             migrationBuilder.Sql(@"
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_ToTeamId' AND object_id = OBJECT_ID('[TransferHistories]'))
-BEGIN
-    CREATE INDEX [IX_TransferHistories_ToTeamId] ON [TransferHistories] ([ToTeamId]);
-END");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_TransferHistories_ToTeamId' AND object_id = OBJECT_ID('[TransferHistories]'))
+                BEGIN
+                    CREATE INDEX [IX_TransferHistories_ToTeamId] ON [TransferHistories] ([ToTeamId]);
+                END");
 
             migrationBuilder.CreateTable(
                 name: "MarketItems",
@@ -220,12 +254,6 @@ END");
                         principalColumn: "TeamId",
                         onDelete: ReferentialAction.Restrict);
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Teams_Token",
-                table: "Teams",
-                column: "Token",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Players_CurrentTeamId",
@@ -306,10 +334,10 @@ END");
                 name: "MarketBids");
 
             migrationBuilder.Sql(@"
-IF OBJECT_ID(N'[TransferHistories]', N'U') IS NOT NULL
-BEGIN
-    DROP TABLE [TransferHistories];
-END");
+                IF OBJECT_ID(N'[TransferHistories]', N'U') IS NOT NULL
+                BEGIN
+                    DROP TABLE [TransferHistories];
+                END");
 
             migrationBuilder.DropTable(
                 name: "MarketItems");
@@ -336,6 +364,19 @@ END");
             migrationBuilder.DropColumn(
                 name: "BudgetBlocked",
                 table: "Teams");
+
+            migrationBuilder.Sql(@"
+            IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Teams_Token' AND object_id = OBJECT_ID('dbo.Teams'))
+                DROP INDEX IX_Teams_Token ON dbo.Teams;
+
+            IF EXISTS (
+                SELECT 1 FROM sys.default_constraints
+                WHERE parent_object_id = OBJECT_ID('dbo.Teams') AND name = 'DF_Teams_Token'
+            )
+            BEGIN
+                ALTER TABLE dbo.Teams DROP CONSTRAINT DF_Teams_Token;
+            END
+            ");
 
             migrationBuilder.DropColumn(
                 name: "Token",
