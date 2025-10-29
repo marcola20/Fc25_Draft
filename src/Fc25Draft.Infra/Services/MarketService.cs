@@ -17,17 +17,20 @@ public class MarketService : IMarketService
 
     private readonly DraftDbContext _dbContext;
     private readonly IMarketCycleGenerator _cycleGenerator;
+    private readonly IMarketSyncService _marketSyncService;
     private readonly MarketOptions _marketOptions;
     private readonly TimeProvider _timeProvider;
 
     public MarketService(
         DraftDbContext dbContext,
         IMarketCycleGenerator cycleGenerator,
+        IMarketSyncService marketSyncService,
         IOptions<MarketOptions> options,
         TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cycleGenerator = cycleGenerator ?? throw new ArgumentNullException(nameof(cycleGenerator));
+        _marketSyncService = marketSyncService ?? throw new ArgumentNullException(nameof(marketSyncService));
         _marketOptions = options.Value ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -244,31 +247,13 @@ public class MarketService : IMarketService
             }
         }
 
-        team.Budget -= item.BuyNowPrice;
-        team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - blockedForItem);
-
-        player.CurrentTeamId = team.TeamId;
-        await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
-
-        item.Status = MarketItemStatus.BuyNow;
+        item.CurrentLeaderTeamId = team.TeamId;
+        item.CurrentLeaderAmount = item.BuyNowPrice;
         item.WinnerTeamId = team.TeamId;
-        item.LastUpdateUtc = now;
-        item.ExpiresAtUtc = now;
+        item.Status = MarketItemStatus.Completed;
 
-        await _dbContext.TransferHistories.AddAsync(new TransferHistory
-        {
-            TransferId = Guid.NewGuid(),
-            PlayerId = player.PlayerId,
-            FromTeamId = null,
-            ToTeamId = team.TeamId,
-            Amount = item.BuyNowPrice,
-            Type = TransferType.MarketAuction,
-            Notes = "Compra imediata",
-            PerformedBy = "sistema",
-            PerformedAtUtc = now
-        }, ct).ConfigureAwait(false);
+        await _marketSyncService.ApplyWinningBidAsync(item.ItemId).ConfigureAwait(false);
 
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new BuyNowResultDto(true, "Compra realizada com sucesso.");
@@ -328,41 +313,13 @@ public class MarketService : IMarketService
                 }
                 else
                 {
-                    await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct, includeCurrentItem: true).ConfigureAwait(false);
-
-                    var value = item.CurrentLeaderAmount.Value;
-                    team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - value);
-                    team.Budget -= value;
-                    if (team.Budget < 0m)
-                    {
-                        team.Budget = 0m;
-                    }
-
-                    var player = await _dbContext.Players
-                        .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)
+                    await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct, includeCurrentItem: true)
                         .ConfigureAwait(false);
-
-                    if (player is not null)
-                    {
-                        player.CurrentTeamId = team.TeamId;
-                        await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
-                    }
 
                     item.Status = MarketItemStatus.Completed;
                     item.WinnerTeamId = team.TeamId;
 
-                    await _dbContext.TransferHistories.AddAsync(new TransferHistory
-                    {
-                        TransferId = Guid.NewGuid(),
-                        PlayerId = item.PlayerId,
-                        FromTeamId = null,
-                        ToTeamId = team.TeamId,
-                        Amount = value,
-                        Type = TransferType.MarketAuction,
-                        Notes = "Leilão encerrado",
-                        PerformedBy = "sistema",
-                        PerformedAtUtc = now
-                    }, ct).ConfigureAwait(false);
+                    await _marketSyncService.ApplyWinningBidAsync(item.ItemId).ConfigureAwait(false);
                 }
             }
             else
@@ -370,10 +327,13 @@ public class MarketService : IMarketService
                 item.Status = MarketItemStatus.Expired;
             }
 
-            item.LastUpdateUtc = now;
-            item.ExpiresAtUtc = now;
+            if (item.Status == MarketItemStatus.Expired)
+            {
+                item.LastUpdateUtc = now;
+                item.ExpiresAtUtc = now;
+                await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
 
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
             processed++;
         }
@@ -441,31 +401,6 @@ public class MarketService : IMarketService
         }
     }
 
-    private async Task SyncRosterAsync(Guid teamId, int playerId, CancellationToken ct)
-    {
-        var existingEntries = await _dbContext.TeamRosters
-            .Where(r => r.PlayerId == playerId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        foreach (var entry in existingEntries)
-        {
-            if (entry.TeamId != teamId)
-            {
-                _dbContext.TeamRosters.Remove(entry);
-            }
-        }
-
-        if (!existingEntries.Any(e => e.TeamId == teamId))
-        {
-            await _dbContext.TeamRosters.AddAsync(new TeamRoster
-            {
-                PlayerId = playerId,
-                TeamId = teamId
-            }, ct).ConfigureAwait(false);
-        }
-    }
-
     private static string NormalizeToken(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -485,7 +420,7 @@ public class MarketService : IMarketService
             MarketItemStatus.BuyNow => "Compra imediata",
             MarketItemStatus.Expired => "Expirado",
             MarketItemStatus.Cancelled => "Cancelado",
-            MarketItemStatus.Completed => "Concluído",
+            MarketItemStatus.Completed => "Vendido",
             _ => item.Status.ToString()
         };
 

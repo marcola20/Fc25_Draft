@@ -86,6 +86,7 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
+builder.Services.AddScoped<IMarketSyncService, MarketSyncService>();
 builder.Services.AddScoped<IMarketService, MarketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<AdminTransferService>();
