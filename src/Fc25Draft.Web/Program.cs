@@ -25,43 +25,39 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
-using Npgsql;
-
 var builder = WebApplication.CreateBuilder(args);
-string? rawUrl =
-    Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "postgresql://cbfv_user:jPtfDQHuUM7XjkeIiMcWb9yVdae3EvNj@dpg-d40sl0vgi27c73cvknm0-a.oregon-postgres.render.com/cbfv";
 
-string connectionString;
-
-if (rawUrl.StartsWith("postgres://") || rawUrl.StartsWith("postgresql://"))
+// Resolve a connection string a partir de appsettings.* e variáveis de ambiente
+string ResolveConnectionString()
 {
-    var uri = new Uri(rawUrl);
-    var userInfo = uri.UserInfo.Split(':');
-    var builderPg = new NpgsqlConnectionStringBuilder
+    var fromConfig = builder.Configuration.GetConnectionString("DefaultConnection");
+    var fromEnvLegacy = Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection"); // compat c/ Render antigo
+    var fromEnvModern = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection"); // padrão aspnet
+
+    var conn = fromEnvModern ?? fromEnvLegacy ?? fromConfig;
+
+    if (string.IsNullOrWhiteSpace(conn))
+        throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
+
+    if (!builder.Environment.IsDevelopment() &&
+        (conn.Contains("localhost", StringComparison.OrdinalIgnoreCase) || conn.Contains("127.0.0.1")))
     {
-        Host = uri.Host,
-        Port = uri.Port > 0 ? uri.Port : 5432,
-        Database = uri.AbsolutePath.Trim('/'),
-        Username = userInfo[0],
-        Password = userInfo.Length > 1 ? userInfo[1] : "",
-        SslMode = SslMode.Require
-    };
-    connectionString = builderPg.ToString();
-}
-else
-{
-    connectionString = rawUrl;
+        throw new InvalidOperationException("Em Production a connection não pode apontar para localhost.");
+    }
+
+    return conn;
 }
 
-builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseNpgsql(connectionString));
+var connString = ResolveConnectionString();
+
+// Use Npgsql em todos os ambientes
 builder.Services.AddDbContext<DraftDbContext>(options =>
     options
-        .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
+        .UseNpgsql(connString, npgsql => npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
         .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
         .EnableDetailedErrors(builder.Environment.IsDevelopment()));
+
+builder.Services.AddHealthChecks().AddNpgSql(connString);
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
@@ -110,8 +106,10 @@ builder.Services.AddScoped<ITransferHistoryService, TransferHistoryService>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// Migração automática apenas em Development
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
 }
@@ -136,6 +134,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapHub<DraftHub>("/hubs/draft");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
