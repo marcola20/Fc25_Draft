@@ -13,7 +13,6 @@ using Fc25Draft.Infra.Data;
 using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Infra.Services;
-using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
@@ -28,40 +27,44 @@ using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-string? rawUrl =
-    Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "postgresql://cbfv_user:jPtfDQHuUM7XjkeIiMcWb9yVdae3EvNj@dpg-d40sl0vgi27c73cvknm0-a.oregon-postgres.render.com/cbfv";
+var env = builder.Environment;
 
-string connectionString;
+var configuration = builder.Configuration;
 
-if (rawUrl.StartsWith("postgres://") || rawUrl.StartsWith("postgresql://"))
+var connectionString = configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection não configurada.");
+
+if (!env.IsDevelopment() &&
+    (connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+    || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)))
 {
-    var uri = new Uri(rawUrl);
-    var userInfo = uri.UserInfo.Split(':');
-    var builderPg = new NpgsqlConnectionStringBuilder
-    {
-        Host = uri.Host,
-        Port = uri.Port > 0 ? uri.Port : 5432,
-        Database = uri.AbsolutePath.Trim('/'),
-        Username = userInfo[0],
-        Password = userInfo.Length > 1 ? userInfo[1] : "",
-        SslMode = SslMode.Require
-    };
-    connectionString = builderPg.ToString();
-}
-else
-{
-    connectionString = rawUrl;
+    connectionString = NormalizePostgresConnectionString(connectionString);
 }
 
-builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseNpgsql(connectionString));
 builder.Services.AddDbContext<DraftDbContext>(options =>
+{
+    if (env.IsDevelopment())
+    {
+        options.UseSqlServer(
+            connectionString,
+            sql => sql.MigrationsAssembly("Fc25Draft.Infra.Migrations.SqlServer"));
+    }
+    else
+    {
+        options.UseNpgsql(
+            connectionString,
+            npg => npg.MigrationsAssembly("Fc25Draft.Infra.Migrations.PostgreSQL"));
+    }
+
     options
-        .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
-        .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
-        .EnableDetailedErrors(builder.Environment.IsDevelopment()));
+        .EnableSensitiveDataLogging(env.IsDevelopment())
+        .EnableDetailedErrors(env.IsDevelopment());
+});
+
+var dbSection = configuration.GetSection("Database");
+bool applyMigrations = dbSection.GetValue("ApplyMigrationsOnStartup", false);
+bool seedDevData = dbSection.GetValue("SeedDevData", false);
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
@@ -110,13 +113,21 @@ builder.Services.AddScoped<ITransferHistoryService, TransferHistoryService>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+if (env.IsDevelopment() && applyMigrations)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
-}
 
-await app.SeedDatabaseAsync();
+    if (seedDevData)
+    {
+        await DevSeeder.SeedAsync(db);
+    }
+}
+else if (env.IsProduction() && (applyMigrations || seedDevData))
+{
+    app.Logger.LogWarning("Flags de migração/seed foram ignoradas em PRODUÇÃO por segurança.");
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -152,6 +163,24 @@ MapTransfersEndpoints(api);
 MapBudgetEndpoints(api);
 
 app.Run();
+
+static string NormalizePostgresConnectionString(string rawUrl)
+{
+    var uri = new Uri(rawUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    var builderPg = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.Trim('/'),
+        Username = userInfo[0],
+        Password = userInfo.Length > 1 ? userInfo[1] : string.Empty,
+        SslMode = SslMode.Require,
+        TrustServerCertificate = true
+    };
+
+    return builderPg.ToString();
+}
 
 static void MapAdminEndpoints(RouteGroupBuilder api)
 {

@@ -5,10 +5,12 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
-        <ItemGroup>
-          <ProjectReference Include="..\Fc25Draft.Core\Fc25Draft.Core.csproj" />
-          <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />
-        </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Fc25Draft.Core\Fc25Draft.Core.csproj" />
+    <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />
+    <ProjectReference Include="..\Fc25Draft.Infra.Migrations.SqlServer\Fc25Draft.Infra.Migrations.SqlServer.csproj" />
+    <ProjectReference Include="..\Fc25Draft.Infra.Migrations.PostgreSQL\Fc25Draft.Infra.Migrations.PostgreSQL.csproj" />
+  </ItemGroup>
         <ItemGroup>
           <PackageReference Include="ClosedXML" Version="0.105.0" />
           <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
