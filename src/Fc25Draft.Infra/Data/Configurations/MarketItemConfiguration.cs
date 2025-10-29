@@ -9,10 +9,10 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
     public void Configure(EntityTypeBuilder<MarketItem> builder)
     {
         builder.HasKey(x => x.ItemId);
-        builder.Property(x => x.BasePrice).HasColumnType("decimal(18,2)").IsRequired();
-        builder.Property(x => x.BuyNowPrice).HasColumnType("decimal(18,2)").IsRequired();
-        builder.Property(x => x.MinIncrement).HasColumnType("decimal(18,2)").IsRequired();
-        builder.Property(x => x.CurrentLeaderAmount).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.BasePrice).HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.MinIncrement).HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.CurrentLeaderAmount).HasColumnType("numeric(18,2)");
         builder.Property(x => x.Status).HasConversion<int>().IsRequired();
         builder.Property(x => x.CreatedAtUtc).IsRequired();
         builder.Property(x => x.LastUpdateUtc).IsRequired();

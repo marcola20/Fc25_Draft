@@ -22,7 +22,7 @@ public class BudgetLedgerConfiguration : IEntityTypeConfiguration<BudgetLedger>
             .HasMaxLength(50);
 
         builder.Property(x => x.Valor)
-            .HasColumnType("decimal(18,2)")
+            .HasColumnType("numeric(18,2)")
             .IsRequired();
 
         builder.Property(x => x.Descricao)
@@ -39,8 +39,8 @@ public class BudgetLedgerConfiguration : IEntityTypeConfiguration<BudgetLedger>
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_BudgetLedger_Tipo", "[Tipo] IN ('CREDIT','DEBIT')");
-            t.HasCheckConstraint("CK_BudgetLedger_Valor", "[Valor] > 0");
+            t.HasCheckConstraint("CK_BudgetLedger_Tipo", '"Tipo" IN (''CREDIT'',''DEBIT'')');
+            t.HasCheckConstraint("CK_BudgetLedger_Valor", '"Valor" > 0');
         });
     }
 }

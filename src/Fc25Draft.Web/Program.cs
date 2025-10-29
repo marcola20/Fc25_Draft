@@ -28,23 +28,17 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//var connectionString =
-//    builder.Configuration.GetConnectionString("DefaultConnection")
-//    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
-//    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
-
-//builder.Services.AddDbContext<DraftDbContext>(opt =>
-//    opt.UseSqlServer(connectionString, sql =>
-//    {
-//        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
-//        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
-//    })
-//       .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
-//       .EnableDetailedErrors(builder.Environment.IsDevelopment())
-//);
+var connectionString =
+    Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "postgresql://cbfv_user:jPtfDQHuUM7XjkeIiMcWb9yVdae3EvNj@dpg-d40sl0vgi27c73cvknm0-a.oregon-postgres.render.com/cbfv";
 
 builder.Services.AddDbContext<DraftDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options
+        .UseNpgsql(connectionString, npgsql =>
+            npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName))
+        .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+        .EnableDetailedErrors(builder.Environment.IsDevelopment()));
 
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));

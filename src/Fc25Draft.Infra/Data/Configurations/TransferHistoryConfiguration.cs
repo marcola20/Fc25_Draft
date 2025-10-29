@@ -11,7 +11,7 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
         builder.HasKey(x => x.TransferId);
 
         builder.Property(x => x.Type).HasConversion<int>().IsRequired();
-        builder.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.Amount).HasColumnType("numeric(18,2)");
         builder.Property(x => x.Notes).HasMaxLength(400);
         builder.Property(x => x.PerformedBy).HasMaxLength(120);
         builder.Property(x => x.PerformedAtUtc).IsRequired();

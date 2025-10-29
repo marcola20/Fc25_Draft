@@ -59,9 +59,7 @@ public class DraftDbContext : DbContext
             e.Property(x => x.Overall).IsRequired();
             e.Property(x => x.Age);
             e.Property(x => x.PlayerGuid)
-             .IsRequired()
-             .HasDefaultValueSql("NEWSEQUENTIALID()")
-             .ValueGeneratedOnAdd();
+             .IsRequired();
             e.HasOne(x => x.Position)
              .WithMany(p => p.Players)
              .HasForeignKey(x => x.PositionId)
@@ -80,8 +78,8 @@ public class DraftDbContext : DbContext
             e.Property(x => x.TeamName).IsRequired().HasMaxLength(80);
             e.Property(x => x.OwnerName).HasMaxLength(80);
             e.Property(x => x.Token).IsRequired().HasMaxLength(80);
-            e.Property(x => x.Budget).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
-            e.Property(x => x.BudgetBlocked).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            e.Property(x => x.Budget).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            e.Property(x => x.BudgetBlocked).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
             e.HasIndex(x => x.TeamName).IsUnique();
             e.HasIndex(x => x.Token).IsUnique();
         });
@@ -107,7 +105,7 @@ public class DraftDbContext : DbContext
             e.HasIndex(x => new { x.DraftId, x.TeamId, x.RoundNumber });
             e.HasIndex(x => x.PlayerId)
              .IsUnique()
-             .HasFilter("[PlayerId] IS NOT NULL");
+             .HasFilter("\"PlayerId\" IS NOT NULL");
             e.HasOne(x => x.Draft)
              .WithMany(d => d.Picks)
              .HasForeignKey(x => x.DraftId)

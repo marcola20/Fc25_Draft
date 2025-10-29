@@ -1,0 +1,13 @@
+\copy "Teams" from '/path/Teams.csv' csv header;
+\copy "Players" from '/path/Players.csv' csv header;
+\copy "Drafts" from '/path/Drafts.csv' csv header;
+\copy "DraftRounds" from '/path/DraftRounds.csv' csv header;
+\copy "DraftPicks" from '/path/DraftPicks.csv' csv header;
+\copy "TeamRosters" from '/path/TeamRosters.csv' csv header;
+\copy "MarketCycles" from '/path/MarketCycles.csv' csv header;
+\copy "MarketItems" from '/path/MarketItems.csv' csv header;
+\copy "MarketBids" from '/path/MarketBids.csv' csv header;
+\copy "BudgetLedgers" from '/path/BudgetLedgers.csv' csv header;
+\copy "TransferHistories" from '/path/TransferHistories.csv' csv header;
+\copy "AdminActionsLog" from '/path/AdminActionsLog.csv' csv header;
+\copy "Token_Administrador" from '/path/Token_Administrador.csv' csv header;

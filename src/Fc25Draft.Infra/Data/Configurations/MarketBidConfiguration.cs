@@ -9,7 +9,7 @@ public class MarketBidConfiguration : IEntityTypeConfiguration<MarketBid>
     public void Configure(EntityTypeBuilder<MarketBid> builder)
     {
         builder.HasKey(x => x.BidId);
-        builder.Property(x => x.Amount).HasColumnType("decimal(18,2)").IsRequired();
+        builder.Property(x => x.Amount).HasColumnType("numeric(18,2)").IsRequired();
         builder.Property(x => x.CreatedAtUtc).IsRequired();
 
         builder.HasOne(x => x.Item)
