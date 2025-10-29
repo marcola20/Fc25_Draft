@@ -1,3 +1,4 @@
+using System.Linq;
 using Fc25Draft.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,7 +39,9 @@ public static class SeedData
                     TeamId = Guid.NewGuid(),
                     TeamName = teamName,
                     OwnerName = ownerName,
-                    TeamToken = Guid.NewGuid()
+                    Token = Guid.NewGuid().ToString("N"),
+                    Budget = 50_000_000m,
+                    BudgetBlocked = 0m
                 });
             }
 
@@ -49,5 +52,22 @@ public static class SeedData
         {
             await context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public static async Task SeedTeamBudgetsAsync(DraftDbContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var teams = await context.Teams.ToListAsync(cancellationToken);
+
+        foreach (var team in teams)
+        {
+            if (team.Budget <= 0m)
+            {
+                team.Budget = 50_000_000m;
+            }
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

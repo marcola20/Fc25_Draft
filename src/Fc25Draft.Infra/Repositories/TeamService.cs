@@ -63,7 +63,7 @@ public class TeamService : ITeamService
             TeamId = Guid.NewGuid(),
             TeamName = normalizedName,
             OwnerName = NormalizeOwner(dto.OwnerName),
-            TeamToken = Guid.NewGuid()
+            Token = Guid.NewGuid().ToString("N")
         };
 
         _db.Teams.Add(entity);

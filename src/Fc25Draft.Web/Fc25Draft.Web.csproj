@@ -4,7 +4,6 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<LangVersion>latest</LangVersion>
-		<UserSecretsId>fc25draft-web-secrets</UserSecretsId>
 	</PropertyGroup>
         <ItemGroup>
           <ProjectReference Include="..\Fc25Draft.Core\Fc25Draft.Core.csproj" />

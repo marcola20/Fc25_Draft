@@ -22,6 +22,35 @@ namespace Fc25Draft.Infra.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.AdminActionsLog", b =>
+                {
+                    b.Property<Guid>("ActionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("ActionId");
+
+                    b.HasIndex("ActionType", "CreatedAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_AdminActionsLog_ActionType_CreatedAtUtc");
+
+                    b.ToTable("AdminActionsLog", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.AdminToken", b =>
                 {
                     b.Property<int>("AdminTokenId")
@@ -39,6 +68,49 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.ToTable("Token_Administrador", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.BudgetLedger", b =>
+                {
+                    b.Property<Guid>("BudgetLedgerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DataUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("BudgetLedgerId");
+
+                    b.HasIndex("TeamId", "DataUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_BudgetLedger_TeamId_DataUtc");
+
+                    b.ToTable("BudgetLedgers", t =>
+                        {
+                            t.HasCheckConstraint("CK_BudgetLedger_Tipo", "[Tipo] IN ('CREDIT','DEBIT')");
+
+                            t.HasCheckConstraint("CK_BudgetLedger_Valor", "[Valor] > 0");
+                        });
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
@@ -123,6 +195,109 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("DraftRounds");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketBid", b =>
+                {
+                    b.Property<Guid>("BidId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("BidId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("ItemId", "CreatedAtUtc");
+
+                    b.ToTable("MarketBids");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketCycle", b =>
+                {
+                    b.Property<Guid>("CycleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("NextCycleAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("CycleId");
+
+                    b.ToTable("MarketCycles");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketItem", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BuyNowPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("CurrentLeaderAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("CurrentLeaderTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastUpdateUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("MinIncrement")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("WinnerTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ItemId");
+
+                    b.HasIndex("CurrentLeaderTeamId");
+
+                    b.HasIndex("PlayerId")
+                        .HasDatabaseName("IX_MarketItems_Player");
+
+                    b.HasIndex("WinnerTeamId");
+
+                    b.HasIndex("CycleId", "Status", "ExpiresAtUtc");
+
+                    b.ToTable("MarketItems");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
                     b.Property<int>("PlayerId")
@@ -134,6 +309,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int?>("Age")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("CurrentTeamId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -142,10 +320,20 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Overall")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("PlayerGuid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
                     b.Property<short>("PositionId")
                         .HasColumnType("smallint");
 
                     b.HasKey("PlayerId");
+
+                    b.HasIndex("CurrentTeamId");
+
+                    b.HasIndex("PlayerGuid")
+                        .IsUnique();
 
                     b.HasIndex("PositionId");
 
@@ -230,6 +418,16 @@ namespace Fc25Draft.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("Budget")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("BudgetBlocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<string>("OwnerName")
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
@@ -239,15 +437,17 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
-                    b.Property<Guid>("TeamToken")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
 
                     b.HasKey("TeamId");
 
                     b.HasIndex("TeamName")
                         .IsUnique();
 
-                    b.HasIndex("TeamToken")
+                    b.HasIndex("Token")
                         .IsUnique();
 
                     b.ToTable("Teams");
@@ -267,6 +467,60 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.ToTable("TeamRosters");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
+                {
+                    b.Property<Guid>("TransferId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("FromTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<DateTime>("PerformedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PerformedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ToTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("TransferId");
+
+                    b.HasIndex("FromTeamId");
+
+                    b.HasIndex("ToTeamId");
+
+                    b.HasIndex("PlayerId", "PerformedAtUtc");
+
+                    b.ToTable("TransferHistories");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.BudgetLedger", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftPick", b =>
@@ -314,13 +568,72 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Draft");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketBid", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.MarketItem", "Item")
+                        .WithMany("Bids")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany("MarketBids")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketItem", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "CurrentLeaderTeam")
+                        .WithMany("LeadingMarketItems")
+                        .HasForeignKey("CurrentLeaderTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.MarketCycle", "Cycle")
+                        .WithMany("Items")
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany("MarketItems")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "WinnerTeam")
+                        .WithMany("WonMarketItems")
+                        .HasForeignKey("WinnerTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CurrentLeaderTeam");
+
+                    b.Navigation("Cycle");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("WinnerTeam");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "CurrentTeam")
+                        .WithMany()
+                        .HasForeignKey("CurrentTeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Fc25Draft.Core.Entities.Position", "Position")
                         .WithMany("Players")
                         .HasForeignKey("PositionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("CurrentTeam");
 
                     b.Navigation("Position");
                 });
@@ -344,6 +657,31 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Team");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferHistory", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "FromTeam")
+                        .WithMany()
+                        .HasForeignKey("FromTeamId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "ToTeam")
+                        .WithMany()
+                        .HasForeignKey("ToTeamId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("FromTeam");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("ToTeam");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
                 {
                     b.Navigation("Picks");
@@ -356,9 +694,21 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Picks");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketCycle", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MarketItem", b =>
+                {
+                    b.Navigation("Bids");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
                     b.Navigation("DraftPicks");
+
+                    b.Navigation("MarketItems");
 
                     b.Navigation("TeamRosters");
                 });
@@ -372,7 +722,13 @@ namespace Fc25Draft.Infra.Migrations
                 {
                     b.Navigation("DraftPicks");
 
+                    b.Navigation("LeadingMarketItems");
+
+                    b.Navigation("MarketBids");
+
                     b.Navigation("Roster");
+
+                    b.Navigation("WonMarketItems");
                 });
 #pragma warning restore 612, 618
         }

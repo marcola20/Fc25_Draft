@@ -1,5 +1,7 @@
 @page "/drafts/manage"
 @using Fc25Draft.Core.DTOs
+@using System.Globalization;
+@using System.Runtime.InteropServices;
 @inject DraftAdminApiClient DraftAdminApiClient
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JSRuntime
@@ -147,7 +149,7 @@ else
                                             <td>@pick.TeamName</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
-                                            <td>@(pick.PickedAtUtc.HasValue? pick.PickedAtUtc.Value.ToLocalTime().ToString("g") : "-")</td>
+                                            <td>@FormatDateTimePtBr(pick.PickedAtUtc)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -195,6 +197,32 @@ else
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    private static readonly CultureInfo PtBr = new("pt-BR");
+    private static readonly TimeZoneInfo SaoPauloTz =
+        TimeZoneInfo.FindSystemTimeZoneById(
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "E. South America Standard Time"   
+                : "America/Sao_Paulo"               
+        );
+
+    private static string FormatDateTimePtBr(DateTime? pickedAtUtc)
+    {
+        if (!pickedAtUtc.HasValue) return "-";
+
+        var utc = DateTime.SpecifyKind(pickedAtUtc.Value, DateTimeKind.Utc);
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, SaoPauloTz);
+
+        return local.ToString("g", PtBr);
+    }
+
+    private static string FormatDateTimePtBr(DateTimeOffset? pickedAt)
+    {
+        if (!pickedAt.HasValue) return "-";
+        var local = TimeZoneInfo.ConvertTimeFromUtc(pickedAt.Value.UtcDateTime, SaoPauloTz);
+        return local.ToString("g", PtBr);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

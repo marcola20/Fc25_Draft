@@ -8,7 +8,7 @@
     }
   },
   "profiles": {
-    "http": {
+    "cbfv_http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
@@ -17,7 +17,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "https": {
+    "cbfv_https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,

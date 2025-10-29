@@ -5,9 +5,14 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Repositories;
+using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
@@ -19,26 +24,33 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
+//var connectionString =
+//    builder.Configuration.GetConnectionString("DefaultConnection")
+//    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
+//    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
 
+//builder.Services.AddDbContext<DraftDbContext>(opt =>
+//    opt.UseSqlServer(connectionString, sql =>
+//    {
+//        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
+//        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
+//    })
+//       .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+//       .EnableDetailedErrors(builder.Environment.IsDevelopment())
+//);
 
-builder.Services.AddDbContext<DraftDbContext>(opt =>
-    opt.UseSqlServer(connectionString, sql =>
-    {
-        sql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName);
-        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null); 
-    })
-       .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
-       .EnableDetailedErrors(builder.Environment.IsDevelopment())
-);
+builder.Services.AddDbContext<DraftDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
+builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection(PricingOptions.SectionName));
+builder.Services.Configure<MarketOptions>(builder.Configuration.GetSection(MarketOptions.SectionName));
+builder.Services.Configure<EconomiaOptions>(builder.Configuration.GetSection(EconomiaOptions.SectionName));
 
 builder.Services
     .AddAuthentication(options =>
@@ -66,9 +78,18 @@ builder.Services.AddScoped<ApiClientFactory>();
 builder.Services.AddScoped<PlayersApiClient>();
 builder.Services.AddScoped<DraftAdminApiClient>();
 builder.Services.AddScoped<TeamsApiClient>();
+builder.Services.AddScoped<AdminTransfersApiClient>();
+builder.Services.AddScoped<BudgetsApiClient>();
+builder.Services.AddScoped<MarketApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
+builder.Services.AddScoped<IPricingService, PricingService>();
+builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
+builder.Services.AddScoped<IMarketService, MarketService>();
+builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<AdminTransferService>();
+builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
 
 var app = builder.Build();
 
@@ -108,6 +129,10 @@ MapAdminEndpoints(api);
 MapDraftEndpoints(api);
 MapPlayerEndpoints(api);
 MapTeamEndpoints(api);
+MapPricingEndpoints(api);
+MapMarketEndpoints(api);
+MapTransfersEndpoints(api);
+MapBudgetEndpoints(api);
 
 app.Run();
 
@@ -116,6 +141,253 @@ static void MapAdminEndpoints(RouteGroupBuilder api)
     var adminApi = api.MapGroup("/admin").RequireAuthorization("AdminOnly");
 
     adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
+
+    var adminTransferApi = adminApi.MapGroup("/transfer");
+
+    adminTransferApi.MapPost("/sell", async (
+        HttpContext httpContext,
+        AdminSellPlayersRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.FromTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de origem é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (request.FromTeamId == request.ToTeamId)
+        {
+            return Results.BadRequest(new { message = "Informe times diferentes para a venda." });
+        }
+
+        if (request.PlayerIds is null || request.PlayerIds.Length == 0)
+        {
+            return Results.BadRequest(new { message = "Selecione ao menos um jogador." });
+        }
+
+        if (request.PlayerIds.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista." });
+        }
+
+        if (request.PlayerIds.Distinct().Count() != request.PlayerIds.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores." });
+        }
+
+        if (request.Amount < 0m)
+        {
+            return Results.BadRequest(new { message = "O valor não pode ser negativo." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.SellAsync(
+                adminToken!,
+                request.FromTeamId,
+                request.ToTeamId,
+                request.PlayerIds,
+                request.Amount,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Venda concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
+    adminTransferApi.MapPost("/swap", async (
+        HttpContext httpContext,
+        AdminSwapPlayersRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.TeamAId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time A é obrigatório." });
+        }
+
+        if (request.TeamBId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time B é obrigatório." });
+        }
+
+        if (request.TeamAId == request.TeamBId)
+        {
+            return Results.BadRequest(new { message = "Informe times diferentes para a troca." });
+        }
+
+        var playersFromA = request.PlayersFromA ?? Array.Empty<Guid>();
+        var playersFromB = request.PlayersFromB ?? Array.Empty<Guid>();
+
+        if (playersFromA.Length == 0 && playersFromB.Length == 0)
+        {
+            return Results.BadRequest(new { message = "Selecione ao menos um jogador para a troca." });
+        }
+
+        if (playersFromA.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista do Time A." });
+        }
+
+        if (playersFromB.Any(id => id == Guid.Empty))
+        {
+            return Results.BadRequest(new { message = "Jogador inválido na lista do Time B." });
+        }
+
+        if (playersFromA.Distinct().Count() != playersFromA.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores do Time A." });
+        }
+
+        if (playersFromB.Distinct().Count() != playersFromB.Length)
+        {
+            return Results.BadRequest(new { message = "Não é permitido repetir jogadores do Time B." });
+        }
+
+        if (playersFromA.Intersect(playersFromB).Any())
+        {
+            return Results.BadRequest(new { message = "Um jogador não pode participar pelos dois times." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.SwapAsync(
+                adminToken!,
+                request.TeamAId,
+                playersFromA,
+                request.TeamBId,
+                playersFromB,
+                request.CashAdjustFromAToB,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Troca concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
+    adminTransferApi.MapPost("/move", async (
+        HttpContext httpContext,
+        AdminMovePlayerRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.PlayerId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Jogador é obrigatório." });
+        }
+
+        if (request.ToTeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "Time de destino é obrigatório." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.MoveAsync(
+                adminToken!,
+                request.PlayerId,
+                request.ToTeamId,
+                request.Reason,
+                ct);
+
+            return Results.Ok(new { message = "Movimentação concluída com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
 }
 
 static void MapDraftEndpoints(RouteGroupBuilder api)
@@ -645,7 +917,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.TeamId,
                 t.TeamName,
                 t.OwnerName,
-                t.TeamToken,
+                t.Token,
                 Jogadores = t.Roster.Count
             })
             .FirstOrDefaultAsync(ct);
@@ -656,7 +928,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         }
 
         var includeToken = httpContext.User.IsInRole("Admin");
-        var teamToken = includeToken ? team.TeamToken : Guid.Empty;
+        var teamToken = includeToken ? team.Token : string.Empty;
 
         var dto = new TeamDetailsDto(
             team.TeamId,
@@ -680,6 +952,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -715,6 +988,7 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
                 t.Roster
                     .OrderBy(r => r.Player.Name)
                     .Select(r => new TeamRosterPlayerDto(
+                        r.Player.PlayerGuid,
                         r.PlayerId,
                         r.Player.Name,
                         r.Player.Position.Name,
@@ -825,20 +1099,689 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
             return Results.BadRequest(new { message = ex.Message });
         }
     });
+
+    adminTeamsApi.MapPost("/adjust-budget", async (
+        HttpContext httpContext,
+        AdminAdjustBudgetRequestDto request,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (request.TeamId == Guid.Empty)
+        {
+            return Results.BadRequest(new { message = "TeamId é obrigatório." });
+        }
+
+        if (request.Delta == 0m)
+        {
+            return Results.BadRequest(new { message = "O ajuste deve ser diferente de zero." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.AdjustBudgetAsync(adminToken!, request.TeamId, request.Delta, request.Reason, ct);
+            return Results.Ok(new { message = "Orçamento ajustado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+}
+
+static void MapBudgetEndpoints(RouteGroupBuilder api)
+{
+    var budgetApi = api.MapGroup("/budgets");
+
+    budgetApi.MapGet(
+        "/available",
+        async ([FromQuery] string? token, DraftDbContext db, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            var teamId = await db.Teams
+                .AsNoTracking()
+                .Where(t => t.Token == token.Trim())
+                .Select(t => (Guid?)t.TeamId)
+                .FirstOrDefaultAsync(ct);
+
+            if (!teamId.HasValue)
+            {
+                return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            var saldo = await budgetService.GetSaldoAsync(teamId.Value, ct);
+            var bloqueado = await budgetService.GetBloqueadoEmLancesAsync(teamId.Value, ct);
+            var disponivel = saldo - bloqueado;
+
+            return Results.Ok(new BudgetSummaryDto(teamId.Value, saldo, bloqueado, disponivel));
+        })
+        .AllowAnonymous();
+
+    budgetApi.MapGet(
+        "/{teamId:guid}",
+        async (Guid teamId, DraftDbContext db, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "TeamId inválido." });
+            }
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var saldo = await budgetService.GetSaldoAsync(teamId, ct);
+            return Results.Ok(new { teamId, saldo });
+        })
+        .AllowAnonymous();
+
+    var adminBudgetApi = api.MapGroup("/admin/budgets").RequireAuthorization("AdminOnly");
+
+    adminBudgetApi.MapPost(
+        "/adjust",
+        async (BudgetAdjustRequestDto request, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            if (request.TeamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "TeamId é obrigatório." });
+            }
+
+            if (request.Valor <= 0)
+            {
+                return Results.BadRequest(new { message = "Valor deve ser maior que zero." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Origem))
+            {
+                return Results.BadRequest(new { message = "Origem é obrigatória." });
+            }
+
+            var tipo = request.Tipo?.Trim().ToUpperInvariant();
+            if (tipo is not ("CREDIT" or "DEBIT"))
+            {
+                return Results.BadRequest(new { message = "Tipo inválido. Use CREDIT ou DEBIT." });
+            }
+
+            try
+            {
+                await budgetService.RegistrarAjusteAsync(
+                    request.TeamId,
+                    request.Valor,
+                    request.Origem,
+                    request.Descricao,
+                    tipo == "CREDIT",
+                    ct);
+
+                var saldoAtual = await budgetService.GetSaldoAsync(request.TeamId, ct);
+                return Results.Ok(new { teamId = request.TeamId, saldo = saldoAtual });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    adminBudgetApi.MapPost(
+        "/apply-match-reward",
+        async (MatchRewardRequestDto request, IBudgetService budgetService, CancellationToken ct) =>
+        {
+            if (request is null)
+            {
+                return Results.BadRequest(new { message = "Payload inválido." });
+            }
+
+            try
+            {
+                var result = await budgetService.ApplyMatchRewardAsync(request, ct);
+
+                if (!result.AjusteRealizado)
+                {
+                    return Results.Ok(new
+                    {
+                        message = "Sem alteração.",
+                        teamId = result.TeamId,
+                        saldo = result.SaldoAtual
+                    });
+                }
+
+                return Results.Ok(new
+                {
+                    teamId = result.TeamId,
+                    valorAplicado = result.ValorAplicado,
+                    saldo = result.SaldoAtual,
+                    tipo = result.Tipo,
+                    descricao = result.Descricao
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    adminBudgetApi.MapGet("/ledger", async ([FromQuery] Guid teamId, DraftDbContext db, CancellationToken ct, [FromQuery] int page = 1, [FromQuery] int pageSize = 20 ) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "teamId é obrigatório." });
+            }
+
+            if (page < 1 || pageSize < 1)
+            {
+                return Results.BadRequest(new { message = "Parâmetros de paginação inválidos." });
+            }
+
+            var size = Math.Min(pageSize, 100);
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var query = db.BudgetLedgers
+                .AsNoTracking()
+                .Where(l => l.TeamId == teamId);
+
+            var total = await query.CountAsync(ct);
+
+            var items = await query
+                .OrderByDescending(l => l.DataUtc)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
+                .ToListAsync(ct);
+
+            return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
+        });
+}
+static void MapPricingEndpoints(RouteGroupBuilder api)
+{
+    var pricingApi = api.MapGroup("/pricing");
+
+    pricingApi.MapGet(
+        "/preview",
+        async (
+            [FromQuery(Name = "pos")] string? positionCode,
+            [FromQuery(Name = "posId")] short? positionId,
+            [FromQuery] int? age,
+            [FromQuery(Name = "ovr")] int? overall,
+            IPricingService pricingService,
+            CancellationToken ct) =>
+        {
+            if (!age.HasValue)
+            {
+                return Results.BadRequest(new { message = "Parâmetro 'age' é obrigatório." });
+            }
+
+            if (!overall.HasValue)
+            {
+                return Results.BadRequest(new { message = "Parâmetro 'ovr' é obrigatório." });
+            }
+
+            if (string.IsNullOrWhiteSpace(positionCode) && !positionId.HasValue)
+            {
+                return Results.BadRequest(new { message = "Informe 'pos' ou 'posId'." });
+            }
+
+            try
+            {
+                var result = await pricingService.CalculateForPositionAsync(positionCode, positionId, age.Value, overall.Value, ct);
+                return Results.Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+    pricingApi.MapGet(
+        "/preview/{playerId:int}",
+        async (int playerId, IPricingService pricingService, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await pricingService.CalculateForPlayerAsync(playerId, ct);
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound(new { message = $"Jogador {playerId} não encontrado." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+}
+
+static void MapTransfersEndpoints(RouteGroupBuilder api)
+{
+    var transfersApi = api.MapGroup("/transfers");
+
+    transfersApi.MapGet("/history", async (
+        [FromQuery] Guid? teamId,
+        [FromQuery] Guid? playerId,
+        [FromQuery] string? type,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        ITransfersQueryService transfersQueryService,
+        CancellationToken ct) =>
+    {
+        TransferType? typeFilter = null;
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var normalizedType = type.Trim();
+            if (Enum.TryParse<TransferType>(normalizedType, ignoreCase: true, out var parsedType))
+            {
+                typeFilter = parsedType;
+            }
+            else if (int.TryParse(normalizedType, out var numericType) && Enum.IsDefined(typeof(TransferType), numericType))
+            {
+                typeFilter = (TransferType)numericType;
+            }
+            else
+            {
+                return Results.BadRequest(new { message = "Tipo de transferência inválido." });
+            }
+        }
+
+        var filter = new TransfersFilter
+        {
+            TeamId = teamId,
+            PlayerId = playerId,
+            Type = typeFilter,
+            FromUtc = from,
+            ToUtc = to,
+            Page = page ?? 1,
+            PageSize = pageSize ?? 20
+        };
+
+        try
+        {
+            var result = await transfersQueryService.QueryHistoryAsync(filter, ct);
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+}
+
+static void MapMarketEndpoints(RouteGroupBuilder api)
+{
+    var marketApi = api.MapGroup("/market");
+
+    marketApi.MapGet(
+        "/history",
+        async ([FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+        {
+            var pageNumber = page < 1 ? 1 : page;
+            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+            var query = db.TransferHistories
+                .AsNoTracking();
+
+            var total = await query.CountAsync(ct);
+
+            var historyRows = await query
+                .OrderByDescending(h => h.PerformedAtUtc)
+                .Skip((pageNumber - 1) * size)
+                .Take(size)
+                .Select(h => new
+                {
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    PlayerName = h.Player.Name,
+                    h.Type,
+                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
+                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount
+                })
+                .ToListAsync(ct);
+
+            var items = historyRows
+                .Select(h => new TransferHistoryItemDto(
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    h.PlayerName,
+                    h.Type.ToDisplayName(),
+                    h.FromTeamName ?? "Mercado Livre",
+                    h.ToTeamName,
+                    h.Amount ?? 0m))
+                .ToList();
+
+            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+        })
+        .AllowAnonymous();
+
+    marketApi.MapGet(
+        "/history/by-team/{teamId:guid}",
+        async (Guid teamId, [FromQuery] int page, [FromQuery] int pageSize, DraftDbContext db, CancellationToken ct) =>
+        {
+            if (teamId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "teamId é obrigatório." });
+            }
+
+            var teamExists = await db.Teams
+                .AsNoTracking()
+                .AnyAsync(t => t.TeamId == teamId, ct);
+
+            if (!teamExists)
+            {
+                return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
+            }
+
+            var pageNumber = page < 1 ? 1 : page;
+            var size = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+            var query = db.TransferHistories
+                .AsNoTracking()
+                .Where(h => h.FromTeamId == teamId || h.ToTeamId == teamId);
+
+            var total = await query.CountAsync(ct);
+
+            var historyRows = await query
+                .OrderByDescending(h => h.PerformedAtUtc)
+                .Skip((pageNumber - 1) * size)
+                .Take(size)
+                .Select(h => new
+                {
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    PlayerName = h.Player.Name,
+                    h.Type,
+                    FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
+                    ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
+                    h.Amount
+                })
+                .ToListAsync(ct);
+
+            var items = historyRows
+                .Select(h => new TransferHistoryItemDto(
+                    h.PerformedAtUtc,
+                    h.PlayerId,
+                    h.PlayerName,
+                    h.Type.ToDisplayName(),
+                    h.FromTeamName ?? "Mercado Livre",
+                    h.ToTeamName,
+                    h.Amount ?? 0m))
+                .ToList();
+
+            return Results.Ok(new PagedResult<TransferHistoryItemDto>(items, total));
+        })
+        .AllowAnonymous();
+
+    marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
+    {
+        await marketService.EnsureCycleAsync(ct);
+        await marketService.CloseExpiredItemsAsync(ct);
+        var items = await marketService.GetActiveItemsAsync(ct);
+        return Results.Ok(items);
+    }).AllowAnonymous();
+
+    marketApi.MapGet("/{itemId:guid}", async (Guid itemId, IMarketService marketService, CancellationToken ct) =>
+    {
+        await marketService.CloseExpiredItemsAsync(ct);
+        var item = await marketService.GetItemAsync(itemId, ct);
+        return item is null
+            ? Results.NotFound(new { message = "Item não encontrado." })
+            : Results.Ok(item);
+    }).AllowAnonymous();
+
+    marketApi.MapPost("/{itemId:guid}/bid", async (
+        Guid itemId,
+        MarketBidRequest request,
+        HttpContext context,
+        IMarketService marketService,
+        CancellationToken ct) =>
+    {
+        var token = GetTeamToken(context, request.TeamToken);
+        if (token is null)
+        {
+            return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        try
+        {
+            var result = await marketService.PlaceBidAsync(itemId, token, request.Amount, ct);
+            return Results.Ok(result);
+        }
+        catch (MarketForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (MarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (MarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    marketApi.MapPost("/{itemId:guid}/buy-now", async (
+        Guid itemId,
+        MarketBuyNowRequest request,
+        HttpContext context,
+        IMarketService marketService,
+        CancellationToken ct) =>
+    {
+        var token = GetTeamToken(context, request.TeamToken);
+        if (token is null)
+        {
+            return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        try
+        {
+            var result = await marketService.BuyNowAsync(itemId, token, ct);
+            return Results.Ok(result);
+        }
+        catch (MarketForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (MarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (MarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    }).AllowAnonymous();
+
+    var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
+
+    adminMarketApi.MapPost("/refresh", async (IMarketCycleGenerator cycleGenerator, CancellationToken ct) =>
+    {
+        var now = DateTime.UtcNow;
+        var needsNew = await cycleGenerator.NeedsNewCycleAsync(now, ct);
+        if (!needsNew)
+        {
+            return Results.Conflict(new { message = "Já existe um ciclo ativo." });
+        }
+
+        var cycle = await cycleGenerator.CreateNewCycleAsync(now, ct);
+        return Results.Ok(cycle);
+    });
+
+    adminMarketApi.MapPost("/close-expired", async (IMarketService marketService, CancellationToken ct) =>
+    {
+        var closed = await marketService.CloseExpiredItemsAsync(ct);
+        return Results.Ok(new { itensFechados = closed });
+    });
+
+    adminMarketApi.MapPost("/cancel/{itemId:guid}", async (
+        Guid itemId,
+        AdminCancelMarketItemRequestDto request,
+        HttpContext httpContext,
+        AdminTransferService adminTransferService,
+        CancellationToken ct) =>
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        if (!TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            await adminTransferService.CancelMarketItemAsync(adminToken!, itemId, request.Reason, ct);
+            return Results.Ok(new { message = "Item cancelado com sucesso." });
+        }
+        catch (AdminForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    });
+
+    static string? GetTeamToken(HttpContext context, string? payloadToken)
+    {
+        var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
+        var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
+        return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
+    }
+}
+
+static bool TryGetAdminToken(HttpContext context, out string? adminToken, out IResult? errorResult)
+{
+    adminToken = null;
+    errorResult = null;
+
+    if (!context.Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var headerValue = authorizationHeader.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(headerValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador ausente." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    const string bearerPrefix = "Bearer ";
+    if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    var tokenValue = headerValue[bearerPrefix.Length..].Trim();
+    if (string.IsNullOrWhiteSpace(tokenValue))
+    {
+        errorResult = Results.Json(new { message = "Token de administrador inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        return false;
+    }
+
+    adminToken = tokenValue;
+    return true;
 }
 
 static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
 {
-    return await db.Players
+    var players = await db.Players
         .AsNoTracking()
         .OrderBy(p => p.Name)
+        .Select(p => new
+        {
+            p.Name,
+            Posicao = p.Position.Name,
+            p.Overall,
+            TemTime = p.TeamRosters.Any(),
+            Time = p.TeamRosters
+                .OrderBy(r => r.TeamId)
+                .Select(r => r.Team.TeamName)
+                .FirstOrDefault()
+        })
+        .ToListAsync(ct);
+
+    return players
         .Select(p => new PlayerExportDto(
             p.Name,
-            p.Position.Name,
+            p.Posicao,
             p.Overall,
-            p.TeamRosters.Any() ? "Escolhido" : "Disponível",
-            p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
-        .ToListAsync(ct);
+            p.TemTime ? "Escolhido" : "Disponível",
+            p.Time))
+        .ToList();
 }
 
 static string BuildPlayerCsv(IReadOnlyList<PlayerExportDto> players)
@@ -859,7 +1802,7 @@ static string BuildDraftBoardCsv(IReadOnlyList<DraftBoardExportDto> entries)
     sb.AppendLine("Rodada;Escolha;Time;Responsável;Jogador;Posição;Data/Hora");
     foreach (var entry in entries)
     {
-        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{{entry.DataHoraUtc.ToLocalTime().ToString(\"dd/MM/yyyy HH:mm:ss\", new System.Globalization.CultureInfo(\"pt-BR\"))}}\r\n");
+        sb.AppendLine($"{entry.Rodada};{entry.Escolha};{Escape(entry.Time)};{Escape(entry.Responsavel)};{Escape(entry.Jogador)};{Escape(entry.Posicao)};{Escape(entry.DataHoraUtc)}");
     }
 
     return sb.ToString();
@@ -875,3 +1818,7 @@ static string Escape(string? value)
     var sanitized = value.Replace("\"", "''");
     return sanitized.Contains(';') ? $"\"{sanitized}\"" : sanitized;
 }
+
+record MarketBidRequest(decimal Amount, string? TeamToken);
+
+record MarketBuyNowRequest(string? TeamToken);

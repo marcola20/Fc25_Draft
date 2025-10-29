@@ -17,7 +17,7 @@ public record TeamDetailsDto(
     Guid TeamId,
     string TeamName,
     string? OwnerName,
-    Guid TeamToken,
+    string Token,
     int Jogadores);
 
 public record TeamRosterDto(
@@ -27,6 +27,7 @@ public record TeamRosterDto(
     IReadOnlyList<TeamRosterPlayerDto> Jogadores);
 
 public record TeamRosterPlayerDto(
+    Guid PlayerGuid,
     int PlayerId,
     string Nome,
     string Posicao,
