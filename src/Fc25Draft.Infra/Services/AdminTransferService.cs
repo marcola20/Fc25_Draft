@@ -319,7 +319,7 @@ public partial class AdminTransferService
             var historyEntries = players.Select(player => new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
-                Type = TransferType.Sale,
+                Type = TransferType.TeamSale,
                 PlayerId = player.PlayerId,
                 FromTeamId = fromTeamId,
                 ToTeamId = toTeamId,
@@ -635,7 +635,7 @@ public partial class AdminTransferService
                 historyEntries.Add(new TransferHistory
                 {
                     TransferId = Guid.NewGuid(),
-                    Type = TransferType.Swap,
+                    Type = TransferType.TeamTrade,
                     PlayerId = player.PlayerId,
                     FromTeamId = teamAId,
                     ToTeamId = teamBId,
@@ -651,7 +651,7 @@ public partial class AdminTransferService
                 historyEntries.Add(new TransferHistory
                 {
                     TransferId = Guid.NewGuid(),
-                    Type = TransferType.Swap,
+                    Type = TransferType.TeamTrade,
                     PlayerId = player.PlayerId,
                     FromTeamId = teamBId,
                     ToTeamId = teamAId,
@@ -792,7 +792,7 @@ public partial class AdminTransferService
             var historyEntry = new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
-                Type = TransferType.AdminMove,
+                Type = TransferType.TeamTrade,
                 PlayerId = player.PlayerId,
                 FromTeamId = fromTeamId,
                 ToTeamId = toTeamId,

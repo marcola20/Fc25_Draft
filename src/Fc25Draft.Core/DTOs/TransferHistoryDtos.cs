@@ -1,23 +1,46 @@
 using System;
+using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.DTOs;
 
 public record TransferHistoryItemDto(
-    DateTime DataUtc,
+    Guid TransferId,
+    DateTime PerformedAtUtc,
     int PlayerId,
     string PlayerName,
+    Guid? FromTeamId,
+    string? FromTeamName,
+    Guid? ToTeamId,
+    string? ToTeamName,
+    decimal? Amount,
+    int Type,
     string Tipo,
-    string? OrigemTeam,
-    string? DestinoTeam,
-    decimal Valor);
+    string? Notes,
+    string? PerformedBy);
 
 public record TransferHistoryDto(
     Guid TransferId,
-    DateTime DataUtc,
-    Guid PlayerId,
+    DateTime PerformedAtUtc,
+    Guid PlayerExternalId,
+    int PlayerId,
     string PlayerName,
+    Guid? FromTeamId,
+    string? FromTeamName,
+    Guid? ToTeamId,
+    string? ToTeamName,
+    decimal? Amount,
+    int Type,
     string Tipo,
-    string? OrigemTeam,
-    string? DestinoTeam,
-    decimal? Valor,
-    string? Notas);
+    string? Notes,
+    string? PerformedBy);
+
+public record RegisterTransferHistoryRequestDto(
+    Guid? TransferId,
+    int PlayerId,
+    Guid? FromTeamId,
+    Guid? ToTeamId,
+    decimal? Amount,
+    TransferType Type,
+    DateTime? PerformedAtUtc,
+    string? Notes,
+    string? PerformedBy);
