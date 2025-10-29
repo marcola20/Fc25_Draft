@@ -2,6 +2,7 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace Fc25Draft.Tests;
 
