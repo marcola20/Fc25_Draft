@@ -27,28 +27,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 var builder = WebApplication.CreateBuilder(args);
 
-// Resolve a connection string a partir de appsettings.* e variáveis de ambiente
-string ResolveConnectionString()
-{
-    var fromConfig = builder.Configuration.GetConnectionString("DefaultConnection");
-    var fromEnvLegacy = Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection"); // compat c/ Render antigo
-    var fromEnvModern = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection"); // padrão aspnet
-
-    var conn = fromEnvModern ?? fromEnvLegacy ?? fromConfig;
-
-    if (string.IsNullOrWhiteSpace(conn))
-        throw new InvalidOperationException("Connection string 'DefaultConnection' não encontrada.");
-
-    if (!builder.Environment.IsDevelopment() &&
-        (conn.Contains("localhost", StringComparison.OrdinalIgnoreCase) || conn.Contains("127.0.0.1")))
-    {
-        throw new InvalidOperationException("Em Production a connection não pode apontar para localhost.");
-    }
-
-    return conn;
-}
-
-var connString = ResolveConnectionString();
+var connString = ConnectionStringResolver.Resolve(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
 
 // Use Npgsql em todos os ambientes
 builder.Services.AddDbContext<DraftDbContext>(options =>
