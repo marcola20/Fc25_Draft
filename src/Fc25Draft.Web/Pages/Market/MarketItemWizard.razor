@@ -1,17 +1,21 @@
+@page "/admin/drafts/new"
 @using System
+@using System.ComponentModel.DataAnnotations
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components.Forms
 
-<EditForm EditContext="formEditContext" OnValidSubmit="HandleSubmitDraftAsync">
+<EditForm Model="formModel" OnValidSubmit="HandleSubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
     <div class="mb-3">
         <label class="form-label" for="cycle-id">Ciclo</label>
         <InputText id="cycle-id"
                    class="form-control"
-                   @bind-Value="cycleInput"
-                   @bind-Value:after="OnCycleInputChanged"
+                   @bind-Value="formModel.CycleIdText"
                    list="cycle-options"
                    placeholder="Informe o GUID do ciclo" />
-        <ValidationMessage For="() => formModel.CycleId" />
+        <ValidationMessage For="() => formModel.CycleIdText" />
         <datalist id="cycle-options">
             <option value="@activeCycleId"></option>
         </datalist>
@@ -69,9 +73,7 @@
 </EditForm>
 
 @code {
-    private readonly MarketItemWizardFormModel formModel = new();
-    private EditContext formEditContext = default!;
-    private string? cycleInput;
+    private DraftFormModel formModel = new();
     private string? activeCycleId;
     private string? playerSearch;
     private object? selectedPlayer;
@@ -84,41 +86,31 @@
 
     protected override void OnInitialized()
     {
-        formEditContext = new EditContext(formModel);
         UpdateProgress();
     }
 
     private string WizardProgress => $"{progressPct}%";
 
-    private async Task HandleSubmitDraftAsync()
+    private async Task HandleSubmitAsync()
     {
-        await SubmitDraftAsync(false);
-    }
-
-    private void OnCycleInputChanged(string v)
-    {
-        cycleInput = v;
-        if (Guid.TryParse(v, out var g))
+        if (Guid.TryParse(formModel.CycleIdText, out var g))
         {
             formModel.CycleId = g;
         }
         else
         {
             formModel.CycleId = null;
+            return;
         }
+
+        await SubmitDraftAsync(false);
     }
 
     private void UseActiveCycle()
     {
-        if (!string.IsNullOrWhiteSpace(activeCycleId) && Guid.TryParse(activeCycleId, out var g))
+        if (!string.IsNullOrWhiteSpace(activeCycleId))
         {
-            cycleInput = activeCycleId;
-            formModel.CycleId = g;
-        }
-        else
-        {
-            cycleInput = string.Empty;
-            formModel.CycleId = null;
+            formModel.CycleIdText = activeCycleId;
         }
     }
 
@@ -204,13 +196,23 @@
         progressPct = totalSteps <= 0 ? 0 : (int)Math.Round(currentIndex * 100d / totalSteps);
     }
 
-    private sealed class MarketItemWizardFormModel
+    private sealed class DraftFormModel
     {
+        [Required(ErrorMessage = "Cycle is required.")]
+        [Display(Name = "Ciclo")]
+        [RegularExpression(@"^[{(]?[0-9A-Fa-f]{8}(-?[0-9A-Fa-f]{4}){3}-?[0-9A-Fa-f]{12}[)}]?$",
+            ErrorMessage = "Enter a valid GUID.")]
+        public string CycleIdText { get; set; } = string.Empty;
+
         public Guid? CycleId { get; set; }
         public Guid? PlayerId { get; set; }
         public decimal? BasePrice { get; set; }
         public decimal? MinIncrement { get; set; }
+        [Display(Name = "Comprar agora")]
+        [Range(0, double.MaxValue, ErrorMessage = "Use a non-negative value.")]
         public decimal? BuyNowPrice { get; set; }
+
+        [Display(Name = "Expira em")]
         public DateTimeOffset? ExpiresAtInput { get; set; }
     }
 
