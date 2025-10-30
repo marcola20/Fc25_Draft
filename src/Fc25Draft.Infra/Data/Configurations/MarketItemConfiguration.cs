@@ -1,6 +1,7 @@
 using Fc25Draft.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace Fc25Draft.Infra.Data.Configurations;
 
@@ -21,8 +22,7 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
         builder.Property(x => x.RowVersion)
             .HasColumnName("xmin")
             .HasColumnType("xid")
-            .IsConcurrencyToken()
-            .ValueGeneratedOnAddOrUpdate();
+            .UseXmin();
 
         builder.HasOne(x => x.Player)
             .WithMany(p => p.MarketItems)
@@ -40,6 +40,7 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.CycleId, x.Status, x.ExpiresAtUtc });
+        builder.HasIndex(x => new { x.CycleId, x.PlayerId }).IsUnique();
         builder.HasIndex(x => x.PlayerId).HasDatabaseName("IX_MarketItems_Player");
     }
 }

@@ -87,6 +87,8 @@ create index "IX_DraftPicks_TeamId" on "DraftPicks" ("TeamId");
 
 create index "IX_MarketItems_CycleId_Status_ExpiresAtUtc" on "MarketItems" ("CycleId", "Status", "ExpiresAtUtc");
 
+create unique index "IX_MarketItems_CycleId_PlayerId" on "MarketItems" ("CycleId", "PlayerId");
+
 create index "IX_MarketItems_CurrentLeaderTeamId" on "MarketItems" ("CurrentLeaderTeamId");
 
 create index "IX_MarketItems_Player" on "MarketItems" ("PlayerId");

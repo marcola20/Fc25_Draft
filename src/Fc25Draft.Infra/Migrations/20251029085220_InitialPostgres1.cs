@@ -419,6 +419,12 @@ namespace Fc25Draft.Infra.Migrations
                 columns: new[] { "CycleId", "Status", "ExpiresAtUtc" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_MarketItems_CycleId_PlayerId",
+                table: "MarketItems",
+                columns: new[] { "CycleId", "PlayerId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MarketItems_Player",
                 table: "MarketItems",
                 column: "PlayerId");

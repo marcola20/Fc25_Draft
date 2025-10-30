@@ -277,10 +277,10 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("integer");
 
                     b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    NpgsqlPropertyBuilderExtensions.UseXmin(b.Property<uint>("RowVersion"));
 
                     b.Property<Guid?>("WinnerTeamId")
                         .HasColumnType("uuid");
@@ -289,10 +289,13 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("CurrentLeaderTeamId");
 
+                    b.HasIndex("WinnerTeamId");
+
+                    b.HasIndex("CycleId", "PlayerId")
+                        .IsUnique();
+
                     b.HasIndex("PlayerId")
                         .HasDatabaseName("IX_MarketItems_Player");
-
-                    b.HasIndex("WinnerTeamId");
 
                     b.HasIndex("CycleId", "Status", "ExpiresAtUtc");
 
