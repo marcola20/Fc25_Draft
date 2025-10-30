@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using System.IO;                        
 
 namespace Fc25Draft.Infra.Data;
 
@@ -8,9 +9,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<DraftDbCon
 {
     public DraftDbContext CreateDbContext(string[] args)
     {
-        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                          ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
-                          ?? "Development";
+        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Development";
 
         var cfg = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
