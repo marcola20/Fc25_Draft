@@ -4,5 +4,9 @@ namespace Fc25Draft.Web.Models.Market;
 
 public class BuyNowRequest
 {
-    public Guid TeamId { get; set; }
+    public Guid ItemId { get; set; }
+
+    public uint RowVersion { get; set; }
+
+    public string? TeamToken { get; set; }
 }
