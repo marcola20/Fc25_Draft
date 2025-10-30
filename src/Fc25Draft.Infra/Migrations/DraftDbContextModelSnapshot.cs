@@ -22,7 +22,6 @@ namespace Fc25Draft.Infra.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "unaccent");
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.AdminActionsLog", b =>
                 {

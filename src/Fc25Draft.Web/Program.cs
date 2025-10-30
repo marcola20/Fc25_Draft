@@ -14,6 +14,7 @@ using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Extensions;
+using Fc25Draft.Web.Infrastructure;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Options;
 using Fc25Draft.Web.Security;
@@ -721,10 +722,11 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var pattern = $"%{q.Trim()}%";
+            var normalized = PostgresSearchExtensions.NormalizeForSearch(q.Trim());
+            var pattern = $"%{normalized}%";
             query = query.Where(p => EF.Functions.ILike(
-                EF.Functions.Unaccent(p.Name),
-                EF.Functions.Unaccent(pattern)));
+                EF.Functions.Translate(p.Name, PostgresSearchExtensions.AccentSource, PostgresSearchExtensions.AccentReplacement),
+                pattern));
         }
 
         if (pos is { Length: > 0 })

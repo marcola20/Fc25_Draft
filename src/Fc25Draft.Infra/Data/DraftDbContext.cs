@@ -1,6 +1,5 @@
 using Fc25Draft.Core.Entities;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace Fc25Draft.Infra.Data;
 
@@ -26,8 +25,6 @@ public class DraftDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
-        mb.HasPostgresExtension("unaccent");
-
         mb.Entity<Position>(e =>
         {
             e.HasKey(x => x.PositionId);

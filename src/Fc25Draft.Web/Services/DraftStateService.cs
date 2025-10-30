@@ -4,6 +4,7 @@ using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Web.Infrastructure;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
 using Microsoft.AspNetCore.SignalR;
@@ -159,10 +160,11 @@ public class DraftStateService
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var pattern = $"%{searchTerm.Trim()}%";
+            var normalized = PostgresSearchExtensions.NormalizeForSearch(searchTerm.Trim());
+            var pattern = $"%{normalized}%";
             query = query.Where(p => EF.Functions.ILike(
-                EF.Functions.Unaccent(p.Name),
-                EF.Functions.Unaccent(pattern)));
+                EF.Functions.Translate(p.Name, PostgresSearchExtensions.AccentSource, PostgresSearchExtensions.AccentReplacement),
+                pattern));
         }
 
         if (currentRound?.OverallMin is int overallMin)
