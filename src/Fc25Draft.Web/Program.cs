@@ -65,7 +65,10 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddServerSideBlazor(options =>
+{
+    options.DetailedErrors = true;
+});
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<DraftService>();

@@ -5,6 +5,7 @@
 @using System.Linq
 @using System.Threading
 @using System.Threading.Tasks
+@using Microsoft.Extensions.Logging
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Components.Market
@@ -16,6 +17,7 @@
 @inject MarketClient Client
 @inject MarketHubClient Hub
 @inject IPositionService PositionService
+@inject ILogger<Index> Logger
 @implements IAsyncDisposable
 
 <PageTitle>Market</PageTitle>
@@ -33,7 +35,11 @@
                SortOptions="@SortOptions"
                StatusOptions="@StatusOptions" />
 
-@if (_isLoading && PageData is null)
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+}
+else if (_isLoading && PageData is null)
 {
     <div class="alert alert-info mt-3" role="status">Loading market items...</div>
 }
@@ -64,6 +70,11 @@ else
 @if (_isLoading && PageData is not null)
 {
     <div class="alert alert-info mt-3" role="status">Refreshing items...</div>
+}
+
+@if (!string.IsNullOrEmpty(_realTimeWarning))
+{
+    <div class="alert alert-warning mt-3" role="status">@_realTimeWarning</div>
 }
 
 @if (TotalPages > 1 && PageData is not null)
@@ -112,6 +123,8 @@ else
     private Func<CoreItemVm, Task>? _itemClosedHandler;
     private bool _isLoading;
     private bool _initialized;
+    private string? _errorMessage;
+    private string? _realTimeWarning;
 
     private int TotalPages
     {
@@ -168,8 +181,20 @@ else
         var ct = PrepareNewLoadCts();
         await LoadPageAsync(1, ct);
 
-        await Hub.ConnectAsync(_lifetimeCts?.Token ?? CancellationToken.None);
-        await JoinCycleAsync();
+        try
+        {
+            await Hub.ConnectAsync(_lifetimeCts?.Token ?? CancellationToken.None);
+            await JoinCycleAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to establish market hub connection.");
+            _realTimeWarning ??= "Real-time updates are currently unavailable. Refresh the page to try again.";
+            StateHasChangedSafe();
+        }
 
         _bidUpdatedHandler = vm =>
         {
@@ -215,17 +240,25 @@ else
     {
         Query.Page = page < 1 ? 1 : page;
         _isLoading = true;
+        _errorMessage = null;
         StateHasChangedSafe();
 
         try
         {
             var result = await Client.GetItemsAsync(Query, ct);
-            PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            var items = result?.Items ?? Array.Empty<CoreItemVm>();
+            var total = result?.Total ?? 0;
+            PageData = new PagedResult<CoreItemVm>(items, total);
             ComputeServerOffsetFromClient();
         }
         catch (OperationCanceledException)
         {
             return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load market items for page {Page}", Query.Page);
+            _errorMessage = "We couldn't load the market items right now. Please try again in a moment.";
         }
         finally
         {
@@ -341,9 +374,21 @@ else
         return _loadCts.Token;
     }
 
-    private Task JoinCycleAsync()
+    private async Task JoinCycleAsync()
     {
-        return Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
+        try
+        {
+            await Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to join market cycle {CycleId}", ActiveCycleId);
+            _realTimeWarning ??= "Real-time updates are currently unavailable. Refresh the page to try again.";
+            StateHasChangedSafe();
+        }
     }
 
     private void StateHasChangedSafe() => _ = InvokeAsync(StateHasChanged);
