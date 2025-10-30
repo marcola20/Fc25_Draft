@@ -1,0 +1,223 @@
+@using System
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components.Forms
+
+<EditForm EditContext="formEditContext" OnValidSubmit="HandleSubmitDraftAsync">
+    <div class="mb-3">
+        <label class="form-label" for="cycle-id">Ciclo</label>
+        <InputText id="cycle-id"
+                   class="form-control"
+                   @bind-Value="cycleInput"
+                   @bind-Value:after="(string v) => OnCycleInputChanged(v)"
+                   list="cycle-options"
+                   placeholder="Informe o GUID do ciclo" />
+        <ValidationMessage For="() => formModel.CycleId" />
+        <datalist id="cycle-options">
+            <option value="@activeCycleId"></option>
+        </datalist>
+        <button type="button" class="btn btn-link btn-sm ps-0" @onclick="UseActiveCycle">Usar ciclo ativo atual (@activeCycleId)</button>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="player-id">Jogador</label>
+        <InputText id="player-id" class="form-control" @bind-Value="playerSearch" />
+        <ValidationMessage For="() => formModel.PlayerId" />
+        <div class="mt-2 d-flex gap-2">
+            <button type="button" class="btn btn-outline-primary" @onclick="LoadPlayerAsync" disabled="@(isLoadingPlayer || !formModel.PlayerId.HasValue)">Buscar jogador</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearPlayerSelection">Trocar jogador</button>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="base-price">Preço base</label>
+        <InputNumber TValue="decimal?" id="base-price" class="form-control" @bind-Value="formModel.BasePrice" />
+        <ValidationMessage For="() => formModel.BasePrice" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="min-increment">Incremento mínimo</label>
+        <InputNumber TValue="decimal?" id="min-increment" class="form-control" @bind-Value="formModel.MinIncrement" />
+        <ValidationMessage For="() => formModel.MinIncrement" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="buy-now">Comprar agora</label>
+        <InputNumber TValue="decimal?" id="buy-now" class="form-control" @bind-Value="formModel.BuyNowPrice" />
+        <ValidationMessage For="() => formModel.BuyNowPrice" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="expires-at">Expira em</label>
+        <InputDate TValue="DateTimeOffset?>" id="expires-at" class="form-control" @bind-Value="formModel.ExpiresAtInput" />
+        <ValidationMessage For="() => formModel.ExpiresAtInput" />
+    </div>
+
+    <div class="mb-3">
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: @WizardProgress" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary" @onclick="PreviousStep" disabled="@(currentStep == MarketItemWizardStep.PlayerSelection || isSubmittingDraft)">Voltar</button>
+        <button type="button" class="btn btn-outline-primary" @onclick="NextStep" disabled="@isSubmittingDraft">Avançar</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="PreviewPricingAsync" disabled="@(selectedPlayer is null || isLoadingPricing)">Sugestão de preço</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ApplyPricingSuggestion">Aplicar sugestão</button>
+        <button type="button" class="btn btn-success" @onclick="PublishFromWizardAsync" disabled="@(isSubmittingDraft || !reviewValid)">Salvar e publicar</button>
+        <button type="submit" class="btn btn-primary" disabled="@isSubmittingDraft">Salvar rascunho</button>
+    </div>
+</EditForm>
+
+@code {
+    private readonly MarketItemWizardFormModel formModel = new();
+    private EditContext formEditContext = default!;
+    private string? cycleInput;
+    private string? activeCycleId;
+    private string? playerSearch;
+    private object? selectedPlayer;
+    private bool isLoadingPlayer;
+    private bool isLoadingPricing;
+    private bool isSubmittingDraft;
+    private bool reviewValid;
+    private MarketItemWizardStep currentStep = MarketItemWizardStep.PlayerSelection;
+    private int progressPct;
+
+    protected override void OnInitialized()
+    {
+        formEditContext = new EditContext(formModel);
+        UpdateProgress();
+    }
+
+    private string WizardProgress => $"{progressPct}%";
+
+    private async Task HandleSubmitDraftAsync()
+    {
+        await SubmitDraftAsync(false);
+    }
+
+    private void OnCycleInputChanged(string v)
+    {
+        cycleInput = v;
+        if (Guid.TryParse(v, out var g))
+        {
+            formModel.CycleId = g;
+        }
+        else
+        {
+            formModel.CycleId = null;
+        }
+    }
+
+    private void UseActiveCycle()
+    {
+        if (!string.IsNullOrWhiteSpace(activeCycleId) && Guid.TryParse(activeCycleId, out var g))
+        {
+            cycleInput = activeCycleId;
+            formModel.CycleId = g;
+        }
+        else
+        {
+            cycleInput = string.Empty;
+            formModel.CycleId = null;
+        }
+    }
+
+    private async Task LoadPlayerAsync()
+    {
+        isLoadingPlayer = true;
+        try
+        {
+            await Task.CompletedTask;
+        }
+        finally
+        {
+            isLoadingPlayer = false;
+        }
+    }
+
+    private void ClearPlayerSelection()
+    {
+        selectedPlayer = null;
+        playerSearch = null;
+        formModel.PlayerId = null;
+    }
+
+    private async Task PreviewPricingAsync()
+    {
+        isLoadingPricing = true;
+        try
+        {
+            await Task.CompletedTask;
+        }
+        finally
+        {
+            isLoadingPricing = false;
+        }
+    }
+
+    private void ApplyPricingSuggestion()
+    {
+        // placeholder for actual implementation
+    }
+
+    private void PreviousStep()
+    {
+        if (currentStep > MarketItemWizardStep.PlayerSelection)
+        {
+            currentStep--;
+            UpdateProgress();
+        }
+    }
+
+    private void NextStep()
+    {
+        if (currentStep < MarketItemWizardStep.Review)
+        {
+            currentStep++;
+            UpdateProgress();
+        }
+    }
+
+    private async Task PublishFromWizardAsync()
+    {
+        reviewValid = true;
+        await SubmitDraftAsync(true);
+    }
+
+    private async Task SubmitDraftAsync(bool publish)
+    {
+        isSubmittingDraft = true;
+        try
+        {
+            await Task.CompletedTask;
+        }
+        finally
+        {
+            isSubmittingDraft = false;
+        }
+    }
+
+    private void UpdateProgress()
+    {
+        var totalSteps = Enum.GetValues<MarketItemWizardStep>().Length - 1;
+        var currentIndex = (int)currentStep;
+        progressPct = totalSteps <= 0 ? 0 : (int)Math.Round(currentIndex * 100d / totalSteps);
+    }
+
+    private sealed class MarketItemWizardFormModel
+    {
+        public Guid? CycleId { get; set; }
+        public Guid? PlayerId { get; set; }
+        public decimal? BasePrice { get; set; }
+        public decimal? MinIncrement { get; set; }
+        public decimal? BuyNowPrice { get; set; }
+        public DateTimeOffset? ExpiresAtInput { get; set; }
+    }
+
+    private enum MarketItemWizardStep
+    {
+        PlayerSelection,
+        Pricing,
+        Review
+    }
+}
