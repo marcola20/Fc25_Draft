@@ -277,10 +277,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("integer");
 
                     b.Property<uint>("RowVersion")
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    NpgsqlPropertyBuilderExtensions.UseXmin(b.Property<uint>("RowVersion"));
+                         .HasColumnName("xmin")
+                         .HasColumnType("xid")
+                         .IsConcurrencyToken();
 
                     b.Property<Guid?>("WinnerTeamId")
                         .HasColumnType("uuid");

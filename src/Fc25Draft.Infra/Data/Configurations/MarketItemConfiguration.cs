@@ -22,7 +22,8 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
         builder.Property(x => x.RowVersion)
             .HasColumnName("xmin")
             .HasColumnType("xid")
-            .UseXmin();
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
 
         builder.HasOne(x => x.Player)
             .WithMany(p => p.MarketItems)
