@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
@@ -106,7 +108,7 @@ public class DraftStateService
     }
 
     public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(
-        short? positionId,
+        IReadOnlyCollection<short>? positionIds,
         string? searchTerm = null,
         int? overallMinFilter = null,
         int? overallMaxFilter = null,
@@ -143,15 +145,24 @@ public class DraftStateService
             .Include(p => p.Position)
             .Where(p => !p.TeamRosters.Any());
 
-        if (positionId.HasValue)
+        if (positionIds is { Count: > 0 })
         {
-            query = query.Where(p => p.PositionId == positionId.Value);
+            var filterPositions = positionIds
+                .Distinct()
+                .ToArray();
+
+            if (filterPositions.Length > 0)
+            {
+                query = query.Where(p => filterPositions.Contains(p.PositionId));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             var pattern = $"%{searchTerm.Trim()}%";
-            query = query.Where(p => EF.Functions.Like(p.Name, pattern));
+            query = query.Where(p => EF.Functions.ILike(
+                EF.Functions.Unaccent(p.Name),
+                EF.Functions.Unaccent(pattern)));
         }
 
         if (currentRound?.OverallMin is int overallMin)

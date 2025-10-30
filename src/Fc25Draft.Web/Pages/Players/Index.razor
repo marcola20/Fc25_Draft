@@ -23,18 +23,50 @@
         </form>
     </div>
     <div class="col-md-3">
-        <label class="form-label" for="positionFilter">Posições</label>
-        <select id="positionFilter"
-                class="form-select"
-                multiple
-                size="@Math.Min(6, Math.Max(3, positions.Count))"
-                @onchange="OnPositionsChanged">
-            <option value="" selected="@(!selectedPositionIds.Any())">Todas</option>
-            @foreach (var position in positions)
-            {
-                <option value="@position.PositionId" selected="@selectedPositionIds.Contains(position.PositionId)">@position.Name</option>
-            }
-        </select>
+        <label class="form-label" for="playerPositionFilter">Posições</label>
+        <div class="dropdown w-100" data-bs-auto-close="outside">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start text-wrap"
+                    type="button"
+                    id="playerPositionFilter"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                @GetSelectedPositionsLabel()
+            </button>
+            <div class="dropdown-menu w-100 p-3 shadow-sm"
+                 aria-labelledby="playerPositionFilter"
+                 style="max-height: 280px; overflow-y: auto;">
+                <div class="form-check mb-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="playerPositionsAll"
+                           checked="@(!selectedPositionIds.Any())"
+                           @onchange="OnSelectAllPositionsChanged" />
+                    <label class="form-check-label" for="playerPositionsAll">Todas</label>
+                </div>
+                <div class="dropdown-divider"></div>
+                @foreach (var position in positions)
+                {
+                    var checkboxId = $"playerPosition{position.PositionId}";
+                    <div class="form-check">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="@checkboxId"
+                               checked="@selectedPositionIds.Contains(position.PositionId)"
+                               @onchange="args => OnPositionToggled(position.PositionId, args.Value)" />
+                        <label class="form-check-label" for="@checkboxId">@position.Name</label>
+                    </div>
+                }
+            </div>
+        </div>
+        @if (selectedPositionIds.Count > 0)
+        {
+            <div class="mt-2 d-flex flex-wrap gap-1">
+                @foreach (var position in positions.Where(p => selectedPositionIds.Contains(p.PositionId)))
+                {
+                    <span class="badge rounded-pill bg-secondary fw-normal">@position.Name</span>
+                }
+            </div>
+        }
     </div>
     <div class="col-md-2 pt-4">
         <div class="form-check">
@@ -292,29 +324,6 @@ else
         await ApplyFiltersAsync();
     }
 
-    private async Task OnPositionsChanged(ChangeEventArgs args)
-    {
-        selectedPositionIds.Clear();
-
-        if (args.Value is string[] values)
-        {
-            foreach (var value in values)
-            {
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    continue;
-                }
-
-                if (short.TryParse(value, out var parsed))
-                {
-                    selectedPositionIds.Add(parsed);
-                }
-            }
-        }
-
-        await ApplyFiltersAsync();
-    }
-
     private async Task OnOnlyAvailableChanged(ChangeEventArgs args)
     {
         if (args.Value is bool boolean)
@@ -553,6 +562,60 @@ else
         var end = Math.Min(totalPlayers, start + players.Count - 1);
 
         return $"Mostrando {start}-{end} de {totalPlayers} jogadores.";
+    }
+
+    private string GetSelectedPositionsLabel()
+    {
+        if (selectedPositionIds.Count == 0 || positions.Count == 0)
+        {
+            return "Todas as posições";
+        }
+
+        var names = positions
+            .Where(p => selectedPositionIds.Contains(p.PositionId))
+            .Select(p => p.Name)
+            .ToList();
+
+        return names.Count == 0 ? "Todas as posições" : string.Join(", ", names);
+    }
+
+    private async Task OnPositionToggled(short positionId, object? value)
+    {
+        var isChecked = ParseCheckboxValue(value);
+        var changed = isChecked
+            ? selectedPositionIds.Add(positionId)
+            : selectedPositionIds.Remove(positionId);
+
+        if (changed)
+        {
+            await ApplyFiltersAsync();
+        }
+    }
+
+    private async Task OnSelectAllPositionsChanged(ChangeEventArgs args)
+    {
+        if (!ParseCheckboxValue(args.Value))
+        {
+            return;
+        }
+
+        if (selectedPositionIds.Count == 0)
+        {
+            return;
+        }
+
+        selectedPositionIds.Clear();
+        await ApplyFiltersAsync();
+    }
+
+    private static bool ParseCheckboxValue(object? value)
+    {
+        return value switch
+        {
+            bool boolean => boolean,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
     }
 
     private void OnAuthenticationChanged()

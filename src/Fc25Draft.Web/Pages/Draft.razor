@@ -1,4 +1,6 @@
 @page "/draft"
+@using System.Collections.Generic
+@using System.Linq
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Services
 @using Microsoft.AspNetCore.SignalR.Client
@@ -89,14 +91,50 @@
         </form>
     </div>
     <div class="col-lg-3">
-        <label for="positionFilter" class="form-label">Posição</label>
-        <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnPositionChanged">
-            <option value="">Todas</option>
-            @foreach (var position in positions)
-            {
-                <option value="@position.PositionId">@position.Name</option>
-            }
-        </select>
+        <label class="form-label" for="draftPositionFilter">Posições</label>
+        <div class="dropdown w-100" data-bs-auto-close="outside">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start text-wrap"
+                    type="button"
+                    id="draftPositionFilter"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                @GetSelectedPositionsLabel()
+            </button>
+            <div class="dropdown-menu w-100 p-3 shadow-sm"
+                 aria-labelledby="draftPositionFilter"
+                 style="max-height: 280px; overflow-y: auto;">
+                <div class="form-check mb-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="draftPositionsAll"
+                           checked="@(!selectedPositionIds.Any())"
+                           @onchange="OnSelectAllPositionsChanged" />
+                    <label class="form-check-label" for="draftPositionsAll">Todas</label>
+                </div>
+                <div class="dropdown-divider"></div>
+                @foreach (var position in positions)
+                {
+                    var checkboxId = $"draftPosition{position.PositionId}";
+                    <div class="form-check">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="@checkboxId"
+                               checked="@selectedPositionIds.Contains(position.PositionId)"
+                               @onchange="args => OnPositionToggled(position.PositionId, args.Value)" />
+                        <label class="form-check-label" for="@checkboxId">@position.Name</label>
+                    </div>
+                }
+            </div>
+        </div>
+        @if (selectedPositionIds.Count > 0)
+        {
+            <div class="mt-2 d-flex flex-wrap gap-1">
+                @foreach (var position in positions.Where(p => selectedPositionIds.Contains(p.PositionId)))
+                {
+                    <span class="badge rounded-pill bg-secondary fw-normal">@position.Name</span>
+                }
+            </div>
+        }
     </div>
     <div class="col-lg-3 d-none d-sm-block">
         <label class="form-label d-block">Atualizar</label>
@@ -192,7 +230,7 @@ else
     private readonly List<AvailablePlayerDto> availablePlayers = new();
     private DraftStateDto? state;
     private HubConnection? hubConnection;
-    private string? selectedPositionId;
+    private readonly HashSet<short> selectedPositionIds = new();
     private string? statusMessage;
     private string statusCss = "alert-success";
     private string? connectionError;
@@ -315,14 +353,9 @@ else
         try
         {
             availablePlayers.Clear();
-            short? positionId = null;
-            if (short.TryParse(selectedPositionId, out var parsed))
-            {
-                positionId = parsed;
-            }
 
             var players = await DraftStateService.GetAvailablePlayersAsync(
-                positionId,
+                selectedPositionIds,
                 string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
                 overallMin,
                 overallMax);
@@ -337,12 +370,6 @@ else
         {
             isLoadingPlayers = false;
         }
-    }
-
-    private async Task OnPositionChanged(ChangeEventArgs args)
-    {
-        selectedPositionId = args.Value?.ToString();
-        await LoadPlayersAsync();
     }
 
     private async Task OnSearchAsync()
@@ -453,6 +480,60 @@ else
 
     private string FormatOwner(string? owner)
         => string.IsNullOrWhiteSpace(owner) ? string.Empty : $" (responsável: {owner})";
+
+    private string GetSelectedPositionsLabel()
+    {
+        if (selectedPositionIds.Count == 0 || positions.Count == 0)
+        {
+            return "Todas as posições";
+        }
+
+        var names = positions
+            .Where(p => selectedPositionIds.Contains(p.PositionId))
+            .Select(p => p.Name)
+            .ToList();
+
+        return names.Count == 0 ? "Todas as posições" : string.Join(", ", names);
+    }
+
+    private async Task OnPositionToggled(short positionId, object? value)
+    {
+        var isChecked = ParseCheckboxValue(value);
+        var changed = isChecked
+            ? selectedPositionIds.Add(positionId)
+            : selectedPositionIds.Remove(positionId);
+
+        if (changed)
+        {
+            await ApplyFiltersAsync();
+        }
+    }
+
+    private async Task OnSelectAllPositionsChanged(ChangeEventArgs args)
+    {
+        if (!ParseCheckboxValue(args.Value))
+        {
+            return;
+        }
+
+        if (selectedPositionIds.Count == 0)
+        {
+            return;
+        }
+
+        selectedPositionIds.Clear();
+        await ApplyFiltersAsync();
+    }
+
+    private static bool ParseCheckboxValue(object? value)
+    {
+        return value switch
+        {
+            bool boolean => boolean,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
+    }
 
     private int GetProgressValue()
     {
