@@ -1,0 +1,1047 @@
+@page "/admin/market-itens"
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using System.Linq
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Services
+@using Fc25Draft.Web.ViewModels.Admin
+@inject AdminAuthService AdminAuth
+@inject MarketApiClient MarketApiClient
+@inject MarketItemPublicationApiClient MarketItemPublicationApiClient
+@inject PlayersApiClient PlayersApiClient
+@inject IPricingService PricingService
+
+@implements IDisposable
+
+<h3>Itens de Mercado (Admin)</h3>
+
+@if (!string.IsNullOrEmpty(pageError))
+{
+    <div class="alert alert-danger" role="alert">@pageError</div>
+}
+
+@if (isLoadingData)
+{
+    <p><em>Carregando dados...</em></p>
+}
+else if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">
+        Informe o token de administrador para gerenciar itens do mercado.
+    </div>
+}
+else
+{
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(selectedTab == "list" ? "active" : null)" type="button" @onclick="() => SelectTab("list")">
+                Itens cadastrados
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(selectedTab == "wizard" ? "active" : null)" type="button" @onclick="() => SelectTab("wizard")">
+                Novo item
+            </button>
+        </li>
+    </ul>
+
+    @if (selectedTab == "list")
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="card-title mb-0">Itens ativos e rascunhos</h5>
+                        <small class="text-muted">Use as ações para publicar ou remover itens em rascunho.</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="LoadDraftsAsync" disabled="@isRefreshingList">
+                            Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(listError))
+                {
+                    <div class="alert alert-danger" role="alert">@listError</div>
+                }
+                @if (!string.IsNullOrEmpty(listActionError))
+                {
+                    <div class="alert alert-warning" role="alert">@listActionError</div>
+                }
+                @if (!string.IsNullOrEmpty(listSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@listSuccessMessage</div>
+                }
+
+                @if (isRefreshingList)
+                {
+                    <p class="text-muted"><em>Carregando itens...</em></p>
+                }
+                else if (marketItems.Count == 0)
+                {
+                    <p class="text-muted mb-0">Nenhum item de mercado cadastrado até o momento.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Jogador</th>
+                                    <th>Posição</th>
+                                    <th class="text-end">Base</th>
+                                    <th class="text-end">Compra imediata</th>
+                                    <th class="text-end">Incremento</th>
+                                    <th>Expira em</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in marketItems)
+                                {
+                                    <tr>
+                                        <td>@item.PlayerName</td>
+                                        <td>@item.Position</td>
+                                        <td class="text-end">@item.BasePrice.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                        <td class="text-end">@(item.BuyNowPrice?.ToString("C", CultureInfo.GetCultureInfo("pt-BR")) ?? "—")</td>
+                                        <td class="text-end">@item.MinIncrement.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                        <td>@item.ExpiresAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>
+                                            <span class="badge @(item.Status == "Draft" ? "bg-secondary" : item.Status == "Published" ? "bg-success" : "bg-info")">@item.Status</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button class="btn btn-success" type="button" @onclick="() => PublishExistingAsync(item)" disabled="@(!CanPublish(item) || publishingItemId == item.ItemId || deletingItemId == item.ItemId)">
+                                                    Publicar
+                                                </button>
+                                                <button class="btn btn-outline-danger" type="button" @onclick="() => DeleteDraftAsync(item)" disabled="@(item.Status != "Draft" || deletingItemId == item.ItemId || publishingItemId == item.ItemId)">
+                                                    Remover
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Assistente de novo item</h5>
+                <p class="text-muted">Preencha as etapas abaixo para criar um rascunho e, opcionalmente, publicar o item imediatamente.</p>
+
+                @if (!string.IsNullOrEmpty(wizardSuccess))
+                {
+                    <div class="alert alert-success" role="alert">@wizardSuccess</div>
+                }
+                @if (!string.IsNullOrEmpty(wizardError))
+                {
+                    <div class="alert alert-danger" role="alert">@wizardError</div>
+                }
+
+                <EditForm EditContext="formEditContext" OnValidSubmit="HandleSubmitDraftAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar" role="progressbar" style="width: @WizardProgress" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    @switch (currentStep)
+                    {
+                        case MarketItemWizardStep.PlayerSelection:
+                            <div class="row g-3">
+                                <div class="col-lg-6">
+                                    <label class="form-label" for="cycle-id">Ciclo</label>
+                                    <InputText id="cycle-id" class="form-control" @bind-Value="cycleInput" @bind-Value:after="OnCycleInputChanged" list="cycle-options" placeholder="Informe o GUID do ciclo" />
+                                    <datalist id="cycle-options">
+                                        @foreach (var cycle in cycleOptions)
+                                        {
+                                            <option value="@cycle" />
+                                        }
+                                    </datalist>
+                                    <ValidationMessage For="() => formModel.CycleId" />
+                                    @if (activeCycleId.HasValue)
+                                    {
+                                        <button type="button" class="btn btn-link btn-sm ps-0" @onclick="UseActiveCycle">Usar ciclo ativo atual (@activeCycleId)</button>
+                                    }
+                                </div>
+                                <div class="col-lg-6">
+                                    <label class="form-label" for="player-id">Jogador (ID)</label>
+                                    <InputNumber id="player-id" class="form-control" TValue="int?" @bind-Value="formModel.PlayerId" />
+                                    <ValidationMessage For="() => formModel.PlayerId" />
+                                    <div class="d-flex gap-2 align-items-center mt-2">
+                                        <button type="button" class="btn btn-outline-primary" @onclick="LoadPlayerAsync" disabled="@(isLoadingPlayer || !formModel.PlayerId.HasValue)">
+                                            Buscar jogador
+                                        </button>
+                                        @if (isLoadingPlayer)
+                                        {
+                                            <span class="text-muted"><em>Carregando...</em></span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(playerError))
+                                    {
+                                        <div class="text-danger small mt-1">@playerError</div>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (selectedPlayer is not null)
+                            {
+                                <div class="alert alert-info mt-3" role="alert">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>@selectedPlayer.Name</strong> (@selectedPlayer.PositionName) — OVR @selectedPlayer.Overall
+                                            <div class="small">Idade: @selectedPlayer.Age | Time atual: @selectedPlayer.TeamName</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearPlayerSelection">Trocar jogador</button>
+                                    </div>
+                                </div>
+                            }
+                            break;
+                        case MarketItemWizardStep.Pricing:
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="base-price">Valor base (R$)</label>
+                                    <InputNumber id="base-price" class="form-control" TValue="decimal?" @bind-Value="formModel.BasePrice" />
+                                    <ValidationMessage For="() => formModel.BasePrice" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="min-increment">Incremento mínimo (R$)</label>
+                                    <InputNumber id="min-increment" class="form-control" TValue="decimal?" @bind-Value="formModel.MinIncrement" />
+                                    <ValidationMessage For="() => formModel.MinIncrement" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="buy-now">Compra imediata (R$)</label>
+                                    <InputNumber id="buy-now" class="form-control" TValue="decimal?" @bind-Value="formModel.BuyNowPrice" />
+                                    <ValidationMessage For="() => formModel.BuyNowPrice" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="expires-at">Expira em</label>
+                                    <InputText id="expires-at" class="form-control" @bind-Value="formModel.ExpiresAtInput" type="datetime-local" step="60" />
+                                    <ValidationMessage For="() => formModel.ExpiresAtInput" />
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="PreviewPricingAsync" disabled="@(selectedPlayer is null || isLoadingPricing)">
+                                    Sugestão de preço
+                                </button>
+                                @if (isLoadingPricing)
+                                {
+                                    <span class="ms-2 text-muted"><em>Calculando...</em></span>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(pricingError))
+                            {
+                                <div class="alert alert-warning mt-3" role="alert">@pricingError</div>
+                            }
+                            else if (pricingPreview is not null)
+                            {
+                                <div class="alert alert-secondary mt-3" role="alert">
+                                    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                                        <div>
+                                            <strong>Sugestão automática</strong>
+                                            <ul class="mb-0 small">
+                                                <li>Base: @pricingPreview.BasePrice.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</li>
+                                                <li>Compra imediata: @pricingPreview.BuyNowPrice.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</li>
+                                                <li>Incremento mínimo: @pricingPreview.MinIncrement.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</li>
+                                            </ul>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ApplyPricingSuggestion">Aplicar sugestão</button>
+                                    </div>
+                                </div>
+                            }
+                            break;
+                        case MarketItemWizardStep.Review:
+                            <div class="row g-3">
+                                <div class="col-lg-6">
+                                    <div class="border rounded p-3 h-100">
+                                        <h6 class="text-uppercase text-muted">Resumo</h6>
+                                        <p class="mb-1"><strong>Jogador:</strong> @(selectedPlayer?.Name ?? "N/D") (ID @formModel.PlayerId)</p>
+                                        <p class="mb-1"><strong>Ciclo:</strong> @formModel.CycleId</p>
+                                        <p class="mb-1"><strong>Valor base:</strong> @FormatCurrency(formModel.BasePrice)</p>
+                                        <p class="mb-1"><strong>Incremento mínimo:</strong> @FormatCurrency(formModel.MinIncrement)</p>
+                                        <p class="mb-1"><strong>Compra imediata:</strong> @FormatCurrency(formModel.BuyNowPrice)</p>
+                                        <p class="mb-0"><strong>Expira em:</strong> @(ParseLocalExpiration()?.ToString("dd/MM/yyyy HH:mm") ?? "N/D")</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="border rounded p-3 h-100 bg-light">
+                                        <h6 class="text-uppercase text-muted">Validação</h6>
+                                        @if (reviewValid)
+                                        {
+                                            <div class="alert alert-success mb-0" role="alert">Pronto para publicar.</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="alert alert-warning mb-0" role="alert">Revise os campos destacados antes de prosseguir.</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            break;
+                    }
+
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="PreviousStep" disabled="@(currentStep == MarketItemWizardStep.PlayerSelection || isSubmittingDraft)">Voltar</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            @if (currentStep != MarketItemWizardStep.Review)
+                            {
+                                <button type="button" class="btn btn-primary" @onclick="NextStep" disabled="@isSubmittingDraft">Avançar</button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-secondary" disabled="@isSubmittingDraft">Salvar rascunho</button>
+                                <button type="button" class="btn btn-success" @onclick="PublishFromWizardAsync" disabled="@(isSubmittingDraft || !reviewValid)">Salvar e publicar</button>
+                            }
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private readonly MarketItemDraftFormModel formModel = new();
+    private EditContext formEditContext = default!;
+    private ValidationMessageStore? validationMessageStore;
+    private readonly List<MarketItemDraftListItemViewModel> marketItems = new();
+    private readonly List<Guid> cycleOptions = new();
+
+    private MarketItemWizardStep currentStep = MarketItemWizardStep.PlayerSelection;
+    private bool isLoadingData = true;
+    private bool isRefreshingList;
+    private bool isLoadingPlayer;
+    private bool isSubmittingDraft;
+    private bool isLoadingPricing;
+    private bool reviewValid;
+
+    private string selectedTab = "list";
+    private string? cycleInput;
+    private string? pageError;
+    private string? listError;
+    private string? listActionError;
+    private string? listSuccessMessage;
+    private string? wizardError;
+    private string? wizardSuccess;
+    private string? playerError;
+    private string? pricingError;
+
+    private PlayerDetailsDto? selectedPlayer;
+    private PricingResult? pricingPreview;
+    private Guid? activeCycleId;
+    private Guid? publishingItemId;
+    private Guid? deletingItemId;
+
+    private CancellationTokenSource? loadDraftsCts;
+    private CancellationTokenSource? submitDraftCts;
+    private CancellationTokenSource? playerCts;
+    private CancellationTokenSource? pricingCts;
+    private CancellationTokenSource? publishExistingCts;
+
+    private static readonly CultureInfo CurrencyCulture = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static readonly Dictionary<MarketItemWizardStep, string[]> StepFields = new()
+    {
+        [MarketItemWizardStep.PlayerSelection] = new[]
+        {
+            nameof(MarketItemDraftFormModel.CycleId),
+            nameof(MarketItemDraftFormModel.PlayerId)
+        },
+        [MarketItemWizardStep.Pricing] = new[]
+        {
+            nameof(MarketItemDraftFormModel.BasePrice),
+            nameof(MarketItemDraftFormModel.BuyNowPrice),
+            nameof(MarketItemDraftFormModel.MinIncrement),
+            nameof(MarketItemDraftFormModel.ExpiresAtInput)
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        formEditContext = new EditContext(formModel);
+        validationMessageStore = new ValidationMessageStore(formEditContext);
+        formEditContext.OnFieldChanged += OnFieldChanged;
+
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            pageError = ex.Message;
+        }
+
+        if (AdminAuth.IsAuthenticated)
+        {
+            await LoadDraftsAsync();
+        }
+
+        isLoadingData = false;
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            if (!AdminAuth.IsAuthenticated)
+            {
+                ClearState();
+            }
+            else
+            {
+                await LoadDraftsAsync();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadDraftsAsync()
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return;
+        }
+
+        loadDraftsCts?.Cancel();
+        loadDraftsCts?.Dispose();
+        loadDraftsCts = new CancellationTokenSource();
+        var ct = loadDraftsCts.Token;
+
+        isRefreshingList = true;
+        listError = null;
+        listActionError = null;
+        listSuccessMessage = null;
+
+        try
+        {
+            var drafts = await MarketItemPublicationApiClient.ListAsync(ct);
+            marketItems.Clear();
+            foreach (var dto in drafts)
+            {
+                marketItems.Add(new MarketItemDraftListItemViewModel(
+                    dto.ItemId,
+                    dto.PlayerName,
+                    dto.Position,
+                    dto.BasePrice,
+                    dto.BuyNowPrice,
+                    dto.MinIncrement,
+                    dto.ExpiresAtUtc,
+                    dto.Status,
+                    dto.RowVersion,
+                    dto.CycleId,
+                    dto.PlayerId));
+            }
+
+            cycleOptions.Clear();
+            foreach (var cycle in marketItems.Select(m => m.CycleId).Distinct())
+            {
+                cycleOptions.Add(cycle);
+            }
+
+            try
+            {
+                var activeItems = await MarketApiClient.GetActiveItemsAsync(ct);
+                var maybeActive = activeItems.FirstOrDefault();
+                activeCycleId = maybeActive?.CycleId;
+                if (activeCycleId.HasValue && !cycleOptions.Contains(activeCycleId.Value))
+                {
+                    cycleOptions.Insert(0, activeCycleId.Value);
+                }
+            }
+            catch
+            {
+                // Ignorar falhas na tentativa de obter o ciclo ativo público.
+            }
+
+            if (!formModel.CycleId.HasValue && cycleOptions.Count > 0)
+            {
+                formModel.CycleId = cycleOptions[0];
+                formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.CycleId)));
+            }
+
+            cycleInput = formModel.CycleId?.ToString();
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            listError = ex.Message;
+            listActionError = null;
+            listSuccessMessage = null;
+        }
+        finally
+        {
+            loadDraftsCts?.Dispose();
+            loadDraftsCts = null;
+            isRefreshingList = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectTab(string tab)
+    {
+        selectedTab = tab;
+        wizardError = null;
+        wizardSuccess = null;
+    }
+
+    private async Task LoadPlayerAsync()
+    {
+        if (!formModel.PlayerId.HasValue)
+        {
+            return;
+        }
+
+        playerCts?.Cancel();
+        playerCts?.Dispose();
+        playerCts = new CancellationTokenSource();
+
+        isLoadingPlayer = true;
+        playerError = null;
+
+        try
+        {
+            var player = await PlayersApiClient.GetByIdAsync(formModel.PlayerId.Value, playerCts.Token);
+            if (player is null)
+            {
+                selectedPlayer = null;
+                playerError = "Jogador não encontrado.";
+            }
+            else
+            {
+                selectedPlayer = player;
+                playerError = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            selectedPlayer = null;
+            playerError = ex.Message;
+        }
+        finally
+        {
+            playerCts?.Dispose();
+            playerCts = null;
+            isLoadingPlayer = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PreviewPricingAsync()
+    {
+        if (selectedPlayer is null)
+        {
+            pricingError = "Selecione um jogador antes de calcular a sugestão.";
+            return;
+        }
+
+        pricingCts?.Cancel();
+        pricingCts?.Dispose();
+        pricingCts = new CancellationTokenSource();
+
+        isLoadingPricing = true;
+        pricingError = null;
+
+        try
+        {
+            pricingPreview = await PricingService.CalculateForPlayerAsync(selectedPlayer.PlayerId, pricingCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            pricingPreview = null;
+            pricingError = ex.Message;
+        }
+        finally
+        {
+            pricingCts?.Dispose();
+            pricingCts = null;
+            isLoadingPricing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyPricingSuggestion()
+    {
+        if (pricingPreview is null)
+        {
+            return;
+        }
+
+        formModel.BasePrice = pricingPreview.BasePrice;
+        formModel.MinIncrement = pricingPreview.MinIncrement;
+        formModel.BuyNowPrice = pricingPreview.BuyNowPrice;
+        pricingError = null;
+
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.BasePrice)));
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.MinIncrement)));
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.BuyNowPrice)));
+    }
+
+    private async Task HandleSubmitDraftAsync()
+    {
+        await SubmitDraftAsync(false);
+    }
+
+    private async Task PublishFromWizardAsync()
+    {
+        if (isSubmittingDraft)
+        {
+            return;
+        }
+
+        if (!ValidateStep(MarketItemWizardStep.Review))
+        {
+            reviewValid = false;
+            return;
+        }
+
+        await SubmitDraftAsync(true);
+    }
+
+    private async Task SubmitDraftAsync(bool publishAfterCreate)
+    {
+        if (isSubmittingDraft)
+        {
+            return;
+        }
+
+        if (!ValidateStep(MarketItemWizardStep.Review))
+        {
+            reviewValid = false;
+            return;
+        }
+
+        submitDraftCts?.Cancel();
+        submitDraftCts?.Dispose();
+        submitDraftCts = new CancellationTokenSource();
+
+        isSubmittingDraft = true;
+        wizardError = null;
+        wizardSuccess = null;
+
+        try
+        {
+            var expiresAtUtc = formModel.GetExpirationUtc();
+            if (expiresAtUtc is null)
+            {
+                wizardError = "Não foi possível interpretar a data de expiração.";
+                return;
+            }
+
+            var request = new MarketItemDraftCreateRequest(
+                formModel.CycleId!.Value,
+                formModel.PlayerId!.Value,
+                formModel.BasePrice!.Value,
+                formModel.BuyNowPrice,
+                formModel.MinIncrement!.Value,
+                expiresAtUtc.Value);
+
+            var created = await MarketItemPublicationApiClient.CreateDraftAsync(request, submitDraftCts.Token);
+
+            MarketItemPublicationDto? finalItem = created;
+
+            if (publishAfterCreate)
+            {
+                finalItem = await MarketItemPublicationApiClient.PublishAsync(created.ItemId, created.RowVersion, submitDraftCts.Token);
+                wizardSuccess = "Item publicado com sucesso.";
+            }
+            else
+            {
+                wizardSuccess = "Rascunho criado com sucesso.";
+            }
+
+            UpsertItem(finalItem);
+            ResetWizard();
+            await LoadDraftsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            wizardError = ex.Message;
+        }
+        finally
+        {
+            submitDraftCts?.Dispose();
+            submitDraftCts = null;
+            isSubmittingDraft = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PublishExistingAsync(MarketItemDraftListItemViewModel item)
+    {
+        if (!CanPublish(item))
+        {
+            return;
+        }
+
+        publishExistingCts?.Cancel();
+        publishExistingCts?.Dispose();
+        publishExistingCts = new CancellationTokenSource();
+        var ct = publishExistingCts.Token;
+
+        publishingItemId = item.ItemId;
+        listActionError = null;
+        listSuccessMessage = null;
+
+        try
+        {
+            var updated = await MarketItemPublicationApiClient.PublishAsync(item.ItemId, item.RowVersion, ct);
+            UpsertItem(updated);
+            listSuccessMessage = "Item publicado com sucesso.";
+            wizardSuccess = null;
+            wizardError = null;
+            selectedTab = "list";
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            listActionError = ex.Message;
+            listSuccessMessage = null;
+        }
+        finally
+        {
+            publishExistingCts?.Dispose();
+            publishExistingCts = null;
+            publishingItemId = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteDraftAsync(MarketItemDraftListItemViewModel item)
+    {
+        if (item.Status != "Draft")
+        {
+            return;
+        }
+
+        publishExistingCts?.Cancel();
+        publishExistingCts?.Dispose();
+
+        deletingItemId = item.ItemId;
+        listActionError = null;
+        listSuccessMessage = null;
+        var cts = new CancellationTokenSource();
+        publishExistingCts = cts;
+
+        try
+        {
+            await MarketItemPublicationApiClient.DeleteAsync(item.ItemId, item.RowVersion, cts.Token);
+            var index = marketItems.FindIndex(x => x.ItemId == item.ItemId);
+            if (index >= 0)
+            {
+                marketItems.RemoveAt(index);
+            }
+            listSuccessMessage = "Rascunho removido.";
+            wizardSuccess = null;
+            wizardError = null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado
+        }
+        catch (Exception ex)
+        {
+            listActionError = ex.Message;
+            listSuccessMessage = null;
+        }
+        finally
+        {
+            publishExistingCts?.Dispose();
+            publishExistingCts = null;
+            deletingItemId = null;
+            StateHasChanged();
+        }
+    }
+
+    private void UpsertItem(MarketItemPublicationDto item)
+    {
+        var viewModel = new MarketItemDraftListItemViewModel(
+            item.ItemId,
+            item.PlayerName,
+            item.Position,
+            item.BasePrice,
+            item.BuyNowPrice,
+            item.MinIncrement,
+            item.ExpiresAtUtc,
+            item.Status,
+            item.RowVersion,
+            item.CycleId,
+            item.PlayerId);
+
+        var index = marketItems.FindIndex(x => x.ItemId == item.ItemId);
+        if (index >= 0)
+        {
+            marketItems[index] = viewModel;
+        }
+        else
+        {
+            marketItems.Add(viewModel);
+        }
+
+        if (!cycleOptions.Contains(item.CycleId))
+        {
+            cycleOptions.Add(item.CycleId);
+        }
+    }
+
+    private void ClearPlayerSelection()
+    {
+        selectedPlayer = null;
+        formModel.PlayerId = null;
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.PlayerId)));
+    }
+
+    private void UseActiveCycle()
+    {
+        if (!activeCycleId.HasValue)
+        {
+            return;
+        }
+
+        formModel.CycleId = activeCycleId.Value;
+        cycleInput = activeCycleId.Value.ToString();
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.CycleId)));
+    }
+
+    private void OnCycleInputChanged(string? value)
+    {
+        var normalized = value?.Trim();
+        cycleInput = normalized;
+
+        if (!string.IsNullOrWhiteSpace(normalized) && Guid.TryParse(normalized, out var parsed))
+        {
+            formModel.CycleId = parsed;
+        }
+        else
+        {
+            formModel.CycleId = null;
+        }
+
+        formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.CycleId)));
+
+        if (currentStep == MarketItemWizardStep.Review)
+        {
+            reviewValid = ValidateStep(MarketItemWizardStep.Review);
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (currentStep == MarketItemWizardStep.PlayerSelection)
+        {
+            return;
+        }
+
+        currentStep--;
+        wizardError = null;
+        reviewValid = currentStep == MarketItemWizardStep.Review && ValidateStep(MarketItemWizardStep.Review);
+    }
+
+    private void NextStep()
+    {
+        if (currentStep == MarketItemWizardStep.Review)
+        {
+            return;
+        }
+
+        if (!ValidateStep(currentStep))
+        {
+            return;
+        }
+
+        if (currentStep == MarketItemWizardStep.PlayerSelection && selectedPlayer is null)
+        {
+            wizardError = "Carregue os dados do jogador antes de avançar.";
+            return;
+        }
+
+        wizardError = null;
+        currentStep++;
+
+        if (currentStep == MarketItemWizardStep.Review)
+        {
+            reviewValid = ValidateStep(MarketItemWizardStep.Review);
+        }
+    }
+
+    private void ResetWizard()
+    {
+        formModel.CycleId = activeCycleId ?? (cycleOptions.Count > 0 ? cycleOptions[0] : (Guid?)null);
+        formModel.PlayerId = null;
+        formModel.BasePrice = null;
+        formModel.BuyNowPrice = null;
+        formModel.MinIncrement = null;
+        formModel.ExpiresAtInput = null;
+        selectedPlayer = null;
+        pricingPreview = null;
+        pricingError = null;
+        reviewValid = false;
+        currentStep = MarketItemWizardStep.PlayerSelection;
+        cycleInput = formModel.CycleId?.ToString();
+        validationMessageStore?.Clear();
+        formEditContext.NotifyValidationStateChanged();
+    }
+
+    private bool ValidateStep(MarketItemWizardStep step)
+    {
+        validationMessageStore?.Clear();
+
+        var context = new ValidationContext(formModel);
+        var results = new List<ValidationResult>();
+        Validator.TryValidateObject(formModel, context, results, true);
+
+        bool hasErrors = false;
+        string[]? allowedFields = StepFields.GetValueOrDefault(step);
+
+        foreach (var result in results)
+        {
+            var members = result.MemberNames?.ToArray();
+            if (members is null || members.Length == 0)
+            {
+                members = new[] { nameof(MarketItemDraftFormModel.BasePrice) };
+            }
+
+            if (allowedFields is not null && !members.Any(m => allowedFields.Contains(m, StringComparer.Ordinal)))
+            {
+                continue;
+            }
+
+            hasErrors = true;
+
+            foreach (var member in members)
+            {
+                validationMessageStore?.Add(new FieldIdentifier(formModel, member), result.ErrorMessage ?? "Campo inválido.");
+            }
+        }
+
+        formEditContext.NotifyValidationStateChanged();
+        return !hasErrors;
+    }
+
+    private void OnFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        wizardError = null;
+
+        if (args.FieldIdentifier.FieldName == nameof(MarketItemDraftFormModel.PlayerId))
+        {
+            selectedPlayer = null;
+            playerError = null;
+            pricingPreview = null;
+            pricingError = null;
+        }
+
+        if (args.FieldIdentifier.FieldName == nameof(MarketItemDraftFormModel.CycleId) && currentStep == MarketItemWizardStep.PlayerSelection)
+        {
+            ValidateStep(MarketItemWizardStep.PlayerSelection);
+        }
+
+        if (currentStep == MarketItemWizardStep.Review)
+        {
+            reviewValid = ValidateStep(MarketItemWizardStep.Review);
+        }
+    }
+
+    private string WizardProgress => currentStep switch
+    {
+        MarketItemWizardStep.PlayerSelection => "33%",
+        MarketItemWizardStep.Pricing => "66%",
+        _ => "100%"
+    };
+
+    private bool CanPublish(MarketItemDraftListItemViewModel item)
+    {
+        return item.Status.Equals("Draft", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string FormatCurrency(decimal? value)
+    {
+        return value.HasValue ? value.Value.ToString("C", CurrencyCulture) : "—";
+    }
+
+    private DateTime? ParseLocalExpiration()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.ExpiresAtInput))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParse(formModel.ExpiresAtInput, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed))
+        {
+            if (parsed.Kind == DateTimeKind.Unspecified)
+            {
+                parsed = DateTime.SpecifyKind(parsed, DateTimeKind.Local);
+            }
+
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private void ClearState()
+    {
+        marketItems.Clear();
+        cycleOptions.Clear();
+        selectedPlayer = null;
+        pricingPreview = null;
+        wizardError = null;
+        wizardSuccess = null;
+        listError = null;
+        listActionError = null;
+        listSuccessMessage = null;
+        cycleInput = null;
+    }
+
+    public void Dispose()
+    {
+        loadDraftsCts?.Cancel();
+        loadDraftsCts?.Dispose();
+        submitDraftCts?.Cancel();
+        submitDraftCts?.Dispose();
+        playerCts?.Cancel();
+        playerCts?.Dispose();
+        pricingCts?.Cancel();
+        pricingCts?.Dispose();
+        publishExistingCts?.Cancel();
+        publishExistingCts?.Dispose();
+
+        formEditContext.OnFieldChanged -= OnFieldChanged;
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

@@ -78,6 +78,7 @@ builder.Services.AddScoped<TeamsApiClient>();
 builder.Services.AddScoped<AdminTransfersApiClient>();
 builder.Services.AddScoped<BudgetsApiClient>();
 builder.Services.AddScoped<MarketApiClient>();
+builder.Services.AddScoped<MarketItemPublicationApiClient>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
