@@ -81,14 +81,7 @@ public class PlayerService : IPlayerService
 
         _db.Players.Add(entity);
 
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException ex)
-        {
-            throw TranslateDbUpdateException(ex);
-        }
+        await SaveChangesEnsuringPlayerIdentityAsync();
 
         return entity.PlayerId;
     }
@@ -266,14 +259,7 @@ public class PlayerService : IPlayerService
         }
 
         await _db.Players.AddRangeAsync(playersToInsert, ct);
-        try
-        {
-            await _db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex)
-        {
-            throw TranslateDbUpdateException(ex);
-        }
+        await SaveChangesEnsuringPlayerIdentityAsync(ct);
 
         return new PlayerImportResultDto(playersToInsert.Count, errors);
     }
@@ -343,6 +329,68 @@ public class PlayerService : IPlayerService
         {
             throw new InvalidOperationException("Já existe um jogador com este nome nesta posição.");
         }
+    }
+
+    private async Task SaveChangesEnsuringPlayerIdentityAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsPlayerPrimaryKeyViolation(ex))
+        {
+            await ResetPlayerIdentitySequenceAsync(ct);
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException retryEx)
+            {
+                throw TranslateDbUpdateException(retryEx);
+            }
+        }
+        catch (DbUpdateException ex)
+        {
+            throw TranslateDbUpdateException(ex);
+        }
+    }
+
+    private static bool IsPlayerPrimaryKeyViolation(DbUpdateException exception)
+    {
+        if (exception.InnerException is not PostgresException postgres)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(postgres.ConstraintName))
+        {
+            return string.Equals(postgres.ConstraintName, "PK_Players", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.Equals(postgres.SqlState, PostgresErrorCodes.UniqueViolation, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(postgres.TableName, "Players", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(postgres.ColumnName) ||
+               string.Equals(postgres.ColumnName, "PlayerId", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task ResetPlayerIdentitySequenceAsync(CancellationToken ct)
+    {
+        var maxId = await _db.Players
+            .AsNoTracking()
+            .MaxAsync(p => (int?)p.PlayerId, ct) ?? 0;
+
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT setval(pg_get_serial_sequence('"Players"', 'PlayerId'), {maxId})",
+            ct);
     }
 
     private static InvalidOperationException TranslateDbUpdateException(DbUpdateException exception)
