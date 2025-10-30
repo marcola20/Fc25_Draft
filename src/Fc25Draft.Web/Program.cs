@@ -1780,13 +1780,15 @@ static void MapMarketItemPublicationEndpoints(RouteGroupBuilder marketApi)
         var item = await service.GetAsync(itemId, ct).ConfigureAwait(false);
         if (item is null)
         {
-            return TypedResults.Problem(new ProblemDetails
+            var problem = new ProblemDetails
             {
                 Title = "Item não encontrado.",
                 Detail = "O item solicitado não existe ou foi removido.",
                 Status = StatusCodes.Status404NotFound,
                 Type = "https://httpstatuses.com/404"
-            }, statusCode: StatusCodes.Status404NotFound);
+            };
+
+            return Results.Problem(problem);
         }
 
         ApplyEtag(context.Response, item.RowVersion);
@@ -1926,26 +1928,24 @@ static bool TryResolveRowVersion(HttpRequest request, out uint rowVersion, out I
 
     if (!request.Headers.TryGetValue(HeaderNames.IfMatch, out var headerValues))
     {
-        errorResult = TypedResults.Problem(new ProblemDetails
-        {
-            Title = "Pré-condição obrigatória.",
-            Detail = "O cabeçalho If-Match é obrigatório para esta operação.",
-            Status = StatusCodes.Status428PreconditionRequired,
-            Type = "https://httpstatuses.com/428"
-        }, statusCode: StatusCodes.Status428PreconditionRequired);
+        errorResult = TypedResults.Problem(
+            title: "Pré-condição obrigatória.",
+            detail: "O cabeçalho If-Match é obrigatório para esta operação.",
+            statusCode: StatusCodes.Status428PreconditionRequired,
+            type: "https://httpstatuses.com/428"
+        );
         return false;
     }
 
     var rawValue = headerValues.FirstOrDefault();
     if (string.IsNullOrWhiteSpace(rawValue))
     {
-        errorResult = TypedResults.Problem(new ProblemDetails
-        {
-            Title = "Cabeçalho If-Match inválido.",
-            Detail = "O valor informado no cabeçalho If-Match é inválido.",
-            Status = StatusCodes.Status400BadRequest,
-            Type = "https://httpstatuses.com/400"
-        }, statusCode: StatusCodes.Status400BadRequest);
+        errorResult = TypedResults.Problem(
+            title: "Cabeçalho If-Match inválido.",
+            detail: "O valor informado no cabeçalho If-Match é inválido.",
+            statusCode: StatusCodes.Status400BadRequest,
+            type: "https://httpstatuses.com/400"
+        );
         return false;
     }
 
@@ -1961,30 +1961,30 @@ static bool TryResolveRowVersion(HttpRequest request, out uint rowVersion, out I
 
     if (!uint.TryParse(parsed, out rowVersion))
     {
-        errorResult = TypedResults.Problem(new ProblemDetails
-        {
-            Title = "Cabeçalho If-Match inválido.",
-            Detail = "Não foi possível interpretar o valor do cabeçalho If-Match.",
-            Status = StatusCodes.Status400BadRequest,
-            Type = "https://httpstatuses.com/400"
-        }, statusCode: StatusCodes.Status400BadRequest);
+        errorResult = TypedResults.Problem(
+            title: "Cabeçalho If-Match inválido.",
+            detail: "Não foi possível interpretar o valor do cabeçalho If-Match.",
+            statusCode: StatusCodes.Status400BadRequest,
+            type: "https://httpstatuses.com/400"
+        );
         return false;
     }
 
     return true;
 }
 
-static IResult CreateValidationProblem(MarketItemValidationException exception)
+static IResult CreateValidationProblem(MarketItemValidationException ex)
 {
-    var problem = new ValidationProblemDetails(exception.Errors)
+    var problem = new ProblemDetails
     {
         Title = "Falha na validação do item de mercado.",
-        Detail = exception.Message,
+        Detail = ex.Message,
         Status = StatusCodes.Status422UnprocessableEntity,
         Type = "https://httpstatuses.com/422"
     };
+    problem.Extensions["errors"] = ex.Errors; 
 
-    return TypedResults.Problem(problem, statusCode: StatusCodes.Status422UnprocessableEntity);
+    return Results.Problem(problem);
 }
 
 static IResult CreateConflictProblem(string message)
@@ -1997,7 +1997,7 @@ static IResult CreateConflictProblem(string message)
         Type = "https://httpstatuses.com/409"
     };
 
-    return TypedResults.Problem(problem, statusCode: StatusCodes.Status409Conflict);
+    return Results.Problem(problem); // <-- use Results aqui
 }
 
 static IResult CreateNotFoundProblem(string message)
@@ -2010,7 +2010,7 @@ static IResult CreateNotFoundProblem(string message)
         Type = "https://httpstatuses.com/404"
     };
 
-    return TypedResults.Problem(problem, statusCode: StatusCodes.Status404NotFound);
+    return Results.Problem(problem);
 }
 
 static IResult CreatePreconditionFailedProblem(string message)
@@ -2023,9 +2023,8 @@ static IResult CreatePreconditionFailedProblem(string message)
         Type = "https://httpstatuses.com/412"
     };
 
-    return TypedResults.Problem(problem, statusCode: StatusCodes.Status412PreconditionFailed);
+    return Results.Problem(problem);
 }
-
 static TransferHistoryItemDto MapTransferHistoryToDto(TransferHistory history)
 {
     if (history is null)
