@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
+using Microsoft.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = ResolveConnectionString(builder);
@@ -83,6 +84,7 @@ builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
+builder.Services.AddScoped<IMarketItemPublicationService, MarketItemPublicationService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<AdminTransferService>();
 builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
@@ -97,7 +99,10 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
 }
 
-await app.SeedDatabaseAsync();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    await app.SeedDatabaseAsync();
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -126,10 +131,10 @@ var api = app.MapGroup("/api");
 
 MapAdminEndpoints(api);
 MapDraftEndpoints(api);
-MapPlayerEndpoints(api);
-MapTeamEndpoints(api);
-MapPricingEndpoints(api);
-MapMarketEndpoints(api);
+    MapPlayerEndpoints(api);
+    MapTeamEndpoints(api);
+    MapPricingEndpoints(api);
+    MapMarketEndpoints(api);
 MapTransfersEndpoints(api);
 MapBudgetEndpoints(api);
 
@@ -1528,6 +1533,8 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 {
     var marketApi = api.MapGroup("/market");
 
+    MapMarketItemPublicationEndpoints(marketApi);
+
     marketApi.MapGet(
         "/history",
         async ([FromQuery] Guid? teamId, [FromQuery] int? take, ITransferHistoryService transferHistoryService) =>
@@ -1751,6 +1758,272 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
         return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
+}
+
+static void MapMarketItemPublicationEndpoints(RouteGroupBuilder marketApi)
+{
+    var itemsApi = marketApi.MapGroup("/items")
+        .RequireAuthorization("AdminOnly");
+
+    itemsApi.MapGet(string.Empty, async (IMarketItemPublicationService service, CancellationToken ct) =>
+    {
+        var items = await service.ListAsync(ct).ConfigureAwait(false);
+        return Results.Ok(items);
+    });
+
+    itemsApi.MapGet("/{itemId:guid}", async (
+        Guid itemId,
+        HttpContext context,
+        IMarketItemPublicationService service,
+        CancellationToken ct) =>
+    {
+        var item = await service.GetAsync(itemId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return TypedResults.Problem(new ProblemDetails
+            {
+                Title = "Item não encontrado.",
+                Detail = "O item solicitado não existe ou foi removido.",
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://httpstatuses.com/404"
+            }, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        ApplyEtag(context.Response, item.RowVersion);
+        return Results.Ok(item);
+    });
+
+    itemsApi.MapPost(string.Empty, async (
+        MarketItemDraftCreateRequest request,
+        HttpContext context,
+        IMarketItemPublicationService service,
+        CancellationToken ct) =>
+    {
+        try
+        {
+            var created = await service.CreateDraftAsync(request, ct).ConfigureAwait(false);
+            ApplyEtag(context.Response, created.RowVersion);
+            return Results.Created($"/api/market/items/{created.ItemId}", created);
+        }
+        catch (MarketItemValidationException ex)
+        {
+            return CreateValidationProblem(ex);
+        }
+        catch (MarketConflictException ex)
+        {
+            return CreateConflictProblem(ex.Message);
+        }
+    });
+
+    itemsApi.MapPut("/{itemId:guid}", async (
+        Guid itemId,
+        MarketItemDraftUpdateRequest request,
+        HttpContext context,
+        IMarketItemPublicationService service,
+        CancellationToken ct) =>
+    {
+        if (!TryResolveRowVersion(context.Request, out var rowVersion, out var error))
+        {
+            return error!;
+        }
+
+        try
+        {
+            var updated = await service.UpdateDraftAsync(itemId, request, rowVersion, ct).ConfigureAwait(false);
+            ApplyEtag(context.Response, updated.RowVersion);
+            return Results.Ok(updated);
+        }
+        catch (MarketItemValidationException ex)
+        {
+            return CreateValidationProblem(ex);
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return CreateNotFoundProblem(ex.Message);
+        }
+        catch (MarketConflictException ex)
+        {
+            return CreateConflictProblem(ex.Message);
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return CreatePreconditionFailedProblem(ex.Message);
+        }
+    });
+
+    itemsApi.MapPost("/{itemId:guid}/publish", async (
+        Guid itemId,
+        HttpContext context,
+        IMarketItemPublicationService service,
+        CancellationToken ct) =>
+    {
+        if (!TryResolveRowVersion(context.Request, out var rowVersion, out var error))
+        {
+            return error!;
+        }
+
+        try
+        {
+            var published = await service.PublishAsync(itemId, rowVersion, ct).ConfigureAwait(false);
+            ApplyEtag(context.Response, published.RowVersion);
+            return Results.Ok(published);
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return CreateNotFoundProblem(ex.Message);
+        }
+        catch (MarketConflictException ex)
+        {
+            return CreateConflictProblem(ex.Message);
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return CreatePreconditionFailedProblem(ex.Message);
+        }
+    });
+
+    itemsApi.MapDelete("/{itemId:guid}", async (
+        Guid itemId,
+        HttpContext context,
+        IMarketItemPublicationService service,
+        CancellationToken ct) =>
+    {
+        if (!TryResolveRowVersion(context.Request, out var rowVersion, out var error))
+        {
+            return error!;
+        }
+
+        try
+        {
+            var deleted = await service.SoftDeleteAsync(itemId, rowVersion, ct).ConfigureAwait(false);
+            ApplyEtag(context.Response, deleted.RowVersion);
+            return Results.NoContent();
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return CreateNotFoundProblem(ex.Message);
+        }
+        catch (MarketConflictException ex)
+        {
+            return CreateConflictProblem(ex.Message);
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return CreatePreconditionFailedProblem(ex.Message);
+        }
+    });
+}
+
+static void ApplyEtag(HttpResponse response, uint rowVersion)
+{
+    response.Headers[HeaderNames.ETag] = $"W/\"{rowVersion}\"";
+}
+
+static bool TryResolveRowVersion(HttpRequest request, out uint rowVersion, out IResult? errorResult)
+{
+    rowVersion = 0;
+    errorResult = null;
+
+    if (!request.Headers.TryGetValue(HeaderNames.IfMatch, out var headerValues))
+    {
+        errorResult = TypedResults.Problem(new ProblemDetails
+        {
+            Title = "Pré-condição obrigatória.",
+            Detail = "O cabeçalho If-Match é obrigatório para esta operação.",
+            Status = StatusCodes.Status428PreconditionRequired,
+            Type = "https://httpstatuses.com/428"
+        }, statusCode: StatusCodes.Status428PreconditionRequired);
+        return false;
+    }
+
+    var rawValue = headerValues.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(rawValue))
+    {
+        errorResult = TypedResults.Problem(new ProblemDetails
+        {
+            Title = "Cabeçalho If-Match inválido.",
+            Detail = "O valor informado no cabeçalho If-Match é inválido.",
+            Status = StatusCodes.Status400BadRequest,
+            Type = "https://httpstatuses.com/400"
+        }, statusCode: StatusCodes.Status400BadRequest);
+        return false;
+    }
+
+    var parsed = rawValue.Trim();
+    if (parsed.StartsWith("W/\"", StringComparison.OrdinalIgnoreCase) && parsed.EndsWith("\""))
+    {
+        parsed = parsed[3..^1];
+    }
+    else if (parsed.StartsWith('"') && parsed.EndsWith('"'))
+    {
+        parsed = parsed[1..^1];
+    }
+
+    if (!uint.TryParse(parsed, out rowVersion))
+    {
+        errorResult = TypedResults.Problem(new ProblemDetails
+        {
+            Title = "Cabeçalho If-Match inválido.",
+            Detail = "Não foi possível interpretar o valor do cabeçalho If-Match.",
+            Status = StatusCodes.Status400BadRequest,
+            Type = "https://httpstatuses.com/400"
+        }, statusCode: StatusCodes.Status400BadRequest);
+        return false;
+    }
+
+    return true;
+}
+
+static IResult CreateValidationProblem(MarketItemValidationException exception)
+{
+    var problem = new ValidationProblemDetails(exception.Errors)
+    {
+        Title = "Falha na validação do item de mercado.",
+        Detail = exception.Message,
+        Status = StatusCodes.Status422UnprocessableEntity,
+        Type = "https://httpstatuses.com/422"
+    };
+
+    return TypedResults.Problem(problem, statusCode: StatusCodes.Status422UnprocessableEntity);
+}
+
+static IResult CreateConflictProblem(string message)
+{
+    var problem = new ProblemDetails
+    {
+        Title = "Conflito ao processar o item.",
+        Detail = message,
+        Status = StatusCodes.Status409Conflict,
+        Type = "https://httpstatuses.com/409"
+    };
+
+    return TypedResults.Problem(problem, statusCode: StatusCodes.Status409Conflict);
+}
+
+static IResult CreateNotFoundProblem(string message)
+{
+    var problem = new ProblemDetails
+    {
+        Title = "Item não encontrado.",
+        Detail = message,
+        Status = StatusCodes.Status404NotFound,
+        Type = "https://httpstatuses.com/404"
+    };
+
+    return TypedResults.Problem(problem, statusCode: StatusCodes.Status404NotFound);
+}
+
+static IResult CreatePreconditionFailedProblem(string message)
+{
+    var problem = new ProblemDetails
+    {
+        Title = "Pré-condição não satisfeita.",
+        Detail = message,
+        Status = StatusCodes.Status412PreconditionFailed,
+        Type = "https://httpstatuses.com/412"
+    };
+
+    return TypedResults.Problem(problem, statusCode: StatusCodes.Status412PreconditionFailed);
 }
 
 static TransferHistoryItemDto MapTransferHistoryToDto(TransferHistory history)
