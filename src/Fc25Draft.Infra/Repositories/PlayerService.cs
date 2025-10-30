@@ -11,6 +11,7 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Fc25Draft.Infra.Repositories;
 
@@ -78,7 +79,15 @@ public class PlayerService : IPlayerService
         };
 
         _db.Players.Add(entity);
-        await _db.SaveChangesAsync();
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw TranslateDbUpdateException(ex);
+        }
 
         return entity.PlayerId;
     }
@@ -97,7 +106,14 @@ public class PlayerService : IPlayerService
         entity.Overall = dto.Overall;
         entity.PositionId = dto.PositionId;
 
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw TranslateDbUpdateException(ex);
+        }
     }
 
     public async Task DeleteAsync(int id)
@@ -225,7 +241,14 @@ public class PlayerService : IPlayerService
         }
 
         await _db.Players.AddRangeAsync(playersToInsert, ct);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            throw TranslateDbUpdateException(ex);
+        }
 
         return new PlayerImportResultDto(playersToInsert.Count, errors);
     }
@@ -276,5 +299,25 @@ public class PlayerService : IPlayerService
         {
             throw new InvalidOperationException("Posição inválida.");
         }
+    }
+
+    private static InvalidOperationException TranslateDbUpdateException(DbUpdateException exception)
+    {
+        if (exception.InnerException is PostgresException postgres)
+        {
+            return postgres.ConstraintName switch
+            {
+                "IX_Players_Name_PositionId" => new InvalidOperationException("Já existe um jogador com este nome nesta posição."),
+                "IX_Players_PlayerGuid" => new InvalidOperationException("Já existe um jogador com este identificador."),
+                "FK_Players_Positions_PositionId" => new InvalidOperationException("Posição informada não existe."),
+                "FK_Players_Teams_CurrentTeamId" => new InvalidOperationException("Time atual informado é inválido."),
+                _ when postgres.SqlState == PostgresErrorCodes.UniqueViolation => new InvalidOperationException("Os dados informados violam uma restrição de unicidade."),
+                _ when postgres.SqlState == PostgresErrorCodes.ForeignKeyViolation => new InvalidOperationException("Os dados informados violam uma restrição de relacionamento."),
+                _ when postgres.SqlState == PostgresErrorCodes.CheckViolation => new InvalidOperationException("Os dados informados violam uma regra de validação."),
+                _ => new InvalidOperationException($"Erro do banco de dados ({postgres.SqlState}): {postgres.MessageText}")
+            };
+        }
+
+        return new InvalidOperationException("Não foi possível salvar o jogador. Detalhes: " + exception.GetBaseException().Message);
     }
 }
