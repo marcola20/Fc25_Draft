@@ -231,15 +231,13 @@ public class MarketService : IMarketService
         try
         {
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            throw new MarketPreconditionFailedException(
-                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
-                ex);
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw MapMarketConcurrencyException(ex);
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new BidResultDto(true, "Lance registrado com sucesso.", amount);
     }
@@ -384,15 +382,13 @@ public class MarketService : IMarketService
         try
         {
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            throw new MarketPreconditionFailedException(
-                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
-                ex);
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw MapMarketConcurrencyException(ex);
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new BuyNowResultDto(true, "Compra realizada com sucesso.");
     }
@@ -540,9 +536,17 @@ public class MarketService : IMarketService
             item.LastUpdateUtc = now;
             item.ExpiresAtUtc = now;
 
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-            processed++;
+            try
+            {
+                await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                processed++;
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                throw MapMarketConcurrencyException(ex);
+            }
         }
 
         await UpdateCycleStatusesAsync(ct).ConfigureAwait(false);
@@ -631,6 +635,20 @@ public class MarketService : IMarketService
                 TeamId = teamId
             }, ct).ConfigureAwait(false);
         }
+    }
+
+    private static Exception MapMarketConcurrencyException(DbUpdateConcurrencyException ex)
+    {
+        if (ex.Entries.Any(entry => entry.Entity is Team))
+        {
+            return new MarketConflictException(
+                "O orçamento do time foi atualizado por outra ação. Recarregue a página e tente novamente.",
+                ex);
+        }
+
+        return new MarketPreconditionFailedException(
+            "O item foi atualizado por outro time. Atualize a página e tente novamente.",
+            ex);
     }
 
     private static string NormalizeToken(string token)

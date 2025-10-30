@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
@@ -77,6 +78,13 @@ public partial class AdminTransferService
             await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw new AdminConflictException(
+                "O orçamento do time foi atualizado por outra ação. Recarregue a página e tente novamente.",
+                ex);
         }
         catch
         {
@@ -175,6 +183,13 @@ public partial class AdminTransferService
             await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw new AdminConflictException(
+                "As informações do item ou do orçamento foram atualizadas por outra ação. Recarregue a página e tente novamente.",
+                ex);
         }
         catch
         {
@@ -370,6 +385,13 @@ public partial class AdminTransferService
             await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw new AdminConflictException(
+                "Os dados de orçamento de um dos times foram atualizados por outra ação. Recarregue a página e tente novamente.",
+                ex);
         }
         catch
         {
@@ -707,6 +729,13 @@ public partial class AdminTransferService
             await _dbContext.AdminActionsLogs.AddAsync(logEntry, ct).ConfigureAwait(false);
             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            throw new AdminConflictException(
+                "Os dados de orçamento de um dos times foram atualizados por outra ação. Recarregue a página e tente novamente.",
+                ex);
         }
         catch
         {

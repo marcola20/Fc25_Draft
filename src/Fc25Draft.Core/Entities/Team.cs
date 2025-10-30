@@ -8,6 +8,7 @@ public class Team
     public string Token { get; set; } = null!;
     public decimal Budget { get; set; }
     public decimal BudgetBlocked { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();

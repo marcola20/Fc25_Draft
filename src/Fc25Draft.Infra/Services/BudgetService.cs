@@ -1,5 +1,6 @@
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Data;
@@ -119,6 +120,17 @@ public class BudgetService : IBudgetService
             {
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+            }
+
+            throw new BudgetConflictException(
+                "O orçamento do time foi atualizado por outra ação. Recarregue a página e tente novamente.",
+                ex);
         }
         catch
         {

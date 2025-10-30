@@ -1217,6 +1217,10 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         {
             return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
         }
+        catch (AdminConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
         catch (ArgumentException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
@@ -1328,6 +1332,10 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
                 var saldoAtual = await budgetService.GetSaldoAsync(request.TeamId, ct);
                 return Results.Ok(new { teamId = request.TeamId, saldo = saldoAtual });
             }
+            catch (BudgetConflictException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
             catch (KeyNotFoundException ex)
             {
                 return Results.NotFound(new { message = ex.Message });
@@ -1369,6 +1377,10 @@ static void MapBudgetEndpoints(RouteGroupBuilder api)
                     tipo = result.Tipo,
                     descricao = result.Descricao
                 });
+            }
+            catch (BudgetConflictException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {

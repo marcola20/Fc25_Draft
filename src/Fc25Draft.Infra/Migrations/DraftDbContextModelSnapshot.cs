@@ -496,6 +496,12 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .IsConcurrencyToken();
+
                     b.Property<string>("OwnerName")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");

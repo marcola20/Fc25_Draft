@@ -6,4 +6,9 @@ public class AdminConflictException : Exception
         : base(message)
     {
     }
+
+    public AdminConflictException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }
