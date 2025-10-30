@@ -47,13 +47,13 @@
     <div class="mb-3">
         <label class="form-label" for="buy-now">Comprar agora</label>
         <InputNumber TValue="decimal?" id="buy-now" class="form-control" @bind-Value="formModel.BuyNowPrice" />
-        <ValidationMessage For="() => formModel.BuyNowPrice" />
+        <ValidationMessage For="@(() => formModel.BuyNowPrice)" />
     </div>
 
     <div class="mb-3">
         <label class="form-label" for="expires-at">Expira em</label>
-        <InputDate TValue="DateTimeOffset?>" id="expires-at" class="form-control" @bind-Value="formModel.ExpiresAtInput" />
-        <ValidationMessage For="() => formModel.ExpiresAtInput" />
+        <InputDate TValue="DateTimeOffset?" id="expires-at" class="form-control" @bind-Value="formModel.ExpiresAtInput" />
+        <ValidationMessage For="@(() => formModel.ExpiresAtInput)" />
     </div>
 
     <div class="mb-3">
