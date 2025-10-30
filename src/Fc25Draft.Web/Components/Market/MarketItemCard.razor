@@ -1,6 +1,7 @@
 @using System
 @using System.ComponentModel.DataAnnotations
 @using System.Globalization
+@using System.Reflection
 @using System.Threading
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components.Forms
@@ -126,6 +127,7 @@
     private CancellationTokenSource? _submitCts;
     private CancellationTokenSource? _timerCts;
     private PeriodicTimer? _timer;
+    private static readonly Func<PeriodicTimer, ValueTask>? _disposeTimerDelegate = CreateDisposeTimerDelegate();
     private Task? _timerTask;
     private bool _isSubmitting;
     private bool _showBuyConfirm;
@@ -279,10 +281,7 @@
         }
         finally
         {
-            if (timer is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
+            await DisposeTimerIfSupportedAsync(timer);
 
             if (ReferenceEquals(_timer, timer))
             {
@@ -464,11 +463,11 @@
             }
         }
 
-        if (_timer is IAsyncDisposable asyncDisposableTimer)
+        if (_timer is not null)
         {
-            await asyncDisposableTimer.DisposeAsync();
+            await DisposeTimerIfSupportedAsync(_timer);
+            _timer = null;
         }
-        _timer = null;
 
         if (_timerCts is not null)
         {
@@ -484,6 +483,25 @@
             _editContext.OnValidationRequested -= HandleValidationRequested;
             _editContext.OnFieldChanged -= HandleFieldChanged;
         }
+    }
+
+    private static ValueTask DisposeTimerIfSupportedAsync(PeriodicTimer timer)
+    {
+        return _disposeTimerDelegate is Func<PeriodicTimer, ValueTask> disposer
+            ? disposer(timer)
+            : ValueTask.CompletedTask;
+    }
+
+    private static Func<PeriodicTimer, ValueTask>? CreateDisposeTimerDelegate()
+    {
+        const string disposeAsyncName = nameof(IAsyncDisposable.DisposeAsync);
+        var disposeMethod = typeof(PeriodicTimer).GetMethod(disposeAsyncName, BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+        if (disposeMethod is null || disposeMethod.ReturnType != typeof(ValueTask))
+        {
+            return null;
+        }
+
+        return (Func<PeriodicTimer, ValueTask>)disposeMethod.CreateDelegate(typeof(Func<PeriodicTimer, ValueTask>));
     }
 
     private class BidFormModel
