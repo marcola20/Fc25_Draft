@@ -68,6 +68,7 @@ public class PlayerService : IPlayerService
         Validate(dto);
 
         await EnsurePositionExists(dto.PositionId);
+        await EnsureUniqueNameForPositionAsync(dto.Name, dto.PositionId);
 
         var entity = new Player
         {
@@ -100,6 +101,7 @@ public class PlayerService : IPlayerService
                      ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
         await EnsurePositionExists(dto.PositionId);
+        await EnsureUniqueNameForPositionAsync(dto.Name, dto.PositionId, id);
 
         entity.Name = dto.Name.Trim();
         entity.Age = dto.Age;
@@ -135,10 +137,21 @@ public class PlayerService : IPlayerService
         using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
 
         var knownPositions = await _db.Positions
-            .Select(p => p.PositionId)
+            .Select(p => new { p.PositionId, p.Name })
             .ToListAsync(ct);
 
-        var positionSet = knownPositions.ToHashSet();
+        var positionSet = knownPositions
+            .Select(p => p.PositionId)
+            .ToHashSet();
+
+        var positionNames = knownPositions.ToDictionary(p => p.PositionId, p => p.Name);
+
+        var existingPlayerKeys = await _db.Players
+            .Select(p => new { p.Name, p.PositionId })
+            .ToListAsync(ct);
+
+        var uniquePlayerKeys = new HashSet<(string Name, short PositionId)>(
+            existingPlayerKeys.Select(p => (p.Name, p.PositionId)));
 
         var lineNumber = 0;
 
@@ -225,9 +238,21 @@ public class PlayerService : IPlayerService
                 continue;
             }
 
+            var normalizedName = name.Trim();
+
+            if (!uniquePlayerKeys.Add((normalizedName, positionId)))
+            {
+                var positionLabel = positionNames.TryGetValue(positionId, out var posName)
+                    ? posName
+                    : positionId.ToString(CultureInfo.InvariantCulture);
+
+                errors.Add($"Linha {lineNumber}: já existe um jogador com o nome \"{normalizedName}\" na posição {positionLabel}.");
+                continue;
+            }
+
             playersToInsert.Add(new Player
             {
-                Name = name.Trim(),
+                Name = normalizedName,
                 Age = age,
                 Overall = overall,
                 PositionId = positionId,
@@ -301,23 +326,102 @@ public class PlayerService : IPlayerService
         }
     }
 
+    private async Task EnsureUniqueNameForPositionAsync(string name, short positionId, int? ignorePlayerId = null)
+    {
+        var normalizedName = name.Trim();
+
+        var query = _db.Players.AsNoTracking()
+            .Where(p => p.PositionId == positionId && p.Name == normalizedName);
+
+        if (ignorePlayerId is int id)
+        {
+            query = query.Where(p => p.PlayerId != id);
+        }
+
+        var exists = await query.AnyAsync();
+        if (exists)
+        {
+            throw new InvalidOperationException("Já existe um jogador com este nome nesta posição.");
+        }
+    }
+
     private static InvalidOperationException TranslateDbUpdateException(DbUpdateException exception)
     {
         if (exception.InnerException is PostgresException postgres)
         {
-            return postgres.ConstraintName switch
+            var constraintName = postgres.ConstraintName;
+
+            if (!string.IsNullOrWhiteSpace(constraintName))
             {
-                "IX_Players_Name_PositionId" => new InvalidOperationException("Já existe um jogador com este nome nesta posição."),
-                "IX_Players_PlayerGuid" => new InvalidOperationException("Já existe um jogador com este identificador."),
-                "FK_Players_Positions_PositionId" => new InvalidOperationException("Posição informada não existe."),
-                "FK_Players_Teams_CurrentTeamId" => new InvalidOperationException("Time atual informado é inválido."),
-                _ when postgres.SqlState == PostgresErrorCodes.UniqueViolation => new InvalidOperationException("Os dados informados violam uma restrição de unicidade."),
-                _ when postgres.SqlState == PostgresErrorCodes.ForeignKeyViolation => new InvalidOperationException("Os dados informados violam uma restrição de relacionamento."),
-                _ when postgres.SqlState == PostgresErrorCodes.CheckViolation => new InvalidOperationException("Os dados informados violam uma regra de validação."),
-                _ => new InvalidOperationException($"Erro do banco de dados ({postgres.SqlState}): {postgres.MessageText}")
-            };
+                switch (constraintName.ToUpperInvariant())
+                {
+                    case "IX_PLAYERS_NAME_POSITIONID":
+                        return new InvalidOperationException("Já existe um jogador com este nome nesta posição.");
+                    case "IX_PLAYERS_PLAYERGUID":
+                        return new InvalidOperationException("Já existe um jogador com este identificador.");
+                    case "FK_PLAYERS_POSITIONS_POSITIONID":
+                        return new InvalidOperationException("Posição informada não existe.");
+                    case "FK_PLAYERS_TEAMS_CURRENTTEAMID":
+                        return new InvalidOperationException("Time atual informado é inválido.");
+                }
+            }
+
+            if (postgres.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return new InvalidOperationException(FormatUniqueViolationMessage(postgres));
+            }
+
+            if (postgres.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+            {
+                return new InvalidOperationException("Os dados informados violam uma restrição de relacionamento.");
+            }
+
+            if (postgres.SqlState == PostgresErrorCodes.CheckViolation)
+            {
+                return new InvalidOperationException("Os dados informados violam uma regra de validação.");
+            }
+
+            return new InvalidOperationException($"Erro do banco de dados ({postgres.SqlState}): {postgres.MessageText}");
         }
 
         return new InvalidOperationException("Não foi possível salvar o jogador. Detalhes: " + exception.GetBaseException().Message);
+    }
+
+    private static string FormatUniqueViolationMessage(PostgresException postgres)
+    {
+        if (!string.IsNullOrWhiteSpace(postgres.ConstraintName))
+        {
+            return $"Os dados informados violam a restrição única '{postgres.ConstraintName}'.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(postgres.Detail))
+        {
+            var detail = postgres.Detail.Trim();
+
+            const string prefix = "Key (";
+            const string separator = ")=(";
+            const string suffix = ") already exists.";
+
+            if (detail.StartsWith(prefix, StringComparison.Ordinal) && detail.Contains(separator, StringComparison.Ordinal))
+            {
+                var keyStart = prefix.Length;
+                var separatorIndex = detail.IndexOf(separator, StringComparison.Ordinal);
+                var key = detail.Substring(keyStart, separatorIndex - keyStart);
+
+                var valueStart = separatorIndex + separator.Length;
+                var valueEnd = detail.IndexOf(suffix, valueStart, StringComparison.OrdinalIgnoreCase);
+                if (valueEnd < 0)
+                {
+                    valueEnd = detail.Length;
+                }
+
+                var value = detail.Substring(valueStart, valueEnd - valueStart).TrimEnd(')');
+                return $"Os dados informados violam uma restrição de unicidade. Chave duplicada: ({key}) = ({value}).";
+            }
+
+            return $"Os dados informados violam uma restrição de unicidade. Detalhes: {detail}";
+        }
+
+        return "Os dados informados violam uma restrição de unicidade.";
     }
 }
