@@ -36,8 +36,8 @@ else
         <MarketItemCard
             Item="item"
             ServerTimeOffset="ServerTimeOffset"
-            OnBidPlaced="@EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync)"
-            OnBought="@EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync)" />
+            OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
+            OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
     }
 }
 
@@ -50,6 +50,9 @@ else
     private TimeSpan ServerTimeOffset = TimeSpan.Zero;
     private Guid ActiveCycleId;
     private CancellationTokenSource? _loadCts;
+    private Func<CoreItemVm, Task>? _bidUpdatedHandler;
+    private Func<CoreItemVm, Task>? _itemBoughtHandler;
+    private Func<CoreItemVm, Task>? _itemClosedHandler;
 
     protected override Task OnInitializedAsync() => Task.CompletedTask;
 
@@ -60,10 +63,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
-        {
-            return;
-        }
+        if (!firstRender) return;
 
         var ct = PrepareNewLoadCts();
         await LoadPageAsync(1, ct);
@@ -71,24 +71,28 @@ else
         await Hub.ConnectAsync();
         await Hub.JoinCycle(ActiveCycleId);
 
-        Hub.OnBidUpdated = vm =>
+        _bidUpdatedHandler = vm =>
         {
             MergeItem(vm);
             StateHasChangedSafe();
             return Task.CompletedTask;
         };
-        Hub.OnItemBought = vm =>
+        _itemBoughtHandler = vm =>
         {
             MergeItem(vm);
             StateHasChangedSafe();
             return Task.CompletedTask;
         };
-        Hub.OnItemClosed = vm =>
+        _itemClosedHandler = vm =>
         {
             MergeItem(vm);
             StateHasChangedSafe();
             return Task.CompletedTask;
         };
+
+        Hub.OnBidUpdated += _bidUpdatedHandler;
+        Hub.OnItemBought += _itemBoughtHandler;
+        Hub.OnItemClosed += _itemClosedHandler;
     }
 
     private async Task LoadPageAsync(int page, CancellationToken ct)
