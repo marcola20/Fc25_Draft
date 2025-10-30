@@ -6,70 +6,170 @@
 @using System.Threading
 @using System.Threading.Tasks
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Hubs
+@using Fc25Draft.Web.Models.Market
 @using Fc25Draft.Web.Services
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 @inject MarketClient Client
 @inject MarketHubClient Hub
+@inject IPositionService PositionService
 @implements IAsyncDisposable
 
-<PageTitle>Mercado</PageTitle>
+<PageTitle>Market</PageTitle>
 
-<h3>Mercado</h3>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="h3 mb-0">Market</h1>
+    @if (PageData is not null)
+    {
+        <span class="text-muted small">@PageData.Total item(s) found</span>
+    }
+</div>
 
-<MarketFilters OnApply="ApplyFiltersAsync" />
+<MarketFilters OnApply="ApplyFiltersAsync"
+               PositionOptions="@_positionOptions"
+               SortOptions="@SortOptions"
+               StatusOptions="@StatusOptions" />
 
-@if (PageData is null)
+@if (_isLoading && PageData is null)
 {
-    <p><em>Carregando itens do mercado...</em></p>
+    <div class="alert alert-info mt-3" role="status">Loading market items...</div>
+}
+else if (PageData is null)
+{
+    <div class="alert alert-info mt-3" role="status">Loading market items...</div>
 }
 else if (PageData.Items.Count == 0)
 {
-    <p>Nenhum item encontrado.</p>
+    <div class="alert alert-secondary mt-3" role="status">No items match the selected filters.</div>
 }
 else
 {
-    foreach (var item in PageData.Items)
-    {
-        <MarketItemCard
-            Item="item"
-            ServerTimeOffset="ServerTimeOffset"
-            OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
-            OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
-    }
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
+        @foreach (var item in PageData.Items)
+        {
+            <div class="col" @key="item.ItemId">
+                <MarketItemCard
+                    Item="item"
+                    ServerTimeOffset="ServerTimeOffset"
+                    OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
+                    OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
+            </div>
+        }
+    </div>
+}
+
+@if (_isLoading && PageData is not null)
+{
+    <div class="alert alert-info mt-3" role="status">Refreshing items...</div>
+}
+
+@if (TotalPages > 1 && PageData is not null)
+{
+    <nav class="mt-4" aria-label="Market pagination">
+        <ul class="pagination pagination-sm justify-content-center flex-wrap">
+            <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Previous page" disabled="@(Query.Page == 1)">Previous</button>
+            </li>
+            @foreach (var page in GetVisiblePages())
+            {
+                <li class="page-item @(page == Query.Page ? "active" : string.Empty)">
+                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)" aria-current="@(page == Query.Page ? "page" : null)">@page</button>
+                </li>
+            }
+            <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Next page" disabled="@(Query.Page >= TotalPages)">Next</button>
+            </li>
+        </ul>
+    </nav>
 }
 
 @code {
     [Parameter]
     public Guid? CycleId { get; set; }
 
+    private static readonly IReadOnlyList<MarketSortOption> SortOptions = new[]
+    {
+        new MarketSortOption("expiresAtUtc", "Ending soon"),
+        new MarketSortOption("-expiresAtUtc", "Ending last"),
+        new MarketSortOption("-currentBid", "Highest bid"),
+        new MarketSortOption("currentBid", "Lowest bid")
+    };
+
+    private static readonly IReadOnlyList<string> StatusOptions = new[] { "Published", "Settled", "Canceled", "Closed", "Active" };
+
+    private readonly List<MarketPositionOption> _positionOptions = new();
     private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
     private PagedResult<CoreItemVm>? PageData;
     private TimeSpan ServerTimeOffset = TimeSpan.Zero;
     private Guid ActiveCycleId;
+    private CancellationTokenSource? _lifetimeCts;
     private CancellationTokenSource? _loadCts;
     private Func<CoreItemVm, Task>? _bidUpdatedHandler;
     private Func<CoreItemVm, Task>? _itemBoughtHandler;
     private Func<CoreItemVm, Task>? _itemClosedHandler;
+    private bool _isLoading;
+    private bool _initialized;
 
-    protected override Task OnInitializedAsync() => Task.CompletedTask;
+    private int TotalPages
+    {
+        get
+        {
+            if (PageData is null)
+            {
+                return 0;
+            }
+
+            if (PageData.Total == 0 || Query.PageSize <= 0)
+            {
+                return 1;
+            }
+
+            return (int)Math.Ceiling(PageData.Total / (double)Query.PageSize);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _lifetimeCts = new CancellationTokenSource();
+        ActiveCycleId = CycleId ?? Guid.Empty;
+        await LoadPositionsAsync();
+    }
 
     protected override void OnParametersSet()
     {
-        ActiveCycleId = CycleId ?? Guid.Empty;
+        var incomingCycle = CycleId ?? Guid.Empty;
+        if (incomingCycle == ActiveCycleId)
+        {
+            return;
+        }
+
+        ActiveCycleId = incomingCycle;
+        if (_initialized)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await JoinCycleAsync();
+                var ct = PrepareNewLoadCts();
+                await LoadPageAsync(1, ct);
+            });
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
+        if (!firstRender)
+        {
+            return;
+        }
 
         var ct = PrepareNewLoadCts();
         await LoadPageAsync(1, ct);
 
-        await Hub.ConnectAsync();
-        await Hub.JoinCycle(ActiveCycleId);
+        await Hub.ConnectAsync(_lifetimeCts?.Token ?? CancellationToken.None);
+        await JoinCycleAsync();
 
         _bidUpdatedHandler = vm =>
         {
@@ -93,31 +193,62 @@ else
         Hub.OnBidUpdated += _bidUpdatedHandler;
         Hub.OnItemBought += _itemBoughtHandler;
         Hub.OnItemClosed += _itemClosedHandler;
+
+        _initialized = true;
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            var positions = await PositionService.GetAllAsync();
+            _positionOptions.Clear();
+            _positionOptions.AddRange(positions.Select(p => new MarketPositionOption(p.PositionId, p.Name)));
+        }
+        catch
+        {
+            _positionOptions.Clear();
+        }
     }
 
     private async Task LoadPageAsync(int page, CancellationToken ct)
     {
-        Query.Page = page;
-        PagedResult<CoreItemVm>? result = await Client.GetItemsAsync(Query, ct);
-        PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
-        ComputeServerOffsetFromClient();
+        Query.Page = page < 1 ? 1 : page;
+        _isLoading = true;
         StateHasChangedSafe();
-    }
 
-    private void ComputeServerOffsetFromClient()
-    {
-        if (Client.LastServerTimeUtc.HasValue)
+        try
         {
-            ServerTimeOffset = Client.LastServerTimeUtc.Value - DateTime.UtcNow;
+            var result = await Client.GetItemsAsync(Query, ct);
+            PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            ComputeServerOffsetFromClient();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChangedSafe();
         }
     }
 
-    private CancellationToken PrepareNewLoadCts()
+    private async Task GoToPageAsync(int page)
     {
-        _loadCts?.Cancel();
-        _loadCts?.Dispose();
-        _loadCts = new CancellationTokenSource();
-        return _loadCts.Token;
+        if (page < 1 || page == Query.Page || PageData is null)
+        {
+            return;
+        }
+
+        var totalPages = TotalPages;
+        if (page > totalPages)
+        {
+            page = totalPages;
+        }
+
+        var ct = PrepareNewLoadCts();
+        await LoadPageAsync(page, ct);
     }
 
     private async Task ApplyFiltersAsync(CoreQueryVm incoming)
@@ -152,7 +283,11 @@ else
 
     private async Task ReloadSingleItemAsync(Guid itemId, CancellationToken ct)
     {
-        _ = itemId;
+        if (itemId == Guid.Empty)
+        {
+            return;
+        }
+
         await LoadPageAsync(Query.Page, ct);
     }
 
@@ -172,12 +307,75 @@ else
         }
     }
 
+    private IEnumerable<int> GetVisiblePages()
+    {
+        var totalPages = TotalPages;
+        if (totalPages <= 1)
+        {
+            yield break;
+        }
+
+        var start = Math.Max(1, Query.Page - 2);
+        var end = Math.Min(totalPages, start + 4);
+        start = Math.Max(1, end - 4);
+
+        for (var page = start; page <= end; page++)
+        {
+            yield return page;
+        }
+    }
+
+    private void ComputeServerOffsetFromClient()
+    {
+        if (Client.LastServerTimeUtc.HasValue)
+        {
+            ServerTimeOffset = Client.LastServerTimeUtc.Value - DateTime.UtcNow;
+        }
+    }
+
+    private CancellationToken PrepareNewLoadCts()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts?.Token ?? CancellationToken.None);
+        return _loadCts.Token;
+    }
+
+    private Task JoinCycleAsync()
+    {
+        return Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
+    }
+
     private void StateHasChangedSafe() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
+        _loadCts = null;
+
+        if (_bidUpdatedHandler is not null)
+        {
+            Hub.OnBidUpdated -= _bidUpdatedHandler;
+        }
+
+        if (_itemBoughtHandler is not null)
+        {
+            Hub.OnItemBought -= _itemBoughtHandler;
+        }
+
+        if (_itemClosedHandler is not null)
+        {
+            Hub.OnItemClosed -= _itemClosedHandler;
+        }
+
+        if (_lifetimeCts is not null)
+        {
+            _lifetimeCts.Cancel();
+            _lifetimeCts.Dispose();
+            _lifetimeCts = null;
+        }
+
         await Hub.DisposeAsync();
     }
 }

@@ -1,34 +1,129 @@
+@using System
 @using System.Collections.Generic
 @using System.Linq
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
+@using Fc25Draft.Web.Models.Market
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
 <EditForm Model="Model" OnValidSubmit="ApplyAsync">
-    <div class="market-filters d-flex flex-column flex-md-row gap-3 align-items-md-end">
-        <div class="flex-grow-1">
-            <label class="form-label" for="market-filter-name">Nome</label>
-            <InputText id="market-filter-name" class="form-control" @bind-Value="Model.Name" />
-        </div>
-        <div class="flex-grow-1">
-            <label class="form-label" for="market-filter-status">Status</label>
-            <InputText id="market-filter-status" class="form-control" @bind-Value="Model.Status" />
-        </div>
-        <div class="flex-grow-1">
-            <label class="form-label" for="market-filter-page-size">Itens por página</label>
-            <InputNumber TValue="int" id="market-filter-page-size" class="form-control" @bind-Value="Model.PageSize" min="1" />
-        </div>
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Aplicar</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">Limpar</button>
+    <div class="market-filters border rounded-3 p-3 bg-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg-3">
+                <label class="form-label" for="market-filter-name">Player name</label>
+                <InputText id="market-filter-name" class="form-control form-control-sm" @bind-Value="Model.Name" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label" for="market-filter-positions">Positions</label>
+                <div class="dropdown w-100">
+                    <button type="button"
+                            id="market-filter-positions"
+                            class="form-select form-select-sm text-start d-flex justify-content-between align-items-center"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            aria-haspopup="listbox"
+                            aria-expanded="false"
+                            aria-label="Filter by positions">
+                        <span class="text-truncate">@PositionsDisplayText</span>
+                        <span class="ms-2 text-secondary" aria-hidden="true">&#9662;</span>
+                    </button>
+                    <div class="dropdown-menu w-100 p-2" role="listbox">
+                        @if (PositionOptions.Count == 0)
+                        {
+                            <span class="dropdown-item-text text-muted">No positions available</span>
+                        }
+                        else
+                        {
+                            @foreach (var option in PositionOptions)
+                            {
+                                var isChecked = Model.Positions.Contains(option.Id);
+                                <label class="dropdown-item d-flex align-items-center gap-2" role="option">
+                                    <input class="form-check-input m-0" type="checkbox" checked="@isChecked" @onchange="args => OnPositionChanged(option.Id, args)" />
+                                    <span>@option.Name</span>
+                                </label>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label" for="market-filter-status">Status</label>
+                <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
+                    <option value="">All statuses</option>
+                    @foreach (var status in StatusOptions)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label" for="market-filter-sort">Sort by</label>
+                <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
+                    <option value="">Default</option>
+                    @foreach (var option in SortOptions)
+                    {
+                        <option value="@option.Value">@option.DisplayName</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label" for="market-filter-overall-min">Overall</label>
+                <div class="input-group input-group-sm">
+                    <InputNumber TValue="int?"
+                                 id="market-filter-overall-min"
+                                 class="form-control"
+                                 @bind-Value="Model.OverallMin"
+                                 min="0"
+                                 aria-label="Minimum overall" />
+                    <span class="input-group-text">to</span>
+                    <InputNumber TValue="int?"
+                                 id="market-filter-overall-max"
+                                 class="form-control"
+                                 @bind-Value="Model.OverallMax"
+                                 min="0"
+                                 aria-label="Maximum overall" />
+                </div>
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label" for="market-filter-page-size">Items per page</label>
+                <InputSelect id="market-filter-page-size" class="form-select form-select-sm" @bind-Value="Model.PageSize">
+                    @foreach (var size in PageSizeOptions)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 col-lg-2 d-flex gap-2 justify-content-lg-end">
+                <button type="submit" class="btn btn-primary btn-sm flex-grow-1 flex-lg-grow-0">Apply filters</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 flex-lg-grow-0" @onclick="ClearAsync">Clear</button>
+            </div>
         </div>
     </div>
 </EditForm>
 
 @code {
+    private static readonly IReadOnlyList<int> PageSizeOptions = new[] { 20, 50, 100 };
     private CoreQueryVm Model = new() { Page = 1, PageSize = 20 };
 
     [Parameter]
     public EventCallback<CoreQueryVm> OnApply { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<MarketPositionOption> PositionOptions { get; set; } = Array.Empty<MarketPositionOption>();
+
+    [Parameter]
+    public IReadOnlyList<string> StatusOptions { get; set; } = Array.Empty<string>();
+
+    [Parameter]
+    public IReadOnlyList<MarketSortOption> SortOptions { get; set; } = Array.Empty<MarketSortOption>();
+
+    private string PositionsDisplayText
+        => Model.Positions.Count switch
+        {
+            0 => "All positions",
+            1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 position",
+            _ => $"{Model.Positions.Count} positions"
+        };
 
     private async Task ApplyAsync()
     {
@@ -54,5 +149,23 @@
     {
         Model = new CoreQueryVm { Page = 1, PageSize = 20 };
         await ApplyAsync();
+    }
+
+    private void OnPositionChanged(int positionId, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool value && value;
+        var positions = Model.Positions ??= new List<int>();
+
+        if (isChecked)
+        {
+            if (!positions.Contains(positionId))
+            {
+                positions.Add(positionId);
+            }
+        }
+        else
+        {
+            positions.Remove(positionId);
+        }
     }
 }

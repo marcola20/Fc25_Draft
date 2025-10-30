@@ -33,10 +33,10 @@ namespace Fc25Draft.Web.Services
             if (query.Positions?.Any() == true) qs.Add($"positions={string.Join(",", query.Positions)}");
             if (query.OverallMin.HasValue) qs.Add($"overallMin={query.OverallMin.Value}");
             if (query.OverallMax.HasValue) qs.Add($"overallMax={query.OverallMax.Value}");
-            if (!string.IsNullOrWhiteSpace(query.Status)) qs.Add($"status={query.Status}");
+            if (!string.IsNullOrWhiteSpace(query.Status)) qs.Add($"status={Uri.EscapeDataString(query.Status)}");
             qs.Add($"page={query.Page}");
             qs.Add($"pageSize={query.PageSize}");
-            if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={query.Sort}");
+            if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={Uri.EscapeDataString(query.Sort)}");
 
             var url = "/api/market/items";
             if (qs.Count > 0)
