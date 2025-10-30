@@ -1,10 +1,490 @@
-@using Fc25Draft.Web.Models.Market
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using System.Threading
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components.Forms
+@using Fc25Draft.Core.DTOs
+@inject Fc25Draft.Web.Services.MarketClient Client
+@inject ILogger<MarketItemCard> Logger
+@implements IAsyncDisposable
 
 <div class="market-item-card">
-    <!-- Market item details will be implemented in a future phase. -->
+    <div class="market-item-card__header">
+        <div class="market-item-card__player">
+            <h3>@Item.PlayerName</h3>
+            <span class="market-item-card__overall">OVR @Item.Overall</span>
+        </div>
+        <div class="market-item-card__status">
+            <span>@Item.Status</span>
+        </div>
+    </div>
+
+    <div class="market-item-card__details">
+        <div>
+            @if (Item.CurrentLeaderAmount.HasValue)
+            {
+                <div class="market-item-card__leader">Current bid: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
+                @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+                {
+                    <div class="market-item-card__leader-team">by @Item.CurrentLeaderTeamName</div>
+                }
+            }
+            else
+            {
+                <div class="market-item-card__leader">No bids yet</div>
+            }
+        </div>
+        <div class="market-item-card__expires">
+            @if (IsExpired)
+            {
+                <span class="market-item-card__expired">Expired</span>
+            }
+            else
+            {
+                <span class="market-item-card__countdown">Time left: @CountdownText</span>
+            }
+        </div>
+    </div>
+
+    <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
+        <DataAnnotationsValidator />
+        <div class="market-item-card__form">
+            <InputNumber @bind-Value="_model.Amount"
+                         class="market-item-card__input"
+                         step="0.01"
+                         disabled="@IsBidDisabled"
+                         placeholder="Bid amount" />
+            <ValidationMessage For="() => _model.Amount" />
+            <button type="submit"
+                    class="market-item-card__bid-btn"
+                    disabled="@IsBidDisabled">
+                Place Bid
+            </button>
+        </div>
+    </EditForm>
+
+    @if (CanBuyNow)
+    {
+        <div class="market-item-card__buy">
+            <button type="button"
+                    class="market-item-card__buy-btn"
+                    disabled="@IsBidDisabled"
+                    @onclick="ShowBuyNowConfirm">
+                Buy Now @Item.BuyNowPrice!.Value.ToString("F2", CultureInfo.InvariantCulture)
+            </button>
+
+            @if (_showBuyConfirm)
+            {
+                <div class="market-item-card__buy-confirm">
+                    <p>Confirm buy now?</p>
+                    <button type="button"
+                            class="market-item-card__confirm-btn"
+                            disabled="@_isSubmitting"
+                            @onclick="ConfirmBuyNowAsync">
+                        Confirm
+                    </button>
+                    <button type="button"
+                            class="market-item-card__cancel-btn"
+                            disabled="@_isSubmitting"
+                            @onclick="CancelBuyNow">
+                        Cancel
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_infoMessage))
+    {
+        <div class="market-item-card__info">@_infoMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="market-item-card__error">@_errorMessage</div>
+    }
 </div>
 
 @code {
     [Parameter]
-    public Core.DTOs.MarketItemVm? Item { get; set; }
+    public MarketItemVm Item { get; set; } = default!;
+
+    [Parameter]
+    public TimeSpan ServerTimeOffset { get; set; }
+
+    [Parameter]
+    public EventCallback<MarketItemVm> OnBidPlaced { get; set; }
+
+    [Parameter]
+    public EventCallback<MarketItemVm> OnBought { get; set; }
+
+    private readonly BidFormModel _model = new();
+    private EditContext? _editContext;
+    private ValidationMessageStore? _validationMessageStore;
+    private CancellationTokenSource? _lifetimeCts;
+    private CancellationTokenSource? _submitCts;
+    private CancellationTokenSource? _timerCts;
+    private PeriodicTimer? _timer;
+    private Task? _timerTask;
+    private bool _isSubmitting;
+    private bool _showBuyConfirm;
+    private string? _infoMessage;
+    private string? _errorMessage;
+
+    private bool IsExpired => Remaining <= TimeSpan.Zero;
+
+    private bool IsBidDisabled => _isSubmitting || IsExpired || !IsActive;
+
+    private bool IsActive => string.Equals(Item.Status, "Active", StringComparison.OrdinalIgnoreCase);
+
+    private bool CanBuyNow => IsActive && Item.BuyNowPrice.HasValue;
+
+    private TimeSpan Remaining
+    {
+        get
+        {
+            var remaining = Item.ExpiresAtUtc - (DateTime.UtcNow + ServerTimeOffset);
+            return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+        }
+    }
+
+    private string CountdownText
+    {
+        get
+        {
+            var remaining = Remaining;
+            return string.Format(CultureInfo.InvariantCulture, "{0:D2}:{1:D2}:{2:D2}", remaining.Hours + (remaining.Days * 24), remaining.Minutes, remaining.Seconds);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (Item is null)
+        {
+            throw new InvalidOperationException("Item parameter is required.");
+        }
+
+        _lifetimeCts = new CancellationTokenSource();
+        _editContext = new EditContext(_model);
+        _validationMessageStore = new ValidationMessageStore(_editContext);
+        _editContext.OnValidationRequested += HandleValidationRequested;
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Item is null)
+        {
+            throw new InvalidOperationException("Item parameter is required.");
+        }
+
+        if (_editContext is null)
+        {
+            _editContext = new EditContext(_model);
+            _validationMessageStore = new ValidationMessageStore(_editContext);
+            _editContext.OnValidationRequested += HandleValidationRequested;
+            _editContext.OnFieldChanged += HandleFieldChanged;
+        }
+
+        ValidateAmount();
+        EnsureTimer();
+    }
+
+    private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e)
+    {
+        ValidateAmount();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        if (e.FieldIdentifier.FieldName == nameof(BidFormModel.Amount))
+        {
+            ValidateAmount();
+        }
+    }
+
+    private void ValidateAmount()
+    {
+        if (_editContext is null || _validationMessageStore is null)
+        {
+            return;
+        }
+
+        var field = new FieldIdentifier(_model, nameof(BidFormModel.Amount));
+        _validationMessageStore.Clear(field);
+
+        var minimum = (Item.CurrentLeaderAmount ?? 0m) + Item.MinIncrement;
+        if (_model.Amount.HasValue && _model.Amount.Value < minimum)
+        {
+            _validationMessageStore.Add(field, $"Bid must be at least {minimum.ToString("F2", CultureInfo.InvariantCulture)}.");
+        }
+
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    private void EnsureTimer()
+    {
+        if (_lifetimeCts is null)
+        {
+            return;
+        }
+
+        if (Remaining <= TimeSpan.Zero)
+        {
+            StopTimer();
+            return;
+        }
+
+        if (_timerTask is not null)
+        {
+            if (!_timerTask.IsCompleted)
+            {
+                return;
+            }
+
+            _timerTask = null;
+        }
+
+        StopTimer();
+
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        _timerCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+        _timerTask = RunTimerAsync(_timer, _timerCts.Token);
+    }
+
+    private void StopTimer()
+    {
+        _timerCts?.Cancel();
+    }
+
+    private async Task RunTimerAsync(PeriodicTimer timer, CancellationToken token)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                if (IsExpired)
+                {
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignored
+        }
+        finally
+        {
+            await timer.DisposeAsync();
+
+            if (ReferenceEquals(_timer, timer))
+            {
+                _timer = null;
+                _timerTask = null;
+                _timerCts?.Dispose();
+                _timerCts = null;
+            }
+        }
+    }
+
+    private async Task HandleBidSubmitAsync()
+    {
+        if (_editContext is null)
+        {
+            return;
+        }
+
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        _infoMessage = null;
+        _errorMessage = null;
+
+        if (!_editContext.Validate())
+        {
+            return;
+        }
+
+        if (!_model.Amount.HasValue)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _submitCts?.Cancel();
+        _submitCts?.Dispose();
+        _submitCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts?.Token ?? CancellationToken.None);
+
+        try
+        {
+            var request = new BidRequest
+            {
+                ItemId = Item.ItemId,
+                Amount = _model.Amount.Value,
+                RowVersion = Item.RowVersion
+            };
+
+            var updatedItem = await Client.PlaceBidAsync(request, _submitCts.Token);
+            Item = updatedItem;
+            _model.Amount = null;
+            var field = new FieldIdentifier(_model, nameof(BidFormModel.Amount));
+            _editContext.NotifyFieldChanged(field);
+            _validationMessageStore?.Clear();
+            _editContext.NotifyValidationStateChanged();
+            await OnBidPlaced.InvokeAsync(updatedItem);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogWarning(ex, "Bid rejected for item {ItemId}", Item.ItemId);
+            _infoMessage = "You were outbid. We refreshed the item with the latest price.";
+            StopTimer();
+            EnsureTimer();
+            if (OnBidPlaced.HasDelegate)
+            {
+                await OnBidPlaced.InvokeAsync(Item);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error placing bid for item {ItemId}", Item.ItemId);
+            _errorMessage = "Something went wrong while placing your bid. Please try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+            _submitCts?.Dispose();
+            _submitCts = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ShowBuyNowConfirm()
+    {
+        if (IsBidDisabled || !CanBuyNow)
+        {
+            return;
+        }
+
+        _showBuyConfirm = true;
+    }
+
+    private void CancelBuyNow()
+    {
+        _showBuyConfirm = false;
+    }
+
+    private async Task ConfirmBuyNowAsync()
+    {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        if (!CanBuyNow)
+        {
+            return;
+        }
+
+        _infoMessage = null;
+        _errorMessage = null;
+        _isSubmitting = true;
+        _submitCts?.Cancel();
+        _submitCts?.Dispose();
+        _submitCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts?.Token ?? CancellationToken.None);
+
+        try
+        {
+            var request = new BuyNowRequest
+            {
+                ItemId = Item.ItemId,
+                RowVersion = Item.RowVersion
+            };
+
+            var updatedItem = await Client.BuyNowAsync(request, _submitCts.Token);
+            Item = updatedItem;
+            _showBuyConfirm = false;
+            StopTimer();
+            EnsureTimer();
+            await OnBought.InvokeAsync(updatedItem);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogWarning(ex, "Buy now rejected for item {ItemId}", Item.ItemId);
+            _showBuyConfirm = false;
+            _infoMessage = "You were outbid. We refreshed the item with the latest price.";
+            StopTimer();
+            EnsureTimer();
+            if (OnBought.HasDelegate)
+            {
+                await OnBought.InvokeAsync(Item);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error buying item {ItemId}", Item.ItemId);
+            _errorMessage = "Something went wrong while completing the purchase. Please try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+            _submitCts?.Dispose();
+            _submitCts = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _submitCts?.Cancel();
+        _submitCts?.Dispose();
+
+        StopTimer();
+
+        if (_timerTask is not null)
+        {
+            try
+            {
+                await _timerTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                _timerTask = null;
+            }
+        }
+
+        if (_timer is not null)
+        {
+            await _timer.DisposeAsync();
+            _timer = null;
+        }
+
+        if (_timerCts is not null)
+        {
+            _timerCts.Dispose();
+            _timerCts = null;
+        }
+
+        _lifetimeCts?.Cancel();
+        _lifetimeCts?.Dispose();
+
+        if (_editContext is not null)
+        {
+            _editContext.OnValidationRequested -= HandleValidationRequested;
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+
+    private class BidFormModel
+    {
+        [Required]
+        public decimal? Amount { get; set; }
+    }
 }
