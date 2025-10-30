@@ -5,7 +5,9 @@
 @using System.Threading
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components.Forms
-@using Fc25Draft.Core.DTOs
+@using BidRequest = Fc25Draft.Core.DTOs.BidRequest
+@using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest
+@using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @inject Fc25Draft.Web.Services.MarketClient Client
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
@@ -109,16 +111,16 @@
 
 @code {
     [Parameter]
-    public MarketItemVm Item { get; set; } = default!;
+    public CoreItemVm Item { get; set; } = default!;
 
     [Parameter]
     public TimeSpan ServerTimeOffset { get; set; }
 
     [Parameter]
-    public EventCallback<MarketItemVm> OnBidPlaced { get; set; }
+    public EventCallback<CoreItemVm> OnBidPlaced { get; set; }
 
     [Parameter]
-    public EventCallback<MarketItemVm> OnBought { get; set; }
+    public EventCallback<CoreItemVm> OnBought { get; set; }
 
     private readonly BidFormModel _model = new();
     private EditContext? _editContext;

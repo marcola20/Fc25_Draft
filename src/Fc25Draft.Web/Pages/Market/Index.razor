@@ -1,17 +1,179 @@
 @page "/market"
-@using Fc25Draft.Web.Models.Market
-@using Fc25Draft.Web.Services
+@page "/market/{cycleId:guid}"
+@using System
+@using System.Collections.Generic
+@using System.Linq
+@using System.Threading
+@using System.Threading.Tasks
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Hubs
-@inject MarketClient MarketClient
-@inject MarketHubClient MarketHubClient
+@using Fc25Draft.Web.Services
+@using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
+@using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
+@inject MarketClient Client
+@inject MarketHubClient Hub
+@implements IAsyncDisposable
 
 <PageTitle>Mercado</PageTitle>
 
 <h3>Mercado</h3>
 
-<MarketFilters />
+<MarketFilters OnApply="ApplyFiltersAsync" />
+
+@if (PageData is null)
+{
+    <p><em>Carregando itens do mercado...</em></p>
+}
+else if (PageData.Items.Count == 0)
+{
+    <p>Nenhum item encontrado.</p>
+}
+else
+{
+    foreach (var item in PageData.Items)
+    {
+        <MarketItemCard
+            Item="item"
+            ServerTimeOffset="ServerTimeOffset"
+            OnBidPlaced="@EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync)"
+            OnBought="@EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync)" />
+    }
+}
 
 @code {
-    private Core.DTOs.MarketQueryVm query = new();
-    private IReadOnlyList<Core.DTOs.MarketItemVm> items = Array.Empty<Core.DTOs.MarketItemVm>();
+    [Parameter]
+    public Guid? CycleId { get; set; }
+
+    private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
+    private PagedResult<CoreItemVm>? PageData;
+    private TimeSpan ServerTimeOffset = TimeSpan.Zero;
+    private Guid ActiveCycleId;
+    private CancellationTokenSource? _loadCts;
+
+    protected override Task OnInitializedAsync() => Task.CompletedTask;
+
+    protected override void OnParametersSet()
+    {
+        ActiveCycleId = CycleId ?? Guid.Empty;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var ct = PrepareNewLoadCts();
+        await LoadPageAsync(1, ct);
+
+        await Hub.ConnectAsync();
+        await Hub.JoinCycle(ActiveCycleId);
+
+        Hub.OnBidUpdated = vm =>
+        {
+            MergeItem(vm);
+            StateHasChangedSafe();
+            return Task.CompletedTask;
+        };
+        Hub.OnItemBought = vm =>
+        {
+            MergeItem(vm);
+            StateHasChangedSafe();
+            return Task.CompletedTask;
+        };
+        Hub.OnItemClosed = vm =>
+        {
+            MergeItem(vm);
+            StateHasChangedSafe();
+            return Task.CompletedTask;
+        };
+    }
+
+    private async Task LoadPageAsync(int page, CancellationToken ct)
+    {
+        Query.Page = page;
+        PagedResult<CoreItemVm>? result = await Client.GetItemsAsync(Query, ct);
+        PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+        ComputeServerOffsetFromClient();
+        StateHasChangedSafe();
+    }
+
+    private void ComputeServerOffsetFromClient()
+    {
+        if (Client.LastServerTimeUtc.HasValue)
+        {
+            ServerTimeOffset = Client.LastServerTimeUtc.Value - DateTime.UtcNow;
+        }
+    }
+
+    private CancellationToken PrepareNewLoadCts()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        return _loadCts.Token;
+    }
+
+    private async Task ApplyFiltersAsync(CoreQueryVm incoming)
+    {
+        Query = new CoreQueryVm
+        {
+            Name = incoming.Name,
+            Positions = incoming.Positions?.ToList() ?? new List<int>(),
+            OverallMin = incoming.OverallMin,
+            OverallMax = incoming.OverallMax,
+            Status = incoming.Status,
+            Page = 1,
+            PageSize = incoming.PageSize > 0 ? incoming.PageSize : 20,
+            Sort = incoming.Sort
+        };
+
+        var ct = PrepareNewLoadCts();
+        await LoadPageAsync(1, ct);
+    }
+
+    private async Task HandleBidPlacedAsync(CoreItemVm vm)
+    {
+        var ct = PrepareNewLoadCts();
+        await ReloadSingleItemAsync(vm.ItemId, ct);
+    }
+
+    private async Task HandleBoughtAsync(CoreItemVm vm)
+    {
+        var ct = PrepareNewLoadCts();
+        await ReloadSingleItemAsync(vm.ItemId, ct);
+    }
+
+    private async Task ReloadSingleItemAsync(Guid itemId, CancellationToken ct)
+    {
+        _ = itemId;
+        await LoadPageAsync(Query.Page, ct);
+    }
+
+    private void MergeItem(CoreItemVm incoming)
+    {
+        if (PageData is null || PageData.Items is null || PageData.Items.Count == 0)
+        {
+            return;
+        }
+
+        var list = PageData.Items.ToList();
+        var index = list.FindIndex(item => item.ItemId == incoming.ItemId);
+        if (index >= 0)
+        {
+            list[index] = incoming;
+            PageData = new PagedResult<CoreItemVm>(list, PageData.Total);
+        }
+    }
+
+    private void StateHasChangedSafe() => _ = InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        await Hub.DisposeAsync();
+    }
 }

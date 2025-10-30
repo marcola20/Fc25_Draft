@@ -1,10 +1,58 @@
-@using Fc25Draft.Web.Models.Market
+@using System.Collections.Generic
+@using System.Linq
+@using Microsoft.AspNetCore.Components.Forms
+@using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
-<div class="market-filters">
-    <!-- Market filters will be implemented in a future phase. -->
-</div>
+<EditForm Model="Model" OnValidSubmit="ApplyAsync">
+    <div class="market-filters d-flex flex-column flex-md-row gap-3 align-items-md-end">
+        <div class="flex-grow-1">
+            <label class="form-label" for="market-filter-name">Nome</label>
+            <InputText id="market-filter-name" class="form-control" @bind-Value="Model.Name" />
+        </div>
+        <div class="flex-grow-1">
+            <label class="form-label" for="market-filter-status">Status</label>
+            <InputText id="market-filter-status" class="form-control" @bind-Value="Model.Status" />
+        </div>
+        <div class="flex-grow-1">
+            <label class="form-label" for="market-filter-page-size">Itens por página</label>
+            <InputNumber TValue="int" id="market-filter-page-size" class="form-control" @bind-Value="Model.PageSize" min="1" />
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Aplicar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">Limpar</button>
+        </div>
+    </div>
+</EditForm>
 
 @code {
+    private CoreQueryVm Model = new() { Page = 1, PageSize = 20 };
+
     [Parameter]
-    public Core.DTOs.MarketQueryVm? Query { get; set; }
+    public EventCallback<CoreQueryVm> OnApply { get; set; }
+
+    private async Task ApplyAsync()
+    {
+        var copy = new CoreQueryVm
+        {
+            Name = Model.Name,
+            Positions = Model.Positions?.ToList() ?? new List<int>(),
+            OverallMin = Model.OverallMin,
+            OverallMax = Model.OverallMax,
+            Status = Model.Status,
+            Page = 1,
+            PageSize = Model.PageSize,
+            Sort = Model.Sort
+        };
+
+        if (OnApply.HasDelegate)
+        {
+            await OnApply.InvokeAsync(copy);
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        Model = new CoreQueryVm { Page = 1, PageSize = 20 };
+        await ApplyAsync();
+    }
 }
