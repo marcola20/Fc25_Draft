@@ -38,7 +38,10 @@ namespace Fc25Draft.Web.Services
             qs.Add($"pageSize={query.PageSize}");
             if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={Uri.EscapeDataString(query.Sort)}");
 
-            var url = "/api/market/items";
+            // Public market endpoints live at /api/market. The previous URL (/api/market/items)
+            // targets the admin-only publication endpoints and results in a 401 response.
+            // Point the client to the anonymous listings endpoint instead.
+            var url = "/api/market";
             if (qs.Count > 0)
                 url += "?" + string.Join("&", qs);
 
@@ -63,7 +66,7 @@ namespace Fc25Draft.Web.Services
         public async Task<CoreItemVm> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
             var http = await _clientFactory.CreateAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{req.ItemId}/bid");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/bid");
             request.Headers.TryAddWithoutValidation("X-RowVersion", req.RowVersion);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
@@ -79,7 +82,7 @@ namespace Fc25Draft.Web.Services
         public async Task<CoreItemVm> BuyNowAsync(BuyNowRequest req, CancellationToken ct)
         {
             var http = await _clientFactory.CreateAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{req.ItemId}/buy-now");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/buy-now");
             request.Headers.TryAddWithoutValidation("X-RowVersion", req.RowVersion);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
