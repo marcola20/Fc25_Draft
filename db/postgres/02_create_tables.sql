@@ -37,7 +37,8 @@ create table "Teams"
     "OwnerName" varchar(80),
     "Token" varchar(80) not null,
     "Budget" numeric(18,2) not null default 0,
-    "BudgetBlocked" numeric(18,2) not null default 0
+    "BudgetBlocked" numeric(18,2) not null default 0,
+    "RowVersion" bytea not null default decode(md5(random()::text || clock_timestamp()::text), 'hex')
 );
 
 create table "Token_Administrador"
@@ -137,6 +138,19 @@ create table "MarketBids"
     "Amount" numeric(18,2) not null,
     "CreatedAtUtc" timestamptz not null
 );
+
+create or replace function set_team_rowversion()
+returns trigger as $$
+begin
+    new."RowVersion" = decode(md5(random()::text || clock_timestamp()::text), 'hex');
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger tr_set_team_rowversion
+before update on "Teams"
+for each row
+execute function set_team_rowversion();
 
 insert into "Positions" ("PositionId", "Name") values
     (1, 'Goleiro'),

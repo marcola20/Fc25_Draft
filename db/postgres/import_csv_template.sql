@@ -1,4 +1,4 @@
-\copy "Teams" from '/path/Teams.csv' csv header;
+\copy "Teams" ("TeamId", "TeamName", "OwnerName", "Token", "Budget", "BudgetBlocked") from '/path/Teams.csv' csv header;
 \copy "Players" from '/path/Players.csv' csv header;
 \copy "Drafts" from '/path/Drafts.csv' csv header;
 \copy "DraftRounds" from '/path/DraftRounds.csv' csv header;
