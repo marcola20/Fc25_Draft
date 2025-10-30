@@ -1,3 +1,4 @@
+@using System
 @using System.ComponentModel.DataAnnotations
 @using System.Globalization
 @using System.Threading
@@ -278,7 +279,10 @@
         }
         finally
         {
-            await timer.DisposeAsync();
+            if (timer is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
 
             if (ReferenceEquals(_timer, timer))
             {
@@ -460,11 +464,11 @@
             }
         }
 
-        if (_timer is not null)
+        if (_timer is IAsyncDisposable asyncDisposableTimer)
         {
-            await _timer.DisposeAsync();
-            _timer = null;
+            await asyncDisposableTimer.DisposeAsync();
         }
+        _timer = null;
 
         if (_timerCts is not null)
         {
