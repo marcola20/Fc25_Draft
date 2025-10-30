@@ -30,6 +30,7 @@ public class MarketHubClient : IAsyncDisposable
         {
             if (_connection.State == HubConnectionState.Disconnected)
             {
+                _logger.LogInformation("Re-establishing market hub connection.");
                 await _connection.StartAsync(ct);
             }
 
@@ -46,13 +47,64 @@ public class MarketHubClient : IAsyncDisposable
         _connection.On<CoreItemVm>("ItemClosed", async vm => await InvokeSafeAsync(OnItemClosed, vm));
         _connection.On<CoreItemVm>("ItemBought", async vm => await InvokeSafeAsync(OnItemBought, vm));
 
+        _connection.Closed += error =>
+        {
+            if (error is not null)
+            {
+                _logger.LogError(error, "Market hub connection closed unexpectedly.");
+            }
+            else
+            {
+                _logger.LogInformation("Market hub connection closed.");
+            }
+
+            return Task.CompletedTask;
+        };
+
+        _connection.Reconnecting += error =>
+        {
+            if (error is not null)
+            {
+                _logger.LogWarning(error, "Market hub connection reconnecting due to an error.");
+            }
+            else
+            {
+                _logger.LogWarning("Market hub connection is reconnecting.");
+            }
+
+            return Task.CompletedTask;
+        };
+
+        _connection.Reconnected += connectionId =>
+        {
+            _logger.LogInformation("Market hub connection reconnected with id {ConnectionId}.", connectionId);
+            return Task.CompletedTask;
+        };
+
+        _logger.LogInformation("Establishing market hub connection at {HubUri}.", hubUri);
         await _connection.StartAsync(ct);
+        _logger.LogInformation("Market hub connection established.");
     }
 
     public async Task JoinCycle(Guid cycleId, CancellationToken ct = default)
     {
-        if (cycleId == Guid.Empty || _connection is null)
+        if (cycleId == Guid.Empty)
         {
+            return;
+        }
+
+        if (_connection is null)
+        {
+            _logger.LogWarning("Cannot join market cycle {CycleId} because the hub connection is not initialized.", cycleId);
+            return;
+        }
+
+        if (_connection.State != HubConnectionState.Connected)
+        {
+            _logger.LogWarning(
+                "Cannot join market cycle {CycleId} because the hub connection state is {State}.",
+                cycleId,
+                _connection.State);
             return;
         }
 
@@ -85,7 +137,16 @@ public class MarketHubClient : IAsyncDisposable
 
         try
         {
+            if (_connection.State != HubConnectionState.Disconnected)
+            {
+                await _connection.StopAsync();
+            }
+
             await _connection.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error while disposing the market hub connection.");
         }
         finally
         {

@@ -5,6 +5,7 @@
 @inject AdminTransfersApiClient AdminTransfersApiClient
 @inject BudgetsApiClient BudgetsApiClient
 @inject MarketApiClient MarketApiClient
+@inject ILogger<Transfers> Logger
 
 @implements IDisposable
 
@@ -617,6 +618,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load negotiation data for admin page.");
             pageError = ex.Message;
         }
         finally
@@ -866,6 +868,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load budget summary for team {TeamId}.", teamId);
             pageError = ex.Message;
             await InvokeAsync(StateHasChanged);
         }
@@ -970,6 +973,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to complete sell negotiation from {FromTeam} to {ToTeam}.", sellModel.FromTeamId, sellModel.ToTeamId);
             sellErrorMessage = ex.Message;
         }
         finally
@@ -1035,6 +1039,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to complete swap negotiation between {TeamA} and {TeamB}.", swapModel.TeamAId, swapModel.TeamBId);
             swapErrorMessage = ex.Message;
         }
         finally
@@ -1099,6 +1104,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to complete move negotiation for player {PlayerId}.", moveModel.PlayerId);
             moveErrorMessage = ex.Message;
         }
         finally
@@ -1136,6 +1142,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to adjust budget for team {TeamId}.", adjustModel.TeamId);
             budgetErrorMessage = ex.Message;
         }
         finally
@@ -1172,6 +1179,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to cancel market item {MarketItemId}.", cancelModel.MarketItemId);
             cancelErrorMessage = ex.Message;
         }
         finally

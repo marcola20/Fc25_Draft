@@ -16,7 +16,7 @@
     <div class="card-body d-flex flex-column gap-3">
         <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start">
             <div>
-                <h3 class="h5 mb-1">@Item.PlayerName</h3>
+                <h3 class="h5 mb-1">@PlayerNameDisplay</h3>
                 <span class="badge bg-secondary" aria-label="Overall rating">OVR @Item.Overall</span>
             </div>
             <span class="badge @StatusBadgeClass">@StatusDisplay</span>
@@ -27,9 +27,9 @@
                 @if (Item.CurrentLeaderAmount.HasValue)
                 {
                     <div class="fw-semibold text-body">Current bid: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
-                    @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+                    @if (!string.IsNullOrWhiteSpace(LeaderTeamNameDisplay))
                     {
-                        <div>by @Item.CurrentLeaderTeamName</div>
+                        <div>by @LeaderTeamNameDisplay</div>
                     }
                 }
                 else
@@ -159,7 +159,24 @@
 
     private bool CanBuyNow => IsActive && Item.BuyNowPrice.HasValue;
 
-    private string StatusDisplay => IsExpired ? "Closed" : Item.Status;
+    private string PlayerNameDisplay => string.IsNullOrWhiteSpace(Item.PlayerName) ? "Unknown player" : Item.PlayerName;
+
+    private string? LeaderTeamNameDisplay => string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName)
+        ? null
+        : Item.CurrentLeaderTeamName;
+
+    private string StatusDisplay
+    {
+        get
+        {
+            if (IsExpired)
+            {
+                return "Closed";
+            }
+
+            return string.IsNullOrWhiteSpace(Item.Status) ? "Unknown" : Item.Status;
+        }
+    }
 
     private string StatusBadgeClass
     {

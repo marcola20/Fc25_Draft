@@ -28,6 +28,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.Net.Http.Headers;
@@ -65,10 +67,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor(options =>
-{
-    options.DetailedErrors = true;
-});
+builder.Services
+    .AddServerSideBlazor()
+    .AddCircuitOptions(options => options.DetailedErrors = true);
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<DraftService>();
@@ -109,7 +110,11 @@ if (!app.Environment.IsEnvironment("Testing"))
     await app.SeedDatabaseAsync();
 }
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+else
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
@@ -128,6 +133,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHub<DraftHub>("/hubs/draft");
+app.MapHub<MarketHub>("/hubs/market");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 app.MapHealthChecks("/health");
@@ -1017,40 +1023,58 @@ static void MapTeamEndpoints(RouteGroupBuilder api)
         return Results.Ok(dto);
     });
 
-    teamsApi.MapGet("/roster", async (DraftDbContext db, CancellationToken ct) =>
+    teamsApi.MapGet("/roster", async (
+        DraftDbContext db,
+        HttpContext context,
+        ILogger<Program> logger,
+        CancellationToken ct) =>
     {
-        var roster = await db.Teams
-            .AsNoTracking()
-            .OrderBy(t => t.TeamName)
-            .Select(t => new TeamRosterDto(
-                t.TeamId,
-                t.TeamName,
-                t.OwnerName,
-                t.Roster
-                    .OrderBy(r => r.Player.Name)
-                    .Select(r => new TeamRosterPlayerDto(
-                        r.Player.PlayerGuid,
-                        r.PlayerId,
-                        r.Player.Name,
-                        r.Player.Position.Name,
-                        r.Player.Overall,
-                        r.Player.Age,
-                        db.DraftPicks
-                            .Where(p => p.PlayerId == r.PlayerId)
-                            .Select(p => p.PickedAtUtc)
-                            .FirstOrDefault(),
-                        db.DraftPicks
-                            .Where(p => p.PlayerId == r.PlayerId)
-                            .Select(p => (int?)p.RoundNumber)
-                            .FirstOrDefault(),
-                        db.DraftPicks
-                            .Where(p => p.PlayerId == r.PlayerId)
-                            .Select(p => (int?)p.PickInRound)
-                            .FirstOrDefault()))
-                    .ToList()))
-            .ToListAsync(ct);
+        try
+        {
+            var roster = await db.Teams
+                .AsNoTracking()
+                .OrderBy(t => t.TeamName)
+                .Select(t => new TeamRosterDto(
+                    t.TeamId,
+                    t.TeamName,
+                    t.OwnerName,
+                    t.Roster
+                        .OrderBy(r => r.Player.Name)
+                        .Select(r => new TeamRosterPlayerDto(
+                            r.Player.PlayerGuid,
+                            r.PlayerId,
+                            r.Player.Name,
+                            r.Player.Position != null ? (r.Player.Position.Name ?? string.Empty) : string.Empty,
+                            r.Player.Overall,
+                            r.Player.Age,
+                            db.DraftPicks
+                                .Where(p => p.PlayerId == r.PlayerId)
+                                .Select(p => p.PickedAtUtc)
+                                .FirstOrDefault(),
+                            db.DraftPicks
+                                .Where(p => p.PlayerId == r.PlayerId)
+                                .Select(p => (int?)p.RoundNumber)
+                                .FirstOrDefault(),
+                            db.DraftPicks
+                                .Where(p => p.PlayerId == r.PlayerId)
+                                .Select(p => (int?)p.PickInRound)
+                                .FirstOrDefault()))
+                        .ToList()))
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
 
-        return Results.Ok(roster);
+            return Results.Ok(roster ?? new List<TeamRosterDto>());
+        }
+        catch (Exception ex)
+        {
+            return CreateServerError(
+                context,
+                logger,
+                "Failed to load team rosters for negotiations.",
+                "Unable to load team rosters.",
+                "An unexpected error occurred while retrieving the team rosters. Please try again.",
+                ex);
+        }
     });
 
     teamsApi.MapGet("/{id:guid}/roster", async (DraftDbContext db, Guid id, CancellationToken ct) =>
@@ -1607,13 +1631,33 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         })
         .RequireAuthorization("AdminOnly");
 
-    marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
-    {
-        await marketService.EnsureCycleAsync(ct);
-        await marketService.CloseExpiredItemsAsync(ct);
-        var items = await marketService.GetActiveItemsAsync(ct);
-        return Results.Ok(items);
-    }).AllowAnonymous();
+    marketApi.MapGet(
+        string.Empty,
+        async (
+            IMarketService marketService,
+            HttpContext context,
+            ILogger<Program> logger,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await marketService.EnsureCycleAsync(ct).ConfigureAwait(false);
+                await marketService.CloseExpiredItemsAsync(ct).ConfigureAwait(false);
+                var items = await marketService.GetActiveItemsAsync(ct).ConfigureAwait(false);
+                return Results.Ok(items ?? new List<MarketItemDto>());
+            }
+            catch (Exception ex)
+            {
+                return CreateServerError(
+                    context,
+                    logger,
+                    "Failed to load public market items.",
+                    "Unable to load market items.",
+                    "An unexpected error occurred while retrieving the market items. Please try again.",
+                    ex);
+            }
+        })
+        .AllowAnonymous();
 
     marketApi.MapGet("/{itemId:guid}", async (Guid itemId, IMarketService marketService, CancellationToken ct) =>
     {
@@ -1770,10 +1814,27 @@ static void MapMarketItemPublicationEndpoints(RouteGroupBuilder marketApi)
     var itemsApi = marketApi.MapGroup("/items")
         .RequireAuthorization("AdminOnly");
 
-    itemsApi.MapGet(string.Empty, async (IMarketItemPublicationService service, CancellationToken ct) =>
+    itemsApi.MapGet(string.Empty, async (
+        IMarketItemPublicationService service,
+        HttpContext context,
+        ILogger<Program> logger,
+        CancellationToken ct) =>
     {
-        var items = await service.ListAsync(ct).ConfigureAwait(false);
-        return Results.Ok(items);
+        try
+        {
+            var items = await service.ListAsync(ct).ConfigureAwait(false);
+            return Results.Ok(items ?? Array.Empty<MarketItemPublicationDto>());
+        }
+        catch (Exception ex)
+        {
+            return CreateServerError(
+                context,
+                logger,
+                "Failed to list market publication items.",
+                "Unable to load market items.",
+                "An unexpected error occurred while retrieving the market publication items. Please try again.",
+                ex);
+        }
     });
 
     itemsApi.MapGet("/{itemId:guid}", async (
@@ -1919,6 +1980,46 @@ static void MapMarketItemPublicationEndpoints(RouteGroupBuilder marketApi)
             return CreatePreconditionFailedProblem(ex.Message);
         }
     });
+}
+
+static IResult CreateServerError(
+    HttpContext context,
+    ILogger logger,
+    string logMessage,
+    string title,
+    string detail,
+    Exception exception)
+{
+    var correlationId = Guid.NewGuid().ToString("N");
+    var path = context.Request.Path.HasValue ? context.Request.Path.Value : string.Empty;
+
+    logger.LogError(
+        exception,
+        "{Message} Path: {Path}. CorrelationId: {CorrelationId}",
+        logMessage,
+        path,
+        correlationId);
+
+    context.Response.Headers["x-correlation-id"] = correlationId;
+
+    var problem = new ProblemDetails
+    {
+        Title = title,
+        Detail = detail,
+        Status = StatusCodes.Status500InternalServerError,
+        Type = "https://httpstatuses.com/500",
+        Instance = path
+    };
+
+    problem.Extensions["correlationId"] = correlationId;
+
+    var env = context.RequestServices.GetService<IHostEnvironment>();
+    if (env?.IsDevelopment() == true)
+    {
+        problem.Extensions["exception"] = exception.ToString();
+    }
+
+    return Results.Problem(problem);
 }
 
 static void ApplyEtag(HttpResponse response, uint rowVersion)

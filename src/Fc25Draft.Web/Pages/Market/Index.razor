@@ -230,8 +230,9 @@ else
             _positionOptions.Clear();
             _positionOptions.AddRange(positions.Select(p => new MarketPositionOption(p.PositionId, p.Name)));
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load positions for market filters.");
             _positionOptions.Clear();
         }
     }

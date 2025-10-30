@@ -52,8 +52,16 @@ namespace Fc25Draft.Web.Services
             // Optionally read server UTC time header
             if (resp.Headers.TryGetValues("x-server-time-utc", out var values))
             {
-                var serverUtc = DateTime.Parse(values.First(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                LastServerTimeUtc = serverUtc;
+                var rawValue = values.FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(rawValue)
+                    && DateTime.TryParse(
+                        rawValue,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out var serverUtc))
+                {
+                    LastServerTimeUtc = serverUtc.ToUniversalTime();
+                }
             }
 
             var json = await resp.Content.ReadAsStringAsync(ct);
