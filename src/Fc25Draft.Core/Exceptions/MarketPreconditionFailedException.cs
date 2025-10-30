@@ -6,4 +6,9 @@ public class MarketPreconditionFailedException : Exception
         : base(message)
     {
     }
+
+    public MarketPreconditionFailedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

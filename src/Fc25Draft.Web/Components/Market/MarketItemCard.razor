@@ -8,6 +8,7 @@
 @using BidRequest = Fc25Draft.Core.DTOs.BidRequest
 @using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
+@using Fc25Draft.Web.Services
 @inject Fc25Draft.Web.Services.MarketClient Client
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
@@ -367,19 +368,20 @@
                 RowVersion = Item.RowVersion
             };
 
-            var updatedItem = await Client.PlaceBidAsync(request, _submitCts.Token);
-            Item = updatedItem;
+            var response = await Client.PlaceBidAsync(request, _submitCts.Token);
+            Item = response.Payload;
+            _infoMessage = response.Message;
             _model.Amount = null;
             var field = new FieldIdentifier(_model, nameof(BidFormModel.Amount));
             _editContext.NotifyFieldChanged(field);
             _validationMessageStore?.Clear();
             _editContext.NotifyValidationStateChanged();
-            await OnBidPlaced.InvokeAsync(updatedItem);
+            await OnBidPlaced.InvokeAsync(response.Payload);
         }
-        catch (InvalidOperationException ex)
+        catch (MarketConcurrencyException ex)
         {
             Logger.LogWarning(ex, "Bid rejected for item {ItemId}", Item.ItemId);
-            _infoMessage = "You were outbid. We refreshed the item with the latest price.";
+            _infoMessage = ex.Message;
             StopTimer();
             EnsureTimer();
             if (OnBidPlaced.HasDelegate)
@@ -443,18 +445,19 @@
                 RowVersion = Item.RowVersion
             };
 
-            var updatedItem = await Client.BuyNowAsync(request, _submitCts.Token);
-            Item = updatedItem;
+            var response = await Client.BuyNowAsync(request, _submitCts.Token);
+            Item = response.Payload;
+            _infoMessage = response.Message;
             _showBuyConfirm = false;
             StopTimer();
             EnsureTimer();
-            await OnBought.InvokeAsync(updatedItem);
+            await OnBought.InvokeAsync(response.Payload);
         }
-        catch (InvalidOperationException ex)
+        catch (MarketConcurrencyException ex)
         {
             Logger.LogWarning(ex, "Buy now rejected for item {ItemId}", Item.ItemId);
             _showBuyConfirm = false;
-            _infoMessage = "You were outbid. We refreshed the item with the latest price.";
+            _infoMessage = ex.Message;
             StopTimer();
             EnsureTimer();
             if (OnBought.HasDelegate)

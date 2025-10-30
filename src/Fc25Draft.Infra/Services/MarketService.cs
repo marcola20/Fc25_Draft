@@ -98,12 +98,19 @@ public class MarketService : IMarketService
         return item is null ? null : ToDto(item);
     }
 
-    public async Task<BidResultDto> PlaceBidAsync(Guid itemId, string teamToken, decimal amount, CancellationToken ct)
+    public async Task<BidResultDto> PlaceBidAsync(
+        Guid itemId,
+        string teamToken,
+        decimal amount,
+        uint expectedRowVersion,
+        CancellationToken ct)
     {
         if (amount <= 0)
         {
             throw new MarketValidationException("O valor do lance deve ser maior que zero.");
         }
+
+        EnsureExpectedRowVersion(expectedRowVersion);
 
         var normalizedToken = NormalizeToken(teamToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -116,6 +123,8 @@ public class MarketService : IMarketService
             .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
+
+        EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
         if (item.Status != MarketItemStatus.Published)
         {
@@ -218,14 +227,31 @@ public class MarketService : IMarketService
             ct).ConfigureAwait(false);
 
         await _dbContext.MarketBids.AddAsync(bid, ct).ConfigureAwait(false);
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new MarketPreconditionFailedException(
+                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
+                ex);
+        }
+
         await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new BidResultDto(true, "Lance registrado com sucesso.", amount);
     }
 
-    public async Task<BuyNowResultDto> BuyNowAsync(Guid itemId, string teamToken, CancellationToken ct)
+    public async Task<BuyNowResultDto> BuyNowAsync(
+        Guid itemId,
+        string teamToken,
+        uint expectedRowVersion,
+        CancellationToken ct)
     {
+        EnsureExpectedRowVersion(expectedRowVersion);
+
         var normalizedToken = NormalizeToken(teamToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -237,6 +263,8 @@ public class MarketService : IMarketService
             .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
+
+        EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
         var previousLeaderId = item.CurrentLeaderTeamId;
         var previousLeaderAmount = item.CurrentLeaderAmount;
@@ -353,7 +381,17 @@ public class MarketService : IMarketService
             PerformedAtUtc = now
         }, ct).ConfigureAwait(false);
 
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new MarketPreconditionFailedException(
+                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
+                ex);
+        }
+
         await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new BuyNowResultDto(true, "Compra realizada com sucesso.");
@@ -634,6 +672,23 @@ public class MarketService : IMarketService
             statusText,
             item.CurrentLeaderAmount,
             item.CurrentLeaderTeam?.TeamName,
-            item.CurrentLeaderTeamId);
+            item.CurrentLeaderTeamId,
+            item.RowVersion);
+    }
+
+    private static void EnsureExpectedRowVersion(uint expectedRowVersion)
+    {
+        if (expectedRowVersion == 0)
+        {
+            throw new MarketPreconditionFailedException("A versão informada do item é inválida.");
+        }
+    }
+
+    private static void EnsureRowVersion(uint current, uint expected)
+    {
+        if (current != expected)
+        {
+            throw new MarketPreconditionFailedException("O item foi atualizado por outro time. Atualize a página e tente novamente.");
+        }
     }
 }

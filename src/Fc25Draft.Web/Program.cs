@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -1641,9 +1642,14 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        if (!TryResolveRowVersion(context.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
+        {
+            return errorResult!;
+        }
+
         try
         {
-            var result = await marketService.PlaceBidAsync(itemId, token, request.Amount, ct);
+            var result = await marketService.PlaceBidAsync(itemId, token, request.Amount, rowVersion, ct);
             return Results.Ok(result);
         }
         catch (MarketForbiddenException ex)
@@ -1657,6 +1663,10 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         catch (MarketConflictException ex)
         {
             return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return CreatePreconditionFailedProblem(ex.Message);
         }
         catch (MarketNotFoundException ex)
         {
@@ -1677,9 +1687,14 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        if (!TryResolveRowVersion(context.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
+        {
+            return errorResult!;
+        }
+
         try
         {
-            var result = await marketService.BuyNowAsync(itemId, token, ct);
+            var result = await marketService.BuyNowAsync(itemId, token, rowVersion, ct);
             return Results.Ok(result);
         }
         catch (MarketForbiddenException ex)
@@ -1693,6 +1708,10 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
         catch (MarketConflictException ex)
         {
             return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return CreatePreconditionFailedProblem(ex.Message);
         }
         catch (MarketNotFoundException ex)
         {
@@ -1930,49 +1949,70 @@ static void ApplyEtag(HttpResponse response, uint rowVersion)
     response.Headers[HeaderNames.ETag] = $"W/\"{rowVersion}\"";
 }
 
-static bool TryResolveRowVersion(HttpRequest request, out uint rowVersion, out IResult? errorResult)
+static bool TryResolveRowVersion(
+    HttpRequest request,
+    out uint rowVersion,
+    out IResult? errorResult,
+    bool allowFallbackToRowVersionHeader = false)
 {
     rowVersion = 0;
     errorResult = null;
 
-    if (!request.Headers.TryGetValue(HeaderNames.IfMatch, out var headerValues))
+    var requirementDetail = allowFallbackToRowVersionHeader
+        ? "Os cabeçalhos If-Match ou X-RowVersion são obrigatórios para esta operação."
+        : "O cabeçalho If-Match é obrigatório para esta operação.";
+
+    var invalidDetail = allowFallbackToRowVersionHeader
+        ? "Não foi possível interpretar o valor informado nos cabeçalhos If-Match ou X-RowVersion."
+        : "Não foi possível interpretar o valor do cabeçalho If-Match.";
+
+    string? rawValue = null;
+    var fromIfMatch = false;
+
+    if (request.Headers.TryGetValue(HeaderNames.IfMatch, out var headerValues))
+    {
+        rawValue = headerValues.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+        fromIfMatch = !string.IsNullOrWhiteSpace(rawValue);
+    }
+
+    if (string.IsNullOrWhiteSpace(rawValue) && allowFallbackToRowVersionHeader)
+    {
+        if (request.Headers.TryGetValue("X-RowVersion", out var customValues))
+        {
+            rawValue = customValues.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(rawValue))
     {
         errorResult = TypedResults.Problem(
             title: "Pré-condição obrigatória.",
-            detail: "O cabeçalho If-Match é obrigatório para esta operação.",
+            detail: requirementDetail,
             statusCode: StatusCodes.Status428PreconditionRequired,
             type: "https://httpstatuses.com/428"
         );
         return false;
     }
 
-    var rawValue = headerValues.FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(rawValue))
-    {
-        errorResult = TypedResults.Problem(
-            title: "Cabeçalho If-Match inválido.",
-            detail: "O valor informado no cabeçalho If-Match é inválido.",
-            statusCode: StatusCodes.Status400BadRequest,
-            type: "https://httpstatuses.com/400"
-        );
-        return false;
-    }
-
     var parsed = rawValue.Trim();
-    if (parsed.StartsWith("W/\"", StringComparison.OrdinalIgnoreCase) && parsed.EndsWith("\""))
+
+    if (fromIfMatch)
     {
-        parsed = parsed[3..^1];
-    }
-    else if (parsed.StartsWith('"') && parsed.EndsWith('"'))
-    {
-        parsed = parsed[1..^1];
+        if (parsed.StartsWith("W/\"", StringComparison.OrdinalIgnoreCase) && parsed.EndsWith("\""))
+        {
+            parsed = parsed[3..^1];
+        }
+        else if (parsed.StartsWith('"') && parsed.EndsWith('"'))
+        {
+            parsed = parsed[1..^1];
+        }
     }
 
     if (!uint.TryParse(parsed, out rowVersion))
     {
         errorResult = TypedResults.Problem(
-            title: "Cabeçalho If-Match inválido.",
-            detail: "Não foi possível interpretar o valor do cabeçalho If-Match.",
+            title: "Cabeçalho de versão inválido.",
+            detail: invalidDetail,
             statusCode: StatusCodes.Status400BadRequest,
             type: "https://httpstatuses.com/400"
         );
@@ -2174,8 +2214,8 @@ static MarketItemVm MapToMarketItemVm(MarketItemDto dto) => new MarketItemVm
     BuyNowPrice = dto.BuyNowPrice,
     MinIncrement = dto.MinIncrement,
     ExpiresAtUtc = dto.ExpiresAtUtc,
-    Status = dto.Status.ToString(), 
-    RowVersion = string.Empty 
+    Status = dto.Status.ToString(),
+    RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
 };
 
 record MarketBidRequest(decimal Amount, string? TeamToken);

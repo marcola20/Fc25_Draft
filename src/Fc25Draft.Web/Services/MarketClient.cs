@@ -9,6 +9,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Extensions;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
 using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest;
 using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm;
@@ -62,36 +65,128 @@ namespace Fc25Draft.Web.Services
 
         public DateTime? LastServerTimeUtc { get; private set; }
 
-        public async Task<CoreItemVm> PlaceBidAsync(BidRequest req, CancellationToken ct)
+        public async Task<MarketClientActionResult<CoreItemVm>> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
             var http = await _clientFactory.CreateAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/bid");
-            request.Headers.TryAddWithoutValidation("X-RowVersion", req.RowVersion);
+            ApplyRowVersionHeaders(request, req.RowVersion);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
-                throw new InvalidOperationException("Outbid or stale version.");
+            {
+                var message = await ExtractProblemMessageAsync(resp, ct)
+                    ?? "Não foi possível registrar o lance porque o item foi atualizado. Atualize os dados e tente novamente.";
+                throw new MarketConcurrencyException(message, resp.StatusCode);
+            }
 
             resp.EnsureSuccessStatusCode();
-            return await resp.Content.ReadFromJsonAsync<CoreItemVm>(cancellationToken: ct)
-                ?? throw new InvalidOperationException("Failed to deserialize MarketItemVm");
+            var result = await resp.Content.ReadFromJsonAsync<BidResultDto>(cancellationToken: ct);
+            var message = result?.Message ?? "Lance registrado com sucesso.";
+
+            var updatedItem = await FetchItemAsync(http, req.ItemId, ct)
+                ?? throw new InvalidOperationException("Failed to reload market item after bid.");
+
+            return new MarketClientActionResult<CoreItemVm>(updatedItem, message);
         }
 
-        public async Task<CoreItemVm> BuyNowAsync(BuyNowRequest req, CancellationToken ct)
+        public async Task<MarketClientActionResult<CoreItemVm>> BuyNowAsync(BuyNowRequest req, CancellationToken ct)
         {
             var http = await _clientFactory.CreateAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/buy-now");
-            request.Headers.TryAddWithoutValidation("X-RowVersion", req.RowVersion);
+            ApplyRowVersionHeaders(request, req.RowVersion);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
-                throw new InvalidOperationException("Outbid or stale version.");
+            {
+                var message = await ExtractProblemMessageAsync(resp, ct)
+                    ?? "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
+                throw new MarketConcurrencyException(message, resp.StatusCode);
+            }
 
             resp.EnsureSuccessStatusCode();
-            return await resp.Content.ReadFromJsonAsync<CoreItemVm>(cancellationToken: ct)
-                ?? throw new InvalidOperationException("Failed to deserialize MarketItemVm");
+            var result = await resp.Content.ReadFromJsonAsync<BuyNowResultDto>(cancellationToken: ct);
+            var message = result?.Message ?? "Compra realizada com sucesso.";
+
+            var updatedItem = await FetchItemAsync(http, req.ItemId, ct)
+                ?? throw new InvalidOperationException("Failed to reload market item after buy now operation.");
+
+            return new MarketClientActionResult<CoreItemVm>(updatedItem, message);
+        }
+
+        private static void ApplyRowVersionHeaders(HttpRequestMessage request, string? rowVersion)
+        {
+            if (string.IsNullOrWhiteSpace(rowVersion))
+            {
+                return;
+            }
+
+            var sanitized = rowVersion.Trim();
+            request.Headers.TryAddWithoutValidation("X-RowVersion", sanitized);
+            request.Headers.TryAddWithoutValidation(HeaderNames.IfMatch, $"W/\"{sanitized}\"");
+        }
+
+        private static async Task<string?> ExtractProblemMessageAsync(HttpResponseMessage response, CancellationToken ct)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return null;
+            }
+
+            try
+            {
+                var problem = JsonSerializer.Deserialize<ProblemDetails>(body, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return problem?.Detail ?? problem?.Title ?? body;
+            }
+            catch
+            {
+                return body;
+            }
+        }
+
+        private static CoreItemVm MapToViewModel(MarketItemDto dto)
+        {
+            return new CoreItemVm
+            {
+                ItemId = dto.ItemId,
+                PlayerId = dto.PlayerId,
+                PlayerName = dto.PlayerName,
+                PositionId = dto.Position.ToPositionId(),
+                Overall = dto.Ovr,
+                CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
+                CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
+                CurrentLeaderAmount = dto.CurrentLeaderAmount,
+                BuyNowPrice = dto.BuyNowPrice,
+                MinIncrement = dto.MinIncrement,
+                ExpiresAtUtc = dto.ExpiresAtUtc,
+                Status = dto.Status,
+                RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
+            };
+        }
+
+        private static async Task<CoreItemVm?> FetchItemAsync(HttpClient http, Guid itemId, CancellationToken ct)
+        {
+            using var resp = await http.GetAsync($"/api/market/{itemId}", ct);
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            resp.EnsureSuccessStatusCode();
+
+            var dto = await resp.Content.ReadFromJsonAsync<MarketItemDto>(
+                options: new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                cancellationToken: ct);
+
+            return dto is null ? null : MapToViewModel(dto);
         }
     }
+
+    public sealed record MarketClientActionResult<T>(T Payload, string Message);
 }

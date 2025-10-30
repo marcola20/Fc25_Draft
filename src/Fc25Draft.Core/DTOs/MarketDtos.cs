@@ -17,7 +17,8 @@ public record MarketItemDto(
     string Status,
     decimal? CurrentLeaderAmount,
     string? CurrentLeaderTeamName,
-    Guid? CurrentLeaderTeamId);
+    Guid? CurrentLeaderTeamId,
+    uint RowVersion);
 
 public record BidResultDto(bool Ok, string Message, decimal? LeaderAmount);
 
