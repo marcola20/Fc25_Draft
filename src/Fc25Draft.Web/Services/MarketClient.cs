@@ -1,15 +1,12 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Web.Models.Market;
-using Fc25Draft.Web.Models.Shared;
+using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
+using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest;
+using MarketItemVm = Fc25Draft.Core.DTOs.MarketItemVm;
+using MarketQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm;
 
 namespace Fc25Draft.Web.Services
 {
