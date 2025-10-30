@@ -1,4 +1,5 @@
 @page "/market"
+@page "/market/{ActiveCycleId:guid}"
 @using System
 @using System.Collections.Generic
 @using System.Globalization
@@ -6,9 +7,8 @@
 @using System.Threading
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components
-@using Fc25Draft.Core.DTOs
+@using CoreDtos = Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Components.Market
-@using Fc25Draft.Web.Models.Market
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Hubs
 @inject MarketClient Client
@@ -168,8 +168,8 @@
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly int[] _pageSizeOptions = new[] { 10, 20, 50 };
     private readonly object _mergeLock = new();
-    private MarketQueryVm Query { get; } = new();
-    private PagedResult<MarketItemVm> PageData { get; set; } = new(Array.Empty<MarketItemVm>(), 0);
+    private Fc25Draft.Web.Models.Market.MarketQueryVm Query { get; } = new();
+    private CoreDtos.PagedResult<CoreDtos.MarketItemVm> PageData { get; set; } = new(Array.Empty<CoreDtos.MarketItemVm>(), 0);
     private TimeSpan ServerTimeOffset { get; set; } = TimeSpan.Zero;
     private Guid? expandedItemId;
     private CancellationTokenSource? _loadCts;
@@ -181,7 +181,7 @@
 
     private int TotalPages => Query.PageSize <= 0
         ? 1
-        : (int)Math.Ceiling(PageData.Total / (double)Query.PageSize);
+        : Math.Max(1, (int)Math.Ceiling(PageData.Total / (double)Query.PageSize));
 
     protected override Task OnInitializedAsync()
     {
@@ -260,7 +260,7 @@
 
         try
         {
-            var request = new Fc25Draft.Core.DTOs.MarketQueryVm
+            var request = new CoreDtos.MarketQueryVm
             {
                 Name = Query.Name,
                 Positions = Query.Positions?.ToList() ?? new List<int>(),
@@ -273,7 +273,7 @@
             };
 
             var result = await Client.GetItemsAsync(request, ct).ConfigureAwait(false);
-            PageData = result ?? new PagedResult<MarketItemVm>(Array.Empty<MarketItemVm>(), 0);
+            PageData = result ?? new CoreDtos.PagedResult<CoreDtos.MarketItemVm>(Array.Empty<CoreDtos.MarketItemVm>(), 0);
 
             if (Client.LastServerTimeUtc.HasValue)
             {
@@ -296,7 +296,7 @@
         }
     }
 
-    private Task ApplyFiltersAsync(MarketQueryVm filters)
+    private Task ApplyFiltersAsync(Fc25Draft.Web.Models.Market.MarketQueryVm filters)
     {
         Query.Name = filters.Name;
         Query.Positions.Clear();
@@ -356,6 +356,10 @@
             }
 
             MergeItem(item);
+            if (Client.LastServerTimeUtc.HasValue)
+            {
+                ServerTimeOffset = Client.LastServerTimeUtc.Value - DateTime.UtcNow;
+            }
             await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)
@@ -368,31 +372,31 @@
         }
     }
 
-    private Task HandleBidPlacedAsync(MarketItemVm item)
+    private Task HandleBidPlacedAsync(CoreDtos.MarketItemVm item)
         => ReloadSingleItemAsync(item.ItemId);
 
-    private Task HandleBoughtAsync(MarketItemVm item)
+    private Task HandleBoughtAsync(CoreDtos.MarketItemVm item)
         => ReloadSingleItemAsync(item.ItemId);
 
-    private Task HandleHubBidUpdatedAsync(MarketItemVm item)
+    private Task HandleHubBidUpdatedAsync(CoreDtos.MarketItemVm item)
     {
         MergeItem(item);
         return InvokeAsync(StateHasChanged);
     }
 
-    private Task HandleHubItemBoughtAsync(MarketItemVm item)
+    private Task HandleHubItemBoughtAsync(CoreDtos.MarketItemVm item)
     {
         MergeItem(item);
         return InvokeAsync(StateHasChanged);
     }
 
-    private Task HandleHubItemClosedAsync(MarketItemVm item)
+    private Task HandleHubItemClosedAsync(CoreDtos.MarketItemVm item)
     {
         MergeItem(item);
         return InvokeAsync(StateHasChanged);
     }
 
-    private void MergeItem(MarketItemVm item)
+    private void MergeItem(CoreDtos.MarketItemVm item)
     {
         lock (_mergeLock)
         {
@@ -404,7 +408,7 @@
             }
 
             items[index] = item;
-            PageData = new PagedResult<MarketItemVm>(items, PageData.Total);
+            PageData = new CoreDtos.PagedResult<CoreDtos.MarketItemVm>(items, PageData.Total);
         }
     }
 
