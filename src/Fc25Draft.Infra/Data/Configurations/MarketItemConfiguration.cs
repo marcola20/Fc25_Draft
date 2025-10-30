@@ -10,13 +10,19 @@ public class MarketItemConfiguration : IEntityTypeConfiguration<MarketItem>
     {
         builder.HasKey(x => x.ItemId);
         builder.Property(x => x.BasePrice).HasColumnType("numeric(18,2)").IsRequired();
-        builder.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)").IsRequired(false);
         builder.Property(x => x.MinIncrement).HasColumnType("numeric(18,2)").IsRequired();
         builder.Property(x => x.CurrentLeaderAmount).HasColumnType("numeric(18,2)");
         builder.Property(x => x.Status).HasConversion<int>().IsRequired();
-        builder.Property(x => x.CreatedAtUtc).IsRequired();
-        builder.Property(x => x.LastUpdateUtc).IsRequired();
-        builder.Property(x => x.ExpiresAtUtc).IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(x => x.PublishedAtUtc).HasColumnType("timestamp with time zone");
+        builder.Property(x => x.LastUpdateUtc).HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(x => x.ExpiresAtUtc).HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .IsConcurrencyToken()
+            .ValueGeneratedOnAddOrUpdate();
 
         builder.HasOne(x => x.Player)
             .WithMany(p => p.MarketItems)

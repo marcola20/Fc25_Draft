@@ -244,7 +244,7 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<decimal>("BasePrice")
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<decimal>("BuyNowPrice")
+                    b.Property<decimal?>("BuyNowPrice")
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -271,8 +271,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<Guid?>("WinnerTeamId")
                         .HasColumnType("uuid");

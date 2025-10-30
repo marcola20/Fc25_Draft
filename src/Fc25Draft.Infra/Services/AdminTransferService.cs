@@ -101,7 +101,7 @@ public partial class AdminTransferService
                 .ConfigureAwait(false)
                 ?? throw new KeyNotFoundException("Item de mercado não encontrado.");
 
-            if (item.Status != MarketItemStatus.Active)
+            if (item.Status != MarketItemStatus.Published)
             {
                 throw new AdminConflictException("Somente itens ativos sem lances podem ser cancelados.");
             }
@@ -111,7 +111,7 @@ public partial class AdminTransferService
                 throw new AdminConflictException("O item possui um líder atual e não pode ser cancelado.");
             }
 
-            item.Status = MarketItemStatus.Cancelled;
+            item.Status = MarketItemStatus.Canceled;
             item.CurrentLeaderAmount = null;
             item.CurrentLeaderTeamId = null;
             item.LastUpdateUtc = now;
@@ -250,7 +250,7 @@ public partial class AdminTransferService
                 .AsNoTracking()
                 .AnyAsync(
                     i => playerNumericIds.Contains(i.PlayerId)
-                        && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged),
+                        && i.Status == MarketItemStatus.Published,
                     ct)
                 .ConfigureAwait(false);
 
@@ -485,7 +485,7 @@ public partial class AdminTransferService
                     .AsNoTracking()
                     .AnyAsync(
                         i => playerNumericIds.Contains(i.PlayerId)
-                            && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged),
+                            && i.Status == MarketItemStatus.Published,
                         ct)
                     .ConfigureAwait(false);
 
@@ -740,7 +740,7 @@ public partial class AdminTransferService
                 .AsNoTracking()
                 .AnyAsync(
                     i => i.PlayerId == player.PlayerId
-                        && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged),
+                        && i.Status == MarketItemStatus.Published,
                     ct)
                 .ConfigureAwait(false);
 

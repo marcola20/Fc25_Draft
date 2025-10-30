@@ -98,14 +98,15 @@ create table "MarketItems"
     "PlayerId" integer not null,
     "Status" integer not null,
     "BasePrice" numeric(18,2) not null,
-    "BuyNowPrice" numeric(18,2) not null,
+    "BuyNowPrice" numeric(18,2),
     "MinIncrement" numeric(18,2) not null,
     "CurrentLeaderAmount" numeric(18,2),
     "CurrentLeaderTeamId" uuid,
     "WinnerTeamId" uuid,
     "CreatedAtUtc" timestamptz not null,
     "LastUpdateUtc" timestamptz not null,
-    "ExpiresAtUtc" timestamptz not null
+    "ExpiresAtUtc" timestamptz not null,
+    "PublishedAtUtc" timestamptz
 );
 
 create table "TeamRosters"

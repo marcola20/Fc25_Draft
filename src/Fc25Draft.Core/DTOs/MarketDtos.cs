@@ -11,7 +11,7 @@ public record MarketItemDto(
     int Ovr,
     int Age,
     decimal BasePrice,
-    decimal BuyNowPrice,
+    decimal? BuyNowPrice,
     decimal MinIncrement,
     DateTime ExpiresAtUtc,
     string Status,

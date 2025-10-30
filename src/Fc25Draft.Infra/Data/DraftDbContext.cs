@@ -196,10 +196,20 @@ public class DraftDbContext : DbContext
         {
             e.HasKey(x => x.ItemId);
 
-            e.Property(x => x.BasePrice).HasColumnType("numeric(18,2)");
-            e.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)");
-            e.Property(x => x.MinIncrement).HasColumnType("numeric(18,2)");
+            e.Property(x => x.BasePrice).HasColumnType("numeric(18,2)").IsRequired();
+            e.Property(x => x.BuyNowPrice).HasColumnType("numeric(18,2)").IsRequired(false);
+            e.Property(x => x.MinIncrement).HasColumnType("numeric(18,2)").IsRequired();
             e.Property(x => x.CurrentLeaderAmount).HasColumnType("numeric(18,2)");
+            e.Property(x => x.Status).HasConversion<int>().IsRequired();
+            e.Property(x => x.CreatedAtUtc).HasColumnType("timestamp with time zone").IsRequired();
+            e.Property(x => x.PublishedAtUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUpdateUtc).HasColumnType("timestamp with time zone").IsRequired();
+            e.Property(x => x.ExpiresAtUtc).HasColumnType("timestamp with time zone").IsRequired();
+            e.Property(x => x.RowVersion)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .IsConcurrencyToken()
+                .ValueGeneratedOnAddOrUpdate();
 
             e.HasIndex(x => new { x.CycleId, x.Status, x.ExpiresAtUtc });
             e.HasIndex(x => x.PlayerId).HasDatabaseName("IX_MarketItems_Player");

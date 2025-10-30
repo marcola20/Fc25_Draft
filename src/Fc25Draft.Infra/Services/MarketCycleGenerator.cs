@@ -106,7 +106,8 @@ public class MarketCycleGenerator : IMarketCycleGenerator
                 BasePrice = pricing.BasePrice,
                 BuyNowPrice = pricing.BuyNowPrice,
                 MinIncrement = pricing.MinIncrement,
-                Status = MarketItemStatus.Active,
+                Status = MarketItemStatus.Published,
+                PublishedAtUtc = now,
                 ExpiresAtUtc = nextCycleAt,
                 CreatedAtUtc = now,
                 LastUpdateUtc = now
@@ -126,7 +127,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
     {
         var ids = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged)
+            .Where(i => i.Status == MarketItemStatus.Published)
             .Select(i => i.PlayerId)
             .ToListAsync(ct)
             .ConfigureAwait(false);

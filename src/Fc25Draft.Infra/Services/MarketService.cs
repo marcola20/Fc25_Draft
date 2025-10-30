@@ -70,7 +70,7 @@ public class MarketService : IMarketService
 
         var items = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged) && i.ExpiresAtUtc > now)
+            .Where(i => i.Status == MarketItemStatus.Published && i.ExpiresAtUtc > now)
             .Include(i => i.Player)
                 .ThenInclude(p => p.Position)
             .Include(i => i.CurrentLeaderTeam)
@@ -113,7 +113,7 @@ public class MarketService : IMarketService
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
 
-        if (item.Status != MarketItemStatus.Active && item.Status != MarketItemStatus.LeaderChanged)
+        if (item.Status != MarketItemStatus.Published)
         {
             throw new MarketConflictException("O item não está disponível para lances.");
         }
@@ -173,7 +173,6 @@ public class MarketService : IMarketService
 
         item.CurrentLeaderTeamId = team.TeamId;
         item.CurrentLeaderAmount = amount;
-        item.Status = MarketItemStatus.LeaderChanged;
         item.LastUpdateUtc = now;
 
         await _dbContext.MarketBids.AddAsync(bid, ct).ConfigureAwait(false);
@@ -197,10 +196,17 @@ public class MarketService : IMarketService
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
 
-        if (item.Status != MarketItemStatus.Active && item.Status != MarketItemStatus.LeaderChanged)
+        if (item.Status != MarketItemStatus.Published)
         {
             throw new MarketConflictException("O item não está disponível para compra imediata.");
         }
+
+        if (!item.BuyNowPrice.HasValue)
+        {
+            throw new MarketConflictException("O item não possui opção de compra imediata.");
+        }
+
+        var buyNowPrice = item.BuyNowPrice.Value;
 
         if (item.ExpiresAtUtc <= now)
         {
@@ -217,7 +223,7 @@ public class MarketService : IMarketService
         var blockedForItem = item.CurrentLeaderTeamId == team.TeamId ? item.CurrentLeaderAmount ?? 0m : 0m;
         var available = team.Budget - team.BudgetBlocked + blockedForItem;
 
-        if (available < item.BuyNowPrice)
+        if (available < buyNowPrice)
         {
             throw new MarketConflictException("Saldo insuficiente para comprar agora.");
         }
@@ -244,13 +250,13 @@ public class MarketService : IMarketService
             }
         }
 
-        team.Budget -= item.BuyNowPrice;
+        team.Budget -= buyNowPrice;
         team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - blockedForItem);
 
         player.CurrentTeamId = team.TeamId;
         await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
 
-        item.Status = MarketItemStatus.BuyNow;
+        item.Status = MarketItemStatus.Settled;
         item.WinnerTeamId = team.TeamId;
         item.LastUpdateUtc = now;
         item.ExpiresAtUtc = now;
@@ -261,7 +267,7 @@ public class MarketService : IMarketService
             PlayerId = player.PlayerId,
             FromTeamId = null,
             ToTeamId = team.TeamId,
-            Amount = item.BuyNowPrice,
+            Amount = buyNowPrice,
             Type = TransferType.MarketAuction,
             Notes = "Compra imediata",
             PerformedBy = "sistema",
@@ -280,7 +286,7 @@ public class MarketService : IMarketService
 
         var itemIds = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged) && i.ExpiresAtUtc <= now)
+            .Where(i => i.Status == MarketItemStatus.Published && i.ExpiresAtUtc <= now)
             .Select(i => i.ItemId)
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -306,7 +312,7 @@ public class MarketService : IMarketService
                 continue;
             }
 
-            if (item.Status != MarketItemStatus.Active && item.Status != MarketItemStatus.LeaderChanged)
+            if (item.Status != MarketItemStatus.Published)
             {
                 continue;
             }
@@ -324,7 +330,10 @@ public class MarketService : IMarketService
 
                 if (team is null)
                 {
-                    item.Status = MarketItemStatus.Expired;
+                    item.Status = MarketItemStatus.Settled;
+                    item.CurrentLeaderTeamId = null;
+                    item.CurrentLeaderAmount = null;
+                    item.WinnerTeamId = null;
                 }
                 else
                 {
@@ -348,7 +357,7 @@ public class MarketService : IMarketService
                         await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
                     }
 
-                    item.Status = MarketItemStatus.Completed;
+                    item.Status = MarketItemStatus.Settled;
                     item.WinnerTeamId = team.TeamId;
 
                     await _dbContext.TransferHistories.AddAsync(new TransferHistory
@@ -367,7 +376,10 @@ public class MarketService : IMarketService
             }
             else
             {
-                item.Status = MarketItemStatus.Expired;
+                item.Status = MarketItemStatus.Settled;
+                item.CurrentLeaderTeamId = null;
+                item.CurrentLeaderAmount = null;
+                item.WinnerTeamId = null;
             }
 
             item.LastUpdateUtc = now;
@@ -396,7 +408,7 @@ public class MarketService : IMarketService
         {
             var hasActive = await _dbContext.MarketItems
                 .AsNoTracking()
-                .AnyAsync(i => i.CycleId == cycleId && (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged), ct)
+                .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Published, ct)
                 .ConfigureAwait(false);
 
             if (!hasActive)
@@ -425,7 +437,7 @@ public class MarketService : IMarketService
 
         var activeLeads = await _dbContext.MarketItems
             .AsNoTracking()
-            .CountAsync(i => (i.Status == MarketItemStatus.Active || i.Status == MarketItemStatus.LeaderChanged) && i.CurrentLeaderTeamId == teamId && i.ItemId != itemId, ct)
+            .CountAsync(i => i.Status == MarketItemStatus.Published && i.CurrentLeaderTeamId == teamId && i.ItemId != itemId, ct)
             .ConfigureAwait(false);
 
         var projected = currentPlayers + activeLeads;
@@ -480,12 +492,10 @@ public class MarketService : IMarketService
     {
         var statusText = item.Status switch
         {
-            MarketItemStatus.Active => "Ativo",
-            MarketItemStatus.LeaderChanged => "Com disputa",
-            MarketItemStatus.BuyNow => "Compra imediata",
-            MarketItemStatus.Expired => "Expirado",
-            MarketItemStatus.Cancelled => "Cancelado",
-            MarketItemStatus.Completed => "Concluído",
+            MarketItemStatus.Draft => "Rascunho",
+            MarketItemStatus.Published => "Publicado",
+            MarketItemStatus.Settled => "Finalizado",
+            MarketItemStatus.Canceled => "Cancelado",
             _ => item.Status.ToString()
         };
 
