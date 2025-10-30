@@ -16,11 +16,11 @@
     <div class="market-filters border rounded-3 p-3 bg-body">
         <div class="row g-3 align-items-end">
             <div class="col-12 col-lg-3">
-                <label class="form-label" for="market-filter-name">Nome do Jogador</label>
-                <InputText id="market-filter-name" class="form-control form-control-sm" @bind-Value="Model.Name" />
+                <label class="form-label" for="market-filter-name">Nome do jogador</label>
+                <InputText id="market-filter-name" class="form-control form-control-sm" @bind-Value="Model.Name" placeholder="Filtrar pelo nome" aria-label="Filtrar pelo nome" />
             </div>
             <div class="col-12 col-lg-3">
-                <label class="form-label" for="market-filter-positions">Posi��es</label>
+                <label class="form-label" for="market-filter-positions">Posições</label>
                 <div class="dropdown w-100">
                     <button type="button"
                             id="market-filter-positions"
@@ -29,14 +29,14 @@
                             data-bs-auto-close="outside"
                             aria-haspopup="listbox"
                             aria-expanded="false"
-                            aria-label="Filter by positions">
+                            aria-label="Filtrar por posições">
                         <span class="text-truncate">@PositionsDisplayText</span>
                         <span class="ms-2 text-secondary" aria-hidden="true">&#9662;</span>
                     </button>
                     <div class="dropdown-menu w-100 p-2" role="listbox">
                         @if (PositionOptions.Count == 0)
                         {
-                            <span class="dropdown-item-text text-muted">No positions available</span>
+                            <span class="dropdown-item-text text-muted">Nenhuma posição disponível</span>
                         }
                         else
                         {
@@ -65,7 +65,7 @@
             <div class="col-12 col-lg-2">
                 <label class="form-label" for="market-filter-sort">Ordenar por</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
-                    <option value="">Padr�o</option>
+                    <option value="">Padrão</option>
                     @foreach (var option in SortOptions)
                     {
                         <option value="@option.Value">@option.DisplayName</option>
@@ -80,18 +80,18 @@
                                  class="form-control"
                                  @bind-Value="Model.OverallMin"
                                  min="0"
-                                 aria-label="Minimum overall" />
-                    <span class="input-group-text">para</span>
+                                 aria-label="Overall mínimo" />
+                    <span class="input-group-text">até</span>
                     <InputNumber TValue="int?"
                                  id="market-filter-overall-max"
                                  class="form-control"
                                  @bind-Value="Model.OverallMax"
                                  min="0"
-                                 aria-label="Maximum overall" />
+                                 aria-label="Overall máximo" />
                 </div>
             </div>
             <div class="col-12 col-lg-2">
-                <label class="form-label" for="market-filter-page-size">Itens por p�gina</label>
+                <label class="form-label" for="market-filter-page-size">Itens por página</label>
                 <InputSelect id="market-filter-page-size" class="form-select form-select-sm" @bind-Value="Model.PageSize">
                     @foreach (var size in PageSizeOptions)
                     {
@@ -100,7 +100,7 @@
                 </InputSelect>
             </div>
             <div class="col-12 col-lg-2 d-flex gap-2 justify-content-lg-end">
-                <button type="submit" class="btn btn-primary btn-sm flex-grow-1 flex-lg-grow-0">Aplicar Filtros</button>
+                <button type="submit" class="btn btn-primary btn-sm flex-grow-1 flex-lg-grow-0">Aplicar filtros</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 flex-lg-grow-0" @onclick="ClearAsync">Limpar</button>
             </div>
         </div>
@@ -127,8 +127,8 @@
     => Model.Positions.Count switch
     {
         0 => "Todas",
-        1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 posi��o",
-        _ => $"{Model.Positions.Count} posi��es"
+        1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 posição",
+        _ => $"{Model.Positions.Count} posições"
     };
 
     private async Task ApplyAsync()

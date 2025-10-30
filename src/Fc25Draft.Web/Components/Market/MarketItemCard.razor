@@ -18,7 +18,7 @@
         <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start">
             <div>
                 <h3 class="h5 mb-1">@Item.PlayerName</h3>
-                <span class="badge bg-secondary" aria-label="Overall rating">OVR @Item.Overall</span>
+                <span class="badge bg-secondary" aria-label="Classificação geral">OVR @Item.Overall</span>
             </div>
             <span class="badge @StatusBadgeClass">@StatusDisplay</span>
         </div>
@@ -27,26 +27,26 @@
             <div class="text-muted small">
                 @if (Item.CurrentLeaderAmount.HasValue)
                 {
-                    <div class="fw-semibold text-body">Current bid: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
+                    <div class="fw-semibold text-body">Lance atual: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
                     @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
                     {
-                        <div>by @Item.CurrentLeaderTeamName</div>
+                        <div>por @Item.CurrentLeaderTeamName</div>
                     }
                 }
                 else
                 {
-                    <div class="fw-semibold text-body">No bids yet</div>
-                    <div>Be the first to bid.</div>
+                    <div class="fw-semibold text-body">Nenhum lance ainda</div>
+                    <div>Seja o primeiro a dar um lance.</div>
                 }
             </div>
             <div class="text-end" aria-live="polite">
                 @if (IsExpired)
                 {
-                    <span class="badge bg-secondary">Closed</span>
+                    <span class="badge bg-secondary">Encerrado</span>
                 }
                 else
                 {
-                    <span class="fw-semibold">Time left: @CountdownText</span>
+                    <span class="fw-semibold">Tempo restante: @CountdownText</span>
                 }
             </div>
         </div>
@@ -55,19 +55,19 @@
             <DataAnnotationsValidator />
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-sm-6 col-lg-5">
-                    <label class="form-label" for="@BidInputId">Bid amount</label>
+                    <label class="form-label" for="@BidInputId">Valor do lance</label>
                     <InputNumber @bind-Value="_model.Amount"
                                  class="form-control form-control-sm"
                                  id="@BidInputId"
                                  step="0.01"
                                  disabled="@IsBidDisabled"
                                  aria-describedby="@BidValidationId"
-                                 placeholder="Enter your bid" />
+                                 placeholder="Insira seu lance" />
                     <ValidationMessage class="text-danger small" id="@BidValidationId" For="() => _model.Amount" />
                 </div>
                 <div class="col-12 col-sm-auto">
                     <label class="form-label d-none d-sm-block">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary btn-sm w-100" disabled="@IsBidDisabled">Bid</button>
+                    <button type="submit" class="btn btn-primary btn-sm w-100" disabled="@IsBidDisabled">Dar lance</button>
                 </div>
             </div>
         </EditForm>
@@ -76,13 +76,13 @@
         {
             <div class="d-flex flex-column gap-2">
                 <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="text-muted small">Buy now price:</span>
+                    <span class="text-muted small">Preço de compra imediata:</span>
                     <span class="fw-semibold">@Item.BuyNowPrice!.Value.ToString("F2", CultureInfo.InvariantCulture)</span>
                     <button type="button"
                             class="btn btn-outline-success btn-sm ms-auto"
                             disabled="@IsBidDisabled"
                             @onclick="ShowBuyNowConfirm">
-                        Buy now
+                        Comprar agora
                     </button>
                 </div>
 
@@ -90,18 +90,18 @@
                 {
                     <div class="alert alert-warning py-2 mb-0" role="alert">
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                            <span class="me-auto">Confirm buy now?</span>
+                            <span class="me-auto">Confirmar compra imediata?</span>
                             <button type="button"
                                     class="btn btn-warning btn-sm"
                                     disabled="@_isSubmitting"
                                     @onclick="ConfirmBuyNowAsync">
-                                Confirm
+                                Confirmar
                             </button>
                             <button type="button"
                                     class="btn btn-outline-secondary btn-sm"
                                     disabled="@_isSubmitting"
                                     @onclick="CancelBuyNow">
-                                Cancel
+                                Cancelar
                             </button>
                         </div>
                     </div>
@@ -160,19 +160,20 @@
 
     private bool CanBuyNow => IsActive && Item.BuyNowPrice.HasValue;
 
-    private string StatusDisplay => IsExpired ? "Closed" : Item.Status;
+    private string StatusDisplay => IsExpired ? "Encerrado" : TranslateStatus(Item.Status);
 
     private string StatusBadgeClass
     {
         get
         {
-            var status = StatusDisplay.ToLowerInvariant();
+            var rawStatus = IsExpired ? "encerrado" : Item.Status ?? string.Empty;
+            var status = rawStatus.ToLowerInvariant();
             return status switch
             {
-                "active" or "published" => "bg-success",
-                "sold" or "settled" => "bg-primary",
-                "closed" => "bg-secondary",
-                "canceled" or "cancelled" => "bg-secondary",
+                "active" or "published" or "ativo" or "publicado" => "bg-success",
+                "sold" or "settled" or "vendido" or "finalizado" => "bg-primary",
+                "closed" or "encerrado" => "bg-secondary",
+                "canceled" or "cancelled" or "cancelado" => "bg-secondary",
                 _ => "bg-secondary"
             };
         }
@@ -255,7 +256,7 @@
         var minimum = (Item.CurrentLeaderAmount ?? 0m) + Item.MinIncrement;
         if (_model.Amount.HasValue && _model.Amount.Value < minimum)
         {
-            _validationMessageStore.Add(field, $"Bid must be at least {minimum.ToString("F2", CultureInfo.InvariantCulture)}.");
+            _validationMessageStore.Add(field, $"O lance deve ser de pelo menos {minimum.ToString("F2", CultureInfo.InvariantCulture)}.");
         }
 
         _editContext.NotifyValidationStateChanged();
@@ -392,7 +393,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Unexpected error placing bid for item {ItemId}", Item.ItemId);
-            _errorMessage = "Something went wrong while placing your bid. Please try again.";
+            _errorMessage = "Ocorreu um erro ao registrar o seu lance. Tente novamente.";
         }
         finally
         {
@@ -468,7 +469,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Unexpected error buying item {ItemId}", Item.ItemId);
-            _errorMessage = "Something went wrong while completing the purchase. Please try again.";
+            _errorMessage = "Ocorreu um erro ao concluir a compra. Tente novamente.";
         }
         finally
         {
@@ -546,5 +547,26 @@
     {
         [Required]
         public decimal? Amount { get; set; }
+    }
+
+    private static string TranslateStatus(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return string.Empty;
+        }
+
+        var normalized = status.ToLowerInvariant();
+        return normalized switch
+        {
+            "draft" or "rascunho" => "Rascunho",
+            "published" or "publicado" => "Publicado",
+            "settled" or "finalizado" => "Finalizado",
+            "canceled" or "cancelled" or "cancelado" => "Cancelado",
+            "active" or "ativo" => "Ativo",
+            "closed" or "encerrado" => "Encerrado",
+            "sold" or "vendido" => "Vendido",
+            _ => CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(normalized)
+        };
     }
 }

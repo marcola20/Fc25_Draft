@@ -25,6 +25,9 @@ public class ApiClientFactory
         var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(_navigationManager.BaseUri);
 
+        client.DefaultRequestHeaders.AcceptLanguage.Clear();
+        client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("pt-BR"));
+
         if (includeAdminToken)
         {
             var token = await _adminAuthService.GetTokenAsync();

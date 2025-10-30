@@ -26,7 +26,7 @@
     <h1 class="h3 mb-0">Mercado</h1>
     @if (PageData is not null)
     {
-        <span class="text-muted small">@PageData.Total item(s) found</span>
+        <span class="text-muted small">@GetResultsSummary()</span>
     }
 </div>
 
@@ -79,10 +79,10 @@ else
 
 @if (TotalPages > 1 && PageData is not null)
 {
-    <nav class="mt-4" aria-label="Market pagination">
+    <nav class="mt-4" aria-label="PaginaÃ§Ã£o do mercado">
         <ul class="pagination pagination-sm justify-content-center flex-wrap">
             <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Previous page" disabled="@(Query.Page == 1)">Anterior</button>
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="PÃ¡gina anterior" disabled="@(Query.Page == 1)">Anterior</button>
             </li>
             @foreach (var page in GetVisiblePages())
             {
@@ -91,7 +91,7 @@ else
                 </li>
             }
             <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Next page" disabled="@(Query.Page >= TotalPages)">Próxima</button>
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="PrÃ³xima pÃ¡gina" disabled="@(Query.Page >= TotalPages)">PrÃ³xima</button>
             </li>
         </ul>
     </nav>
@@ -104,7 +104,7 @@ else
     private static readonly IReadOnlyList<MarketSortOption> SortOptions = new[]
     {
         new MarketSortOption("expiresAtUtc", "Terminando em breve"),
-        new MarketSortOption("-expiresAtUtc", "Terminando por último"),
+        new MarketSortOption("-expiresAtUtc", "Terminando por Ãºltimo"),
         new MarketSortOption("-currentBid", "Maior lance"),
         new MarketSortOption("currentBid", "Menor lance")
     };
@@ -193,8 +193,8 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Falha ao estabelecer conexão com o hub do mercado.");
-            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
+            Logger.LogError(ex, "Falha ao estabelecer conexÃ£o com o hub do mercado.");
+            _realTimeWarning ??= "As atualizaÃ§Ãµes em tempo real estÃ£o temporariamente indisponÃ­veis. Recarregue a pÃ¡gina para tentar novamente.";
             StateHasChangedSafe();
         }
 
@@ -259,8 +259,8 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Falha ao carregar os itens do mercado para a página {Page}", Query.Page);
-            _errorMessage = "Não foi possível carregar os itens do mercado no momento. Tente novamente em instantes.";
+            Logger.LogError(ex, "Falha ao carregar os itens do mercado para a pÃ¡gina {Page}", Query.Page);
+            _errorMessage = "NÃ£o foi possÃ­vel carregar os itens do mercado no momento. Tente novamente em instantes.";
         }
         finally
         {
@@ -388,12 +388,24 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Falha ao ingressar no ciclo de mercado {CycleId}", ActiveCycleId);
-            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
+            _realTimeWarning ??= "As atualizaÃ§Ãµes em tempo real estÃ£o temporariamente indisponÃ­veis. Recarregue a pÃ¡gina para tentar novamente.";
             StateHasChangedSafe();
         }
     }
 
     private void StateHasChangedSafe() => _ = InvokeAsync(StateHasChanged);
+
+    private string GetResultsSummary()
+    {
+        if (PageData is null)
+        {
+            return string.Empty;
+        }
+
+        var total = PageData.Total;
+        var suffix = total == 1 ? "item encontrado" : "itens encontrados";
+        return $"{total} {suffix}";
+    }
 
     public async ValueTask DisposeAsync()
     {
