@@ -75,9 +75,9 @@ namespace Fc25Draft.Web.Services
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                var message = await ExtractProblemMessageAsync(resp, ct)
+                var errorMessage = await ExtractProblemMessageAsync(resp, ct)
                     ?? "Não foi possível registrar o lance porque o item foi atualizado. Atualize os dados e tente novamente.";
-                throw new MarketConcurrencyException(message, resp.StatusCode);
+                throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
             resp.EnsureSuccessStatusCode();
@@ -100,9 +100,9 @@ namespace Fc25Draft.Web.Services
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                var message = await ExtractProblemMessageAsync(resp, ct)
+                var errorMessage = await ExtractProblemMessageAsync(resp, ct)
                     ?? "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
-                throw new MarketConcurrencyException(message, resp.StatusCode);
+                throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
             resp.EnsureSuccessStatusCode();
