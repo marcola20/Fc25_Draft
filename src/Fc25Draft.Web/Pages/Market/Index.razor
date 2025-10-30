@@ -1,17 +1,525 @@
 @page "/market"
+@using System
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using System.Threading
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Models.Market
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Hubs
-@inject MarketClient MarketClient
-@inject MarketHubClient MarketHubClient
+@inject MarketClient Client
+@inject MarketHubClient Hub
+@inject ILogger<Index> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Mercado</PageTitle>
 
-<h3>Mercado</h3>
+<div class="market-page">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Mercado</h3>
+        @if (ServerTimeOffset != TimeSpan.Zero)
+        {
+            <span class="text-muted small">Relógio do servidor ajustado em @FormatOffset(ServerTimeOffset).</span>
+        }
+    </div>
 
-<MarketFilters />
+    <MarketFilters Query="Query" OnApply="ApplyFiltersAsync" />
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_hubError))
+    {
+        <div class="alert alert-warning mt-3" role="alert">@_hubError</div>
+    }
+
+    <div class="market-toolbar d-flex flex-wrap gap-2 align-items-center mt-3">
+        <div>
+            <strong>@PageData.Total</strong> itens encontrados
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0" for="marketPageSize">Itens por página</label>
+            <select id="marketPageSize"
+                    class="form-select form-select-sm"
+                    style="width: auto;"
+                    @onchange="OnPageSizeChanged"
+                    disabled="@_isLoading">
+                @foreach (var size in _pageSizeOptions)
+                {
+                    <option value="@size" selected="@(Query.PageSize == size)">@size</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+        <table class="table table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Jogador</th>
+                    <th>Posição</th>
+                    <th class="text-center">Overall</th>
+                    <th>Time líder</th>
+                    <th class="text-end">Lance atual</th>
+                    <th class="text-end">Comprar agora</th>
+                    <th>Expira</th>
+                    <th>Status</th>
+                    <th class="text-end">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_isLoading)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else if (!PageData.Items.Any())
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">Nenhum item encontrado.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var item in PageData.Items)
+                    {
+                        var isExpanded = expandedItemId == item.ItemId;
+                        <tr class="@GetRowCss(isExpanded)">
+                            <td>@item.PlayerName</td>
+                            <td>@item.PositionId</td>
+                            <td class="text-center">@item.Overall</td>
+                            <td>@(string.IsNullOrWhiteSpace(item.CurrentLeaderTeamName) ? "-" : item.CurrentLeaderTeamName)</td>
+                            <td class="text-end">@FormatCurrency(item.CurrentLeaderAmount)</td>
+                            <td class="text-end">@FormatCurrency(item.BuyNowPrice)</td>
+                            <td>@item.ExpiresAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
+                            <td>@item.Status</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        @onclick="() => ToggleItem(item.ItemId)"
+                                        disabled="@_isLoading">
+                                    @(isExpanded ? "Recolher" : "Detalhes")
+                                </button>
+                            </td>
+                        </tr>
+                        if (isExpanded)
+                        {
+                            <tr class="table-borderless">
+                                <td colspan="9">
+                                    <MarketItemCard Item="item"
+                                                   ServerTimeOffset="ServerTimeOffset"
+                                                   OnBidPlaced="HandleBidPlacedAsync"
+                                                   OnBought="HandleBoughtAsync" />
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (TotalPages > 1)
+    {
+        <nav aria-label="Paginação do mercado" class="mt-3">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
+                    <button class="page-link"
+                            type="button"
+                            disabled="@(Query.Page == 1 || _isLoading)"
+                            @onclick="() => LoadPageAsync(Query.Page - 1)">Anterior</button>
+                </li>
+                @foreach (var page in GetVisiblePages())
+                {
+                    <li class="page-item @(page == Query.Page ? "active" : string.Empty)">
+                        <button class="page-link"
+                                type="button"
+                                disabled="@_isLoading"
+                                @onclick="() => LoadPageAsync(page)">@page</button>
+                    </li>
+                }
+                <li class="page-item @(Query.Page == TotalPages ? "disabled" : string.Empty)">
+                    <button class="page-link"
+                            type="button"
+                            disabled="@(Query.Page == TotalPages || _isLoading)"
+                            @onclick="() => LoadPageAsync(Query.Page + 1)">Próximo</button>
+                </li>
+            </ul>
+        </nav>
+    }
+</div>
 
 @code {
-    private Core.DTOs.MarketQueryVm query = new();
-    private IReadOnlyList<Core.DTOs.MarketItemVm> items = Array.Empty<Core.DTOs.MarketItemVm>();
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "cycleId")]
+    public Guid ActiveCycleId { get; set; }
+
+    private readonly CancellationTokenSource _disposeCts = new();
+    private readonly int[] _pageSizeOptions = new[] { 10, 20, 50 };
+    private readonly object _mergeLock = new();
+    private MarketQueryVm Query { get; } = new();
+    private PagedResult<MarketItemVm> PageData { get; set; } = new(Array.Empty<MarketItemVm>(), 0);
+    private TimeSpan ServerTimeOffset { get; set; } = TimeSpan.Zero;
+    private Guid? expandedItemId;
+    private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _reloadCts;
+    private bool _isLoading;
+    private bool _hubInitialized;
+    private string? _errorMessage;
+    private string? _hubError;
+
+    private int TotalPages => Query.PageSize <= 0
+        ? 1
+        : (int)Math.Ceiling(PageData.Total / (double)Query.PageSize);
+
+    protected override Task OnInitializedAsync()
+    {
+        Query.Page = 1;
+        Query.PageSize = 20;
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await LoadPageAsync(Query.Page);
+        await InitializeHubAsync();
+    }
+
+    private async Task InitializeHubAsync()
+    {
+        if (_hubInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            await Hub.ConnectAsync(_disposeCts.Token);
+            Hub.OnBidUpdated += HandleHubBidUpdatedAsync;
+            Hub.OnItemBought += HandleHubItemBoughtAsync;
+            Hub.OnItemClosed += HandleHubItemClosedAsync;
+            _hubInitialized = true;
+
+            if (ActiveCycleId == Guid.Empty)
+            {
+                Logger.LogWarning("ActiveCycleId was not provided. Hub join skipped.");
+            }
+            else
+            {
+                await Hub.JoinCycle(ActiveCycleId, _disposeCts.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignored during disposal.
+        }
+        catch (Exception ex)
+        {
+            _hubError = "Não foi possível conectar às atualizações em tempo real.";
+            Logger.LogError(ex, "Erro ao inicializar o hub do mercado.");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadPageAsync(int page)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        Query.Page = page;
+        await FetchPageDataAsync();
+    }
+
+    private async Task FetchPageDataAsync()
+    {
+        CancelActiveLoad();
+        _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        var ct = _loadCts.Token;
+
+        _isLoading = true;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var request = new Fc25Draft.Core.DTOs.MarketQueryVm
+            {
+                Name = Query.Name,
+                Positions = Query.Positions?.ToList() ?? new List<int>(),
+                OverallMin = Query.OverallMin,
+                OverallMax = Query.OverallMax,
+                Status = Query.Status,
+                Page = Query.Page,
+                PageSize = Query.PageSize,
+                Sort = Query.Sort
+            };
+
+            var result = await Client.GetItemsAsync(request, ct).ConfigureAwait(false);
+            PageData = result ?? new PagedResult<MarketItemVm>(Array.Empty<MarketItemVm>(), 0);
+
+            if (Client.LastServerTimeUtc.HasValue)
+            {
+                ServerTimeOffset = Client.LastServerTimeUtc.Value - DateTime.UtcNow;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when requesting a new page or disposing.
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Não foi possível carregar os itens do mercado.";
+            Logger.LogError(ex, "Erro ao carregar página {Page}", Query.Page);
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private Task ApplyFiltersAsync(MarketQueryVm filters)
+    {
+        Query.Name = filters.Name;
+        Query.Positions.Clear();
+        if (filters.Positions?.Any() == true)
+        {
+            Query.Positions.AddRange(filters.Positions);
+        }
+        Query.OverallMin = filters.OverallMin;
+        Query.OverallMax = filters.OverallMax;
+        Query.Status = string.IsNullOrWhiteSpace(filters.Status) ? null : filters.Status;
+        Query.Sort = filters.Sort;
+        Query.Page = 1;
+        Query.PageSize = filters.PageSize > 0 ? filters.PageSize : Query.PageSize;
+        expandedItemId = null;
+
+        return LoadPageAsync(Query.Page);
+    }
+
+    private Task ChangePageSizeAsync(int size)
+    {
+        if (size <= 0 || Query.PageSize == size)
+        {
+            return Task.CompletedTask;
+        }
+
+        Query.PageSize = size;
+        Query.Page = 1;
+        expandedItemId = null;
+        return LoadPageAsync(Query.Page);
+    }
+
+    private Task SortAsync(string sortKey)
+    {
+        if (string.Equals(Query.Sort, sortKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.CompletedTask;
+        }
+
+        Query.Sort = sortKey;
+        Query.Page = 1;
+        expandedItemId = null;
+        return LoadPageAsync(Query.Page);
+    }
+
+    private async Task ReloadSingleItemAsync(Guid itemId)
+    {
+        CancelActiveReload();
+        _reloadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        var ct = _reloadCts.Token;
+
+        try
+        {
+            var item = await Client.GetItemAsync(itemId, ct).ConfigureAwait(false);
+            if (item is null)
+            {
+                return;
+            }
+
+            MergeItem(item);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignored when a newer request is issued or the component is disposed.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar item {ItemId}", itemId);
+        }
+    }
+
+    private Task HandleBidPlacedAsync(MarketItemVm item)
+        => ReloadSingleItemAsync(item.ItemId);
+
+    private Task HandleBoughtAsync(MarketItemVm item)
+        => ReloadSingleItemAsync(item.ItemId);
+
+    private Task HandleHubBidUpdatedAsync(MarketItemVm item)
+    {
+        MergeItem(item);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleHubItemBoughtAsync(MarketItemVm item)
+    {
+        MergeItem(item);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleHubItemClosedAsync(MarketItemVm item)
+    {
+        MergeItem(item);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void MergeItem(MarketItemVm item)
+    {
+        lock (_mergeLock)
+        {
+            var items = PageData.Items.ToList();
+            var index = items.FindIndex(i => i.ItemId == item.ItemId);
+            if (index < 0)
+            {
+                return;
+            }
+
+            items[index] = item;
+            PageData = new PagedResult<MarketItemVm>(items, PageData.Total);
+        }
+    }
+
+    private void ToggleItem(Guid itemId)
+    {
+        expandedItemId = expandedItemId == itemId ? null : itemId;
+    }
+
+    private async Task OnPageSizeChanged(ChangeEventArgs args)
+    {
+        if (args.Value is null)
+        {
+            return;
+        }
+
+        if (!int.TryParse(args.Value.ToString(), out var size))
+        {
+            return;
+        }
+
+        await ChangePageSizeAsync(size);
+    }
+
+    private IEnumerable<int> GetVisiblePages()
+    {
+        var total = TotalPages;
+        if (total <= 5)
+        {
+            return Enumerable.Range(1, total);
+        }
+
+        var current = Query.Page;
+        var start = Math.Max(current - 2, 1);
+        var end = Math.Min(start + 4, total);
+        if (end - start < 4)
+        {
+            start = Math.Max(end - 4, 1);
+        }
+
+        return Enumerable.Range(start, end - start + 1);
+    }
+
+    private string FormatCurrency(decimal? value)
+        => value.HasValue ? value.Value.ToString("F2", CultureInfo.InvariantCulture) : "-";
+
+    private static string GetRowCss(bool isExpanded)
+        => isExpanded ? "table-active" : string.Empty;
+
+    private static string FormatOffset(TimeSpan offset)
+        => offset >= TimeSpan.Zero
+            ? $"+{offset.TotalSeconds:0}s"
+            : $"{offset.TotalSeconds:0}s";
+
+    private void CancelActiveLoad()
+    {
+        try
+        {
+            _loadCts?.Cancel();
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _loadCts?.Dispose();
+            _loadCts = null;
+        }
+    }
+
+    private void CancelActiveReload()
+    {
+        try
+        {
+            _reloadCts?.Cancel();
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _reloadCts?.Dispose();
+            _reloadCts = null;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposeCts.Cancel();
+
+        CancelActiveLoad();
+        CancelActiveReload();
+
+        Hub.OnBidUpdated -= HandleHubBidUpdatedAsync;
+        Hub.OnItemBought -= HandleHubItemBoughtAsync;
+        Hub.OnItemClosed -= HandleHubItemClosedAsync;
+
+        try
+        {
+            await Hub.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao descartar o hub do mercado.");
+        }
+
+        _disposeCts.Dispose();
+    }
 }
+
+<style>
+    .market-page {
+        padding-bottom: 1.5rem;
+    }
+
+    .market-toolbar .form-label {
+        font-size: 0.85rem;
+    }
+</style>

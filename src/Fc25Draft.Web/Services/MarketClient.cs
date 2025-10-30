@@ -53,6 +53,26 @@ namespace Fc25Draft.Web.Services
 
         public DateTime? LastServerTimeUtc { get; private set; }
 
+        public async Task<MarketItemVm?> GetItemAsync(Guid itemId, CancellationToken ct)
+        {
+            using var resp = await _http.GetAsync($"/api/market/{itemId}", ct);
+
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            resp.EnsureSuccessStatusCode();
+
+            if (resp.Headers.TryGetValues("x-server-time-utc", out var values))
+            {
+                var serverUtc = DateTime.Parse(values.First(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                LastServerTimeUtc = serverUtc;
+            }
+
+            return await resp.Content.ReadFromJsonAsync<MarketItemVm>(cancellationToken: ct);
+        }
+
         public async Task<MarketItemVm> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{req.ItemId}/bid");

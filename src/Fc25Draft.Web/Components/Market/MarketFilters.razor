@@ -1,10 +1,274 @@
+@using System
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Models.Market
+@inject IPositionService PositionService
 
-<div class="market-filters">
-    <!-- Market filters will be implemented in a future phase. -->
+<div class="market-filters border rounded p-3 bg-light">
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-4 col-md-3">
+            <label class="form-label" for="marketFilterName">Nome</label>
+            <InputText id="marketFilterName"
+                       class="form-control"
+                       @bind-Value="_localQuery.Name" />
+        </div>
+        <div class="col-sm-4 col-md-3 position-relative">
+            <label class="form-label d-block" for="marketFilterPositions">Posições</label>
+            <button id="marketFilterPositions"
+                    type="button"
+                    class="form-control text-start d-flex justify-content-between align-items-center"
+                    @onclick="TogglePositionsPanel">
+                <span>@GetSelectedPositionsLabel()</span>
+            </button>
+            @if (_positionsPanelOpen)
+            {
+                <div class="position-dropdown shadow-sm border rounded bg-white p-2">
+                    <div class="position-dropdown__list">
+                        @foreach (var position in _positions)
+                        {
+                            var checkboxId = $"marketFilterPosition{position.PositionId}";
+                            <div class="form-check">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       id="@checkboxId"
+                                       checked="@_localQuery.Positions.Contains(position.PositionId)"
+                                       @onchange="args => TogglePosition(position.PositionId, args.Value)" />
+                                <label class="form-check-label" for="@checkboxId">@position.Name</label>
+                            </div>
+                        }
+                    </div>
+                    <div class="text-end mt-2">
+                        <button type="button" class="btn btn-link btn-sm" @onclick="ClosePositionsPanel">Fechar</button>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="col-sm-4 col-md-2">
+            <label class="form-label" for="marketFilterOverallMin">Overall mín.</label>
+            <InputNumber id="marketFilterOverallMin"
+                         class="@GetOverallInputClass()"
+                         @bind-Value="_localQuery.OverallMin"
+                         @bind-Value:event="oninput" />
+        </div>
+        <div class="col-sm-4 col-md-2">
+            <label class="form-label" for="marketFilterOverallMax">Overall máx.</label>
+            <InputNumber id="marketFilterOverallMax"
+                         class="@GetOverallInputClass()"
+                         @bind-Value="_localQuery.OverallMax"
+                         @bind-Value:event="oninput" />
+            @if (IsOverallInvalid)
+            {
+                <div class="invalid-feedback d-block">Overall mínimo deve ser menor ou igual ao máximo.</div>
+            }
+        </div>
+        <div class="col-sm-4 col-md-2">
+            <label class="form-label" for="marketFilterStatus">Status</label>
+            <select id="marketFilterStatus" class="form-select" @bind="_localQuery.Status">
+                <option value="">Todos</option>
+                <option value="Active">Ativos</option>
+                <option value="Closed">Encerrados</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-12 col-lg-2 d-flex gap-2 justify-content-end">
+            <button type="button"
+                    class="btn btn-secondary"
+                    disabled="@_isSubmitting"
+                    @onclick="ClearAsync">Limpar</button>
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(_isSubmitting || IsOverallInvalid)"
+                    @onclick="ApplyAsync">Aplicar</button>
+        </div>
+    </div>
 </div>
 
 @code {
     [Parameter]
-    public Core.DTOs.MarketQueryVm? Query { get; set; }
+    public MarketQueryVm? Query { get; set; }
+
+    [Parameter]
+    public EventCallback<MarketQueryVm> OnApply { get; set; }
+
+    private readonly MarketQueryVm _localQuery = new();
+    private readonly List<Position> _positions = new();
+    private bool _positionsPanelOpen;
+    private bool _isSubmitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPositionsAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Query is null)
+        {
+            ResetLocalQuery();
+            return;
+        }
+
+        _localQuery.Name = Query.Name;
+        _localQuery.Positions.Clear();
+        if (Query.Positions?.Any() == true)
+        {
+            _localQuery.Positions.AddRange(Query.Positions);
+        }
+        _localQuery.OverallMin = Query.OverallMin;
+        _localQuery.OverallMax = Query.OverallMax;
+        _localQuery.Status = Query.Status;
+        _localQuery.Page = Query.Page;
+        _localQuery.PageSize = Query.PageSize;
+        _localQuery.Sort = Query.Sort;
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            var items = await PositionService.GetAllAsync();
+            _positions.Clear();
+            _positions.AddRange(items.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            // O componente ainda funciona mesmo se não conseguir carregar as posições.
+        }
+    }
+
+    private Task ApplyAsync()
+    {
+        if (_isSubmitting || IsOverallInvalid)
+        {
+            return Task.CompletedTask;
+        }
+
+        return InvokeSubmitAsync(CloneLocalQuery());
+    }
+
+    private Task ClearAsync()
+    {
+        if (_isSubmitting)
+        {
+            return Task.CompletedTask;
+        }
+
+        ResetLocalQuery();
+        return InvokeSubmitAsync(CloneLocalQuery());
+    }
+
+    private async Task InvokeSubmitAsync(MarketQueryVm snapshot)
+    {
+        _isSubmitting = true;
+        try
+        {
+            snapshot.Page = 1;
+            snapshot.PageSize = _localQuery.PageSize > 0 ? _localQuery.PageSize : 20;
+            await OnApply.InvokeAsync(snapshot);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            _positionsPanelOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ResetLocalQuery()
+    {
+        _localQuery.Name = null;
+        _localQuery.Positions.Clear();
+        _localQuery.OverallMin = null;
+        _localQuery.OverallMax = null;
+        _localQuery.Status = null;
+        _localQuery.Page = 1;
+        _localQuery.PageSize = 20;
+        _localQuery.Sort = null;
+    }
+
+    private string GetSelectedPositionsLabel()
+    {
+        if (_localQuery.Positions.Count == 0)
+        {
+            return "Todas";
+        }
+
+        var labels = _localQuery.Positions
+            .Select(id => _positions.FirstOrDefault(p => p.PositionId == id)?.Name ?? id.ToString(CultureInfo.InvariantCulture))
+            .ToArray();
+        return string.Join(", ", labels);
+    }
+
+    private void TogglePositionsPanel()
+    {
+        _positionsPanelOpen = !_positionsPanelOpen;
+    }
+
+    private void ClosePositionsPanel()
+    {
+        _positionsPanelOpen = false;
+    }
+
+    private void TogglePosition(int positionId, object? value)
+    {
+        var isChecked = value is bool boolean && boolean;
+        if (isChecked)
+        {
+            if (!_localQuery.Positions.Contains(positionId))
+            {
+                _localQuery.Positions.Add(positionId);
+            }
+        }
+        else
+        {
+            _localQuery.Positions.Remove(positionId);
+        }
+    }
+
+    private bool IsOverallInvalid =>
+        _localQuery.OverallMin.HasValue &&
+        _localQuery.OverallMax.HasValue &&
+        _localQuery.OverallMin > _localQuery.OverallMax;
+
+    private string GetOverallInputClass()
+        => $"form-control{(IsOverallInvalid ? " is-invalid" : string.Empty)}";
+
+    private static MarketQueryVm CloneLocalQuery(MarketQueryVm source)
+        => new()
+        {
+            Name = source.Name,
+            Positions = source.Positions?.ToList() ?? new List<int>(),
+            OverallMin = source.OverallMin,
+            OverallMax = source.OverallMax,
+            Status = string.IsNullOrWhiteSpace(source.Status) ? null : source.Status,
+            Page = source.Page,
+            PageSize = source.PageSize,
+            Sort = source.Sort
+        };
+
+    private MarketQueryVm CloneLocalQuery() => CloneLocalQuery(_localQuery);
 }
+
+<style>
+    .market-filters {
+        font-size: 0.9rem;
+    }
+
+    .market-filters .position-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1050;
+        min-width: 220px;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+
+    .market-filters .position-dropdown__list {
+        max-height: 180px;
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+</style>
