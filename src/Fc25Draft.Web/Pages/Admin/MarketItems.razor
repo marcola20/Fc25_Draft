@@ -35,12 +35,16 @@ else
 {
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
-            <button class="nav-link @(selectedTab == "list" ? "active" : null)" type="button" @onclick="() => SelectTab("list")">
+            <button class="nav-link @(selectedTab == "list" ? "active" : null)"
+                    type="button"
+                    @onclick='() => SelectTab("list")'>
                 Itens cadastrados
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link @(selectedTab == "wizard" ? "active" : null)" type="button" @onclick="() => SelectTab("wizard")">
+            <button class="nav-link @(selectedTab == "wizard" ? "active" : null)"
+                    type="button"
+                    @onclick='() => SelectTab("wizard")'>
                 Novo item
             </button>
         </li>
@@ -147,7 +151,7 @@ else
                     <div class="alert alert-danger" role="alert">@wizardError</div>
                 }
 
-                <EditForm EditContext="formEditContext" OnValidSubmit="HandleSubmitDraftAsync">
+                <EditForm EditContext="formEditContext" OnValidSubmit="@((EditContext _) => HandleSubmitDraftAsync())">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -163,7 +167,12 @@ else
                             <div class="row g-3">
                                 <div class="col-lg-6">
                                     <label class="form-label" for="cycle-id">Ciclo</label>
-                                    <InputText id="cycle-id" class="form-control" @bind-Value="cycleInput" @bind-Value:after="OnCycleInputChanged" list="cycle-options" placeholder="Informe o GUID do ciclo" />
+                                    <InputText id="cycle-id"
+                                               class="form-control"
+                                               @bind-Value="cycleInput"
+                                               @bind-Value:after="(string v) => OnCycleInputChanged(v)"
+                                               list="cycle-options"
+                                               placeholder="Informe o GUID do ciclo" />
                                     <datalist id="cycle-options">
                                         @foreach (var cycle in cycleOptions)
                                         {
@@ -606,7 +615,7 @@ else
         formEditContext.NotifyFieldChanged(new FieldIdentifier(formModel, nameof(formModel.BuyNowPrice)));
     }
 
-    private async Task HandleSubmitDraftAsync()
+    private async Task HandleSubmitDraftAsync()           
     {
         await SubmitDraftAsync(false);
     }
