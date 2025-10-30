@@ -94,11 +94,13 @@ builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<AdminTransferService>();
 builder.Services.AddScoped<ITransfersQueryService, TransfersQueryService>();
 builder.Services.AddScoped<ITransferHistoryService, TransferHistoryService>();
+builder.Services.AddServerSideBlazor().AddCircuitOptions(o => o.DetailedErrors = true);
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
@@ -128,6 +130,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHub<DraftHub>("/hubs/draft");
+app.MapHub<MarketHub>("/hubs/market");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 app.MapHealthChecks("/health");
@@ -136,10 +139,10 @@ var api = app.MapGroup("/api");
 
 MapAdminEndpoints(api);
 MapDraftEndpoints(api);
-    MapPlayerEndpoints(api);
-    MapTeamEndpoints(api);
-    MapPricingEndpoints(api);
-    MapMarketEndpoints(api);
+MapPlayerEndpoints(api);
+MapTeamEndpoints(api);
+MapPricingEndpoints(api);
+MapMarketEndpoints(api);
 MapTransfersEndpoints(api);
 MapBudgetEndpoints(api);
 
@@ -1540,34 +1543,42 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
 
     MapMarketItemPublicationEndpoints(marketApi);
 
-    marketApi.MapGet(
-        "/history",
-        async ([FromQuery] Guid? teamId, [FromQuery] int? take, ITransferHistoryService transferHistoryService) =>
+    marketApi.MapGet("", async (IMarketService market, ILoggerFactory lf, CancellationToken ct) =>
+    {
+        var log = lf.CreateLogger("MarketList");
+
+        try
         {
-            var size = take ?? 50;
+            try
+            {
+                await market.EnsureCycleAsync(ct);
+            }
+            catch (Exception ex) when (ex.Message.Contains("Jogadores insuficientes", StringComparison.OrdinalIgnoreCase))
+            {
+                log.LogInformation(ex, "Sem jogadores suficientes para abrir ciclo. Retornando lista vazia.");
+                return Results.Ok(new PagedResult<MarketItemVm>(Array.Empty<MarketItemVm>(), 0));
+            }
 
             try
             {
-                var historyItems = teamId.HasValue
-                    ? await transferHistoryService.GetTransfersByTeamAsync(teamId.Value, size)
-                    : await transferHistoryService.GetRecentTransfersAsync(size);
-
-                var response = historyItems
-                    .Select(MapTransferHistoryToDto)
-                    .ToList();
-
-                return Results.Ok(response);
+                await market.CloseExpiredItemsAsync(ct);
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
-                return Results.BadRequest(new { message = ex.Message });
+                log.LogWarning(ex, "CloseExpiredItems failed");
             }
-            catch (InvalidOperationException ex)
-            {
-                return Results.NotFound(new { message = ex.Message });
-            }
-        })
-        .AllowAnonymous();
+
+            var items = await market.GetActiveItemsAsync(ct);
+            var vms = items.Select(MapToMarketItemVm).ToArray();
+            return Results.Ok(new PagedResult<MarketItemVm>(vms, vms.Length));
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "GetActiveItems/Mapping failed");
+            return Results.Problem(title: "Failed to load market items.",
+                                   detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }).AllowAnonymous();
 
     marketApi.MapPost(
         "/history",
@@ -1606,14 +1617,6 @@ static void MapMarketEndpoints(RouteGroupBuilder api)
             }
         })
         .RequireAuthorization("AdminOnly");
-
-    marketApi.MapGet(string.Empty, async (IMarketService marketService, CancellationToken ct) =>
-    {
-        await marketService.EnsureCycleAsync(ct);
-        await marketService.CloseExpiredItemsAsync(ct);
-        var items = await marketService.GetActiveItemsAsync(ct);
-        return Results.Ok(items);
-    }).AllowAnonymous();
 
     marketApi.MapGet("/{itemId:guid}", async (Guid itemId, IMarketService marketService, CancellationToken ct) =>
     {
@@ -2155,6 +2158,24 @@ static string Escape(string? value)
     var sanitized = value.Replace("\"", "''");
     return sanitized.Contains(';') ? $"\"{sanitized}\"" : sanitized;
 }
+
+
+static MarketItemVm MapToMarketItemVm(MarketItemDto dto) => new MarketItemVm
+{
+    ItemId = dto.ItemId,
+    PlayerId = dto.PlayerId,
+    PlayerName = dto.PlayerName,
+    PositionId = dto.Position.ToPositionId(),
+    Overall = dto.Ovr,
+    CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
+    CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
+    CurrentLeaderAmount = dto.CurrentLeaderAmount,
+    BuyNowPrice = dto.BuyNowPrice,
+    MinIncrement = dto.MinIncrement,
+    ExpiresAtUtc = dto.ExpiresAtUtc,
+    Status = dto.Status.ToString(), 
+    RowVersion = string.Empty 
+};
 
 record MarketBidRequest(decimal Amount, string? TeamToken);
 

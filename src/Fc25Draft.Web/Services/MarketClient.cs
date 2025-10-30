@@ -27,7 +27,6 @@ namespace Fc25Draft.Web.Services
 
         public async Task<PagedResult<CoreItemVm>> GetItemsAsync(CoreQueryVm query, CancellationToken ct)
         {
-            // Build query string manually, handling nulls
             var qs = new List<string>();
             if (!string.IsNullOrWhiteSpace(query.Name)) qs.Add($"name={Uri.EscapeDataString(query.Name)}");
             if (query.Positions?.Any() == true) qs.Add($"positions={string.Join(",", query.Positions)}");
@@ -38,18 +37,18 @@ namespace Fc25Draft.Web.Services
             qs.Add($"pageSize={query.PageSize}");
             if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={Uri.EscapeDataString(query.Sort)}");
 
-            // Public market endpoints live at /api/market. The previous URL (/api/market/items)
-            // targets the admin-only publication endpoints and results in a 401 response.
-            // Point the client to the anonymous listings endpoint instead.
             var url = "/api/market";
             if (qs.Count > 0)
                 url += "?" + string.Join("&", qs);
 
             var http = await _clientFactory.CreateAsync();
             using var resp = await http.GetAsync(url, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException($"GET {url} -> {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+
             resp.EnsureSuccessStatusCode();
 
-            // Optionally read server UTC time header
             if (resp.Headers.TryGetValues("x-server-time-utc", out var values))
             {
                 var serverUtc = DateTime.Parse(values.First(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);

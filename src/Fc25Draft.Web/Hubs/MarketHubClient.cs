@@ -1,10 +1,10 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using Fc25Draft.Core.DTOs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
-using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Fc25Draft.Web.Hubs;
 
@@ -20,9 +20,9 @@ public class MarketHubClient : IAsyncDisposable
         _logger = logger;
     }
 
-    public Func<CoreItemVm, Task>? OnBidUpdated { get; set; }
-    public Func<CoreItemVm, Task>? OnItemClosed { get; set; }
-    public Func<CoreItemVm, Task>? OnItemBought { get; set; }
+    public Func<MarketItemVm, Task>? OnBidUpdated { get; set; }
+    public Func<MarketItemVm, Task>? OnItemClosed { get; set; }
+    public Func<MarketItemVm, Task>? OnItemBought { get; set; }
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
@@ -42,9 +42,9 @@ public class MarketHubClient : IAsyncDisposable
             .WithAutomaticReconnect()
             .Build();
 
-        _connection.On<CoreItemVm>("BidUpdated", async vm => await InvokeSafeAsync(OnBidUpdated, vm));
-        _connection.On<CoreItemVm>("ItemClosed", async vm => await InvokeSafeAsync(OnItemClosed, vm));
-        _connection.On<CoreItemVm>("ItemBought", async vm => await InvokeSafeAsync(OnItemBought, vm));
+        _connection.On<MarketItemVm>("BidUpdated", async vm => await InvokeSafeAsync(OnBidUpdated, vm));
+        _connection.On<MarketItemVm>("ItemClosed", async vm => await InvokeSafeAsync(OnItemClosed, vm));
+        _connection.On<MarketItemVm>("ItemBought", async vm => await InvokeSafeAsync(OnItemBought, vm));
 
         await _connection.StartAsync(ct);
     }
@@ -59,7 +59,7 @@ public class MarketHubClient : IAsyncDisposable
         await _connection.InvokeAsync("JoinCycle", cycleId, ct);
     }
 
-    private async Task InvokeSafeAsync(Func<CoreItemVm, Task>? handler, CoreItemVm payload)
+    private async Task InvokeSafeAsync(Func<MarketItemVm, Task>? handler, MarketItemVm payload)
     {
         if (handler is null)
         {

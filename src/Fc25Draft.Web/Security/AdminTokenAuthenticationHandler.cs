@@ -7,8 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Web.Security;
 
-public class AdminTokenAuthenticationHandler
-    : AuthenticationHandler<AuthenticationSchemeOptions>
+public class AdminTokenAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     public const string SchemeName = "AdminToken";
 
@@ -37,11 +36,11 @@ public class AdminTokenAuthenticationHandler
 
         var headerValue = authorizationHeader.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerValue))
-            return AuthenticateResult.Fail("Cabeçalho de autorização ausente.");
+            return AuthenticateResult.NoResult(); 
 
         const string bearerPrefix = "Bearer ";
         if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-            return AuthenticateResult.Fail("Formato de autorização inválido.");
+            return AuthenticateResult.NoResult(); 
 
         var providedToken = headerValue[bearerPrefix.Length..].Trim();
         if (!Guid.TryParse(providedToken, out var tokenGuid))
@@ -49,16 +48,16 @@ public class AdminTokenAuthenticationHandler
 
         var tokenExists = await _db.AdminTokens
             .AsNoTracking()
-            .AnyAsync(t => t.Token == tokenGuid);
+            .AnyAsync(t => t.Token == tokenGuid, Context.RequestAborted);
 
         if (!tokenExists)
             return AuthenticateResult.Fail("Token de administrador inválido.");
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.Name, "Administrador"),
-            new Claim(ClaimTypes.Role, "Admin")
-        };
+        new Claim(ClaimTypes.Name, "Administrador"),
+        new Claim(ClaimTypes.Role, "Admin"),
+    };
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
