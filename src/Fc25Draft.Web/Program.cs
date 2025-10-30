@@ -725,7 +725,7 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
             var normalized = PostgresSearchExtensions.NormalizeForSearch(q.Trim());
             var pattern = $"%{normalized}%";
             query = query.Where(p => EF.Functions.ILike(
-                EF.Functions.Translate(p.Name, PostgresSearchExtensions.AccentSource, PostgresSearchExtensions.AccentReplacement),
+                PostgresSearchExtensions.Translate(p.Name, PostgresSearchExtensions.AccentSource, PostgresSearchExtensions.AccentReplacement),
                 pattern));
         }
 

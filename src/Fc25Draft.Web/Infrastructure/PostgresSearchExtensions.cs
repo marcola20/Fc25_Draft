@@ -10,7 +10,7 @@ public static class PostgresSearchExtensions
     public const string AccentReplacement = "AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn";
 
     [DbFunction("translate", IsBuiltIn = true)]
-    public static string? Translate(this DbFunctions _, string? value, string? from, string? to)
+    public static string? Translate(string? value, string? from, string? to)
         => throw new NotSupportedException("This method is intended for use with Entity Framework Core LINQ queries.");
 
     public static string NormalizeForSearch(string value)
