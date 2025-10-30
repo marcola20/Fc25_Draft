@@ -8,7 +8,7 @@
         <InputText id="cycle-id"
                    class="form-control"
                    @bind-Value="cycleInput"
-                   @bind-Value:after="(string v) => OnCycleInputChanged(v)"
+                   @bind-Value:after="OnCycleInputChanged"
                    list="cycle-options"
                    placeholder="Informe o GUID do ciclo" />
         <ValidationMessage For="() => formModel.CycleId" />
