@@ -73,7 +73,8 @@ public class PlayerService : IPlayerService
             Name = dto.Name.Trim(),
             Age = dto.Age,
             Overall = dto.Overall,
-            PositionId = dto.PositionId
+            PositionId = dto.PositionId,
+            PlayerGuid = Guid.NewGuid()
         };
 
         _db.Players.Add(entity);
@@ -213,7 +214,8 @@ public class PlayerService : IPlayerService
                 Name = name.Trim(),
                 Age = age,
                 Overall = overall,
-                PositionId = positionId
+                PositionId = positionId,
+                PlayerGuid = Guid.NewGuid()
             });
         }
 
