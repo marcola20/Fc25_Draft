@@ -76,7 +76,7 @@ else
             @foreach (var page in GetVisiblePages())
             {
                 <li class="page-item @(page == Query.Page ? "active" : string.Empty)">
-                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)" aria-current="@(page == Query.Page ? "page" : null)">@page</button>
+                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)" aria-current="@(page) == Query.Page ? "page" : null)">@(page)</button>
                 </li>
             }
             <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
