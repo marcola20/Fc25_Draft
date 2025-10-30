@@ -2,6 +2,7 @@ using System.Data;
 using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
@@ -19,16 +20,19 @@ public class MarketService : IMarketService
     private readonly IMarketCycleGenerator _cycleGenerator;
     private readonly MarketOptions _marketOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly ITransactionLogService _transactionLogService;
 
     public MarketService(
         DraftDbContext dbContext,
         IMarketCycleGenerator cycleGenerator,
         IOptions<MarketOptions> options,
+        ITransactionLogService transactionLogService,
         TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cycleGenerator = cycleGenerator ?? throw new ArgumentNullException(nameof(cycleGenerator));
         _marketOptions = options.Value ?? throw new ArgumentNullException(nameof(options));
+        _transactionLogService = transactionLogService ?? throw new ArgumentNullException(nameof(transactionLogService));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -147,6 +151,8 @@ public class MarketService : IMarketService
 
         var previousLeaderId = item.CurrentLeaderTeamId;
         var previousAmount = item.CurrentLeaderAmount ?? 0m;
+        Guid? outbidTargetTeamId = previousLeaderId;
+        string? outbidNotes = null;
 
         if (previousLeaderId.HasValue)
         {
@@ -157,6 +163,15 @@ public class MarketService : IMarketService
             if (previousTeam is not null)
             {
                 previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - previousAmount);
+
+                var previousTeamName = string.IsNullOrWhiteSpace(previousTeam.TeamName)
+                    ? previousTeam.TeamId.ToString()
+                    : previousTeam.TeamName;
+                outbidNotes = $"Time {previousTeamName} foi superado no leilão.";
+            }
+            else
+            {
+                outbidNotes = "Líder anterior não encontrado ao liberar orçamento.";
             }
         }
 
@@ -174,6 +189,33 @@ public class MarketService : IMarketService
         item.CurrentLeaderTeamId = team.TeamId;
         item.CurrentLeaderAmount = amount;
         item.LastUpdateUtc = now;
+
+        if (previousLeaderId.HasValue)
+        {
+            await _transactionLogService.LogMarketAsync(
+                item,
+                MarketTransactionType.Outbid,
+                team.TeamId,
+                outbidTargetTeamId,
+                previousAmount,
+                team.TeamId.ToString(),
+                outbidNotes,
+                now,
+                ct).ConfigureAwait(false);
+        }
+
+        var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
+
+        await _transactionLogService.LogMarketAsync(
+            item,
+            MarketTransactionType.BidPlaced,
+            team.TeamId,
+            previousLeaderId,
+            amount,
+            team.TeamId.ToString(),
+            bidNotes,
+            now,
+            ct).ConfigureAwait(false);
 
         await _dbContext.MarketBids.AddAsync(bid, ct).ConfigureAwait(false);
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -195,6 +237,9 @@ public class MarketService : IMarketService
             .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
+
+        var previousLeaderId = item.CurrentLeaderTeamId;
+        var previousLeaderAmount = item.CurrentLeaderAmount;
 
         if (item.Status != MarketItemStatus.Published)
         {
@@ -238,6 +283,8 @@ public class MarketService : IMarketService
             throw new MarketConflictException("O jogador já está vinculado a outro elenco.");
         }
 
+        Team? previousLeaderTeam = null;
+
         if (item.CurrentLeaderTeamId.HasValue)
         {
             var previousTeam = await _dbContext.Teams
@@ -247,7 +294,26 @@ public class MarketService : IMarketService
             if (previousTeam is not null)
             {
                 previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - (item.CurrentLeaderAmount ?? 0m));
+                previousLeaderTeam = previousTeam;
             }
+        }
+
+        if (previousLeaderId.HasValue && previousLeaderId != team.TeamId)
+        {
+            var outbidNotes = previousLeaderTeam is not null
+                ? $"Time {(!string.IsNullOrWhiteSpace(previousLeaderTeam.TeamName) ? previousLeaderTeam.TeamName : previousLeaderTeam.TeamId.ToString())} foi superado na compra imediata."
+                : "Líder anterior não encontrado ao processar compra imediata.";
+
+            await _transactionLogService.LogMarketAsync(
+                item,
+                MarketTransactionType.Outbid,
+                team.TeamId,
+                previousLeaderId,
+                previousLeaderAmount,
+                team.TeamId.ToString(),
+                outbidNotes,
+                now,
+                ct).ConfigureAwait(false);
         }
 
         team.Budget -= buyNowPrice;
@@ -260,6 +326,19 @@ public class MarketService : IMarketService
         item.WinnerTeamId = team.TeamId;
         item.LastUpdateUtc = now;
         item.ExpiresAtUtc = now;
+
+        var buyNowNotes = FormattableString.Invariant($"Compra imediata por {buyNowPrice:0.00}.");
+
+        await _transactionLogService.LogMarketAsync(
+            item,
+            MarketTransactionType.BuyNow,
+            team.TeamId,
+            previousLeaderId,
+            buyNowPrice,
+            team.TeamId.ToString(),
+            buyNowNotes,
+            now,
+            ct).ConfigureAwait(false);
 
         await _dbContext.TransferHistories.AddAsync(new TransferHistory
         {
@@ -322,6 +401,9 @@ public class MarketService : IMarketService
                 continue;
             }
 
+            var previousLeaderId = item.CurrentLeaderTeamId;
+            var previousLeaderAmount = item.CurrentLeaderAmount;
+
             if (item.CurrentLeaderTeamId.HasValue && item.CurrentLeaderAmount.HasValue)
             {
                 var team = await _dbContext.Teams
@@ -334,6 +416,17 @@ public class MarketService : IMarketService
                     item.CurrentLeaderTeamId = null;
                     item.CurrentLeaderAmount = null;
                     item.WinnerTeamId = null;
+
+                    await _transactionLogService.LogMarketAsync(
+                        item,
+                        MarketTransactionType.AuctionExpired,
+                        null,
+                        previousLeaderId,
+                        previousLeaderAmount,
+                        "sistema",
+                        "Leilão encerrado sem vencedor válido.",
+                        now,
+                        ct).ConfigureAwait(false);
                 }
                 else
                 {
@@ -372,6 +465,19 @@ public class MarketService : IMarketService
                         PerformedBy = "sistema",
                         PerformedAtUtc = now
                     }, ct).ConfigureAwait(false);
+
+                    var settleNotes = FormattableString.Invariant($"Leilão encerrado por {value:0.00}.");
+
+                    await _transactionLogService.LogMarketAsync(
+                        item,
+                        MarketTransactionType.AuctionSettled,
+                        team.TeamId,
+                        previousLeaderId,
+                        value,
+                        "sistema",
+                        settleNotes,
+                        now,
+                        ct).ConfigureAwait(false);
                 }
             }
             else
@@ -380,6 +486,17 @@ public class MarketService : IMarketService
                 item.CurrentLeaderTeamId = null;
                 item.CurrentLeaderAmount = null;
                 item.WinnerTeamId = null;
+
+                await _transactionLogService.LogMarketAsync(
+                    item,
+                    MarketTransactionType.AuctionExpired,
+                    null,
+                    null,
+                    null,
+                    "sistema",
+                    "Leilão expirado sem lances válidos.",
+                    now,
+                    ct).ConfigureAwait(false);
             }
 
             item.LastUpdateUtc = now;

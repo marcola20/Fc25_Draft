@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,12 +19,15 @@ public partial class AdminTransferService
 
     private readonly DraftDbContext _dbContext;
     private readonly TimeProvider _timeProvider;
+    private readonly ITransactionLogService _transactionLogService;
 
     public AdminTransferService(
         DraftDbContext dbContext,
+        ITransactionLogService transactionLogService,
         TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _transactionLogService = transactionLogService ?? throw new ArgumentNullException(nameof(transactionLogService));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -138,6 +143,21 @@ public partial class AdminTransferService
                     team.BudgetBlocked = decimal.Round(team.BudgetBlocked - releaseAmount, 2, MidpointRounding.AwayFromZero);
                 }
             }
+
+            var cancelNotes = normalizedReason is null
+                ? "Item cancelado pelo administrador."
+                : $"Item cancelado: {normalizedReason}";
+
+            await _transactionLogService.LogMarketAsync(
+                item,
+                MarketTransactionType.ItemCanceled,
+                null,
+                lastBid?.TeamId,
+                lastBid?.Amount,
+                adminTokenGuid.ToString(),
+                cancelNotes,
+                now,
+                ct).ConfigureAwait(false);
 
             var logEntry = new AdminActionsLog
             {

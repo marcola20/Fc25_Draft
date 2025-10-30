@@ -89,6 +89,7 @@ builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
 builder.Services.AddScoped<IMarketService, MarketService>();
+builder.Services.AddScoped<ITransactionLogService, TransactionLogService>();
 builder.Services.AddScoped<IMarketItemPublicationService, MarketItemPublicationService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<AdminTransferService>();
