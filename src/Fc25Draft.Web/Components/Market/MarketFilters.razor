@@ -6,15 +6,21 @@
 @using Fc25Draft.Web.Models.Market
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
+<style>
+    .market-filters label.form-label {
+        color: white !important;
+    }
+</style>
+
 <EditForm Model="Model" OnValidSubmit="ApplyAsync">
     <div class="market-filters border rounded-3 p-3 bg-body">
         <div class="row g-3 align-items-end">
             <div class="col-12 col-lg-3">
-                <label class="form-label" for="market-filter-name">Player name</label>
+                <label class="form-label" for="market-filter-name">Nome do Jogador</label>
                 <InputText id="market-filter-name" class="form-control form-control-sm" @bind-Value="Model.Name" />
             </div>
             <div class="col-12 col-lg-3">
-                <label class="form-label" for="market-filter-positions">Positions</label>
+                <label class="form-label" for="market-filter-positions">Posições</label>
                 <div class="dropdown w-100">
                     <button type="button"
                             id="market-filter-positions"
@@ -49,7 +55,7 @@
             <div class="col-12 col-lg-2">
                 <label class="form-label" for="market-filter-status">Status</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
-                    <option value="">All statuses</option>
+                    <option value="">Todos</option>
                     @foreach (var status in StatusOptions)
                     {
                         <option value="@status">@status</option>
@@ -57,9 +63,9 @@
                 </InputSelect>
             </div>
             <div class="col-12 col-lg-2">
-                <label class="form-label" for="market-filter-sort">Sort by</label>
+                <label class="form-label" for="market-filter-sort">Ordenar por</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
-                    <option value="">Default</option>
+                    <option value="">Padrão</option>
                     @foreach (var option in SortOptions)
                     {
                         <option value="@option.Value">@option.DisplayName</option>
@@ -75,7 +81,7 @@
                                  @bind-Value="Model.OverallMin"
                                  min="0"
                                  aria-label="Minimum overall" />
-                    <span class="input-group-text">to</span>
+                    <span class="input-group-text">para</span>
                     <InputNumber TValue="int?"
                                  id="market-filter-overall-max"
                                  class="form-control"
@@ -85,7 +91,7 @@
                 </div>
             </div>
             <div class="col-12 col-lg-2">
-                <label class="form-label" for="market-filter-page-size">Items per page</label>
+                <label class="form-label" for="market-filter-page-size">Itens por página</label>
                 <InputSelect id="market-filter-page-size" class="form-select form-select-sm" @bind-Value="Model.PageSize">
                     @foreach (var size in PageSizeOptions)
                     {
@@ -94,8 +100,8 @@
                 </InputSelect>
             </div>
             <div class="col-12 col-lg-2 d-flex gap-2 justify-content-lg-end">
-                <button type="submit" class="btn btn-primary btn-sm flex-grow-1 flex-lg-grow-0">Apply filters</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 flex-lg-grow-0" @onclick="ClearAsync">Clear</button>
+                <button type="submit" class="btn btn-primary btn-sm flex-grow-1 flex-lg-grow-0">Aplicar Filtros</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 flex-lg-grow-0" @onclick="ClearAsync">Limpar</button>
             </div>
         </div>
     </div>
@@ -118,12 +124,12 @@
     public IReadOnlyList<MarketSortOption> SortOptions { get; set; } = Array.Empty<MarketSortOption>();
 
     private string PositionsDisplayText
-        => Model.Positions.Count switch
-        {
-            0 => "All positions",
-            1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 position",
-            _ => $"{Model.Positions.Count} positions"
-        };
+    => Model.Positions.Count switch
+    {
+        0 => "Todas",
+        1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 posição",
+        _ => $"{Model.Positions.Count} posições"
+    };
 
     private async Task ApplyAsync()
     {

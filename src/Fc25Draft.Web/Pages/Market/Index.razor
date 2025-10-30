@@ -20,10 +20,10 @@
 @inject ILogger<Index> Logger
 @implements IAsyncDisposable
 
-<PageTitle>Market</PageTitle>
+<PageTitle>Mercado</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h1 class="h3 mb-0">Market</h1>
+    <h1 class="h3 mb-0">Mercado</h1>
     @if (PageData is not null)
     {
         <span class="text-muted small">@PageData.Total item(s) found</span>
@@ -41,15 +41,15 @@
 }
 else if (_isLoading && PageData is null)
 {
-    <div class="alert alert-info mt-3" role="status">Loading market items...</div>
+    <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
 }
 else if (PageData is null)
 {
-    <div class="alert alert-info mt-3" role="status">Loading market items...</div>
+    <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
 }
 else if (PageData.Items.Count == 0)
 {
-    <div class="alert alert-secondary mt-3" role="status">No items match the selected filters.</div>
+    <div class="alert alert-secondary mt-3" role="status">Nenhum item corresponde aos filtros selecionados.</div>
 }
 else
 {
@@ -69,7 +69,7 @@ else
 
 @if (_isLoading && PageData is not null)
 {
-    <div class="alert alert-info mt-3" role="status">Refreshing items...</div>
+    <div class="alert alert-info mt-3" role="status">Recarregando itens...</div>
 }
 
 @if (!string.IsNullOrEmpty(_realTimeWarning))
@@ -82,7 +82,7 @@ else
     <nav class="mt-4" aria-label="Market pagination">
         <ul class="pagination pagination-sm justify-content-center flex-wrap">
             <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Previous page" disabled="@(Query.Page == 1)">Previous</button>
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Previous page" disabled="@(Query.Page == 1)">Anterior</button>
             </li>
             @foreach (var page in GetVisiblePages())
             {
@@ -91,7 +91,7 @@ else
                 </li>
             }
             <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Next page" disabled="@(Query.Page >= TotalPages)">Next</button>
+                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Next page" disabled="@(Query.Page >= TotalPages)">Próxima</button>
             </li>
         </ul>
     </nav>
@@ -103,13 +103,15 @@ else
 
     private static readonly IReadOnlyList<MarketSortOption> SortOptions = new[]
     {
-        new MarketSortOption("expiresAtUtc", "Ending soon"),
-        new MarketSortOption("-expiresAtUtc", "Ending last"),
-        new MarketSortOption("-currentBid", "Highest bid"),
-        new MarketSortOption("currentBid", "Lowest bid")
+        new MarketSortOption("expiresAtUtc", "Terminando em breve"),
+        new MarketSortOption("-expiresAtUtc", "Terminando por último"),
+        new MarketSortOption("-currentBid", "Maior lance"),
+        new MarketSortOption("currentBid", "Menor lance")
     };
 
-    private static readonly IReadOnlyList<string> StatusOptions = new[] { "Published", "Settled", "Canceled", "Closed", "Active" };
+    private static readonly IReadOnlyList<string> StatusOptions = new[] { "Publicado", "Finalizado", "Cancelado", "Encerrado", "Ativo" };
+
+
 
     private readonly List<MarketPositionOption> _positionOptions = new();
     private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
@@ -191,8 +193,8 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to establish market hub connection.");
-            _realTimeWarning ??= "Real-time updates are currently unavailable. Refresh the page to try again.";
+            Logger.LogError(ex, "Falha ao estabelecer conexão com o hub do mercado.");
+            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
             StateHasChangedSafe();
         }
 
@@ -257,8 +259,8 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load market items for page {Page}", Query.Page);
-            _errorMessage = "We couldn't load the market items right now. Please try again in a moment.";
+            Logger.LogError(ex, "Falha ao carregar os itens do mercado para a página {Page}", Query.Page);
+            _errorMessage = "Não foi possível carregar os itens do mercado no momento. Tente novamente em instantes.";
         }
         finally
         {
@@ -385,8 +387,8 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to join market cycle {CycleId}", ActiveCycleId);
-            _realTimeWarning ??= "Real-time updates are currently unavailable. Refresh the page to try again.";
+            Logger.LogError(ex, "Falha ao ingressar no ciclo de mercado {CycleId}", ActiveCycleId);
+            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
             StateHasChangedSafe();
         }
     }

@@ -198,18 +198,19 @@
 
     private sealed class DraftFormModel
     {
-        [Required(ErrorMessage = "Cycle is required.")]
+        [Required(ErrorMessage = "O ciclo é obrigatório.")]
         [Display(Name = "Ciclo")]
         [RegularExpression(@"^[{(]?[0-9A-Fa-f]{8}(-?[0-9A-Fa-f]{4}){3}-?[0-9A-Fa-f]{12}[)}]?$",
-            ErrorMessage = "Enter a valid GUID.")]
+            ErrorMessage = "Informe um GUID válido.")]
         public string CycleIdText { get; set; } = string.Empty;
 
         public Guid? CycleId { get; set; }
         public Guid? PlayerId { get; set; }
         public decimal? BasePrice { get; set; }
         public decimal? MinIncrement { get; set; }
+
         [Display(Name = "Comprar agora")]
-        [Range(0, double.MaxValue, ErrorMessage = "Use a non-negative value.")]
+        [Range(0, double.MaxValue, ErrorMessage = "Use um valor positivo.")]
         public decimal? BuyNowPrice { get; set; }
 
         [Display(Name = "Expira em")]
