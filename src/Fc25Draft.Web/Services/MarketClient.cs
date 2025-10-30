@@ -1,8 +1,9 @@
 using System.Globalization;
+using System.Linq;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Fc25Draft.Core.DTOs;
-using Fc25Draft.Web.Models.Market;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
 using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest;
 using MarketItemVm = Fc25Draft.Core.DTOs.MarketItemVm;
