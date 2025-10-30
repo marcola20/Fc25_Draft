@@ -1,0 +1,17 @@
+@page "/market"
+@using Fc25Draft.Web.Models.Market
+@using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Hubs
+@inject MarketClient MarketClient
+@inject MarketHubClient MarketHubClient
+
+<PageTitle>Mercado</PageTitle>
+
+<h3>Mercado</h3>
+
+<MarketFilters />
+
+@code {
+    private MarketQueryVm query = new();
+    private IReadOnlyList<MarketItemVm> items = Array.Empty<MarketItemVm>();
+}
