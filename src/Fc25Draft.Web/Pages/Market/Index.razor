@@ -9,6 +9,7 @@
 @using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Hubs
 @using Fc25Draft.Web.Services
+@using Microsoft.Extensions.Logging
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 @inject MarketClient Client
@@ -21,16 +22,93 @@
 
 <MarketFilters OnApply="ApplyFiltersAsync" />
 
-@if (PageData is null)
+@if (_isLoading && PageData is null)
 {
-    <p><em>Carregando itens do mercado...</em></p>
+    <div class="d-flex align-items-center gap-2 text-muted" role="status">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>Loading market items…</span>
+    </div>
+}
+else if (PageData is null)
+{
+    if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@_errorMessage</div>
+    }
+    else
+    {
+        <div class="alert alert-info" role="status">Use the filters to load market items.</div>
+    }
 }
 else if (PageData.Items.Count == 0)
 {
-    <p>Nenhum item encontrado.</p>
+    <div class="alert alert-secondary" role="status">No market items found for the selected filters.</div>
 }
 else
 {
+    if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-warning" role="alert">@_errorMessage</div>
+    }
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <span class="text-muted small">@GetResultsSummary()</span>
+        @if (TotalPages > 1)
+        {
+            <nav aria-label="Market pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Query.Page <= 1 ? "disabled" : string.Empty)">
+                        <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Previous page" disabled="@(_isLoading || Query.Page <= 1)">‹</button>
+                    </li>
+                    @if (TotalPages > 0)
+                    {
+                        var visiblePages = GetVisiblePages().ToArray();
+                        if (visiblePages.Length > 0 && visiblePages[0] > 1)
+                        {
+                            <li class="page-item">
+                                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(1)" disabled="@_isLoading">1</button>
+                            </li>
+                            if (visiblePages[0] > 2)
+                            {
+                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                            }
+                        }
+
+                        foreach (var pageNumber in visiblePages)
+                        {
+                            var isActive = pageNumber == Query.Page;
+                            <li class="page-item @(isActive ? "active" : string.Empty)">
+                                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(pageNumber)" disabled="@(_isLoading || isActive)">@pageNumber</button>
+                            </li>
+                        }
+
+                        if (visiblePages.Length > 0 && visiblePages[^1] < TotalPages)
+                        {
+                            if (visiblePages[^1] < TotalPages - 1)
+                            {
+                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                            }
+                            <li class="page-item">
+                                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(TotalPages)" disabled="@_isLoading">@TotalPages</button>
+                            </li>
+                        }
+                    }
+                    <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
+                        <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Next page" disabled="@(_isLoading || Query.Page >= TotalPages)">›</button>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted" role="status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            <span>Updating results…</span>
+        </div>
+    }
+
     foreach (var item in PageData.Items)
     {
         <MarketItemCard
@@ -45,14 +123,20 @@ else
     [Parameter]
     public Guid? CycleId { get; set; }
 
-    private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
+    private CoreQueryVm Query = new() { Page = 1, PageSize = 20, Sort = "expires" };
     private PagedResult<CoreItemVm>? PageData;
     private TimeSpan ServerTimeOffset = TimeSpan.Zero;
     private Guid ActiveCycleId;
     private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _hubCts;
     private Func<CoreItemVm, Task>? _bidUpdatedHandler;
     private Func<CoreItemVm, Task>? _itemBoughtHandler;
     private Func<CoreItemVm, Task>? _itemClosedHandler;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    [Inject]
+    private ILogger<Index> Logger { get; set; } = default!;
 
     protected override Task OnInitializedAsync() => Task.CompletedTask;
 
@@ -68,8 +152,23 @@ else
         var ct = PrepareNewLoadCts();
         await LoadPageAsync(1, ct);
 
-        await Hub.ConnectAsync();
-        await Hub.JoinCycle(ActiveCycleId);
+        _hubCts = new CancellationTokenSource();
+
+        try
+        {
+            await Hub.ConnectAsync(_hubCts.Token);
+            await Hub.JoinCycle(ActiveCycleId, _hubCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignored during disposal
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to connect to market hub for cycle {CycleId}", ActiveCycleId);
+            _errorMessage ??= "Live updates are unavailable. Refresh the page to retry.";
+            StateHasChangedSafe();
+        }
 
         _bidUpdatedHandler = vm =>
         {
@@ -98,10 +197,28 @@ else
     private async Task LoadPageAsync(int page, CancellationToken ct)
     {
         Query.Page = page;
-        PagedResult<CoreItemVm>? result = await Client.GetItemsAsync(Query, ct);
-        PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
-        ComputeServerOffsetFromClient();
-        StateHasChangedSafe();
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var result = await Client.GetItemsAsync(Query, ct).ConfigureAwait(false);
+            PageData = result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            ComputeServerOffsetFromClient();
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load market items for page {Page}", page);
+            _errorMessage = "We couldn’t load the market items. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChangedSafe();
+        }
     }
 
     private void ComputeServerOffsetFromClient()
@@ -131,7 +248,7 @@ else
             Status = incoming.Status,
             Page = 1,
             PageSize = incoming.PageSize > 0 ? incoming.PageSize : 20,
-            Sort = incoming.Sort
+            Sort = string.IsNullOrWhiteSpace(incoming.Sort) ? Query.Sort : incoming.Sort
         };
 
         var ct = PrepareNewLoadCts();
@@ -152,7 +269,6 @@ else
 
     private async Task ReloadSingleItemAsync(Guid itemId, CancellationToken ct)
     {
-        _ = itemId;
         await LoadPageAsync(Query.Page, ct);
     }
 
@@ -178,6 +294,92 @@ else
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
+        _hubCts?.Cancel();
+        _hubCts?.Dispose();
+
+        Hub.OnBidUpdated = null;
+        Hub.OnItemBought = null;
+        Hub.OnItemClosed = null;
+
         await Hub.DisposeAsync();
+    }
+
+    private int TotalPages
+    {
+        get
+        {
+            if (PageData is null || PageData.Total <= 0 || Query.PageSize <= 0)
+            {
+                return 0;
+            }
+
+            return (int)Math.Ceiling(PageData.Total / (double)Query.PageSize);
+        }
+    }
+
+    private IEnumerable<int> GetVisiblePages()
+    {
+        var totalPages = TotalPages;
+        if (totalPages <= 0)
+        {
+            yield break;
+        }
+
+        var start = Math.Max(1, Query.Page - 2);
+        var end = Math.Min(totalPages, Query.Page + 2);
+
+        if (end - start < 4)
+        {
+            start = Math.Max(1, end - 4);
+            end = Math.Min(totalPages, start + 4);
+        }
+
+        for (var page = start; page <= end; page++)
+        {
+            yield return page;
+        }
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (PageData is null)
+        {
+            return;
+        }
+
+        var totalPages = TotalPages;
+        if (totalPages == 0)
+        {
+            return;
+        }
+
+        if (page < 1)
+        {
+            page = 1;
+        }
+        else if (page > totalPages)
+        {
+            page = totalPages;
+        }
+
+        if (page == Query.Page)
+        {
+            return;
+        }
+
+        var ct = PrepareNewLoadCts();
+        await LoadPageAsync(page, ct);
+    }
+
+    private string GetResultsSummary()
+    {
+        if (PageData is null || PageData.Total == 0 || Query.PageSize <= 0)
+        {
+            return "No items";
+        }
+
+        var start = ((Query.Page - 1) * Query.PageSize) + 1;
+        var end = Math.Min(PageData.Total, start + (PageData.Items?.Count ?? 0) - 1);
+        return $"Showing {start}-{end} of {PageData.Total} items";
     }
 }

@@ -1,47 +1,199 @@
+@using System
 @using System.Collections.Generic
 @using System.Linq
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Logging
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
-<EditForm Model="Model" OnValidSubmit="ApplyAsync">
-    <div class="market-filters d-flex flex-column flex-md-row gap-3 align-items-md-end">
-        <div class="flex-grow-1">
-            <label class="form-label" for="market-filter-name">Nome</label>
-            <InputText id="market-filter-name" class="form-control" @bind-Value="Model.Name" />
+<EditForm Model="Model" OnValidSubmit="ApplyAsync" class="mb-3">
+    <div class="row row-cols-1 row-cols-md-6 g-2 g-lg-3 align-items-end market-filter-bar">
+        <div class="col-md-2">
+            <label class="form-label" for="market-filter-name">Name</label>
+            <InputText id="market-filter-name" class="form-control" @bind-Value="Model.Name" aria-label="Filter by player name" />
         </div>
-        <div class="flex-grow-1">
+
+        <div class="col-md-2">
+            <label class="form-label" for="market-filter-positions">Positions</label>
+            @if (_isPositionDropdownOpen)
+            {
+                <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="ClosePositionsDropdown"></div>
+            }
+            <div class="position-relative" style="z-index: 1010;">
+                <button type="button"
+                        id="market-filter-positions"
+                        class="btn btn-outline-secondary w-100 text-start d-flex align-items-center justify-content-between"
+                        @onclick="TogglePositionsDropdown"
+                        @onkeydown="HandlePositionsDropdownKeyDown"
+                        aria-haspopup="true"
+                        aria-expanded="@_isPositionDropdownOpen"
+                        aria-label="Select positions">
+                    <span class="flex-grow-1 text-truncate">@GetSelectedPositionsLabel()</span>
+                    <span class="ms-2 small" aria-hidden="true">▾</span>
+                </button>
+                <div class="dropdown-menu w-100 p-3 shadow-sm @(_isPositionDropdownOpen ? "show" : string.Empty)"
+                     role="listbox"
+                     aria-labelledby="market-filter-positions"
+                     style="max-height: 16rem; overflow-y: auto;"
+                     @onclick:stopPropagation>
+                    <div class="form-check mb-2">
+                        <input id="market-filter-positions-all"
+                               class="form-check-input"
+                               type="checkbox"
+                               checked="@(!_selectedPositionIds.Any())"
+                               @onchange="OnSelectAllPositionsChanged" />
+                        <label class="form-check-label" for="market-filter-positions-all">All positions</label>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    @foreach (var position in _positions)
+                    {
+                        var checkboxId = $"market-filter-position-{position.PositionId}";
+                        <div class="form-check">
+                            <input id="@checkboxId"
+                                   class="form-check-input"
+                                   type="checkbox"
+                                   checked="@_selectedPositionIds.Contains(position.PositionId)"
+                                   @onchange="args => OnPositionToggled(position.PositionId, args.Value)" />
+                            <label class="form-check-label" for="@checkboxId">@position.Name</label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-1">
+            <label class="form-label" for="market-filter-overall-min">Overall min</label>
+            <InputNumber TValue="int?"
+                         id="market-filter-overall-min"
+                         class="form-control"
+                         @bind-Value="Model.OverallMin"
+                         aria-label="Minimum overall"
+                         min="50"
+                         max="99" />
+        </div>
+
+        <div class="col-6 col-md-1">
+            <label class="form-label" for="market-filter-overall-max">Overall max</label>
+            <InputNumber TValue="int?"
+                         id="market-filter-overall-max"
+                         class="form-control"
+                         @bind-Value="Model.OverallMax"
+                         aria-label="Maximum overall"
+                         min="50"
+                         max="99" />
+        </div>
+
+        <div class="col-md-2">
             <label class="form-label" for="market-filter-status">Status</label>
-            <InputText id="market-filter-status" class="form-control" @bind-Value="Model.Status" />
+            <InputSelect TValue="string" id="market-filter-status" class="form-select" @bind-Value="Model.Status" aria-label="Filter by status">
+                <option value="">Any</option>
+                @foreach (var option in StatusOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </InputSelect>
         </div>
-        <div class="flex-grow-1">
-            <label class="form-label" for="market-filter-page-size">Itens por página</label>
-            <InputNumber TValue="int" id="market-filter-page-size" class="form-control" @bind-Value="Model.PageSize" min="1" />
+
+        <div class="col-md-2">
+            <label class="form-label" for="market-filter-sort">Sort</label>
+            <InputSelect TValue="string" id="market-filter-sort" class="form-select" @bind-Value="Model.Sort" aria-label="Sort items">
+                @foreach (var option in SortOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </InputSelect>
         </div>
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Aplicar</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">Limpar</button>
+
+        <div class="col-6 col-md-1">
+            <label class="form-label" for="market-filter-page-size">Page size</label>
+            <InputSelect TValue="int" id="market-filter-page-size" class="form-select" @bind-Value="Model.PageSize" aria-label="Items per page">
+                @foreach (var size in PageSizeOptions)
+                {
+                    <option value="@size">@size</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-6 col-md-1 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100">Apply filters</button>
+            <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearAsync">Clear</button>
         </div>
     </div>
 </EditForm>
 
 @code {
-    private CoreQueryVm Model = new() { Page = 1, PageSize = 20 };
+    private static readonly IReadOnlyList<int> PageSizeOptions = new[] { 20, 50, 100 };
+
+    private static readonly IReadOnlyList<(string Value, string Label)> StatusOptions = new[]
+    {
+        ("Active", "Active"),
+        ("Closed", "Closed"),
+        ("Settled", "Settled"),
+        ("Canceled", "Canceled")
+    };
+
+    private static readonly IReadOnlyList<(string Value, string Label)> SortOptions = new[]
+    {
+        ("expires", "Ending soon"),
+        ("price_desc", "Highest bid"),
+        ("price_asc", "Lowest bid"),
+        ("overall_desc", "Overall ↓"),
+        ("overall_asc", "Overall ↑")
+    };
+
+    private readonly HashSet<short> _selectedPositionIds = new();
+    private IReadOnlyList<Position> _positions = Array.Empty<Position>();
+    private bool _isPositionDropdownOpen;
+
+    private CoreQueryVm Model = new() { Page = 1, PageSize = PageSizeDefault, Sort = SortOptions[0].Value };
+
+    private const int PageSizeDefault = 20;
 
     [Parameter]
     public EventCallback<CoreQueryVm> OnApply { get; set; }
 
+    [Inject]
+    private IPositionService PositionService { get; set; } = default!;
+
+    [Inject]
+    private ILogger<MarketFilters> Logger { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var items = await PositionService.GetAllAsync().ConfigureAwait(false);
+            _positions = items.OrderBy(p => p.PositionId).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load positions for market filters.");
+            _positions = Array.Empty<Position>();
+        }
+    }
+
     private async Task ApplyAsync()
     {
+        Model.Positions = _selectedPositionIds.Select(id => (int)id).ToList();
+
+        var desiredSort = string.IsNullOrWhiteSpace(Model.Sort) ? SortOptions[0].Value : Model.Sort;
+        if (!SortOptions.Any(option => string.Equals(option.Value, desiredSort, StringComparison.OrdinalIgnoreCase)))
+        {
+            desiredSort = SortOptions[0].Value;
+        }
+
+        Model.Sort = desiredSort;
+
         var copy = new CoreQueryVm
         {
-            Name = Model.Name,
+            Name = string.IsNullOrWhiteSpace(Model.Name) ? null : Model.Name,
             Positions = Model.Positions?.ToList() ?? new List<int>(),
             OverallMin = Model.OverallMin,
             OverallMax = Model.OverallMax,
-            Status = Model.Status,
+            Status = string.IsNullOrWhiteSpace(Model.Status) ? null : Model.Status,
             Page = 1,
-            PageSize = Model.PageSize,
-            Sort = Model.Sort
+            PageSize = PageSizeOptions.Contains(Model.PageSize) ? Model.PageSize : PageSizeDefault,
+            Sort = string.IsNullOrWhiteSpace(Model.Sort) ? null : Model.Sort
         };
 
         if (OnApply.HasDelegate)
@@ -52,7 +204,86 @@
 
     private async Task ClearAsync()
     {
-        Model = new CoreQueryVm { Page = 1, PageSize = 20 };
+        _selectedPositionIds.Clear();
+        Model = new CoreQueryVm { Page = 1, PageSize = PageSizeDefault, Sort = SortOptions[0].Value };
+        ClosePositionsDropdown();
         await ApplyAsync();
+    }
+
+    private void TogglePositionsDropdown()
+    {
+        _isPositionDropdownOpen = !_isPositionDropdownOpen;
+    }
+
+    private void ClosePositionsDropdown()
+    {
+        _isPositionDropdownOpen = false;
+    }
+
+    private void HandlePositionsDropdownKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            ClosePositionsDropdown();
+        }
+    }
+
+    private async Task OnPositionToggled(short positionId, object? value)
+    {
+        var isChecked = ParseCheckboxValue(value);
+        if (isChecked)
+        {
+            _selectedPositionIds.Add(positionId);
+        }
+        else
+        {
+            _selectedPositionIds.Remove(positionId);
+        }
+
+        await ApplyAsync();
+    }
+
+    private async Task OnSelectAllPositionsChanged(ChangeEventArgs args)
+    {
+        if (!ParseCheckboxValue(args.Value))
+        {
+            return;
+        }
+
+        if (_selectedPositionIds.Count == 0)
+        {
+            return;
+        }
+
+        _selectedPositionIds.Clear();
+        await ApplyAsync();
+    }
+
+    private string GetSelectedPositionsLabel()
+    {
+        if (_selectedPositionIds.Count == 0)
+        {
+            return "All positions";
+        }
+
+        var names = _positions
+            .Where(p => _selectedPositionIds.Contains(p.PositionId))
+            .Select(p => p.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToArray();
+
+        return names.Length == 0
+            ? $"{_selectedPositionIds.Count} selected"
+            : string.Join(", ", names);
+    }
+
+    private static bool ParseCheckboxValue(object? value)
+    {
+        return value switch
+        {
+            bool boolean => boolean,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
     }
 }

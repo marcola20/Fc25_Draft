@@ -42,6 +42,18 @@ a, .btn-link {
     font-size: 0.95rem;
 }
 
+.market-filter-bar .form-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.market-filter-bar .form-control,
+.market-filter-bar .form-select,
+.market-filter-bar .btn {
+    min-height: 2.5rem;
+    font-size: 0.95rem;
+}
+
 @media (max-width: 575.98px) {
     .draft-filter-group {
         --bs-gutter-x: 0.75rem;

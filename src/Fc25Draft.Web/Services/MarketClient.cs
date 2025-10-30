@@ -54,7 +54,10 @@ namespace Fc25Draft.Web.Services
             }
 
             var json = await resp.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
             return result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
         }
 

@@ -12,101 +12,113 @@
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
 
-<div class="market-item-card">
-    <div class="market-item-card__header">
-        <div class="market-item-card__player">
-            <h3>@Item.PlayerName</h3>
-            <span class="market-item-card__overall">OVR @Item.Overall</span>
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body d-flex flex-column gap-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <div>
+                <h4 class="h5 mb-1">@Item.PlayerName</h4>
+                <div class="text-muted small">OVR @Item.Overall</div>
+            </div>
+            <span class="badge @GetStatusBadgeClass() align-self-start">@Item.Status</span>
         </div>
-        <div class="market-item-card__status">
-            <span>@Item.Status</span>
-        </div>
-    </div>
 
-    <div class="market-item-card__details">
-        <div>
-            @if (Item.CurrentLeaderAmount.HasValue)
-            {
-                <div class="market-item-card__leader">Current bid: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
-                @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+        <div class="row row-cols-1 row-cols-sm-2 gy-3">
+            <div>
+                @if (Item.CurrentLeaderAmount.HasValue)
                 {
-                    <div class="market-item-card__leader-team">by @Item.CurrentLeaderTeamName</div>
+                    <div class="fw-semibold">Current bid: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
+                    @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+                    {
+                        <div class="text-muted small">by @Item.CurrentLeaderTeamName</div>
+                    }
                 }
-            }
-            else
-            {
-                <div class="market-item-card__leader">No bids yet</div>
-            }
+                else
+                {
+                    <div class="text-muted">No bids yet</div>
+                }
+            </div>
+            <div class="text-sm-end">
+                @if (IsExpired)
+                {
+                    <span class="badge bg-secondary" aria-live="polite">Closed</span>
+                }
+                else
+                {
+                    <span class="fw-semibold" aria-live="polite">Time left: @CountdownText</span>
+                }
+            </div>
         </div>
-        <div class="market-item-card__expires">
-            @if (IsExpired)
-            {
-                <span class="market-item-card__expired">Expired</span>
-            }
-            else
-            {
-                <span class="market-item-card__countdown">Time left: @CountdownText</span>
-            }
-        </div>
-    </div>
 
-    <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
-        <DataAnnotationsValidator />
-        <div class="market-item-card__form">
-            <InputNumber @bind-Value="_model.Amount"
-                         class="market-item-card__input"
-                         step="0.01"
-                         disabled="@IsBidDisabled"
-                         placeholder="Bid amount" />
-            <ValidationMessage For="() => _model.Amount" />
-            <button type="submit"
-                    class="market-item-card__bid-btn"
-                    disabled="@IsBidDisabled">
-                Place Bid
-            </button>
-        </div>
-    </EditForm>
-
-    @if (CanBuyNow)
-    {
-        <div class="market-item-card__buy">
-            <button type="button"
-                    class="market-item-card__buy-btn"
-                    disabled="@IsBidDisabled"
-                    @onclick="ShowBuyNowConfirm">
-                Buy Now @Item.BuyNowPrice!.Value.ToString("F2", CultureInfo.InvariantCulture)
-            </button>
-
-            @if (_showBuyConfirm)
-            {
-                <div class="market-item-card__buy-confirm">
-                    <p>Confirm buy now?</p>
-                    <button type="button"
-                            class="market-item-card__confirm-btn"
-                            disabled="@_isSubmitting"
-                            @onclick="ConfirmBuyNowAsync">
-                        Confirm
-                    </button>
-                    <button type="button"
-                            class="market-item-card__cancel-btn"
-                            disabled="@_isSubmitting"
-                            @onclick="CancelBuyNow">
-                        Cancel
+        <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
+            <DataAnnotationsValidator />
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label" for="bid-@Item.ItemId">Bid amount</label>
+                    <InputNumber @bind-Value="_model.Amount"
+                                 id="bid-@Item.ItemId"
+                                 class="form-control"
+                                 step="0.01"
+                                 disabled="@IsBidDisabled"
+                                 placeholder="Enter bid"
+                                 aria-describedby="bid-help-@Item.ItemId" />
+                    <small id="bid-help-@Item.ItemId" class="form-text text-muted">Minimum increment: @Item.MinIncrement.ToString("F2", CultureInfo.InvariantCulture)</small>
+                    <ValidationMessage For="() => _model.Amount" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@IsBidDisabled">
+                        Bid
                     </button>
                 </div>
-            }
-        </div>
-    }
+            </div>
+        </EditForm>
 
-    @if (!string.IsNullOrEmpty(_infoMessage))
-    {
-        <div class="market-item-card__info">@_infoMessage</div>
-    }
+        @if (CanBuyNow)
+        {
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                <button type="button"
+                        class="btn btn-outline-success"
+                        disabled="@IsBidDisabled"
+                        @onclick="ShowBuyNowConfirm">
+                    Buy now @Item.BuyNowPrice!.Value.ToString("F2", CultureInfo.InvariantCulture)
+                </button>
 
-    @if (!string.IsNullOrEmpty(_errorMessage))
-    {
-        <div class="market-item-card__error">@_errorMessage</div>
-    }
+                @if (_showBuyConfirm)
+                {
+                    <div class="alert alert-warning mb-0 py-2 px-3" role="alert">
+                        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                            <span class="fw-semibold">Confirm buy now?</span>
+                            <div class="btn-group">
+                                <button type="button"
+                                        class="btn btn-sm btn-success"
+                                        disabled="@_isSubmitting"
+                                        @onclick="ConfirmBuyNowAsync">
+                                    Confirm
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        disabled="@_isSubmitting"
+                                        @onclick="CancelBuyNow">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_infoMessage))
+        {
+            <div class="alert alert-info mb-0" role="status">@_infoMessage</div>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger mb-0" role="alert">@_errorMessage</div>
+        }
+    </div>
 </div>
 
 @code {
@@ -237,6 +249,7 @@
         if (Remaining <= TimeSpan.Zero)
         {
             StopTimer();
+            MarkAsClosed();
             return;
         }
 
@@ -270,6 +283,7 @@
             {
                 if (IsExpired)
                 {
+                    MarkAsClosed();
                     await InvokeAsync(StateHasChanged);
                     break;
                 }
@@ -510,5 +524,26 @@
     {
         [Required]
         public decimal? Amount { get; set; }
+    }
+
+    private void MarkAsClosed()
+    {
+        if (!string.Equals(Item.Status, "Closed", StringComparison.OrdinalIgnoreCase) && IsExpired)
+        {
+            Item.Status = "Closed";
+        }
+    }
+
+    private string GetStatusBadgeClass()
+    {
+        var status = Item.Status?.ToLowerInvariant();
+        return status switch
+        {
+            "active" or "publicado" => "bg-success",
+            "closed" or "finalizado" => "bg-secondary",
+            "settled" => "bg-info text-dark",
+            "canceled" or "cancelado" => "bg-danger",
+            _ => "bg-primary"
+        };
     }
 }
