@@ -58,15 +58,6 @@
                 }
             </div>
         </div>
-        @if (selectedPositionIds.Count > 0)
-        {
-            <div class="mt-2 d-flex flex-wrap gap-1">
-                @foreach (var position in positions.Where(p => selectedPositionIds.Contains(p.PositionId)))
-                {
-                    <span class="badge rounded-pill bg-secondary fw-normal">@position.Name</span>
-                }
-            </div>
-        }
     </div>
     <div class="col-md-2 pt-4">
         <div class="form-check">
