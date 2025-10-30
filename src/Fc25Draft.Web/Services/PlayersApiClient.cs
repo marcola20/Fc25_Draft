@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -21,45 +22,60 @@ public class PlayersApiClient
 
     public async Task<PagedResult<PlayerListItemDto>> GetAsync(
         string? search,
-        short? positionId,
+        IReadOnlyCollection<short>? positionIds,
         bool onlyAvailable,
         int? overallMin,
         int? overallMax,
+        string? sortBy,
+        string? sortOrder,
         int page,
         int pageSize,
         CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync();
 
-        var query = new Dictionary<string, string?>
+        var query = new List<KeyValuePair<string, string?>>
         {
-            ["page"] = Math.Max(1, page).ToString(),
-            ["pageSize"] = Math.Max(1, pageSize).ToString()
+            new("page", Math.Max(1, page).ToString()),
+            new("pageSize", Math.Max(1, pageSize).ToString())
         };
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query["q"] = search;
+            query.Add(new KeyValuePair<string, string?>("q", search));
         }
 
-        if (positionId.HasValue)
+        if (positionIds is { Count: > 0 })
         {
-            query["pos"] = positionId.Value.ToString();
+            foreach (var id in positionIds.Distinct())
+            {
+                query.Add(new KeyValuePair<string, string?>("pos", id.ToString()));
+            }
         }
 
         if (onlyAvailable)
         {
-            query["onlyAvailable"] = "true";
+            query.Add(new KeyValuePair<string, string?>("onlyAvailable", "true"));
         }
 
         if (overallMin.HasValue)
         {
-            query["overallMin"] = overallMin.Value.ToString();
+            query.Add(new KeyValuePair<string, string?>("overallMin", overallMin.Value.ToString()));
         }
 
         if (overallMax.HasValue)
         {
-            query["overallMax"] = overallMax.Value.ToString();
+            query.Add(new KeyValuePair<string, string?>("overallMax", overallMax.Value.ToString()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(sortBy))
+        {
+            query.Add(new KeyValuePair<string, string?>("sortBy", sortBy));
+        }
+
+        if (!string.IsNullOrWhiteSpace(sortOrder))
+        {
+            query.Add(new KeyValuePair<string, string?>("sortOrder", sortOrder));
         }
 
         var url = QueryHelpers.AddQueryString("api/players", query);

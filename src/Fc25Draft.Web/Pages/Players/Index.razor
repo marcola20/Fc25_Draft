@@ -1,5 +1,6 @@
 @page "/players"
 @using System
+@using System.Collections.Generic
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using System.Linq
@@ -22,12 +23,16 @@
         </form>
     </div>
     <div class="col-md-3">
-        <label class="form-label" for="positionFilter">Posição</label>
-        <select id="positionFilter" class="form-select" value="@selectedPositionId" @onchange="OnFilterChanged">
-            <option value="">Todas</option>
+        <label class="form-label" for="positionFilter">Posições</label>
+        <select id="positionFilter"
+                class="form-select"
+                multiple
+                size="@Math.Min(6, Math.Max(3, positions.Count))"
+                @onchange="OnPositionsChanged">
+            <option value="" selected="@(!selectedPositionIds.Any())">Todas</option>
             @foreach (var position in positions)
             {
-                <option value="@position.PositionId">@position.Name</option>
+                <option value="@position.PositionId" selected="@selectedPositionIds.Contains(position.PositionId)">@position.Name</option>
             }
         </select>
     </div>
@@ -129,8 +134,28 @@ else
                 <tr>
                     <th>Nome</th>
                     <th>Posição</th>
-                    <th>Overall</th>
-                    <th>Idade</th>
+                    <th>
+                        <button type="button"
+                                class="btn btn-link p-0 text-decoration-none"
+                                @onclick="@(() => ChangeSort("overall"))">
+                            Overall
+                            @if (sortBy == "overall")
+                            {
+                                <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                            }
+                        </button>
+                    </th>
+                    <th>
+                        <button type="button"
+                                class="btn btn-link p-0 text-decoration-none"
+                                @onclick="@(() => ChangeSort("age"))">
+                            Idade
+                            @if (sortBy == "age")
+                            {
+                                <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                            }
+                        </button>
+                    </th>
                     <th>Status</th>
                     <th>Time</th>
                     <th class="text-end">Ações</th>
@@ -212,7 +237,7 @@ else
     private string? search;
     private string? errorMessage;
     private bool isLoading = true;
-    private string? selectedPositionId;
+    private readonly HashSet<short> selectedPositionIds = new();
     private bool onlyAvailable;
     private bool authInitialized;
     private bool isImporting;
@@ -222,6 +247,8 @@ else
     private readonly List<string> importErrors = new();
     private int? overallMin;
     private int? overallMax;
+    private string sortBy = "overall";
+    private bool sortDescending = true;
 
     protected override void OnInitialized()
     {
@@ -265,9 +292,26 @@ else
         await ApplyFiltersAsync();
     }
 
-    private async Task OnFilterChanged(ChangeEventArgs args)
+    private async Task OnPositionsChanged(ChangeEventArgs args)
     {
-        selectedPositionId = args.Value?.ToString();
+        selectedPositionIds.Clear();
+
+        if (args.Value is string[] values)
+        {
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                if (short.TryParse(value, out var parsed))
+                {
+                    selectedPositionIds.Add(parsed);
+                }
+            }
+        }
+
         await ApplyFiltersAsync();
     }
 
@@ -354,13 +398,16 @@ else
 
         try
         {
-            short? positionId = null;
-            if (short.TryParse(selectedPositionId, out var parsed))
-            {
-                positionId = parsed;
-            }
-
-            var result = await PlayersApiClient.GetAsync(search, positionId, onlyAvailable, overallMin, overallMax, currentPage, PageSize);
+            var result = await PlayersApiClient.GetAsync(
+                search,
+                selectedPositionIds,
+                onlyAvailable,
+                overallMin,
+                overallMax,
+                sortBy,
+                sortDescending ? "desc" : "asc",
+                currentPage,
+                PageSize);
             players.AddRange(result.Items);
             totalPlayers = result.Total;
             totalPages = Math.Max(1, (int)Math.Ceiling(totalPlayers / (double)PageSize));
@@ -396,6 +443,21 @@ else
     {
         currentPage = 1;
         await LoadPlayersAsync();
+    }
+
+    private async Task ChangeSort(string column)
+    {
+        if (sortBy == column)
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortBy = column;
+            sortDescending = true;
+        }
+
+        await ApplyFiltersAsync();
     }
 
     private void CreatePlayer()

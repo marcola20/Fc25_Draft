@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = ResolveConnectionString(builder);
@@ -696,10 +697,12 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
     playersApi.MapGet(string.Empty, async (
         DraftDbContext db,
         string? q,
-        short? pos,
+        [FromQuery(Name = "pos")] short[]? pos,
         bool? onlyAvailable,
         int? overallMin,
         int? overallMax,
+        string? sortBy,
+        string? sortOrder,
         int page = 1,
         int pageSize = 10,
         CancellationToken ct = default) =>
@@ -719,12 +722,15 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
         if (!string.IsNullOrWhiteSpace(q))
         {
             var pattern = $"%{q.Trim()}%";
-            query = query.Where(p => EF.Functions.Like(p.Name, pattern));
+            query = query.Where(p => EF.Functions.ILike(
+                EF.Functions.Unaccent(p.Name),
+                EF.Functions.Unaccent(pattern)));
         }
 
-        if (pos.HasValue)
+        if (pos is { Length: > 0 })
         {
-            query = query.Where(p => p.PositionId == pos.Value);
+            var positions = pos.Distinct().ToArray();
+            query = query.Where(p => positions.Contains(p.PositionId));
         }
 
         if (onlyAvailable is true)
@@ -742,11 +748,29 @@ static void MapPlayerEndpoints(RouteGroupBuilder api)
             query = query.Where(p => p.Overall <= overallMax.Value);
         }
 
+        var normalizedSortBy = string.IsNullOrWhiteSpace(sortBy)
+            ? "overall"
+            : sortBy.Trim().ToLowerInvariant();
+        var normalizedSortOrder = string.IsNullOrWhiteSpace(sortOrder)
+            ? "desc"
+            : sortOrder.Trim().ToLowerInvariant();
+        var sortDescending = normalizedSortOrder != "asc";
+
+        IOrderedQueryable<Player> orderedQuery = normalizedSortBy switch
+        {
+            "age" when sortDescending => query.OrderByDescending(p => p.Age ?? int.MinValue),
+            "age" => query.OrderBy(p => p.Age ?? int.MaxValue),
+            "overall" when sortDescending => query.OrderByDescending(p => p.Overall),
+            "overall" => query.OrderBy(p => p.Overall),
+            _ when sortDescending => query.OrderByDescending(p => p.Overall),
+            _ => query.OrderBy(p => p.Overall)
+        };
+
+        orderedQuery = orderedQuery.ThenBy(p => p.Name);
+
         var total = await query.CountAsync(ct);
 
-        var items = await query
-            .OrderByDescending(p => p.Overall)
-            .ThenBy(p => p.Name)
+        var items = await orderedQuery
             .Skip((currentPage - 1) * currentPageSize)
             .Take(currentPageSize)
             .Select(p => new PlayerListItemDto(
