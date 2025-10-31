@@ -91,12 +91,12 @@
             _initialPageSize = Model.PageSize > 0 ? Model.PageSize : 25;
         }
 
-        if (Model.ItemId.HasValue && string.IsNullOrWhiteSpace(_itemIdInput))
+        if (Model != null && Model.ItemId.HasValue && string.IsNullOrWhiteSpace(_itemIdInput))
         {
             _itemIdInput = Model.ItemId.Value.ToString();
         }
 
-        if (Model.CycleId.HasValue && string.IsNullOrWhiteSpace(_cycleIdInput))
+        if (Model != null && Model.CycleId.HasValue && string.IsNullOrWhiteSpace(_cycleIdInput))
         {
             _cycleIdInput = Model.CycleId.Value.ToString();
         }
