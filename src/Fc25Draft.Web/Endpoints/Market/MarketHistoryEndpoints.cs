@@ -211,18 +211,6 @@ public static class MarketHistoryEndpoints
                 parsedType = typeValue;
             }
 
-            if (Page < 1)
-            {
-                errorResult = Results.BadRequest(new { message = "Página deve ser maior ou igual a 1." });
-                return false;
-            }
-
-            if (PageSize < 1)
-            {
-                errorResult = Results.BadRequest(new { message = "Tamanho da página deve ser maior ou igual a 1." });
-                return false;
-            }
-
             var effectiveFromUtc = fromUtc ?? legacyFromUtc;
             var effectiveToUtc = toUtc ?? legacyToUtc;
 
@@ -231,6 +219,9 @@ public static class MarketHistoryEndpoints
                 errorResult = Results.BadRequest(new { message = "A data inicial deve ser menor ou igual à data final." });
                 return false;
             }
+
+            var sanitizedPage = Page < 1 ? 1 : Page;
+            var sanitizedPageSize = PageSize < 1 ? 1 : Math.Min(PageSize, 100);
 
             MarketTransactionType? type = null;
             if (parsedType.HasValue)
@@ -261,8 +252,8 @@ public static class MarketHistoryEndpoints
                 PerformedBy = string.IsNullOrWhiteSpace(PerformedBy) ? null : PerformedBy.Trim(),
                 FromUtc = effectiveFromUtc,
                 ToUtc = effectiveToUtc,
-                Page = Page,
-                PageSize = PageSize
+                Page = sanitizedPage,
+                PageSize = sanitizedPageSize
             };
 
             return true;

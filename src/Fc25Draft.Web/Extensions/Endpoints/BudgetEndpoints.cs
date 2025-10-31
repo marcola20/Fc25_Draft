@@ -117,9 +117,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 async ([FromQuery] Guid teamId, DraftDbContext db, CancellationToken ct, [FromQuery] int page = 1, [FromQuery] int pageSize = 20) =>
                 {
                     if (teamId == Guid.Empty) return Results.BadRequest(new { message = "teamId é obrigatório." });
-                    if (page < 1 || pageSize < 1) return Results.BadRequest(new { message = "Parâmetros de paginação inválidos." });
 
-                    var size = Math.Min(pageSize, 100);
+                    var currentPage = page < 1 ? 1 : page;
+                    var currentPageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
 
                     var teamExists = await db.Teams.AsNoTracking().AnyAsync(t => t.TeamId == teamId, ct);
                     if (!teamExists) return Results.NotFound(new { message = $"Time {teamId} não encontrado." });
@@ -129,12 +129,12 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     var total = await query.CountAsync(ct);
                     var items = await query
                         .OrderByDescending(l => l.DataUtc)
-                        .Skip((page - 1) * size)
-                        .Take(size)
+                        .Skip((currentPage - 1) * currentPageSize)
+                        .Take(currentPageSize)
                         .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
                         .ToListAsync(ct);
 
-                    return Results.Ok(new PagedResult<LedgerItemDto>(items, total, page, size));
+                    return Results.Ok(new PagedResult<LedgerItemDto>(items, total, currentPage, currentPageSize));
                 });
 
             return api;

@@ -36,8 +36,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 int pageSize = 10,
                 CancellationToken ct = default) =>
             {
-                var currentPage = Math.Max(1, page);
-                var currentPageSize = pageSize <= 0 ? 10 : pageSize;
+                var currentPage = page < 1 ? 1 : page;
+                var currentPageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 100);
 
                 var query = db.Players.AsNoTracking().Where(p => true);
 
