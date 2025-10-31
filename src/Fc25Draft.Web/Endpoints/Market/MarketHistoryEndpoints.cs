@@ -101,12 +101,13 @@ public static class MarketHistoryEndpoints
             var fileName = $"historico-mercado-{timestamp}.csv";
 
             return Results.Stream(
-                async (stream, cancellationToken) =>
+                async stream =>
                 {
-                    await WriteCsvAsync(stream, items, cancellationToken).ConfigureAwait(false);
+                    await WriteCsvAsync(stream, items, ct).ConfigureAwait(false);
                 },
                 "text/csv",
-                fileName);
+                fileName
+            );
         }
         catch (InvalidOperationException ex)
         {
