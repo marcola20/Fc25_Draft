@@ -46,3 +46,37 @@ window.fc25Share = {
         return 'error';
     }
 };
+
+window.fc25Files = {
+    saveFileFromBase64: function (fileName, contentType, base64Data) {
+        try {
+            if (!base64Data) {
+                throw new Error('Conteúdo do arquivo ausente.');
+            }
+
+            const safeName = (typeof fileName === 'string' && fileName.trim()) ? fileName : 'download.csv';
+            const type = (typeof contentType === 'string' && contentType.trim()) ? contentType : 'application/octet-stream';
+
+            const binary = atob(base64Data);
+            const length = binary.length;
+            const bytes = new Uint8Array(length);
+
+            for (let i = 0; i < length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+
+            const blob = new Blob([bytes], { type: type });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = safeName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Erro ao salvar o arquivo exportado:', error);
+            throw error;
+        }
+    }
+};

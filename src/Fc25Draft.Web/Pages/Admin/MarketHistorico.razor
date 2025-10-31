@@ -6,6 +6,7 @@
 @inject MarketApiClient MarketApiClient
 @inject AdminAuthService AdminAuth
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <PageTitle>Histórico do Mercado (Admin)</PageTitle>
@@ -23,16 +24,39 @@ else
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <span class="text-muted small">Filtros adicionais permitem investigar atividades específicas.</span>
         <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-secondary btn-sm"
-               href="@ExportUrl"
-               target="_blank"
-               rel="noopener noreferrer">Exportar CSV</a>
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    disabled="@_isExporting"
+                    @onclick="StartExportAsync">
+                @if (_isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Gerando CSV...</span>
+                }
+                else
+                {
+                    <span>Exportar CSV</span>
+                }
+            </button>
+            @if (_isExporting)
+            {
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        @onclick="CancelExport">
+                    Cancelar download
+                </button>
+            }
             <button type="button"
                     class="btn btn-outline-primary btn-sm"
                     @onclick="ReloadAsync"
                     disabled="@_isLoading">Recarregar</button>
         </div>
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(_exportErrorMessage))
+    {
+        <div class="alert alert-danger mt-2" role="alert">@_exportErrorMessage</div>
+    }
 
     <MarketHistoryFilters Model="_query"
                           OnApply="LoadAsync"
@@ -126,8 +150,9 @@ else
     private bool _isLoading;
     private string? _errorMessage;
     private CancellationTokenSource? _loadCts;
-
-    private string ExportUrl => Navigation.ToAbsoluteUri(MarketApiClient.GetHistoryExportUrl(_query)).ToString();
+    private bool _isExporting;
+    private string? _exportErrorMessage;
+    private CancellationTokenSource? _exportCts;
 
     private int TotalPages
         => _page is null || _page.PageSize <= 0
@@ -200,6 +225,60 @@ else
     private Task ReloadAsync()
         => LoadAsync(_query.Page);
 
+    private async Task StartExportAsync()
+    {
+        if (_isExporting)
+        {
+            return;
+        }
+
+        _exportCts?.Cancel();
+        _exportCts?.Dispose();
+        _exportCts = new CancellationTokenSource();
+
+        _isExporting = true;
+        _exportErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await MarketApiClient.DownloadHistoryCsvAsync(_query, _exportCts.Token);
+            var base64 = Convert.ToBase64String(result.Content);
+            await JSRuntime.InvokeVoidAsync("fc25Files.saveFileFromBase64", result.FileName, result.ContentType, base64);
+        }
+        catch (OperationCanceledException)
+        {
+            _exportErrorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _exportErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _exportErrorMessage = "Não foi possível exportar o histórico. Tente novamente.";
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            _isExporting = false;
+            _exportCts?.Dispose();
+            _exportCts = null;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelExport()
+    {
+        if (!_isExporting)
+        {
+            return;
+        }
+
+        _exportErrorMessage = null;
+        _exportCts?.Cancel();
+    }
+
     private async Task GoToPageAsync(int page)
     {
         if (page < 1 || page == _query.Page)
@@ -263,6 +342,8 @@ else
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
         _loadCts?.Cancel();
         _loadCts?.Dispose();
+        _exportCts?.Cancel();
+        _exportCts?.Dispose();
     }
 
     private void OnAuthenticationChanged()

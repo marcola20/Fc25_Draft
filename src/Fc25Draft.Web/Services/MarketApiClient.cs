@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
@@ -98,6 +99,26 @@ public class MarketApiClient
         return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
     }
 
+    public async Task<FileDownloadResult> DownloadHistoryCsvAsync(MarketHistoryQueryOptions query, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var url = BuildHistoryUrl("api/admin/market/history/export", query, includePaging: false);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+        await EnsureSuccessAsync(response);
+
+        var content = await response.Content.ReadAsByteArrayAsync(ct);
+        var contentType = response.Content.Headers.ContentType?.ToString() ?? "text/csv";
+        var disposition = response.Content.Headers.ContentDisposition;
+        var fileName = disposition?.FileNameStar ?? disposition?.FileName?.Trim('"') ?? $"historico-mercado-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv";
+
+        return new FileDownloadResult(content, fileName, contentType);
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
@@ -131,4 +152,6 @@ public class MarketApiClient
     }
 
     private sealed record ApiMessageResponse(string? Message);
+
+    public sealed record FileDownloadResult(byte[] Content, string FileName, string ContentType);
 }

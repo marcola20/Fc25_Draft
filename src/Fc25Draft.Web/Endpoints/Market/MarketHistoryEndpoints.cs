@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Fc25Draft.Core.DTOs;
@@ -43,7 +44,7 @@ public static class MarketHistoryEndpoints
             return Task.FromResult<IResult>(Results.BadRequest(new { message = "Identificador do item é obrigatório." }));
         }
 
-        return ExecuteQueryAsync(request with { ItemId = itemId }, historyService, ct);
+        return ExecuteQueryAsync(request, historyService, ct, itemIdOverride: itemId);
     }
 
     private static Task<IResult> HandleCycleHistoryAsync(
@@ -57,15 +58,17 @@ public static class MarketHistoryEndpoints
             return Task.FromResult<IResult>(Results.BadRequest(new { message = "Identificador do ciclo é obrigatório." }));
         }
 
-        return ExecuteQueryAsync(request with { CycleId = cycleId }, historyService, ct);
+        return ExecuteQueryAsync(request, historyService, ct, cycleIdOverride: cycleId);
     }
 
     private static async Task<IResult> ExecuteQueryAsync(
         MarketHistoryQueryParameters request,
         IMarketHistoryQueryService historyService,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid? cycleIdOverride = null,
+        Guid? itemIdOverride = null)
     {
-        if (!request.TryCreateFilter(out var filter, out var errorResult))
+        if (!request.TryCreateFilter(out var filter, out var errorResult, cycleIdOverride, itemIdOverride))
         {
             return errorResult!;
         }
@@ -91,40 +94,59 @@ public static class MarketHistoryEndpoints
             return errorResult!;
         }
 
-        var items = await historyService.ExportAsync(filter, ct).ConfigureAwait(false);
-        var csv = BuildCsv(items);
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
-        var fileName = $"historico-mercado-{timestamp}.csv";
-        var content = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv)).ToArray();
-        return Results.File(content, "text/csv", fileName);
+        try
+        {
+            var items = await historyService.ExportAsync(filter, ct).ConfigureAwait(false);
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+            var fileName = $"historico-mercado-{timestamp}.csv";
+
+            return Results.Stream(
+                async (stream, cancellationToken) =>
+                {
+                    await WriteCsvAsync(stream, items, cancellationToken).ConfigureAwait(false);
+                },
+                "text/csv",
+                fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
     }
 
-    private static string BuildCsv(IReadOnlyList<MarketTransactionDto> items)
+    private static async Task WriteCsvAsync(Stream stream, IReadOnlyList<MarketTransactionDto> items, CancellationToken ct)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("Data/Hora (UTC);Ciclo;Item;Jogador;Posição;Equipe origem;Equipe destino;Tipo;Valor;Responsável;Notas");
+        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+        await using var writer = new StreamWriter(stream, encoding, bufferSize: 1024, leaveOpen: true);
+
+        await writer.WriteLineAsync("DataHoraUtc;Evento;Jogador;TimeOrigem;TimeDestino;Valor;Observacoes").ConfigureAwait(false);
 
         foreach (var item in items)
         {
+            ct.ThrowIfCancellationRequested();
+
             var amount = item.Amount.HasValue
                 ? item.Amount.Value.ToString("F2", CultureInfo.InvariantCulture)
                 : string.Empty;
 
-            sb
+            var lineBuilder = new StringBuilder();
+            lineBuilder
                 .Append(Escape(item.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))).Append(';')
-                .Append(Escape(item.CycleId.ToString())).Append(';')
-                .Append(Escape(item.ItemId.ToString())).Append(';')
+                .Append(Escape(item.TypeName)).Append(';')
                 .Append(Escape(item.PlayerName)).Append(';')
-                .Append(Escape(item.PositionName)).Append(';')
                 .Append(Escape(item.TeamName ?? string.Empty)).Append(';')
                 .Append(Escape(item.TargetTeamName ?? string.Empty)).Append(';')
-                .Append(Escape(item.TypeName)).Append(';')
                 .Append(Escape(amount)).Append(';')
-                .Append(Escape(item.PerformedBy)).Append(';')
-                .Append(Escape(item.Notes ?? string.Empty)).AppendLine();
+                .Append(Escape(item.Notes ?? string.Empty));
+
+            await writer.WriteLineAsync(lineBuilder.ToString()).ConfigureAwait(false);
         }
 
-        return sb.ToString();
+        await writer.FlushAsync().ConfigureAwait(false);
     }
 
     private static string Escape(string value)
@@ -141,26 +163,53 @@ public static class MarketHistoryEndpoints
 
     private sealed record MarketHistoryQueryParameters
     {
-        public Guid? CycleId { get; init; }
-        public Guid? ItemId { get; init; }
-        public Guid? TeamId { get; init; }
+        [FromQuery(Name = "cycleId")] public string? CycleIdRaw { get; init; }
+        [FromQuery(Name = "itemId")] public string? ItemIdRaw { get; init; }
+        [FromQuery(Name = "teamId")] public string? TeamIdRaw { get; init; }
         public int? PlayerId { get; init; }
         public string? PlayerName { get; init; }
         public string? TeamName { get; init; }
         public string? TargetTeamName { get; init; }
-        public int? Type { get; init; }
+        [FromQuery(Name = "type")] public string? TypeRaw { get; init; }
         public string? PerformedBy { get; init; }
-        [FromQuery(Name = "from")] public DateTime? FromUtc { get; init; }
-        [FromQuery(Name = "fromUtc")] public DateTime? LegacyFromUtc { get; init; }
-        [FromQuery(Name = "to")] public DateTime? ToUtc { get; init; }
-        [FromQuery(Name = "toUtc")] public DateTime? LegacyToUtc { get; init; }
+        [FromQuery(Name = "from")] public string? FromUtcRaw { get; init; }
+        [FromQuery(Name = "fromUtc")] public string? LegacyFromUtcRaw { get; init; }
+        [FromQuery(Name = "to")] public string? ToUtcRaw { get; init; }
+        [FromQuery(Name = "toUtc")] public string? LegacyToUtcRaw { get; init; }
         public int Page { get; init; } = 1;
         public int PageSize { get; init; } = 50;
 
-        public bool TryCreateFilter(out MarketHistoryFilter filter, out IResult? errorResult)
+        public bool TryCreateFilter(out MarketHistoryFilter filter, out IResult? errorResult, Guid? cycleIdOverride = null, Guid? itemIdOverride = null)
         {
             filter = default!;
             errorResult = null;
+
+            if (!TryParseGuid(CycleIdRaw, "cycleId", out var cycleId, out errorResult) ||
+                !TryParseGuid(ItemIdRaw, "itemId", out var itemId, out errorResult) ||
+                !TryParseGuid(TeamIdRaw, "teamId", out var teamId, out errorResult))
+            {
+                return false;
+            }
+
+            if (!TryParseDateTime(FromUtcRaw, "from", out var fromUtc, out errorResult) ||
+                !TryParseDateTime(LegacyFromUtcRaw, "fromUtc", out var legacyFromUtc, out errorResult) ||
+                !TryParseDateTime(ToUtcRaw, "to", out var toUtc, out errorResult) ||
+                !TryParseDateTime(LegacyToUtcRaw, "toUtc", out var legacyToUtc, out errorResult))
+            {
+                return false;
+            }
+
+            var parsedType = default(int?);
+            if (!string.IsNullOrWhiteSpace(TypeRaw))
+            {
+                if (!int.TryParse(TypeRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var typeValue))
+                {
+                    errorResult = Results.BadRequest(new { message = "Parâmetro \"type\" deve ser um número inteiro válido." });
+                    return false;
+                }
+
+                parsedType = typeValue;
+            }
 
             if (Page < 1)
             {
@@ -174,44 +223,91 @@ public static class MarketHistoryEndpoints
                 return false;
             }
 
-            if (FromUtc.HasValue && ToUtc.HasValue && FromUtc.Value > ToUtc.Value)
+            var effectiveFromUtc = fromUtc ?? legacyFromUtc;
+            var effectiveToUtc = toUtc ?? legacyToUtc;
+
+            if (effectiveFromUtc.HasValue && effectiveToUtc.HasValue && effectiveFromUtc.Value > effectiveToUtc.Value)
             {
                 errorResult = Results.BadRequest(new { message = "A data inicial deve ser menor ou igual à data final." });
                 return false;
             }
 
             MarketTransactionType? type = null;
-            if (Type.HasValue)
+            if (parsedType.HasValue)
             {
-                if (!Enum.IsDefined(typeof(MarketTransactionType), Type.Value))
+                if (!Enum.IsDefined(typeof(MarketTransactionType), parsedType.Value))
                 {
                     errorResult = Results.BadRequest(new { message = "Tipo de transação inválido." });
                     return false;
                 }
 
-                type = (MarketTransactionType)Type.Value;
+                type = (MarketTransactionType)parsedType.Value;
             }
 
-            var fromUtc = FromUtc ?? LegacyFromUtc;
-            var toUtc = ToUtc ?? LegacyToUtc;
+            var normalizedCycleId = cycleIdOverride ?? cycleId;
+            var normalizedItemId = itemIdOverride ?? itemId;
+            var normalizedTeamId = teamId;
 
             filter = new MarketHistoryFilter
             {
-                CycleId = NormalizeGuid(CycleId),
-                ItemId = NormalizeGuid(ItemId),
-                TeamId = NormalizeGuid(TeamId),
+                CycleId = NormalizeGuid(normalizedCycleId),
+                ItemId = NormalizeGuid(normalizedItemId),
+                TeamId = NormalizeGuid(normalizedTeamId),
                 PlayerId = PlayerId,
                 PlayerName = string.IsNullOrWhiteSpace(PlayerName) ? null : PlayerName.Trim(),
                 TeamName = string.IsNullOrWhiteSpace(TeamName) ? null : TeamName.Trim(),
                 TargetTeamName = string.IsNullOrWhiteSpace(TargetTeamName) ? null : TargetTeamName.Trim(),
                 Type = type,
                 PerformedBy = string.IsNullOrWhiteSpace(PerformedBy) ? null : PerformedBy.Trim(),
-                FromUtc = fromUtc,
-                ToUtc = toUtc,
+                FromUtc = effectiveFromUtc,
+                ToUtc = effectiveToUtc,
                 Page = Page,
                 PageSize = PageSize
             };
 
+            return true;
+        }
+
+        private static bool TryParseGuid(string? value, string parameterName, out Guid? result, out IResult? errorResult)
+        {
+            result = null;
+            errorResult = null;
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return true;
+            }
+
+            if (!Guid.TryParse(value.Trim(), out var parsed))
+            {
+                errorResult = Results.BadRequest(new { message = $"Parâmetro \"{parameterName}\" deve ser um GUID válido." });
+                return false;
+            }
+
+            result = parsed;
+            return true;
+        }
+
+        private static bool TryParseDateTime(string? value, string parameterName, out DateTime? result, out IResult? errorResult)
+        {
+            result = null;
+            errorResult = null;
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return true;
+            }
+
+            if (!DateTimeOffset.TryParse(value.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
+            {
+                errorResult = Results.BadRequest(new
+                {
+                    message = $"Parâmetro \"{parameterName}\" possui formato de data/hora inválido. Utilize o padrão ISO 8601 (ex.: 2024-01-31T12:00:00Z)."
+                });
+                return false;
+            }
+
+            result = parsed.UtcDateTime;
             return true;
         }
 

@@ -4,6 +4,7 @@ using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Linq;
 
 namespace Fc25Draft.Infra.Services;
@@ -11,7 +12,7 @@ namespace Fc25Draft.Infra.Services;
 public class MarketHistoryQueryService : IMarketHistoryQueryService
 {
     private const int MaxPageSize = 200;
-    private const int MaxExportRecords = 5000;
+    private const int MaxExportRecords = 100_000;
     private readonly DraftDbContext _dbContext;
 
     public MarketHistoryQueryService(DraftDbContext dbContext)
@@ -200,7 +201,7 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
 
         var items = await q
             .OrderByDescending(x => x.m.CreatedAtUtc)
-            .Take(MaxExportRecords)
+            .Take(MaxExportRecords + 1)
             .Select(x => new MarketTransactionDto(
                 x.m.TransactionId,
                 x.m.CycleId,
@@ -219,6 +220,13 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
                 x.m.Notes,
                 x.m.CreatedAtUtc))
             .ToListAsync(ct);
+
+        if (items.Count > MaxExportRecords)
+        {
+            var culture = CultureInfo.GetCultureInfo("pt-BR");
+            var limitText = MaxExportRecords.ToString("N0", culture);
+            throw new InvalidOperationException($"A exportação pode conter no máximo {limitText} registros. Refine os filtros e tente novamente.");
+        }
 
         return items;
     }
