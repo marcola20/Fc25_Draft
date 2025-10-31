@@ -1,12 +1,13 @@
+using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Web.Models.MarketCycles;
+using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using Fc25Draft.Core.DTOs;
-using Fc25Draft.Core.Entities;
-using Fc25Draft.Web.Models.MarketCycles;
 
 namespace Fc25Draft.Web.Services;
 
@@ -36,7 +37,20 @@ public class MarketCycleClient
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        var result = await JsonSerializer.DeserializeAsync<PagedResult<MarketCycleDto>>(stream, SerializerOptions, ct).ConfigureAwait(false);
+
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+
+        if (contentType is null || !contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
+        {
+            var raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Esperado JSON, mas veio '{contentType ?? "desconhecido"}'. " +
+                $"Body (primeiros 400 chars): {raw[..Math.Min(400, raw.Length)]}");
+        }
+
+        var result = await response.Content
+            .ReadFromJsonAsync<PagedResult<MarketCycleDto>>(SerializerOptions, ct)
+            .ConfigureAwait(false);
 
         return result ?? PagedResult<MarketCycleDto>.Empty(request.Page, request.PageSize);
     }
@@ -61,11 +75,25 @@ public class MarketCycleClient
         ArgumentNullException.ThrowIfNull(request);
 
         var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
-        using var response = await client.PostAsJsonAsync("api/admin/market/cycles", request, ct).ConfigureAwait(false);
+        using var response = await client.PostAsJsonAsync("api/admin/market/cycles", request, SerializerOptions, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
-        return await response.Content.ReadFromJsonAsync<MarketCycleDto>(SerializerOptions, ct).ConfigureAwait(false)
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+
+        if (!string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(contentType, "text/json", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(contentType, "application/problem+json", StringComparison.OrdinalIgnoreCase))
+        {
+            var raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Resposta não está em JSON (Content-Type: {contentType ?? "desconhecido"}).\n" +
+                $"Body (primeiros 2000 chars):\n{(raw?.Length > 2000 ? raw[..2000] + "…(truncated)" : raw)}");
+        }
+
+        var dto = await response.Content.ReadFromJsonAsync<MarketCycleDto>(SerializerOptions, ct)
+            .ConfigureAwait(false)
             ?? throw new InvalidOperationException("Resposta inválida do servidor ao criar o ciclo de mercado.");
+        return dto;
     }
 
     public async Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct = default)
@@ -127,45 +155,106 @@ public class MarketCycleClient
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
+        if (response.IsSuccessStatusCode) return;
 
-        var message = await ReadErrorMessageAsync(response, ct).ConfigureAwait(false);
-        throw new InvalidOperationException(message);
+        var details = await BuildErrorDetailsAsync(response, ct).ConfigureAwait(false);
+
+        // Prefira HttpRequestException com StatusCode preenchido
+        throw new HttpRequestException(details.UserMessage, null, response.StatusCode);
     }
 
-    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)
+    private static async Task<(string UserMessage, string FullLog)> BuildErrorDetailsAsync(HttpResponseMessage response, CancellationToken ct)
     {
+        var method = response.RequestMessage?.Method.Method ?? "UNKNOWN";
+        var url = response.RequestMessage?.RequestUri?.ToString() ?? "UNKNOWN";
+        var status = (int)response.StatusCode;
+        var reason = response.ReasonPhrase ?? "";
+
+        // Tenta ler o body bruto (independente do tipo) para logging e parsers
+        string raw = string.Empty;
+        try { raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false); } catch { /* ignore */ }
+
+        // 1) ApiErrorResponse (seu contrato)
         try
         {
-            var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(error?.Message))
+            var err = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
+            if (err is not null)
             {
-                return error.Message;
-            }
+                var msg = !string.IsNullOrWhiteSpace(err.Message)
+                    ? err.Message
+                    : (err.Errors is { Count: > 0 }
+                        ? string.Join(" ", err.Errors.SelectMany(kv => kv.Value ?? Array.Empty<string>()))
+                        : null);
 
-            if (error?.Errors is { Count: > 0 })
-            {
-                return string.Join(" ", error.Errors.SelectMany(pair => pair.Value ?? Array.Empty<string>()));
+                if (!string.IsNullOrWhiteSpace(msg))
+                    return (Decorate(msg), ComposeLog());
             }
         }
-        catch
+        catch { /* fallback */ }
+
+        // 2) RFC 7807 ProblemDetails (muito comum em APIs .NET)
+        try
         {
-            // Ignorado: fallback abaixo.
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
+            if (problem is not null)
+            {
+                var msg = problem.Title ?? problem.Detail ?? "Unexpected error.";
+                return (Decorate(msg), ComposeLog(problem.Detail ?? raw));
+            }
         }
+        catch { /* fallback */ }
 
-        return response.StatusCode switch
+        // 3) ValidationProblemDetails (model state)
+        try
+        {
+            var v = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(ct).ConfigureAwait(false);
+            if (v is not null)
+            {
+                var flat = v.Errors?.Values?.SelectMany(x => x)?.ToArray() ?? Array.Empty<string>();
+                var msg = flat.Length > 0 ? string.Join(" ", flat) : (v.Title ?? "Validation error.");
+                return (Decorate(msg), ComposeLog(string.Join(Environment.NewLine, flat)));
+            }
+        }
+        catch { /* fallback */ }
+
+        // 4) Se veio text/plain / text/html, use o texto
+        if (!string.IsNullOrWhiteSpace(raw))
+            return (Decorate(raw), ComposeLog());
+
+        // 5) Mapeamentos de status comuns
+        string fallback = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
                 => "Ação permitida somente para administradores. Verifique o token informado.",
             HttpStatusCode.NotFound
-                => "Ciclo do mercado não encontrado.",
+                => "Recurso não encontrado.",
             HttpStatusCode.Conflict
-                => "A operação não pôde ser concluída devido a um conflito no estado atual do mercado.",
-            _ => "Não foi possível comunicar com o servidor. Tente novamente."
+                => "A operação não pôde ser concluída devido a um conflito no estado atual.",
+            _ => "Falha ao comunicar com o servidor."
         };
+        return (Decorate(fallback), ComposeLog());
+
+        // Helpers locais
+        string Decorate(string msg)
+            => $"{msg}".Trim();
+
+        string ComposeLog(string? bodyOverride = null)
+        {
+            var contentType = response.Content?.Headers?.ContentType?.ToString() ?? "(none)";
+            var requestId = response.Headers.TryGetValues("x-request-id", out var v1) ? v1.FirstOrDefault()
+                           : response.Headers.TryGetValues("Request-Id", out var v2) ? v2.FirstOrDefault()
+                           : response.Headers.TryGetValues("traceparent", out var v3) ? v3.FirstOrDefault()
+                           : null;
+
+            var body = (bodyOverride ?? raw) ?? string.Empty;
+            const int max = 4000; // evita log gigante
+            if (body.Length > max) body = body[..max] + "…(truncated)";
+
+            return $"HTTP {status} {reason} at {method} {url}\n" +
+                   $"Content-Type: {contentType}\n" +
+                   (requestId is null ? "" : $"RequestId: {requestId}\n") +
+                   $"Body:\n{body}";
+        }
     }
 
     private sealed record ApiErrorResponse(string? Message, Dictionary<string, string[]?>? Errors);

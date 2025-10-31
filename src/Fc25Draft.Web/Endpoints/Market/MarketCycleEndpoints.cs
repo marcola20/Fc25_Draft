@@ -10,13 +10,11 @@ public static class MarketCycleEndpoints
 {
     public static RouteGroupBuilder MapMarketCycleEndpoints(this RouteGroupBuilder marketApi)
     {
-        var cycles = marketApi.MapGroup("/cycles").RequireAuthorization("AdminOnly");
-
-        cycles.MapPost(string.Empty, HandleCreateAsync);
-        cycles.MapGet(string.Empty, HandleQueryAsync);
+        var cycles = marketApi.MapGroup("/cycles").RequireAuthorization("AdminOnly"); 
+        cycles.MapPost("", HandleCreateAsync);
+        cycles.MapGet("", HandleQueryAsync);
         cycles.MapGet("/{cycleId:guid}", HandleGetAsync);
         cycles.MapPatch("/{cycleId:guid}/status", HandleStatusUpdateAsync);
-
         return marketApi;
     }
 
@@ -52,7 +50,8 @@ public static class MarketCycleEndpoints
         try
         {
             var created = await service.CreateAsync(command, ct).ConfigureAwait(false);
-            return Results.Created($"/api/market/cycles/{created.CycleId}", created);
+            return TypedResults.Created($"/api/admin/market/cycles/{created.CycleId}", created);
+
         }
         catch (MarketConflictException ex)
         {

@@ -15,7 +15,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var marketApi = api.MapGroup("/market");
 
             marketApi.MapMarketItemPublicationEndpoints();
-            marketApi.MapMarketCycleEndpoints();
 
             // GET /api/market
             marketApi.MapGet(string.Empty, async (IMarketService market, ILoggerFactory lf, IWebHostEnvironment env, HttpContext http, CancellationToken ct) =>
@@ -189,6 +188,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             // ADMIN /api/admin/market
             var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
+            adminMarketApi.MapMarketCycleEndpoints();
 
             adminMarketApi.MapPost("/refresh", async (IMarketCycleGenerator cycleGenerator, CancellationToken ct) =>
             {

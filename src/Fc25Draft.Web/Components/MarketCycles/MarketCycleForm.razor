@@ -10,9 +10,8 @@
             <label class="form-label" for="cycle-name">Nome do ciclo</label>
             <InputText id="cycle-name"
                        class="form-control"
-                       @bind-Value="Model.Name"
-                       @bind-Value:event="oninput" />
-            <ValidationMessage For="() => Model.Name" />
+                       @bind-Value="Model.Name"/>
+            <ValidationMessage For="@(() => Model.Name)" />
         </div>
         <div class="col-md-3">
             <label class="form-label" for="cycle-status">Status</label>
@@ -22,7 +21,7 @@
                     <option value="@status.Value">@status.Label</option>
                 }
             </InputSelect>
-            <ValidationMessage For="() => Model.Status" />
+            <ValidationMessage For="@(() => Model.Status)" />
         </div>
         <div class="col-12 col-md-6">
             <label class="form-label" for="starts-at">Início (horário local)</label>
@@ -32,7 +31,7 @@
                    @bind="Model.StartsAtLocal"
                    @bind:format="yyyy-MM-ddTHH:mm"
                    @bind:event="oninput" />
-            <ValidationMessage For="() => Model.StartsAtLocal" />
+            <ValidationMessage For="@(() => Model.StartsAtLocal)" />
         </div>
         <div class="col-12 col-md-6">
             <label class="form-label" for="ends-at">Término (horário local)</label>
@@ -42,16 +41,15 @@
                    @bind="Model.EndsAtLocal"
                    @bind:format="yyyy-MM-ddTHH:mm"
                    @bind:event="oninput" />
-            <ValidationMessage For="() => Model.EndsAtLocal" />
+            <ValidationMessage For="@(() => Model.EndsAtLocal)" />
         </div>
         <div class="col-12">
             <label class="form-label" for="cycle-notes">Anotações (opcional)</label>
             <InputTextArea id="cycle-notes"
                            class="form-control"
                            Rows="3"
-                           @bind-Value="Model.Notes"
-                           @bind-Value:event="oninput" />
-            <ValidationMessage For="() => Model.Notes" />
+                           @bind-Value="Model.Notes"/>
+            <ValidationMessage For="@(() => Model.Notes)" />
         </div>
     </div>
 

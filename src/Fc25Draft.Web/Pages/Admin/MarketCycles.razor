@@ -44,6 +44,7 @@ else
     {
         <EditForm Model="_filters" OnValidSubmit="ApplyFiltersAsync">
             <DataAnnotationsValidator />
+            <ValidationSummary />
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-3 col-lg-2">
                     <label class="form-label" for="filter-status">Status</label>
@@ -78,7 +79,7 @@ else
                 </div>
             </div>
         </EditForm>
-        <ValidationSummary />
+       
 
         @if (!string.IsNullOrEmpty(_listError))
         {

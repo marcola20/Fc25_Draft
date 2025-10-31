@@ -23,52 +23,45 @@ public class MarketApiClient
 
     public async Task<IReadOnlyList<MarketItemDto>> GetActiveItemsAsync(CancellationToken ct = default)
     {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, "api/market");
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var response = await client.SendAsync(req, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await EnsureSuccessAsync(response); 
+            return Array.Empty<MarketItemDto>(); 
+        }
+
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+
+        if (!string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(mediaType, "text/json", StringComparison.OrdinalIgnoreCase))
+        {
+            var text = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"A API /api/market retornou conteúdo não-JSON ({mediaType ?? "desconhecido"}). " +
+                $"Prévia: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}");
+        }
+
         try
         {
-            var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+            // Desserialização resiliente
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            var items = await JsonSerializer.DeserializeAsync<IReadOnlyList<MarketItemDto>>(
+                stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
 
-            HttpResponseMessage response = null!;
-
-            try
-            {
-                response = await client.GetAsync("api/market", ct);
-            }
-            catch (Exception httpEx)
-            {
-                throw new HttpRequestException($"Erro ao chamar API /api/market: {httpEx.Message}", httpEx);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                string? content = null;
-                try
-                {
-                    content = await response.Content.ReadAsStringAsync(ct);
-                }
-                catch (Exception readEx)
-                {
-                    content = $"[Falha ao ler conteúdo da resposta: {readEx.Message}]";
-                }
-
-                throw new HttpRequestException(
-                    $"Erro HTTP {(int)response.StatusCode} {response.ReasonPhrase} ao chamar /api/market. " +
-                    $"Corpo da resposta: {content}");
-            }
-
-            var items = await response.Content.ReadFromJsonAsync<IReadOnlyList<MarketItemDto>>(cancellationToken: ct);
             return items ?? Array.Empty<MarketItemDto>();
         }
-        catch (HttpRequestException ex)
+        catch (JsonException jex)
         {
-            Console.WriteLine("❌ Erro HTTP ao buscar market items:");
-            Console.WriteLine(ex.ToString());
-            throw; 
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("❌ Erro inesperado em GetActiveItemsAsync:");
-            Console.WriteLine(ex.ToString());
-            throw;
+            var preview = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"Falha ao ler JSON de /api/market. Prévia do corpo: {preview.Substring(0, Math.Min(200, preview.Length))}",
+                jex);
         }
     }
 
@@ -121,26 +114,35 @@ public class MarketApiClient
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
+        if (response.IsSuccessStatusCode) return;
+
+        string? body = null;
+        string? contentType = response.Content.Headers.ContentType?.ToString();
 
         ApiMessageResponse? error = null;
         try
         {
-            error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>();
+            if (contentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true)
+                error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>();
         }
-        catch
+        catch { /* ignora */ }
+
+        if (error is null)
         {
-            // ignorar erros de desserialização
+            try
+            {
+                var raw = await response.Content.ReadAsStringAsync();
+                body = raw?.Length > 2000 ? raw[..2000] + "…" : raw;
+            }
+            catch { /* ignora */ }
         }
 
-        var message = error?.Message ?? $"Erro ao comunicar com o servidor ({response.StatusCode}).";
+        var message = error?.Message
+            ?? $"Erro ao comunicar com o servidor ({(int)response.StatusCode} {response.StatusCode}). " +
+               (string.IsNullOrWhiteSpace(body) ? "" : $"Corpo: {body}");
+
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        {
             message = "Ação permitida somente para administradores. Verifique o token informado.";
-        }
 
         throw new InvalidOperationException(message);
     }
