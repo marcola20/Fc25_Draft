@@ -1,4 +1,5 @@
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Web.Endpoints.Market;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Extensions.DI;
 using Fc25Draft.Web.Extensions.Endpoints;
@@ -13,7 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddInfra(builder.Configuration, builder.Environment)
-    .AddCoreServices(builder.Configuration);
+    .AddCoreServices(builder.Configuration)
+    .AddMarketHistoryFeature();
 
 builder.Services
     .AddAuthentication(opts => {
@@ -71,6 +73,7 @@ api.MapDraftEndpoints()
    .MapPricingEndpoints()
    .MapTransfersEndpoints()
    .MapMarketEndpoints()
+   .MapMarketHistoryEndpoints()
    .MapAdminEndpoints();
 
 app.MapBlazorHub();

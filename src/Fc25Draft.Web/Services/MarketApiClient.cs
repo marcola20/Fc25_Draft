@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Web.Models.Market;
 
 namespace Fc25Draft.Web.Services;
 
@@ -26,6 +28,33 @@ public class MarketApiClient
 
         var items = await response.Content.ReadFromJsonAsync<IReadOnlyList<MarketItemDto>>(cancellationToken: ct);
         return items ?? Array.Empty<MarketItemDto>();
+    }
+
+    public async Task<PagedResult<MarketTransactionDto>> GetHistoryAsync(MarketHistoryQueryOptions query, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var url = BuildHistoryUrl("api/admin/market/history", query, includePaging: true);
+        using var response = await client.GetAsync(url, ct);
+        await EnsureSuccessAsync(response);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        var result = await JsonSerializer.DeserializeAsync<PagedResult<MarketTransactionDto>>(stream, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }, ct);
+
+        return result ?? new PagedResult<MarketTransactionDto>(Array.Empty<MarketTransactionDto>(), 0);
+    }
+
+    public string GetHistoryExportUrl(MarketHistoryQueryOptions query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var basePath = "api/admin/market/history/export";
+        var qs = query.ToQueryString(includePaging: false);
+        return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
@@ -52,6 +81,12 @@ public class MarketApiClient
         }
 
         throw new InvalidOperationException(message);
+    }
+
+    private static string BuildHistoryUrl(string basePath, MarketHistoryQueryOptions query, bool includePaging)
+    {
+        var qs = query.ToQueryString(includePaging);
+        return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
     }
 
     private sealed record ApiMessageResponse(string? Message);

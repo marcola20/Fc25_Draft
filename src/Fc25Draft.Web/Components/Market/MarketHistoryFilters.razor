@@ -1,0 +1,142 @@
+@using System.Linq
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Extensions
+@using Fc25Draft.Web.Models.Market
+
+<EditForm Model="Model" OnValidSubmit="HandleApplyAsync">
+    <div class="row g-3">
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="history-player">Nome do jogador</label>
+            <InputText id="history-player" class="form-control" @bind-Value="Model.PlayerName" />
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="history-team">Equipe envolvida</label>
+            <InputText id="history-team" class="form-control" @bind-Value="Model.TeamName" />
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="history-type">Tipo de evento</label>
+            <InputSelect id="history-type" class="form-select" @bind-Value="Model.Type" TValue="MarketTransactionType?">
+                <option value="">Todos</option>
+                @foreach (var option in TypeOptions)
+                {
+                    <option value="@option.Type">@option.Label</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label" for="history-from">Data inicial</label>
+            <InputDate id="history-from" class="form-control" @bind-Value="Model.FromUtc" TValue="DateTime?" />
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label" for="history-to">Data final</label>
+            <InputDate id="history-to" class="form-control" @bind-Value="Model.ToUtc" TValue="DateTime?" />
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label" for="history-item">Item do mercado</label>
+            <InputText id="history-item" class="form-control" @bind-Value="_itemIdInput" />
+            <div class="form-text">Cole o GUID do item para filtrar.</div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label" for="history-cycle">Ciclo</label>
+            <InputText id="history-cycle" class="form-control" @bind-Value="_cycleIdInput" />
+        </div>
+        @if (ShowAdminFields)
+        {
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="history-target-team">Equipe destino</label>
+                <InputText id="history-target-team" class="form-control" @bind-Value="Model.TargetTeamName" />
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="history-performed">Responsável</label>
+                <InputText id="history-performed" class="form-control" @bind-Value="Model.PerformedBy" />
+            </div>
+        }
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary" disabled="@IsLoading">Aplicar filtros</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="HandleResetAsync" disabled="@IsLoading">Limpar</button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public MarketHistoryQueryOptions Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnApply { get; set; }
+
+    [Parameter]
+    public EventCallback OnReset { get; set; }
+
+    [Parameter]
+    public bool ShowAdminFields { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    private static readonly IReadOnlyList<(MarketTransactionType Type, string Label)> TypeOptions = Enum
+        .GetValues<MarketTransactionType>()
+        .Select(type => (type, type.ToDisplayName()))
+        .ToArray();
+
+    private int _initialPageSize;
+    private string _itemIdInput = string.Empty;
+    private string _cycleIdInput = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialPageSize == 0 && Model is not null)
+        {
+            _initialPageSize = Model.PageSize > 0 ? Model.PageSize : 25;
+        }
+
+        if (Model.ItemId.HasValue && string.IsNullOrWhiteSpace(_itemIdInput))
+        {
+            _itemIdInput = Model.ItemId.Value.ToString();
+        }
+
+        if (Model.CycleId.HasValue && string.IsNullOrWhiteSpace(_cycleIdInput))
+        {
+            _cycleIdInput = Model.CycleId.Value.ToString();
+        }
+    }
+
+    private async Task HandleApplyAsync()
+    {
+        Model.ItemId = Guid.TryParse(_itemIdInput, out var parsedItemId) ? parsedItemId : null;
+        Model.CycleId = Guid.TryParse(_cycleIdInput, out var parsedCycleId) ? parsedCycleId : null;
+        Model.Page = 1;
+        if (OnApply.HasDelegate)
+        {
+            await OnApply.InvokeAsync();
+        }
+    }
+
+    private async Task HandleResetAsync()
+    {
+        Model.CycleId = null;
+        Model.ItemId = null;
+        Model.PlayerId = null;
+        Model.PlayerName = null;
+        Model.TeamName = null;
+        Model.TargetTeamName = null;
+        Model.Type = null;
+        Model.PerformedBy = null;
+        Model.FromUtc = null;
+        Model.ToUtc = null;
+        Model.Page = 1;
+        Model.PageSize = _initialPageSize > 0 ? _initialPageSize : 25;
+        _itemIdInput = string.Empty;
+        _cycleIdInput = string.Empty;
+
+        if (OnReset.HasDelegate)
+        {
+            await OnReset.InvokeAsync();
+        }
+        else if (OnApply.HasDelegate)
+        {
+            await OnApply.InvokeAsync();
+        }
+    }
+}

@@ -1,0 +1,236 @@
+@page "/admin/mercado/historico"
+@using System.Globalization
+@using Fc25Draft.Web.Components.Market
+@using Fc25Draft.Web.Models.Market
+@inject MarketApiClient MarketApiClient
+@inject AdminAuthService AdminAuth
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Histórico do Mercado (Admin)</PageTitle>
+
+<h1 class="h3 mb-3">Histórico do Mercado (Admin)</h1>
+
+@if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">
+        Entre como administrador para visualizar o histórico completo do mercado.
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <span class="text-muted">Filtros adicionais permitem investigar atividades específicas.</span>
+        <a class="btn btn-outline-secondary btn-sm" href="@ExportUrl" target="_blank" rel="noopener noreferrer">Exportar CSV</a>
+    </div>
+
+    <MarketHistoryFilters Model="_query" OnApply="LoadAsync" ShowAdminFields="true" IsLoading="_isLoading" />
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+    }
+    else if (_isLoading && _page is null)
+    {
+        <div class="alert alert-info mt-3" role="status">Carregando histórico...</div>
+    }
+    else if (_page is null)
+    {
+        <div class="alert alert-info mt-3" role="status">Carregando histórico...</div>
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <div class="alert alert-warning mt-3" role="status">Nenhum evento encontrado com os filtros selecionados.</div>
+    }
+    else
+    {
+        <div class="table-responsive mt-3">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Ciclo</th>
+                        <th>Item</th>
+                        <th>Jogador</th>
+                        <th>Tipo</th>
+                        <th>Equipe origem</th>
+                        <th>Equipe destino</th>
+                        <th>Valor</th>
+                        <th>Responsável</th>
+                        <th>Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in _page.Items)
+                {
+                    <tr>
+                        <td>@item.OccurredAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                        <td class="font-monospace small">@item.CycleId</td>
+                        <td class="font-monospace small">@item.ItemId</td>
+                        <td>
+                            <div class="fw-semibold">@item.PlayerName</div>
+                            <div class="text-muted small">@item.PositionName</div>
+                        </td>
+                        <td>@item.TypeName</td>
+                        <td>@(string.IsNullOrWhiteSpace(item.TeamName) ? "Mercado" : item.TeamName)</td>
+                        <td>@(string.IsNullOrWhiteSpace(item.TargetTeamName) ? "-" : item.TargetTeamName)</td>
+                        <td>@FormatAmount(item.Amount)</td>
+                        <td>@item.PerformedBy</td>
+                        <td>@(string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (_isLoading && _page is not null)
+    {
+        <div class="alert alert-info mt-3" role="status">Recarregando histórico...</div>
+    }
+
+    @if (TotalPages > 1 && _page is not null)
+    {
+        <nav class="mt-4" aria-label="Paginação do histórico do mercado para administradores">
+            <ul class="pagination pagination-sm flex-wrap">
+                <li class="page-item @(_query.Page == 1 ? "disabled" : null)">
+                    <button type="button" class="page-link" @onclick="async () => await GoToPageAsync(_query.Page - 1)" disabled="@(_query.Page == 1)">Anterior</button>
+                </li>
+                @foreach (var page in VisiblePages)
+                {
+                    <li class="page-item @(page == _query.Page ? "active" : null)">
+                        <button type="button" class="page-link" @onclick="async () => await GoToPageAsync(page)">@page</button>
+                    </li>
+                }
+                <li class="page-item @(_query.Page >= TotalPages ? "disabled" : null)">
+                    <button type="button" class="page-link" @onclick="async () => await GoToPageAsync(_query.Page + 1)" disabled="@(_query.Page >= TotalPages)">Próxima</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private readonly MarketHistoryQueryOptions _query = new() { Page = 1, PageSize = 50 };
+    private PagedResult<MarketTransactionDto>? _page;
+    private bool _isLoading;
+    private string? _errorMessage;
+    private CancellationTokenSource? _loadCts;
+
+    private string ExportUrl => Navigation.ToAbsoluteUri(MarketApiClient.GetHistoryExportUrl(_query)).ToString();
+
+    private int TotalPages
+        => _page is null || _query.PageSize <= 0
+            ? 1
+            : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_query.PageSize));
+
+    private IEnumerable<int> VisiblePages
+    {
+        get
+        {
+            var current = _query.Page;
+            var start = Math.Max(1, current - 2);
+            var end = Math.Min(TotalPages, current + 2);
+            for (var page = start; page <= end; page++)
+            {
+                yield return page;
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        await AdminAuth.EnsureInitializedAsync();
+        if (AdminAuth.IsAuthenticated)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        await LoadAsync(_query.Page);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return;
+        }
+
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+
+        _query.Page = page;
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await MarketApiClient.GetHistoryAsync(_query, _loadCts.Token);
+            _page = result;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page == _query.Page)
+        {
+            return;
+        }
+
+        await LoadAsync(page);
+    }
+
+    private static string FormatAmount(decimal? amount)
+    {
+        if (!amount.HasValue)
+        {
+            return "-";
+        }
+
+        var culture = CultureInfo.GetCultureInfo("pt-BR");
+        return string.Format(culture, "{0:C}", amount.Value);
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (AdminAuth.IsAuthenticated)
+            {
+                await LoadAsync();
+            }
+            else
+            {
+                _loadCts?.Cancel();
+                _page = null;
+                _errorMessage = null;
+                StateHasChanged();
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+    }
+}

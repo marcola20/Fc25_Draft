@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Extensions;
+using Fc25Draft.Web.Models.Market;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
@@ -115,6 +116,38 @@ namespace Fc25Draft.Web.Services
             return new MarketClientActionResult<CoreItemVm>(updatedItem, message);
         }
 
+        public async Task<PagedResult<MarketTransactionDto>> GetHistoryAsync(MarketHistoryQueryOptions query, CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+
+            var url = BuildHistoryUrl("/api/market/history", query, includePaging: true);
+            var http = await _clientFactory.CreateAsync();
+            using var resp = await http.GetAsync(url, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"GET {url} -> {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+            }
+
+            resp.EnsureSuccessStatusCode();
+
+            var result = JsonSerializer.Deserialize<PagedResult<MarketTransactionDto>>(body, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return result ?? new PagedResult<MarketTransactionDto>(Array.Empty<MarketTransactionDto>(), 0);
+        }
+
+        public string GetHistoryExportUrl(MarketHistoryQueryOptions query)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+
+            var basePath = "/api/market/history/export";
+            var qs = query.ToQueryString(includePaging: false);
+            return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
+        }
+
         private static void ApplyRowVersionHeaders(HttpRequestMessage request, string? rowVersion)
         {
             if (string.IsNullOrWhiteSpace(rowVersion))
@@ -185,6 +218,12 @@ namespace Fc25Draft.Web.Services
                 cancellationToken: ct);
 
             return dto is null ? null : MapToViewModel(dto);
+        }
+
+        private static string BuildHistoryUrl(string basePath, MarketHistoryQueryOptions query, bool includePaging)
+        {
+            var qs = query.ToQueryString(includePaging);
+            return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
         }
     }
 
