@@ -559,11 +559,8 @@ else
         _historyLifecycleCts?.Dispose();
         _historyLifecycleCts = null;
 
-        if (_historyTimer is not null)
-        {
-            _ = _historyTimer.DisposeAsync();
-            _historyTimer = null;
-        }
+        _historyTimer?.Dispose(); 
+        _historyTimer = null;
 
         _historyPollingTask = null;
     }
@@ -591,9 +588,7 @@ else
     private async Task EnsureHistoryInitializedAsync()
     {
         if (_historyInitialized)
-        {
             return;
-        }
 
         _historyLifecycleCts?.Cancel();
         _historyLifecycleCts?.Dispose();
@@ -611,7 +606,7 @@ else
             _historyError = null;
             await InvokeAsync(StateHasChanged);
 
-            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1), ct);
 
             _historyEvents.Clear();
             _historyIds.Clear();
@@ -643,31 +638,23 @@ else
         finally
         {
             if (release)
-            {
                 _historySemaphore.Release();
-            }
 
             _historyLoading = false;
             await InvokeAsync(StateHasChanged);
         }
 
         if (_historyLifecycleCts is not null && _historyInitialized)
-        {
             StartHistoryPolling();
-        }
     }
 
     private async Task RefreshHistoryAsync()
     {
         if (!_historyInitialized || _historyLifecycleCts is null)
-        {
             return;
-        }
 
         if (!_historyLatestUtc.HasValue)
-        {
             return;
-        }
 
         var ct = PrepareHistoryRequestCts();
         var release = false;
@@ -677,16 +664,14 @@ else
             await _historySemaphore.WaitAsync(ct);
             release = true;
 
-            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
             var newItems = result.Items
                 .Where(item => !_historyIds.Contains(item.TransactionId))
                 .OrderBy(item => item.OccurredAtUtc)
                 .ToList();
 
             if (newItems.Count == 0)
-            {
                 return;
-            }
 
             foreach (var item in newItems)
             {
@@ -696,9 +681,7 @@ else
 
             var latest = newItems.Max(i => i.OccurredAtUtc);
             if (!_historyLatestUtc.HasValue || latest > _historyLatestUtc)
-            {
                 _historyLatestUtc = latest;
-            }
         }
         catch (OperationCanceledException)
         {
@@ -710,9 +693,7 @@ else
         finally
         {
             if (release)
-            {
                 _historySemaphore.Release();
-            }
 
             await InvokeAsync(StateHasChanged);
         }
@@ -721,9 +702,7 @@ else
     private async Task LoadHistoryUpdatesAsync(CancellationToken ct)
     {
         if (!_historyInitialized || !_historyLatestUtc.HasValue)
-        {
             return;
-        }
 
         var release = false;
         try
@@ -731,16 +710,14 @@ else
             await _historySemaphore.WaitAsync(ct);
             release = true;
 
-            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
             var newItems = result.Items
                 .Where(item => !_historyIds.Contains(item.TransactionId))
                 .OrderBy(item => item.OccurredAtUtc)
                 .ToList();
 
             if (newItems.Count == 0)
-            {
                 return;
-            }
 
             foreach (var item in newItems)
             {
@@ -750,9 +727,7 @@ else
 
             var latest = newItems.Max(i => i.OccurredAtUtc);
             if (!_historyLatestUtc.HasValue || latest > _historyLatestUtc)
-            {
                 _historyLatestUtc = latest;
-            }
 
             await InvokeAsync(StateHasChanged);
         }
@@ -766,9 +741,7 @@ else
         finally
         {
             if (release)
-            {
                 _historySemaphore.Release();
-            }
         }
     }
 
@@ -788,22 +761,16 @@ else
             release = true;
 
             if (!_historyHasMore)
-            {
                 return;
-            }
 
             _historyLoadingMore = true;
             _historyError = null;
             await InvokeAsync(StateHasChanged);
 
-            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(_historyNextPage), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(_historyNextPage), ct);
             foreach (var item in result.Items)
-            {
                 if (_historyIds.Add(item.TransactionId))
-                {
                     _historyEvents.Add(item);
-                }
-            }
 
             var totalPages = result.PageSize > 0
                 ? (int)Math.Ceiling(result.Total / (double)result.PageSize)
@@ -822,9 +789,7 @@ else
         finally
         {
             if (release)
-            {
                 _historySemaphore.Release();
-            }
 
             _historyLoadingMore = false;
             await InvokeAsync(StateHasChanged);
@@ -834,35 +799,37 @@ else
     private void StartHistoryPolling()
     {
         if (_historyLifecycleCts is null)
-        {
             return;
-        }
 
-        if (_historyTimer is not null)
-        {
-            _ = _historyTimer.DisposeAsync();
-        }
+        var old = Interlocked.Exchange(ref _historyTimer, null);
+        old?.Dispose();
 
-        _historyTimer = new PeriodicTimer(TimeSpan.FromSeconds(25));
+        var timer = new PeriodicTimer(TimeSpan.FromSeconds(25));
+        _historyTimer = timer;
+
         var token = _historyLifecycleCts.Token;
 
-        _historyPollingTask = Task.Run(async () =>
+        _historyPollingTask = Task.Run(() => PollAsync(timer, token), token);
+    }
+
+    private async Task PollAsync(PeriodicTimer timer, CancellationToken ct)
+    {
+        try
         {
-            try
-            {
-                while (_historyTimer is not null && await _historyTimer.WaitForNextTickAsync(token))
-                {
-                    await LoadHistoryUpdatesAsync(token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Falha no polling do histórico de lances.");
-            }
-        }, token);
+            while (await timer.WaitForNextTickAsync(ct))
+                await LoadHistoryUpdatesAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha no polling do histórico de lances.");
+        }
+        finally
+        {
+            timer.Dispose();
+        }
     }
 
     private static string FormatHistoryTimestamp(DateTime utc)
@@ -911,11 +878,8 @@ else
         _historyLifecycleCts?.Dispose();
         _historyLifecycleCts = null;
 
-        if (_historyTimer is not null)
-        {
-            await _historyTimer.DisposeAsync();
-            _historyTimer = null;
-        }
+        _historyTimer?.Dispose();
+        _historyTimer = null;
 
         if (_historyPollingTask is not null)
         {
@@ -926,23 +890,18 @@ else
             catch (OperationCanceledException)
             {
             }
+
             _historyPollingTask = null;
         }
 
         if (_bidUpdatedHandler is not null)
-        {
             Hub.OnBidUpdated -= _bidUpdatedHandler;
-        }
 
         if (_itemBoughtHandler is not null)
-        {
             Hub.OnItemBought -= _itemBoughtHandler;
-        }
 
         if (_itemClosedHandler is not null)
-        {
             Hub.OnItemClosed -= _itemClosedHandler;
-        }
 
         if (_lifetimeCts is not null)
         {
@@ -955,4 +914,5 @@ else
 
         await Hub.DisposeAsync();
     }
+
 }
