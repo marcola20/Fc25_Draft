@@ -7,6 +7,7 @@ public class MarketHistoryQueryOptions
 {
     public Guid? CycleId { get; set; }
     public Guid? ItemId { get; set; }
+    public Guid? TeamId { get; set; }
     public int? PlayerId { get; set; }
     public string? PlayerName { get; set; }
     public string? TeamName { get; set; }
@@ -30,6 +31,11 @@ public class MarketHistoryQueryOptions
         if (ItemId.HasValue && ItemId.Value != Guid.Empty)
         {
             parameters.Add($"itemId={ItemId.Value}");
+        }
+
+        if (TeamId.HasValue && TeamId.Value != Guid.Empty)
+        {
+            parameters.Add($"teamId={TeamId.Value}");
         }
 
         if (PlayerId.HasValue)
@@ -64,12 +70,12 @@ public class MarketHistoryQueryOptions
 
         if (FromUtc.HasValue)
         {
-            parameters.Add($"fromUtc={Uri.EscapeDataString(ToIsoString(FromUtc.Value))}");
+            parameters.Add($"from={Uri.EscapeDataString(ToIsoString(FromUtc.Value))}");
         }
 
         if (ToUtc.HasValue)
         {
-            parameters.Add($"toUtc={Uri.EscapeDataString(ToIsoString(ToUtc.Value))}");
+            parameters.Add($"to={Uri.EscapeDataString(ToIsoString(ToUtc.Value))}");
         }
 
         if (includePaging)

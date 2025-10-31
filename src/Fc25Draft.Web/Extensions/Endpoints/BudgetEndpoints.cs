@@ -134,7 +134,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         .Select(l => new LedgerItemDto(l.DataUtc, l.Tipo, l.Origem, l.Valor, l.Descricao))
                         .ToListAsync(ct);
 
-                    return Results.Ok(new PagedResult<LedgerItemDto>(items, total));
+                    return Results.Ok(new PagedResult<LedgerItemDto>(items, total, page, size));
                 });
 
             return api;

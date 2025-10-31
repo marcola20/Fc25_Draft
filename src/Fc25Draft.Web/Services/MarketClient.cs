@@ -63,7 +63,7 @@ namespace Fc25Draft.Web.Services
 
             if (string.IsNullOrWhiteSpace(json) || json == "null")
             {
-                return new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+                return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
 
             try
@@ -71,13 +71,13 @@ namespace Fc25Draft.Web.Services
                 var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                return result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+                return result ?? PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
             catch (JsonException jex)
             {
                 Console.WriteLine($"⚠️ Falha ao desserializar JSON em {nameof(PagedResult<CoreItemVm>)}: {jex.Message}");
                 Console.WriteLine($"Conteúdo recebido: '{json}'");
-                return new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+                return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
 
         }
@@ -154,7 +154,7 @@ namespace Fc25Draft.Web.Services
                 PropertyNameCaseInsensitive = true
             });
 
-            return result ?? new PagedResult<MarketTransactionDto>(Array.Empty<MarketTransactionDto>(), 0);
+            return result ?? PagedResult<MarketTransactionDto>.Empty(query.Page, query.PageSize);
         }
 
         public string GetHistoryExportUrl(MarketHistoryQueryOptions query)

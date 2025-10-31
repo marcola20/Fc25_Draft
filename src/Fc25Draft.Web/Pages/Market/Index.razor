@@ -142,12 +142,12 @@ else
                 return 0;
             }
 
-            if (PageData.Total == 0 || Query.PageSize <= 0)
+            if (PageData.Total == 0 || PageData.PageSize <= 0)
             {
                 return 1;
             }
 
-            return (int)Math.Ceiling(PageData.Total / (double)Query.PageSize);
+            return (int)Math.Ceiling(PageData.Total / (double)PageData.PageSize);
         }
     }
 
@@ -255,7 +255,7 @@ else
             var result = await Client.GetItemsAsync(Query, ct);
             var items = result?.Items ?? Array.Empty<CoreItemVm>();
             var total = result?.Total ?? 0;
-            PageData = new PagedResult<CoreItemVm>(items, total);
+            PageData = new PagedResult<CoreItemVm>(items, total, Query.Page, Query.PageSize);
             ComputeServerOffsetFromClient();
         }
         catch (OperationCanceledException)
@@ -343,7 +343,7 @@ else
         if (index >= 0)
         {
             list[index] = incoming;
-            PageData = new PagedResult<CoreItemVm>(list, PageData.Total);
+            PageData = new PagedResult<CoreItemVm>(list, PageData.Total, PageData.Page, PageData.PageSize);
         }
     }
 

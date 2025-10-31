@@ -6,6 +6,7 @@ public sealed record MarketHistoryFilter
 {
     public Guid? CycleId { get; init; }
     public Guid? ItemId { get; init; }
+    public Guid? TeamId { get; init; }
     public int? PlayerId { get; init; }
     public string? PlayerName { get; init; }
     public string? TeamName { get; init; }

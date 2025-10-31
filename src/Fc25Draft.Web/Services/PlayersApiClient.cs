@@ -83,7 +83,7 @@ public class PlayersApiClient
         await EnsureSuccessAsync(response);
 
         var result = await response.Content.ReadFromJsonAsync<PagedResult<PlayerListItemDto>>(cancellationToken: ct);
-        return result ?? new PagedResult<PlayerListItemDto>(Array.Empty<PlayerListItemDto>(), 0);
+        return result ?? PagedResult<PlayerListItemDto>.Empty(page, pageSize);
     }
 
     public async Task<PlayerDetailsDto?> GetByIdAsync(int id, CancellationToken ct = default)

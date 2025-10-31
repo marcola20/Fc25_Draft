@@ -86,7 +86,7 @@ public class MarketApiClient
             PropertyNameCaseInsensitive = true
         }, ct);
 
-        return result ?? new PagedResult<MarketTransactionDto>(Array.Empty<MarketTransactionDto>(), 0);
+        return result ?? PagedResult<MarketTransactionDto>.Empty(query.Page, query.PageSize);
     }
 
     public string GetHistoryExportUrl(MarketHistoryQueryOptions query)

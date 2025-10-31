@@ -1,10 +1,10 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
-using System.Linq.Expressions;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -23,78 +23,37 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
     {
         ValidateFilter(filter);
 
-        var q =
-            from m in _dbContext.MarketTransactions.AsNoTracking()
-            join p in _dbContext.Players.AsNoTracking() on m.PlayerId equals p.PlayerId
-            join pos in _dbContext.Positions.AsNoTracking() on p.PositionId equals pos.PositionId
-            join tf0 in _dbContext.Teams.AsNoTracking() on m.TeamId equals tf0.TeamId into gjFrom
-            from tf in gjFrom.DefaultIfEmpty()
-            join tt0 in _dbContext.Teams.AsNoTracking() on m.TargetTeamId equals tt0.TeamId into gjTo
-            from tt in gjTo.DefaultIfEmpty()
-            select new { m, p, pos, tf, tt };
-
-        if (filter.CycleId.HasValue) q = q.Where(x => x.m.CycleId == filter.CycleId.Value);
-        if (filter.ItemId.HasValue) q = q.Where(x => x.m.ItemId == filter.ItemId.Value);
-        if (filter.PlayerId.HasValue) q = q.Where(x => x.m.PlayerId == filter.PlayerId.Value);
-
-        if (!string.IsNullOrWhiteSpace(filter.PlayerName))
-        {
-            var pat = $"%{filter.PlayerName.Trim()}%";
-            q = q.Where(x => EF.Functions.ILike(x.p.Name, pat));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.TeamName))
-        {
-            var pat = $"%{filter.TeamName.Trim()}%";
-            q = q.Where(x =>
-                (x.tf != null && EF.Functions.ILike(x.tf.TeamName, pat)) ||
-                (x.tt != null && EF.Functions.ILike(x.tt.TeamName, pat)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.TargetTeamName))
-        {
-            var pat = $"%{filter.TargetTeamName.Trim()}%";
-            q = q.Where(x => x.tt != null && EF.Functions.ILike(x.tt.TeamName, pat));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.PerformedBy))
-        {
-            var pat = $"%{filter.PerformedBy.Trim()}%";
-            q = q.Where(x => EF.Functions.ILike(x.m.PerformedBy, pat));
-        }
-
-        if (filter.Type.HasValue) q = q.Where(x => x.m.Type == filter.Type.Value);
-        if (filter.FromUtc.HasValue) q = q.Where(x => x.m.CreatedAtUtc >= EnsureUtc(filter.FromUtc.Value));
-        if (filter.ToUtc.HasValue) q = q.Where(x => x.m.CreatedAtUtc <= EnsureUtc(filter.ToUtc.Value));
+        var q = BuildQuery();
+        q = ApplyFilter(q, filter);
 
         var total = await q.CountAsync(ct);
         var pageSize = Math.Min(filter.PageSize, MaxPageSize);
         var skip = (filter.Page - 1) * pageSize;
 
         var items = await q
-            .OrderByDescending(x => x.m.CreatedAtUtc)  
+            .OrderByDescending(x => x.Transaction.CreatedAtUtc)
             .Skip(skip)
             .Take(pageSize)
             .Select(x => new MarketTransactionDto(
-                x.m.TransactionId,
-                x.m.CycleId,
-                x.m.ItemId,
-                x.m.PlayerId,
-                x.p.Name,
-                x.pos.Name,
-                x.m.TeamId,
-                x.tf != null ? x.tf.TeamName : null,
-                x.m.TargetTeamId,
-                x.tt != null ? x.tt.TeamName : null,
-                x.m.Type,
-                x.m.Type.ToDisplayName(), 
-                x.m.Amount,
-                x.m.PerformedBy,
-                x.m.Notes,
-                x.m.CreatedAtUtc))
+                x.Transaction.TransactionId,
+                x.Transaction.CycleId,
+                x.Transaction.ItemId,
+                x.Transaction.PlayerId,
+                x.Player.Name,
+                x.Position.Name,
+                x.Transaction.TeamId,
+                x.FromTeam != null ? x.FromTeam.TeamName : null,
+                x.Transaction.TargetTeamId,
+                x.ToTeam != null ? x.ToTeam.TeamName : null,
+                x.Transaction.Type,
+                x.Transaction.Type.ToDisplayName(),
+                x.Transaction.Amount,
+                x.Transaction.PerformedBy,
+                x.Transaction.Notes,
+                x.Transaction.CreatedAtUtc))
             .ToListAsync(ct);
 
-        return new PagedResult<MarketTransactionDto>(items, total);
+        return new PagedResult<MarketTransactionDto>(items, total, filter.Page, pageSize);
     }
 
 
@@ -102,7 +61,36 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
     {
         ValidateFilter(filter, allowZeroPage: true);
 
-        var q =
+        var q = BuildQuery();
+        q = ApplyFilter(q, filter);
+
+        var items = await q
+            .OrderByDescending(x => x.Transaction.CreatedAtUtc)
+            .Take(MaxExportRecords)
+            .Select(x => new MarketTransactionDto(
+                x.Transaction.TransactionId,
+                x.Transaction.CycleId,
+                x.Transaction.ItemId,
+                x.Transaction.PlayerId,
+                x.Player.Name,
+                x.Position.Name,
+                x.Transaction.TeamId,
+                x.FromTeam != null ? x.FromTeam.TeamName : null,
+                x.Transaction.TargetTeamId,
+                x.ToTeam != null ? x.ToTeam.TeamName : null,
+                x.Transaction.Type,
+                x.Transaction.Type.ToDisplayName(),
+                x.Transaction.Amount,
+                x.Transaction.PerformedBy,
+                x.Transaction.Notes,
+                x.Transaction.CreatedAtUtc))
+            .ToListAsync(ct);
+
+        return items;
+    }
+
+    private IQueryable<QueryProjection> BuildQuery()
+        =>
             from m in _dbContext.MarketTransactions.AsNoTracking()
             join p in _dbContext.Players.AsNoTracking() on m.PlayerId equals p.PlayerId
             join pos in _dbContext.Positions.AsNoTracking() on p.PositionId equals pos.PositionId
@@ -110,32 +98,79 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
             from tf in gjFrom.DefaultIfEmpty()
             join tt0 in _dbContext.Teams.AsNoTracking() on m.TargetTeamId equals tt0.TeamId into gjTo
             from tt in gjTo.DefaultIfEmpty()
-            select new { m, p, pos, tf, tt };
+            select new QueryProjection(m, p, pos, tf, tt);
 
+    private static IQueryable<QueryProjection> ApplyFilter(IQueryable<QueryProjection> query, MarketHistoryFilter filter)
+    {
+        if (filter.CycleId.HasValue)
+        {
+            var cycleId = filter.CycleId.Value;
+            query = query.Where(x => x.Transaction.CycleId == cycleId);
+        }
 
-        var items = await q
-            .OrderByDescending(x => x.m.CreatedAtUtc)     
-            .Take(MaxExportRecords)
-            .Select(x => new MarketTransactionDto(
-                x.m.TransactionId,
-                x.m.CycleId,
-                x.m.ItemId,
-                x.m.PlayerId,
-                x.p.Name,
-                x.pos.Name,
-                x.m.TeamId,
-                x.tf != null ? x.tf.TeamName : null,
-                x.m.TargetTeamId,
-                x.tt != null ? x.tt.TeamName : null,
-                x.m.Type,
-                x.m.Type.ToDisplayName(),                 
-                x.m.Amount,
-                x.m.PerformedBy,
-                x.m.Notes,
-                x.m.CreatedAtUtc))
-            .ToListAsync(ct);
+        if (filter.ItemId.HasValue)
+        {
+            var itemId = filter.ItemId.Value;
+            query = query.Where(x => x.Transaction.ItemId == itemId);
+        }
 
-        return items;
+        if (filter.TeamId.HasValue)
+        {
+            var teamId = filter.TeamId.Value;
+            query = query.Where(x => x.Transaction.TeamId == teamId || x.Transaction.TargetTeamId == teamId);
+        }
+
+        if (filter.PlayerId.HasValue)
+        {
+            var playerId = filter.PlayerId.Value;
+            query = query.Where(x => x.Transaction.PlayerId == playerId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.PlayerName))
+        {
+            var pat = $"%{filter.PlayerName.Trim()}%";
+            query = query.Where(x => EF.Functions.ILike(x.Player.Name, pat));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.TeamName))
+        {
+            var pat = $"%{filter.TeamName.Trim()}%";
+            query = query.Where(x =>
+                (x.FromTeam != null && EF.Functions.ILike(x.FromTeam.TeamName, pat)) ||
+                (x.ToTeam != null && EF.Functions.ILike(x.ToTeam.TeamName, pat)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.TargetTeamName))
+        {
+            var pat = $"%{filter.TargetTeamName.Trim()}%";
+            query = query.Where(x => x.ToTeam != null && EF.Functions.ILike(x.ToTeam.TeamName, pat));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.PerformedBy))
+        {
+            var pat = $"%{filter.PerformedBy.Trim()}%";
+            query = query.Where(x => EF.Functions.ILike(x.Transaction.PerformedBy, pat));
+        }
+
+        if (filter.Type.HasValue)
+        {
+            var type = filter.Type.Value;
+            query = query.Where(x => x.Transaction.Type == type);
+        }
+
+        if (filter.FromUtc.HasValue)
+        {
+            var from = EnsureUtc(filter.FromUtc.Value);
+            query = query.Where(x => x.Transaction.CreatedAtUtc >= from);
+        }
+
+        if (filter.ToUtc.HasValue)
+        {
+            var to = EnsureUtc(filter.ToUtc.Value);
+            query = query.Where(x => x.Transaction.CreatedAtUtc <= to);
+        }
+
+        return query;
     }
 
 
@@ -163,4 +198,11 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
         DateTimeKind.Local => value.ToUniversalTime(),
         _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
     };
+
+    private sealed record QueryProjection(
+        MarketTransaction Transaction,
+        Player Player,
+        Position Position,
+        Team? FromTeam,
+        Team? ToTeam);
 }

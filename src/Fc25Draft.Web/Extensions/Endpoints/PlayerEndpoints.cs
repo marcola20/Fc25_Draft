@@ -100,7 +100,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
                     .ToListAsync(ct);
 
-                return Results.Ok(new PagedResult<PlayerListItemDto>(items, total));
+                return Results.Ok(new PagedResult<PlayerListItemDto>(items, total, currentPage, currentPageSize));
             });
 
             playersApi.MapGet("/{id:int}", async (DraftDbContext db, int id, CancellationToken ct = default) =>

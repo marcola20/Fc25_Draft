@@ -106,9 +106,9 @@ else
     private string ExportUrl => Navigation.ToAbsoluteUri(MarketClient.GetHistoryExportUrl(_query)).ToString();
 
     private int TotalPages
-        => _page is null || _query.PageSize <= 0
+        => _page is null || _page.PageSize <= 0
             ? 1
-            : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_query.PageSize));
+            : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
 
     private IEnumerable<int> VisiblePages
     {

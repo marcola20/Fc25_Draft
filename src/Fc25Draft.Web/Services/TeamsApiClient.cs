@@ -35,7 +35,7 @@ public class TeamsApiClient
         await EnsureSuccessAsync(response);
 
         var result = await response.Content.ReadFromJsonAsync<PagedResult<TeamListItemDto>>(cancellationToken: ct);
-        return result ?? new PagedResult<TeamListItemDto>(Array.Empty<TeamListItemDto>(), 0);
+        return result ?? PagedResult<TeamListItemDto>.Empty(page, pageSize);
     }
 
     public async Task<TeamDetailsDto?> GetByIdAsync(Guid id, CancellationToken ct = default)

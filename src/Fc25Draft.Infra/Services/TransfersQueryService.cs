@@ -97,7 +97,7 @@ public class TransfersQueryService : ITransfersQueryService
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        return new PagedResult<TransferHistoryDto>(items, total);
+        return new PagedResult<TransferHistoryDto>(items, total, filter.Page, size);
     }
 
     private static DateTime EnsureUtc(DateTime value)

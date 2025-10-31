@@ -48,7 +48,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.Roster.Count))
                     .ToListAsync(ct);
 
-                return Results.Ok(new PagedResult<TeamListItemDto>(items, total));
+                return Results.Ok(new PagedResult<TeamListItemDto>(items, total, currentPage, currentPageSize));
             });
 
             teamsApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, HttpContext httpContext, CancellationToken ct = default) =>

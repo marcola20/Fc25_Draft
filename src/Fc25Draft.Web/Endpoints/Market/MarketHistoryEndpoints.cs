@@ -16,6 +16,9 @@ public static class MarketHistoryEndpoints
         history.MapGet(string.Empty, HandleQueryAsync).AllowAnonymous();
         history.MapGet("/export", HandleExportAsync).AllowAnonymous();
 
+        api.MapGet("/market/items/{itemId:guid}/history", HandleItemHistoryAsync).AllowAnonymous();
+        api.MapGet("/market/cycles/{cycleId:guid}/history", HandleCycleHistoryAsync).AllowAnonymous();
+
         var adminHistory = api.MapGroup("/admin/market/history").RequireAuthorization("AdminOnly");
         adminHistory.MapGet(string.Empty, HandleQueryAsync);
         adminHistory.MapGet("/export", HandleExportAsync);
@@ -23,8 +26,42 @@ public static class MarketHistoryEndpoints
         return api;
     }
 
-    private static async Task<IResult> HandleQueryAsync(
+    private static Task<IResult> HandleQueryAsync(
         [AsParameters] MarketHistoryQueryParameters request,
+        IMarketHistoryQueryService historyService,
+        CancellationToken ct)
+        => ExecuteQueryAsync(request, historyService, ct);
+
+    private static Task<IResult> HandleItemHistoryAsync(
+        Guid itemId,
+        [AsParameters] MarketHistoryQueryParameters request,
+        IMarketHistoryQueryService historyService,
+        CancellationToken ct)
+    {
+        if (itemId == Guid.Empty)
+        {
+            return Task.FromResult<IResult>(Results.BadRequest(new { message = "Identificador do item é obrigatório." }));
+        }
+
+        return ExecuteQueryAsync(request with { ItemId = itemId }, historyService, ct);
+    }
+
+    private static Task<IResult> HandleCycleHistoryAsync(
+        Guid cycleId,
+        [AsParameters] MarketHistoryQueryParameters request,
+        IMarketHistoryQueryService historyService,
+        CancellationToken ct)
+    {
+        if (cycleId == Guid.Empty)
+        {
+            return Task.FromResult<IResult>(Results.BadRequest(new { message = "Identificador do ciclo é obrigatório." }));
+        }
+
+        return ExecuteQueryAsync(request with { CycleId = cycleId }, historyService, ct);
+    }
+
+    private static async Task<IResult> ExecuteQueryAsync(
+        MarketHistoryQueryParameters request,
         IMarketHistoryQueryService historyService,
         CancellationToken ct)
     {
@@ -106,14 +143,17 @@ public static class MarketHistoryEndpoints
     {
         public Guid? CycleId { get; init; }
         public Guid? ItemId { get; init; }
+        public Guid? TeamId { get; init; }
         public int? PlayerId { get; init; }
         public string? PlayerName { get; init; }
         public string? TeamName { get; init; }
         public string? TargetTeamName { get; init; }
         public int? Type { get; init; }
         public string? PerformedBy { get; init; }
-        public DateTime? FromUtc { get; init; }
-        public DateTime? ToUtc { get; init; }
+        [FromQuery(Name = "from")] public DateTime? FromUtc { get; init; }
+        [FromQuery(Name = "fromUtc")] public DateTime? LegacyFromUtc { get; init; }
+        [FromQuery(Name = "to")] public DateTime? ToUtc { get; init; }
+        [FromQuery(Name = "toUtc")] public DateTime? LegacyToUtc { get; init; }
         public int Page { get; init; } = 1;
         public int PageSize { get; init; } = 50;
 
@@ -152,23 +192,30 @@ public static class MarketHistoryEndpoints
                 type = (MarketTransactionType)Type.Value;
             }
 
+            var fromUtc = FromUtc ?? LegacyFromUtc;
+            var toUtc = ToUtc ?? LegacyToUtc;
+
             filter = new MarketHistoryFilter
             {
-                CycleId = CycleId,
-                ItemId = ItemId,
+                CycleId = NormalizeGuid(CycleId),
+                ItemId = NormalizeGuid(ItemId),
+                TeamId = NormalizeGuid(TeamId),
                 PlayerId = PlayerId,
                 PlayerName = string.IsNullOrWhiteSpace(PlayerName) ? null : PlayerName.Trim(),
                 TeamName = string.IsNullOrWhiteSpace(TeamName) ? null : TeamName.Trim(),
                 TargetTeamName = string.IsNullOrWhiteSpace(TargetTeamName) ? null : TargetTeamName.Trim(),
                 Type = type,
                 PerformedBy = string.IsNullOrWhiteSpace(PerformedBy) ? null : PerformedBy.Trim(),
-                FromUtc = FromUtc,
-                ToUtc = ToUtc,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
                 Page = Page,
                 PageSize = PageSize
             };
 
             return true;
         }
+
+        private static Guid? NormalizeGuid(Guid? value)
+            => value.HasValue && value.Value == Guid.Empty ? null : value;
     }
 }
