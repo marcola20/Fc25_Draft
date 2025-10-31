@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -171,7 +172,7 @@ public static class MarketHistoryEndpoints
         public string? PlayerName { get; init; }
         public string? TeamName { get; init; }
         public string? TargetTeamName { get; init; }
-        [FromQuery(Name = "type")] public string? TypeRaw { get; init; }
+        [FromQuery(Name = "type")] public string[] TypeRaw { get; init; } = Array.Empty<string>();
         public string? PerformedBy { get; init; }
         [FromQuery(Name = "from")] public string? FromUtcRaw { get; init; }
         [FromQuery(Name = "fromUtc")] public string? LegacyFromUtcRaw { get; init; }
@@ -201,9 +202,28 @@ public static class MarketHistoryEndpoints
             }
 
             var parsedType = default(int?);
-            if (!string.IsNullOrWhiteSpace(TypeRaw))
+            var sanitizedTypeValues = TypeRaw
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v.Trim())
+                .ToList();
+
+            if (sanitizedTypeValues.Count > 1)
             {
-                if (!int.TryParse(TypeRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var typeValue))
+                errorResult = Results.BadRequest(new { message = "Informe apenas um valor para o parâmetro \"type\"." });
+                return false;
+            }
+
+            if (sanitizedTypeValues.Count == 1)
+            {
+                var rawType = sanitizedTypeValues[0];
+
+                if (rawType.Contains(',', StringComparison.Ordinal))
+                {
+                    errorResult = Results.BadRequest(new { message = "O parâmetro \"type\" não aceita múltiplos valores." });
+                    return false;
+                }
+
+                if (!int.TryParse(rawType, NumberStyles.Integer, CultureInfo.InvariantCulture, out var typeValue))
                 {
                     errorResult = Results.BadRequest(new { message = "Parâmetro \"type\" deve ser um número inteiro válido." });
                     return false;

@@ -155,7 +155,6 @@ public class MarketService : IMarketService
 
         var previousLeaderId = item.CurrentLeaderTeamId;
         var previousAmount = item.CurrentLeaderAmount ?? 0m;
-        Guid? outbidTargetTeamId = previousLeaderId;
         string? outbidNotes = null;
 
         if (previousLeaderId.HasValue)
@@ -194,21 +193,11 @@ public class MarketService : IMarketService
         item.CurrentLeaderAmount = amount;
         item.LastUpdateUtc = now;
 
-        if (previousLeaderId.HasValue)
-        {
-            await _transactionLogService.LogMarketAsync(
-                item,
-                MarketTransactionType.Outbid,
-                team.TeamId,
-                outbidTargetTeamId,
-                previousAmount,
-                team.TeamId.ToString(),
-                outbidNotes,
-                now,
-                ct).ConfigureAwait(false);
-        }
-
         var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
+        if (!string.IsNullOrWhiteSpace(outbidNotes))
+        {
+            bidNotes = $"{bidNotes} {outbidNotes}";
+        }
 
         await _transactionLogService.LogMarketAsync(
             item,
@@ -262,7 +251,6 @@ public class MarketService : IMarketService
         EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
         var previousLeaderId = item.CurrentLeaderTeamId;
-        var previousLeaderAmount = item.CurrentLeaderAmount;
 
         if (item.Status != MarketItemStatus.Published)
         {
@@ -321,22 +309,12 @@ public class MarketService : IMarketService
             }
         }
 
+        string? takeoverNotes = null;
         if (previousLeaderId.HasValue && previousLeaderId != team.TeamId)
         {
-            var outbidNotes = previousLeaderTeam is not null
+            takeoverNotes = previousLeaderTeam is not null
                 ? $"Time {(!string.IsNullOrWhiteSpace(previousLeaderTeam.TeamName) ? previousLeaderTeam.TeamName : previousLeaderTeam.TeamId.ToString())} foi superado na compra imediata."
                 : "Líder anterior não encontrado ao processar compra imediata.";
-
-            await _transactionLogService.LogMarketAsync(
-                item,
-                MarketTransactionType.Outbid,
-                team.TeamId,
-                previousLeaderId,
-                previousLeaderAmount,
-                team.TeamId.ToString(),
-                outbidNotes,
-                now,
-                ct).ConfigureAwait(false);
         }
 
         team.Budget -= buyNowPrice;
@@ -351,6 +329,10 @@ public class MarketService : IMarketService
         item.ExpiresAtUtc = now;
 
         var buyNowNotes = FormattableString.Invariant($"Compra imediata por {buyNowPrice:0.00}.");
+        if (!string.IsNullOrWhiteSpace(takeoverNotes))
+        {
+            buyNowNotes = $"{buyNowNotes} {takeoverNotes}";
+        }
 
         await _transactionLogService.LogMarketAsync(
             item,
