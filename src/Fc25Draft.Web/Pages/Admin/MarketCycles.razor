@@ -172,7 +172,7 @@ else
                     @foreach (var page in VisiblePages)
                     {
                         <li class="page-item @(page == _currentPage ? "active" : null)">
-                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@page</button>
+                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@(page)</button>
                         </li>
                     }
                     <li class="page-item @(_currentPage >= TotalPages ? "disabled" : null)">
