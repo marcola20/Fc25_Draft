@@ -19,9 +19,13 @@ create table "Drafts"
 create table "MarketCycles"
 (
     "CycleId" uuid not null primary key,
+    "Name" varchar(120) not null,
+    "Status" integer not null,
+    "StartsAtUtc" timestamptz not null,
+    "EndsAtUtc" timestamptz not null,
+    "Notes" varchar(500),
     "CreatedAtUtc" timestamptz not null,
-    "NextCycleAtUtc" timestamptz not null,
-    "Status" integer not null
+    "UpdatedAtUtc" timestamptz not null
 );
 
 create table "Positions"

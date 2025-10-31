@@ -59,15 +59,33 @@ public class MarketItemPublicationService : IMarketItemPublicationService
             AddError(errors, "playerId", "O jogador é obrigatório.");
         }
 
+        MarketCycle? cycle = null;
+
+        if (request.CycleId != Guid.Empty)
+        {
+            cycle = await _dbContext.MarketCycles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.CycleId == request.CycleId, ct)
+                .ConfigureAwait(false);
+
+            if (cycle is null)
+            {
+                AddError(errors, "cycleId", "O ciclo informado não foi encontrado.");
+            }
+            else
+            {
+                var normalizedExpiration = NormalizeToUtc(request.ExpiresAtUtc);
+                if (normalizedExpiration > cycle.EndsAtUtc)
+                {
+                    AddError(errors, "expiresAtUtc", "A expiração deve ocorrer antes do término do ciclo.");
+                }
+            }
+        }
+
         if (errors.Count > 0)
         {
             throw new MarketItemValidationException("Não foi possível criar o item de mercado.", BuildErrorDictionary(errors));
         }
-
-        var cycle = await _dbContext.MarketCycles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CycleId == request.CycleId, ct)
-            .ConfigureAwait(false);
 
         if (cycle is null)
         {
@@ -79,9 +97,9 @@ public class MarketItemPublicationService : IMarketItemPublicationService
                 }));
         }
 
-        if (cycle.Status != MarketCycleStatus.Active)
+        if (cycle.Status != MarketCycleStatus.Open)
         {
-            throw new MarketConflictException("O ciclo informado não está ativo.");
+            throw new MarketConflictException("O ciclo informado não está aberto.");
         }
 
         var player = await _dbContext.Players
@@ -149,6 +167,7 @@ public class MarketItemPublicationService : IMarketItemPublicationService
         var item = await _dbContext.MarketItems
             .Include(i => i.Player)
                 .ThenInclude(p => p.Position)
+            .Include(i => i.Cycle)
             .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
@@ -160,10 +179,31 @@ public class MarketItemPublicationService : IMarketItemPublicationService
 
         EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
+        if (item.Cycle is null)
+        {
+            throw new MarketConflictException("Ciclo do item não encontrado.");
+        }
+
+        if (item.Cycle.Status != MarketCycleStatus.Open)
+        {
+            throw new MarketConflictException("O ciclo associado não está aberto para alterações.");
+        }
+
+        var normalizedExpiration = NormalizeToUtc(request.ExpiresAtUtc);
+        if (normalizedExpiration > item.Cycle.EndsAtUtc)
+        {
+            throw new MarketItemValidationException(
+                "Não foi possível atualizar o item de mercado.",
+                BuildErrorDictionary(new Dictionary<string, List<string>>
+                {
+                    ["expiresAtUtc"] = new() { "A expiração deve ocorrer antes do término do ciclo." }
+                }));
+        }
+
         item.BasePrice = request.BasePrice;
         item.BuyNowPrice = request.BuyNowPrice;
         item.MinIncrement = request.MinIncrement;
-        item.ExpiresAtUtc = NormalizeToUtc(request.ExpiresAtUtc);
+        item.ExpiresAtUtc = normalizedExpiration;
         item.LastUpdateUtc = now;
 
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -176,6 +216,7 @@ public class MarketItemPublicationService : IMarketItemPublicationService
         var item = await _dbContext.MarketItems
             .Include(i => i.Player)
                 .ThenInclude(p => p.Position)
+            .Include(i => i.Cycle)
             .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
             .ConfigureAwait(false)
             ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
@@ -187,7 +228,22 @@ public class MarketItemPublicationService : IMarketItemPublicationService
 
         EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
+        if (item.Cycle is null)
+        {
+            throw new MarketConflictException("Ciclo do item não encontrado.");
+        }
+
+        if (item.Cycle.Status != MarketCycleStatus.Open)
+        {
+            throw new MarketConflictException("O ciclo associado não está aberto para publicação.");
+        }
+
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        if (item.ExpiresAtUtc > item.Cycle.EndsAtUtc)
+        {
+            throw new MarketConflictException("A data de expiração deve ocorrer antes do término do ciclo.");
+        }
+
         if (item.ExpiresAtUtc <= now)
         {
             throw new MarketConflictException("A data de expiração deve ser futura para publicar o item.");

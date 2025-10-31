@@ -123,9 +123,13 @@ public class MarketItemPublicationServiceTests
         context.MarketCycles.Add(new MarketCycle
         {
             CycleId = cycleId,
+            Name = $"Ciclo Teste {now:yyyyMMddHHmm}",
+            Status = MarketCycleStatus.Open,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddDays(7),
+            Notes = null,
             CreatedAtUtc = now,
-            NextCycleAtUtc = now.AddDays(7),
-            Status = MarketCycleStatus.Active
+            UpdatedAtUtc = now
         });
 
         context.Players.Add(new Player

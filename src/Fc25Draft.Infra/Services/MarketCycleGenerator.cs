@@ -32,19 +32,29 @@ public class MarketCycleGenerator : IMarketCycleGenerator
 
     public async Task<bool> NeedsNewCycleAsync(DateTime utcNow, CancellationToken ct)
     {
-        var activeCycleExists = await _dbContext.MarketCycles
+        var openCycleExists = await _dbContext.MarketCycles
             .AsNoTracking()
-            .AnyAsync(c => c.Status == MarketCycleStatus.Active, ct)
+            .AnyAsync(c => c.Status == MarketCycleStatus.Open, ct)
             .ConfigureAwait(false);
 
-        if (activeCycleExists)
+        if (openCycleExists)
+        {
+            return false;
+        }
+
+        var futureDraftExists = await _dbContext.MarketCycles
+            .AsNoTracking()
+            .AnyAsync(c => c.Status == MarketCycleStatus.Draft && c.StartsAtUtc > utcNow, ct)
+            .ConfigureAwait(false);
+
+        if (futureDraftExists)
         {
             return false;
         }
 
         var lastCycle = await _dbContext.MarketCycles
             .AsNoTracking()
-            .OrderByDescending(c => c.CreatedAtUtc)
+            .OrderByDescending(c => c.StartsAtUtc)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
@@ -53,7 +63,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
             return true;
         }
 
-        return utcNow >= lastCycle.NextCycleAtUtc;
+        return utcNow >= lastCycle.EndsAtUtc;
     }
 
     public async Task<MarketCycleDto> CreateNewCycleAsync(DateTime utcNow, CancellationToken ct)
@@ -64,22 +74,25 @@ public class MarketCycleGenerator : IMarketCycleGenerator
             .BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct)
             .ConfigureAwait(false);
 
-        var existingActive = await _dbContext.MarketCycles
-            .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Active, ct)
+        var existingOpen = await _dbContext.MarketCycles
+            .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Open, ct)
             .ConfigureAwait(false);
 
-        if (existingActive is not null)
+        if (existingOpen is not null)
         {
-            return new MarketCycleDto(existingActive.CycleId, existingActive.CreatedAtUtc, existingActive.NextCycleAtUtc);
+            return ToDto(existingOpen);
         }
 
-        var nextCycleAt = now.AddHours(_marketOptions.CycleDurationHours);
+        var endsAt = now.AddHours(_marketOptions.CycleDurationHours);
         var cycle = new MarketCycle
         {
             CycleId = Guid.NewGuid(),
+            Name = FormattableString.Invariant($"Ciclo de Mercado {now:yyyyMMddHHmm}"),
+            Status = MarketCycleStatus.Open,
+            StartsAtUtc = now,
+            EndsAtUtc = endsAt,
             CreatedAtUtc = now,
-            NextCycleAtUtc = nextCycleAt,
-            Status = MarketCycleStatus.Active
+            UpdatedAtUtc = now
         };
 
         var excludedPlayerIds = await LoadExcludedPlayersAsync(ct).ConfigureAwait(false);
@@ -108,7 +121,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
                 MinIncrement = pricing.MinIncrement,
                 Status = MarketItemStatus.Published,
                 PublishedAtUtc = now,
-                ExpiresAtUtc = nextCycleAt,
+                ExpiresAtUtc = endsAt,
                 CreatedAtUtc = now,
                 LastUpdateUtc = now
             };
@@ -120,7 +133,20 @@ public class MarketCycleGenerator : IMarketCycleGenerator
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
 
-        return new MarketCycleDto(cycle.CycleId, cycle.CreatedAtUtc, cycle.NextCycleAtUtc);
+        return ToDto(cycle);
+    }
+
+    private static MarketCycleDto ToDto(MarketCycle cycle)
+    {
+        return new MarketCycleDto(
+            cycle.CycleId,
+            cycle.Name,
+            cycle.Status,
+            cycle.StartsAtUtc,
+            cycle.EndsAtUtc,
+            cycle.CreatedAtUtc,
+            cycle.UpdatedAtUtc,
+            cycle.Notes);
     }
 
     private async Task<HashSet<int>> LoadExcludedPlayersAsync(CancellationToken ct)

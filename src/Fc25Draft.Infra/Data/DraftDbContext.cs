@@ -184,9 +184,34 @@ public class DraftDbContext : DbContext
         mb.Entity<MarketCycle>(e =>
         {
             e.HasKey(x => x.CycleId);
-            e.Property(x => x.CreatedAtUtc).IsRequired();
-            e.Property(x => x.NextCycleAtUtc).IsRequired();
-            e.Property(x => x.Status).IsRequired();
+
+            e.Property(x => x.Name)
+             .IsRequired()
+             .HasMaxLength(120);
+
+            e.Property(x => x.Status)
+             .HasConversion<int>()
+             .IsRequired();
+
+            e.Property(x => x.StartsAtUtc)
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
+            e.Property(x => x.EndsAtUtc)
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
+            e.Property(x => x.Notes)
+             .HasMaxLength(500);
+
+            e.Property(x => x.CreatedAtUtc)
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
+            e.Property(x => x.UpdatedAtUtc)
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
             e.HasMany(c => c.Items)
              .WithOne(i => i.Cycle)
              .HasForeignKey(i => i.CycleId)

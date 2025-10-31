@@ -307,13 +307,18 @@ public class MarketItemPublicationEndpointsTests : IClassFixture<MarketItemPubli
 
         var cycleId = Guid.NewGuid();
         var now = DateTime.UtcNow;
+        var endsAt = now.AddDays(7);
 
         db.MarketCycles.Add(new MarketCycle
         {
             CycleId = cycleId,
+            Name = $"Ciclo Integração {now:yyyyMMddHHmm}",
+            Status = MarketCycleStatus.Open,
+            StartsAtUtc = now,
+            EndsAtUtc = endsAt,
+            Notes = null,
             CreatedAtUtc = now,
-            NextCycleAtUtc = now.AddDays(7),
-            Status = MarketCycleStatus.Active
+            UpdatedAtUtc = now
         });
 
         foreach (var playerId in playerIds)

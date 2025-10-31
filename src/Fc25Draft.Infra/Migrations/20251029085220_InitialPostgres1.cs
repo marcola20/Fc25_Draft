@@ -49,9 +49,13 @@ namespace Fc25Draft.Infra.Migrations
                 columns: table => new
                 {
                     CycleId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    StartsAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    EndsAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Notes = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    NextCycleAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false)
+                    UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {

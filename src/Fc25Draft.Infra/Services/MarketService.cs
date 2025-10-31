@@ -40,27 +40,53 @@ public class MarketService : IMarketService
             return await _cycleGenerator.CreateNewCycleAsync(now, ct).ConfigureAwait(false);
         }
 
-        var active = await _dbContext.MarketCycles
+        var openCycle = await _dbContext.MarketCycles
             .AsNoTracking()
-            .Where(c => c.Status == MarketCycleStatus.Active)
-            .OrderByDescending(c => c.CreatedAtUtc)
+            .Where(c => c.Status == MarketCycleStatus.Open)
+            .OrderByDescending(c => c.StartsAtUtc)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-        if (active is not null)
+        if (openCycle is not null)
         {
-            return new MarketCycleDto(active.CycleId, active.CreatedAtUtc, active.NextCycleAtUtc);
+            return ToCycleDto(openCycle);
+        }
+
+        var upcomingDraft = await _dbContext.MarketCycles
+            .AsNoTracking()
+            .Where(c => c.Status == MarketCycleStatus.Draft && c.StartsAtUtc > now)
+            .OrderBy(c => c.StartsAtUtc)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        if (upcomingDraft is not null)
+        {
+            return ToCycleDto(upcomingDraft);
         }
 
         var last = await _dbContext.MarketCycles
             .AsNoTracking()
-            .OrderByDescending(c => c.CreatedAtUtc)
+            .OrderByDescending(c => c.StartsAtUtc)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-        return last is null
-            ? new MarketCycleDto(Guid.Empty, now, now.AddHours(_marketOptions.CycleDurationHours))
-            : new MarketCycleDto(last.CycleId, last.CreatedAtUtc, last.NextCycleAtUtc);
+        if (last is not null)
+        {
+            return ToCycleDto(last);
+        }
+
+        var fallbackStarts = now;
+        var fallbackEnds = now.AddHours(_marketOptions.CycleDurationHours);
+
+        return new MarketCycleDto(
+            Guid.Empty,
+            "Ciclo de Mercado (pré-visualização)",
+            MarketCycleStatus.Draft,
+            fallbackStarts,
+            fallbackEnds,
+            fallbackStarts,
+            fallbackStarts,
+            null);
     }
 
     public async Task<List<MarketItemDto>> GetActiveItemsAsync(CancellationToken ct)
@@ -522,12 +548,12 @@ public class MarketService : IMarketService
             processed++;
         }
 
-        await UpdateCycleStatusesAsync(ct).ConfigureAwait(false);
+        await UpdateCycleStatusesAsync(now, ct).ConfigureAwait(false);
 
         return processed;
     }
 
-    private async Task UpdateCycleStatusesAsync(CancellationToken ct)
+    private async Task UpdateCycleStatusesAsync(DateTime now, CancellationToken ct)
     {
         var cycleIds = await _dbContext.MarketItems
             .AsNoTracking()
@@ -549,9 +575,10 @@ public class MarketService : IMarketService
                     .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
                     .ConfigureAwait(false);
 
-                if (cycle is not null && cycle.Status == MarketCycleStatus.Active)
+                if (cycle is not null && cycle.Status == MarketCycleStatus.Open)
                 {
                     cycle.Status = MarketCycleStatus.Closed;
+                    cycle.UpdatedAtUtc = now;
                     _dbContext.MarketCycles.Update(cycle);
                 }
             }
@@ -651,6 +678,19 @@ public class MarketService : IMarketService
             item.CurrentLeaderTeam?.TeamName,
             item.CurrentLeaderTeamId,
             item.RowVersion);
+    }
+
+    private static MarketCycleDto ToCycleDto(MarketCycle cycle)
+    {
+        return new MarketCycleDto(
+            cycle.CycleId,
+            cycle.Name,
+            cycle.Status,
+            cycle.StartsAtUtc,
+            cycle.EndsAtUtc,
+            cycle.CreatedAtUtc,
+            cycle.UpdatedAtUtc,
+            cycle.Notes);
     }
 
     private static void EnsureExpectedRowVersion(uint expectedRowVersion)
