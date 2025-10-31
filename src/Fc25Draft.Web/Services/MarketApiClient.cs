@@ -22,12 +22,53 @@ public class MarketApiClient
 
     public async Task<IReadOnlyList<MarketItemDto>> GetActiveItemsAsync(CancellationToken ct = default)
     {
-        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
-        var response = await client.GetAsync("api/market", ct);
-        await EnsureSuccessAsync(response);
+        try
+        {
+            var client = await _clientFactory.CreateAsync(includeAdminToken: true);
 
-        var items = await response.Content.ReadFromJsonAsync<IReadOnlyList<MarketItemDto>>(cancellationToken: ct);
-        return items ?? Array.Empty<MarketItemDto>();
+            HttpResponseMessage response = null!;
+
+            try
+            {
+                response = await client.GetAsync("api/market", ct);
+            }
+            catch (Exception httpEx)
+            {
+                throw new HttpRequestException($"Erro ao chamar API /api/market: {httpEx.Message}", httpEx);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string? content = null;
+                try
+                {
+                    content = await response.Content.ReadAsStringAsync(ct);
+                }
+                catch (Exception readEx)
+                {
+                    content = $"[Falha ao ler conteúdo da resposta: {readEx.Message}]";
+                }
+
+                throw new HttpRequestException(
+                    $"Erro HTTP {(int)response.StatusCode} {response.ReasonPhrase} ao chamar /api/market. " +
+                    $"Corpo da resposta: {content}");
+            }
+
+            var items = await response.Content.ReadFromJsonAsync<IReadOnlyList<MarketItemDto>>(cancellationToken: ct);
+            return items ?? Array.Empty<MarketItemDto>();
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine("❌ Erro HTTP ao buscar market items:");
+            Console.WriteLine(ex.ToString());
+            throw; 
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("❌ Erro inesperado em GetActiveItemsAsync:");
+            Console.WriteLine(ex.ToString());
+            throw;
+        }
     }
 
     public async Task<PagedResult<MarketTransactionDto>> GetHistoryAsync(MarketHistoryQueryOptions query, CancellationToken ct = default)

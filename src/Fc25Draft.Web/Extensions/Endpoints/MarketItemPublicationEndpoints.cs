@@ -155,7 +155,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 try
                 {
                     await service.SoftDeleteAsync(itemId, rowVersion, ct).ConfigureAwait(false);
-                    // Retornamos 204, mas ainda aplicamos ETag do último estado conhecido (opcional)
                     EndpointHelpers.ApplyEtag(context.Response, rowVersion);
                     return Results.NoContent();
                 }

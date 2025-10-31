@@ -269,7 +269,6 @@ else
                                             <li class="list-group-item d-flex justify-content-between align-items-start">
                                                 <div>
                                                     <div><strong>@player.Name</strong> (@player.Position) - OVR @player.Overall</div>
-                                                    <small class="text-muted">@player.Observation</small>
                                                 </div>
                                                 @if (!string.IsNullOrEmpty(player.Badge))
                                                 {
@@ -301,7 +300,6 @@ else
                                             <li class="list-group-item d-flex justify-content-between align-items-start">
                                                 <div>
                                                     <div><strong>@player.Name</strong> (@player.Position) - OVR @player.Overall</div>
-                                                    <small class="text-muted">@player.Observation</small>
                                                 </div>
                                                 @if (!string.IsNullOrEmpty(player.Badge))
                                                 {
@@ -1205,29 +1203,49 @@ else
 
         var preview = new List<SwapPreviewItem>();
 
-        foreach (var player in team.Players)
+        foreach (var playerId in outgoing)
         {
-            if (outgoing.Contains(player.PlayerId))
+            if (playersById.TryGetValue(playerId, out var player) && player.TeamId == teamId)
             {
-                continue;
+                preview.Add(new SwapPreviewItem(
+                    player.PlayerId,
+                    player.Name,
+                    player.Position,
+                    player.Overall,
+                    "Sai"
+                ));
             }
-
-            preview.Add(new SwapPreviewItem(player.PlayerId, player.Name, player.Position, player.Overall, "Permanece", "Continua no elenco"));
         }
 
         foreach (var incomingId in incoming)
         {
-            if (!playersById.TryGetValue(incomingId, out var incomingPlayer))
+            if (playersById.TryGetValue(incomingId, out var incomingPlayer) && incomingPlayer.TeamId != teamId)
             {
-                continue;
+                preview.Add(new SwapPreviewItem(
+                    incomingPlayer.PlayerId,
+                    incomingPlayer.Name,
+                    incomingPlayer.Position,
+                    incomingPlayer.Overall,
+                    "Chega"
+                ));
             }
-
-            preview.Add(new SwapPreviewItem(incomingPlayer.PlayerId, incomingPlayer.Name, incomingPlayer.Position, incomingPlayer.Overall, "Chega", $"Vem de {incomingPlayer.TeamName}"));
         }
 
         return preview
             .OrderBy(p => p.Name)
             .ToList();
+    }
+
+    private string GetTeamNameOf(IReadOnlyList<Guid> incomingIds, Guid currentTeamId)
+    {
+        foreach (var id in incomingIds)
+        {
+            if (playersById.TryGetValue(id, out var p) && p.TeamId != currentTeamId)
+            {
+                return p.TeamName;
+            }
+        }
+        return "outro time";
     }
 
     private bool TryGetBudgetPreview(Guid teamId, decimal cashAdjust, bool isTeamA, out decimal current, out decimal preview)
@@ -1359,14 +1377,13 @@ else
 
     private sealed class SwapPreviewItem
     {
-        public SwapPreviewItem(Guid playerId, string name, string position, int overall, string badge, string observation)
+        public SwapPreviewItem(Guid playerId, string name, string position, int overall, string badge)
         {
             PlayerId = playerId;
             Name = name;
             Position = position;
             Overall = overall;
             Badge = badge;
-            Observation = observation;
         }
 
         public Guid PlayerId { get; }
@@ -1374,7 +1391,6 @@ else
         public string Position { get; }
         public int Overall { get; }
         public string Badge { get; }
-        public string Observation { get; }
     }
 
     private sealed class SellFormModel : IValidatableObject

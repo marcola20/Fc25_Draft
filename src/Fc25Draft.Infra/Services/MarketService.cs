@@ -22,12 +22,7 @@ public class MarketService : IMarketService
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
 
-    public MarketService(
-        DraftDbContext dbContext,
-        IMarketCycleGenerator cycleGenerator,
-        IOptions<MarketOptions> options,
-        ITransactionLogService transactionLogService,
-        TimeProvider? timeProvider = null)
+    public MarketService(DraftDbContext dbContext, IMarketCycleGenerator cycleGenerator, IOptions<MarketOptions> options, ITransactionLogService transactionLogService, TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cycleGenerator = cycleGenerator ?? throw new ArgumentNullException(nameof(cycleGenerator));

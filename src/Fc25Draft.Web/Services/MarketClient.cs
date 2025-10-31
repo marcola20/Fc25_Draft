@@ -60,8 +60,26 @@ namespace Fc25Draft.Web.Services
             }
 
             var json = await resp.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+            {
+                return new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            }
+
+            try
+            {
+                var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return result ?? new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            }
+            catch (JsonException jex)
+            {
+                Console.WriteLine($"⚠️ Falha ao desserializar JSON em {nameof(PagedResult<CoreItemVm>)}: {jex.Message}");
+                Console.WriteLine($"Conteúdo recebido: '{json}'");
+                return new PagedResult<CoreItemVm>(Array.Empty<CoreItemVm>(), 0);
+            }
+
         }
 
         public DateTime? LastServerTimeUtc { get; private set; }
