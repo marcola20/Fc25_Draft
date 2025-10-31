@@ -38,6 +38,15 @@ a, .btn-link {
     color: red;
 }
 
+.toast-container {
+    z-index: 1080;
+    width: min(360px, 90vw);
+}
+
+.toast .toast-header {
+    align-items: center;
+}
+
 .draft-filter-group label {
     font-size: 0.95rem;
 }

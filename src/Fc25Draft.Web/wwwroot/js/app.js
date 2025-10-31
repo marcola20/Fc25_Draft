@@ -80,3 +80,40 @@ window.fc25Files = {
         }
     }
 };
+
+window.fc25Unsaved = (function () {
+    let handler = null;
+
+    function enable(message) {
+        if (handler) {
+            return;
+        }
+
+        handler = function (event) {
+            event.preventDefault();
+            if (message) {
+                event.returnValue = message;
+                return message;
+            }
+
+            event.returnValue = '';
+            return '';
+        };
+
+        window.addEventListener('beforeunload', handler);
+    }
+
+    function disable() {
+        if (!handler) {
+            return;
+        }
+
+        window.removeEventListener('beforeunload', handler);
+        handler = null;
+    }
+
+    return {
+        enable: enable,
+        disable: disable
+    };
+})();

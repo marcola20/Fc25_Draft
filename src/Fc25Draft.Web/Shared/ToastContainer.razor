@@ -1,0 +1,100 @@
+@using System
+@using System.Collections.Generic
+@using System.Linq
+@using System.Threading.Tasks
+@inject ToastService Toasts
+@implements IDisposable
+
+<div class="toast-container position-fixed top-0 end-0 p-3" aria-live="polite" aria-atomic="true">
+    @foreach (var toast in _messages)
+    {
+        <div class="toast show mb-2" role="status" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header @GetHeaderClass(toast.Level)">
+                <strong class="me-auto">@toast.Title</strong>
+                <button type="button"
+                        class="btn-close"
+                        aria-label="Fechar notificação"
+                        @onclick="() => Close(toast.Id)"></button>
+            </div>
+            <div class="toast-body">
+                @toast.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<ToastService.ToastMessage> _messages = new();
+
+    protected override void OnInitialized()
+    {
+        Toasts.ToastAdded += OnToastAdded;
+        Toasts.ToastRemoved += OnToastRemoved;
+
+        foreach (var existing in Toasts.CurrentMessages.OrderBy(m => m.Title))
+        {
+            _ = AddToastAsync(existing);
+        }
+    }
+
+    private void OnToastAdded(ToastService.ToastMessage toast)
+    {
+        _ = AddToastAsync(toast);
+    }
+
+    private async Task AddToastAsync(ToastService.ToastMessage toast)
+    {
+        if (_messages.Any(m => m.Id == toast.Id))
+        {
+            return;
+        }
+
+        _messages.Add(toast);
+        await InvokeAsync(StateHasChanged);
+        _ = AutoDismissAsync(toast);
+    }
+
+    private async Task AutoDismissAsync(ToastService.ToastMessage toast)
+    {
+        try
+        {
+            await Task.Delay(toast.Duration);
+            Close(toast.Id);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void Close(Guid id)
+    {
+        var removed = _messages.RemoveAll(t => t.Id == id) > 0;
+        if (removed)
+        {
+            Toasts.Dismiss(id);
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string GetHeaderClass(ToastService.ToastLevel level) => level switch
+    {
+        ToastService.ToastLevel.Success => "bg-success text-white",
+        ToastService.ToastLevel.Error => "bg-danger text-white",
+        _ => "bg-primary text-white"
+    };
+
+    private void OnToastRemoved(Guid id)
+    {
+        if (_messages.RemoveAll(t => t.Id == id) > 0)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        Toasts.ToastAdded -= OnToastAdded;
+        Toasts.ToastRemoved -= OnToastRemoved;
+        _messages.Clear();
+    }
+}

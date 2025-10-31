@@ -47,7 +47,9 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<BudgetsApiClient>();
             services.AddScoped<MarketApiClient>();
             services.AddScoped<MarketClient>();
+            services.AddScoped<MarketCycleClient>();
             services.AddScoped<MarketHubClient>();
+            services.AddScoped<ToastService>();
 
             services.AddHttpClient();
             services.AddSignalR();

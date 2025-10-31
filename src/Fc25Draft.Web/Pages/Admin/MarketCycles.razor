@@ -1,0 +1,741 @@
+@page "/admin/mercado/ciclos"
+@using System
+@using System.Collections.Generic
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+@using System.Threading
+@using System.Threading.Tasks
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Web.Components.MarketCycles
+@using Fc25Draft.Web.Models.MarketCycles
+@using Fc25Draft.Web.Utilities
+@inject AdminAuthService AdminAuth
+@inject MarketCycleClient MarketCycleClient
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<PageTitle>Administração de Ciclos do Mercado</PageTitle>
+
+<h1 class="h3 mb-3">Administração de Ciclos do Mercado</h1>
+
+@if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">
+        Entre como administrador para gerenciar os ciclos do mercado.
+    </div>
+}
+else
+{
+    <div class="mb-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-primary btn-sm" @onclick="async () => await BeginCreateAsync()">Novo ciclo</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="async () => await LoadAsync(_currentPage)" disabled="@_isLoading">Recarregar</button>
+        </div>
+        <div class="nav nav-tabs">
+            <button class="nav-link @(_activeTab == ListTab ? "active" : string.Empty)" @onclick="async () => await SwitchTabAsync(ListTab)" type="button">Listagem</button>
+            <button class="nav-link @(_activeTab == EditTab ? "active" : string.Empty)" @onclick="async () => await SwitchTabAsync(EditTab)" type="button">@(_editingCycleId.HasValue ? "Edição" : "Criação")</button>
+        </div>
+    </div>
+
+    @if (_activeTab == ListTab)
+    {
+        <EditForm Model="_filters" OnValidSubmit="ApplyFiltersAsync">
+            <DataAnnotationsValidator />
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-3 col-lg-2">
+                    <label class="form-label" for="filter-status">Status</label>
+                    <InputSelect id="filter-status" class="form-select" @bind-Value="_filters.Status">
+                        <option value="">Todos</option>
+                        @foreach (var status in StatusOptions)
+                        {
+                            <option value="@status.Value">@status.Label</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 col-md-3 col-lg-2">
+                    <label class="form-label" for="filter-page-size">Itens por página</label>
+                    <InputSelect id="filter-page-size" class="form-select" @bind-Value="_filters.PageSize">
+                        @foreach (var size in PageSizeOptions)
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="filter-start">Início após (local)</label>
+                    <input id="filter-start" class="form-control" type="datetime-local" @bind="_filters.StartsAfterLocal" @bind:format="yyyy-MM-ddTHH:mm" @bind:event="oninput" />
+                </div>
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="filter-end">Início antes de (local)</label>
+                    <input id="filter-end" class="form-control" type="datetime-local" @bind="_filters.StartsBeforeLocal" @bind:format="yyyy-MM-ddTHH:mm" @bind:event="oninput" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@_isLoading">Aplicar filtros</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters" disabled="@_isLoading">Limpar filtros</button>
+                </div>
+            </div>
+        </EditForm>
+        <ValidationSummary />
+
+        @if (!string.IsNullOrEmpty(_listError))
+        {
+            <div class="alert alert-danger mt-3" role="alert">@_listError</div>
+        }
+        else if (_isLoading && _cycles is null)
+        {
+            <div class="alert alert-info mt-3" role="status">Carregando ciclos do mercado...</div>
+        }
+        else if (_cycles is null)
+        {
+            <div class="alert alert-info mt-3" role="status">Carregando ciclos do mercado...</div>
+        }
+        else if (!_cycles.Items.Any())
+        {
+            <div class="alert alert-warning mt-3" role="status">Nenhum ciclo encontrado com os filtros atuais.</div>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(NameColumn)">
+                                    Nome @SortIcon(NameColumn)
+                                </button>
+                            </th>
+                            <th scope="col">Status</th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(StartsColumn)">
+                                    Início @SortIcon(StartsColumn)
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(EndsColumn)">
+                                    Término @SortIcon(EndsColumn)
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(UpdatedColumn)">
+                                    Atualizado @SortIcon(UpdatedColumn)
+                                </button>
+                            </th>
+                            <th scope="col" class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in GetSortedItems())
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@item.Name</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="text-muted small">@item.Notes</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(item.Status)">@GetStatusLabel(item.Status)</span>
+                            </td>
+                            <td class="text-nowrap">@BrazilTime.FormatDateTime(item.StartsAtUtc)</td>
+                            <td class="text-nowrap">@BrazilTime.FormatDateTime(item.EndsAtUtc)</td>
+                            <td class="text-nowrap">@BrazilTime.FormatDateTime(item.UpdatedAtUtc)</td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-success" disabled="@(!CanOpen(item))" @onclick="async () => await OpenCycleAsync(item)">Abrir ciclo</button>
+                                    <button type="button" class="btn btn-outline-danger" disabled="@(!CanClose(item))" @onclick="async () => await CloseCycleAsync(item)">Fechar ciclo</button>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="async () => await BeginEditAsync(item)">Editar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (_isLoading && _cycles is not null)
+        {
+            <div class="alert alert-info mt-3" role="status">Atualizando dados...</div>
+        }
+
+        @if (_cycles is not null && TotalPages > 1)
+        {
+            <nav class="mt-3" aria-label="Paginação dos ciclos do mercado">
+                <ul class="pagination pagination-sm flex-wrap">
+                    <li class="page-item @(_currentPage <= 1 ? "disabled" : null)">
+                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage - 1)" disabled="@(_currentPage <= 1)">Anterior</button>
+                    </li>
+                    @foreach (var page in VisiblePages)
+                    {
+                        <li class="page-item @(page == _currentPage ? "active" : null)">
+                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@page</button>
+                        </li>
+                    }
+                    <li class="page-item @(_currentPage >= TotalPages ? "disabled" : null)">
+                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage + 1)" disabled="@(_currentPage >= TotalPages)">Próxima</button>
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
+    else if (_activeTab == EditTab)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 mb-3">@(_editingCycleId.HasValue ? "Editar ciclo" : "Criar novo ciclo")</h2>
+                @if (!string.IsNullOrEmpty(_saveError))
+                {
+                    <div class="alert alert-danger" role="alert">@_saveError</div>
+                }
+
+                <MarketCycleForm Model="_formModel"
+                                 IsSubmitting="@_isSaving"
+                                 SubmitLabel="@(_editingCycleId.HasValue ? "Salvar alterações" : "Criar ciclo")"
+                                 DirtyStateChanged="OnFormDirtyChanged"
+                                 OnValidSubmit="HandleFormSubmitAsync"
+                                 ShowCancelButton="true"
+                                 OnCancel="CancelEdit"
+                                 @ref="_formRef" />
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private const string ListTab = "list";
+    private const string EditTab = "edit";
+    private const string NameColumn = "name";
+    private const string StartsColumn = "start";
+    private const string EndsColumn = "end";
+    private const string UpdatedColumn = "updated";
+
+    private readonly MarketCycleFilterModel _filters = new();
+    private MarketCycleFormModel _formModel = CreateDefaultModel();
+    private PagedResult<MarketCycleDto>? _cycles;
+    private CancellationTokenSource? _loadCts;
+    private readonly HashSet<Guid> _updatingStatus = new();
+
+    private string _activeTab = ListTab;
+    private string? _listError;
+    private string? _saveError;
+    private bool _isLoading;
+    private bool _isSaving;
+    private int _currentPage = 1;
+    private string _sortColumn = StartsColumn;
+    private bool _sortDescending = true;
+    private Guid? _editingCycleId;
+    private bool _formDirty;
+    private bool _beforeUnloadEnabled;
+    private IDisposable? _locationRegistration;
+    private MarketCycleForm? _formRef;
+
+    private static IReadOnlyList<int> PageSizeOptions { get; } = new[] { 10, 20, 50, 100 };
+
+    private static IReadOnlyList<(MarketCycleStatus Value, string Label)> StatusOptions { get; } = Enum
+        .GetValues<MarketCycleStatus>()
+        .Select(value => (value, GetStatusLabel(value)))
+        .ToList();
+
+    private IEnumerable<int> VisiblePages
+    {
+        get
+        {
+            if (_cycles is null)
+            {
+                yield return 1;
+                yield break;
+            }
+
+            var start = Math.Max(1, _currentPage - 2);
+            var end = Math.Min(TotalPages, _currentPage + 2);
+            for (var page = start; page <= end; page++)
+            {
+                yield return page;
+            }
+        }
+    }
+
+    private int TotalPages
+        => _cycles is null || _cycles.PageSize <= 0
+            ? 1
+            : Math.Max(1, (int)Math.Ceiling(_cycles.Total / (double)_cycles.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        _locationRegistration = Navigation.RegisterLocationChangingHandler(OnLocationChanging);
+        await AdminAuth.EnsureInitializedAsync();
+        if (AdminAuth.IsAuthenticated)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        await LoadAsync(1);
+    }
+
+    private void ClearFilters()
+    {
+        _filters.Status = null;
+        _filters.PageSize = 20;
+        _filters.StartsAfterLocal = null;
+        _filters.StartsBeforeLocal = null;
+    }
+
+    private async Task LoadAsync(int page = 1)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return;
+        }
+
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+
+        var request = new MarketCycleQueryRequest
+        {
+            Page = page,
+            PageSize = Math.Clamp(_filters.PageSize, 5, 100),
+            Status = _filters.Status,
+            StartsAfterUtc = _filters.StartsAfterLocal.HasValue ? BrazilTime.ConvertToUtc(_filters.StartsAfterLocal.Value) : null,
+            StartsBeforeUtc = _filters.StartsBeforeLocal.HasValue ? BrazilTime.ConvertToUtc(_filters.StartsBeforeLocal.Value) : null
+        };
+
+        _isLoading = true;
+        _listError = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var result = await MarketCycleClient.QueryAsync(request, _loadCts.Token);
+            _cycles = result;
+            _currentPage = result.Page;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _listError = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _listError = "Não foi possível carregar os ciclos do mercado.";
+            Toasts.ShowError(_listError);
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private IEnumerable<MarketCycleDto> GetSortedItems()
+    {
+        if (_cycles is null)
+        {
+            return Array.Empty<MarketCycleDto>();
+        }
+
+        var items = _cycles.Items.AsEnumerable();
+        return (_sortColumn, _sortDescending) switch
+        {
+            (NameColumn, true) => items.OrderByDescending(i => i.Name, StringComparer.CurrentCultureIgnoreCase),
+            (NameColumn, false) => items.OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase),
+            (EndsColumn, true) => items.OrderByDescending(i => i.EndsAtUtc),
+            (EndsColumn, false) => items.OrderBy(i => i.EndsAtUtc),
+            (UpdatedColumn, true) => items.OrderByDescending(i => i.UpdatedAtUtc),
+            (UpdatedColumn, false) => items.OrderBy(i => i.UpdatedAtUtc),
+            (StartsColumn, false) => items.OrderBy(i => i.StartsAtUtc),
+            _ => items.OrderByDescending(i => i.StartsAtUtc)
+        };
+    }
+
+    private RenderFragment SortIcon(string column) => builder =>
+    {
+        if (_sortColumn != column)
+        {
+            return;
+        }
+
+        var icon = _sortDescending ? "oi-chevron-bottom" : "oi-chevron-top";
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", $"oi {icon} ms-1");
+        builder.AddAttribute(2, "aria-hidden", "true");
+        builder.CloseElement();
+    };
+
+    private void ChangeSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDescending = column != NameColumn;
+        }
+    }
+
+    private static string GetStatusLabel(MarketCycleStatus status) => status switch
+    {
+        MarketCycleStatus.Draft => "Rascunho",
+        MarketCycleStatus.Open => "Aberto",
+        MarketCycleStatus.Closed => "Encerrado",
+        _ => status.ToString()
+    };
+
+    private static string GetStatusBadgeClass(MarketCycleStatus status) => status switch
+    {
+        MarketCycleStatus.Draft => "bg-secondary",
+        MarketCycleStatus.Open => "bg-success",
+        MarketCycleStatus.Closed => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private bool CanOpen(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Open && !_updatingStatus.Contains(cycle.CycleId);
+
+    private bool CanClose(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Closed && !_updatingStatus.Contains(cycle.CycleId);
+
+    private async Task OpenCycleAsync(MarketCycleDto cycle)
+    {
+        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Open, false, "Ciclo aberto com sucesso.");
+    }
+
+    private async Task CloseCycleAsync(MarketCycleDto cycle)
+    {
+        var forceClose = cycle.Status == MarketCycleStatus.Open;
+        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Closed, forceClose, forceClose ? "Ciclo encerrado. Todas as ofertas em aberto serão canceladas." : "Ciclo encerrado.");
+    }
+
+    private async Task UpdateCycleStatusAsync(MarketCycleDto cycle, MarketCycleStatus status, bool forceClose, string successMessage)
+    {
+        if (_updatingStatus.Contains(cycle.CycleId))
+        {
+            return;
+        }
+
+        _updatingStatus.Add(cycle.CycleId);
+        try
+        {
+            await MarketCycleClient.UpdateStatusAsync(cycle.CycleId, status, forceClose);
+            Toasts.ShowSuccess(successMessage);
+            await LoadAsync(_currentPage);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError("Não foi possível atualizar o status do ciclo. Tente novamente.");
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            _updatingStatus.Remove(cycle.CycleId);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task BeginEditAsync(MarketCycleDto cycle)
+    {
+        if (_activeTab == EditTab && _formDirty)
+        {
+            var proceed = await ConfirmDiscardAsync();
+            if (!proceed)
+            {
+                return;
+            }
+        }
+
+        _editingCycleId = cycle.CycleId;
+        _formModel = new MarketCycleFormModel
+        {
+            CycleId = cycle.CycleId,
+            Name = cycle.Name,
+            Status = cycle.Status,
+            StartsAtLocal = BrazilTime.ConvertFromUtc(cycle.StartsAtUtc),
+            EndsAtLocal = BrazilTime.ConvertFromUtc(cycle.EndsAtUtc),
+            Notes = cycle.Notes
+        };
+        _activeTab = EditTab;
+        _formDirty = false;
+        _saveError = null;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        _formRef?.ResetDirtyState();
+        await UpdateUnsavedWarningAsync();
+    }
+
+    private async Task BeginCreateAsync()
+    {
+        if (_activeTab == EditTab && _formDirty)
+        {
+            var proceed = await ConfirmDiscardAsync();
+            if (!proceed)
+            {
+                return;
+            }
+        }
+
+        _editingCycleId = null;
+        _formModel = CreateDefaultModel();
+        _activeTab = EditTab;
+        _formDirty = false;
+        _saveError = null;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        _formRef?.ResetDirtyState();
+        await UpdateUnsavedWarningAsync();
+    }
+
+    private async Task SwitchTabAsync(string tab)
+    {
+        if (_activeTab == tab)
+        {
+            return;
+        }
+
+        if (_activeTab == EditTab && _formDirty)
+        {
+            var proceed = await ConfirmDiscardAsync();
+            if (!proceed)
+            {
+                return;
+            }
+        }
+
+        _activeTab = tab;
+        if (tab == ListTab)
+        {
+            _formDirty = false;
+            _saveError = null;
+            _editingCycleId = null;
+            await UpdateUnsavedWarningAsync();
+        }
+        else
+        {
+            await UpdateUnsavedWarningAsync();
+        }
+    }
+
+    private async Task HandleFormSubmitAsync(MarketCycleFormModel model)
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        if (!model.StartsAtLocal.HasValue || !model.EndsAtLocal.HasValue)
+        {
+            _saveError = "Informe as datas de início e término.";
+            return;
+        }
+
+        _isSaving = true;
+        _saveError = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var request = new MarketCycleCreateRequest
+            {
+                Name = model.Name,
+                Status = model.Status,
+                Notes = string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim(),
+                StartsAtUtc = BrazilTime.ConvertToUtc(model.StartsAtLocal.Value),
+                EndsAtUtc = BrazilTime.ConvertToUtc(model.EndsAtLocal.Value)
+            };
+
+            await MarketCycleClient.CreateAsync(request);
+            Toasts.ShowSuccess("Ciclo salvo com sucesso.");
+            _formDirty = false;
+            _editingCycleId = null;
+            _activeTab = ListTab;
+            _formModel = CreateDefaultModel();
+            _formRef?.ResetDirtyState();
+            await UpdateUnsavedWarningAsync();
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _saveError = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _saveError = "Não foi possível salvar o ciclo. Tente novamente.";
+            Toasts.ShowError(_saveError);
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            _isSaving = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnFormDirtyChanged(bool isDirty)
+    {
+        _formDirty = isDirty;
+        await UpdateUnsavedWarningAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CancelEdit()
+    {
+        if (_formDirty)
+        {
+            var proceed = await ConfirmDiscardAsync();
+            if (!proceed)
+            {
+                return;
+            }
+        }
+
+        _activeTab = ListTab;
+        _formDirty = false;
+        _saveError = null;
+        _editingCycleId = null;
+        await UpdateUnsavedWarningAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<bool> ConfirmDiscardAsync()
+    {
+        try
+        {
+            return await JSRuntime.InvokeAsync<bool>("confirm", "Existem alterações não salvas. Deseja descartá-las?");
+        }
+        catch (JSException)
+        {
+            return true;
+        }
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (!HasUnsavedChanges)
+        {
+            return;
+        }
+
+        var proceed = await ConfirmDiscardAsync();
+        if (!proceed)
+        {
+            context.PreventNavigation();
+        }
+    }
+
+    private bool HasUnsavedChanges => _activeTab == EditTab && _formDirty;
+
+    private async Task UpdateUnsavedWarningAsync()
+    {
+        var shouldEnable = HasUnsavedChanges;
+        if (shouldEnable == _beforeUnloadEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            if (shouldEnable)
+            {
+                await JSRuntime.InvokeVoidAsync("fc25Unsaved.enable", "Existem alterações não salvas no formulário de ciclos do mercado.");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("fc25Unsaved.disable");
+            }
+            _beforeUnloadEnabled = shouldEnable;
+        }
+        catch (JSException)
+        {
+            _beforeUnloadEnabled = shouldEnable;
+        }
+    }
+
+    private static MarketCycleFormModel CreateDefaultModel()
+    {
+        var start = BrazilTime.ConvertFromUtc(DateTime.UtcNow);
+        return new MarketCycleFormModel
+        {
+            Name = string.Empty,
+            Status = MarketCycleStatus.Draft,
+            StartsAtLocal = start,
+            EndsAtLocal = start.AddDays(7)
+        };
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            if (!AdminAuth.IsAuthenticated)
+            {
+                _cycles = null;
+                _listError = null;
+                _activeTab = ListTab;
+                _formDirty = false;
+                await UpdateUnsavedWarningAsync();
+            }
+            else
+            {
+                await LoadAsync();
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _locationRegistration?.Dispose();
+        if (_beforeUnloadEnabled)
+        {
+            try
+            {
+                JSRuntime.InvokeVoidAsync("fc25Unsaved.disable");
+            }
+            catch
+            {
+                // ignorado
+            }
+        }
+    }
+
+    private sealed class MarketCycleFilterModel : IValidatableObject
+    {
+        [Range(5, 200, ErrorMessage = "O tamanho da página deve estar entre 5 e 200.")]
+        public int PageSize { get; set; } = 20;
+
+        public MarketCycleStatus? Status { get; set; }
+
+        public DateTime? StartsAfterLocal { get; set; }
+
+        public DateTime? StartsBeforeLocal { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (StartsAfterLocal.HasValue && StartsBeforeLocal.HasValue && StartsAfterLocal.Value > StartsBeforeLocal.Value)
+            {
+                yield return new ValidationResult(
+                    "A data inicial deve ser anterior ou igual à data final.",
+                    new[] { nameof(StartsAfterLocal), nameof(StartsBeforeLocal) });
+            }
+        }
+    }
+}

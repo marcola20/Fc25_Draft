@@ -33,6 +33,16 @@ public static class BrazilTime
         return $"{local:dd/MM/yyyy HH:mm} ({TimeZoneDisplayName})";
     }
 
+    public static DateTime ConvertToUtc(DateTime local)
+    {
+        return local.Kind switch
+        {
+            DateTimeKind.Utc => local,
+            DateTimeKind.Local => TimeZoneInfo.ConvertTimeToUtc(local, TimeZone),
+            _ => TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), TimeZone)
+        };
+    }
+
     public static bool TryParseDateTime(string? input, out DateTime resultUtc)
     {
         if (string.IsNullOrWhiteSpace(input))
