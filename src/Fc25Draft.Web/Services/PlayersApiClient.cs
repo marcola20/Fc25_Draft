@@ -104,6 +104,12 @@ public class PlayersApiClient
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         var response = await client.PostAsJsonAsync("api/admin/players", dto, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new Exception($"API {(int)response.StatusCode} {response.ReasonPhrase}. Body: {body}");
+        }
         await EnsureSuccessAsync(response);
     }
 
