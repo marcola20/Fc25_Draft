@@ -3,6 +3,7 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Services;
+using Fc25Draft.Web.Endpoints.Market;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fc25Draft.Web.Extensions.Endpoints
@@ -14,6 +15,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var marketApi = api.MapGroup("/market");
 
             marketApi.MapMarketItemPublicationEndpoints();
+            marketApi.MapMarketCycleEndpoints();
 
             // GET /api/market
             marketApi.MapGet(string.Empty, async (IMarketService market, ILoggerFactory lf, IWebHostEnvironment env, HttpContext http, CancellationToken ct) =>

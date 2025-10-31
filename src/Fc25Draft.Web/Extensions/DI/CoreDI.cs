@@ -28,6 +28,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<IPositionService, PositionService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
+            services.AddScoped<IMarketCycleAdminService, MarketCycleAdminService>();
             services.AddScoped<IMarketService, MarketService>();
             services.AddScoped<ITransactionLogService, TransactionLogService>();
             services.AddScoped<IMarketItemPublicationService, MarketItemPublicationService>();
