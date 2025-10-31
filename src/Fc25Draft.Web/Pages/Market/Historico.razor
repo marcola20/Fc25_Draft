@@ -1,18 +1,28 @@
 @page "/market/historico"
-@using System.Globalization
 @using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Models.Market
+@using Fc25Draft.Web.Utilities
 @inject MarketClient MarketClient
 @inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>Histórico do Mercado</PageTitle>
 
-<h1 class="h3 mb-3">Histórico do Mercado</h1>
-
-<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-    <span class="text-muted">Consulte os eventos registrados no mercado e exporte os dados em CSV.</span>
-    <a class="btn btn-outline-secondary btn-sm" href="@ExportUrl" target="_blank" rel="noopener noreferrer">Exportar CSV</a>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Histórico do Mercado</h1>
+        <p class="text-muted small mb-0">Visualize os eventos registrados no mercado e acompanhe o movimento dos lances.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary btn-sm"
+           href="@ExportUrl"
+           target="_blank"
+           rel="noopener noreferrer">Exportar CSV</a>
+        <button type="button"
+                class="btn btn-outline-primary btn-sm"
+                @onclick="ReloadAsync"
+                disabled="@_isLoading">Recarregar</button>
+    </div>
 </div>
 
 <MarketHistoryFilters Model="_query" OnApply="LoadAsync" IsLoading="_isLoading" />
@@ -39,31 +49,32 @@ else
         <table class="table table-sm table-striped align-middle">
             <thead>
                 <tr>
-                    <th>Data/Hora</th>
-                    <th>Jogador</th>
-                    <th>Tipo</th>
-                    <th>Equipe origem</th>
-                    <th>Equipe destino</th>
-                    <th>Valor</th>
-                    <th>Responsável</th>
-                    <th>Notas</th>
+                    <th scope="col">Data/Hora (UTC)</th>
+                    <th scope="col">Evento</th>
+                    <th scope="col">Jogador</th>
+                    <th scope="col">Time Origem</th>
+                    <th scope="col">Time Destino</th>
+                    <th scope="col">Valor</th>
+                    <th scope="col">Observações</th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var item in _page.Items)
             {
                 <tr>
-                    <td>@item.OccurredAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                    <td class="text-nowrap">@FormatTimestamp(item.OccurredAtUtc)</td>
+                    <td>
+                        <div class="fw-semibold">@item.TypeName</div>
+                        <div class="text-muted small">@BuildEventSummary(item)</div>
+                    </td>
                     <td>
                         <div class="fw-semibold">@item.PlayerName</div>
                         <div class="text-muted small">@item.PositionName</div>
                     </td>
-                    <td>@item.TypeName</td>
-                    <td>@(string.IsNullOrWhiteSpace(item.TeamName) ? "Mercado" : item.TeamName)</td>
-                    <td>@(string.IsNullOrWhiteSpace(item.TargetTeamName) ? "-" : item.TargetTeamName)</td>
+                    <td>@FormatTeam(item.TeamName, fallback:"Mercado")</td>
+                    <td>@FormatTeam(item.TargetTeamName)</td>
                     <td>@FormatAmount(item.Amount)</td>
-                    <td>@item.PerformedBy</td>
-                    <td>@(string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes)</td>
+                    <td>@FormatNotes(item.Notes)</td>
                 </tr>
             }
             </tbody>
@@ -128,9 +139,7 @@ else
         => LoadAsync();
 
     private async Task LoadAsync()
-    {
-        await LoadAsync(_query.Page);
-    }
+        => await LoadAsync(_query.Page);
 
     private async Task LoadAsync(int page)
     {
@@ -138,10 +147,10 @@ else
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
 
-        _query.Page = page;
+        _query.Page = page < 1 ? 1 : page;
         _isLoading = true;
         _errorMessage = null;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
 
         try
         {
@@ -153,14 +162,18 @@ else
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            _errorMessage = "Não foi possível carregar o histórico do mercado. Tente novamente em instantes.";
+            Console.Error.WriteLine(ex);
         }
         finally
         {
             _isLoading = false;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
+
+    private Task ReloadAsync()
+        => LoadAsync(_query.Page);
 
     private async Task GoToPageAsync(int page)
     {
@@ -172,15 +185,38 @@ else
         await LoadAsync(page);
     }
 
-    private static string FormatAmount(decimal? amount)
-    {
-        if (!amount.HasValue)
-        {
-            return "-";
-        }
+    private static string FormatTimestamp(DateTime utc)
+        => BrazilTime.FormatDateTimeWithZone(utc);
 
-        var culture = CultureInfo.GetCultureInfo("pt-BR");
-        return string.Format(culture, "{0:C}", amount.Value);
+    private static string FormatTeam(string? teamName, string fallback = "-")
+        => string.IsNullOrWhiteSpace(teamName) ? fallback : teamName;
+
+    private static string FormatAmount(decimal? amount)
+        => amount.HasValue ? string.Format(BrazilTime.Culture, "{0:C}", amount.Value) : "-";
+
+    private static string FormatNotes(string? notes)
+        => string.IsNullOrWhiteSpace(notes) ? "-" : notes!;
+
+    private static string BuildEventSummary(MarketTransactionDto item)
+    {
+        var origin = FormatTeam(item.TeamName, "Mercado");
+        var destination = FormatTeam(item.TargetTeamName);
+        var amountText = item.Amount.HasValue
+            ? string.Format(BrazilTime.Culture, "{0:C}", item.Amount.Value)
+            : null;
+
+        return item.Type switch
+        {
+            MarketTransactionType.BidPlaced when amountText is not null
+                => $"Lance registrado por {origin}: {amountText}",
+            MarketTransactionType.Outbid when amountText is not null
+                => $"{origin} superou {destination} ({amountText})",
+            MarketTransactionType.BuyNow when amountText is not null
+                => $"Compra imediata por {origin} ({amountText})",
+            _ when !string.IsNullOrWhiteSpace(destination)
+                => $"{origin} → {destination}",
+            _ => origin
+        };
     }
 
     public void Dispose()

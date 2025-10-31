@@ -1,5 +1,5 @@
-using System.Globalization;
 using Fc25Draft.Core.Enums;
+using Fc25Draft.Web.Utilities;
 
 namespace Fc25Draft.Web.Models.Market;
 
@@ -21,81 +21,34 @@ public class MarketHistoryQueryOptions
 
     public string ToQueryString(bool includePaging = true)
     {
-        var parameters = new List<string>();
-
-        if (CycleId.HasValue && CycleId.Value != Guid.Empty)
-        {
-            parameters.Add($"cycleId={CycleId.Value}");
-        }
-
-        if (ItemId.HasValue && ItemId.Value != Guid.Empty)
-        {
-            parameters.Add($"itemId={ItemId.Value}");
-        }
-
-        if (TeamId.HasValue && TeamId.Value != Guid.Empty)
-        {
-            parameters.Add($"teamId={TeamId.Value}");
-        }
-
-        if (PlayerId.HasValue)
-        {
-            parameters.Add($"playerId={PlayerId.Value}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(PlayerName))
-        {
-            parameters.Add($"playerName={Uri.EscapeDataString(PlayerName.Trim())}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(TeamName))
-        {
-            parameters.Add($"teamName={Uri.EscapeDataString(TeamName.Trim())}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(TargetTeamName))
-        {
-            parameters.Add($"targetTeamName={Uri.EscapeDataString(TargetTeamName.Trim())}");
-        }
+        var builder = new QueryStringBuilder()
+            .Add("cycleId", CycleId)
+            .Add("itemId", ItemId)
+            .Add("teamId", TeamId)
+            .Add("playerId", PlayerId)
+            .Add("playerName", Normalize(PlayerName))
+            .Add("teamName", Normalize(TeamName))
+            .Add("targetTeamName", Normalize(TargetTeamName))
+            .Add("performedBy", Normalize(PerformedBy))
+            .Add("from", FromUtc)
+            .Add("to", ToUtc);
 
         if (Type.HasValue)
         {
-            parameters.Add($"type={(int)Type.Value}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(PerformedBy))
-        {
-            parameters.Add($"performedBy={Uri.EscapeDataString(PerformedBy.Trim())}");
-        }
-
-        if (FromUtc.HasValue)
-        {
-            parameters.Add($"from={Uri.EscapeDataString(ToIsoString(FromUtc.Value))}");
-        }
-
-        if (ToUtc.HasValue)
-        {
-            parameters.Add($"to={Uri.EscapeDataString(ToIsoString(ToUtc.Value))}");
+            builder.AddInvariant("type", (int)Type.Value);
         }
 
         if (includePaging)
         {
-            parameters.Add($"page={Page}");
-            parameters.Add($"pageSize={PageSize}");
+            var safePage = Page < 1 ? 1 : Page;
+            var safePageSize = PageSize < 1 ? 1 : PageSize;
+            builder.AddInvariant("page", safePage);
+            builder.AddInvariant("pageSize", safePageSize);
         }
 
-        return string.Join("&", parameters);
+        return builder.Build();
     }
 
-    private static string ToIsoString(DateTime value)
-    {
-        if (value.Kind == DateTimeKind.Unspecified)
-        {
-            value = DateTime.SpecifyKind(value, DateTimeKind.Utc);
-        }
-
-        return value.Kind == DateTimeKind.Utc
-            ? value.ToString("O", CultureInfo.InvariantCulture)
-            : value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-    }
+    private static string? Normalize(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

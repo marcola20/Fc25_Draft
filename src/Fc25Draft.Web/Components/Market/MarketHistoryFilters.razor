@@ -2,60 +2,115 @@
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Extensions
 @using Fc25Draft.Web.Models.Market
+@using Fc25Draft.Web.Utilities
 
-<EditForm Model="Model" OnValidSubmit="HandleApplyAsync">
-    <div class="row g-3">
-        <div class="col-lg-4 col-md-6">
-            <label class="form-label" for="history-player">Nome do jogador</label>
-            <InputText id="history-player" class="form-control" @bind-Value="Model.PlayerName" />
-        </div>
-        <div class="col-lg-4 col-md-6">
-            <label class="form-label" for="history-team">Equipe envolvida</label>
-            <InputText id="history-team" class="form-control" @bind-Value="Model.TeamName" />
-        </div>
-        <div class="col-lg-4 col-md-6">
-            <label class="form-label" for="history-type">Tipo de evento</label>
-            <InputSelect id="history-type" class="form-select" @bind-Value="Model.Type" TValue="MarketTransactionType?">
-                <option value="">Todos</option>
-                @foreach (var option in TypeOptions)
+<EditForm Model="Model" OnSubmit="HandleSubmitAsync">
+    <div class="bg-light border rounded p-3">
+        <div class="row g-3 g-xl-2 align-items-end">
+            <div class="col-12 col-sm-6 col-lg-3 col-xxl-2">
+                <label class="form-label" for="history-cycle">Ciclo</label>
+                <input id="history-cycle"
+                       class="form-control form-control-sm"
+                       @bind-value="_cycleIdInput"
+                       @bind-value:event="oninput"
+                       placeholder="GUID do ciclo"
+                       autocomplete="off" />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3 col-xxl-2">
+                <label class="form-label" for="history-item">Item</label>
+                <input id="history-item"
+                       class="form-control form-control-sm"
+                       @bind-value="_itemIdInput"
+                       @bind-value:event="oninput"
+                       placeholder="GUID do item"
+                       autocomplete="off" />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3 col-xxl-2">
+                <label class="form-label" for="history-player">Jogador</label>
+                <InputText id="history-player"
+                           class="form-control form-control-sm"
+                           @bind-Value="Model.PlayerName"
+                           placeholder="Nome ou parte do nome" />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3 col-xxl-2">
+                <label class="form-label" for="history-team">Time</label>
+                <InputText id="history-team"
+                           class="form-control form-control-sm"
+                           @bind-Value="Model.TeamName"
+                           placeholder="Nome do time" />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3 col-xxl-2">
+                <label class="form-label" for="history-type">Tipo</label>
+                <InputSelect id="history-type"
+                             class="form-select form-select-sm"
+                             @bind-Value="Model.Type"
+                             TValue="MarketTransactionType?">
+                    <option value="">Todos</option>
+                    @foreach (var option in TypeOptions)
+                    {
+                        <option value="@option.Type">@option.Label</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+                <label class="form-label" for="history-from">Início do período</label>
+                <input id="history-from"
+                       type="datetime-local"
+                       class="@GetInputClass(_fromError)"
+                       @bind-value="_fromInput"
+                       @bind-value:event="oninput"
+                       step="60"
+                       aria-describedby="history-from-help"
+                       autocomplete="off" />
+                <div id="history-from-help" class="form-text">Horário de Brasília (@BrazilTime.TimeZoneDisplayName).</div>
+                @if (!string.IsNullOrEmpty(_fromError))
                 {
-                    <option value="@option.Type">@option.Label</option>
+                    <div class="invalid-feedback d-block">@_fromError</div>
                 }
-            </InputSelect>
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <label class="form-label" for="history-from">Data inicial</label>
-            <InputDate id="history-from" class="form-control" @bind-Value="Model.FromUtc" TValue="DateTime?" />
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <label class="form-label" for="history-to">Data final</label>
-            <InputDate id="history-to" class="form-control" @bind-Value="Model.ToUtc" TValue="DateTime?" />
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <label class="form-label" for="history-item">Item do mercado</label>
-            <InputText id="history-item" class="form-control" @bind-Value="_itemIdInput" />
-            <div class="form-text">Cole o GUID do item para filtrar.</div>
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <label class="form-label" for="history-cycle">Ciclo</label>
-            <InputText id="history-cycle" class="form-control" @bind-Value="_cycleIdInput" />
-        </div>
-        @if (ShowAdminFields)
-        {
-            <div class="col-lg-4 col-md-6">
-                <label class="form-label" for="history-target-team">Equipe destino</label>
-                <InputText id="history-target-team" class="form-control" @bind-Value="Model.TargetTeamName" />
             </div>
-            <div class="col-lg-4 col-md-6">
-                <label class="form-label" for="history-performed">Responsável</label>
-                <InputText id="history-performed" class="form-control" @bind-Value="Model.PerformedBy" />
+            <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+                <label class="form-label" for="history-to">Fim do período</label>
+                <input id="history-to"
+                       type="datetime-local"
+                       class="@GetInputClass(_toError)"
+                       @bind-value="_toInput"
+                       @bind-value:event="oninput"
+                       step="60"
+                       autocomplete="off" />
+                @if (!string.IsNullOrEmpty(_toError))
+                {
+                    <div class="invalid-feedback d-block">@_toError</div>
+                }
             </div>
-        }
-    </div>
 
-    <div class="d-flex gap-2 mt-3">
-        <button type="submit" class="btn btn-primary" disabled="@IsLoading">Aplicar filtros</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="HandleResetAsync" disabled="@IsLoading">Limpar</button>
+            @if (ShowAdminFields)
+            {
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label" for="history-target-team">Time destino</label>
+                    <InputText id="history-target-team"
+                               class="form-control form-control-sm"
+                               @bind-Value="Model.TargetTeamName"
+                               placeholder="Nome do time destino" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label" for="history-performed">Responsável</label>
+                    <InputText id="history-performed"
+                               class="form-control form-control-sm"
+                               @bind-Value="Model.PerformedBy"
+                               placeholder="Usuário ou sistema" />
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_generalError))
+        {
+            <div class="alert alert-warning mt-3" role="alert">@_generalError</div>
+        }
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="submit" class="btn btn-primary btn-sm" disabled="@IsLoading">Aplicar filtros</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="HandleResetAsync" disabled="@IsLoading">Limpar</button>
+        </div>
     </div>
 </EditForm>
 
@@ -83,6 +138,15 @@
     private int _initialPageSize;
     private string _itemIdInput = string.Empty;
     private string _cycleIdInput = string.Empty;
+    private string _fromInput = string.Empty;
+    private string _toInput = string.Empty;
+    private string? _fromError;
+    private string? _toError;
+    private string? _generalError;
+    private Guid? _lastAppliedItemId;
+    private Guid? _lastAppliedCycleId;
+    private DateTime? _lastAppliedFromUtc;
+    private DateTime? _lastAppliedToUtc;
 
     protected override void OnParametersSet()
     {
@@ -91,32 +155,121 @@
             _initialPageSize = Model.PageSize > 0 ? Model.PageSize : 25;
         }
 
-        if (Model != null && Model.ItemId.HasValue && string.IsNullOrWhiteSpace(_itemIdInput))
+        if (Model is null)
         {
-            _itemIdInput = Model.ItemId.Value.ToString();
+            return;
         }
 
-        if (Model != null && Model.CycleId.HasValue && string.IsNullOrWhiteSpace(_cycleIdInput))
+        if (_lastAppliedItemId != Model.ItemId)
         {
-            _cycleIdInput = Model.CycleId.Value.ToString();
+            _lastAppliedItemId = Model.ItemId;
+            _itemIdInput = Model.ItemId.HasValue && Model.ItemId.Value != Guid.Empty
+                ? Model.ItemId.Value.ToString()
+                : string.Empty;
+        }
+
+        if (_lastAppliedCycleId != Model.CycleId)
+        {
+            _lastAppliedCycleId = Model.CycleId;
+            _cycleIdInput = Model.CycleId.HasValue && Model.CycleId.Value != Guid.Empty
+                ? Model.CycleId.Value.ToString()
+                : string.Empty;
+        }
+
+        if (_lastAppliedFromUtc != Model.FromUtc)
+        {
+            _lastAppliedFromUtc = Model.FromUtc;
+            _fromInput = Model.FromUtc.HasValue
+                ? BrazilTime.ConvertFromUtc(Model.FromUtc.Value).ToString("yyyy-MM-dd'T'HH:mm")
+                : string.Empty;
+        }
+
+        if (_lastAppliedToUtc != Model.ToUtc)
+        {
+            _lastAppliedToUtc = Model.ToUtc;
+            _toInput = Model.ToUtc.HasValue
+                ? BrazilTime.ConvertFromUtc(Model.ToUtc.Value).ToString("yyyy-MM-dd'T'HH:mm")
+                : string.Empty;
         }
     }
 
-    private async Task HandleApplyAsync()
+    private async Task HandleSubmitAsync(EditContext context)
     {
-        Model.ItemId = Guid.TryParse(_itemIdInput, out var parsedItemId) ? parsedItemId : null;
-        Model.CycleId = Guid.TryParse(_cycleIdInput, out var parsedCycleId) ? parsedCycleId : null;
+        if (Model is null)
+        {
+            return;
+        }
+
+        _fromError = null;
+        _toError = null;
+        _generalError = null;
+
+        DateTime? fromUtc = null;
+        DateTime? toUtc = null;
+
+        if (!string.IsNullOrWhiteSpace(_fromInput))
+        {
+            if (BrazilTime.TryParseDateTime(_fromInput, out var parsedFrom))
+            {
+                fromUtc = parsedFrom;
+            }
+            else
+            {
+                _fromError = "Formato inválido. Use AAAA-MM-DDTHH:MM.";
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_toInput))
+        {
+            if (BrazilTime.TryParseDateTime(_toInput, out var parsedTo))
+            {
+                toUtc = parsedTo;
+            }
+            else
+            {
+                _toError = "Formato inválido. Use AAAA-MM-DDTHH:MM.";
+            }
+        }
+
+        if (_fromError is not null || _toError is not null)
+        {
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (fromUtc.HasValue && toUtc.HasValue && fromUtc.Value > toUtc.Value)
+        {
+            _generalError = "A data final deve ser igual ou posterior à data inicial.";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        Model.CycleId = Guid.TryParse(_cycleIdInput, out var parsedCycle) ? parsedCycle : null;
+        Model.ItemId = Guid.TryParse(_itemIdInput, out var parsedItem) ? parsedItem : null;
+        Model.FromUtc = fromUtc;
+        Model.ToUtc = toUtc;
         Model.Page = 1;
+
         if (OnApply.HasDelegate)
         {
             await OnApply.InvokeAsync();
+        }
+        else
+        {
+            await InvokeAsync(StateHasChanged);
         }
     }
 
     private async Task HandleResetAsync()
     {
+        if (Model is null)
+        {
+            return;
+        }
+
         Model.CycleId = null;
         Model.ItemId = null;
+        Model.TeamId = null;
         Model.PlayerId = null;
         Model.PlayerName = null;
         Model.TeamName = null;
@@ -127,8 +280,18 @@
         Model.ToUtc = null;
         Model.Page = 1;
         Model.PageSize = _initialPageSize > 0 ? _initialPageSize : 25;
+
         _itemIdInput = string.Empty;
         _cycleIdInput = string.Empty;
+        _fromInput = string.Empty;
+        _toInput = string.Empty;
+        _fromError = null;
+        _toError = null;
+        _generalError = null;
+        _lastAppliedItemId = null;
+        _lastAppliedCycleId = null;
+        _lastAppliedFromUtc = null;
+        _lastAppliedToUtc = null;
 
         if (OnReset.HasDelegate)
         {
@@ -139,4 +302,7 @@
             await OnApply.InvokeAsync();
         }
     }
+
+    private static string GetInputClass(string? error)
+        => string.IsNullOrEmpty(error) ? "form-control form-control-sm" : "form-control form-control-sm is-invalid";
 }

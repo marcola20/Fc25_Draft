@@ -7,11 +7,13 @@
 @using System.Threading.Tasks
 @using Microsoft.Extensions.Logging
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Components.Market
 @using Fc25Draft.Web.Hubs
 @using Fc25Draft.Web.Models.Market
 @using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Utilities
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 @inject MarketClient Client
@@ -25,7 +27,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h1 class="h3 mb-0">Mercado</h1>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        @if (PageData is not null)
+        @if (PageData is not null && _activeTab == MarketTab.Items)
         {
             <span class="text-muted small">@GetResultsSummary()</span>
         }
@@ -35,71 +37,151 @@
     </div>
 </div>
 
-<MarketFilters OnApply="ApplyFiltersAsync"
-               PositionOptions="@_positionOptions"
-               SortOptions="@SortOptions"
-               StatusOptions="@StatusOptions" />
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button type="button"
+                class="nav-link @(_activeTab == MarketTab.Items ? "active" : null)"
+                role="tab"
+                aria-selected="@(_activeTab == MarketTab.Items)"
+                @onclick="async () => await SetTabAsync(MarketTab.Items)">
+            Itens disponíveis
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button type="button"
+                class="nav-link @(_activeTab == MarketTab.History ? "active" : null)"
+                role="tab"
+                aria-selected="@(_activeTab == MarketTab.History)"
+                @onclick="async () => await SetTabAsync(MarketTab.History)">
+            Histórico de Lances
+        </button>
+    </li>
+</ul>
 
-@if (!string.IsNullOrEmpty(_errorMessage))
+@if (_activeTab == MarketTab.Items)
 {
-    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
-}
-else if (_isLoading && PageData is null)
-{
-    <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
-}
-else if (PageData is null)
-{
-    <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
-}
-else if (PageData.Items.Count == 0)
-{
-    <div class="alert alert-secondary mt-3" role="status">Nenhum item corresponde aos filtros selecionados.</div>
+    <MarketFilters OnApply="ApplyFiltersAsync"
+                   PositionOptions="@_positionOptions"
+                   SortOptions="@SortOptions"
+                   StatusOptions="@StatusOptions" />
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+    }
+    else if (_isLoading && PageData is null)
+    {
+        <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
+    }
+    else if (PageData is null)
+    {
+        <div class="alert alert-info mt-3" role="status">Carregando itens...</div>
+    }
+    else if (PageData.Items.Count == 0)
+    {
+        <div class="alert alert-secondary mt-3" role="status">Nenhum item corresponde aos filtros selecionados.</div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
+            @foreach (var item in PageData.Items)
+            {
+                <div class="col" @key="item.ItemId">
+                    <MarketItemCard
+                        Item="item"
+                        ServerTimeOffset="ServerTimeOffset"
+                        OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
+                        OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
+                </div>
+            }
+        </div>
+    }
+
+    @if (_isLoading && PageData is not null)
+    {
+        <div class="alert alert-info mt-3" role="status">Recarregando itens...</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_realTimeWarning))
+    {
+        <div class="alert alert-warning mt-3" role="status">@_realTimeWarning</div>
+    }
+
+    @if (TotalPages > 1 && PageData is not null)
+    {
+        <nav class="mt-4" aria-label="Paginação do mercado">
+            <ul class="pagination pagination-sm justify-content-center flex-wrap">
+                <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
+                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Página anterior" disabled="@(Query.Page == 1)">Anterior</button>
+                </li>
+                @foreach (var page in GetVisiblePages())
+                {
+                    <li class="page-item @(page == Query.Page ? "active" : string.Empty)">
+                        <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)" aria-current="@(page) == Query.Page ? "page" : null)">@(page)</button>
+                    </li>
+                }
+                <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
+                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Próxima página" disabled="@(Query.Page >= TotalPages)">Próxima</button>
+                </li>
+            </ul>
+        </nav>
+    }
 }
 else
 {
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
-        @foreach (var item in PageData.Items)
+    <section class="mt-3" aria-live="polite">
+        <p class="text-muted small">Eventos mais recentes aparecem no topo. Atualizações são aplicadas automaticamente.</p>
+
+        @if (!string.IsNullOrEmpty(_historyError))
         {
-            <div class="col" @key="item.ItemId">
-                <MarketItemCard
-                    Item="item"
-                    ServerTimeOffset="ServerTimeOffset"
-                    OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
-                    OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
+            <div class="alert alert-danger" role="alert">@_historyError</div>
+        }
+        else if (_historyLoading && !_historyInitialized)
+        {
+            <div class="alert alert-info" role="status">Carregando histórico de lances...</div>
+        }
+        else if (_historyEvents.Count == 0)
+        {
+            <div class="alert alert-secondary" role="status">Nenhum lance registrado ainda neste ciclo.</div>
+        }
+        else
+        {
+            <div class="border-start border-2 ps-3 mt-3">
+                @foreach (var entry in _historyEvents)
+                {
+                    <article class="mb-4 position-relative" @key="entry.TransactionId">
+                        <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width: 12px; height: 12px;"></span>
+                        <div class="ms-4">
+                            <div class="fw-semibold">@entry.TypeName</div>
+                            <div class="text-muted small">@FormatHistoryTimestamp(entry.OccurredAtUtc)</div>
+                            <div class="small">@BuildHistoryDescription(entry)</div>
+                        </div>
+                    </article>
+                }
             </div>
         }
-    </div>
-}
 
-@if (_isLoading && PageData is not null)
-{
-    <div class="alert alert-info mt-3" role="status">Recarregando itens...</div>
-}
+        @if (_historyLoading && _historyInitialized)
+        {
+            <div class="alert alert-info" role="status">Atualizando histórico...</div>
+        }
 
-@if (!string.IsNullOrEmpty(_realTimeWarning))
-{
-    <div class="alert alert-warning mt-3" role="status">@_realTimeWarning</div>
-}
-
-@if (TotalPages > 1 && PageData is not null)
-{
-    <nav class="mt-4" aria-label="Paginação do mercado">
-        <ul class="pagination pagination-sm justify-content-center flex-wrap">
-            <li class="page-item @(Query.Page == 1 ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page - 1)" aria-label="Página anterior" disabled="@(Query.Page == 1)">Anterior</button>
-            </li>
-            @foreach (var page in GetVisiblePages())
-            {
-                <li class="page-item @(page == Query.Page ? "active" : string.Empty)">
-                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)" aria-current="@(page) == Query.Page ? "page" : null)">@(page)</button>
-                </li>
-            }
-            <li class="page-item @(Query.Page >= TotalPages ? "disabled" : string.Empty)">
-                <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(Query.Page + 1)" aria-label="Próxima página" disabled="@(Query.Page >= TotalPages)">Próxima</button>
-            </li>
-        </ul>
-    </nav>
+        @if (_historyHasMore || _historyLoadingMore)
+        {
+            <div class="d-flex gap-2 mt-3">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        @onclick="LoadMoreHistoryAsync"
+                        disabled="@(!_historyHasMore || _historyLoadingMore)">
+                    Carregar mais
+                </button>
+                @if (_historyLoadingMore)
+                {
+                    <span class="text-muted small align-self-center">Carregando eventos anteriores...</span>
+                }
+            </div>
+        }
+    </section>
 }
 
 @code {
@@ -116,7 +198,13 @@ else
 
     private static readonly IReadOnlyList<string> StatusOptions = new[] { "Publicado", "Finalizado", "Cancelado", "Encerrado", "Ativo" };
 
+    private enum MarketTab
+    {
+        Items,
+        History
+    }
 
+    private const int HistoryPageSize = 25;
 
     private readonly List<MarketPositionOption> _positionOptions = new();
     private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
@@ -132,6 +220,22 @@ else
     private bool _initialized;
     private string? _errorMessage;
     private string? _realTimeWarning;
+    private MarketTab _activeTab = MarketTab.Items;
+
+    private readonly List<MarketTransactionDto> _historyEvents = new();
+    private readonly HashSet<Guid> _historyIds = new();
+    private readonly SemaphoreSlim _historySemaphore = new(1, 1);
+    private CancellationTokenSource? _historyLifecycleCts;
+    private CancellationTokenSource? _historyRequestCts;
+    private PeriodicTimer? _historyTimer;
+    private Task? _historyPollingTask;
+    private bool _historyInitialized;
+    private bool _historyLoading;
+    private bool _historyLoadingMore;
+    private bool _historyHasMore;
+    private string? _historyError;
+    private DateTime? _historyLatestUtc;
+    private int _historyNextPage = 1;
 
     private int TotalPages
     {
@@ -167,6 +271,7 @@ else
         }
 
         ActiveCycleId = incomingCycle;
+        ResetHistoryState();
         if (_initialized)
         {
             _ = InvokeAsync(async () =>
@@ -175,6 +280,11 @@ else
                 var ct = PrepareNewLoadCts();
                 await LoadPageAsync(1, ct);
             });
+        }
+
+        if (_activeTab == MarketTab.History)
+        {
+            _ = InvokeAsync(EnsureHistoryInitializedAsync);
         }
     }
 
@@ -203,24 +313,9 @@ else
             StateHasChangedSafe();
         }
 
-        _bidUpdatedHandler = vm =>
-        {
-            MergeItem(vm);
-            StateHasChangedSafe();
-            return Task.CompletedTask;
-        };
-        _itemBoughtHandler = vm =>
-        {
-            MergeItem(vm);
-            StateHasChangedSafe();
-            return Task.CompletedTask;
-        };
-        _itemClosedHandler = vm =>
-        {
-            MergeItem(vm);
-            StateHasChangedSafe();
-            return Task.CompletedTask;
-        };
+        _bidUpdatedHandler = HandleRealtimeUpdateAsync;
+        _itemBoughtHandler = HandleRealtimeUpdateAsync;
+        _itemClosedHandler = HandleRealtimeUpdateAsync;
 
         Hub.OnBidUpdated += _bidUpdatedHandler;
         Hub.OnItemBought += _itemBoughtHandler;
@@ -313,12 +408,14 @@ else
     {
         var ct = PrepareNewLoadCts();
         await ReloadSingleItemAsync(vm.ItemId, ct);
+        await RefreshHistoryAsync();
     }
 
     private async Task HandleBoughtAsync(CoreItemVm vm)
     {
         var ct = PrepareNewLoadCts();
         await ReloadSingleItemAsync(vm.ItemId, ct);
+        await RefreshHistoryAsync();
     }
 
     private async Task ReloadSingleItemAsync(Guid itemId, CancellationToken ct)
@@ -345,6 +442,13 @@ else
             list[index] = incoming;
             PageData = new PagedResult<CoreItemVm>(list, PageData.Total, PageData.Page, PageData.PageSize);
         }
+    }
+
+    private async Task HandleRealtimeUpdateAsync(CoreItemVm incoming)
+    {
+        MergeItem(incoming);
+        StateHasChangedSafe();
+        await RefreshHistoryAsync();
     }
 
     private IEnumerable<int> GetVisiblePages()
@@ -412,11 +516,418 @@ else
         return $"{total} {suffix}";
     }
 
+    private async Task SetTabAsync(MarketTab tab)
+    {
+        if (_activeTab == tab)
+        {
+            if (tab == MarketTab.History)
+            {
+                await EnsureHistoryInitializedAsync();
+                await RefreshHistoryAsync();
+            }
+
+            return;
+        }
+
+        _activeTab = tab;
+        StateHasChangedSafe();
+
+        if (tab == MarketTab.History)
+        {
+            await EnsureHistoryInitializedAsync();
+            await RefreshHistoryAsync();
+        }
+    }
+
+    private void ResetHistoryState()
+    {
+        _historyInitialized = false;
+        _historyLoading = false;
+        _historyLoadingMore = false;
+        _historyHasMore = false;
+        _historyError = null;
+        _historyEvents.Clear();
+        _historyIds.Clear();
+        _historyLatestUtc = null;
+        _historyNextPage = 1;
+
+        _historyRequestCts?.Cancel();
+        _historyRequestCts?.Dispose();
+        _historyRequestCts = null;
+
+        _historyLifecycleCts?.Cancel();
+        _historyLifecycleCts?.Dispose();
+        _historyLifecycleCts = null;
+
+        if (_historyTimer is not null)
+        {
+            _ = _historyTimer.DisposeAsync();
+            _historyTimer = null;
+        }
+
+        _historyPollingTask = null;
+    }
+
+    private CancellationToken PrepareHistoryRequestCts()
+    {
+        _historyRequestCts?.Cancel();
+        _historyRequestCts?.Dispose();
+        _historyRequestCts = CancellationTokenSource.CreateLinkedTokenSource(
+            _historyLifecycleCts?.Token ?? _lifetimeCts?.Token ?? CancellationToken.None);
+        return _historyRequestCts.Token;
+    }
+
+    private MarketHistoryQueryOptions BuildHistoryQuery(int page, DateTime? fromUtc = null)
+    {
+        return new MarketHistoryQueryOptions
+        {
+            CycleId = ActiveCycleId == Guid.Empty ? null : ActiveCycleId,
+            Page = page,
+            PageSize = HistoryPageSize,
+            FromUtc = fromUtc
+        };
+    }
+
+    private async Task EnsureHistoryInitializedAsync()
+    {
+        if (_historyInitialized)
+        {
+            return;
+        }
+
+        _historyLifecycleCts?.Cancel();
+        _historyLifecycleCts?.Dispose();
+        _historyLifecycleCts = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifetimeCts?.Token ?? CancellationToken.None);
+
+        var ct = PrepareHistoryRequestCts();
+        var release = false;
+
+        try
+        {
+            await _historySemaphore.WaitAsync(ct);
+            release = true;
+            _historyLoading = true;
+            _historyError = null;
+            await InvokeAsync(StateHasChanged);
+
+            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1), ct);
+
+            _historyEvents.Clear();
+            _historyIds.Clear();
+            foreach (var item in result.Items)
+            {
+                _historyEvents.Add(item);
+                _historyIds.Add(item.TransactionId);
+            }
+
+            _historyLatestUtc = result.Items.Count > 0
+                ? result.Items.Max(i => i.OccurredAtUtc)
+                : (DateTime?)null;
+
+            var totalPages = result.PageSize > 0
+                ? (int)Math.Ceiling(result.Total / (double)result.PageSize)
+                : 1;
+            _historyHasMore = totalPages > 1;
+            _historyNextPage = _historyHasMore ? 2 : 1;
+            _historyInitialized = true;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar histórico de lances");
+            _historyError = "Não foi possível carregar o histórico de lances. Tente novamente.";
+        }
+        finally
+        {
+            if (release)
+            {
+                _historySemaphore.Release();
+            }
+
+            _historyLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        if (_historyLifecycleCts is not null && _historyInitialized)
+        {
+            StartHistoryPolling();
+        }
+    }
+
+    private async Task RefreshHistoryAsync()
+    {
+        if (!_historyInitialized || _historyLifecycleCts is null)
+        {
+            return;
+        }
+
+        if (!_historyLatestUtc.HasValue)
+        {
+            return;
+        }
+
+        var ct = PrepareHistoryRequestCts();
+        var release = false;
+
+        try
+        {
+            await _historySemaphore.WaitAsync(ct);
+            release = true;
+
+            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var newItems = result.Items
+                .Where(item => !_historyIds.Contains(item.TransactionId))
+                .OrderBy(item => item.OccurredAtUtc)
+                .ToList();
+
+            if (newItems.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var item in newItems)
+            {
+                _historyEvents.Insert(0, item);
+                _historyIds.Add(item.TransactionId);
+            }
+
+            var latest = newItems.Max(i => i.OccurredAtUtc);
+            if (!_historyLatestUtc.HasValue || latest > _historyLatestUtc)
+            {
+                _historyLatestUtc = latest;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao atualizar histórico após evento");
+        }
+        finally
+        {
+            if (release)
+            {
+                _historySemaphore.Release();
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadHistoryUpdatesAsync(CancellationToken ct)
+    {
+        if (!_historyInitialized || !_historyLatestUtc.HasValue)
+        {
+            return;
+        }
+
+        var release = false;
+        try
+        {
+            await _historySemaphore.WaitAsync(ct);
+            release = true;
+
+            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var newItems = result.Items
+                .Where(item => !_historyIds.Contains(item.TransactionId))
+                .OrderBy(item => item.OccurredAtUtc)
+                .ToList();
+
+            if (newItems.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var item in newItems)
+            {
+                _historyEvents.Insert(0, item);
+                _historyIds.Add(item.TransactionId);
+            }
+
+            var latest = newItems.Max(i => i.OccurredAtUtc);
+            if (!_historyLatestUtc.HasValue || latest > _historyLatestUtc)
+            {
+                _historyLatestUtc = latest;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao atualizar histórico via polling");
+        }
+        finally
+        {
+            if (release)
+            {
+                _historySemaphore.Release();
+            }
+        }
+    }
+
+    private async Task LoadMoreHistoryAsync()
+    {
+        if (!_historyInitialized || (!_historyHasMore && !_historyLoadingMore))
+        {
+            return;
+        }
+
+        var ct = PrepareHistoryRequestCts();
+        var release = false;
+
+        try
+        {
+            await _historySemaphore.WaitAsync(ct);
+            release = true;
+
+            if (!_historyHasMore)
+            {
+                return;
+            }
+
+            _historyLoadingMore = true;
+            _historyError = null;
+            await InvokeAsync(StateHasChanged);
+
+            var result = await MarketClient.GetHistoryAsync(BuildHistoryQuery(_historyNextPage), ct);
+            foreach (var item in result.Items)
+            {
+                if (_historyIds.Add(item.TransactionId))
+                {
+                    _historyEvents.Add(item);
+                }
+            }
+
+            var totalPages = result.PageSize > 0
+                ? (int)Math.Ceiling(result.Total / (double)result.PageSize)
+                : _historyNextPage;
+            _historyNextPage++;
+            _historyHasMore = _historyNextPage <= totalPages;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar eventos anteriores do histórico");
+            _historyError = "Não foi possível carregar eventos anteriores.";
+        }
+        finally
+        {
+            if (release)
+            {
+                _historySemaphore.Release();
+            }
+
+            _historyLoadingMore = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void StartHistoryPolling()
+    {
+        if (_historyLifecycleCts is null)
+        {
+            return;
+        }
+
+        if (_historyTimer is not null)
+        {
+            _ = _historyTimer.DisposeAsync();
+        }
+
+        _historyTimer = new PeriodicTimer(TimeSpan.FromSeconds(25));
+        var token = _historyLifecycleCts.Token;
+
+        _historyPollingTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (_historyTimer is not null && await _historyTimer.WaitForNextTickAsync(token))
+                {
+                    await LoadHistoryUpdatesAsync(token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Falha no polling do histórico de lances.");
+            }
+        }, token);
+    }
+
+    private static string FormatHistoryTimestamp(DateTime utc)
+        => BrazilTime.FormatDateTimeWithZone(utc);
+
+    private static string FormatHistoryTeam(string? teamName, string fallback = "-")
+        => string.IsNullOrWhiteSpace(teamName) ? fallback : teamName!;
+
+    private static string BuildHistoryDescription(MarketTransactionDto entry)
+    {
+        var origin = FormatHistoryTeam(entry.TeamName, "Mercado");
+        var destination = FormatHistoryTeam(entry.TargetTeamName);
+        var amountText = entry.Amount.HasValue
+            ? string.Format(BrazilTime.Culture, "{0:C}", entry.Amount.Value)
+            : null;
+
+        return entry.Type switch
+        {
+            MarketTransactionType.BidPlaced when amountText is not null
+                => $"Lance de {amountText} por {origin}.",
+            MarketTransactionType.Outbid when amountText is not null
+                => $"{origin} superou {destination} com {amountText}.",
+            MarketTransactionType.BuyNow when amountText is not null
+                => $"Compra imediata por {origin} ({amountText}).",
+            MarketTransactionType.AuctionSettled
+                => $"Leilão concluído para {destination}.",
+            MarketTransactionType.AuctionExpired
+                => "Leilão expirado sem vencedor.",
+            _ when !string.IsNullOrWhiteSpace(destination)
+                => $"{origin} → {destination}",
+            _ => origin
+        };
+    }
+
     public async ValueTask DisposeAsync()
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = null;
+
+        _historyRequestCts?.Cancel();
+        _historyRequestCts?.Dispose();
+        _historyRequestCts = null;
+
+        _historyLifecycleCts?.Cancel();
+        _historyLifecycleCts?.Dispose();
+        _historyLifecycleCts = null;
+
+        if (_historyTimer is not null)
+        {
+            await _historyTimer.DisposeAsync();
+            _historyTimer = null;
+        }
+
+        if (_historyPollingTask is not null)
+        {
+            try
+            {
+                await _historyPollingTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            _historyPollingTask = null;
+        }
 
         if (_bidUpdatedHandler is not null)
         {
@@ -439,6 +950,8 @@ else
             _lifetimeCts.Dispose();
             _lifetimeCts = null;
         }
+
+        _historySemaphore.Dispose();
 
         await Hub.DisposeAsync();
     }
