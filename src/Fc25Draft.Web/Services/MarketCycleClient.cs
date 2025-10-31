@@ -174,48 +174,65 @@ public class MarketCycleClient
         string raw = string.Empty;
         try { raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false); } catch { /* ignore */ }
 
-        // 1) ApiErrorResponse (seu contrato)
-        try
-        {
-            var err = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
-            if (err is not null)
-            {
-                var msg = !string.IsNullOrWhiteSpace(err.Message)
-                    ? err.Message
-                    : (err.Errors is { Count: > 0 }
-                        ? string.Join(" ", err.Errors.SelectMany(kv => kv.Value ?? Array.Empty<string>()))
-                        : null);
+        var mediaType = response.Content?.Headers?.ContentType?.MediaType;
+        var isJson = mediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) ?? false;
 
-                if (!string.IsNullOrWhiteSpace(msg))
-                    return (Decorate(msg), ComposeLog());
-            }
+        if (!isJson)
+        {
+            return (Decorate(raw), ComposeLog());
         }
-        catch { /* fallback */ }
+
+        // 1) ApiErrorResponse (seu contrato)
+        if (isJson)
+        {
+            try
+            {
+                var err = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
+                if (err is not null)
+                {
+                    var msg = !string.IsNullOrWhiteSpace(err.Message)
+                        ? err.Message
+                        : (err.Errors is { Count: > 0 }
+                            ? string.Join(" ", err.Errors.SelectMany(kv => kv.Value ?? Array.Empty<string>()))
+                            : null);
+
+                    if (!string.IsNullOrWhiteSpace(msg))
+                        return (Decorate(msg), ComposeLog());
+                }
+            }
+            catch { /* fallback */ }
+        }
 
         // 2) RFC 7807 ProblemDetails (muito comum em APIs .NET)
-        try
+        if (isJson)
         {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
-            if (problem is not null)
+            try
             {
-                var msg = problem.Title ?? problem.Detail ?? "Unexpected error.";
-                return (Decorate(msg), ComposeLog(problem.Detail ?? raw));
+                var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
+                if (problem is not null)
+                {
+                    var msg = problem.Title ?? problem.Detail ?? "Unexpected error.";
+                    return (Decorate(msg), ComposeLog(problem.Detail ?? raw));
+                }
             }
+            catch { /* fallback */ }
         }
-        catch { /* fallback */ }
 
         // 3) ValidationProblemDetails (model state)
-        try
+        if (isJson)
         {
-            var v = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(ct).ConfigureAwait(false);
-            if (v is not null)
+            try
             {
-                var flat = v.Errors?.Values?.SelectMany(x => x)?.ToArray() ?? Array.Empty<string>();
-                var msg = flat.Length > 0 ? string.Join(" ", flat) : (v.Title ?? "Validation error.");
-                return (Decorate(msg), ComposeLog(string.Join(Environment.NewLine, flat)));
+                var v = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(ct).ConfigureAwait(false);
+                if (v is not null)
+                {
+                    var flat = v.Errors?.Values?.SelectMany(x => x)?.ToArray() ?? Array.Empty<string>();
+                    var msg = flat.Length > 0 ? string.Join(" ", flat) : (v.Title ?? "Validation error.");
+                    return (Decorate(msg), ComposeLog(string.Join(Environment.NewLine, flat)));
+                }
             }
+            catch { /* fallback */ }
         }
-        catch { /* fallback */ }
 
         // 4) Se veio text/plain / text/html, use o texto
         if (!string.IsNullOrWhiteSpace(raw))
