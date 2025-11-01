@@ -37,6 +37,7 @@ else
         <div class="nav nav-tabs">
             <button class="nav-link @(_activeTab == ListTab ? "active" : string.Empty)" @onclick="async () => await SwitchTabAsync(ListTab)" type="button">Listagem</button>
             <button class="nav-link @(_activeTab == EditTab ? "active" : string.Empty)" @onclick="async () => await SwitchTabAsync(EditTab)" type="button">@(_editingCycleId.HasValue ? "Edição" : "Criação")</button>
+            <button class="nav-link @(_activeTab == GenerateTab ? "active" : string.Empty)" @onclick="async () => await SwitchTabAsync(GenerateTab)" type="button">Gerar itens</button>
         </div>
     </div>
 
@@ -149,6 +150,7 @@ else
                                     <button type="button" class="btn btn-outline-success" disabled="@(!CanOpen(item))" @onclick="async () => await OpenCycleAsync(item)">Abrir ciclo</button>
                                     <button type="button" class="btn btn-outline-danger" disabled="@(!CanClose(item))" @onclick="async () => await CloseCycleAsync(item)">Fechar ciclo</button>
                                     <button type="button" class="btn btn-outline-primary" @onclick="async () => await BeginEditAsync(item)">Editar</button>
+                                    <button type="button" class="btn btn-outline-warning" disabled="@(item.Status != MarketCycleStatus.Draft)" @onclick="async () => await BeginGenerationAsync(item)">Gerar itens</button>
                                 </div>
                             </td>
                         </tr>
@@ -204,11 +206,18 @@ else
             </div>
         </div>
     }
+    else if (_activeTab == GenerateTab)
+    {
+        <MarketItemGenerationTab Cycle="@_generationCycle"
+                                 CycleUpdated="OnGenerationCycleUpdated"
+                                 @key="_generationCycle?.CycleId" />
+    }
 }
 
 @code {
     private const string ListTab = "list";
     private const string EditTab = "edit";
+    private const string GenerateTab = "generate";
     private const string NameColumn = "name";
     private const string StartsColumn = "start";
     private const string EndsColumn = "end";
@@ -233,6 +242,7 @@ else
     private bool _beforeUnloadEnabled;
     private IDisposable? _locationRegistration;
     private MarketCycleForm? _formRef;
+    private MarketCycleDto? _generationCycle;
 
     private static IReadOnlyList<int> PageSizeOptions { get; } = new[] { 10, 20, 50, 100 };
 
@@ -318,6 +328,14 @@ else
             var result = await MarketCycleClient.QueryAsync(request, _loadCts.Token);
             _cycles = result;
             _currentPage = result.Page;
+            if (_generationCycle is not null)
+            {
+                var refreshed = result.Items.FirstOrDefault(i => i.CycleId == _generationCycle.CycleId);
+                if (refreshed is not null)
+                {
+                    _generationCycle = refreshed;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -502,6 +520,27 @@ else
         await UpdateUnsavedWarningAsync();
     }
 
+    private async Task BeginGenerationAsync(MarketCycleDto cycle)
+    {
+        if (cycle.Status != MarketCycleStatus.Draft)
+        {
+            Toasts.ShowError("Apenas ciclos em rascunho podem receber itens gerados automaticamente.");
+            return;
+        }
+
+        if (_activeTab != GenerateTab)
+        {
+            await SwitchTabAsync(GenerateTab);
+            if (_activeTab != GenerateTab)
+            {
+                return;
+            }
+        }
+
+        _generationCycle = cycle;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task SwitchTabAsync(string tab)
     {
         if (_activeTab == tab)
@@ -529,6 +568,24 @@ else
         else
         {
             await UpdateUnsavedWarningAsync();
+        }
+    }
+
+    private async Task OnGenerationCycleUpdated(Guid cycleId)
+    {
+        await LoadAsync(_currentPage);
+
+        try
+        {
+            var updated = await MarketCycleClient.GetByIdAsync(cycleId);
+            if (updated is not null)
+            {
+                _generationCycle = updated;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
         }
     }
 
