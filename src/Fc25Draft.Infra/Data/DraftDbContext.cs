@@ -237,6 +237,7 @@ public class DraftDbContext : DbContext
                 .IsConcurrencyToken()
                 .ValueGeneratedOnAddOrUpdate();
 
+            e.HasIndex(x => new { x.CycleId, x.PlayerId }).IsUnique();
             e.HasIndex(x => new { x.CycleId, x.Status, x.ExpiresAtUtc });
             e.HasIndex(x => x.PlayerId).HasDatabaseName("IX_MarketItems_Player");
 
