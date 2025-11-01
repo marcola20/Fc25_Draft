@@ -27,6 +27,9 @@ public static class BrazilTime
         return local.ToString(format, Culture);
     }
 
+    public static string FormatDateTimeLocal(DateTime utc, string format = "dd/MM/yyyy HH:mm")
+        => FormatDateTime(utc, format);
+
     public static string FormatDateTimeWithZone(DateTime utc)
     {
         var local = ConvertFromUtc(utc);

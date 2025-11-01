@@ -51,7 +51,7 @@ else
         <table class="table table-sm table-striped align-middle">
             <thead>
                 <tr>
-                    <th scope="col">Data/Hora (UTC)</th>
+                    <th scope="col">Data/Hora</th>
                     <th scope="col">Evento</th>
                     <th scope="col">Jogador</th>
                     <th scope="col">Time Origem</th>
@@ -188,7 +188,7 @@ else
     }
 
     private static string FormatTimestamp(DateTime utc)
-        => BrazilTime.FormatDateTimeWithZone(utc);
+        => BrazilTime.FormatDateTimeLocal(utc);
 
     private static string FormatTeam(string? teamName, string fallback = "-")
         => string.IsNullOrWhiteSpace(teamName) ? fallback : teamName;
@@ -203,26 +203,7 @@ else
     }
 
     private static string BuildEventSummary(MarketTransactionDto item)
-    {
-        var origin = FormatTeam(item.TeamName, "Mercado");
-        var destination = FormatTeam(item.TargetTeamName);
-        var amountText = item.Amount.HasValue
-            ? string.Format(BrazilTime.Culture, "{0:C}", item.Amount.Value)
-            : null;
-
-        return item.Type switch
-        {
-            MarketTransactionType.BidPlaced when amountText is not null
-                => $"Lance registrado por {origin}: {amountText}",
-            MarketTransactionType.Outbid when amountText is not null
-                => $"{origin} superou {destination} ({amountText})",
-            MarketTransactionType.BuyNow when amountText is not null
-                => $"Compra imediata por {origin} ({amountText})",
-            _ when !string.IsNullOrWhiteSpace(destination)
-                => $"{origin} → {destination}",
-            _ => origin
-        };
-    }
+        => MarketHistoryTextFormatter.FormatDescription(item);
 
     public void Dispose()
     {

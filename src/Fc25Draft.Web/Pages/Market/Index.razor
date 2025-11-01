@@ -68,7 +68,8 @@
     <MarketFilters OnApply="ApplyFiltersAsync"
                    PositionOptions="@_positionOptions"
                    SortOptions="@SortOptions"
-                   StatusOptions="@StatusOptions" />
+                   StatusOptions="@StatusOptions"
+                   ResultsSummary="@GetResultsSummary()" />
 
     @if (!string.IsNullOrEmpty(_cycleNotice))
     {
@@ -1180,7 +1181,7 @@ else
     }
 
     private static string FormatHistoryTimestamp(DateTime utc)
-        => BrazilTime.FormatDateTimeWithZone(utc);
+        => BrazilTime.FormatDateTimeLocal(utc);
 
     private async Task OpenTeamTokenModal()
     {

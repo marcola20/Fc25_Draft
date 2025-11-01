@@ -15,16 +15,23 @@ public static class MarketHistoryTextFormatter
     {
         var origin = FormatTeam(entry.TeamName, "Mercado");
         var destination = FormatTeam(entry.TargetTeamName);
+        var player = string.IsNullOrWhiteSpace(entry.PlayerName) ? null : entry.PlayerName;
         var amountText = FormatAmount(entry.Amount);
 
         return entry.Type switch
         {
             MarketTransactionType.BidPlaced when amountText is not null
-                => $"Lance de {amountText} por {origin}.",
+                => player is null
+                    ? $"Lance de {amountText} por {origin}."
+                    : $"Lance de {amountText} por {origin} em {player}.",
             MarketTransactionType.Outbid when amountText is not null
-                => $"{origin} superou {destination} com {amountText}.",
+                => player is null
+                    ? $"{origin} superou {destination} com {amountText}."
+                    : $"{origin} superou {destination} com {amountText} em {player}.",
             MarketTransactionType.BuyNow when amountText is not null
-                => $"Compra imediata por {origin} ({amountText}).",
+                => player is null
+                    ? $"Compra imediata por {origin} ({amountText})."
+                    : $"Compra imediata por {origin} em {player} ({amountText}).",
             MarketTransactionType.AuctionSettled
                 => $"Leilão concluído para {destination}.",
             MarketTransactionType.AuctionExpired
