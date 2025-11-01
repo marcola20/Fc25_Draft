@@ -44,8 +44,7 @@ else
                         <input id="filter-player"
                                class="form-control"
                                placeholder="Busque pelo nome"
-                               @bind="_playerSearch"
-                               @bind:event="oninput"
+                               value="@_playerSearch"
                                @oninput="OnPlayerSearchChanged"
                                autocomplete="off" />
                         @if (_selectedPlayer is not null)
@@ -67,7 +66,6 @@ else
                                 }
                             </div>
                         }
-                        <div class="form-text">Selecione um jogador na lista sugerida.</div>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label" for="filter-start">Início do período</label>
@@ -181,7 +179,7 @@ else
                     @foreach (var page in VisiblePages)
                     {
                         <li class="page-item @(page == _currentPage ? "active" : null)">
-                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@page</button>
+                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@(page)</button>
                         </li>
                     }
                     <li class="page-item @(_currentPage >= _transfers.TotalPages ? "disabled" : null)">
@@ -406,7 +404,7 @@ else
         {
             var result = await PlayersApiClient.GetAsync(value.Trim(), null, false, null, null, null, null, 1, 10, _playerSearchCts.Token).ConfigureAwait(false);
             _playerSuggestions.Clear();
-            _playerSuggestions.AddRange(result.Items.Select(p => new PlayerSuggestion(p.PlayerId, p.Name, p.Position, p.Overall)));
+            _playerSuggestions.AddRange(result.Items.Select(p => new PlayerSuggestion(p.PlayerId, p.Name, p.PositionName, p.Overall)));
         }
         catch (OperationCanceledException)
         {

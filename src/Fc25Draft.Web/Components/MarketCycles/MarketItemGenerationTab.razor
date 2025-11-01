@@ -264,7 +264,7 @@ else
                                     @for (var page = 1; page <= TotalPreviewPages; page++)
                                     {
                                         <li class="page-item @(page == _previewPage ? "active" : null)">
-                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@page</button>
+                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@(page)</button>
                                         </li>
                                     }
                                     <li class="page-item @(_previewPage >= TotalPreviewPages ? "disabled" : null)">

@@ -475,8 +475,6 @@ else
     private string? moveErrorMessage;
     private string? budgetSuccessMessage;
     private string? budgetErrorMessage;
-    private string? cancelSuccessMessage;
-    private string? cancelErrorMessage;
 
     private bool isLoadingData = true;
     private bool authInitialized;
@@ -484,7 +482,6 @@ else
     private bool isSubmittingSwap;
     private bool isSubmittingMove;
     private bool isSubmittingBudget;
-    private bool isSubmittingCancel;
 
     protected override void OnInitialized()
     {
@@ -1195,8 +1192,6 @@ else
         moveErrorMessage = null;
         budgetSuccessMessage = null;
         budgetErrorMessage = null;
-        cancelSuccessMessage = null;
-        cancelErrorMessage = null;
     }
 
     private void OnAuthenticationChanged()
