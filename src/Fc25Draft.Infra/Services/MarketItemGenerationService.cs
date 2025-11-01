@@ -233,7 +233,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
         var openCyclePlayers = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => i.Cycle.Status == MarketCycleStatus.Open && i.Status == MarketItemStatus.Published)
+            .Where(i => i.Cycle.Status == MarketCycleStatus.Active && i.Status == MarketItemStatus.Active)
             .Select(i => i.PlayerId)
             .ToListAsync(ct)
             .ConfigureAwait(false);

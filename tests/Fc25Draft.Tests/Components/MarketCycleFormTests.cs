@@ -75,7 +75,7 @@ public class MarketCycleFormTests
         var model = new MarketCycleFormModel
         {
             Name = "Ciclo válido",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtLocal = now,
             EndsAtLocal = now.AddHours(4)
         };

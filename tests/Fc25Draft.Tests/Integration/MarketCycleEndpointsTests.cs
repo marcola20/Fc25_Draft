@@ -69,7 +69,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
             Name = "Novo Ciclo",
             StartsAtUtc = DateTime.UtcNow.AddHours(1),
             EndsAtUtc = DateTime.UtcNow.AddHours(5),
-            Status = MarketCycleStatus.Open
+            Status = MarketCycleStatus.Active
         };
 
         var message = new HttpRequestMessage(HttpMethod.Post, "/api/market/cycles")
@@ -83,7 +83,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
         Assert.NotNull(payload);
-        Assert.Equal("Já existe um ciclo aberto.", payload!["message"]);
+        Assert.Equal("Já existe um ciclo ativo.", payload!["message"]);
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         {
             CycleId = Guid.NewGuid(),
             Name = "Ciclo Atual",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtUtc = now.AddHours(-1),
             EndsAtUtc = now.AddHours(5),
             CreatedAtUtc = now,
@@ -291,7 +291,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
             {
                 CycleId = Guid.NewGuid(),
                 Name = "Ciclo C",
-                Status = MarketCycleStatus.Open,
+                Status = MarketCycleStatus.Active,
                 StartsAtUtc = baseTime.AddHours(4),
                 EndsAtUtc = baseTime.AddHours(10),
                 CreatedAtUtc = baseTime.AddHours(3),
@@ -332,7 +332,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         {
             CycleId = cycleId,
             Name = "Ciclo com Itens",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtUtc = now.AddHours(-2),
             EndsAtUtc = now.AddHours(10),
             CreatedAtUtc = now.AddHours(-3),
@@ -348,7 +348,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
             BuyNowPrice = 1500m,
             MinIncrement = 100m,
             ExpiresAtUtc = now.AddHours(5),
-            Status = MarketItemStatus.Published,
+            Status = MarketItemStatus.Active,
             PublishedAtUtc = now,
             CreatedAtUtc = now,
             LastUpdateUtc = now

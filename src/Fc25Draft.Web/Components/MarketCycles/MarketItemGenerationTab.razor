@@ -702,16 +702,18 @@ else
     private static string GetStatusLabel(MarketCycleStatus status) => status switch
     {
         MarketCycleStatus.Draft => "Rascunho",
-        MarketCycleStatus.Open => "Aberto",
+        MarketCycleStatus.Active => "Ativo",
         MarketCycleStatus.Closed => "Encerrado",
+        MarketCycleStatus.Archived => "Arquivado",
         _ => status.ToString()
     };
 
     private static string GetStatusBadgeClass(MarketCycleStatus status) => status switch
     {
         MarketCycleStatus.Draft => "bg-secondary",
-        MarketCycleStatus.Open => "bg-success",
+        MarketCycleStatus.Active => "bg-success",
         MarketCycleStatus.Closed => "bg-dark",
+        MarketCycleStatus.Archived => "bg-secondary",
         _ => "bg-secondary"
     };
 

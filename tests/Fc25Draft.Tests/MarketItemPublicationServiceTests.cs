@@ -76,7 +76,7 @@ public class MarketItemPublicationServiceTests
             BuyNowPrice = 5_200m,
             MinIncrement = 150m,
             ExpiresAtUtc = fakeTime.GetUtcNow().UtcDateTime.AddHours(6),
-            Status = MarketItemStatus.Published,
+            Status = MarketItemStatus.Active,
             CreatedAtUtc = fakeTime.GetUtcNow().UtcDateTime,
             LastUpdateUtc = fakeTime.GetUtcNow().UtcDateTime,
             RowVersion = 11
@@ -124,7 +124,7 @@ public class MarketItemPublicationServiceTests
         {
             CycleId = cycleId,
             Name = $"Ciclo Teste {now:yyyyMMddHHmm}",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtUtc = now,
             EndsAtUtc = now.AddDays(7),
             Notes = null,

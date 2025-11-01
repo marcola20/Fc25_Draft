@@ -32,12 +32,12 @@ public class MarketCycleGenerator : IMarketCycleGenerator
 
     public async Task<bool> NeedsNewCycleAsync(DateTime utcNow, CancellationToken ct)
     {
-        var openCycleExists = await _dbContext.MarketCycles
+        var activeCycleExists = await _dbContext.MarketCycles
             .AsNoTracking()
-            .AnyAsync(c => c.Status == MarketCycleStatus.Open, ct)
+            .AnyAsync(c => c.Status == MarketCycleStatus.Active, ct)
             .ConfigureAwait(false);
 
-        if (openCycleExists)
+        if (activeCycleExists)
         {
             return false;
         }
@@ -79,11 +79,11 @@ public class MarketCycleGenerator : IMarketCycleGenerator
 
             try
             {
-                var existingOpen = await _dbContext.MarketCycles
-                    .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Open, ct);
+                var existingActive = await _dbContext.MarketCycles
+                    .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Active, ct);
 
-                if (existingOpen is not null)
-                    return ToDto(existingOpen);
+                if (existingActive is not null)
+                    return ToDto(existingActive);
 
                 var cycleId = Guid.NewGuid();
 
@@ -92,7 +92,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
                 {
                     CycleId = cycleId,
                     Name = FormattableString.Invariant($"Ciclo de Mercado {now:yyyyMMddHHmm}"),
-                    Status = MarketCycleStatus.Open,
+                    Status = MarketCycleStatus.Active,
                     StartsAtUtc = now,
                     EndsAtUtc = endsAt,
                     CreatedAtUtc = now,
@@ -121,7 +121,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
                         BasePrice = pricing.BasePrice,
                         BuyNowPrice = pricing.BuyNowPrice,
                         MinIncrement = pricing.MinIncrement,
-                        Status = MarketItemStatus.Published,
+                        Status = MarketItemStatus.Active,
                         PublishedAtUtc = now,
                         ExpiresAtUtc = endsAt,
                         CreatedAtUtc = now,
@@ -160,7 +160,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
     {
         var ids = await _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => i.Status == MarketItemStatus.Published)
+            .Where(i => i.Status == MarketItemStatus.Active)
             .Select(i => i.PlayerId)
             .ToListAsync(ct)
             .ConfigureAwait(false);

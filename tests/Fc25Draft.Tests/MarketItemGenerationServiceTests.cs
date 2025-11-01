@@ -20,7 +20,7 @@ public class MarketItemGenerationServiceTests
         {
             CycleId = cycleId,
             Name = "Aberto",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtUtc = DateTime.UtcNow.AddHours(-1),
             EndsAtUtc = DateTime.UtcNow.AddHours(5),
             CreatedAtUtc = DateTime.UtcNow.AddHours(-2),

@@ -97,9 +97,9 @@ public class MarketItemPublicationService : IMarketItemPublicationService
                 }));
         }
 
-        if (cycle.Status != MarketCycleStatus.Open)
+        if (cycle.Status != MarketCycleStatus.Active)
         {
-            throw new MarketConflictException("O ciclo informado não está aberto.");
+            throw new MarketConflictException("O ciclo informado não está ativo.");
         }
 
         var player = await _dbContext.Players
@@ -184,9 +184,9 @@ public class MarketItemPublicationService : IMarketItemPublicationService
             throw new MarketConflictException("Ciclo do item não encontrado.");
         }
 
-        if (item.Cycle.Status != MarketCycleStatus.Open)
+        if (item.Cycle.Status != MarketCycleStatus.Active)
         {
-            throw new MarketConflictException("O ciclo associado não está aberto para alterações.");
+            throw new MarketConflictException("O ciclo associado não está ativo para alterações.");
         }
 
         var normalizedExpiration = NormalizeToUtc(request.ExpiresAtUtc);
@@ -233,9 +233,9 @@ public class MarketItemPublicationService : IMarketItemPublicationService
             throw new MarketConflictException("Ciclo do item não encontrado.");
         }
 
-        if (item.Cycle.Status != MarketCycleStatus.Open)
+        if (item.Cycle.Status != MarketCycleStatus.Active)
         {
-            throw new MarketConflictException("O ciclo associado não está aberto para publicação.");
+            throw new MarketConflictException("O ciclo associado não está ativo para publicação.");
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -249,7 +249,7 @@ public class MarketItemPublicationService : IMarketItemPublicationService
             throw new MarketConflictException("A data de expiração deve ser futura para publicar o item.");
         }
 
-        item.Status = MarketItemStatus.Published;
+        item.Status = MarketItemStatus.Active;
         item.PublishedAtUtc = now;
         item.LastUpdateUtc = now;
 

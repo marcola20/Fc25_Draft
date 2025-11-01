@@ -38,16 +38,16 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             throw new MarketValidationException("A data de início deve ser anterior à data de término.");
         }
 
-        if (command.Status == MarketCycleStatus.Open)
+        if (command.Status == MarketCycleStatus.Active)
         {
             var hasOpenCycle = await _dbContext.MarketCycles
                 .AsNoTracking()
-                .AnyAsync(c => c.Status == MarketCycleStatus.Open, ct)
+                .AnyAsync(c => c.Status == MarketCycleStatus.Active, ct)
                 .ConfigureAwait(false);
 
             if (hasOpenCycle)
             {
-                throw new MarketConflictException("Já existe um ciclo aberto.");
+                throw new MarketConflictException("Já existe um ciclo ativo.");
             }
         }
 
@@ -164,16 +164,16 @@ public class MarketCycleAdminService : IMarketCycleAdminService
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        if (status == MarketCycleStatus.Open)
+        if (status == MarketCycleStatus.Active)
         {
             var hasOtherOpen = await _dbContext.MarketCycles
                 .AsNoTracking()
-                .AnyAsync(c => c.CycleId != cycleId && c.Status == MarketCycleStatus.Open, ct)
+                .AnyAsync(c => c.CycleId != cycleId && c.Status == MarketCycleStatus.Active, ct)
                 .ConfigureAwait(false);
 
             if (hasOtherOpen)
             {
-                throw new MarketConflictException("Já existe um ciclo aberto.");
+                throw new MarketConflictException("Já existe um ciclo ativo.");
             }
 
             var items = await _dbContext.MarketItems
@@ -190,8 +190,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                     continue;
                 }
 
-                // FIX: Promote draft market items when opening a cycle so they appear in the active market.
-                item.Status = MarketItemStatus.Published;
+                // FIX: Promote draft market items when activating a cycle so they appear in the active market.
+                item.Status = MarketItemStatus.Active;
                 item.PublishedAtUtc = now;
                 item.LastUpdateUtc = now;
             }
@@ -201,7 +201,7 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         {
             var hasActiveItems = await _dbContext.MarketItems
                 .AsNoTracking()
-                .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Published, ct)
+                .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active, ct)
                 .ConfigureAwait(false);
 
             if (hasActiveItems && !forceClose)
@@ -213,7 +213,7 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             {
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
                 var items = await _dbContext.MarketItems
-                    .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Published)
+                    .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active)
                     .ToListAsync(ct)
                     .ConfigureAwait(false);
 

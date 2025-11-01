@@ -172,13 +172,13 @@ public class MarketItemPublicationEndpointsTests : IClassFixture<MarketItemPubli
         Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
         var published = await publishResponse.Content.ReadFromJsonAsync<MarketItemPublicationDto>();
         Assert.NotNull(published);
-        Assert.Equal("Published", published!.Status);
+        Assert.Equal("Active", published!.Status);
         Assert.NotNull(published.PublishedAtUtc);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
         var entity = await db.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == created.ItemId);
-        Assert.Equal(MarketItemStatus.Published, entity.Status);
+        Assert.Equal(MarketItemStatus.Active, entity.Status);
     }
 
     [Fact]
@@ -313,7 +313,7 @@ public class MarketItemPublicationEndpointsTests : IClassFixture<MarketItemPubli
         {
             CycleId = cycleId,
             Name = $"Ciclo Integração {now:yyyyMMddHHmm}",
-            Status = MarketCycleStatus.Open,
+            Status = MarketCycleStatus.Active,
             StartsAtUtc = now,
             EndsAtUtc = endsAt,
             Notes = null,

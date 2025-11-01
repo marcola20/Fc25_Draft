@@ -28,7 +28,7 @@ public class MarketItemGenerationTabTests
     {
         using var ctx = CreateContext();
         var now = DateTime.UtcNow;
-        var cycle = new MarketCycleDto(Guid.NewGuid(), "Ciclo", MarketCycleStatus.Open, now, now.AddHours(2), now, now, null);
+        var cycle = new MarketCycleDto(Guid.NewGuid(), "Ciclo", MarketCycleStatus.Active, now, now.AddHours(2), now, now, null);
 
         var cut = ctx.RenderComponent<MarketItemGenerationTab>(parameters => parameters
             .Add(p => p.Cycle, cycle));

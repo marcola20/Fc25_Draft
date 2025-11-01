@@ -570,12 +570,11 @@
         return normalized switch
         {
             "draft" or "rascunho" => "Rascunho",
-            "published" or "publicado" => "Publicado",
-            "settled" or "finalizado" => "Finalizado",
+            "published" or "publicado" or "active" or "ativo" => "Ativo",
+            "settled" or "finalizado" or "sold" or "vendido" => "Vendido",
             "canceled" or "cancelled" or "cancelado" => "Cancelado",
-            "active" or "ativo" => "Ativo",
+            "expired" or "expirado" => "Expirado",
             "closed" or "encerrado" => "Encerrado",
-            "sold" or "vendido" => "Vendido",
             _ => CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(normalized)
         };
     }

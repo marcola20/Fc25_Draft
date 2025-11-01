@@ -194,8 +194,9 @@
     private static string GetLabel(MarketCycleStatus status) => status switch
     {
         MarketCycleStatus.Draft => "Rascunho",
-        MarketCycleStatus.Open => "Aberto",
+        MarketCycleStatus.Active => "Ativo",
         MarketCycleStatus.Closed => "Encerrado",
+        MarketCycleStatus.Archived => "Arquivado",
         _ => status.ToString()
     };
 }

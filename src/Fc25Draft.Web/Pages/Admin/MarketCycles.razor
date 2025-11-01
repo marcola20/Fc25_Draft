@@ -147,7 +147,7 @@ else
                             <td class="text-nowrap">@BrazilTime.FormatDateTime(item.UpdatedAtUtc)</td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-success" disabled="@(!CanOpen(item))" @onclick="async () => await OpenCycleAsync(item)">Abrir ciclo</button>
+                                    <button type="button" class="btn btn-outline-success" disabled="@(!CanActivate(item))" @onclick="async () => await ActivateCycleAsync(item)">Ativar ciclo</button>
                                     <button type="button" class="btn btn-outline-danger" disabled="@(!CanClose(item))" @onclick="async () => await CloseCycleAsync(item)">Fechar ciclo</button>
                                     <button type="button" class="btn btn-outline-primary" @onclick="async () => await BeginEditAsync(item)">Editar</button>
                                     <button type="button" class="btn btn-outline-warning" disabled="@(item.Status != MarketCycleStatus.Draft)" @onclick="async () => await BeginGenerationAsync(item)">Gerar itens</button>
@@ -410,32 +410,34 @@ else
     private static string GetStatusLabel(MarketCycleStatus status) => status switch
     {
         MarketCycleStatus.Draft => "Rascunho",
-        MarketCycleStatus.Open => "Aberto",
+        MarketCycleStatus.Active => "Ativo",
         MarketCycleStatus.Closed => "Encerrado",
+        MarketCycleStatus.Archived => "Arquivado",
         _ => status.ToString()
     };
 
     private static string GetStatusBadgeClass(MarketCycleStatus status) => status switch
     {
         MarketCycleStatus.Draft => "bg-secondary",
-        MarketCycleStatus.Open => "bg-success",
+        MarketCycleStatus.Active => "bg-success",
         MarketCycleStatus.Closed => "bg-dark",
+        MarketCycleStatus.Archived => "bg-secondary",
         _ => "bg-secondary"
     };
 
-    private bool CanOpen(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Open && !_updatingStatus.Contains(cycle.CycleId);
+    private bool CanActivate(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Active && !_updatingStatus.Contains(cycle.CycleId);
 
     private bool CanClose(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Closed && !_updatingStatus.Contains(cycle.CycleId);
 
-    private async Task OpenCycleAsync(MarketCycleDto cycle)
+    private async Task ActivateCycleAsync(MarketCycleDto cycle)
     {
-        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Open, false, "Ciclo aberto com sucesso.");
+        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Active, false, "Ciclo ativado com sucesso.");
     }
 
     private async Task CloseCycleAsync(MarketCycleDto cycle)
     {
-        var forceClose = cycle.Status == MarketCycleStatus.Open;
-        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Closed, forceClose, forceClose ? "Ciclo encerrado. Todas as ofertas em aberto serão canceladas." : "Ciclo encerrado.");
+        var forceClose = cycle.Status == MarketCycleStatus.Active;
+        await UpdateCycleStatusAsync(cycle, MarketCycleStatus.Closed, forceClose, forceClose ? "Ciclo encerrado. Todas as ofertas ativas serão canceladas." : "Ciclo encerrado.");
     }
 
     private async Task UpdateCycleStatusAsync(MarketCycleDto cycle, MarketCycleStatus status, bool forceClose, string successMessage)

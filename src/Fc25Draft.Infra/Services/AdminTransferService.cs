@@ -106,7 +106,7 @@ public partial class AdminTransferService
                 .ConfigureAwait(false)
                 ?? throw new KeyNotFoundException("Item de mercado não encontrado.");
 
-            if (item.Status != MarketItemStatus.Published)
+            if (item.Status != MarketItemStatus.Active)
             {
                 throw new AdminConflictException("Somente itens ativos sem lances podem ser cancelados.");
             }
@@ -270,7 +270,7 @@ public partial class AdminTransferService
                 .AsNoTracking()
                 .AnyAsync(
                     i => playerNumericIds.Contains(i.PlayerId)
-                        && i.Status == MarketItemStatus.Published,
+                        && i.Status == MarketItemStatus.Active,
                     ct)
                 .ConfigureAwait(false);
 
@@ -505,7 +505,7 @@ public partial class AdminTransferService
                     .AsNoTracking()
                     .AnyAsync(
                         i => playerNumericIds.Contains(i.PlayerId)
-                            && i.Status == MarketItemStatus.Published,
+                            && i.Status == MarketItemStatus.Active,
                         ct)
                     .ConfigureAwait(false);
 
@@ -760,7 +760,7 @@ public partial class AdminTransferService
                 .AsNoTracking()
                 .AnyAsync(
                     i => i.PlayerId == player.PlayerId
-                        && i.Status == MarketItemStatus.Published,
+                        && i.Status == MarketItemStatus.Active,
                     ct)
                 .ConfigureAwait(false);
 
