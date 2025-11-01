@@ -25,9 +25,11 @@ public static class MarketCycleEndpoints
         cycles.MapGet("/{cycleId:guid}", HandleGetAsync);
         cycles.MapPatch("/{cycleId:guid}/status", HandleStatusUpdateAsync);
         cycles.MapPost("/{cycleId:guid}:conclude", HandleConcludeAsync);
-        cycles.MapPost("/{cycleId:guid}/items:preview", HandlePreviewAsync);
-        cycles.MapPost("/{cycleId:guid}/items:generate", HandleGenerateAsync);
-        cycles.MapDelete("/{cycleId:guid}/items", HandleDeleteItemsAsync);
+
+        var items = cycles.MapGroup("/{cycleId:guid}/items");
+        items.MapPost("/preview", HandlePreviewAsync);
+        items.MapPost("/generate", HandleGenerateAsync);
+        items.MapDelete(string.Empty, HandleDeleteItemsAsync);
         return marketApi;
     }
 
@@ -189,7 +191,7 @@ public static class MarketCycleEndpoints
 
     private static async Task<IResult> HandlePreviewAsync(
         Guid cycleId,
-        MarketItemGenerationRequestDto request,
+        GenerateItemsRequestDto request,
         IMarketItemGenerationService service,
         CancellationToken ct)
     {
@@ -216,7 +218,7 @@ public static class MarketCycleEndpoints
 
     private static async Task<IResult> HandleGenerateAsync(
         Guid cycleId,
-        MarketItemGenerationRequestDto request,
+        GenerateItemsRequestDto request,
         IMarketItemGenerationService service,
         CancellationToken ct)
     {
@@ -261,28 +263,24 @@ public static class MarketCycleEndpoints
         }
     }
 
-    private static MarketItemGenerationOptions ToOptions(MarketItemGenerationRequestDto request)
+    private static MarketItemGenerationOptions ToOptions(GenerateItemsRequestDto request)
     {
-        var filters = request.Filters ?? new MarketItemGenerationFiltersDto();
-        var lifecycle = request.Lifecycle ?? new MarketItemGenerationLifecycleDto();
-
-        var playerIds = filters.PlayerIds?.Where(id => id > 0).Distinct().ToArray();
-        var positionIds = filters.PositionIds?.Distinct().ToArray();
+        var positionIds = request.PositionIds?.Where(id => id > 0).Distinct().ToArray();
 
         return new MarketItemGenerationOptions(
             request.DesiredCount,
             request.Seed,
             new MarketItemGenerationFilters(
-                playerIds?.Length > 0 ? playerIds : null,
-                positionIds?.Length > 0 ? positionIds : null,
-                filters.MinOverall,
-                filters.MaxOverall,
-                filters.MinAge,
-                filters.MaxAge),
-            new MarketItemLifecycleOptions(
-                lifecycle.PublishAtUtc,
-                lifecycle.ExpiresAtUtc,
-                lifecycle.DurationHours));
+                positionIds,
+                request.MinOverall,
+                request.MaxOverall),
+            request.MaxPerTeam,
+            request.ExcludeAlreadyListedInOpenCycles,
+            request.EnsureUniquePlayerPerCycle,
+            new MarketItemExpirationOptions(
+                request.AutoSpreadExpirationsAcrossCycle,
+                request.MinItemLifespan,
+                request.MaxItemLifespan));
     }
 
     private static MarketItemGenerationPreviewDto ToDto(MarketItemGenerationPreview preview)
@@ -290,7 +288,11 @@ public static class MarketCycleEndpoints
         return new MarketItemGenerationPreviewDto(
             preview.RequestedCount,
             preview.EligibleCount,
+            preview.GeneratedCount,
+            preview.SkippedCount,
             preview.Seed,
+            preview.FirstExpiresAtUtc,
+            preview.LastExpiresAtUtc,
             preview.Items.Select(ToDto).ToList());
     }
 
@@ -299,9 +301,11 @@ public static class MarketCycleEndpoints
         return new MarketItemGenerationResultDto(
             result.RequestedCount,
             result.EligibleCount,
+            result.GeneratedCount,
+            result.SkippedCount,
             result.Seed,
-            result.CreatedCount,
-            result.SkippedExistingCount,
+            result.FirstExpiresAtUtc,
+            result.LastExpiresAtUtc,
             result.Items.Select(ToDto).ToList());
     }
 

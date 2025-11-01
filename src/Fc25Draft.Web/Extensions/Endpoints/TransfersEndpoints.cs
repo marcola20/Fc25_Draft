@@ -12,7 +12,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
         {
             var transfersApi = api.MapGroup("/transfers");
 
-            transfersApi.MapGet("/history", HandleHistoryAsync).AllowAnonymous();
+            transfersApi.MapGet("/history", HandleHistoryAsync).RequireAuthorization("AdminOnly");
+            transfersApi.MapGet("/{transferId:guid}", HandleGetAsync).RequireAuthorization("AdminOnly");
 
             return api;
         }
@@ -38,6 +39,17 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }
         }
 
+        private static async Task<IResult> HandleGetAsync(
+            Guid transferId,
+            ITransfersQueryService transfersQueryService,
+            CancellationToken ct)
+        {
+            var transfer = await transfersQueryService.GetByIdAsync(transferId, ct).ConfigureAwait(false);
+            return transfer is null
+                ? Results.NotFound(new { message = "Transferência não encontrada." })
+                : Results.Ok(transfer);
+        }
+
         private sealed record TransfersHistoryQueryParameters
         {
             [FromQuery(Name = "teamId")] public string? TeamIdRaw { get; init; }
@@ -47,6 +59,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             [FromQuery(Name = "to")] public string? ToUtcRaw { get; init; }
             [FromQuery(Name = "page")] public string? PageRaw { get; init; }
             [FromQuery(Name = "pageSize")] public string? PageSizeRaw { get; init; }
+            [FromQuery(Name = "q")] public string? QueryRaw { get; init; }
 
             public bool TryCreateFilter(out TransfersFilter filter, out IResult? errorResult)
             {
@@ -54,7 +67,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 errorResult = null;
 
                 if (!TryParseGuid(TeamIdRaw, "teamId", out var teamId, out errorResult) ||
-                    !TryParseGuid(PlayerIdRaw, "playerId", out var playerId, out errorResult))
+                    !TryParseInt(PlayerIdRaw, "playerId", out var playerId, out errorResult))
                 {
                     return false;
                 }
@@ -88,10 +101,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 filter = new TransfersFilter
                 {
                     TeamId = NormalizeGuid(teamId),
-                    PlayerId = NormalizeGuid(playerId),
+                    PlayerId = playerId,
                     Type = type,
                     FromUtc = fromUtc,
                     ToUtc = toUtc,
+                    Query = string.IsNullOrWhiteSpace(QueryRaw) ? null : QueryRaw.Trim(),
                     Page = sanitizedPage,
                     PageSize = sanitizedPageSize
                 };

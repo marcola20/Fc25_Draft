@@ -593,6 +593,8 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("PlayerId", "PerformedAtUtc");
 
+                    b.HasIndex("PerformedAtUtc");
+
                     b.ToTable("TransferHistories");
                 });
 

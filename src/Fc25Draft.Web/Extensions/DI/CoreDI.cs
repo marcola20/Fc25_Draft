@@ -49,6 +49,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<DraftAdminApiClient>();
             services.AddScoped<TeamsApiClient>();
             services.AddScoped<AdminTransfersApiClient>();
+            services.AddScoped<TransfersClient>();
             services.AddScoped<BudgetsApiClient>();
             services.AddScoped<MarketApiClient>();
             services.AddScoped<MarketClient>();

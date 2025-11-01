@@ -1,1285 +1,484 @@
-@page "/admin/negociacoes"
+@page "/admin/transferencias"
 @using System.Globalization
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Utilities
 @inject AdminAuthService AdminAuth
+@inject TransfersClient TransfersClient
 @inject TeamsApiClient TeamsApiClient
-@inject AdminTransfersApiClient AdminTransfersApiClient
-@inject BudgetsApiClient BudgetsApiClient
-@inject MarketApiClient MarketApiClient
+@inject PlayersApiClient PlayersApiClient
+@inject ToastService Toasts
 
 @implements IDisposable
 
-<h3>Negociações (Admin)</h3>
+<PageTitle>Histórico de Transferências</PageTitle>
 
-@if (!string.IsNullOrEmpty(pageError))
-{
-    <div class="alert alert-danger" role="alert">@pageError</div>
-}
+<h1 class="h3 mb-3">Histórico de Transferências</h1>
 
-@if (isLoadingData)
-{
-    <p><em>Carregando dados...</em></p>
-}
-else if (!AdminAuth.IsAuthenticated)
+@if (!AdminAuth.IsAuthenticated)
 {
     <div class="alert alert-warning" role="alert">
-        Entre como administrador para executar operações de transferência.
+        Entre como administrador para visualizar o histórico de transferências.
     </div>
 }
 else
 {
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "sell" ? "active" : null)"
-                    @onclick='() => SelectTab("sell")'>
-                Venda
-            </button>
-        </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "swap" ? "active" : null)"
-                    @onclick='() => SelectTab("swap")'>
-                Troca
-            </button>
-        </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "move" ? "active" : null)"
-                    @onclick='() => SelectTab("move")'>
-                Mover
-            </button>
-        </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "budget" ? "active" : null)"
-                    @onclick='() => SelectTab("budget")'>
-                Ajustar orçamento
-            </button>
-        </li>
-    </ul>
+    <EditForm EditContext="_filterContext" OnValidSubmit="ApplyFiltersAsync">
+        <DataAnnotationsValidator />
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="filter-team">Time</label>
+                        <InputSelect id="filter-team" class="form-select" @bind-Value="_filter.TeamId" TValue="Guid?">
+                            <option value="">Todos os times</option>
+                            @foreach (var team in _teams)
+                            {
+                                <option value="@team.TeamId">@team.TeamName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="filter-player">Jogador</label>
+                        <input id="filter-player"
+                               class="form-control"
+                               placeholder="Busque pelo nome"
+                               @bind="_playerSearch"
+                               @bind:event="oninput"
+                               @oninput="OnPlayerSearchChanged"
+                               autocomplete="off" />
+                        @if (_selectedPlayer is not null)
+                        {
+                            <div class="form-text text-success">Selecionado: @_selectedPlayer.Name</div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearSelectedPlayer">Remover jogador</button>
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_playerSearch) && _playerSuggestions.Count > 0)
+                        {
+                            <div class="list-group shadow-sm mt-2">
+                                @foreach (var suggestion in _playerSuggestions)
+                                {
+                                    <button type="button" class="list-group-item list-group-item-action"
+                                            @onclick="() => SelectPlayer(suggestion)">
+                                        @suggestion.Name (@suggestion.Position) - OVR @suggestion.Overall
+                                    </button>
+                                }
+                            </div>
+                        }
+                        <div class="form-text">Selecione um jogador na lista sugerida.</div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="filter-start">Início do período</label>
+                        <input id="filter-start" type="date" class="form-control" @bind="_filter.StartDate" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="filter-end">Fim do período</label>
+                        <input id="filter-end" type="date" class="form-control" @bind="_filter.EndDate" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="filter-texto">Busca textual</label>
+                        <InputText id="filter-texto" class="form-control" @bind-Value="_filter.Query" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="filter-pagesize">Itens por página</label>
+                        <InputNumber id="filter-pagesize" class="form-control" @bind-Value="_filter.PageSize" />
+                        <ValidationMessage For="@(() => _filter.PageSize)" />
+                    </div>
+                    <div class="col-12 col-md-3 d-flex gap-2 justify-content-md-end">
+                        <button type="submit" class="btn btn-primary" disabled="@_isLoading">Aplicar</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ClearFiltersAsync" disabled="@_isLoading">Limpar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </EditForm>
 
-    @switch (selectedTab)
+    @if (!string.IsNullOrEmpty(_error))
     {
-        case "sell":
-            <div>
-                @if (!string.IsNullOrEmpty(sellSuccessMessage))
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    else if (_isLoading && _transfers is null)
+    {
+        <div class="alert alert-info" role="status">Carregando transferências...</div>
+    }
+    else if (_transfers is null)
+    {
+        <div class="alert alert-info" role="status">Carregando transferências...</div>
+    }
+    else if (_transfers.Total == 0)
+    {
+        <div class="alert alert-warning" role="status">Nenhuma transferência encontrada para os filtros informados.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>
+                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Date))">
+                                Data/Hora @SortIcon(nameof(TransferSort.Date))
+                            </button>
+                        </th>
+                        <th>
+                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Player))">
+                                Jogador @SortIcon(nameof(TransferSort.Player))
+                            </button>
+                        </th>
+                        <th>
+                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.FromTeam))">
+                                Saiu do time @SortIcon(nameof(TransferSort.FromTeam))
+                            </button>
+                        </th>
+                        <th>
+                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.ToTeam))">
+                                Foi para o time @SortIcon(nameof(TransferSort.ToTeam))
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Amount))">
+                                Valor @SortIcon(nameof(TransferSort.Amount))
+                            </button>
+                        </th>
+                        <th>Observações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in GetSortedItems())
                 {
-                    <div class="alert alert-success" role="alert">@sellSuccessMessage</div>
-                }
-                @if (!string.IsNullOrEmpty(sellErrorMessage))
-                {
-                    <div class="alert alert-danger" role="alert">@sellErrorMessage</div>
-                }
-
-                <EditForm EditContext="sellEditContext" OnValidSubmit="SubmitSellAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="sell-from-team">Time vendedor</label>
-                            <InputSelect id="sell-from-team" class="form-select" TValue="Guid" @bind-Value="sellModel.FromTeamId" @bind-Value:after="OnSellFromTeamChanged">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in teams)
-                                {
-                                    <option value="@team.TeamId">@team.TeamName</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => sellModel.FromTeamId" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="sell-to-team">Time comprador</label>
-                            <InputSelect id="sell-to-team" class="form-select" TValue="Guid" @bind-Value="sellModel.ToTeamId" @bind-Value:after="OnSellToTeamChanged">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in GetDestinationTeams(sellModel.FromTeamId))
-                                {
-                                    <option value="@team.TeamId">@team.TeamName</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => sellModel.ToTeamId" />
-                        </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <h5>Jogadores selecionados</h5>
-                        @if (sellPlayerOptions.Count == 0)
-                        {
-                            <p class="text-muted">Selecione o time vendedor para listar os jogadores disponíveis.</p>
-                        }
-                        else
-                        {
-                            <div class="row row-cols-1 row-cols-md-2 g-2">
-                                @foreach (var player in sellPlayerOptions)
-                                {
-                                    var checkboxId = $"sell-player-{player.PlayerId}";
-                                    <div class="col">
-                                        <div class="form-check border rounded p-2 h-100">
-                                            <InputCheckbox id="@checkboxId" class="form-check-input" @bind-Value="player.IsSelected" @bind-Value:after="OnSellPlayersChanged" />
-                                            <label class="form-check-label ms-2" for="@checkboxId">
-                                                <strong>@player.Name</strong> (@player.Position) - OVR @player.Overall
-                                            </label>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        <ValidationMessage For="() => sellModel.SelectedPlayerIds" />
-                    </div>
-
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-4">
-                            <label class="form-label" for="sell-amount">Valor total (R$)</label>
-                            <InputNumber id="sell-amount" class="form-control" TValue="decimal" @bind-Value="sellModel.Amount" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label" for="sell-reason">Motivo</label>
-                            <InputTextArea id="sell-reason" class="form-control" rows="3" @bind-Value="sellModel.Reason" />
-                            <ValidationMessage For="() => sellModel.Reason" />
-                        </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <button class="btn btn-primary" type="submit" disabled="@(isSubmittingSell)">Confirmar venda</button>
-                    </div>
-                </EditForm>
-            </div>
-            break;
-        case "swap":
-            <div>
-                @if (!string.IsNullOrEmpty(swapSuccessMessage))
-                {
-                    <div class="alert alert-success" role="alert">@swapSuccessMessage</div>
-                }
-                @if (!string.IsNullOrEmpty(swapErrorMessage))
-                {
-                    <div class="alert alert-danger" role="alert">@swapErrorMessage</div>
-                }
-
-                <EditForm EditContext="swapEditContext" OnValidSubmit="SubmitSwapAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <div class="row g-3">
-                        <div class="col-lg-6">
-                            <div class="mb-3">
-                                <label class="form-label" for="swap-team-a">Time A</label>
-                                <InputSelect id="swap-team-a" class="form-select" TValue="Guid" @bind-Value="swapModel.TeamAId" @bind-Value:after="OnSwapTeamAChanged">
-                                    <option value="@Guid.Empty">Selecione</option>
-                                    @foreach (var team in teams)
-                                    {
-                                        <option value="@team.TeamId">@team.TeamName</option>
-                                    }
-                                </InputSelect>
-                                <ValidationMessage For="() => swapModel.TeamAId" />
-                            </div>
-
-                            <h5>Jogadores do Time A</h5>
-                            @if (swapTeamAOptions.Count == 0)
+                    <tr>
+                        <td class="text-nowrap">@BrazilTime.FormatDateTime(item.OccurredAtUtc)</td>
+                        <td class="fw-semibold">@item.PlayerName</td>
+                        <td>@item.FromTeamName</td>
+                        <td>@item.ToTeamName</td>
+                        <td class="text-end">@item.Amount.ToString("C0", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(item.Notes))
                             {
-                                <p class="text-muted">Selecione o Time A para visualizar o elenco.</p>
+                                var shortText = item.Notes.Length > 60 ? item.Notes[..60] + "…" : item.Notes;
+                                <span title="@item.Notes">@shortText</span>
                             }
                             else
                             {
-                                <div class="row row-cols-1 row-cols-md-2 g-2">
-                                    @foreach (var player in swapTeamAOptions)
-                                    {
-                                        var checkboxId = $"swap-a-{player.PlayerId}";
-                                        <div class="col">
-                                            <div class="form-check border rounded p-2 h-100">
-                                                <InputCheckbox id="@checkboxId" class="form-check-input" @bind-Value="player.IsSelected" @bind-Value:after="OnSwapPlayersChanged" />
-                                                <label class="form-check-label ms-2" for="@checkboxId">
-                                                    <strong>@player.Name</strong> (@player.Position) - OVR @player.Overall
-                                                </label>
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
+                                <span class="text-muted">—</span>
                             }
-                            <ValidationMessage For="() => swapModel.PlayersFromA" />
-                        </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
 
-                        <div class="col-lg-6">
-                            <div class="mb-3">
-                                <label class="form-label" for="swap-team-b">Time B</label>
-                                <InputSelect id="swap-team-b" class="form-select" TValue="Guid" @bind-Value="swapModel.TeamBId" @bind-Value:after="OnSwapTeamBChanged">
-                                    <option value="@Guid.Empty">Selecione</option>
-                                    @foreach (var team in GetDestinationTeams(swapModel.TeamAId))
-                                    {
-                                        <option value="@team.TeamId">@team.TeamName</option>
-                                    }
-                                </InputSelect>
-                                <ValidationMessage For="() => swapModel.TeamBId" />
-                            </div>
-
-                            <h5>Jogadores do Time B</h5>
-                            @if (swapTeamBOptions.Count == 0)
-                            {
-                                <p class="text-muted">Selecione o Time B para visualizar o elenco.</p>
-                            }
-                            else
-                            {
-                                <div class="row row-cols-1 row-cols-md-2 g-2">
-                                    @foreach (var player in swapTeamBOptions)
-                                    {
-                                        var checkboxId = $"swap-b-{player.PlayerId}";
-                                        <div class="col">
-                                            <div class="form-check border rounded p-2 h-100">
-                                                <InputCheckbox id="@checkboxId" class="form-check-input" @bind-Value="player.IsSelected" @bind-Value:after="OnSwapPlayersChanged" />
-                                                <label class="form-check-label ms-2" for="@checkboxId">
-                                                    <strong>@player.Name</strong> (@player.Position) - OVR @player.Overall
-                                                </label>
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            <ValidationMessage For="() => swapModel.PlayersFromB" />
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-4">
-                            <label class="form-label" for="swap-cash">Ajuste em dinheiro (A → B)</label>
-                            <InputNumber id="swap-cash" class="form-control" TValue="decimal" @bind-Value="swapModel.CashAdjustFromAToB" @bind-Value:after="OnSwapCashAdjustChanged" />
-                            <ValidationMessage For="() => swapModel.CashAdjustFromAToB" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label" for="swap-reason">Motivo</label>
-                            <InputTextArea id="swap-reason" class="form-control" rows="3" @bind-Value="swapModel.Reason" />
-                            <ValidationMessage For="() => swapModel.Reason" />
-                        </div>
-                    </div>
-
-                    @if (swapModel.TeamAId != Guid.Empty && swapModel.TeamBId != Guid.Empty)
+        @if (_transfers.TotalPages > 1)
+        {
+            <nav class="mt-3" aria-label="Paginação do histórico de transferências">
+                <ul class="pagination pagination-sm flex-wrap mb-0">
+                    <li class="page-item @(_currentPage <= 1 ? "disabled" : null)">
+                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage - 1)" disabled="@(_currentPage <= 1)">Anterior</button>
+                    </li>
+                    @foreach (var page in VisiblePages)
                     {
-                        <div class="row g-3 mt-3">
-                            <div class="col-lg-6">
-                                <h5>@GetTeamName(swapModel.TeamAId) após a troca</h5>
-                                @if (GetSwapPreview(swapModel.TeamAId, swapModel.PlayersFromA, swapModel.PlayersFromB).Count == 0)
-                                {
-                                    <p class="text-muted">Nenhum jogador selecionado.</p>
-                                }
-                                else
-                                {
-                                    <ul class="list-group">
-                                        @foreach (var player in GetSwapPreview(swapModel.TeamAId, swapModel.PlayersFromA, swapModel.PlayersFromB))
-                                        {
-                                            <li class="list-group-item d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <div><strong>@player.Name</strong> (@player.Position) - OVR @player.Overall</div>
-                                                </div>
-                                                @if (!string.IsNullOrEmpty(player.Badge))
-                                                {
-                                                    <span class="badge bg-secondary">@player.Badge</span>
-                                                }
-                                            </li>
-                                        }
-                                    </ul>
-                                }
-                                @if (TryGetBudgetPreview(swapModel.TeamAId, swapModel.CashAdjustFromAToB, isTeamA: true, out var currentA, out var previewA))
-                                {
-                                    <div class="mt-2">
-                                        <div><strong>Saldo atual:</strong> @FormatCurrency(currentA)</div>
-                                        <div><strong>Após troca:</strong> @FormatCurrency(previewA)</div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="col-lg-6">
-                                <h5>@GetTeamName(swapModel.TeamBId) após a troca</h5>
-                                @if (GetSwapPreview(swapModel.TeamBId, swapModel.PlayersFromB, swapModel.PlayersFromA).Count == 0)
-                                {
-                                    <p class="text-muted">Nenhum jogador selecionado.</p>
-                                }
-                                else
-                                {
-                                    <ul class="list-group">
-                                        @foreach (var player in GetSwapPreview(swapModel.TeamBId, swapModel.PlayersFromB, swapModel.PlayersFromA))
-                                        {
-                                            <li class="list-group-item d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <div><strong>@player.Name</strong> (@player.Position) - OVR @player.Overall</div>
-                                                </div>
-                                                @if (!string.IsNullOrEmpty(player.Badge))
-                                                {
-                                                    <span class="badge bg-secondary">@player.Badge</span>
-                                                }
-                                            </li>
-                                        }
-                                    </ul>
-                                }
-                                @if (TryGetBudgetPreview(swapModel.TeamBId, swapModel.CashAdjustFromAToB, isTeamA: false, out var currentB, out var previewB))
-                                {
-                                    <div class="mt-2">
-                                        <div><strong>Saldo atual:</strong> @FormatCurrency(currentB)</div>
-                                        <div><strong>Após troca:</strong> @FormatCurrency(previewB)</div>
-                                    </div>
-                                }
-                            </div>
-                        </div>
+                        <li class="page-item @(page == _currentPage ? "active" : null)">
+                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@page</button>
+                        </li>
                     }
+                    <li class="page-item @(_currentPage >= _transfers.TotalPages ? "disabled" : null)">
+                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage + 1)" disabled="@(_currentPage >= _transfers.TotalPages)">Próxima</button>
+                    </li>
+                </ul>
+            </nav>
+        }
 
-                    <div class="mt-3">
-                        <button class="btn btn-primary" type="submit" disabled="@(isSubmittingSwap)">Confirmar troca</button>
-                    </div>
-                </EditForm>
-            </div>
-            break;
-        case "move":
-            <div>
-                @if (!string.IsNullOrEmpty(moveSuccessMessage))
-                {
-                    <div class="alert alert-success" role="alert">@moveSuccessMessage</div>
-                }
-                @if (!string.IsNullOrEmpty(moveErrorMessage))
-                {
-                    <div class="alert alert-danger" role="alert">@moveErrorMessage</div>
-                }
-
-                <EditForm EditContext="moveEditContext" OnValidSubmit="SubmitMoveAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <div class="row g-3">
-                        <div class="col-lg-4">
-                            <label class="form-label" for="move-from-team">Time de origem</label>
-                            <InputSelect id="move-from-team" class="form-select" TValue="Guid" @bind-Value="moveModel.FromTeamId" @bind-Value:after="OnMoveFromTeamChanged">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in teams)
-                                {
-                                    <option value="@team.TeamId">@team.TeamName</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => moveModel.FromTeamId" />
-                        </div>
-                        <div class="col-lg-4">
-                            <label class="form-label" for="move-player">Jogador</label>
-                            <InputSelect id="move-player" class="form-select" TValue="Guid" @bind-Value="moveModel.PlayerId" @bind-Value:after="OnMovePlayerChanged">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var player in GetPlayersForTeam(moveModel.FromTeamId))
-                                {
-                                    <option value="@player.PlayerId">@player.Name (@player.Position) - OVR @player.Overall</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => moveModel.PlayerId" />
-                        </div>
-                        <div class="col-lg-4">
-                            <label class="form-label" for="move-team">Time de destino</label>
-                            <InputSelect id="move-team" class="form-select" TValue="Guid" @bind-Value="moveModel.ToTeamId">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in GetDestinationTeams(moveModel.FromTeamId))
-                                {
-                                    <option value="@team.TeamId">@team.TeamName</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => moveModel.ToTeamId" />
-                        </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <label class="form-label" for="move-reason">Motivo</label>
-                        <InputTextArea id="move-reason" class="form-control" rows="3" @bind-Value="moveModel.Reason" />
-                        <ValidationMessage For="() => moveModel.Reason" />
-                    </div>
-
-                    <div class="mt-3">
-                        <button class="btn btn-primary" type="submit" disabled="@(isSubmittingMove)">Mover jogador</button>
-                    </div>
-                </EditForm>
-            </div>
-            break;
-        case "budget":
-            <div>
-                @if (!string.IsNullOrEmpty(budgetSuccessMessage))
-                {
-                    <div class="alert alert-success" role="alert">@budgetSuccessMessage</div>
-                }
-                @if (!string.IsNullOrEmpty(budgetErrorMessage))
-                {
-                    <div class="alert alert-danger" role="alert">@budgetErrorMessage</div>
-                }
-
-                <EditForm EditContext="adjustEditContext" OnValidSubmit="SubmitAdjustBudgetAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <div class="row g-3">
-                        <div class="col-lg-6">
-                            <label class="form-label" for="budget-team">Time</label>
-                            <InputSelect id="budget-team" class="form-select" TValue="Guid" @bind-Value="adjustModel.TeamId" @bind-Value:after="OnBudgetTeamChanged">
-                                <option value="@Guid.Empty">Selecione</option>
-                                @foreach (var team in teams)
-                                {
-                                    <option value="@team.TeamId">@team.TeamName</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => adjustModel.TeamId" />
-                        </div>
-                        <div class="col-lg-6">
-                            <label class="form-label" for="budget-delta">Delta (R$)</label>
-                            <InputNumber id="budget-delta" class="form-control" TValue="decimal" @bind-Value="adjustModel.Delta" />
-                            <ValidationMessage For="() => adjustModel.Delta" />
-                        </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <label class="form-label" for="budget-reason">Motivo</label>
-                        <InputTextArea id="budget-reason" class="form-control" rows="3" @bind-Value="adjustModel.Reason" />
-                        <ValidationMessage For="() => adjustModel.Reason" />
-                    </div>
-
-                    @if (adjustModel.TeamId != Guid.Empty && teamBudgets.TryGetValue(adjustModel.TeamId, out var budgetSaldo))
-                    {
-                        <div class="mt-2">
-                            <div><strong>Saldo atual:</strong> @FormatCurrency(budgetSaldo)</div>
-                            <div><strong>Após ajuste:</strong> @FormatCurrency(budgetSaldo + adjustModel.Delta)</div>
-                        </div>
-                    }
-
-                    <div class="mt-3">
-                        <button class="btn btn-primary" type="submit" disabled="@(isSubmittingBudget)">Aplicar ajuste</button>
-                    </div>
-                </EditForm>
-            </div>
-            break;
+        @if (_isLoading)
+        {
+            <div class="alert alert-info mt-3" role="status">Atualizando dados...</div>
+        }
     }
 }
 
 @code {
-    private readonly CultureInfo currencyCulture = CultureInfo.GetCultureInfo("pt-BR");
-    private readonly List<TeamRosterInfo> teams = new();
-    private readonly Dictionary<Guid, TeamRosterInfo> teamsById = new();
-    private readonly Dictionary<Guid, PlayerInfo> playersById = new();
-    private readonly List<SelectablePlayer> sellPlayerOptions = new();
-    private readonly List<SelectablePlayer> swapTeamAOptions = new();
-    private readonly List<SelectablePlayer> swapTeamBOptions = new();
-    private readonly List<MarketItemDto> marketItems = new();
-    private readonly Dictionary<Guid, decimal> teamBudgets = new();
+    private readonly TransferHistoryFilterModel _filter = new();
+    private EditContext _filterContext = default!;
+    private IReadOnlyList<TeamListItemDto> _teams = Array.Empty<TeamListItemDto>();
+    private readonly List<PlayerSuggestion> _playerSuggestions = new();
+    private PlayerSuggestion? _selectedPlayer;
+    private string? _playerSearch;
+    private PagedResult<TransferListItemDto>? _transfers;
+    private int _currentPage = 1;
+    private string _sortColumn = nameof(TransferSort.Date);
+    private bool _sortDescending = true;
+    private bool _isLoading;
+    private string? _error;
+    private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _playerSearchCts;
 
-    private readonly SellFormModel sellModel = new();
-    private readonly SwapFormModel swapModel = new();
-    private readonly MoveFormModel moveModel = new();
-    private readonly AdjustBudgetFormModel adjustModel = new();
-    private readonly CancelMarketFormModel cancelModel = new();
-
-    private EditContext? sellEditContext;
-    private EditContext? swapEditContext;
-    private EditContext? moveEditContext;
-    private EditContext? adjustEditContext;
-    private EditContext? cancelEditContext;
-    private ValidationMessageStore? sellValidationMessages;
-    private ValidationMessageStore? swapValidationMessages;
-
-    private string selectedTab = "sell";
-    private string? pageError;
-    private string? sellSuccessMessage;
-    private string? sellErrorMessage;
-    private string? swapSuccessMessage;
-    private string? swapErrorMessage;
-    private string? moveSuccessMessage;
-    private string? moveErrorMessage;
-    private string? budgetSuccessMessage;
-    private string? budgetErrorMessage;
-    private string? cancelSuccessMessage;
-    private string? cancelErrorMessage;
-
-    private bool isLoadingData = true;
-    private bool authInitialized;
-    private bool isSubmittingSell;
-    private bool isSubmittingSwap;
-    private bool isSubmittingMove;
-    private bool isSubmittingBudget;
-    private bool isSubmittingCancel;
-
-    protected override void OnInitialized()
+    private IEnumerable<int> VisiblePages
     {
-        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        get
+        {
+            if (_transfers is null)
+            {
+                yield return 1;
+                yield break;
+            }
 
-        sellEditContext = new EditContext(sellModel);
-        sellEditContext.OnValidationRequested += OnSellValidationRequested;
-        sellValidationMessages = new ValidationMessageStore(sellEditContext);
-
-        swapEditContext = new EditContext(swapModel);
-        swapEditContext.OnValidationRequested += OnSwapValidationRequested;
-        swapValidationMessages = new ValidationMessageStore(swapEditContext);
-
-        moveEditContext = new EditContext(moveModel);
-        adjustEditContext = new EditContext(adjustModel);
-        cancelEditContext = new EditContext(cancelModel);
+            var start = Math.Max(1, _currentPage - 2);
+            var end = Math.Min(_transfers.TotalPages, _currentPage + 2);
+            for (var page = start; page <= end; page++)
+            {
+                yield return page;
+            }
+        }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender)
-        {
-            return;
-        }
+        _filterContext = new EditContext(_filter);
+        _filterContext.OnFieldChanged += (_, __) => InvokeAsync(StateHasChanged);
 
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
         await AdminAuth.EnsureInitializedAsync();
-        authInitialized = true;
 
         if (AdminAuth.IsAuthenticated)
         {
-            await LoadDataAsync();
+            await LoadInitialDataAsync();
         }
-        else
-        {
-            isLoadingData = false;
-        }
-
-        StateHasChanged();
     }
 
-    private void SelectTab(string tab)
+    private async Task LoadInitialDataAsync()
     {
-        selectedTab = tab;
-        ClearMessages();
+        await LoadTeamsAsync();
+        await LoadAsync();
     }
 
-    private async Task LoadDataAsync()
+    private async Task LoadTeamsAsync()
     {
-        isLoadingData = true;
-        pageError = null;
-
         try
         {
-            var rosters = await TeamsApiClient.GetRostersAsync();
-
-            teams.Clear();
-            teamsById.Clear();
-            playersById.Clear();
-            foreach (var roster in rosters.OrderBy(t => t.TeamName))
-            {
-                var teamInfo = new TeamRosterInfo(roster.TeamId, roster.TeamName, roster.OwnerName);
-                foreach (var player in roster.Jogadores.OrderBy(p => p.Nome))
-                {
-                    var playerInfo = new PlayerInfo(player.PlayerGuid, roster.TeamId, roster.TeamName, player.Nome, player.Posicao, player.Overall);
-                    teamInfo.Players.Add(playerInfo);
-                    playersById[player.PlayerGuid] = playerInfo;
-                }
-
-                teams.Add(teamInfo);
-                teamsById[roster.TeamId] = teamInfo;
-            }
-
-            var items = await MarketApiClient.GetActiveItemsAsync();
-            marketItems.Clear();
-            marketItems.AddRange(items.OrderBy(i => i.PlayerName));
-
-            teamBudgets.Clear();
-
-            RefreshSellPlayers();
-            RefreshSwapPlayers();
-            EnsureMoveSelection();
-            EnsureCancelSelection();
+            var result = await TeamsApiClient.GetAsync(null, 1, 100, CancellationToken.None).ConfigureAwait(false);
+            _teams = result.Items
+                .OrderBy(t => t.TeamName, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
         }
         catch (Exception ex)
         {
-            pageError = ex.Message;
+            _teams = Array.Empty<TeamListItemDto>();
+            Console.Error.WriteLine(ex);
+            Toasts.ShowError("Não foi possível carregar a lista de times.");
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        await LoadAsync(1);
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _filter.TeamId = null;
+        _filter.StartDate = null;
+        _filter.EndDate = null;
+        _filter.Query = null;
+        _filter.PageSize = 20;
+        _selectedPlayer = null;
+        _playerSearch = null;
+        _playerSuggestions.Clear();
+
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int page = 1)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return;
+        }
+
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+
+        _isLoading = true;
+        _error = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var request = new TransferHistoryQueryRequest
+            {
+                TeamId = _filter.TeamId,
+                PlayerId = _selectedPlayer?.PlayerId,
+                DateFromUtc = _filter.StartDate.HasValue ? BrazilTime.ConvertToUtc(_filter.StartDate.Value) : null,
+                DateToUtc = _filter.EndDate.HasValue ? BrazilTime.ConvertToUtc(_filter.EndDate.Value.AddDays(1).AddTicks(-1)) : null,
+                Query = _filter.Query,
+                Page = page,
+                PageSize = Math.Clamp(_filter.PageSize, 5, 100)
+            };
+
+            _transfers = await TransfersClient.QueryAsync(request, _loadCts.Token).ConfigureAwait(false);
+            _currentPage = _transfers.Page;
+        }
+        catch (OperationCanceledException)
+        {
+            // ignorado
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _error = "Não foi possível carregar o histórico de transferências.";
+            Toasts.ShowError(_error);
+            Console.Error.WriteLine(ex);
         }
         finally
         {
-            isLoadingData = false;
-        }
-    }
-
-    private void RefreshSellPlayers()
-    {
-        sellPlayerOptions.Clear();
-
-        if (sellModel.FromTeamId == Guid.Empty || !teamsById.TryGetValue(sellModel.FromTeamId, out var team))
-        {
-            sellModel.SelectedPlayerIds.Clear();
-            ValidateSellSelection();
-            return;
-        }
-
-        foreach (var player in team.Players)
-        {
-            var option = new SelectablePlayer(player.PlayerId, player.Name, player.Position, player.Overall)
-            {
-                IsSelected = sellModel.SelectedPlayerIds.Contains(player.PlayerId)
-            };
-            sellPlayerOptions.Add(option);
-        }
-
-        ValidateSellSelection();
-    }
-
-    private void RefreshSwapPlayers()
-    {
-        swapTeamAOptions.Clear();
-        swapTeamBOptions.Clear();
-
-        if (swapModel.TeamAId != Guid.Empty && teamsById.TryGetValue(swapModel.TeamAId, out var teamA))
-        {
-            foreach (var player in teamA.Players)
-            {
-                var option = new SelectablePlayer(player.PlayerId, player.Name, player.Position, player.Overall)
-                {
-                    IsSelected = swapModel.PlayersFromA.Contains(player.PlayerId)
-                };
-                swapTeamAOptions.Add(option);
-            }
-        }
-        else
-        {
-            swapModel.PlayersFromA.Clear();
-        }
-
-        if (swapModel.TeamBId != Guid.Empty && teamsById.TryGetValue(swapModel.TeamBId, out var teamB))
-        {
-            foreach (var player in teamB.Players)
-            {
-                var option = new SelectablePlayer(player.PlayerId, player.Name, player.Position, player.Overall)
-                {
-                    IsSelected = swapModel.PlayersFromB.Contains(player.PlayerId)
-                };
-                swapTeamBOptions.Add(option);
-            }
-        }
-        else
-        {
-            swapModel.PlayersFromB.Clear();
-        }
-
-        ValidateSwapSelection();
-    }
-
-    private void EnsureMoveSelection()
-    {
-        if (teams.Count == 0)
-        {
-            moveModel.FromTeamId = Guid.Empty;
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-            return;
-        }
-
-        if (moveModel.FromTeamId != Guid.Empty && !teamsById.ContainsKey(moveModel.FromTeamId))
-        {
-            moveModel.FromTeamId = Guid.Empty;
-        }
-
-        if (moveModel.FromTeamId == Guid.Empty)
-        {
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-            return;
-        }
-
-        if (moveModel.PlayerId != Guid.Empty
-            && (!playersById.TryGetValue(moveModel.PlayerId, out var player)
-                || player.TeamId != moveModel.FromTeamId))
-        {
-            moveModel.PlayerId = Guid.Empty;
-        }
-
-        if (moveModel.ToTeamId == moveModel.FromTeamId)
-        {
-            moveModel.ToTeamId = Guid.Empty;
-        }
-    }
-
-    private void EnsureCancelSelection()
-    {
-        if (cancelModel.MarketItemId != Guid.Empty && marketItems.All(i => i.ItemId != cancelModel.MarketItemId))
-        {
-            cancelModel.MarketItemId = Guid.Empty;
-        }
-    }
-
-    private void OnSellFromTeamChanged()
-    {
-        if (sellModel.ToTeamId == sellModel.FromTeamId)
-        {
-            sellModel.ToTeamId = Guid.Empty;
-        }
-
-        RefreshSellPlayers();
-        StateHasChanged();
-    }
-
-    private void OnSellToTeamChanged()
-    {
-        if (sellModel.ToTeamId == sellModel.FromTeamId)
-        {
-            sellModel.ToTeamId = Guid.Empty;
-        }
-    }
-
-    private void OnSellPlayersChanged()
-    {
-        ValidateSellSelection();
-    }
-
-    private void OnSwapTeamAChanged()
-    {
-        if (swapModel.TeamAId == swapModel.TeamBId)
-        {
-            swapModel.TeamBId = Guid.Empty;
-        }
-
-        RefreshSwapPlayers();
-        _ = EnsureBudgetAsync(swapModel.TeamAId);
-        StateHasChanged();
-    }
-
-    private void OnSwapTeamBChanged()
-    {
-        if (swapModel.TeamBId == swapModel.TeamAId)
-        {
-            swapModel.TeamBId = Guid.Empty;
-        }
-
-        RefreshSwapPlayers();
-        _ = EnsureBudgetAsync(swapModel.TeamBId);
-        StateHasChanged();
-    }
-
-    private void OnSwapPlayersChanged()
-    {
-        ValidateSwapSelection();
-    }
-
-    private void OnSwapCashAdjustChanged()
-    {
-        StateHasChanged();
-    }
-
-    private void OnMoveFromTeamChanged()
-    {
-        if (moveModel.FromTeamId == Guid.Empty)
-        {
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-            return;
-        }
-
-        if (!teamsById.ContainsKey(moveModel.FromTeamId))
-        {
-            moveModel.FromTeamId = Guid.Empty;
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-            return;
-        }
-
-        if (moveModel.PlayerId != Guid.Empty
-            && (!playersById.TryGetValue(moveModel.PlayerId, out var player)
-                || player.TeamId != moveModel.FromTeamId))
-        {
-            moveModel.PlayerId = Guid.Empty;
-        }
-
-        if (moveModel.ToTeamId == moveModel.FromTeamId)
-        {
-            moveModel.ToTeamId = Guid.Empty;
-        }
-    }
-
-    private void OnMovePlayerChanged()
-    {
-        if (moveModel.PlayerId == Guid.Empty)
-        {
-            return;
-        }
-
-        if (playersById.TryGetValue(moveModel.PlayerId, out var player))
-        {
-            moveModel.FromTeamId = player.TeamId;
-
-            if (moveModel.ToTeamId == moveModel.FromTeamId)
-            {
-                moveModel.ToTeamId = Guid.Empty;
-            }
-        }
-        else
-        {
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-        }
-    }
-
-    private void OnBudgetTeamChanged()
-    {
-        _ = EnsureBudgetAsync(adjustModel.TeamId);
-        StateHasChanged();
-    }
-
-    private async Task EnsureBudgetAsync(Guid teamId)
-    {
-        if (teamId == Guid.Empty || teamBudgets.ContainsKey(teamId))
-        {
-            return;
-        }
-
-        try
-        {
-            var summary = await BudgetsApiClient.GetSummaryAsync(teamId);
-            if (summary is not null)
-            {
-                teamBudgets[teamId] = summary.Saldo;
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch (Exception ex)
-        {
-            pageError = ex.Message;
+            _isLoading = false;
             await InvokeAsync(StateHasChanged);
         }
     }
 
-    private void OnSellValidationRequested(object? sender, ValidationRequestedEventArgs args)
-        => ValidateSellSelection();
-
-    private void ValidateSellSelection()
+    private IEnumerable<TransferListItemDto> GetSortedItems()
     {
-        sellModel.SelectedPlayerIds = sellPlayerOptions.Where(p => p.IsSelected).Select(p => p.PlayerId).ToList();
-
-        if (sellValidationMessages is null || sellEditContext is null)
+        if (_transfers is null)
         {
-            return;
+            return Array.Empty<TransferListItemDto>();
         }
 
-        var field = new FieldIdentifier(sellModel, nameof(SellFormModel.SelectedPlayerIds));
-        sellValidationMessages.Clear(field);
-
-        if (sellModel.SelectedPlayerIds.Count == 0)
+        var items = _transfers.Items.AsEnumerable();
+        return (_sortColumn, _sortDescending) switch
         {
-            sellValidationMessages.Add(field, "Selecione ao menos um jogador.");
-        }
-
-        sellEditContext.NotifyValidationStateChanged();
+            (nameof(TransferSort.Player), true) => items.OrderByDescending(i => i.PlayerName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.Player), false) => items.OrderBy(i => i.PlayerName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.FromTeam), true) => items.OrderByDescending(i => i.FromTeamName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.FromTeam), false) => items.OrderBy(i => i.FromTeamName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.ToTeam), true) => items.OrderByDescending(i => i.ToTeamName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.ToTeam), false) => items.OrderBy(i => i.ToTeamName, StringComparer.CurrentCultureIgnoreCase),
+            (nameof(TransferSort.Amount), true) => items.OrderByDescending(i => i.Amount),
+            (nameof(TransferSort.Amount), false) => items.OrderBy(i => i.Amount),
+            _ when _sortDescending => items.OrderByDescending(i => i.OccurredAtUtc),
+            _ => items.OrderBy(i => i.OccurredAtUtc)
+        };
     }
 
-    private void OnSwapValidationRequested(object? sender, ValidationRequestedEventArgs args)
-        => ValidateSwapSelection();
-
-    private void ValidateSwapSelection()
+    private void ChangeSort(string column)
     {
-        swapModel.PlayersFromA = swapTeamAOptions.Where(p => p.IsSelected).Select(p => p.PlayerId).ToList();
-        swapModel.PlayersFromB = swapTeamBOptions.Where(p => p.IsSelected).Select(p => p.PlayerId).ToList();
-
-        if (swapValidationMessages is null || swapEditContext is null)
+        if (_sortColumn == column)
         {
-            return;
+            _sortDescending = !_sortDescending;
         }
-
-        var fieldA = new FieldIdentifier(swapModel, nameof(SwapFormModel.PlayersFromA));
-        var fieldB = new FieldIdentifier(swapModel, nameof(SwapFormModel.PlayersFromB));
-        swapValidationMessages.Clear(fieldA);
-        swapValidationMessages.Clear(fieldB);
-
-        if (swapModel.TeamAId == Guid.Empty && swapModel.TeamBId == Guid.Empty)
+        else
         {
-            swapEditContext.NotifyValidationStateChanged();
-            return;
+            _sortColumn = column;
+            _sortDescending = column == nameof(TransferSort.Date);
         }
-
-        if (swapModel.PlayersFromA.Count == 0 && swapModel.PlayersFromB.Count == 0)
-        {
-            swapValidationMessages.Add(fieldA, "Selecione ao menos um jogador.");
-            swapValidationMessages.Add(fieldB, "Selecione ao menos um jogador.");
-        }
-
-        swapEditContext.NotifyValidationStateChanged();
     }
 
-    private async Task SubmitSellAsync()
+    private string SortIcon(string column)
     {
-        if (sellModel.FromTeamId == sellModel.ToTeamId)
+        if (_sortColumn != column)
         {
-            sellErrorMessage = "Escolha times diferentes para a venda.";
+            return string.Empty;
+        }
+
+        return _sortDescending ? "▼" : "▲";
+    }
+
+    private async Task OnPlayerSearchChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        {
+            _playerSuggestions.Clear();
+            _selectedPlayer = null;
             return;
         }
 
-        isSubmittingSell = true;
-        sellErrorMessage = null;
-        sellSuccessMessage = null;
+        _playerSearchCts?.Cancel();
+        _playerSearchCts?.Dispose();
+        _playerSearchCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         try
         {
-            var reason = string.IsNullOrWhiteSpace(sellModel.Reason)
-                ? null
-                : sellModel.Reason.Trim();
-            var request = new AdminSellPlayersRequestDto(
-                sellModel.FromTeamId,
-                sellModel.ToTeamId,
-                sellModel.SelectedPlayerIds.ToArray(),
-                sellModel.Amount,
-                reason);
-
-            var message = await AdminTransfersApiClient.SellAsync(request);
-            sellSuccessMessage = message;
-
-            teamBudgets.Remove(sellModel.FromTeamId);
-            teamBudgets.Remove(sellModel.ToTeamId);
-
-            sellModel.SelectedPlayerIds.Clear();
-            foreach (var option in sellPlayerOptions)
-            {
-                option.IsSelected = false;
-            }
-
-            sellModel.Amount = 0m;
-            sellModel.Reason = null;
-
-            await LoadDataAsync();
+            var result = await PlayersApiClient.GetAsync(value.Trim(), null, false, null, null, null, null, 1, 10, _playerSearchCts.Token).ConfigureAwait(false);
+            _playerSuggestions.Clear();
+            _playerSuggestions.AddRange(result.Items.Select(p => new PlayerSuggestion(p.PlayerId, p.Name, p.Position, p.Overall)));
+        }
+        catch (OperationCanceledException)
+        {
+            // ignorado
         }
         catch (Exception ex)
         {
-            sellErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSubmittingSell = false;
+            Console.Error.WriteLine(ex);
+            Toasts.ShowError("Falha ao buscar jogadores.");
         }
     }
 
-    private async Task SubmitSwapAsync()
+    private void SelectPlayer(PlayerSuggestion suggestion)
     {
-        if (swapModel.TeamAId == swapModel.TeamBId)
-        {
-            swapErrorMessage = "Selecione times diferentes para a troca.";
-            return;
-        }
-
-        isSubmittingSwap = true;
-        swapErrorMessage = null;
-        swapSuccessMessage = null;
-
-        try
-        {
-            var reason = string.IsNullOrWhiteSpace(swapModel.Reason)
-                ? null
-                : swapModel.Reason.Trim();
-            var previousTeamA = swapModel.TeamAId;
-            var previousTeamB = swapModel.TeamBId;
-            var request = new AdminSwapPlayersRequestDto(
-                previousTeamA,
-                swapModel.PlayersFromA.ToArray(),
-                previousTeamB,
-                swapModel.PlayersFromB.ToArray(),
-                swapModel.CashAdjustFromAToB,
-                reason);
-
-            var message = await AdminTransfersApiClient.SwapAsync(request);
-            swapSuccessMessage = message;
-
-            teamBudgets.Remove(previousTeamA);
-            teamBudgets.Remove(previousTeamB);
-
-            swapModel.PlayersFromA.Clear();
-            swapModel.PlayersFromB.Clear();
-            foreach (var option in swapTeamAOptions)
-            {
-                option.IsSelected = false;
-            }
-            foreach (var option in swapTeamBOptions)
-            {
-                option.IsSelected = false;
-            }
-
-            swapModel.CashAdjustFromAToB = 0m;
-            swapModel.Reason = null;
-            swapModel.TeamAId = Guid.Empty;
-            swapModel.TeamBId = Guid.Empty;
-            swapTeamAOptions.Clear();
-            swapTeamBOptions.Clear();
-            swapValidationMessages?.Clear();
-            swapEditContext?.NotifyValidationStateChanged();
-
-            await LoadDataAsync();
-        }
-        catch (Exception ex)
-        {
-            swapErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSubmittingSwap = false;
-        }
+        _selectedPlayer = suggestion;
+        _playerSearch = suggestion.Name;
+        _playerSuggestions.Clear();
     }
 
-    private async Task SubmitMoveAsync()
+    private void ClearSelectedPlayer()
     {
-        if (moveModel.FromTeamId == Guid.Empty)
-        {
-            moveErrorMessage = "Selecione o time de origem.";
-            return;
-        }
-
-        var currentTeam = GetCurrentTeamForPlayer(moveModel.PlayerId);
-        if (currentTeam == Guid.Empty)
-        {
-            moveErrorMessage = "Jogador inválido.";
-            return;
-        }
-
-        if (currentTeam != moveModel.FromTeamId)
-        {
-            moveErrorMessage = "Selecione um jogador que pertença ao time de origem.";
-            return;
-        }
-
-        if (moveModel.ToTeamId == currentTeam)
-        {
-            moveErrorMessage = "Selecione um time diferente do atual.";
-            return;
-        }
-
-        isSubmittingMove = true;
-        moveErrorMessage = null;
-        moveSuccessMessage = null;
-
-        try
-        {
-            var reason = string.IsNullOrWhiteSpace(moveModel.Reason)
-                ? null
-                : moveModel.Reason.Trim();
-            var request = new AdminMovePlayerRequestDto(
-                moveModel.PlayerId,
-                moveModel.ToTeamId,
-                reason);
-
-            var message = await AdminTransfersApiClient.MoveAsync(request);
-            moveSuccessMessage = message;
-
-            teamBudgets.Remove(currentTeam);
-            teamBudgets.Remove(moveModel.ToTeamId);
-
-            moveModel.FromTeamId = Guid.Empty;
-            moveModel.PlayerId = Guid.Empty;
-            moveModel.ToTeamId = Guid.Empty;
-            moveModel.Reason = null;
-
-            await LoadDataAsync();
-        }
-        catch (Exception ex)
-        {
-            moveErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSubmittingMove = false;
-        }
-    }
-
-    private async Task SubmitAdjustBudgetAsync()
-    {
-        if (adjustModel.TeamId == Guid.Empty)
-        {
-            budgetErrorMessage = "Selecione um time.";
-            return;
-        }
-
-        isSubmittingBudget = true;
-        budgetErrorMessage = null;
-        budgetSuccessMessage = null;
-
-        try
-        {
-            var reason = string.IsNullOrWhiteSpace(adjustModel.Reason)
-                ? null
-                : adjustModel.Reason.Trim();
-            var request = new AdminAdjustBudgetRequestDto(adjustModel.TeamId, adjustModel.Delta, reason);
-            var message = await AdminTransfersApiClient.AdjustBudgetAsync(request);
-            budgetSuccessMessage = message;
-
-            teamBudgets.Remove(adjustModel.TeamId);
-            adjustModel.Delta = 0m;
-            adjustModel.Reason = null;
-
-            await LoadDataAsync();
-        }
-        catch (Exception ex)
-        {
-            budgetErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSubmittingBudget = false;
-        }
-    }
-
-    private IEnumerable<TeamRosterInfo> GetDestinationTeams(Guid excludeTeamId)
-        => excludeTeamId == Guid.Empty ? teams : teams.Where(t => t.TeamId != excludeTeamId);
-
-    private IReadOnlyList<PlayerInfo> GetPlayersForTeam(Guid teamId)
-        => teamId != Guid.Empty && teamsById.TryGetValue(teamId, out var team)
-            ? team.Players
-            : Array.Empty<PlayerInfo>();
-
-    private Guid GetCurrentTeamForPlayer(Guid playerId)
-        => playersById.TryGetValue(playerId, out var player)
-            ? player.TeamId
-            : Guid.Empty;
-
-    private string GetTeamName(Guid teamId)
-        => teamsById.TryGetValue(teamId, out var team) ? team.TeamName : "Time";
-
-    private IReadOnlyList<SwapPreviewItem> GetSwapPreview(Guid teamId, IReadOnlyList<Guid> outgoing, IReadOnlyList<Guid> incoming)
-    {
-        if (!teamsById.TryGetValue(teamId, out var team))
-        {
-            return Array.Empty<SwapPreviewItem>();
-        }
-
-        var preview = new List<SwapPreviewItem>();
-
-        foreach (var playerId in outgoing)
-        {
-            if (playersById.TryGetValue(playerId, out var player) && player.TeamId == teamId)
-            {
-                preview.Add(new SwapPreviewItem(
-                    player.PlayerId,
-                    player.Name,
-                    player.Position,
-                    player.Overall,
-                    "Sai"
-                ));
-            }
-        }
-
-        foreach (var incomingId in incoming)
-        {
-            if (playersById.TryGetValue(incomingId, out var incomingPlayer) && incomingPlayer.TeamId != teamId)
-            {
-                preview.Add(new SwapPreviewItem(
-                    incomingPlayer.PlayerId,
-                    incomingPlayer.Name,
-                    incomingPlayer.Position,
-                    incomingPlayer.Overall,
-                    "Chega"
-                ));
-            }
-        }
-
-        return preview
-            .OrderBy(p => p.Name)
-            .ToList();
-    }
-
-    private string GetTeamNameOf(IReadOnlyList<Guid> incomingIds, Guid currentTeamId)
-    {
-        foreach (var id in incomingIds)
-        {
-            if (playersById.TryGetValue(id, out var p) && p.TeamId != currentTeamId)
-            {
-                return p.TeamName;
-            }
-        }
-        return "outro time";
-    }
-
-    private bool TryGetBudgetPreview(Guid teamId, decimal cashAdjust, bool isTeamA, out decimal current, out decimal preview)
-    {
-        current = 0m;
-        preview = 0m;
-
-        if (!teamBudgets.TryGetValue(teamId, out var saldo))
-        {
-            return false;
-        }
-
-        current = saldo;
-        preview = isTeamA ? saldo - cashAdjust : saldo + cashAdjust;
-        return true;
-    }
-
-    private string FormatCurrency(decimal value)
-        => value.ToString("C", currencyCulture);
-
-    private void ClearMessages()
-    {
-        sellSuccessMessage = null;
-        sellErrorMessage = null;
-        swapSuccessMessage = null;
-        swapErrorMessage = null;
-        moveSuccessMessage = null;
-        moveErrorMessage = null;
-        budgetSuccessMessage = null;
-        budgetErrorMessage = null;
-        cancelSuccessMessage = null;
-        cancelErrorMessage = null;
+        _selectedPlayer = null;
+        _playerSearch = null;
+        _playerSuggestions.Clear();
     }
 
     private void OnAuthenticationChanged()
     {
-        if (!authInitialized)
+        InvokeAsync(async () =>
         {
-            return;
-        }
-
-        _ = InvokeAsync(async () =>
-        {
-            if (AdminAuth.IsAuthenticated)
+            if (!AdminAuth.IsAuthenticated)
             {
-                await LoadDataAsync();
+                _transfers = null;
+                _error = null;
+                CancelPendingRequests();
             }
             else
             {
-                isLoadingData = false;
-                teams.Clear();
-                teamsById.Clear();
-                playersById.Clear();
-                marketItems.Clear();
-                teamBudgets.Clear();
-                ClearMessages();
+                await LoadInitialDataAsync();
             }
-
-            StateHasChanged();
         });
+    }
+
+    private void CancelPendingRequests()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
+
+        _playerSearchCts?.Cancel();
+        _playerSearchCts?.Dispose();
+        _playerSearchCts = null;
     }
 
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
-
-        if (sellEditContext is not null)
-        {
-            sellEditContext.OnValidationRequested -= OnSellValidationRequested;
-        }
-
-        if (swapEditContext is not null)
-        {
-            swapEditContext.OnValidationRequested -= OnSwapValidationRequested;
-        }
+        CancelPendingRequests();
     }
 
-    private sealed class TeamRosterInfo
+    private enum TransferSort
     {
-        public TeamRosterInfo(Guid teamId, string teamName, string? ownerName)
-        {
-            TeamId = teamId;
-            TeamName = teamName;
-            OwnerName = ownerName;
-        }
-
-        public Guid TeamId { get; }
-        public string TeamName { get; }
-        public string? OwnerName { get; }
-        public List<PlayerInfo> Players { get; } = new();
+        Date,
+        Player,
+        FromTeam,
+        ToTeam,
+        Amount
     }
 
-    private sealed class PlayerInfo
+    private sealed class PlayerSuggestion
     {
-        public PlayerInfo(Guid playerId, Guid teamId, string teamName, string name, string position, int overall)
-        {
-            PlayerId = playerId;
-            TeamId = teamId;
-            TeamName = teamName;
-            Name = name;
-            Position = position;
-            Overall = overall;
-        }
-
-        public Guid PlayerId { get; }
-        public Guid TeamId { get; }
-        public string TeamName { get; }
-        public string Name { get; }
-        public string Position { get; }
-        public int Overall { get; }
-    }
-
-    private sealed class SelectablePlayer
-    {
-        public SelectablePlayer(Guid playerId, string name, string position, int overall)
+        public PlayerSuggestion(int playerId, string name, string position, int overall)
         {
             PlayerId = playerId;
             Name = name;
@@ -1287,127 +486,33 @@ else
             Overall = overall;
         }
 
-        public Guid PlayerId { get; }
+        public int PlayerId { get; }
         public string Name { get; }
         public string Position { get; }
         public int Overall { get; }
-        public bool IsSelected { get; set; }
     }
 
-    private sealed class SwapPreviewItem
+    private sealed class TransferHistoryFilterModel : IValidatableObject
     {
-        public SwapPreviewItem(Guid playerId, string name, string position, int overall, string badge)
-        {
-            PlayerId = playerId;
-            Name = name;
-            Position = position;
-            Overall = overall;
-            Badge = badge;
-        }
+        public Guid? TeamId { get; set; }
 
-        public Guid PlayerId { get; }
-        public string Name { get; }
-        public string Position { get; }
-        public int Overall { get; }
-        public string Badge { get; }
-    }
+        public DateTime? StartDate { get; set; }
 
-    private sealed class SellFormModel : IValidatableObject
-    {
-        [Required(ErrorMessage = "Time vendedor é obrigatório.")]
-        public Guid FromTeamId { get; set; }
+        public DateTime? EndDate { get; set; }
 
-        [Required(ErrorMessage = "Time comprador é obrigatório.")]
-        public Guid ToTeamId { get; set; }
+        public string? Query { get; set; }
 
-        [Range(typeof(decimal), "0", "79228162514264337593543950335", ErrorMessage = "O valor não pode ser negativo.")]
-        public decimal Amount { get; set; }
-
-        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
-        public string? Reason { get; set; }
-
-        public List<Guid> SelectedPlayerIds { get; set; } = new();
+        [Range(5, 100, ErrorMessage = "Informe um valor entre 5 e 100.")]
+        public int PageSize { get; set; } = 20;
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (FromTeamId != Guid.Empty && FromTeamId == ToTeamId)
+            if (StartDate.HasValue && EndDate.HasValue && StartDate > EndDate)
             {
-                yield return new ValidationResult("Selecione times diferentes.", new[] { nameof(ToTeamId) });
+                yield return new ValidationResult(
+                    "A data inicial deve ser anterior à data final.",
+                    new[] { nameof(StartDate), nameof(EndDate) });
             }
         }
-    }
-
-    private sealed class SwapFormModel : IValidatableObject
-    {
-        [Required(ErrorMessage = "Selecione o Time A.")]
-        public Guid TeamAId { get; set; }
-
-        [Required(ErrorMessage = "Selecione o Time B.")]
-        public Guid TeamBId { get; set; }
-
-        [Range(typeof(decimal), "0", "79228162514264337593543950335", ErrorMessage = "O ajuste não pode ser negativo.")]
-        public decimal CashAdjustFromAToB { get; set; }
-
-        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
-        public string? Reason { get; set; }
-
-        public List<Guid> PlayersFromA { get; set; } = new();
-        public List<Guid> PlayersFromB { get; set; } = new();
-
-        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-        {
-            if (TeamAId != Guid.Empty && TeamAId == TeamBId)
-            {
-                yield return new ValidationResult("Selecione times diferentes.", new[] { nameof(TeamBId) });
-            }
-        }
-    }
-
-    private sealed class MoveFormModel
-    {
-        [Required(ErrorMessage = "Time de origem é obrigatório.")]
-        public Guid FromTeamId { get; set; }
-
-        [Required(ErrorMessage = "Jogador é obrigatório.")]
-        public Guid PlayerId { get; set; }
-
-        [Required(ErrorMessage = "Time de destino é obrigatório.")]
-        public Guid ToTeamId { get; set; }
-
-        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
-        public string? Reason { get; set; }
-    }
-
-    private sealed class AdjustBudgetFormModel : IValidatableObject
-    {
-        [Required(ErrorMessage = "Time é obrigatório.")]
-        public Guid TeamId { get; set; }
-
-        public decimal Delta { get; set; }
-
-        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
-        public string? Reason { get; set; }
-
-        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-        {
-            if (TeamId == Guid.Empty)
-            {
-                yield return new ValidationResult("Time é obrigatório.", new[] { nameof(TeamId) });
-            }
-
-            if (Delta == 0m)
-            {
-                yield return new ValidationResult("O ajuste deve ser diferente de zero.", new[] { nameof(Delta) });
-            }
-        }
-    }
-
-    private sealed class CancelMarketFormModel
-    {
-        [Required(ErrorMessage = "Selecione um item.")]
-        public Guid MarketItemId { get; set; }
-
-        [StringLength(200, ErrorMessage = "Motivo deve ter até 200 caracteres.")]
-        public string? Reason { get; set; }
     }
 }

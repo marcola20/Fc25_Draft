@@ -17,6 +17,7 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
         builder.Property(x => x.PerformedAtUtc).IsRequired();
 
         builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+        builder.HasIndex(x => x.PerformedAtUtc);
 
         builder.HasOne(x => x.Player)
             .WithMany()

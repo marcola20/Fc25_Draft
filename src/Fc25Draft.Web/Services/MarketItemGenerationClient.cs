@@ -9,9 +9,9 @@ namespace Fc25Draft.Web.Services;
 
 public interface IMarketItemGenerationClient
 {
-    Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct);
+    Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, GenerateItemsRequestDto request, CancellationToken ct);
 
-    Task<MarketItemGenerationResultDto> GenerateAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct);
+    Task<MarketItemGenerationResultDto> GenerateAsync(Guid cycleId, GenerateItemsRequestDto request, CancellationToken ct);
 
     Task<MarketItemGenerationDeleteResultDto> DeleteDraftsAsync(Guid cycleId, CancellationToken ct);
 }
@@ -31,18 +31,18 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         _clientFactory = clientFactory;
     }
 
-    public async Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct)
+    public async Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, GenerateItemsRequestDto request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
-        using var response = await client.PostAsJsonAsync($"api/admin/market/cycles/{cycleId}/items:preview", request, SerializerOptions, ct).ConfigureAwait(false);
+        using var response = await client.PostAsJsonAsync($"api/admin/market/cycles/{cycleId}/items/preview", request, SerializerOptions, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         return await ReadJsonAsync<MarketItemGenerationPreviewDto>(response, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Resposta inválida do servidor ao pré-visualizar a geração de itens.");
     }
 
-    public async Task<MarketItemGenerationResultDto> GenerateAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct)
+    public async Task<MarketItemGenerationResultDto> GenerateAsync(Guid cycleId, GenerateItemsRequestDto request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -50,7 +50,7 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         {
             var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
             using var response = await client.PostAsJsonAsync(
-                $"api/admin/market/cycles/{cycleId}/items:generate",
+                $"api/admin/market/cycles/{cycleId}/items/generate",
                 request, SerializerOptions, ct).ConfigureAwait(false);
 
             await EnsureSuccessAsync(response, ct).ConfigureAwait(false);

@@ -1,23 +1,23 @@
 namespace Fc25Draft.Core.DTOs;
 
 public record MarketItemGenerationFilters(
-    IReadOnlyCollection<int>? PlayerIds,
     IReadOnlyCollection<short>? PositionIds,
     int? MinOverall,
-    int? MaxOverall,
-    int? MinAge,
-    int? MaxAge);
+    int? MaxOverall);
 
-public record MarketItemLifecycleOptions(
-    DateTime? PublishAtUtc,
-    DateTime? ExpiresAtUtc,
-    int? DurationHours);
+public record MarketItemExpirationOptions(
+    bool AutoSpreadAcrossCycle,
+    TimeSpan? MinItemLifespan,
+    TimeSpan? MaxItemLifespan);
 
 public record MarketItemGenerationOptions(
-    int DesiredCount,
+    int? DesiredCount,
     int? Seed,
     MarketItemGenerationFilters Filters,
-    MarketItemLifecycleOptions LifecycleOptions);
+    int? MaxPerTeam,
+    bool ExcludeAlreadyListedInOpenCycles,
+    bool EnsureUniquePlayerPerCycle,
+    MarketItemExpirationOptions ExpirationOptions);
 
 public record MarketItemGenerationCandidate(
     int PlayerId,
@@ -43,14 +43,20 @@ public record MarketItemGenerationPreview(
     Guid CycleId,
     int RequestedCount,
     int EligibleCount,
+    int GeneratedCount,
+    int SkippedCount,
     int Seed,
+    DateTime? FirstExpiresAtUtc,
+    DateTime? LastExpiresAtUtc,
     IReadOnlyList<MarketItemGenerationItem> Items);
 
 public record MarketItemGenerationResult(
     Guid CycleId,
     int RequestedCount,
     int EligibleCount,
+    int GeneratedCount,
+    int SkippedCount,
     int Seed,
-    int CreatedCount,
-    int SkippedExistingCount,
+    DateTime? FirstExpiresAtUtc,
+    DateTime? LastExpiresAtUtc,
     IReadOnlyList<MarketItemGenerationItem> Items);

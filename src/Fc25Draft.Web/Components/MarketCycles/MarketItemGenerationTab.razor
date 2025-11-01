@@ -1,5 +1,6 @@
 @using System.Globalization
 @using System.Linq
+@using Microsoft.AspNetCore.Components.Forms
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using Fc25Draft.Core.Interfaces
@@ -11,7 +12,7 @@
 @if (Cycle is null)
 {
     <div class="alert alert-info" role="alert">
-        Selecione um ciclo em rascunho na aba de listagem para gerar itens automaticamente.
+        Selecione um ciclo em rascunho na aba de listagem para configurar a geração de itens.
     </div>
 }
 else
@@ -33,7 +34,7 @@ else
             @if (!IsDraftCycle)
             {
                 <div class="alert alert-warning" role="alert">
-                    Apenas ciclos em rascunho podem receber novos itens gerados automaticamente.
+                    Apenas ciclos em rascunho podem receber itens gerados automaticamente.
                 </div>
             }
 
@@ -44,9 +45,7 @@ else
 
             @if (_model is null || _editContext is null)
             {
-                <div class="alert alert-info" role="status">
-                    Preparando formulário de geração…
-                </div>
+                <div class="alert alert-info" role="status">Preparando formulário...</div>
             }
             else
             {
@@ -54,7 +53,7 @@ else
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
-                    <fieldset disabled="@(!IsDraftCycle || IsBusy || _model is null)">
+                    <fieldset disabled="@(!IsDraftCycle || IsBusy)">
                         <div class="row g-3">
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="generation-count">Quantidade desejada</label>
@@ -67,49 +66,31 @@ else
                                 <ValidationMessage For="@(() => _model!.Seed)" />
                             </div>
                             <div class="col-12 col-md-4">
-                                <label class="form-label" for="generation-duration">Duração (horas)</label>
-                                <InputNumber id="generation-duration" class="form-control" @bind-Value="_model!.Lifecycle.DurationHours" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.DurationHours)" />
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="generation-publish">Publicar em (horário local, opcional)</label>
-                                <input id="generation-publish"
-                                       class="form-control"
-                                       type="datetime-local"
-                                       @bind="_model!.Lifecycle.PublishAtLocal"
-                                       @bind:format="yyyy-MM-ddTHH:mm"
-                                       @bind:event="oninput" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.PublishAtLocal)" />
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="generation-expire">Expira em (horário local, opcional)</label>
-                                <input id="generation-expire"
-                                       class="form-control"
-                                       type="datetime-local"
-                                       @bind="_model!.Lifecycle.ExpiresAtLocal"
-                                       @bind:format="yyyy-MM-ddTHH:mm"
-                                       @bind:event="oninput" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.ExpiresAtLocal)" />
+                                <label class="form-label" for="generation-max-team">Máx. por time</label>
+                                <InputNumber id="generation-max-team" class="form-control" @bind-Value="_model!.MaxPerTeam" />
+                                <ValidationMessage For="@(() => _model!.MaxPerTeam)" />
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-ovr-min">Overall mínimo</label>
-                                <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.Filters.MinOverall" />
-                                <ValidationMessage For="@(() => _model!.Filters.MinOverall)" />
+                                <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.MinOverall" />
+                                <ValidationMessage For="@(() => _model!.MinOverall)" />
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-ovr-max">Overall máximo</label>
-                                <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.Filters.MaxOverall" />
-                                <ValidationMessage For="@(() => _model!.Filters.MaxOverall)" />
+                                <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.MaxOverall" />
+                                <ValidationMessage For="@(() => _model!.MaxOverall)" />
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="form-label" for="generation-age-min">Idade mínima</label>
-                                <InputNumber id="generation-age-min" class="form-control" @bind-Value="_model!.Filters.MinAge" />
-                                <ValidationMessage For="@(() => _model!.Filters.MinAge)" />
+                                <div class="form-check mt-4 pt-1">
+                                    <InputCheckbox id="generation-exclude" class="form-check-input" @bind-Value="_model!.ExcludeAlreadyListed" />
+                                    <label class="form-check-label" for="generation-exclude">Excluir já listados em ciclos ativos</label>
+                                </div>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="form-label" for="generation-age-max">Idade máxima</label>
-                                <InputNumber id="generation-age-max" class="form-control" @bind-Value="_model!.Filters.MaxAge" />
-                                <ValidationMessage For="@(() => _model!.Filters.MaxAge)" />
+                                <div class="form-check mt-4 pt-1">
+                                    <InputCheckbox id="generation-unique" class="form-check-input" @bind-Value="_model!.EnsureUniqueInCycle" />
+                                    <label class="form-check-label" for="generation-unique">Garantir único por ciclo</label>
+                                </div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label d-block">Posições</label>
@@ -119,7 +100,7 @@ else
                                 }
                                 else if (_positionOptions.Count == 0)
                                 {
-                                    <div class="form-text text-muted">Nenhuma posição disponível foi encontrada.</div>
+                                    <div class="form-text text-muted">Nenhuma posição encontrada.</div>
                                 }
                                 else
                                 {
@@ -139,14 +120,32 @@ else
                                     </div>
                                 }
                             </div>
+                            <div class="col-12">
+                                <label class="form-label">Modo de expiração</label>
+                                <div class="form-check">
+                                    <InputCheckbox id="generation-auto" class="form-check-input" @bind-Value="_model!.AutoSpreadExpirations" />
+                                    <label class="form-check-label" for="generation-auto">Distribuir automaticamente ao longo do ciclo</label>
+                                </div>
+                            </div>
+                            @if (!_model!.AutoSpreadExpirations)
+                            {
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label" for="generation-lifespan-min">Vida útil mínima (horas)</label>
+                                    <InputNumber id="generation-lifespan-min" class="form-control" @bind-Value="_model!.MinLifespanHours" />
+                                    <ValidationMessage For="@(() => _model!.MinLifespanHours)" />
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label" for="generation-lifespan-max">Vida útil máxima (horas)</label>
+                                    <InputNumber id="generation-lifespan-max" class="form-control" @bind-Value="_model!.MaxLifespanHours" />
+                                    <ValidationMessage For="@(() => _model!.MaxLifespanHours)" />
+                                </div>
+                            }
                         </div>
                     </fieldset>
 
                     @if (_showValidationSummary)
                     {
-                        <div class="alert alert-danger mt-3" role="alert">
-                            Corrija os campos destacados antes de continuar.
-                        </div>
+                        <div class="alert alert-danger mt-3" role="alert">Corrija os campos destacados antes de continuar.</div>
                     }
 
                     <div class="d-flex flex-wrap gap-2 mt-4">
@@ -176,11 +175,11 @@ else
                             @if (_isClearing)
                             {
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                <span>Limpando...</span>
+                                <span>Limpar itens</span>
                             }
                             else
                             {
-                                <span>Limpar rascunho</span>
+                                <span>Limpar itens</span>
                             }
                         </button>
                     </div>
@@ -201,19 +200,25 @@ else
                 </div>
                 <div class="modal-body">
                     <dl class="row small">
-                        <dt class="col-sm-3">Solicitados</dt>
-                        <dd class="col-sm-9">@_preview.RequestedCount</dd>
-                        <dt class="col-sm-3">Elegíveis</dt>
-                        <dd class="col-sm-9">@_preview.EligibleCount</dd>
-                        <dt class="col-sm-3">Semente utilizada</dt>
-                        <dd class="col-sm-9">@_preview.Seed</dd>
+                        <dt class="col-sm-4">Solicitados</dt>
+                        <dd class="col-sm-8">@_preview.RequestedCount</dd>
+                        <dt class="col-sm-4">Elegíveis</dt>
+                        <dd class="col-sm-8">@_preview.EligibleCount</dd>
+                        <dt class="col-sm-4">Gerados</dt>
+                        <dd class="col-sm-8">@_preview.GeneratedCount</dd>
+                        <dt class="col-sm-4">Ignorados</dt>
+                        <dd class="col-sm-8">@_preview.SkippedCount</dd>
+                        <dt class="col-sm-4">Primeira expiração</dt>
+                        <dd class="col-sm-8">@FormatDateTime(_preview.FirstExpiresAtUtc)</dd>
+                        <dt class="col-sm-4">Última expiração</dt>
+                        <dd class="col-sm-8">@FormatDateTime(_preview.LastExpiresAtUtc)</dd>
+                        <dt class="col-sm-4">Semente utilizada</dt>
+                        <dd class="col-sm-8">@_preview.Seed</dd>
                     </dl>
 
                     @if (_preview.Items.Count == 0)
                     {
-                        <div class="alert alert-info" role="alert">
-                            Nenhum jogador elegível foi encontrado com os filtros informados.
-                        </div>
+                        <div class="alert alert-info" role="alert">Nenhum jogador elegível foi encontrado com os filtros informados.</div>
                     }
                     else
                     {
@@ -259,7 +264,7 @@ else
                                     @for (var page = 1; page <= TotalPreviewPages; page++)
                                     {
                                         <li class="page-item @(page == _previewPage ? "active" : null)">
-                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@(page)</button>
+                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@page</button>
                                         </li>
                                     }
                                     <li class="page-item @(_previewPage >= TotalPreviewPages ? "disabled" : null)">
@@ -319,7 +324,7 @@ else
 
     private bool CanPreview => IsDraftCycle && !IsBusy && _model is not null && _editContext is not null;
 
-    private bool CanGenerate => IsDraftCycle && !IsBusy && _model is not null && _editContext is not null;
+    private bool CanGenerate => CanPreview;
 
     private bool CanClear => IsDraftCycle && !_isClearing && Cycle is not null;
 
@@ -406,7 +411,6 @@ else
         }
 
         _model = MarketItemGenerationFormModel.Create(cycleId.Value);
-        _model.Lifecycle.PublishAtLocal = BrazilTime.ConvertFromUtc(DateTime.UtcNow);
         ConfigureEditContext();
     }
 
@@ -444,7 +448,7 @@ else
     }
 
     private bool IsPositionSelected(short positionId)
-        => _model?.Filters.PositionIds.Contains(positionId) ?? false;
+        => _model?.PositionIds.Contains(positionId) ?? false;
 
     private void OnPositionToggled(short positionId, ChangeEventArgs args)
     {
@@ -454,7 +458,7 @@ else
         }
 
         var isChecked = args.Value is bool b && b;
-        var list = _model.Filters.PositionIds;
+        var list = _model.PositionIds;
 
         if (isChecked)
         {
@@ -468,7 +472,7 @@ else
             list.Remove(positionId);
         }
 
-        _editContext.NotifyFieldChanged(new FieldIdentifier(_model.Filters, nameof(_model.Filters.PositionIds)));
+        _editContext.NotifyFieldChanged(new FieldIdentifier(_model, nameof(_model.PositionIds)));
     }
 
     private async Task HandlePreviewAsync()
@@ -492,7 +496,6 @@ else
         }
         catch (OperationCanceledException)
         {
-            // ignorado
         }
         catch (HttpRequestException ex)
         {
@@ -526,7 +529,7 @@ else
 
         _showValidationSummary = false;
 
-        var confirmed = await ConfirmAsync($"Deseja gerar {_model.DesiredCount} itens para o ciclo '{Cycle.Name}'?").ConfigureAwait(false);
+        var confirmed = await ConfirmAsync($"Deseja gerar itens para o ciclo '{Cycle.Name}'?").ConfigureAwait(false);
         if (!confirmed)
         {
             return;
@@ -539,15 +542,23 @@ else
         {
             var request = _model.ToRequestDto();
             var result = await GenerationClient.GenerateAsync(Cycle.CycleId, request, token).ConfigureAwait(false);
-            var message = $"Gerados {result.CreatedCount} itens (solicitados {result.RequestedCount}).";
-            if (result.SkippedExistingCount > 0)
+            var message = $"Gerados {result.GeneratedCount} itens (solicitados {result.RequestedCount}).";
+            if (result.SkippedCount > 0)
             {
-                message += $" {result.SkippedExistingCount} itens existentes foram ignorados.";
+                message += $" {result.SkippedCount} itens foram ignorados.";
             }
 
             Toasts.ShowSuccess(message);
 
-            _preview = new MarketItemGenerationPreviewDto(result.RequestedCount, result.EligibleCount, result.Seed, result.Items);
+            _preview = new MarketItemGenerationPreviewDto(
+                result.RequestedCount,
+                result.EligibleCount,
+                result.GeneratedCount,
+                result.SkippedCount,
+                result.Seed,
+                result.FirstExpiresAtUtc,
+                result.LastExpiresAtUtc,
+                result.Items);
             _previewPage = 1;
             _showPreviewModal = true;
 
@@ -558,7 +569,6 @@ else
         }
         catch (OperationCanceledException)
         {
-            // ignorado
         }
         catch (HttpRequestException ex)
         {
@@ -612,7 +622,6 @@ else
         }
         catch (OperationCanceledException)
         {
-            // ignorado
         }
         catch (HttpRequestException ex)
         {
@@ -666,7 +675,6 @@ else
         }
         catch
         {
-            // ignorado
         }
         finally
         {
@@ -692,6 +700,9 @@ else
             return true;
         }
     }
+
+    private static string FormatDateTime(DateTime? value)
+        => value.HasValue ? BrazilTime.FormatDateTime(value.Value) : "–";
 
     private static string GetStatusLabel(MarketCycleStatus status) => status switch
     {

@@ -6,5 +6,7 @@ namespace Fc25Draft.Core.Interfaces;
 
 public interface ITransfersQueryService
 {
-    Task<PagedResult<TransferHistoryDto>> QueryHistoryAsync(TransfersFilter filter, CancellationToken ct);
+    Task<PagedResult<TransferListItemDto>> QueryHistoryAsync(TransfersFilter filter, CancellationToken ct);
+
+    Task<TransferListItemDto?> GetByIdAsync(Guid transferId, CancellationToken ct);
 }

@@ -34,6 +34,17 @@ public record TransferHistoryDto(
     string? Notes,
     string? PerformedBy);
 
+public class TransferListItemDto
+{
+    public Guid TransferId { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public string FromTeamName { get; set; } = string.Empty;
+    public string ToTeamName { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string? Notes { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+}
+
 public record RegisterTransferHistoryRequestDto(
     Guid? TransferId,
     int PlayerId,
