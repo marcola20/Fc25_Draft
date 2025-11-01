@@ -3,15 +3,20 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Models.MarketCycles;
+using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Fc25Draft.Web.Endpoints.Market;
 
 public static class MarketCycleEndpoints
 {
+    private const string IdempotencyKeyHeaderName = "Idempotency-Key";
+    private static readonly TimeSpan StatusUpdateIdempotencyTtl = TimeSpan.FromMinutes(2);
+
     public static RouteGroupBuilder MapMarketCycleEndpoints(this RouteGroupBuilder marketApi)
     {
         var cycles = marketApi.MapGroup("/cycles").RequireAuthorization("AdminOnly"); 
@@ -106,6 +111,9 @@ public static class MarketCycleEndpoints
         MarketCycleStatusUpdateRequest request,
         IMarketCycleAdminService service,
         IAuctionSettlementService settlementService,
+        IIdempotencyStore idempotencyStore,
+        HttpContext httpContext,
+        ILogger<MarketCycleEndpoints> logger,
         CancellationToken ct)
     {
         if (!TryValidate(request, out var validationError))
@@ -114,10 +122,18 @@ public static class MarketCycleEndpoints
         }
 
         var status = request.Status ?? MarketCycleStatus.Draft;
+        var idempotencyKey = ExtractIdempotencyKey(httpContext);
+
+        if (!string.IsNullOrEmpty(idempotencyKey) && !idempotencyStore.TryRegister(idempotencyKey, StatusUpdateIdempotencyTtl))
+        {
+            logger.LogInformation("Ignoring duplicate status update for cycle {CycleId} to {Status} with key {IdempotencyKey}", cycleId, status, idempotencyKey);
+            return TypedResults.Accepted();
+        }
 
         try
         {
             var updated = await service.UpdateStatusAsync(cycleId, status, request.ForceClose, ct).ConfigureAwait(false);
+            logger.LogInformation("Updated cycle {CycleId} to {Status} with key {IdempotencyKey}", cycleId, updated.Status, idempotencyKey);
             if (updated.Status == MarketCycleStatus.Closed)
             {
                 var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct).ConfigureAwait(false);
@@ -138,6 +154,17 @@ public static class MarketCycleEndpoints
         {
             return Results.Conflict(new { message = ex.Message });
         }
+    }
+
+    private static string? ExtractIdempotencyKey(HttpContext httpContext)
+    {
+        if (!httpContext.Request.Headers.TryGetValue(IdempotencyKeyHeaderName, out var values))
+        {
+            return null;
+        }
+
+        var key = values.ToString();
+        return string.IsNullOrWhiteSpace(key) ? null : key.Trim();
     }
 
     private static async Task<IResult> HandlePreviewAsync(

@@ -5,6 +5,7 @@ using Fc25Draft.Web.Extensions.DI;
 using Fc25Draft.Web.Extensions.Endpoints;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
+using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,8 @@ builder.Services
 
 builder.Services.AddAuthorization(o => o.AddPolicy("AdminOnly", p => p.RequireRole("Admin")));
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor(o => o.DetailedErrors = true); 
+builder.Services.AddServerSideBlazor(o => o.DetailedErrors = true);
+builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 
 var app = builder.Build();
 

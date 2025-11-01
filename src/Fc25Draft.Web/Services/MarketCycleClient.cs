@@ -110,6 +110,9 @@ public class MarketCycleClient
             Content = JsonContent.Create(request)
         };
 
+        var idempotencyKey = Guid.NewGuid().ToString("N");
+        httpRequest.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+
         using var response = await client.SendAsync(httpRequest, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 

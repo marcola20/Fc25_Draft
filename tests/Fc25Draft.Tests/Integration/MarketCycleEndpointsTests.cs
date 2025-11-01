@@ -220,6 +220,52 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         Assert.Equal(0m, team.BudgetBlocked);
     }
 
+    [Fact]
+    public async Task Patch_IgnoresDuplicateIdempotencyKey()
+    {
+        var factory = CreateIsolatedFactory();
+        var cycleId = await SeedDraftCycleAsync(factory);
+        var token = await SeedAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+
+        var request = new MarketCycleStatusUpdateRequest
+        {
+            Status = MarketCycleStatus.Active,
+            ForceClose = false
+        };
+
+        var idempotencyKey = Guid.NewGuid().ToString("N");
+
+        var firstMessage = new HttpRequestMessage(HttpMethod.Patch, $"/api/market/cycles/{cycleId:D}/status")
+        {
+            Content = JsonContent.Create(request)
+        };
+        firstMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.ToString());
+        firstMessage.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+
+        var firstResponse = await client.SendAsync(firstMessage);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        var dto = await firstResponse.Content.ReadFromJsonAsync<MarketCycleDto>();
+        Assert.NotNull(dto);
+        var firstUpdatedAt = dto!.UpdatedAtUtc;
+
+        var secondMessage = new HttpRequestMessage(HttpMethod.Patch, $"/api/market/cycles/{cycleId:D}/status")
+        {
+            Content = JsonContent.Create(request)
+        };
+        secondMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.ToString());
+        secondMessage.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+
+        var secondResponse = await client.SendAsync(secondMessage);
+        Assert.Equal(HttpStatusCode.Accepted, secondResponse.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        var persisted = await db.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Active, persisted.Status);
+        Assert.Equal(firstUpdatedAt, persisted.UpdatedAtUtc);
+    }
+
     private WebApplicationFactory<Program> CreateIsolatedFactory()
         => _factory.WithWebHostBuilder(builder =>
         {
@@ -263,6 +309,30 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         });
 
         await db.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> SeedDraftCycleAsync(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        db.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Rascunho",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now.AddHours(-1),
+            EndsAtUtc = now.AddHours(5),
+            CreatedAtUtc = now.AddHours(-2),
+            UpdatedAtUtc = now.AddHours(-2)
+        });
+
+        await db.SaveChangesAsync();
+        return cycleId;
     }
 
     private static async Task SeedMultipleCyclesAsync(WebApplicationFactory<Program> factory)

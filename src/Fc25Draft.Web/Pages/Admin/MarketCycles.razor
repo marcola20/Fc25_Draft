@@ -130,8 +130,28 @@ else
                             <td class="text-nowrap">@BrazilTime.FormatDateTime(item.UpdatedAtUtc)</td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-success" disabled="@(!CanActivate(item))" @onclick="async () => await ActivateCycleAsync(item)">Ativar ciclo</button>
-                                    <button type="button" class="btn btn-outline-danger" disabled="@(!CanClose(item))" @onclick="async () => await CloseCycleAsync(item)">Fechar ciclo</button>
+                                    <button type="button"
+                                            class="btn btn-outline-success"
+                                            disabled="@(!CanActivate(item))"
+                                            @onclick:preventDefault="true"
+                                            @onclick="async () => await ActivateCycleAsync(item)">
+                                        @if (IsUpdating(item.CycleId))
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                        }
+                                        <span>Ativar ciclo</span>
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-danger"
+                                            disabled="@(!CanClose(item))"
+                                            @onclick:preventDefault="true"
+                                            @onclick="async () => await CloseCycleAsync(item)">
+                                        @if (IsUpdating(item.CycleId))
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                        }
+                                        <span>Fechar ciclo</span>
+                                    </button>
                                     <button type="button" class="btn btn-outline-primary" @onclick="async () => await BeginEditAsync(item)">Editar</button>
                                     <button type="button" class="btn btn-outline-warning" disabled="@(item.Status != MarketCycleStatus.Draft)" @onclick="async () => await BeginGenerationAsync(item)">Gerar itens</button>
                                 </div>
@@ -408,9 +428,11 @@ else
         _ => "bg-secondary"
     };
 
-    private bool CanActivate(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Active && !_updatingStatus.Contains(cycle.CycleId);
+    private bool CanActivate(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Active && !IsUpdating(cycle.CycleId);
 
-    private bool CanClose(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Closed && !_updatingStatus.Contains(cycle.CycleId);
+    private bool CanClose(MarketCycleDto cycle) => cycle.Status != MarketCycleStatus.Closed && !IsUpdating(cycle.CycleId);
+
+    private bool IsUpdating(Guid cycleId) => _updatingStatus.Contains(cycleId);
 
     private async Task ActivateCycleAsync(MarketCycleDto cycle)
     {
@@ -431,6 +453,7 @@ else
         }
 
         _updatingStatus.Add(cycle.CycleId);
+        await InvokeAsync(StateHasChanged);
         try
         {
             await MarketCycleClient.UpdateStatusAsync(cycle.CycleId, status, forceClose);

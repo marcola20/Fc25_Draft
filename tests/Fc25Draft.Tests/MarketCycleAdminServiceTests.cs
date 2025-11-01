@@ -1,6 +1,7 @@
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fc25Draft.Tests;
@@ -107,6 +108,59 @@ public class MarketCycleAdminServiceTests
 
         var updatedItem = await context.MarketItems.AsNoTracking().SingleAsync(i => i.CycleId == cycleId);
         Assert.Equal(MarketItemStatus.Canceled, updatedItem.Status);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_IsMonotonicUnderConcurrentRequests()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<DraftDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var cycleId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using (var setupContext = new DraftDbContext(options))
+        {
+            await setupContext.Database.EnsureCreatedAsync();
+            setupContext.MarketCycles.Add(new MarketCycle
+            {
+                CycleId = cycleId,
+                Name = "Concorrente",
+                Status = MarketCycleStatus.Draft,
+                StartsAtUtc = now.AddHours(-1),
+                EndsAtUtc = now.AddHours(5),
+                CreatedAtUtc = now.AddHours(-2),
+                UpdatedAtUtc = now.AddHours(-2)
+            });
+
+            await setupContext.SaveChangesAsync();
+        }
+
+        var activateTask = Task.Run(async () =>
+        {
+            await using var ctx = new DraftDbContext(options);
+            var service = new MarketCycleAdminService(ctx);
+            await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Active, forceClose: false, CancellationToken.None);
+        });
+
+        var closeTask = Task.Run(async () =>
+        {
+            await using var ctx = new DraftDbContext(options);
+            var service = new MarketCycleAdminService(ctx);
+            await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Closed, forceClose: true, CancellationToken.None);
+        });
+
+        await Task.WhenAll(activateTask, closeTask);
+
+        await using (var verification = new DraftDbContext(options))
+        {
+            var cycle = await verification.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+            Assert.Equal(MarketCycleStatus.Closed, cycle.Status);
+        }
     }
 
     private static DraftDbContext CreateDbContext()
