@@ -74,7 +74,11 @@
                    SortOptions="@SortOptions"
                    StatusOptions="@StatusOptions" />
 
-    @if (!string.IsNullOrEmpty(_errorMessage))
+    @if (!string.IsNullOrEmpty(_cycleNotice))
+    {
+        <div class="alert alert-info mt-3" role="status">@_cycleNotice</div>
+    }
+    else if (!string.IsNullOrEmpty(_errorMessage))
     {
         <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
     }
@@ -294,6 +298,7 @@ else
     private bool _isLoading;
     private bool _initialized;
     private string? _errorMessage;
+    private string? _cycleNotice;
     private string? _realTimeWarning;
     private MarketTab _activeTab = MarketTab.Items;
     private bool _teamTokenConfigured;
@@ -431,6 +436,10 @@ else
         {
             _positionOptions.Clear();
         }
+        finally
+        {
+            StateHasChangedSafe();
+        }
     }
 
     private async Task LoadPageAsync(int page, CancellationToken ct)
@@ -438,6 +447,7 @@ else
         Query.Page = page < 1 ? 1 : page;
         _isLoading = true;
         _errorMessage = null;
+        _cycleNotice = null;
         StateHasChangedSafe();
 
         try
@@ -448,6 +458,14 @@ else
             var total = result?.Total ?? 0;
             PageData = new PagedResult<CoreItemVm>(items, total, Query.Page, Query.PageSize);
             ComputeServerOffsetFromClient();
+        }
+        catch (MarketCycleUnavailableException ex)
+        {
+            Logger.LogInformation("Market cycle unavailable: {Message}", ex.Message);
+            _cycleNotice = string.IsNullOrWhiteSpace(ex.Message)
+                ? "Este ciclo ainda não está ativo."
+                : ex.Message;
+            PageData = PagedResult<CoreItemVm>.Empty(Query.Page, Query.PageSize);
         }
         catch (OperationCanceledException)
         {

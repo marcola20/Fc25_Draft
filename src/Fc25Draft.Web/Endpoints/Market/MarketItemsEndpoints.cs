@@ -56,6 +56,9 @@ public static class MarketItemsEndpoints
             if (cycle is null)
                 return Results.NotFound(new { message = "Ciclo de mercado não encontrado." });
 
+            if (cycle.Status == MarketCycleStatus.Draft && request.CycleId.HasValue && request.CycleId.Value != Guid.Empty)
+                return Results.Conflict(new { message = "Este ciclo ainda não está ativo." });
+
             if (!request.TryBuildQuery(cycle.CycleId, out var query, out var errorResult))
                 return errorResult!;
 

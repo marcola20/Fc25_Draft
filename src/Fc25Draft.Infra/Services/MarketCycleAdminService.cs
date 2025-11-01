@@ -177,15 +177,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
 
             foreach (var item in items)
             {
-                if (item.ExpiresAtUtc <= now)
-                {
-                    item.Status = MarketItemStatus.Canceled;
-                    item.LastUpdateUtc = now;
-                    continue;
-                }
-
                 item.Status = MarketItemStatus.Active;
-                item.PublishedAtUtc = now;
+                item.PublishedAtUtc ??= now;
                 item.LastUpdateUtc = now;
             }
         }

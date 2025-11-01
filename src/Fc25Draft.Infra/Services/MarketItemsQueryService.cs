@@ -29,6 +29,7 @@ public class MarketItemsQueryService : IMarketItemsQueryService
         var itemsQuery = _dbContext.MarketItems
             .AsNoTracking()
             .Where(i => i.CycleId == query.CycleId)
+            .Where(i => i.Cycle.Status != MarketCycleStatus.Draft)
             .Include(i => i.Player)
                 .ThenInclude(p => p.Position)
             .Include(i => i.CurrentLeaderTeam)

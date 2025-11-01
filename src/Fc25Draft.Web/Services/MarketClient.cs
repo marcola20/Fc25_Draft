@@ -70,6 +70,13 @@ namespace Fc25Draft.Web.Services
             using var resp = await http.GetAsync(url, ct);
 
             var body = await resp.Content.ReadAsStringAsync(ct);
+            if (resp.StatusCode == HttpStatusCode.Conflict)
+            {
+                var message = ExtractSimpleMessage(body)
+                    ?? "Este ciclo ainda não está ativo.";
+                throw new MarketCycleUnavailableException(message, resp.StatusCode);
+            }
+
             if (!resp.IsSuccessStatusCode)
                 throw new HttpRequestException($"GET {url} -> {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
 
@@ -364,6 +371,42 @@ namespace Fc25Draft.Web.Services
             {
                 return body;
             }
+        }
+
+        private static string? ExtractSimpleMessage(string? body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    if (doc.RootElement.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+                    {
+                        return message.GetString();
+                    }
+
+                    if (doc.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                    {
+                        return detail.GetString();
+                    }
+
+                    if (doc.RootElement.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+                    {
+                        return title.GetString();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore parse errors and fall back to the raw body.
+            }
+
+            return body;
         }
 
         private static PagedResult<CoreItemVm> MapToViewModel(PagedResult<MarketItemListDto> source)

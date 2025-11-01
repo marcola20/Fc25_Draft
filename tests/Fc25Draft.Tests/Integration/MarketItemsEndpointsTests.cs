@@ -1,8 +1,11 @@
 using System;
 using System.Linq;
+using System.Net;
 using System.Net.Http.Json;
+using System.Threading;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -20,6 +23,45 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
     public MarketItemsEndpointsTests(MarketItemsEndpointsFactory factory)
     {
         _factory = factory;
+    }
+
+    [Fact]
+    public async Task GetItems_ReturnsConflict_WhenCycleIsDraft()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var cycleId = await SeedDraftCycleAsync(factory);
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/market/items?cycleId={cycleId:D}&page=1&pageSize=5");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var payload = await response.Content.ReadAsStringAsync();
+        Assert.Contains("ainda não está ativo", payload, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetItems_AfterActivation_DoesNotReturnCanceledStatus()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var cycleId = await SeedDraftCycleAsync(factory);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var adminService = scope.ServiceProvider.GetRequiredService<IMarketCycleAdminService>();
+            await adminService.UpdateStatusAsync(cycleId, MarketCycleStatus.Active, forceClose: false, CancellationToken.None);
+        }
+
+        var client = factory.CreateClient();
+        var response = await client.GetAsync($"/api/market/items?cycleId={cycleId:D}&page=1&pageSize=10");
+        response.EnsureSuccessStatusCode();
+
+        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var result = await response.Content.ReadFromJsonAsync<PagedResult<MarketItemListDto>>(options);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result!.Items);
+        Assert.All(result.Items, item => Assert.NotEqual(MarketItemStatus.Canceled, item.Status));
+        Assert.DoesNotContain(result.Items, item => string.Equals(item.StatusText, "Cancelado", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -151,6 +193,77 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
                 PublishedAtUtc = now,
                 CurrentLeaderAmount = null,
                 RowVersion = 1
+            });
+
+        await db.SaveChangesAsync();
+        return cycleId;
+    }
+
+    private static async Task<Guid> SeedDraftCycleAsync(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Positions.AnyAsync(p => p.PositionId == 60))
+        {
+            db.Positions.Add(new Position { PositionId = 60, Name = "Teste Draft" });
+        }
+
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        db.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Ciclo Rascunho",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now.AddHours(-1),
+            EndsAtUtc = now.AddDays(1),
+            CreatedAtUtc = now.AddHours(-2),
+            UpdatedAtUtc = now.AddHours(-2)
+        });
+
+        var players = new[]
+        {
+            new Player { PlayerId = 200, Name = "Jogador Draft 1", Overall = 82, PositionId = 60, PlayerGuid = Guid.NewGuid() },
+            new Player { PlayerId = 201, Name = "Jogador Draft 2", Overall = 79, PositionId = 60, PlayerGuid = Guid.NewGuid() }
+        };
+
+        foreach (var player in players)
+        {
+            if (!await db.Players.AnyAsync(p => p.PlayerId == player.PlayerId))
+            {
+                db.Players.Add(player);
+            }
+        }
+
+        db.MarketItems.AddRange(
+            new MarketItem
+            {
+                ItemId = Guid.NewGuid(),
+                CycleId = cycleId,
+                PlayerId = 200,
+                BasePrice = 250m,
+                BuyNowPrice = 800m,
+                MinIncrement = 25m,
+                ExpiresAtUtc = now.AddHours(5),
+                Status = MarketItemStatus.Draft,
+                CreatedAtUtc = now,
+                LastUpdateUtc = now
+            },
+            new MarketItem
+            {
+                ItemId = Guid.NewGuid(),
+                CycleId = cycleId,
+                PlayerId = 201,
+                BasePrice = 300m,
+                BuyNowPrice = 900m,
+                MinIncrement = 30m,
+                ExpiresAtUtc = now.AddHours(6),
+                Status = MarketItemStatus.Draft,
+                CreatedAtUtc = now,
+                LastUpdateUtc = now
             });
 
         await db.SaveChangesAsync();

@@ -71,6 +71,7 @@
                 <label class="form-label" for="@BidInputId">Valor do lance</label>
                 <div class="input-group input-group-sm">
                     <InputText @bind-Value="_model.AmountText"
+                               @bind-Value:event="oninput"
                                class="form-control me-2"
                                id="@BidInputId"
                                inputmode="decimal"
@@ -264,7 +265,7 @@
         }
 
         EnsureTimer();
-        EnsureBidValueInitialized();
+        ValidateAmount();
     }
 
     private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e)
@@ -278,32 +279,6 @@
         {
             ValidateAmount();
         }
-    }
-
-    private void EnsureBidValueInitialized()
-    {
-        var raw = _model.AmountText;
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            SetBidToMinimum();
-            return;
-        }
-
-        if (!TryParseAmount(raw, out var parsed) || parsed < Item.RequiredMinBid)
-        {
-            SetBidToMinimum();
-            return;
-        }
-
-        var formatted = FormatCurrency(parsed);
-        if (!string.Equals(raw, formatted, StringComparison.Ordinal))
-        {
-            _model.AmountText = formatted;
-            NotifyAmountChanged();
-            return;
-        }
-
-        ValidateAmount();
     }
 
     private void ValidateAmount()
@@ -351,8 +326,19 @@
             return false;
         }
 
+        var sanitized = input.Trim();
+
+        if (sanitized.StartsWith("R$", StringComparison.OrdinalIgnoreCase))
+        {
+            sanitized = sanitized[2..].TrimStart();
+        }
+
+        sanitized = sanitized
+            .Replace("\u00A0", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
+
         return decimal.TryParse(
-            input.Trim(),
+            sanitized,
             NumberStyles.Number | NumberStyles.AllowCurrencySymbol,
             CurrencyCulture,
             out amount);
@@ -383,7 +369,7 @@
     {
         if (!TryParseAmount(_model.AmountText, out var parsed) || parsed < Item.RequiredMinBid)
         {
-            SetBidToMinimum();
+            ValidateAmount();
             return;
         }
 
