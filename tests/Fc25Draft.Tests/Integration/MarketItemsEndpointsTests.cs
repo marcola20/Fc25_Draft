@@ -3,8 +3,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Threading;
+using System.Text.Json;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -108,6 +110,34 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
         Assert.False(soldItem.IsActive);
     }
 
+    [Fact]
+    public async Task ExpiredCycleReads_DoNotChangeCycleStatus()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var (cycleId, originalUpdatedAt) = await SeedExpiredActiveCycleAsync(factory);
+        var client = factory.CreateClient();
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        var itemsResponse = await client.GetAsync($"/api/market/items?cycleId={cycleId:D}&page=1&pageSize=10");
+        itemsResponse.EnsureSuccessStatusCode();
+
+        var itemsResult = await itemsResponse.Content.ReadFromJsonAsync<PagedResult<MarketItemListDto>>(options);
+        Assert.NotNull(itemsResult);
+        Assert.NotEmpty(itemsResult!.Items);
+        Assert.All(itemsResult.Items, item => Assert.False(item.IsActive));
+
+        await AssertCycleRemainsActiveAsync(factory, cycleId, originalUpdatedAt);
+
+        var historyResponse = await client.GetAsync($"/api/market/history?cycleId={cycleId:D}&page=1&pageSize=10");
+        historyResponse.EnsureSuccessStatusCode();
+
+        var historyResult = await historyResponse.Content.ReadFromJsonAsync<PagedResult<MarketTransactionDto>>(options);
+        Assert.NotNull(historyResult);
+
+        await AssertCycleRemainsActiveAsync(factory, cycleId, originalUpdatedAt);
+    }
+
     private static async Task<Guid> SeedCycleAsync(WebApplicationFactory<Program> factory)
     {
         using var scope = factory.Services.CreateScope();
@@ -200,6 +230,92 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
 
         await db.SaveChangesAsync();
         return cycleId;
+    }
+
+    private static async Task<(Guid CycleId, DateTime OriginalUpdatedAtUtc)> SeedExpiredActiveCycleAsync(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        const int positionId = 70;
+        if (!await db.Positions.AnyAsync(p => p.PositionId == positionId))
+        {
+            db.Positions.Add(new Position { PositionId = positionId, Name = "Teste Expirado" });
+        }
+
+        var now = DateTime.UtcNow;
+        var originalUpdatedAt = now.AddHours(-6);
+        var cycleId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var playerId = 300;
+
+        var cycle = new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Ciclo Expirado",
+            Status = MarketCycleStatus.Active,
+            StartsAtUtc = now.AddHours(-12),
+            EndsAtUtc = now.AddMinutes(-30),
+            CreatedAtUtc = now.AddHours(-13),
+            UpdatedAtUtc = originalUpdatedAt
+        };
+
+        var player = new Player
+        {
+            PlayerId = playerId,
+            Name = "Jogador Expirado",
+            Overall = 82,
+            PositionId = positionId,
+            PlayerGuid = Guid.NewGuid()
+        };
+
+        db.MarketCycles.Add(cycle);
+        if (!await db.Players.AnyAsync(p => p.PlayerId == playerId))
+        {
+            db.Players.Add(player);
+        }
+
+        db.MarketItems.Add(new MarketItem
+        {
+            ItemId = itemId,
+            CycleId = cycleId,
+            PlayerId = playerId,
+            BasePrice = 400m,
+            MinIncrement = 40m,
+            ExpiresAtUtc = now.AddMinutes(-45),
+            Status = MarketItemStatus.Active,
+            CreatedAtUtc = now.AddHours(-8),
+            LastUpdateUtc = now.AddHours(-2)
+        });
+
+        db.MarketTransactions.Add(new MarketTransaction
+        {
+            TransactionId = Guid.NewGuid(),
+            CycleId = cycleId,
+            ItemId = itemId,
+            PlayerId = playerId,
+            TeamId = null,
+            TargetTeamId = null,
+            Type = MarketTransactionType.AuctionExpired,
+            Amount = null,
+            PerformedBy = "sistema",
+            Notes = "Expiração registrada para histórico",
+            CreatedAtUtc = now.AddMinutes(-20),
+            RowVersion = 1
+        });
+
+        await db.SaveChangesAsync();
+        return (cycleId, originalUpdatedAt);
+    }
+
+    private static async Task AssertCycleRemainsActiveAsync(WebApplicationFactory<Program> factory, Guid cycleId, DateTime expectedUpdatedAtUtc)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        var cycle = await db.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Active, cycle.Status);
+        Assert.Equal(expectedUpdatedAtUtc, cycle.UpdatedAtUtc);
     }
 
     private static async Task<Guid> SeedDraftCycleAsync(WebApplicationFactory<Program> factory)

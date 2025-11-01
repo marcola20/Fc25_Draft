@@ -88,8 +88,6 @@ public class AuctionSettlementService : IAuctionSettlementService
             }
         }
 
-        await UpdateCycleStatusAsync(cycleId, now, ct).ConfigureAwait(false);
-
         return new AuctionSettlementResult(sold, expired);
     }
 
@@ -242,32 +240,6 @@ public class AuctionSettlementService : IAuctionSettlementService
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
         return SettlementOutcome.Expired;
-    }
-
-    private async Task UpdateCycleStatusAsync(Guid cycleId, DateTime now, CancellationToken ct)
-    {
-        var hasActive = await _dbContext.MarketItems
-            .AsNoTracking()
-            .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active, ct)
-            .ConfigureAwait(false);
-
-        if (hasActive)
-        {
-            return;
-        }
-
-        var cycle = await _dbContext.MarketCycles
-            .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
-            .ConfigureAwait(false);
-
-        if (cycle is null || cycle.Status == MarketCycleStatus.Closed)
-        {
-            return;
-        }
-
-        cycle.Status = MarketCycleStatus.Closed;
-        cycle.UpdatedAtUtc = now;
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     private async Task EnsureSquadLimitAsync(Guid teamId, Guid currentItemId, CancellationToken ct)

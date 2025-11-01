@@ -42,6 +42,8 @@ public class AuctionSettlementServiceTests
             BudgetBlocked = 2000m
         };
 
+        var originalCycleUpdatedAt = now.AddHours(-1);
+
         var cycle = new MarketCycle
         {
             CycleId = cycleId,
@@ -50,7 +52,7 @@ public class AuctionSettlementServiceTests
             StartsAtUtc = now.AddHours(-2),
             EndsAtUtc = now.AddHours(5),
             CreatedAtUtc = now.AddHours(-3),
-            UpdatedAtUtc = now.AddHours(-1)
+            UpdatedAtUtc = originalCycleUpdatedAt
         };
 
         var item = new MarketItem
@@ -104,6 +106,10 @@ public class AuctionSettlementServiceTests
         Assert.Equal(MarketTransactionType.AuctionSettled, transaction.Type);
         Assert.Equal(teamId, transaction.TeamId);
         Assert.Equal(2000m, transaction.Amount);
+
+        var persistedCycle = await context.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Active, persistedCycle.Status);
+        Assert.Equal(originalCycleUpdatedAt, persistedCycle.UpdatedAtUtc);
     }
 
     [Fact]
@@ -124,6 +130,8 @@ public class AuctionSettlementServiceTests
             PlayerGuid = Guid.NewGuid()
         };
 
+        var originalCycleUpdatedAt = now.AddHours(-1);
+
         var cycle = new MarketCycle
         {
             CycleId = cycleId,
@@ -132,7 +140,7 @@ public class AuctionSettlementServiceTests
             StartsAtUtc = now.AddHours(-2),
             EndsAtUtc = now.AddHours(3),
             CreatedAtUtc = now.AddHours(-4),
-            UpdatedAtUtc = now.AddHours(-1)
+            UpdatedAtUtc = originalCycleUpdatedAt
         };
 
         var item = new MarketItem
@@ -171,6 +179,10 @@ public class AuctionSettlementServiceTests
         var transaction = await context.MarketTransactions.AsNoTracking().SingleAsync();
         Assert.Equal(MarketTransactionType.AuctionExpired, transaction.Type);
         Assert.Equal(itemId, transaction.ItemId);
+
+        var persistedCycle = await context.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Active, persistedCycle.Status);
+        Assert.Equal(originalCycleUpdatedAt, persistedCycle.UpdatedAtUtc);
     }
 
     [Fact]
@@ -200,6 +212,8 @@ public class AuctionSettlementServiceTests
             BudgetBlocked = 1500m
         };
 
+        var originalCycleUpdatedAt = now.AddHours(-1);
+
         var cycle = new MarketCycle
         {
             CycleId = cycleId,
@@ -208,7 +222,7 @@ public class AuctionSettlementServiceTests
             StartsAtUtc = now.AddHours(-1),
             EndsAtUtc = now.AddHours(2),
             CreatedAtUtc = now.AddHours(-3),
-            UpdatedAtUtc = now.AddHours(-1)
+            UpdatedAtUtc = originalCycleUpdatedAt
         };
 
         var item = new MarketItem
@@ -250,6 +264,10 @@ public class AuctionSettlementServiceTests
 
         var rosterEntry = await context.TeamRosters.AsNoTracking().FirstOrDefaultAsync(r => r.TeamId == team.TeamId && r.PlayerId == player.PlayerId);
         Assert.NotNull(rosterEntry);
+
+        var persistedCycle = await context.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Active, persistedCycle.Status);
+        Assert.Equal(originalCycleUpdatedAt, persistedCycle.UpdatedAtUtc);
     }
 
     private static DraftDbContext CreateContext()
