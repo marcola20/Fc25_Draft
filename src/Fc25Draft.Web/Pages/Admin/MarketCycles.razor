@@ -57,23 +57,6 @@ else
                         }
                     </InputSelect>
                 </div>
-                <div class="col-12 col-md-3 col-lg-2">
-                    <label class="form-label" for="filter-page-size">Itens por página</label>
-                    <InputSelect id="filter-page-size" class="form-select" @bind-Value="_filters.PageSize">
-                        @foreach (var size in PageSizeOptions)
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="col-12 col-lg-4">
-                    <label class="form-label" for="filter-start">Início após (local)</label>
-                    <input id="filter-start" class="form-control" type="datetime-local" @bind="_filters.StartsAfterLocal" @bind:format="yyyy-MM-ddTHH:mm" @bind:event="oninput" />
-                </div>
-                <div class="col-12 col-lg-4">
-                    <label class="form-label" for="filter-end">Início antes de (local)</label>
-                    <input id="filter-end" class="form-control" type="datetime-local" @bind="_filters.StartsBeforeLocal" @bind:format="yyyy-MM-ddTHH:mm" @bind:event="oninput" />
-                </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-primary" disabled="@_isLoading">Aplicar filtros</button>
                     <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters" disabled="@_isLoading">Limpar filtros</button>
