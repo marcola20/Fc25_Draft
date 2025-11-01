@@ -1,5 +1,3 @@
-using System.Data;
-using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
@@ -7,11 +5,14 @@ using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Fc25Draft.Core.Utilities;
+using System.Data;
 using System.Globalization;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -24,6 +25,10 @@ public class MarketService : IMarketService
     private readonly MarketOptions _marketOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
+    private static readonly TimeZoneInfo SaoPauloTz =
+    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time")
+        : TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
     public MarketService(DraftDbContext dbContext, IMarketCycleGenerator cycleGenerator, IOptions<MarketOptions> options, ITransactionLogService transactionLogService, TimeProvider? timeProvider = null)
     {
@@ -130,7 +135,9 @@ public class MarketService : IMarketService
         EnsureExpectedRowVersion(expectedRowVersion);
 
         var normalizedToken = NormalizeToken(teamToken);
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, SaoPauloTz);
 
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
@@ -144,12 +151,13 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc <= now)
+            if (item.ExpiresAtUtc <= nowBr)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
-                .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
+                .FirstOrDefaultAsync(t => t.Token != null && t.Token.ToUpper() == normalizedToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
+
 
             if (item.CurrentLeaderTeamId == team.TeamId)
             {
@@ -212,12 +220,12 @@ public class MarketService : IMarketService
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
                 Amount = amount,
-                CreatedAtUtc = now
+                CreatedAtUtc = nowBr
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
             item.CurrentLeaderAmount = amount;
-            item.LastUpdateUtc = now;
+            item.LastUpdateUtc = nowBr;
 
             var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
             if (!string.IsNullOrWhiteSpace(outbidNotes))
@@ -225,7 +233,7 @@ public class MarketService : IMarketService
 
             await _transactionLogService.LogMarketAsync(
                 item, MarketTransactionType.BidPlaced, team.TeamId, previousLeaderId,
-                amount, team.TeamId.ToString(), bidNotes, now, ct2);
+                amount, team.TeamId.ToString(), bidNotes, nowBr, ct2);
 
             await _dbContext.MarketBids.AddAsync(bid, ct2);
 
@@ -607,11 +615,9 @@ public class MarketService : IMarketService
     private static string NormalizeToken(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
-        {
             throw new MarketForbiddenException("Token de time é obrigatório.");
-        }
 
-        return token.Trim();
+        return token.Trim().ToUpperInvariant();
     }
 
     private static MarketItemDto ToDto(MarketItem item)

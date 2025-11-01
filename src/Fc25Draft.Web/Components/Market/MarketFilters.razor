@@ -26,10 +26,6 @@
                                    placeholder="Filtrar pelo nome"
                                    aria-label="Filtrar pelo nome" />
                     </div>
-                    <div class="d-flex flex-wrap gap-2 justify-content-start">
-                        <button type="submit" class="btn btn-primary btn-sm">Aplicar filtros</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
-                    </div>
                 </div>
             </div>
             <div class="col-12 col-lg-3">
@@ -102,6 +98,10 @@
                                  min="0"
                                  aria-label="Overall máximo" />
                 </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 justify-content-start">
+                <button type="submit" class="btn btn-primary btn-sm">Aplicar filtros</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
             </div>
         </div>
     </div>
