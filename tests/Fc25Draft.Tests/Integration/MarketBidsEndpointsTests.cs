@@ -151,6 +151,97 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
     }
 
     [Fact]
+    public async Task PostBid_ReturnsConflict_WhenCycleClosed()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var scenario = await SeedBidScenarioAsync(
+            factory,
+            basePrice: 12_000_000m,
+            minIncrement: 1_000_000m,
+            currentLeaderAmount: null,
+            buyNowPrice: 20_000_000m,
+            teamBudget: 40_000_000m,
+            cycleStatus: MarketCycleStatus.Closed);
+
+        var minimum = MarketPricing.ComputeRequiredMinBid(
+            scenario.BasePrice,
+            scenario.MinIncrement,
+            scenario.CurrentLeaderAmount,
+            scenario.BuyNowPrice);
+
+        using var request = BuildBidRequest(scenario, minimum);
+        var client = factory.CreateClient();
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(GetJsonOptions());
+        var detail = GetProblemMessage(problem);
+        Assert.Contains("não está ativo", detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostBid_ReturnsConflict_WhenItemExpired()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var expiredAt = DateTime.UtcNow.AddMinutes(-5);
+        var scenario = await SeedBidScenarioAsync(
+            factory,
+            basePrice: 8_000_000m,
+            minIncrement: 500_000m,
+            currentLeaderAmount: null,
+            buyNowPrice: 15_000_000m,
+            teamBudget: 30_000_000m,
+            expiresAtUtc: expiredAt);
+
+        var minimum = MarketPricing.ComputeRequiredMinBid(
+            scenario.BasePrice,
+            scenario.MinIncrement,
+            scenario.CurrentLeaderAmount,
+            scenario.BuyNowPrice);
+
+        using var request = BuildBidRequest(scenario, minimum);
+        var client = factory.CreateClient();
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(GetJsonOptions());
+        var detail = GetProblemMessage(problem);
+        Assert.Contains("já expirou", detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostBid_ReturnsConflict_WhenItemInactive()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var scenario = await SeedBidScenarioAsync(
+            factory,
+            basePrice: 9_000_000m,
+            minIncrement: 500_000m,
+            currentLeaderAmount: null,
+            buyNowPrice: 18_000_000m,
+            teamBudget: 35_000_000m,
+            itemStatus: MarketItemStatus.Sold);
+
+        var minimum = MarketPricing.ComputeRequiredMinBid(
+            scenario.BasePrice,
+            scenario.MinIncrement,
+            scenario.CurrentLeaderAmount,
+            scenario.BuyNowPrice);
+
+        using var request = BuildBidRequest(scenario, minimum);
+        var client = factory.CreateClient();
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(GetJsonOptions());
+        var detail = GetProblemMessage(problem);
+        Assert.Contains("não está disponível", detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task PostBid_AddsHistoryEntry_ForRealtimeRefresh()
     {
         var factory = _factory.WithWebHostBuilder(_ => { });
@@ -242,13 +333,41 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
         PropertyNameCaseInsensitive = true
     };
 
+    private static string GetProblemMessage(ProblemDetails? problem)
+    {
+        if (problem is null)
+        {
+            return string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(problem.Detail))
+        {
+            return problem.Detail!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(problem.Title))
+        {
+            return problem.Title!;
+        }
+
+        if (problem.Extensions.TryGetValue("message", out var extension) && extension is not null)
+        {
+            return extension.ToString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
     private static async Task<BidScenario> SeedBidScenarioAsync(
         WebApplicationFactory<Program> factory,
         decimal basePrice,
         decimal minIncrement,
         decimal? currentLeaderAmount,
         decimal? buyNowPrice,
-        decimal teamBudget)
+        decimal teamBudget,
+        MarketCycleStatus cycleStatus = MarketCycleStatus.Active,
+        MarketItemStatus itemStatus = MarketItemStatus.Active,
+        DateTime? expiresAtUtc = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
@@ -265,7 +384,7 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
         {
             CycleId = cycleId,
             Name = "Ciclo Teste",
-            Status = MarketCycleStatus.Active,
+            Status = cycleStatus,
             StartsAtUtc = now.AddHours(-1),
             EndsAtUtc = now.AddHours(2),
             CreatedAtUtc = now.AddHours(-2),
@@ -301,8 +420,8 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
             BasePrice = basePrice,
             BuyNowPrice = buyNowPrice,
             MinIncrement = minIncrement,
-            ExpiresAtUtc = now.AddHours(1),
-            Status = MarketItemStatus.Active,
+            ExpiresAtUtc = expiresAtUtc ?? now.AddHours(1),
+            Status = itemStatus,
             CreatedAtUtc = now.AddHours(-1),
             LastUpdateUtc = now.AddMinutes(-10),
             PublishedAtUtc = now.AddHours(-1),

@@ -35,6 +35,8 @@ public class MarketItemsQueryService : IMarketItemsQueryService
             .Include(i => i.CurrentLeaderTeam)
             .AsQueryable();
 
+        var nowUtc = DateTime.UtcNow;
+
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = $"%{query.Search.Trim()}%";
@@ -67,8 +69,6 @@ public class MarketItemsQueryService : IMarketItemsQueryService
 
         if (query.SortBy == MarketItemsSortField.ExpiresAtUtc && !query.SortDescending)
         {
-            var nowUtc = DateTime.UtcNow;
-
             orderedQuery = itemsQuery
                 .Select(i => new
                 {
@@ -132,7 +132,10 @@ public class MarketItemsQueryService : IMarketItemsQueryService
                 i.CurrentLeaderTeam != null && !string.IsNullOrWhiteSpace(i.CurrentLeaderTeam.TeamName)
                     ? i.CurrentLeaderTeam.TeamName
                     : i.CurrentLeaderTeamId.HasValue ? i.CurrentLeaderTeamId.Value.ToString() : null,
-                i.RowVersion))
+                i.RowVersion,
+                i.Cycle.Status == MarketCycleStatus.Active
+                    && i.Status == MarketItemStatus.Active
+                    && i.ExpiresAtUtc > nowUtc))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 

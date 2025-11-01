@@ -184,21 +184,9 @@
 
     private bool IsExpired => Remaining <= TimeSpan.Zero;
 
-    private bool IsBidDisabled => _isSubmitting || IsExpired || !IsActive || !_model.ParsedAmount.HasValue || IsCurrentTeamLeader;
+    private bool IsBidDisabled => _isSubmitting || IsExpired || !Item.IsActive || !_model.ParsedAmount.HasValue || IsCurrentTeamLeader;
 
-    private bool IsActive
-    {
-        get
-        {
-            var status = Item.Status?.Trim() ?? string.Empty;
-            return status.Equals("active", StringComparison.OrdinalIgnoreCase)
-                || status.Equals("published", StringComparison.OrdinalIgnoreCase)
-                || status.Equals("publicado", StringComparison.OrdinalIgnoreCase)
-                || status.Equals("ativo", StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    private bool CanBuyNow => IsActive && Item.BuyNowPrice.HasValue;
+    private bool CanBuyNow => Item.IsActive && Item.BuyNowPrice.HasValue;
 
     private bool IsCurrentTeamLeader => CurrentTeamId.HasValue && Item.CurrentLeaderTeamId.HasValue && Item.CurrentLeaderTeamId.Value == CurrentTeamId.Value;
 
@@ -229,6 +217,11 @@
     {
         get
         {
+            if (!Item.IsActive)
+            {
+                return TimeSpan.Zero;
+            }
+
             var remaining = Item.ExpiresAtUtc - (DateTime.UtcNow + ServerTimeOffset);
             return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
         }

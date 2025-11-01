@@ -20,7 +20,8 @@ public sealed record MarketItemListDto(
     string StatusText,
     Guid? CurrentLeaderTeamId,
     string? CurrentLeaderTeamName,
-    uint RowVersion);
+    uint RowVersion,
+    bool IsActive);
 
 public enum MarketItemsSortField
 {

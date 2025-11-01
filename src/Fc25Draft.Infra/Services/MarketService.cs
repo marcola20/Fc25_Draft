@@ -151,11 +151,15 @@ public class MarketService : IMarketService
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
             var item = await _dbContext.MarketItems
+                .Include(i => i.Cycle)
                 .Include(i => i.Player).ThenInclude(p => p.Position)
                 .FirstOrDefaultAsync(i => i.ItemId == itemId, ct2)
                 ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
 
             EnsureRowVersion(item.RowVersion, expectedRowVersion);
+
+            if (item.Cycle is null || item.Cycle.Status != MarketCycleStatus.Active)
+                throw new MarketConflictException("O ciclo do mercado não está ativo no momento.");
 
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");

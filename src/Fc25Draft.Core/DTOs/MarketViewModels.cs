@@ -50,6 +50,8 @@ public class MarketItemVm
 
     public DateTime ExpiresAtUtc { get; set; }
 
+    public bool IsActive { get; set; }
+
     public string Status { get; set; } = string.Empty;
 
     public string RowVersion { get; set; } = string.Empty;

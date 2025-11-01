@@ -84,6 +84,7 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
         Assert.Equal("Ativo", item.StatusText);
         Assert.True(item.CurrentBid.HasValue);
         Assert.Equal(500m, item.CurrentBid);
+        Assert.True(item.IsActive);
     }
 
     [Fact]
@@ -103,6 +104,8 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
         Assert.Equal(3, result!.Items.Count);
         var orderedIds = result.Items.Select(i => i.PlayerId).ToArray();
         Assert.Equal(new[] { 101, 100, 102 }, orderedIds);
+        var soldItem = result.Items.First(i => i.PlayerId == 101);
+        Assert.False(soldItem.IsActive);
     }
 
     private static async Task<Guid> SeedCycleAsync(WebApplicationFactory<Program> factory)

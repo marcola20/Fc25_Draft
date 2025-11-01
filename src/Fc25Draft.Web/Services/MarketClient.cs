@@ -437,6 +437,7 @@ namespace Fc25Draft.Web.Services
                 MinIncrement = dto.MinIncrement,
                 RequiredMinBid = dto.RequiredMinBid,
                 ExpiresAtUtc = dto.ExpiresAtUtc,
+                IsActive = dto.IsActive,
                 Status = dto.StatusText,
                 RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
             };
@@ -444,6 +445,8 @@ namespace Fc25Draft.Web.Services
 
         private static CoreItemVm MapToViewModel(MarketItemDto dto)
         {
+            var isActive = IsStatusActive(dto.Status) && dto.ExpiresAtUtc > DateTime.UtcNow;
+
             return new CoreItemVm
             {
                 ItemId = dto.ItemId,
@@ -459,9 +462,24 @@ namespace Fc25Draft.Web.Services
                 MinIncrement = dto.MinIncrement,
                 RequiredMinBid = dto.RequiredMinBid,
                 ExpiresAtUtc = dto.ExpiresAtUtc,
+                IsActive = isActive,
                 Status = dto.Status,
                 RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
             };
+        }
+
+        private static bool IsStatusActive(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return false;
+            }
+
+            var normalized = status.Trim();
+            return normalized.Equals("active", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("published", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("publicado", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("ativo", StringComparison.OrdinalIgnoreCase);
         }
 
         private static async Task<CoreItemVm?> FetchItemAsync(HttpClient http, Guid itemId, CancellationToken ct)
