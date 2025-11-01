@@ -490,7 +490,12 @@ else
     {
         try
         {
-            await Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
+            var joined = await Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
+            if (!joined)
+            {
+                _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
+                StateHasChangedSafe();
+            }
         }
         catch (OperationCanceledException)
         {

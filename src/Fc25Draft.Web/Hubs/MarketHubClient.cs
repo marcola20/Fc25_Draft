@@ -49,14 +49,26 @@ public class MarketHubClient : IAsyncDisposable
         await _connection.StartAsync(ct);
     }
 
-    public async Task JoinCycle(Guid cycleId, CancellationToken ct = default)
+    public async Task<bool> JoinCycle(Guid cycleId, CancellationToken ct = default)
     {
         if (cycleId == Guid.Empty || _connection is null)
         {
-            return;
+            return false;
         }
 
-        await _connection.InvokeAsync("JoinCycle", cycleId, ct);
+        try
+        {
+            return await _connection.InvokeAsync<bool>("JoinCycle", cycleId, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to join market cycle {CycleId}.", cycleId);
+            return false;
+        }
     }
 
     private async Task InvokeSafeAsync(Func<MarketItemVm, Task>? handler, MarketItemVm payload)
