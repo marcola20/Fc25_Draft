@@ -61,7 +61,7 @@ public static class MarketCycleEndpoints
         {
             return Results.BadRequest(new { message = ex.Message });
         }
-        catch (DbUpdateException eax) 
+        catch (DbUpdateException) 
         {
             return Results.Problem("Falha ao salvar o ciclo.", statusCode: StatusCodes.Status500InternalServerError);
         }

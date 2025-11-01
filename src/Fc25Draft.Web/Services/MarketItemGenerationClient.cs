@@ -46,11 +46,23 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
-        using var response = await client.PostAsJsonAsync($"api/admin/market/cycles/{cycleId}/items:generate", request, SerializerOptions, ct).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
-        return await ReadJsonAsync<MarketItemGenerationResultDto>(response, ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Resposta inválida do servidor ao gerar itens para o ciclo.");
+        try
+        {
+            var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
+            using var response = await client.PostAsJsonAsync(
+                $"api/admin/market/cycles/{cycleId}/items:generate",
+                request, SerializerOptions, ct).ConfigureAwait(false);
+
+            await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+
+            return await ReadJsonAsync<MarketItemGenerationResultDto>(response, ct).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Resposta inválida do servidor ao gerar itens para o ciclo.");
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine(ex.ToString());
+            throw;
+        }
     }
 
     public async Task<MarketItemGenerationDeleteResultDto> DeleteDraftsAsync(Guid cycleId, CancellationToken ct)
@@ -65,12 +77,15 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
-        {
             return;
-        }
 
-        var details = await BuildErrorDetailsAsync(response, ct).ConfigureAwait(false);
-        throw new HttpRequestException(details.UserMessage, null, response.StatusCode);
+        var (userMessage, fullLog) = await BuildErrorDetailsAsync(response, ct).ConfigureAwait(false);
+
+        Console.Error.WriteLine(fullLog);
+
+        var status = (int)response.StatusCode;
+        var prefix = $"(HTTP {status}) ";
+        throw new HttpRequestException(prefix + userMessage, null, response.StatusCode);
     }
 
     private static async Task<T?> ReadJsonAsync<T>(HttpResponseMessage response, CancellationToken ct)
@@ -93,49 +108,43 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         var reason = response.ReasonPhrase ?? string.Empty;
 
         string raw = string.Empty;
-        try
-        {
-            raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            // ignorado
-        }
+        try { raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false); } catch { /* ignore */ }
 
         try
         {
             var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
             if (error is not null)
             {
-                var message = !string.IsNullOrWhiteSpace(error.Message)
+                var msg = !string.IsNullOrWhiteSpace(error.Message)
                     ? error.Message
                     : error.Errors is { Count: > 0 }
-                        ? string.Join(" ", error.Errors.SelectMany(pair => pair.Value ?? Array.Empty<string>()))
+                        ? string.Join(" ", error.Errors.SelectMany(p => p.Value ?? Array.Empty<string>()))
                         : null;
 
-                if (!string.IsNullOrWhiteSpace(message))
-                {
-                    return (Decorate(message), ComposeLog(raw));
-                }
+                if (!string.IsNullOrWhiteSpace(msg))
+                    return (Decorate(msg!), ComposeLog(raw));
             }
         }
-        catch
-        {
-            // fallback
-        }
+        catch { /* fallback */ }
 
         try
         {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(SerializerOptions, ct).ConfigureAwait(false);
             if (problem is not null)
             {
-                var message = problem.Title ?? problem.Detail ?? "Erro inesperado.";
-                return (Decorate(message), ComposeLog(problem.Detail ?? raw));
+                var msg = problem.Title ?? problem.Detail ?? reason ?? "Erro inesperado.";
+                var detail = problem.Detail ?? raw;
+                return (Decorate(msg), ComposeLog(detail));
             }
         }
-        catch
+        catch { /* fallback */ }
+
+        if (!string.IsNullOrWhiteSpace(raw))
         {
-            // fallback
+            var firstLine = raw.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            var snippet = firstLine?.Trim();
+            if (!string.IsNullOrWhiteSpace(snippet))
+                return (Decorate(snippet!), ComposeLog(raw));
         }
 
         var fallback = $"{method} {url} -> {status} {reason}.";
@@ -145,9 +154,7 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
             => $"{method} {url} -> {status} {reason}. Body: {body ?? raw}";
 
         static string Decorate(string message)
-            => string.IsNullOrWhiteSpace(message)
-                ? "Falha ao comunicar com o servidor."
-                : message.Trim();
+            => string.IsNullOrWhiteSpace(message) ? "Falha ao comunicar com o servidor." : message.Trim();
     }
 
     private sealed record ApiErrorResponse(string? Message, Dictionary<string, string[]?>? Errors);

@@ -40,79 +40,101 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
     public async Task<MarketItemGenerationResult> GenerateAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
     {
-        await using var transaction = await _dbContext.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable, ct)
-            .ConfigureAwait(false);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        var context = await PrepareAsync(cycleId, options, ct).ConfigureAwait(false);
-        var existingPlayers = await _dbContext.MarketItems
-            .Where(i => i.CycleId == cycleId)
-            .Select(i => i.PlayerId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        var existingSet = new HashSet<int>(existingPlayers);
-        var createdItems = new List<MarketItemGenerationItem>();
-        var skipped = 0;
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        foreach (var candidate in context.SelectedPlayers)
+        return await strategy.ExecuteAsync(async () =>
         {
-            if (existingSet.Contains(candidate.PlayerId))
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            try
             {
-                skipped++;
-                continue;
+                var context = await PrepareAsync(cycleId, options, ct);
+
+                var existingPlayers = await _dbContext.MarketItems
+                    .Where(i => i.CycleId == cycleId)
+                    .Select(i => i.PlayerId)
+                    .ToListAsync(ct);
+
+                var existingSet = new HashSet<int>(existingPlayers);
+                var createdItems = new List<MarketItemGenerationItem>();
+                var skipped = 0;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+                foreach (var candidate in context.SelectedPlayers)
+                {
+                    if (existingSet.Contains(candidate.PlayerId))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    var pricing = await _pricingService.CalculateForPlayerAsync(candidate.PlayerId, ct);
+
+                    var item = new MarketItem
+                    {
+                        ItemId = Guid.NewGuid(),
+                        CycleId = cycleId,
+                        PlayerId = candidate.PlayerId,
+                        BasePrice = pricing.BasePrice,
+                        BuyNowPrice = pricing.BuyNowPrice,
+                        MinIncrement = pricing.MinIncrement,
+                        ExpiresAtUtc = context.ExpiresAtUtc,
+                        Status = MarketItemStatus.Draft,
+                        CreatedAtUtc = now,
+                        LastUpdateUtc = now
+                    };
+
+                    await _dbContext.MarketItems.AddAsync(item, ct);
+                    existingSet.Add(candidate.PlayerId);
+
+                    createdItems.Add(new MarketItemGenerationItem(
+                        candidate.PlayerId,
+                        candidate.PlayerName,
+                        candidate.PositionId,
+                        candidate.PositionName,
+                        candidate.Overall,
+                        candidate.Age,
+                        pricing.BasePrice,
+                        pricing.BuyNowPrice,
+                        pricing.MinIncrement,
+                        context.ExpiresAtUtc));
+                }
+
+                if (createdItems.Count > 0)
+                {
+                    try
+                    {
+                        await _dbContext.SaveChangesAsync(ct);
+                    }
+                    catch (DbUpdateException)
+                    {
+                        var already = await _dbContext.MarketItems
+                            .Where(i => i.CycleId == cycleId)
+                            .Select(i => i.PlayerId)
+                            .ToListAsync(ct);
+
+                        var alreadySet = new HashSet<int>(already);
+                        skipped += createdItems.Count(ci => alreadySet.Contains(ci.PlayerId));
+                        createdItems.RemoveAll(ci => alreadySet.Contains(ci.PlayerId));
+                    }
+                }
+
+                await tx.CommitAsync(ct);
+
+                return new MarketItemGenerationResult(
+                    context.CycleId,
+                    options.DesiredCount,
+                    context.EligibleCount,
+                    context.Seed,
+                    createdItems.Count,
+                    skipped,
+                    createdItems);
             }
-
-            var pricing = await _pricingService
-                .CalculateForPlayerAsync(candidate.PlayerId, ct)
-                .ConfigureAwait(false);
-
-            var item = new MarketItem
+            catch
             {
-                ItemId = Guid.NewGuid(),
-                CycleId = cycleId,
-                PlayerId = candidate.PlayerId,
-                BasePrice = pricing.BasePrice,
-                BuyNowPrice = pricing.BuyNowPrice,
-                MinIncrement = pricing.MinIncrement,
-                ExpiresAtUtc = context.ExpiresAtUtc,
-                Status = MarketItemStatus.Draft,
-                CreatedAtUtc = now,
-                LastUpdateUtc = now
-            };
-
-            await _dbContext.MarketItems.AddAsync(item, ct).ConfigureAwait(false);
-            existingSet.Add(candidate.PlayerId);
-
-            createdItems.Add(new MarketItemGenerationItem(
-                candidate.PlayerId,
-                candidate.PlayerName,
-                candidate.PositionId,
-                candidate.PositionName,
-                candidate.Overall,
-                candidate.Age,
-                pricing.BasePrice,
-                pricing.BuyNowPrice,
-                pricing.MinIncrement,
-                context.ExpiresAtUtc));
-        }
-
-        if (createdItems.Count > 0)
-        {
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
-
-        return new MarketItemGenerationResult(
-            context.CycleId,
-            options.DesiredCount,
-            context.EligibleCount,
-            context.Seed,
-            createdItems.Count,
-            skipped,
-            createdItems);
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        });
     }
 
     public async Task<int> DeleteDraftsAsync(Guid cycleId, CancellationToken ct)

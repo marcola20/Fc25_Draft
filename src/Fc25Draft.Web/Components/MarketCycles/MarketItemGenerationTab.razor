@@ -42,147 +42,156 @@ else
                 <div class="alert alert-danger" role="alert">@_positionsError</div>
             }
 
-            <EditForm EditContext="_editContext" OnValidSubmit="HandlePreviewAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+            @if (_model is null || _editContext is null)
+            {
+                <div class="alert alert-info" role="status">
+                    Preparando formulário de geração…
+                </div>
+            }
+            else
+            {
+                <EditForm EditContext="_editContext" OnValidSubmit="HandlePreviewAsync" @key="_editContext">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
 
-                <fieldset disabled="@(!IsDraftCycle || IsBusy || _model is null)">
-                    <div class="row g-3">
-                        <div class="col-12 col-md-4">
-                            <label class="form-label" for="generation-count">Quantidade desejada</label>
-                            <InputNumber id="generation-count" class="form-control" @bind-Value="_model!.DesiredCount" />
-                            <ValidationMessage For="@(() => _model!.DesiredCount)" />
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label" for="generation-seed">Semente (opcional)</label>
-                            <InputNumber id="generation-seed" class="form-control" @bind-Value="_model!.Seed" />
-                            <ValidationMessage For="@(() => _model!.Seed)" />
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label" for="generation-duration">Duração (horas)</label>
-                            <InputNumber id="generation-duration" class="form-control" @bind-Value="_model!.Lifecycle.DurationHours" />
-                            <ValidationMessage For="@(() => _model!.Lifecycle.DurationHours)" />
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="generation-publish">Publicar em (horário local, opcional)</label>
-                            <input id="generation-publish"
-                                   class="form-control"
-                                   type="datetime-local"
-                                   @bind="_model!.Lifecycle.PublishAtLocal"
-                                   @bind:format="yyyy-MM-ddTHH:mm"
-                                   @bind:event="oninput" />
-                            <ValidationMessage For="@(() => _model!.Lifecycle.PublishAtLocal)" />
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="generation-expire">Expira em (horário local, opcional)</label>
-                            <input id="generation-expire"
-                                   class="form-control"
-                                   type="datetime-local"
-                                   @bind="_model!.Lifecycle.ExpiresAtLocal"
-                                   @bind:format="yyyy-MM-ddTHH:mm"
-                                   @bind:event="oninput" />
-                            <ValidationMessage For="@(() => _model!.Lifecycle.ExpiresAtLocal)" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="generation-ovr-min">Overall mínimo</label>
-                            <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.Filters.MinOverall" />
-                            <ValidationMessage For="@(() => _model!.Filters.MinOverall)" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="generation-ovr-max">Overall máximo</label>
-                            <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.Filters.MaxOverall" />
-                            <ValidationMessage For="@(() => _model!.Filters.MaxOverall)" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="generation-age-min">Idade mínima</label>
-                            <InputNumber id="generation-age-min" class="form-control" @bind-Value="_model!.Filters.MinAge" />
-                            <ValidationMessage For="@(() => _model!.Filters.MinAge)" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="generation-age-max">Idade máxima</label>
-                            <InputNumber id="generation-age-max" class="form-control" @bind-Value="_model!.Filters.MaxAge" />
-                            <ValidationMessage For="@(() => _model!.Filters.MaxAge)" />
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
-                                <InputCheckbox id="generation-free-agents" class="form-check-input" @bind-Value="_model!.Filters.OnlyFreeAgents" />
-                                <label class="form-check-label" for="generation-free-agents">Apenas agentes livres</label>
+                    <fieldset disabled="@(!IsDraftCycle || IsBusy || _model is null)">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="generation-count">Quantidade desejada</label>
+                                <InputNumber id="generation-count" class="form-control" @bind-Value="_model!.DesiredCount" />
+                                <ValidationMessage For="@(() => _model!.DesiredCount)" />
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="generation-seed">Semente (opcional)</label>
+                                <InputNumber id="generation-seed" class="form-control" @bind-Value="_model!.Seed" />
+                                <ValidationMessage For="@(() => _model!.Seed)" />
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="generation-duration">Duração (horas)</label>
+                                <InputNumber id="generation-duration" class="form-control" @bind-Value="_model!.Lifecycle.DurationHours" />
+                                <ValidationMessage For="@(() => _model!.Lifecycle.DurationHours)" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="generation-publish">Publicar em (horário local, opcional)</label>
+                                <input id="generation-publish"
+                                       class="form-control"
+                                       type="datetime-local"
+                                       @bind="_model!.Lifecycle.PublishAtLocal"
+                                       @bind:format="yyyy-MM-ddTHH:mm"
+                                       @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _model!.Lifecycle.PublishAtLocal)" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="generation-expire">Expira em (horário local, opcional)</label>
+                                <input id="generation-expire"
+                                       class="form-control"
+                                       type="datetime-local"
+                                       @bind="_model!.Lifecycle.ExpiresAtLocal"
+                                       @bind:format="yyyy-MM-ddTHH:mm"
+                                       @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _model!.Lifecycle.ExpiresAtLocal)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-ovr-min">Overall mínimo</label>
+                                <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.Filters.MinOverall" />
+                                <ValidationMessage For="@(() => _model!.Filters.MinOverall)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-ovr-max">Overall máximo</label>
+                                <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.Filters.MaxOverall" />
+                                <ValidationMessage For="@(() => _model!.Filters.MaxOverall)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-age-min">Idade mínima</label>
+                                <InputNumber id="generation-age-min" class="form-control" @bind-Value="_model!.Filters.MinAge" />
+                                <ValidationMessage For="@(() => _model!.Filters.MinAge)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-age-max">Idade máxima</label>
+                                <InputNumber id="generation-age-max" class="form-control" @bind-Value="_model!.Filters.MaxAge" />
+                                <ValidationMessage For="@(() => _model!.Filters.MaxAge)" />
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <InputCheckbox id="generation-free-agents" class="form-check-input" @bind-Value="_model!.Filters.OnlyFreeAgents" />
+                                    <label class="form-check-label" for="generation-free-agents">Apenas agentes livres</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Posições</label>
+                                @if (_isLoadingPositions)
+                                {
+                                    <div class="form-text">Carregando posições...</div>
+                                }
+                                else if (_positionOptions.Count == 0)
+                                {
+                                    <div class="form-text text-muted">Nenhuma posição disponível foi encontrada.</div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-wrap gap-3">
+                                        @foreach (var option in _positionOptions)
+                                        {
+                                            var checkboxId = $"generation-position-{option.Id}";
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       id="@checkboxId"
+                                                       checked="@IsPositionSelected(option.Id)"
+                                                       @onchange="args => OnPositionToggled(option.Id, args)" />
+                                                <label class="form-check-label" for="@checkboxId">@option.Name</label>
+                                            </div>
+                                        }
+                                    </div>
+                                }
                             </div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label d-block">Posições</label>
-                            @if (_isLoadingPositions)
+                    </fieldset>
+
+                    @if (_showValidationSummary)
+                    {
+                        <div class="alert alert-danger mt-3" role="alert">
+                            Corrija os campos destacados antes de continuar.
+                        </div>
+                    }
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button type="submit" class="btn btn-outline-primary" disabled="@(!CanPreview)">
+                            @if (_isPreviewing)
                             {
-                                <div class="form-text">Carregando posições...</div>
-                            }
-                            else if (_positionOptions.Count == 0)
-                            {
-                                <div class="form-text text-muted">Nenhuma posição disponível foi encontrada.</div>
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Pré-visualizando...</span>
                             }
                             else
                             {
-                                <div class="d-flex flex-wrap gap-3">
-                                    @foreach (var option in _positionOptions)
-                                    {
-                                        var checkboxId = $"generation-position-{option.Id}";
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input"
-                                                   type="checkbox"
-                                                   id="@checkboxId"
-                                                   checked="@IsPositionSelected(option.Id)"
-                                                   @onchange="args => OnPositionToggled(option.Id, args)" />
-                                            <label class="form-check-label" for="@checkboxId">@option.Name</label>
-                                        </div>
-                                    }
-                                </div>
+                                <span>Pré-visualizar</span>
                             }
-                        </div>
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="HandleGenerateAsync" disabled="@(!CanGenerate)">
+                            @if (_isGenerating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Gerando itens...</span>
+                            }
+                            else
+                            {
+                                <span>Gerar itens</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" @onclick="HandleClearAsync" disabled="@(!CanClear)">
+                            @if (_isClearing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Limpando...</span>
+                            }
+                            else
+                            {
+                                <span>Limpar rascunho</span>
+                            }
+                        </button>
                     </div>
-                </fieldset>
-
-                @if (_showValidationSummary)
-                {
-                    <div class="alert alert-danger mt-3" role="alert">
-                        Corrija os campos destacados antes de continuar.
-                    </div>
-                }
-
-                <div class="d-flex flex-wrap gap-2 mt-4">
-                    <button type="submit" class="btn btn-outline-primary" disabled="@(!CanPreview)">
-                        @if (_isPreviewing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            <span>Pré-visualizando...</span>
-                        }
-                        else
-                        {
-                            <span>Pré-visualizar</span>
-                        }
-                    </button>
-                    <button type="button" class="btn btn-primary" @onclick="HandleGenerateAsync" disabled="@(!CanGenerate)">
-                        @if (_isGenerating)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            <span>Gerando itens...</span>
-                        }
-                        else
-                        {
-                            <span>Gerar itens</span>
-                        }
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" @onclick="HandleClearAsync" disabled="@(!CanClear)">
-                        @if (_isClearing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            <span>Limpando...</span>
-                        }
-                        else
-                        {
-                            <span>Limpar rascunho</span>
-                        }
-                    </button>
-                </div>
-            </EditForm>
+                </EditForm>
+            }
         </div>
     </div>
 }
@@ -256,7 +265,7 @@ else
                                     @for (var page = 1; page <= TotalPreviewPages; page++)
                                     {
                                         <li class="page-item @(page == _previewPage ? "active" : null)">
-                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@page</button>
+                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@(page)</button>
                                         </li>
                                     }
                                     <li class="page-item @(_previewPage >= TotalPreviewPages ? "disabled" : null)">

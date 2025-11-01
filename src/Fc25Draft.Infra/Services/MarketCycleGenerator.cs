@@ -68,72 +68,79 @@ public class MarketCycleGenerator : IMarketCycleGenerator
 
     public async Task<MarketCycleDto> CreateNewCycleAsync(DateTime utcNow, CancellationToken ct)
     {
-        var now = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        await using var transaction = await _dbContext.Database
-            .BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct)
-            .ConfigureAwait(false);
-
-        var existingOpen = await _dbContext.MarketCycles
-            .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Open, ct)
-            .ConfigureAwait(false);
-
-        if (existingOpen is not null)
+        return await strategy.ExecuteAsync(async () =>
         {
-            return ToDto(existingOpen);
-        }
+            var now = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
 
-        var endsAt = now.AddHours(_marketOptions.CycleDurationHours);
-        var cycle = new MarketCycle
-        {
-            CycleId = Guid.NewGuid(),
-            Name = FormattableString.Invariant($"Ciclo de Mercado {now:yyyyMMddHHmm}"),
-            Status = MarketCycleStatus.Open,
-            StartsAtUtc = now,
-            EndsAtUtc = endsAt,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
-        };
+            await using var tx = await _dbContext.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
 
-        var excludedPlayerIds = await LoadExcludedPlayersAsync(ct).ConfigureAwait(false);
-        var selectedPlayers = await SelectPlayersAsync(excludedPlayerIds, ct).ConfigureAwait(false);
-
-        if (selectedPlayers.Count != _marketOptions.Bands.CountTotal)
-        {
-            throw new MarketValidationException(
-                $"Configuração inconsistente: esperado {_marketOptions.Bands.CountTotal} jogadores, obtidos {selectedPlayers.Count}.");
-        }
-
-        foreach (var player in selectedPlayers)
-        {
-            var age = player.Age ?? 27;
-            var weight = MarketWeightResolver.GetByPositionId(player.PositionId);
-            var varianceFactor = 1m + GetVarianceFactor(player.PlayerId, cycle.CycleId);
-            var pricing = _pricingService.Calculate(weight * varianceFactor, player.Overall, age);
-
-            var item = new MarketItem
+            try
             {
-                ItemId = Guid.NewGuid(),
-                CycleId = cycle.CycleId,
-                PlayerId = player.PlayerId,
-                BasePrice = pricing.BasePrice,
-                BuyNowPrice = pricing.BuyNowPrice,
-                MinIncrement = pricing.MinIncrement,
-                Status = MarketItemStatus.Published,
-                PublishedAtUtc = now,
-                ExpiresAtUtc = endsAt,
-                CreatedAtUtc = now,
-                LastUpdateUtc = now
-            };
+                var existingOpen = await _dbContext.MarketCycles
+                    .FirstOrDefaultAsync(c => c.Status == MarketCycleStatus.Open, ct);
 
-            cycle.Items.Add(item);
-        }
+                if (existingOpen is not null)
+                    return ToDto(existingOpen);
 
-        await _dbContext.MarketCycles.AddAsync(cycle, ct).ConfigureAwait(false);
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+                var cycleId = Guid.NewGuid();
 
-        return ToDto(cycle);
+                var endsAt = now.AddHours(_marketOptions.CycleDurationHours);
+                var cycle = new MarketCycle
+                {
+                    CycleId = cycleId,
+                    Name = FormattableString.Invariant($"Ciclo de Mercado {now:yyyyMMddHHmm}"),
+                    Status = MarketCycleStatus.Open,
+                    StartsAtUtc = now,
+                    EndsAtUtc = endsAt,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                };
+
+                var excludedPlayerIds = await LoadExcludedPlayersAsync(ct);
+                var selectedPlayers = await SelectPlayersAsync(excludedPlayerIds, ct);
+
+                if (selectedPlayers.Count != _marketOptions.Bands.CountTotal)
+                    throw new MarketValidationException(
+                        $"Configuração inconsistente: esperado {_marketOptions.Bands.CountTotal} jogadores, obtidos {selectedPlayers.Count}.");
+
+                foreach (var player in selectedPlayers)
+                {
+                    var age = player.Age ?? 27;
+                    var weight = MarketWeightResolver.GetByPositionId(player.PositionId);
+                    var varianceFactor = 1m + GetVarianceFactor(player.PlayerId, cycle.CycleId);
+                    var pricing = _pricingService.Calculate(weight * varianceFactor, player.Overall, age);
+
+                    cycle.Items.Add(new MarketItem
+                    {
+                        ItemId = Guid.NewGuid(),
+                        CycleId = cycle.CycleId,
+                        PlayerId = player.PlayerId,
+                        BasePrice = pricing.BasePrice,
+                        BuyNowPrice = pricing.BuyNowPrice,
+                        MinIncrement = pricing.MinIncrement,
+                        Status = MarketItemStatus.Published,
+                        PublishedAtUtc = now,
+                        ExpiresAtUtc = endsAt,
+                        CreatedAtUtc = now,
+                        LastUpdateUtc = now
+                    });
+                }
+
+                await _dbContext.MarketCycles.AddAsync(cycle, ct);
+                await _dbContext.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                return ToDto(cycle);
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        });
     }
 
     private static MarketCycleDto ToDto(MarketCycle cycle)

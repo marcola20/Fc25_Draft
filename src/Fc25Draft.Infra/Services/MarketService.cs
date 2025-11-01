@@ -119,285 +119,224 @@ public class MarketService : IMarketService
         return item is null ? null : ToDto(item);
     }
 
-    public async Task<BidResultDto> PlaceBidAsync(
-        Guid itemId,
-        string teamToken,
-        decimal amount,
-        uint expectedRowVersion,
-        CancellationToken ct)
+    public async Task<BidResultDto> PlaceBidAsync(Guid itemId, string teamToken, decimal amount, uint expectedRowVersion, CancellationToken ct)
     {
         if (amount <= 0)
-        {
             throw new MarketValidationException("O valor do lance deve ser maior que zero.");
-        }
 
         EnsureExpectedRowVersion(expectedRowVersion);
 
         var normalizedToken = NormalizeToken(teamToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
-
-        var item = await _dbContext.MarketItems
-            .Include(i => i.Player)
-                .ThenInclude(p => p.Position)
-            .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
-            .ConfigureAwait(false)
-            ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
-
-        EnsureRowVersion(item.RowVersion, expectedRowVersion);
-
-        if (item.Status != MarketItemStatus.Published)
+        return await InSerializableTxAsync<BidResultDto>(async ct2 =>
         {
-            throw new MarketConflictException("O item não está disponível para lances.");
-        }
+            var item = await _dbContext.MarketItems
+                .Include(i => i.Player).ThenInclude(p => p.Position)
+                .FirstOrDefaultAsync(i => i.ItemId == itemId, ct2)
+                ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
 
-        if (item.ExpiresAtUtc <= now)
-        {
-            throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
-        }
+            EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
-        var team = await _dbContext.Teams
-            .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct)
-            .ConfigureAwait(false)
-            ?? throw new MarketForbiddenException("Token de time inválido.");
+            if (item.Status != MarketItemStatus.Published)
+                throw new MarketConflictException("O item não está disponível para lances.");
 
-        var minimumBid = item.CurrentLeaderAmount.HasValue
-            ? item.CurrentLeaderAmount.Value + item.MinIncrement
-            : item.BasePrice;
+            if (item.ExpiresAtUtc <= now)
+                throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
-        if (amount < minimumBid)
-        {
-            throw new MarketValidationException($"O lance mínimo permitido é {minimumBid:0.00}.");
-        }
+            var team = await _dbContext.Teams
+                .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
+                ?? throw new MarketForbiddenException("Token de time inválido.");
 
-        await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct).ConfigureAwait(false);
+            var minimumBid = item.CurrentLeaderAmount.HasValue
+                ? item.CurrentLeaderAmount.Value + item.MinIncrement
+                : item.BasePrice;
 
-        var availableBudget = team.Budget - team.BudgetBlocked;
-        if (availableBudget < amount)
-        {
-            throw new MarketConflictException("Saldo insuficiente para registrar o lance.");
-        }
+            if (amount < minimumBid)
+                throw new MarketValidationException($"O lance mínimo permitido é {minimumBid:0.00}.");
 
-        var previousLeaderId = item.CurrentLeaderTeamId;
-        var previousAmount = item.CurrentLeaderAmount ?? 0m;
-        string? outbidNotes = null;
+            await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct2);
 
-        if (previousLeaderId.HasValue)
-        {
-            var previousTeam = await _dbContext.Teams
-                .FirstOrDefaultAsync(t => t.TeamId == previousLeaderId.Value, ct)
-                .ConfigureAwait(false);
+            var availableBudget = team.Budget - team.BudgetBlocked;
+            if (availableBudget < amount)
+                throw new MarketConflictException("Saldo insuficiente para registrar o lance.");
 
-            if (previousTeam is not null)
+            var previousLeaderId = item.CurrentLeaderTeamId;
+            var previousAmount = item.CurrentLeaderAmount ?? 0m;
+            string? outbidNotes = null;
+
+            if (previousLeaderId.HasValue)
             {
-                previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - previousAmount);
+                var previousTeam = await _dbContext.Teams
+                    .FirstOrDefaultAsync(t => t.TeamId == previousLeaderId.Value, ct2);
 
-                var previousTeamName = string.IsNullOrWhiteSpace(previousTeam.TeamName)
-                    ? previousTeam.TeamId.ToString()
-                    : previousTeam.TeamName;
-                outbidNotes = $"Time {previousTeamName} foi superado no leilão.";
+                if (previousTeam is not null)
+                {
+                    previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - previousAmount);
+                    var previousTeamName = string.IsNullOrWhiteSpace(previousTeam.TeamName)
+                        ? previousTeam.TeamId.ToString()
+                        : previousTeam.TeamName;
+                    outbidNotes = $"Time {previousTeamName} foi superado no leilão.";
+                }
+                else
+                {
+                    outbidNotes = "Líder anterior não encontrado ao liberar orçamento.";
+                }
             }
-            else
+
+            team.BudgetBlocked += amount;
+
+            var bid = new MarketBid
             {
-                outbidNotes = "Líder anterior não encontrado ao liberar orçamento.";
+                BidId = Guid.NewGuid(),
+                ItemId = item.ItemId,
+                TeamId = team.TeamId,
+                Amount = amount,
+                CreatedAtUtc = now
+            };
+
+            item.CurrentLeaderTeamId = team.TeamId;
+            item.CurrentLeaderAmount = amount;
+            item.LastUpdateUtc = now;
+
+            var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
+            if (!string.IsNullOrWhiteSpace(outbidNotes))
+                bidNotes = $"{bidNotes} {outbidNotes}";
+
+            await _transactionLogService.LogMarketAsync(
+                item, MarketTransactionType.BidPlaced, team.TeamId, previousLeaderId,
+                amount, team.TeamId.ToString(), bidNotes, now, ct2);
+
+            await _dbContext.MarketBids.AddAsync(bid, ct2);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(ct2);
             }
-        }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                throw new MarketPreconditionFailedException(
+                    "O item foi atualizado por outro time. Atualize a página e tente novamente.", ex);
+            }
 
-        team.BudgetBlocked += amount;
-
-        var bid = new MarketBid
-        {
-            BidId = Guid.NewGuid(),
-            ItemId = item.ItemId,
-            TeamId = team.TeamId,
-            Amount = amount,
-            CreatedAtUtc = now
-        };
-
-        item.CurrentLeaderTeamId = team.TeamId;
-        item.CurrentLeaderAmount = amount;
-        item.LastUpdateUtc = now;
-
-        var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
-        if (!string.IsNullOrWhiteSpace(outbidNotes))
-        {
-            bidNotes = $"{bidNotes} {outbidNotes}";
-        }
-
-        await _transactionLogService.LogMarketAsync(
-            item,
-            MarketTransactionType.BidPlaced,
-            team.TeamId,
-            previousLeaderId,
-            amount,
-            team.TeamId.ToString(),
-            bidNotes,
-            now,
-            ct).ConfigureAwait(false);
-
-        await _dbContext.MarketBids.AddAsync(bid, ct).ConfigureAwait(false);
-
-        try
-        {
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            throw new MarketPreconditionFailedException(
-                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
-                ex);
-        }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
-
-        return new BidResultDto(true, "Lance registrado com sucesso.", amount);
+            return new BidResultDto(true, "Lance registrado com sucesso.", amount);
+        }, ct);
     }
 
-    public async Task<BuyNowResultDto> BuyNowAsync(
-        Guid itemId,
-        string teamToken,
-        uint expectedRowVersion,
-        CancellationToken ct)
+    public async Task<BuyNowResultDto> BuyNowAsync(Guid itemId, string teamToken, uint expectedRowVersion, CancellationToken ct)
     {
         EnsureExpectedRowVersion(expectedRowVersion);
 
         var normalizedToken = NormalizeToken(teamToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
-
-        var item = await _dbContext.MarketItems
-            .Include(i => i.Player)
-                .ThenInclude(p => p.Position)
-            .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
-            .ConfigureAwait(false)
-            ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
-
-        EnsureRowVersion(item.RowVersion, expectedRowVersion);
-
-        var previousLeaderId = item.CurrentLeaderTeamId;
-
-        if (item.Status != MarketItemStatus.Published)
+        return await InSerializableTxAsync<BuyNowResultDto>(async ct2 =>
         {
-            throw new MarketConflictException("O item não está disponível para compra imediata.");
-        }
+            var item = await _dbContext.MarketItems
+                .Include(i => i.Player).ThenInclude(p => p.Position)
+                .FirstOrDefaultAsync(i => i.ItemId == itemId, ct2)
+                ?? throw new MarketNotFoundException("Item de mercado não encontrado.");
 
-        if (!item.BuyNowPrice.HasValue)
-        {
-            throw new MarketConflictException("O item não possui opção de compra imediata.");
-        }
+            EnsureRowVersion(item.RowVersion, expectedRowVersion);
 
-        var buyNowPrice = item.BuyNowPrice.Value;
+            var previousLeaderId = item.CurrentLeaderTeamId;
 
-        if (item.ExpiresAtUtc <= now)
-        {
-            throw new MarketConflictException("O item já expirou. Atualize e tente novamente.");
-        }
+            if (item.Status != MarketItemStatus.Published)
+                throw new MarketConflictException("O item não está disponível para compra imediata.");
 
-        var team = await _dbContext.Teams
-            .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct)
-            .ConfigureAwait(false)
-            ?? throw new MarketForbiddenException("Token de time inválido.");
+            if (!item.BuyNowPrice.HasValue)
+                throw new MarketConflictException("O item não possui opção de compra imediata.");
 
-        await EnsureSquadLimitAsync(team.TeamId, item.ItemId, null, ct, includeCurrentItem: true).ConfigureAwait(false);
+            var buyNowPrice = item.BuyNowPrice.Value;
 
-        var blockedForItem = item.CurrentLeaderTeamId == team.TeamId ? item.CurrentLeaderAmount ?? 0m : 0m;
-        var available = team.Budget - team.BudgetBlocked + blockedForItem;
+            if (item.ExpiresAtUtc <= now)
+                throw new MarketConflictException("O item já expirou. Atualize e tente novamente.");
 
-        if (available < buyNowPrice)
-        {
-            throw new MarketConflictException("Saldo insuficiente para comprar agora.");
-        }
+            var team = await _dbContext.Teams
+                .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
+                ?? throw new MarketForbiddenException("Token de time inválido.");
 
-        var player = await _dbContext.Players
-            .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)
-            .ConfigureAwait(false)
-            ?? throw new MarketNotFoundException("Jogador não encontrado para este item.");
+            await EnsureSquadLimitAsync(team.TeamId, item.ItemId, null, ct2, includeCurrentItem: true);
 
-        if (player.CurrentTeamId.HasValue && player.CurrentTeamId != team.TeamId)
-        {
-            throw new MarketConflictException("O jogador já está vinculado a outro elenco.");
-        }
+            var blockedForItem = item.CurrentLeaderTeamId == team.TeamId ? item.CurrentLeaderAmount ?? 0m : 0m;
+            var available = team.Budget - team.BudgetBlocked + blockedForItem;
 
-        Team? previousLeaderTeam = null;
+            if (available < buyNowPrice)
+                throw new MarketConflictException("Saldo insuficiente para comprar agora.");
 
-        if (item.CurrentLeaderTeamId.HasValue)
-        {
-            var previousTeam = await _dbContext.Teams
-                .FirstOrDefaultAsync(t => t.TeamId == item.CurrentLeaderTeamId.Value, ct)
-                .ConfigureAwait(false);
+            var player = await _dbContext.Players
+                .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct2)
+                ?? throw new MarketNotFoundException("Jogador não encontrado para este item.");
 
-            if (previousTeam is not null)
+            if (player.CurrentTeamId.HasValue && player.CurrentTeamId != team.TeamId)
+                throw new MarketConflictException("O jogador já está vinculado a outro elenco.");
+
+            Team? previousLeaderTeam = null;
+
+            if (item.CurrentLeaderTeamId.HasValue)
             {
-                previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - (item.CurrentLeaderAmount ?? 0m));
-                previousLeaderTeam = previousTeam;
+                var previousTeam = await _dbContext.Teams
+                    .FirstOrDefaultAsync(t => t.TeamId == item.CurrentLeaderTeamId.Value, ct2);
+
+                if (previousTeam is not null)
+                {
+                    previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - (item.CurrentLeaderAmount ?? 0m));
+                    previousLeaderTeam = previousTeam;
+                }
             }
-        }
 
-        string? takeoverNotes = null;
-        if (previousLeaderId.HasValue && previousLeaderId != team.TeamId)
-        {
-            takeoverNotes = previousLeaderTeam is not null
-                ? $"Time {(!string.IsNullOrWhiteSpace(previousLeaderTeam.TeamName) ? previousLeaderTeam.TeamName : previousLeaderTeam.TeamId.ToString())} foi superado na compra imediata."
-                : "Líder anterior não encontrado ao processar compra imediata.";
-        }
+            string? takeoverNotes = null;
+            if (previousLeaderId.HasValue && previousLeaderId != team.TeamId)
+            {
+                takeoverNotes = previousLeaderTeam is not null
+                    ? $"Time {(!string.IsNullOrWhiteSpace(previousLeaderTeam.TeamName) ? previousLeaderTeam.TeamName : previousLeaderTeam.TeamId.ToString())} foi superado na compra imediata."
+                    : "Líder anterior não encontrado ao processar compra imediata.";
+            }
 
-        team.Budget -= buyNowPrice;
-        team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - blockedForItem);
+            team.Budget -= buyNowPrice;
+            team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - blockedForItem);
 
-        player.CurrentTeamId = team.TeamId;
-        await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
+            player.CurrentTeamId = team.TeamId;
+            await SyncRosterAsync(team.TeamId, player.PlayerId, ct2);
 
-        item.Status = MarketItemStatus.Settled;
-        item.WinnerTeamId = team.TeamId;
-        item.LastUpdateUtc = now;
-        item.ExpiresAtUtc = now;
+            item.Status = MarketItemStatus.Settled;
+            item.WinnerTeamId = team.TeamId;
+            item.LastUpdateUtc = now;
+            item.ExpiresAtUtc = now;
 
-        var buyNowNotes = FormattableString.Invariant($"Compra imediata por {buyNowPrice:0.00}.");
-        if (!string.IsNullOrWhiteSpace(takeoverNotes))
-        {
-            buyNowNotes = $"{buyNowNotes} {takeoverNotes}";
-        }
+            var buyNowNotes = FormattableString.Invariant($"Compra imediata por {buyNowPrice:0.00}.");
+            if (!string.IsNullOrWhiteSpace(takeoverNotes))
+                buyNowNotes = $"{buyNowNotes} {takeoverNotes}";
 
-        await _transactionLogService.LogMarketAsync(
-            item,
-            MarketTransactionType.BuyNow,
-            team.TeamId,
-            previousLeaderId,
-            buyNowPrice,
-            team.TeamId.ToString(),
-            buyNowNotes,
-            now,
-            ct).ConfigureAwait(false);
+            await _transactionLogService.LogMarketAsync(
+                item, MarketTransactionType.BuyNow, team.TeamId, previousLeaderId,
+                buyNowPrice, team.TeamId.ToString(), buyNowNotes, now, ct2);
 
-        await _dbContext.TransferHistories.AddAsync(new TransferHistory
-        {
-            TransferId = Guid.NewGuid(),
-            PlayerId = player.PlayerId,
-            FromTeamId = null,
-            ToTeamId = team.TeamId,
-            Amount = buyNowPrice,
-            Type = TransferType.MarketAuction,
-            Notes = "Compra imediata",
-            PerformedBy = "sistema",
-            PerformedAtUtc = now
-        }, ct).ConfigureAwait(false);
+            await _dbContext.TransferHistories.AddAsync(new TransferHistory
+            {
+                TransferId = Guid.NewGuid(),
+                PlayerId = player.PlayerId,
+                FromTeamId = null,
+                ToTeamId = team.TeamId,
+                Amount = buyNowPrice,
+                Type = TransferType.MarketAuction,
+                Notes = "Compra imediata",
+                PerformedBy = "sistema",
+                PerformedAtUtc = now
+            }, ct2);
 
-        try
-        {
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            throw new MarketPreconditionFailedException(
-                "O item foi atualizado por outro time. Atualize a página e tente novamente.",
-                ex);
-        }
+            try
+            {
+                await _dbContext.SaveChangesAsync(ct2);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                throw new MarketPreconditionFailedException(
+                    "O item foi atualizado por outro time. Atualize a página e tente novamente.", ex);
+            }
 
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
-
-        return new BuyNowResultDto(true, "Compra realizada com sucesso.");
+            return new BuyNowResultDto(true, "Compra realizada com sucesso.");
+        }, ct);
     }
 
     public async Task<int> CloseExpiredItemsAsync(CancellationToken ct)
@@ -707,5 +646,26 @@ public class MarketService : IMarketService
         {
             throw new MarketPreconditionFailedException("O item foi atualizado por outro time. Atualize a página e tente novamente.");
         }
+    }
+
+    private async Task<T> InSerializableTxAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct)
+    {
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            try
+            {
+                var result = await work(ct);
+                await tx.CommitAsync(ct);
+                return result;
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        });
     }
 }
