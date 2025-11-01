@@ -257,8 +257,7 @@ public static class MarketCycleEndpoints
                 filters.MinOverall,
                 filters.MaxOverall,
                 filters.MinAge,
-                filters.MaxAge,
-                filters.OnlyFreeAgents),
+                filters.MaxAge),
             new MarketItemLifecycleOptions(
                 lifecycle.PublishAtUtc,
                 lifecycle.ExpiresAtUtc,

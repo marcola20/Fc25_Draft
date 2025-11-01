@@ -1,3 +1,4 @@
+using System;
 using System.Data;
 using System.Linq;
 using Fc25Draft.Core.DTOs;
@@ -252,15 +253,19 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         HashSet<int> excluded,
         CancellationToken ct)
     {
-        filters ??= new MarketItemGenerationFilters(null, null, null, null, null, null, true);
+        filters ??= new MarketItemGenerationFilters(null, null, null, null, null, null);
+
+        var excludedIds = excluded.Count > 0 ? excluded.ToArray() : Array.Empty<int>();
 
         var query = _dbContext.Players
             .AsNoTracking()
-            .Where(p => !excluded.Contains(p.PlayerId));
+            .Where(p => p.CurrentTeamId == null)
+            .Where(p => !_dbContext.MarketItems
+                .Any(i => i.PlayerId == p.PlayerId && i.Status == MarketItemStatus.Active && i.Cycle.Status == MarketCycleStatus.Active));
 
-        if (filters.OnlyFreeAgents)
+        if (excludedIds.Length > 0)
         {
-            query = query.Where(p => p.CurrentTeamId == null);
+            query = query.Where(p => !excludedIds.Contains(p.PlayerId));
         }
 
         if (filters.PlayerIds is { Count: > 0 })

@@ -15,7 +15,6 @@ public class MarketItemGenerationFormModelTests
 
         Assert.Equal(cycleId, model.CycleId);
         Assert.Equal(10, model.DesiredCount);
-        Assert.True(model.Filters.OnlyFreeAgents);
         Assert.Equal(24, model.Lifecycle.DurationHours);
     }
 

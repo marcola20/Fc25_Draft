@@ -42,7 +42,7 @@ public class MarketItemGenerationServiceTests
         var options = new MarketItemGenerationOptions(
             1,
             123,
-            new MarketItemGenerationFilters(null, null, null, null, null, null, true),
+            new MarketItemGenerationFilters(null, null, null, null, null, null),
             new MarketItemLifecycleOptions(null, null, null));
 
         await Assert.ThrowsAsync<MarketValidationException>(
@@ -81,7 +81,7 @@ public class MarketItemGenerationServiceTests
         var options = new MarketItemGenerationOptions(
             2,
             555,
-            new MarketItemGenerationFilters(null, null, null, null, null, null, true),
+            new MarketItemGenerationFilters(null, null, null, null, null, null),
             new MarketItemLifecycleOptions(null, null, null));
 
         var ex = await Assert.ThrowsAsync<MarketValidationException>(
@@ -131,7 +131,7 @@ public class MarketItemGenerationServiceTests
         var options = new MarketItemGenerationOptions(
             2,
             99,
-            new MarketItemGenerationFilters(null, null, null, null, null, null, true),
+            new MarketItemGenerationFilters(null, null, null, null, null, null),
             new MarketItemLifecycleOptions(null, null, null));
 
         var first = await service.GenerateAsync(cycleId, options, CancellationToken.None);

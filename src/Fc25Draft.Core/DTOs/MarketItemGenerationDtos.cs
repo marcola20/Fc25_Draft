@@ -6,8 +6,7 @@ public record MarketItemGenerationFilters(
     int? MinOverall,
     int? MaxOverall,
     int? MinAge,
-    int? MaxAge,
-    bool OnlyFreeAgents);
+    int? MaxAge);
 
 public record MarketItemLifecycleOptions(
     DateTime? PublishAtUtc,

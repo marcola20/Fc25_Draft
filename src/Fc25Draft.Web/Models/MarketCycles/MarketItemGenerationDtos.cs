@@ -30,7 +30,6 @@ public class MarketItemGenerationFiltersDto
     public int? MinAge { get; set; }
     [Range(15, 60)]
     public int? MaxAge { get; set; }
-    public bool OnlyFreeAgents { get; set; } = true;
 }
 
 public class MarketItemGenerationLifecycleDto

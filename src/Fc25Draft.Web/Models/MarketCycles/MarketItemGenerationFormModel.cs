@@ -73,8 +73,6 @@ public class MarketItemGenerationFiltersModel : IValidatableObject
     [Range(15, 60, ErrorMessage = "A idade máxima deve estar entre 15 e 60 anos.")]
     public int? MaxAge { get; set; }
 
-    public bool OnlyFreeAgents { get; set; } = true;
-
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (MinOverall.HasValue && MaxOverall.HasValue && MinOverall.Value > MaxOverall.Value)
@@ -101,8 +99,7 @@ public class MarketItemGenerationFiltersModel : IValidatableObject
             MinOverall = MinOverall,
             MaxOverall = MaxOverall,
             MinAge = MinAge,
-            MaxAge = MaxAge,
-            OnlyFreeAgents = OnlyFreeAgents
+            MaxAge = MaxAge
         };
     }
 }

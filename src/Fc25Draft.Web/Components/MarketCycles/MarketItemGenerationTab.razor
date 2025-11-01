@@ -112,12 +112,6 @@ else
                                 <ValidationMessage For="@(() => _model!.Filters.MaxAge)" />
                             </div>
                             <div class="col-12">
-                                <div class="form-check">
-                                    <InputCheckbox id="generation-free-agents" class="form-check-input" @bind-Value="_model!.Filters.OnlyFreeAgents" />
-                                    <label class="form-check-label" for="generation-free-agents">Apenas agentes livres</label>
-                                </div>
-                            </div>
-                            <div class="col-12">
                                 <label class="form-label d-block">Posições</label>
                                 @if (_isLoadingPositions)
                                 {
