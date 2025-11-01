@@ -1,6 +1,7 @@
 @page "/teams/details/{Id:guid}"
 @using System.Linq
 @using System.Globalization
+@using Fc25Draft.Core.Extensions
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
@@ -62,7 +63,18 @@ else
                     <thead>
                         <tr>
                             <th scope="col">Jogador</th>
-                            <th scope="col" class="text-center">Posição</th>
+                            <th scope="col" class="text-center" aria-sort="@GetAriaSort(RosterSortColumn.Position)">
+                                <button type="button"
+                                        class="@GetSortButtonClass(RosterSortColumn.Position)"
+                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Position)">
+                                    Posição
+                                    @if (_activeSortColumn == RosterSortColumn.Position)
+                                    {
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Position)</span>
+                                    }
+                                </button>
+                            </th>
                             <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.Overall)">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Overall)"
@@ -144,7 +156,7 @@ else
     private bool authInitialized;
     private readonly List<RosterPlayerViewModel> _rosterPlayers = new();
     private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
-    private RosterSortColumn? _activeSortColumn;
+    private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -235,9 +247,12 @@ else
                 basePrice = 0m;
             }
 
+            var positionId = player.Posicao.ToPositionId();
+
             _rosterPlayers.Add(new RosterPlayerViewModel(
                 player.Nome,
                 player.Posicao,
+                positionId,
                 player.Overall,
                 player.Idade,
                 basePrice));
@@ -257,6 +272,7 @@ else
             _activeSortColumn = column;
             _sortDescending = column switch
             {
+                RosterSortColumn.Position => false,
                 RosterSortColumn.Age => false,
                 _ => true
             };
@@ -271,12 +287,16 @@ else
 
         if (_activeSortColumn is null)
         {
-            query = query.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            query = query.OrderBy(p => p.PositionId)
+                .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
         }
         else
         {
             query = _activeSortColumn switch
             {
+                RosterSortColumn.Position => _sortDescending
+                    ? query.OrderByDescending(p => p.PositionId).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(p => p.PositionId).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
                 RosterSortColumn.Overall => _sortDescending
                     ? query.OrderByDescending(p => p.Overall).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                     : query.OrderBy(p => p.Overall).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
@@ -333,10 +353,11 @@ else
 
     private enum RosterSortColumn
     {
+        Position,
         Overall,
         Age,
         BasePrice
     }
 
-    private sealed record RosterPlayerViewModel(string Name, string Position, int Overall, int? Age, decimal BasePrice);
+    private sealed record RosterPlayerViewModel(string Name, string Position, int PositionId, int Overall, int? Age, decimal BasePrice);
 }
