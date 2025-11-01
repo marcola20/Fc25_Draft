@@ -168,6 +168,14 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                     throw new MarketConflictException("Não é possível reabrir um ciclo encerrado.");
 
                 cycle.Status = MarketCycleStatus.Active;
+                cycle.UpdatedAtUtc = nowUtc;
+
+                await _dbContext.MarketItems
+                    .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Draft)
+                    .ExecuteUpdateAsync(set => set
+                        .SetProperty(i => i.Status, MarketItemStatus.Active)
+                        .SetProperty(i => i.LastUpdateUtc, nowUtc),
+                        ct);
             }
             else if (newStatus == MarketCycleStatus.Closed)
             {
@@ -175,17 +183,16 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                     throw new MarketConflictException("Apenas ciclos ativos podem ser encerrados sem 'force'.");
 
                 cycle.Status = MarketCycleStatus.Closed;
+                cycle.UpdatedAtUtc = nowUtc;
             }
             else
             {
                 cycle.Status = newStatus;
+                cycle.UpdatedAtUtc = nowUtc;
             }
-
-            cycle.UpdatedAtUtc = nowUtc;
 
             await _dbContext.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-
             return ToDto(cycle);
         });
     }
