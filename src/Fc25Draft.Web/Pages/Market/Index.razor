@@ -96,14 +96,14 @@
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
             @foreach (var item in PageData.Items)
             {
-                <div class="col" @key="item.ItemId">
-                    <MarketItemCard
-                        Item="item"
-                        CurrentTeamId="_currentTeamId"
-                        ServerTimeOffset="ServerTimeOffset"
-                        OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
-                        OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
-                        OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))" />
+                <div class="col">
+                    <MarketItemCard @key="item.ItemId"
+                                    Item="item"
+                                    CurrentTeamId="_currentTeamId"
+                                    ServerTimeOffset="ServerTimeOffset"
+                                    OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
+                                    OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
+                                    OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))" />
                 </div>
             }
         </div>

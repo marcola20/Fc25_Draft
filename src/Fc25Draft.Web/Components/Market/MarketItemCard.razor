@@ -70,13 +70,13 @@
             <div class="mb-2">
                 <label class="form-label" for="@BidInputId">Valor do lance</label>
                 <div class="input-group input-group-sm">
-                    <InputText @bind-Value="_model.AmountText"
-                               @bind-Value:event="oninput"
+                    <InputText @key="Item.ItemId"
+                               @bind-Value="_model.AmountText"
+                               @bind-Value:event="onchange"
                                class="form-control me-2"
                                id="@BidInputId"
                                inputmode="decimal"
                                placeholder="Ex.: R$ 30.000.000,00"
-                               @onfocus="HandleBidFocus"
                                @onblur="HandleBidBlur" />
                     <button type="submit"
                             class="btn btn-primary"
@@ -169,6 +169,8 @@
     private bool _showBuyConfirm;
     private string? _infoMessage;
     private string? _errorMessage;
+    private bool _touched;
+    private string? _lastFormatted;
 
     private string BidInputId => $"bid-amount-{Item.ItemId}";
 
@@ -265,8 +267,8 @@
         }
 
         EnsureTimer();
-        ValidateAmount();
     }
+
 
     private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e)
     {
@@ -357,19 +359,16 @@
         NotifyAmountChanged();
     }
 
-    private void HandleBidFocus(FocusEventArgs _)
+    private void MarkTouched(string _)
     {
-        if (string.IsNullOrWhiteSpace(_model.AmountText))
-        {
-            SetBidToMinimum();
-        }
+        _touched = true;
     }
 
     private void HandleBidBlur(FocusEventArgs _)
     {
         if (!TryParseAmount(_model.AmountText, out var parsed) || parsed < Item.RequiredMinBid)
         {
-            ValidateAmount();
+            ValidateAmount(); 
             return;
         }
 

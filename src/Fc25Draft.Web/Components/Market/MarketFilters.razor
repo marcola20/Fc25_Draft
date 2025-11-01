@@ -28,6 +28,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-positions">Posições</label>
                 <div class="dropdown w-100">
@@ -61,6 +62,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-status">Status</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
@@ -71,6 +73,7 @@
                     }
                 </InputSelect>
             </div>
+
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-sort">Ordenar por</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
@@ -81,6 +84,7 @@
                     }
                 </InputSelect>
             </div>
+
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-overall-min">Overall</label>
                 <div class="input-group input-group-sm">
@@ -99,13 +103,17 @@
                                  aria-label="Overall máximo" />
                 </div>
             </div>
-            <div class="col-12 col-md-auto">
-                <div class="d-flex flex-wrap align-items-end gap-2">
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-12">
+                <div class="d-flex flex-wrap align-items-center gap-2">
                     <button type="submit" class="btn btn-primary btn-sm">Aplicar filtros</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
+
                     @if (!string.IsNullOrWhiteSpace(ResultsSummary))
                     {
-                        <span class="text-muted small align-self-center">@ResultsSummary</span>
+                        <span class="text-muted small ms-auto">@ResultsSummary</span>
                     }
                 </div>
             </div>
