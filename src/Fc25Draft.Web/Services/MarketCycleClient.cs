@@ -139,6 +139,21 @@ public class MarketCycleClient
         return result;
     }
 
+    public async Task<MarketCycleStatusUpdateResult> ConcludeAsync(Guid cycleId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
+
+        using var response = await client.PostAsync($"api/admin/market/cycles/{cycleId}:conclude", content: null, ct).ConfigureAwait(false);
+
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+
+        var result = await response.Content
+            .ReadFromJsonAsync<MarketCycleStatusUpdateResult>(SerializerOptions, ct)
+            .ConfigureAwait(false);
+
+        return result ?? throw new InvalidOperationException("Resposta inválida do servidor ao concluir o ciclo.");
+    }
+
     private static void AppendQueryString(StringBuilder builder, MarketCycleQueryRequest request)
     {
         var hasQuery = false;
