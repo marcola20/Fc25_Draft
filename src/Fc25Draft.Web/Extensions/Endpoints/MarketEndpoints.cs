@@ -146,46 +146,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return Results.Ok(new { cicloId = cycle.CycleId, vendidos = summary.Sold, expirados = summary.Expired });
             });
 
-            adminMarketApi.MapPost("/cancel/{itemId:guid}", async (
-                Guid itemId,
-                AdminCancelMarketItemRequestDto request,
-                HttpContext httpContext,
-                AdminTransferService adminTransferService,
-                CancellationToken ct) =>
-            {
-                if (request is null)
-                {
-                    return Results.BadRequest(new { message = "Payload inválido." });
-                }
-
-                if (!EndpointHelpers.TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
-                {
-                    return errorResult!;
-                }
-
-                try
-                {
-                    await adminTransferService.CancelMarketItemAsync(adminToken!, itemId, request.Reason, ct);
-                    return Results.Ok(new { message = "Item cancelado com sucesso." });
-                }
-                catch (AdminForbiddenException ex)
-                {
-                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.BadRequest(new { message = ex.Message });
-                }
-                catch (AdminConflictException ex)
-                {
-                    return Results.Conflict(new { message = ex.Message });
-                }
-                catch (KeyNotFoundException ex)
-                {
-                    return Results.NotFound(new { message = ex.Message });
-                }
-            });
-
             return api;
         }
 

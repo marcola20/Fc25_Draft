@@ -45,13 +45,6 @@ public class AdminTransfersApiClient
         return await ReadMessageAsync(response);
     }
 
-    public async Task<string> CancelMarketItemAsync(Guid itemId, AdminCancelMarketItemRequestDto request, CancellationToken ct = default)
-    {
-        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
-        var response = await client.PostAsJsonAsync($"api/admin/market/cancel/{itemId}", request, ct);
-        return await ReadMessageAsync(response);
-    }
-
     private static async Task<string> ReadMessageAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)

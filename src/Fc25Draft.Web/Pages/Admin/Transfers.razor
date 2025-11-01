@@ -52,12 +52,6 @@ else
                 Ajustar orçamento
             </button>
         </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link @(selectedTab == "cancel" ? "active" : null)"
-                    @onclick='() => SelectTab("cancel")'>
-                Cancelar mercado
-            </button>
-        </li>
     </ul>
 
     @switch (selectedTab)
@@ -439,45 +433,6 @@ else
 
                     <div class="mt-3">
                         <button class="btn btn-primary" type="submit" disabled="@(isSubmittingBudget)">Aplicar ajuste</button>
-                    </div>
-                </EditForm>
-            </div>
-            break;
-        case "cancel":
-            <div>
-                @if (!string.IsNullOrEmpty(cancelSuccessMessage))
-                {
-                    <div class="alert alert-success" role="alert">@cancelSuccessMessage</div>
-                }
-                @if (!string.IsNullOrEmpty(cancelErrorMessage))
-                {
-                    <div class="alert alert-danger" role="alert">@cancelErrorMessage</div>
-                }
-
-                <EditForm EditContext="cancelEditContext" OnValidSubmit="SubmitCancelAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <div class="mb-3">
-                        <label class="form-label" for="cancel-item">Item de mercado</label>
-                        <InputSelect id="cancel-item" class="form-select" TValue="Guid" @bind-Value="cancelModel.MarketItemId">
-                            <option value="@Guid.Empty">Selecione</option>
-                            @foreach (var item in marketItems)
-                            {
-                                <option value="@item.ItemId">@item.PlayerName (@item.Position) - expira em @item.ExpiresAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</option>
-                            }
-                        </InputSelect>
-                        <ValidationMessage For="() => cancelModel.MarketItemId" />
-                    </div>
-
-                    <div class="mt-3">
-                        <label class="form-label" for="cancel-reason">Motivo</label>
-                        <InputTextArea id="cancel-reason" class="form-control" rows="3" @bind-Value="cancelModel.Reason" />
-                        <ValidationMessage For="() => cancelModel.Reason" />
-                    </div>
-
-                    <div class="mt-3">
-                        <button class="btn btn-danger" type="submit" disabled="@(isSubmittingCancel)">Cancelar item</button>
                     </div>
                 </EditForm>
             </div>
@@ -1139,42 +1094,6 @@ else
         finally
         {
             isSubmittingBudget = false;
-        }
-    }
-
-    private async Task SubmitCancelAsync()
-    {
-        if (cancelModel.MarketItemId == Guid.Empty)
-        {
-            cancelErrorMessage = "Selecione um item para cancelar.";
-            return;
-        }
-
-        isSubmittingCancel = true;
-        cancelErrorMessage = null;
-        cancelSuccessMessage = null;
-
-        try
-        {
-            var reason = string.IsNullOrWhiteSpace(cancelModel.Reason)
-                ? null
-                : cancelModel.Reason.Trim();
-            var request = new AdminCancelMarketItemRequestDto(reason);
-            var message = await AdminTransfersApiClient.CancelMarketItemAsync(cancelModel.MarketItemId, request);
-            cancelSuccessMessage = message;
-
-            cancelModel.MarketItemId = Guid.Empty;
-            cancelModel.Reason = null;
-
-            await LoadDataAsync();
-        }
-        catch (Exception ex)
-        {
-            cancelErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSubmittingCancel = false;
         }
     }
 
