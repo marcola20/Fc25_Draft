@@ -162,6 +162,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             return ToDto(cycle);
         }
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         if (status == MarketCycleStatus.Open)
         {
             var hasOtherOpen = await _dbContext.MarketCycles
@@ -172,6 +174,26 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             if (hasOtherOpen)
             {
                 throw new MarketConflictException("Já existe um ciclo aberto.");
+            }
+
+            var items = await _dbContext.MarketItems
+                .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Draft)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            foreach (var item in items)
+            {
+                if (item.ExpiresAtUtc <= now)
+                {
+                    item.Status = MarketItemStatus.Canceled;
+                    item.LastUpdateUtc = now;
+                    continue;
+                }
+
+                // FIX: Promote draft market items when opening a cycle so they appear in the active market.
+                item.Status = MarketItemStatus.Published;
+                item.PublishedAtUtc = now;
+                item.LastUpdateUtc = now;
             }
         }
 
@@ -204,7 +226,7 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         }
 
         cycle.Status = status;
-        cycle.UpdatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        cycle.UpdatedAtUtc = now;
 
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
