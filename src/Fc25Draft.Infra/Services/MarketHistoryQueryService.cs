@@ -84,7 +84,7 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
         if (filter.FromUtc.HasValue)
         {
             var from = EnsureUtc(filter.FromUtc.Value);
-            q = q.Where(x => x.m.CreatedAtUtc >= from);
+            q = q.Where(x => x.m.CreatedAtUtc > from);
         }
 
         if (filter.ToUtc.HasValue)
@@ -190,7 +190,7 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
         if (filter.FromUtc.HasValue)
         {
             var from = EnsureUtc(filter.FromUtc.Value);
-            q = q.Where(x => x.m.CreatedAtUtc >= from);
+            q = q.Where(x => x.m.CreatedAtUtc > from);
         }
 
         if (filter.ToUtc.HasValue)

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -147,6 +148,78 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
             ?? (problem.Extensions.TryGetValue("message", out var extension) ? extension?.ToString() : null)
             ?? string.Empty;
         Assert.Contains("already leads", detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostBid_AddsHistoryEntry_ForRealtimeRefresh()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var scenario = await SeedBidScenarioAsync(
+            factory,
+            basePrice: 18_000_000m,
+            minIncrement: 1_000_000m,
+            currentLeaderAmount: null,
+            buyNowPrice: 40_000_000m,
+            teamBudget: 90_000_000m);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            var item = await db.MarketItems.FirstAsync(i => i.ItemId == scenario.ItemId);
+            var seedTeamId = Guid.NewGuid();
+            db.MarketTransactions.Add(new MarketTransaction
+            {
+                TransactionId = Guid.NewGuid(),
+                CycleId = scenario.CycleId,
+                ItemId = scenario.ItemId,
+                PlayerId = item.PlayerId,
+                TeamId = seedTeamId,
+                TargetTeamId = scenario.TeamId,
+                Type = MarketTransactionType.BidPlaced,
+                Amount = scenario.BasePrice,
+                PerformedBy = seedTeamId.ToString(),
+                Notes = "Seed history entry",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10)
+            });
+
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+        }
+
+        var client = factory.CreateClient();
+        var baselineResponse = await client.GetAsync($"/api/market/items/{scenario.ItemId}/history");
+        baselineResponse.EnsureSuccessStatusCode();
+
+        var baseline = await baselineResponse.Content.ReadFromJsonAsync<PagedResult<MarketTransactionDto>>(GetJsonOptions());
+        var latestBefore = baseline?.Items?.Max(i => i.OccurredAtUtc);
+
+        var minimum = MarketPricing.ComputeRequiredMinBid(
+            scenario.BasePrice,
+            scenario.MinIncrement,
+            scenario.CurrentLeaderAmount,
+            scenario.BuyNowPrice);
+
+        using var request = BuildBidRequest(scenario, amount: minimum);
+        var bidResponse = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, bidResponse.StatusCode);
+
+        var query = latestBefore.HasValue
+            ? $"?from={Uri.EscapeDataString(latestBefore.Value.ToString("O"))}"
+            : string.Empty;
+
+        var historyResponse = await client.GetAsync($"/api/market/items/{scenario.ItemId}/history{query}");
+        historyResponse.EnsureSuccessStatusCode();
+
+        var history = await historyResponse.Content.ReadFromJsonAsync<PagedResult<MarketTransactionDto>>(GetJsonOptions());
+        Assert.NotNull(history);
+        Assert.NotEmpty(history!.Items);
+        Assert.Contains(history.Items, h =>
+            h.Type == MarketTransactionType.BidPlaced &&
+            h.TeamId == scenario.TeamId &&
+            h.Amount == minimum);
     }
 
     private static HttpRequestMessage BuildBidRequest(BidScenario scenario, decimal amount)

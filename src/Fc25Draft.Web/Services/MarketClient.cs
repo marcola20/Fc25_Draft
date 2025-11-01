@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Web.Models.Market;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
@@ -72,8 +71,11 @@ namespace Fc25Draft.Web.Services
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (resp.StatusCode == HttpStatusCode.Conflict)
             {
-                var message = ExtractSimpleMessage(body)
-                    ?? "Este ciclo ainda não está ativo.";
+                var message = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    message = "Este ciclo ainda não está ativo.";
+                }
                 throw new MarketCycleUnavailableException(message, resp.StatusCode);
             }
 
@@ -137,15 +139,21 @@ namespace Fc25Draft.Web.Services
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                var errorMessage = await ExtractProblemMessageAsync(resp, ct)
-                    ?? "Não foi possível registrar o lance porque o item foi atualizado. Atualize os dados e tente novamente.";
+                var errorMessage = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    errorMessage = "Não foi possível registrar o lance porque o item foi atualizado. Atualize os dados e tente novamente.";
+                }
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
             if (!resp.IsSuccessStatusCode)
             {
-                var message = await ExtractProblemMessageAsync(resp, ct)
-                    ?? $"Falha ao registrar o lance. Código {(int)resp.StatusCode}.";
+                var message = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    message = $"Falha ao registrar o lance. Código {(int)resp.StatusCode}.";
+                }
                 throw new MarketClientException(message, resp.StatusCode);
             }
 
@@ -179,15 +187,21 @@ namespace Fc25Draft.Web.Services
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                var errorMessage = await ExtractProblemMessageAsync(resp, ct)
-                    ?? "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
+                var errorMessage = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    errorMessage = "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
+                }
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
             if (!resp.IsSuccessStatusCode)
             {
-                var message2 = await ExtractProblemMessageAsync(resp, ct)
-                    ?? $"Falha ao concluir a compra. Código {(int)resp.StatusCode}.";
+                var message2 = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(message2))
+                {
+                    message2 = $"Falha ao concluir a compra. Código {(int)resp.StatusCode}.";
+                }
                 throw new MarketClientException(message2, resp.StatusCode);
             }
 
@@ -233,8 +247,11 @@ namespace Fc25Draft.Web.Services
 
             if (!resp.IsSuccessStatusCode)
             {
-                var message = await ExtractProblemMessageAsync(resp, ct)
-                    ?? $"Falha ao carregar dados do time. Código {(int)resp.StatusCode}.";
+                var message = await ReadErrorMessageAsync(resp);
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    message = $"Falha ao carregar dados do time. Código {(int)resp.StatusCode}.";
+                }
                 throw new MarketClientException(message, resp.StatusCode);
             }
 
@@ -350,63 +367,51 @@ namespace Fc25Draft.Web.Services
             return (sortBy, sortOrder);
         }
 
-        private static async Task<string?> ExtractProblemMessageAsync(HttpResponseMessage response, CancellationToken ct)
+        private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage resp)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                return null;
-            }
+            var body = await resp.Content.ReadAsStringAsync();
 
-            try
+            if (!string.IsNullOrWhiteSpace(body))
             {
-                var problem = JsonSerializer.Deserialize<ProblemDetails>(body, new JsonSerializerOptions
+                try
                 {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                return problem?.Detail ?? problem?.Title ?? body;
-            }
-            catch
-            {
-                return body;
-            }
-        }
-
-        private static string? ExtractSimpleMessage(string? body)
-        {
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                return null;
-            }
-
-            try
-            {
-                using var doc = JsonDocument.Parse(body);
-                if (doc.RootElement.ValueKind == JsonValueKind.Object)
-                {
-                    if (doc.RootElement.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object)
                     {
-                        return message.GetString();
-                    }
+                        if (doc.RootElement.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String)
+                        {
+                            return m.GetString()!;
+                        }
 
-                    if (doc.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
-                    {
-                        return detail.GetString();
-                    }
+                        if (doc.RootElement.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.String)
+                        {
+                            return e.GetString()!;
+                        }
 
-                    if (doc.RootElement.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
-                    {
-                        return title.GetString();
+                        if (doc.RootElement.TryGetProperty("detail", out var d) && d.ValueKind == JsonValueKind.String)
+                        {
+                            return d.GetString()!;
+                        }
+
+                        if (doc.RootElement.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String)
+                        {
+                            return t.GetString()!;
+                        }
                     }
                 }
-            }
-            catch (JsonException)
-            {
-                // Ignore parse errors and fall back to the raw body.
+                catch (JsonException)
+                {
+                    // Ignore parse errors and fall back to the raw body.
+                }
+
+                var trimmed = body.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    return trimmed;
+                }
             }
 
-            return body;
+            return $"{(int)resp.StatusCode} {resp.ReasonPhrase}";
         }
 
         private static PagedResult<CoreItemVm> MapToViewModel(PagedResult<MarketItemListDto> source)

@@ -292,6 +292,7 @@ else
     private Func<CoreItemVm, Task>? _bidUpdatedHandler;
     private Func<CoreItemVm, Task>? _itemBoughtHandler;
     private Func<CoreItemVm, Task>? _itemClosedHandler;
+    private bool _hubHandlersAttached;
     private bool _isLoading;
     private bool _initialized;
     private string? _errorMessage;
@@ -386,10 +387,18 @@ else
 
         try
         {
-            var connected = await EnsureHubConnectedAsync();
-            if (connected)
+            var hubToken = _lifetimeCts?.Token ?? CancellationToken.None;
+            await Hub.ConnectAsync(hubToken);
+            _hubConnected = Hub.IsConnected;
+
+            if (_hubConnected)
             {
-                await JoinCycleAsync();
+                AttachHubHandlers();
+                var joined = await JoinCycleAsync();
+                if (!joined)
+                {
+                    UpdateRealTimeWarning(RealTimeWarningMessage);
+                }
             }
             else
             {
@@ -409,14 +418,6 @@ else
         }
 
         await LoadTeamTokenStatusAsync();
-
-        _bidUpdatedHandler = HandleRealtimeUpdateAsync;
-        _itemBoughtHandler = HandleRealtimeUpdateAsync;
-        _itemClosedHandler = HandleRealtimeUpdateAsync;
-
-        Hub.OnBidUpdated += _bidUpdatedHandler;
-        Hub.OnItemBought += _itemBoughtHandler;
-        Hub.OnItemClosed += _itemClosedHandler;
 
         _initialized = true;
     }
@@ -557,21 +558,23 @@ else
 
     private async Task HandleRealtimeUpdateAsync(CoreItemVm incoming)
     {
-        var closed = IsItemClosed(incoming);
         MergeItem(incoming);
 
-        if (closed && _lifetimeCts is not null && !_lifetimeCts.IsCancellationRequested)
+        if (IsItemClosed(incoming) && _lifetimeCts is not null && !_lifetimeCts.IsCancellationRequested)
         {
             Logger.LogInformation("Realtime update indicates item {ItemId} is closed. Reloading page {Page}.", incoming.ItemId, Query.Page);
             var ct = PrepareNewLoadCts();
             await LoadPageAsync(Query.Page, ct);
         }
-        else
-        {
-            StateHasChangedSafe();
-        }
 
         await RefreshHistoryAsync();
+
+        if (_lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool IsItemClosed(CoreItemVm item)
@@ -753,6 +756,7 @@ else
             }
 
             _hubConnected = true;
+            AttachHubHandlers();
             return true;
         }
 
@@ -782,6 +786,7 @@ else
                 if (Hub.IsConnected)
                 {
                     _hubConnected = true;
+                    AttachHubHandlers();
                     Logger.LogInformation("Connected to market hub on attempt {Attempt}.", attempt + 1);
                     return true;
                 }
@@ -810,6 +815,35 @@ else
         _hubConnected = false;
         Logger.LogWarning("Unable to establish market hub connection after {Attempts} attempts.", HubReconnectDelays.Length);
         return false;
+    }
+
+    private void AttachHubHandlers()
+    {
+        if (_hubHandlersAttached)
+        {
+            return;
+        }
+
+        _bidUpdatedHandler ??= HandleRealtimeUpdateAsync;
+        _itemBoughtHandler ??= HandleRealtimeUpdateAsync;
+        _itemClosedHandler ??= HandleRealtimeUpdateAsync;
+
+        if (_bidUpdatedHandler is not null)
+        {
+            Hub.OnBidUpdated += _bidUpdatedHandler;
+        }
+
+        if (_itemBoughtHandler is not null)
+        {
+            Hub.OnItemBought += _itemBoughtHandler;
+        }
+
+        if (_itemClosedHandler is not null)
+        {
+            Hub.OnItemClosed += _itemClosedHandler;
+        }
+
+        _hubHandlersAttached = true;
     }
 
     private void UpdateRealTimeWarning(string? message)
@@ -933,6 +967,15 @@ else
         };
     }
 
+    private DateTime? GetHistoryCursorUtc()
+    {
+        if (!_historyLatestUtc.HasValue)
+            return null;
+
+        var latest = _historyLatestUtc.Value;
+        return latest == DateTime.MinValue ? latest : latest.AddTicks(-1);
+    }
+
     private async Task EnsureHistoryInitializedAsync()
     {
         if (_historyInitialized)
@@ -1001,7 +1044,8 @@ else
         if (!_historyInitialized || _historyLifecycleCts is null)
             return;
 
-        if (!_historyLatestUtc.HasValue)
+        var fromUtc = GetHistoryCursorUtc();
+        if (!fromUtc.HasValue)
             return;
 
         var ct = PrepareHistoryRequestCts();
@@ -1012,7 +1056,7 @@ else
             await _historySemaphore.WaitAsync(ct);
             release = true;
 
-            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, fromUtc), ct);
             var newItems = result.Items
                 .Where(item => !_historyIds.Contains(item.TransactionId))
                 .OrderBy(item => item.OccurredAtUtc)
@@ -1049,7 +1093,11 @@ else
 
     private async Task LoadHistoryUpdatesAsync(CancellationToken ct)
     {
-        if (!_historyInitialized || !_historyLatestUtc.HasValue)
+        if (!_historyInitialized)
+            return;
+
+        var fromUtc = GetHistoryCursorUtc();
+        if (!fromUtc.HasValue)
             return;
 
         var release = false;
@@ -1058,7 +1106,7 @@ else
             await _historySemaphore.WaitAsync(ct);
             release = true;
 
-            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, _historyLatestUtc), ct);
+            var result = await Client.GetHistoryAsync(BuildHistoryQuery(1, fromUtc), ct);
             var newItems = result.Items
                 .Where(item => !_historyIds.Contains(item.TransactionId))
                 .OrderBy(item => item.OccurredAtUtc)
@@ -1152,7 +1200,7 @@ else
         var old = Interlocked.Exchange(ref _historyTimer, null);
         old?.Dispose();
 
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(25));
+        var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
         _historyTimer = timer;
 
         var token = _historyLifecycleCts.Token;
@@ -1395,6 +1443,8 @@ else
 
         if (_itemClosedHandler is not null)
             Hub.OnItemClosed -= _itemClosedHandler;
+
+        _hubHandlersAttached = false;
 
         if (_lifetimeCts is not null)
         {
