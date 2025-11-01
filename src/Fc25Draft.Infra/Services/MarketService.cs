@@ -159,7 +159,7 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc <= nowUtc)
+            if (item.ExpiresAtUtc.AddHours(3) <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
@@ -295,7 +295,7 @@ public class MarketService : IMarketService
 
             var buyNowPrice = item.BuyNowPrice.Value;
 
-            if (item.ExpiresAtUtc <= nowUtc)
+            if (item.ExpiresAtUtc.AddHours(3) <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
