@@ -3,6 +3,7 @@ using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
@@ -73,6 +74,30 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores);
                 return Results.Ok(dto);
+            });
+
+            teamsApi.MapGet("/me", async (DraftDbContext db, HttpContext httpContext, CancellationToken ct) =>
+            {
+                var token = httpContext.Request.Headers["X-Team-Token"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+                }
+
+                var normalized = token.Trim();
+
+                var identity = await db.Teams
+                    .AsNoTracking()
+                    .Where(t => t.Token == normalized)
+                    .Select(t => new TeamIdentityDto(t.TeamId, t.TeamName))
+                    .FirstOrDefaultAsync(ct);
+
+                if (identity is null)
+                {
+                    return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                return Results.Ok(identity);
             });
 
             teamsApi.MapGet("/roster", async (DraftDbContext db, CancellationToken ct) =>

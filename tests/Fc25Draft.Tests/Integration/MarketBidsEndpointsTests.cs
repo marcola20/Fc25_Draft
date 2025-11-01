@@ -116,6 +116,39 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
         Assert.Contains("saldo", problem!.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task PostBid_ReturnsBadRequest_WhenTeamAlreadyLeads()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var scenario = await SeedBidScenarioAsync(
+            factory,
+            basePrice: 15_000_000m,
+            minIncrement: 500_000m,
+            currentLeaderAmount: 16_000_000m,
+            buyNowPrice: 40_000_000m,
+            teamBudget: 80_000_000m);
+
+        var client = factory.CreateClient();
+        var minimum = MarketPricing.ComputeRequiredMinBid(
+            scenario.BasePrice,
+            scenario.MinIncrement,
+            scenario.CurrentLeaderAmount,
+            scenario.BuyNowPrice);
+
+        using var request = BuildBidRequest(scenario, minimum);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(GetJsonOptions());
+        Assert.NotNull(problem);
+        var detail = problem!.Detail
+            ?? problem.Title
+            ?? (problem.Extensions.TryGetValue("message", out var extension) ? extension?.ToString() : null)
+            ?? string.Empty;
+        Assert.Contains("already leads", detail, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static HttpRequestMessage BuildBidRequest(BidScenario scenario, decimal amount)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{scenario.ItemId}/bids")
@@ -200,7 +233,7 @@ public class MarketBidsEndpointsTests : IClassFixture<MarketItemsEndpointsFactor
             CreatedAtUtc = now.AddHours(-1),
             LastUpdateUtc = now.AddMinutes(-10),
             PublishedAtUtc = now.AddHours(-1),
-            CurrentLeaderTeamId = null,
+            CurrentLeaderTeamId = currentLeaderAmount.HasValue ? teamId : null,
             CurrentLeaderAmount = currentLeaderAmount,
             RowVersion = 1
         });

@@ -98,6 +98,7 @@
                 <div class="col" @key="item.ItemId">
                     <MarketItemCard
                         Item="item"
+                        CurrentTeamId="_currentTeamId"
                         ServerTimeOffset="ServerTimeOffset"
                         OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
                         OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
@@ -272,6 +273,7 @@ else
     private bool _teamTokenModalOpen;
     private string _teamTokenInput = string.Empty;
     private string? _teamTokenError;
+    private Guid? _currentTeamId;
 
     private readonly List<MarketTransactionDto> _historyEvents = new();
     private readonly HashSet<Guid> _historyIds = new();
@@ -981,6 +983,7 @@ else
             _teamTokenModalOpen = false;
             _teamTokenInput = string.Empty;
             _teamTokenError = null;
+            _currentTeamId = null;
             StateHasChangedSafe();
         }
         catch (Exception ex)
@@ -1011,14 +1014,57 @@ else
 
     private async Task LoadTeamTokenStatusAsync()
     {
+        string? token;
         try
         {
-            var token = await TeamAccess.GetTokenAsync();
-            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+            token = await TeamAccess.GetTokenAsync();
         }
         catch (InvalidOperationException)
         {
-            // Ignorado durante o pré-render.
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar token do time.");
+            _teamTokenConfigured = false;
+            _currentTeamId = null;
+            StateHasChangedSafe();
+            return;
+        }
+
+        _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+
+        if (_teamTokenConfigured && token is not null)
+        {
+            await LoadCurrentTeamIdentityAsync(token);
+        }
+        else
+        {
+            _currentTeamId = null;
+        }
+
+        StateHasChangedSafe();
+    }
+
+    private async Task LoadCurrentTeamIdentityAsync(string token)
+    {
+        try
+        {
+            var identity = await Client.GetMyTeamAsync(token, _lifetimeCts?.Token ?? CancellationToken.None);
+            _currentTeamId = identity?.TeamId;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (MarketClientException ex)
+        {
+            Logger.LogWarning(ex, "Falha ao carregar identidade do time.");
+            _currentTeamId = null;
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Falha HTTP ao carregar identidade do time.");
+            _currentTeamId = null;
         }
     }
 
@@ -1026,18 +1072,7 @@ else
     {
         _ = InvokeAsync(async () =>
         {
-            try
-            {
-                var token = await TeamAccess.GetTokenAsync();
-                _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Falha ao atualizar status do token do time.");
-                _teamTokenConfigured = false;
-            }
-
-            StateHasChanged();
+            await LoadTeamTokenStatusAsync();
         });
     }
 

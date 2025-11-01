@@ -151,6 +151,11 @@ public class MarketService : IMarketService
                 .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
 
+            if (item.CurrentLeaderTeamId == team.TeamId)
+            {
+                throw new MarketValidationException("Your team already leads this item.");
+            }
+
             var requiredMinimum = MarketPricing.ComputeRequiredMinBid(
                 item.BasePrice,
                 item.MinIncrement,

@@ -20,6 +20,10 @@ public record TeamDetailsDto(
     string Token,
     int Jogadores);
 
+public record TeamIdentityDto(
+    Guid TeamId,
+    string TeamName);
+
 public record TeamRosterDto(
     Guid TeamId,
     string TeamName,

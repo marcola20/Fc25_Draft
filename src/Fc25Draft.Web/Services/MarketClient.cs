@@ -187,6 +187,42 @@ namespace Fc25Draft.Web.Services
             return new MarketClientActionResult<CoreItemVm>(updatedItem, message);
         }
 
+        public async Task<TeamIdentityDto?> GetMyTeamAsync(string? tokenOverride = null, CancellationToken ct = default)
+        {
+            var token = string.IsNullOrWhiteSpace(tokenOverride)
+                ? await _teamAccess.GetTokenAsync()
+                : tokenOverride;
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            var http = await _clientFactory.CreateAsync();
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/teams/me");
+            request.Headers.TryAddWithoutValidation("X-Team-Token", token);
+
+            using var resp = await http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                return null;
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var message = await ExtractProblemMessageAsync(resp, ct)
+                    ?? $"Falha ao carregar dados do time. Código {(int)resp.StatusCode}.";
+                throw new MarketClientException(message, resp.StatusCode);
+            }
+
+            var identity = await resp.Content.ReadFromJsonAsync<TeamIdentityDto>(
+                options: new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                cancellationToken: ct);
+
+            return identity;
+        }
+
         public async Task<PagedResult<MarketTransactionDto>> GetHistoryAsync(MarketHistoryQueryOptions query, CancellationToken ct)
         {
             ArgumentNullException.ThrowIfNull(query);

@@ -1,10 +1,10 @@
 @using System
-@using System.ComponentModel.DataAnnotations
 @using System.Globalization
 @using System.Reflection
 @using System.Threading
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
 @using BidRequest = Fc25Draft.Core.DTOs.BidRequest
 @using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
@@ -43,9 +43,8 @@
                     }
                 </div>
                 <div>
-                    <div class="text-muted small">Lance mínimo</div>
+                    <div class="text-muted small" title="@MinIncrementTooltip">Lance mínimo</div>
                     <div class="fw-semibold text-body">@FormatCurrency(Item.RequiredMinBid)</div>
-                    <div class="small text-muted">Incremento mínimo: @FormatCurrency(Item.MinIncrement)</div>
                 </div>
                 @if (CanBuyNow)
                 {
@@ -68,22 +67,23 @@
         </div>
 
         <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
-            <DataAnnotationsValidator />
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-sm-6 col-lg-5">
-                    <label class="form-label" for="@BidInputId">Valor do lance</label>
+            <div class="mb-2">
+                <label class="form-label" for="@BidInputId">Valor do lance</label>
+                <div class="input-group input-group-sm">
                     <InputText @bind-Value="_model.AmountText"
-                               class="form-control form-control-sm"
+                               @bind-Value:event="oninput"
+                               class="form-control"
                                id="@BidInputId"
                                inputmode="decimal"
-                               disabled="@IsBidDisabled"
-                               aria-describedby="@BidValidationId"
-                               placeholder="Ex.: R$ 30.000.000,00" />
-                    <ValidationMessage class="text-danger small" id="@BidValidationId" For="() => _model.AmountText" />
-                </div>
-                <div class="col-12 col-sm-auto">
-                    <label class="form-label d-none d-sm-block">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary btn-sm w-100" disabled="@IsBidDisabled">Dar lance</button>
+                               placeholder="Ex.: R$ 30.000.000,00"
+                               @onfocus="HandleBidFocus"
+                               @onblur="HandleBidBlur" />
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@IsBidDisabled"
+                            title="@LeaderTooltip">
+                        Dar lance
+                    </button>
                 </div>
             </div>
         </EditForm>
@@ -141,6 +141,9 @@
     public CoreItemVm Item { get; set; } = default!;
 
     [Parameter]
+    public Guid? CurrentTeamId { get; set; }
+
+    [Parameter]
     public TimeSpan ServerTimeOffset { get; set; }
 
     [Parameter]
@@ -169,11 +172,9 @@
 
     private string BidInputId => $"bid-amount-{Item.ItemId}";
 
-    private string BidValidationId => $"bid-amount-validation-{Item.ItemId}";
-
     private bool IsExpired => Remaining <= TimeSpan.Zero;
 
-    private bool IsBidDisabled => _isSubmitting || IsExpired || !IsActive;
+    private bool IsBidDisabled => _isSubmitting || IsExpired || !IsActive || !_model.ParsedAmount.HasValue || IsCurrentTeamLeader;
 
     private bool IsActive
     {
@@ -188,6 +189,12 @@
     }
 
     private bool CanBuyNow => IsActive && Item.BuyNowPrice.HasValue;
+
+    private bool IsCurrentTeamLeader => CurrentTeamId.HasValue && Item.CurrentLeaderTeamId.HasValue && Item.CurrentLeaderTeamId.Value == CurrentTeamId.Value;
+
+    private string? LeaderTooltip => IsCurrentTeamLeader ? "Seu time já é o líder do lance atual." : null;
+
+    private string? MinIncrementTooltip => Item.MinIncrement > 0m ? $"Incremento mínimo: {FormatCurrency(Item.MinIncrement)}" : null;
 
     private string StatusDisplay => IsExpired ? "Encerrado" : TranslateStatus(Item.Status);
 
@@ -257,8 +264,8 @@
             _editContext.OnFieldChanged += HandleFieldChanged;
         }
 
-        ValidateAmount();
         EnsureTimer();
+        EnsureBidValueInitialized();
     }
 
     private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e)
@@ -272,6 +279,32 @@
         {
             ValidateAmount();
         }
+    }
+
+    private void EnsureBidValueInitialized()
+    {
+        var raw = _model.AmountText;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            SetBidToMinimum();
+            return;
+        }
+
+        if (!TryParseAmount(raw, out var parsed) || parsed < Item.RequiredMinBid)
+        {
+            SetBidToMinimum();
+            return;
+        }
+
+        var formatted = FormatCurrency(parsed);
+        if (!string.Equals(raw, formatted, StringComparison.Ordinal))
+        {
+            _model.AmountText = formatted;
+            NotifyAmountChanged();
+            return;
+        }
+
+        ValidateAmount();
     }
 
     private void ValidateAmount()
@@ -289,9 +322,11 @@
         var raw = _model.AmountText;
         if (string.IsNullOrWhiteSpace(raw))
         {
-            _validationMessageStore.Add(field, "Informe o valor do lance.");
+            _editContext.NotifyValidationStateChanged();
+            return;
         }
-        else if (!TryParseAmount(raw, out var parsed))
+
+        if (!TryParseAmount(raw, out var parsed))
         {
             _validationMessageStore.Add(field, "Informe um valor válido.");
         }
@@ -302,6 +337,7 @@
             if (parsed < minimum)
             {
                 _validationMessageStore.Add(field, $"O lance deve ser de pelo menos {FormatCurrency(minimum)}.");
+                _model.ParsedAmount = null;
             }
         }
 
@@ -321,6 +357,57 @@
             NumberStyles.Number | NumberStyles.AllowCurrencySymbol,
             CurrencyCulture,
             out amount);
+    }
+
+    private void SetBidToMinimum()
+    {
+        var formatted = FormatCurrency(Item.RequiredMinBid);
+        if (string.Equals(_model.AmountText, formatted, StringComparison.Ordinal))
+        {
+            ValidateAmount();
+            return;
+        }
+
+        _model.AmountText = formatted;
+        NotifyAmountChanged();
+    }
+
+    private void HandleBidFocus(FocusEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_model.AmountText))
+        {
+            SetBidToMinimum();
+        }
+    }
+
+    private void HandleBidBlur(FocusEventArgs _)
+    {
+        if (!TryParseAmount(_model.AmountText, out var parsed) || parsed < Item.RequiredMinBid)
+        {
+            SetBidToMinimum();
+            return;
+        }
+
+        var formatted = FormatCurrency(parsed);
+        if (!string.Equals(_model.AmountText, formatted, StringComparison.Ordinal))
+        {
+            _model.AmountText = formatted;
+            NotifyAmountChanged();
+            return;
+        }
+
+        ValidateAmount();
+    }
+
+    private void NotifyAmountChanged()
+    {
+        if (_editContext is null)
+        {
+            return;
+        }
+
+        var field = new FieldIdentifier(_model, nameof(BidFormModel.AmountText));
+        _editContext.NotifyFieldChanged(field);
     }
 
     private static string FormatCurrency(decimal value) => value.ToString("C", CurrencyCulture);

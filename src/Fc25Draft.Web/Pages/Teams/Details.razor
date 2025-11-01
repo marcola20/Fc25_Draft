@@ -1,10 +1,12 @@
 @page "/teams/details/{Id:guid}"
 @using System.Linq
+@using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
+@inject IPricingService PricingService
 
 @implements IDisposable
 
@@ -49,7 +51,7 @@ else
         {
             <p class="text-muted">Não foi possível carregar o elenco da equipe.</p>
         }
-        else if (roster.Jogadores.Count == 0)
+        else if (_sortedRosterPlayers.Count == 0)
         {
             <p class="mb-0">Nenhum jogador vinculado.</p>
         }
@@ -59,20 +61,55 @@ else
                 <table class="table table-striped table-sm mb-0">
                     <thead>
                         <tr>
-                            <th>Jogador</th>
-                            <th class="text-center">Posição</th>
-                            <th class="text-end">Overall</th>
-                            <th class="text-end">Idade</th>
+                            <th scope="col">Jogador</th>
+                            <th scope="col" class="text-center">Posição</th>
+                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.Overall)">
+                                <button type="button"
+                                        class="@GetSortButtonClass(RosterSortColumn.Overall)"
+                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Overall)">
+                                    Overall
+                                    @if (_activeSortColumn == RosterSortColumn.Overall)
+                                    {
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Overall)</span>
+                                    }
+                                </button>
+                            </th>
+                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.Age)">
+                                <button type="button"
+                                        class="@GetSortButtonClass(RosterSortColumn.Age)"
+                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Age)">
+                                    Idade
+                                    @if (_activeSortColumn == RosterSortColumn.Age)
+                                    {
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Age)</span>
+                                    }
+                                </button>
+                            </th>
+                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.BasePrice)">
+                                <button type="button"
+                                        class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
+                                        @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
+                                    Preço base
+                                    @if (_activeSortColumn == RosterSortColumn.BasePrice)
+                                    {
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.BasePrice)</span>
+                                    }
+                                </button>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var player in roster.Jogadores.OrderBy(p => p.Nome))
+                        @foreach (var player in _sortedRosterPlayers)
                         {
                             <tr>
-                                <td>@player.Nome</td>
-                                <td class="text-center">@player.Posicao</td>
+                                <td>@player.Name</td>
+                                <td class="text-center">@player.Position</td>
                                 <td class="text-end">@player.Overall</td>
-                                <td class="text-end">@(player.Idade?.ToString() ?? "-")</td>
+                                <td class="text-end">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                                <td class="text-end">@FormatCurrency(player.BasePrice)</td>
                             </tr>
                         }
                     </tbody>
@@ -105,6 +142,11 @@ else
     private string? errorMessage;
     private bool isLoading = true;
     private bool authInitialized;
+    private readonly List<RosterPlayerViewModel> _rosterPlayers = new();
+    private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
+    private RosterSortColumn? _activeSortColumn;
+    private bool _sortDescending;
+    private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
     protected override void OnInitialized()
     {
@@ -133,6 +175,8 @@ else
         isLoading = true;
         errorMessage = null;
         roster = null;
+        _rosterPlayers.Clear();
+        _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
 
         try
         {
@@ -144,6 +188,15 @@ else
             }
 
             roster = await TeamsApiClient.GetRosterByIdAsync(Id);
+
+            if (roster is not null)
+            {
+                await PopulateRosterPlayersAsync(roster.Jogadores);
+            }
+            else
+            {
+                ApplyRosterSort();
+            }
         }
         catch (Exception ex)
         {
@@ -165,8 +218,125 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private async Task PopulateRosterPlayersAsync(IReadOnlyList<TeamRosterPlayerDto> players)
+    {
+        _rosterPlayers.Clear();
+
+        foreach (var player in players)
+        {
+            decimal basePrice = 0m;
+            try
+            {
+                var pricing = await PricingService.CalculateForPlayerAsync(player.PlayerId, default);
+                basePrice = pricing.BasePrice;
+            }
+            catch
+            {
+                basePrice = 0m;
+            }
+
+            _rosterPlayers.Add(new RosterPlayerViewModel(
+                player.Nome,
+                player.Posicao,
+                player.Overall,
+                player.Idade,
+                basePrice));
+        }
+
+        ApplyRosterSort();
+    }
+
+    private void ToggleRosterSort(RosterSortColumn column)
+    {
+        if (_activeSortColumn == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _activeSortColumn = column;
+            _sortDescending = column switch
+            {
+                RosterSortColumn.Age => false,
+                _ => true
+            };
+        }
+
+        ApplyRosterSort();
+    }
+
+    private void ApplyRosterSort()
+    {
+        IEnumerable<RosterPlayerViewModel> query = _rosterPlayers;
+
+        if (_activeSortColumn is null)
+        {
+            query = query.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            query = _activeSortColumn switch
+            {
+                RosterSortColumn.Overall => _sortDescending
+                    ? query.OrderByDescending(p => p.Overall).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(p => p.Overall).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
+                RosterSortColumn.Age => _sortDescending
+                    ? query.OrderByDescending(p => p.Age ?? int.MinValue).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(p => p.Age ?? int.MaxValue).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
+                RosterSortColumn.BasePrice => _sortDescending
+                    ? query.OrderByDescending(p => p.BasePrice).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(p => p.BasePrice).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
+                _ => query
+            };
+        }
+
+        _sortedRosterPlayers = query.ToList();
+    }
+
+    private string GetSortButtonClass(RosterSortColumn column)
+    {
+        var classes = "btn btn-link btn-sm p-0 text-decoration-none text-body";
+        if (_activeSortColumn == column)
+        {
+            classes += " fw-semibold";
+        }
+
+        return classes;
+    }
+
+    private string GetAriaSort(RosterSortColumn column)
+    {
+        if (_activeSortColumn != column)
+        {
+            return "none";
+        }
+
+        return _sortDescending ? "descending" : "ascending";
+    }
+
+    private string GetSortDirectionDescription(RosterSortColumn column)
+    {
+        if (_activeSortColumn != column)
+        {
+            return "Sem ordenação ativa";
+        }
+
+        return _sortDescending ? "Ordenado em ordem decrescente" : "Ordenado em ordem crescente";
+    }
+
+    private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
+
+    private enum RosterSortColumn
+    {
+        Overall,
+        Age,
+        BasePrice
+    }
+
+    private sealed record RosterPlayerViewModel(string Name, string Position, int Overall, int? Age, decimal BasePrice);
 }
