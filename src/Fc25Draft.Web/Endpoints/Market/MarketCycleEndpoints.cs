@@ -1,8 +1,9 @@
-using System.ComponentModel.DataAnnotations;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Models.MarketCycles;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace Fc25Draft.Web.Endpoints.Market;
 
@@ -19,25 +20,20 @@ public static class MarketCycleEndpoints
     }
 
     private static async Task<IResult> HandleCreateAsync(
-        MarketCycleCreateRequest request,
-        IMarketCycleAdminService service,
-        CancellationToken ct)
+     MarketCycleCreateRequest request,
+     IMarketCycleAdminService service,
+     CancellationToken ct)
     {
         if (!TryValidate(request, out var validationError))
-        {
             return validationError!;
-        }
 
         if (!request.StartsAtUtc.HasValue || !request.EndsAtUtc.HasValue)
         {
-            return Results.ValidationProblem(
-                new Dictionary<string, string[]>
-                {
-                    [nameof(request.StartsAtUtc)] = new[] { "A data de início é obrigatória." },
-                    [nameof(request.EndsAtUtc)] = new[] { "A data de término é obrigatória." }
-                },
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Falha na validação.");
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.StartsAtUtc)] = new[] { "A data de início é obrigatória." },
+                [nameof(request.EndsAtUtc)] = new[] { "A data de término é obrigatória." }
+            }, statusCode: StatusCodes.Status400BadRequest, title: "Falha na validação.");
         }
 
         var command = new MarketCycleCreateCommand(
@@ -51,7 +47,6 @@ public static class MarketCycleEndpoints
         {
             var created = await service.CreateAsync(command, ct).ConfigureAwait(false);
             return TypedResults.Created($"/api/admin/market/cycles/{created.CycleId}", created);
-
         }
         catch (MarketConflictException ex)
         {
@@ -61,7 +56,12 @@ public static class MarketCycleEndpoints
         {
             return Results.BadRequest(new { message = ex.Message });
         }
+        catch (DbUpdateException eax) 
+        {
+            return Results.Problem("Falha ao salvar o ciclo.", statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
+
 
     private static async Task<IResult> HandleQueryAsync(
         [AsParameters] MarketCycleQueryRequest request,

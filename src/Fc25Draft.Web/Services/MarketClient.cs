@@ -33,53 +33,68 @@ namespace Fc25Draft.Web.Services
         {
             var qs = new List<string>();
             if (!string.IsNullOrWhiteSpace(query.Name)) qs.Add($"name={Uri.EscapeDataString(query.Name)}");
-            if (query.Positions?.Any() == true) qs.Add($"positions={string.Join(",", query.Positions)}");
+            if (query.Positions?.Any() == true)
+                foreach (var id in query.Positions.Distinct()) qs.Add($"pos={id}");
             if (query.OverallMin.HasValue) qs.Add($"overallMin={query.OverallMin.Value}");
             if (query.OverallMax.HasValue) qs.Add($"overallMax={query.OverallMax.Value}");
             if (!string.IsNullOrWhiteSpace(query.Status)) qs.Add($"status={Uri.EscapeDataString(query.Status)}");
-            qs.Add($"page={query.Page}");
-            qs.Add($"pageSize={query.PageSize}");
+            qs.Add($"page={Math.Max(1, query.Page)}");
+            qs.Add($"pageSize={Math.Max(1, query.PageSize)}");
             if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={Uri.EscapeDataString(query.Sort)}");
 
             var url = "/api/market";
-            if (qs.Count > 0)
-                url += "?" + string.Join("&", qs);
+            if (qs.Count > 0) url += "?" + string.Join("&", qs);
 
             var http = await _clientFactory.CreateAsync();
             using var resp = await http.GetAsync(url, ct);
+
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
                 throw new HttpRequestException($"GET {url} -> {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
 
-            resp.EnsureSuccessStatusCode();
-
-            if (resp.Headers.TryGetValues("x-server-time-utc", out var values))
+            if (resp.Headers.TryGetValues("x-server-time-utc", out var values) &&
+                DateTime.TryParse(values.FirstOrDefault(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var serverUtc))
             {
-                var serverUtc = DateTime.Parse(values.First(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
                 LastServerTimeUtc = serverUtc;
             }
 
-            var json = await resp.Content.ReadAsStringAsync(ct);
-
-            if (string.IsNullOrWhiteSpace(json) || json == "null")
-            {
+            if (resp.StatusCode == System.Net.HttpStatusCode.NoContent)
                 return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
-            }
+
+            var json = body ?? string.Empty;
+            var trimmed = json.AsSpan().Trim();
+
+            if (trimmed.Length == 0 || trimmed.SequenceEqual("null".AsSpan()))
+                return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+            };
+            options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 
             try
             {
-                var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (trimmed[0] == '[')
+                {
+                    var list = JsonSerializer.Deserialize<List<CoreItemVm>>(json, options) ?? new List<CoreItemVm>();
+                    return new PagedResult<CoreItemVm>(list, list.Count, query.Page, query.PageSize);
+                }
+
+                var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json, options);
 
                 return result ?? PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
             catch (JsonException jex)
             {
-                Console.WriteLine($"⚠️ Falha ao desserializar JSON em {nameof(PagedResult<CoreItemVm>)}: {jex.Message}");
-                Console.WriteLine($"Conteúdo recebido: '{json}'");
+                var contentType = resp.Content.Headers.ContentType?.MediaType ?? "(desconhecido)";
+                Console.WriteLine($"⚠️ JSON inválido para {nameof(PagedResult<CoreItemVm>)}: {jex.Message}");
+                Console.WriteLine($"content-type={contentType}");
+                var preview = json.Length > 500 ? json.Substring(0, 500) : json;
+                Console.WriteLine($"payload (até 500 chars): {preview}");
                 return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
-
         }
 
         public DateTime? LastServerTimeUtc { get; private set; }

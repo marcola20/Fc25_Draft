@@ -159,7 +159,6 @@ public class MarketCycleClient
 
         var details = await BuildErrorDetailsAsync(response, ct).ConfigureAwait(false);
 
-        // Prefira HttpRequestException com StatusCode preenchido
         throw new HttpRequestException(details.UserMessage, null, response.StatusCode);
     }
 
@@ -170,11 +169,9 @@ public class MarketCycleClient
         var status = (int)response.StatusCode;
         var reason = response.ReasonPhrase ?? "";
 
-        // Tenta ler o body bruto (independente do tipo) para logging e parsers
         string raw = string.Empty;
         try { raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false); } catch { /* ignore */ }
 
-        // 1) ApiErrorResponse (seu contrato)
         try
         {
             var err = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
@@ -192,7 +189,6 @@ public class MarketCycleClient
         }
         catch { /* fallback */ }
 
-        // 2) RFC 7807 ProblemDetails (muito comum em APIs .NET)
         try
         {
             var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
@@ -204,7 +200,6 @@ public class MarketCycleClient
         }
         catch { /* fallback */ }
 
-        // 3) ValidationProblemDetails (model state)
         try
         {
             var v = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(ct).ConfigureAwait(false);
@@ -217,11 +212,9 @@ public class MarketCycleClient
         }
         catch { /* fallback */ }
 
-        // 4) Se veio text/plain / text/html, use o texto
         if (!string.IsNullOrWhiteSpace(raw))
             return (Decorate(raw), ComposeLog());
 
-        // 5) Mapeamentos de status comuns
         string fallback = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
