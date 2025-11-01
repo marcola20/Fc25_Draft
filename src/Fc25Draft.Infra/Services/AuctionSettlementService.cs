@@ -45,70 +45,84 @@ public class AuctionSettlementService : IAuctionSettlementService
     private async Task<AuctionSettlementResult> SettleAsync(Guid cycleId, bool onlyExpired, CancellationToken ct)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        var candidatesQuery = _dbContext.MarketItems
-            .AsNoTracking()
-            .Where(i => i.CycleId == cycleId)
-            .Where(i => i.Status != MarketItemStatus.Sold && i.Status != MarketItemStatus.Canceled);
-
-        if (onlyExpired)
+        return await strategy.ExecuteAsync(async () =>
         {
-            candidatesQuery = candidatesQuery.Where(i => i.ExpiresAtUtc <= now);
-        }
+            await using var tx = await _dbContext.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, ct)
+                .ConfigureAwait(false);
 
-        var itemIds = await candidatesQuery
-            .Select(i => i.ItemId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+            var itemsQuery = _dbContext.MarketItems
+                .Include(i => i.Player)
+                .Where(i => i.CycleId == cycleId)
+                .Where(i => i.Status != MarketItemStatus.Sold && i.Status != MarketItemStatus.Canceled);
 
-        var sold = 0;
-        var expired = 0;
-        foreach (var itemId in itemIds)
-        {
-            try
+            if (onlyExpired)
             {
-                var outcome = await SettleSingleAsync(itemId, now, onlyExpired, ct).ConfigureAwait(false);
-                switch (outcome)
+                itemsQuery = itemsQuery.Where(i => i.ExpiresAtUtc <= now);
+            }
+
+            var items = await itemsQuery
+                .OrderBy(i => i.CreatedAtUtc)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            var sold = 0;
+            var expired = 0;
+
+            foreach (var item in items)
+            {
+                try
                 {
-                    case SettlementOutcome.Sold:
-                        sold++;
-                        break;
-                    case SettlementOutcome.Expired:
-                        expired++;
-                        break;
+                    var outcome = await ProcessItemAsync(item, now, onlyExpired, ct).ConfigureAwait(false);
+
+                    switch (outcome)
+                    {
+                        case SettlementOutcome.Sold:
+                            sold++;
+                            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                            break;
+                        case SettlementOutcome.Expired:
+                            expired++;
+                            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                            break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao finalizar item {ItemId}", item.ItemId);
+                    throw;
                 }
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao finalizar item {ItemId}", itemId);
-            }
-        }
 
-        await UpdateCycleStatusAsync(cycleId, now, ct).ConfigureAwait(false);
+            if (!onlyExpired)
+            {
+                var cycle = await _dbContext.MarketCycles
+                    .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
+                    .ConfigureAwait(false)
+                    ?? throw new MarketNotFoundException("Ciclo não encontrado.");
 
-        return new AuctionSettlementResult(sold, expired);
+                cycle.Status = MarketCycleStatus.Closed;
+                cycle.UpdatedAtUtc = now;
+                await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await UpdateCycleStatusAsync(cycleId, now, ct).ConfigureAwait(false);
+            }
+
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+            return new AuctionSettlementResult(sold, expired);
+        });
     }
 
-    private async Task<SettlementOutcome> SettleSingleAsync(Guid itemId, DateTime now, bool onlyExpired, CancellationToken ct)
+    private async Task<SettlementOutcome> ProcessItemAsync(MarketItem item, DateTime now, bool onlyExpired, CancellationToken ct)
     {
-        await using var transaction = await _dbContext.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable, ct)
-            .ConfigureAwait(false);
-
-        var item = await _dbContext.MarketItems
-            .Include(i => i.Player)
-            .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
-            .ConfigureAwait(false);
-
-        if (item is null)
-        {
-            return SettlementOutcome.None;
-        }
-
         if (item.Status == MarketItemStatus.Sold || item.Status == MarketItemStatus.Canceled)
         {
             return SettlementOutcome.None;
@@ -117,6 +131,15 @@ public class AuctionSettlementService : IAuctionSettlementService
         if (onlyExpired && item.ExpiresAtUtc > now)
         {
             return SettlementOutcome.None;
+        }
+
+        if (item.Player is null)
+        {
+            item.Player = await _dbContext.Players
+                .Include(p => p.Position)
+                .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)
+                .ConfigureAwait(false)
+                ?? throw new MarketNotFoundException("Jogador não encontrado para o item do mercado.");
         }
 
         var previousLeaderId = item.CurrentLeaderTeamId;
@@ -138,6 +161,8 @@ public class AuctionSettlementService : IAuctionSettlementService
                 item.CurrentLeaderTeamId = null;
                 item.CurrentLeaderAmount = null;
                 item.WinnerTeamId = null;
+                item.LastUpdateUtc = now;
+                item.ExpiresAtUtc = now;
 
                 await _transactionLogService.LogMarketAsync(
                     item,
@@ -150,11 +175,6 @@ public class AuctionSettlementService : IAuctionSettlementService
                     now,
                     ct).ConfigureAwait(false);
 
-                item.LastUpdateUtc = now;
-                item.ExpiresAtUtc = now;
-
-                await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
                 return SettlementOutcome.Expired;
             }
 
@@ -211,8 +231,6 @@ public class AuctionSettlementService : IAuctionSettlementService
                 now,
                 ct).ConfigureAwait(false);
 
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
             return SettlementOutcome.Sold;
         }
 
@@ -239,8 +257,6 @@ public class AuctionSettlementService : IAuctionSettlementService
             now,
             ct).ConfigureAwait(false);
 
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
         return SettlementOutcome.Expired;
     }
 

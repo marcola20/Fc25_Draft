@@ -1,8 +1,13 @@
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Fc25Draft.Tests;
 
@@ -56,7 +61,7 @@ public class MarketCycleAdminServiceTests
 
         await context.SaveChangesAsync();
 
-        var service = new MarketCycleAdminService(context, fakeTime);
+        var service = CreateService(context, fakeTime);
         await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Active, forceClose: false, CancellationToken.None);
 
         var reloadedItems = await context.MarketItems
@@ -103,7 +108,7 @@ public class MarketCycleAdminServiceTests
 
         await context.SaveChangesAsync();
 
-        var service = new MarketCycleAdminService(context, fakeTime);
+        var service = CreateService(context, fakeTime);
         await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Closed, forceClose: true, CancellationToken.None);
 
         var updatedItem = await context.MarketItems.AsNoTracking().SingleAsync(i => i.CycleId == cycleId);
@@ -143,14 +148,14 @@ public class MarketCycleAdminServiceTests
         var activateTask = Task.Run(async () =>
         {
             await using var ctx = new DraftDbContext(options);
-            var service = new MarketCycleAdminService(ctx);
+            var service = CreateService(ctx);
             await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Active, forceClose: false, CancellationToken.None);
         });
 
         var closeTask = Task.Run(async () =>
         {
             await using var ctx = new DraftDbContext(options);
-            var service = new MarketCycleAdminService(ctx);
+            var service = CreateService(ctx);
             await service.UpdateStatusAsync(cycleId, MarketCycleStatus.Closed, forceClose: true, CancellationToken.None);
         });
 
@@ -162,6 +167,112 @@ public class MarketCycleAdminServiceTests
             Assert.Equal(MarketCycleStatus.Closed, cycle.Status);
         }
     }
+
+    [Fact]
+    public async Task ConcludeAsync_AssignsWinningBidAndClosesCycle()
+    {
+        var fakeTime = new FakeTimeProvider(new DateTimeOffset(2024, 3, 10, 14, 0, 0, TimeSpan.Zero));
+        await using var context = CreateDbContext();
+        await SeedPositionAndPlayerAsync(context);
+
+        var cycleId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var now = fakeTime.GetUtcNow().UtcDateTime;
+
+        context.Teams.Add(new Team
+        {
+            TeamId = teamId,
+            TeamName = "Equipe Campeã",
+            Token = "TEAM-TOKEN",
+            Budget = 5_000m,
+            BudgetBlocked = 2_000m
+        });
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Ciclo Ativo",
+            Status = MarketCycleStatus.Active,
+            StartsAtUtc = now.AddHours(-2),
+            EndsAtUtc = now.AddHours(4),
+            CreatedAtUtc = now.AddHours(-3),
+            UpdatedAtUtc = now.AddHours(-3)
+        });
+
+        context.MarketItems.Add(new MarketItem
+        {
+            ItemId = itemId,
+            CycleId = cycleId,
+            PlayerId = 1,
+            BasePrice = 500m,
+            MinIncrement = 50m,
+            ExpiresAtUtc = now.AddHours(1),
+            Status = MarketItemStatus.Active,
+            CreatedAtUtc = now.AddHours(-1),
+            LastUpdateUtc = now.AddHours(-1),
+            CurrentLeaderTeamId = teamId,
+            CurrentLeaderAmount = 2_000m
+        });
+
+        await context.SaveChangesAsync();
+
+        var settlement = new AuctionSettlementService(
+            context,
+            new TransactionLogService(context),
+            NullLogger<AuctionSettlementService>.Instance,
+            fakeTime);
+
+        var service = new MarketCycleAdminService(context, settlement, fakeTime);
+
+        var result = await service.ConcludeAsync(cycleId, CancellationToken.None);
+
+        Assert.Equal(MarketCycleStatus.Closed, result.Cycle.Status);
+        Assert.NotNull(result.SettlementSummary);
+        Assert.Equal(1, result.SettlementSummary!.Sold);
+        Assert.Equal(0, result.SettlementSummary!.Expired);
+
+        var updatedCycle = await context.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
+        Assert.Equal(MarketCycleStatus.Closed, updatedCycle.Status);
+        Assert.Equal(now, updatedCycle.UpdatedAtUtc);
+
+        var item = await context.MarketItems.AsNoTracking().SingleAsync(i => i.ItemId == itemId);
+        Assert.Equal(MarketItemStatus.Sold, item.Status);
+        Assert.Equal(teamId, item.WinnerTeamId);
+        Assert.Equal(2_000m, item.CurrentLeaderAmount);
+
+        var team = await context.Teams.AsNoTracking().SingleAsync(t => t.TeamId == teamId);
+        Assert.Equal(3_000m, team.Budget);
+        Assert.Equal(0m, team.BudgetBlocked);
+
+        var player = await context.Players.AsNoTracking().SingleAsync(p => p.PlayerId == 1);
+        Assert.Equal(teamId, player.CurrentTeamId);
+
+        var rosterEntry = await context.TeamRosters.AsNoTracking()
+            .SingleAsync(r => r.TeamId == teamId && r.PlayerId == 1);
+        Assert.NotNull(rosterEntry);
+
+        var transfer = await context.TransferHistories.AsNoTracking().SingleAsync();
+        Assert.Equal(1, transfer.PlayerId);
+        Assert.Equal(teamId, transfer.ToTeamId);
+        Assert.Equal(2_000m, transfer.Amount);
+        Assert.Equal(DateTimeKind.Utc, transfer.PerformedAtUtc.Kind);
+        Assert.Equal(now, transfer.PerformedAtUtc);
+
+        var transaction = await context.MarketTransactions.AsNoTracking().SingleAsync();
+        Assert.Equal(MarketTransactionType.AuctionSettled, transaction.Type);
+        Assert.Equal(teamId, transaction.TeamId);
+        Assert.Equal(DateTimeKind.Utc, transaction.CreatedAtUtc.Kind);
+        Assert.Equal(now, transaction.CreatedAtUtc);
+
+        var secondCall = await service.ConcludeAsync(cycleId, CancellationToken.None);
+        Assert.NotNull(secondCall.SettlementSummary);
+        Assert.Equal(1, secondCall.SettlementSummary!.Sold);
+        Assert.Equal(1, await context.TransferHistories.CountAsync());
+    }
+
+    private static MarketCycleAdminService CreateService(DraftDbContext context, TimeProvider? timeProvider = null, IAuctionSettlementService? settlementService = null)
+        => new(context, settlementService ?? new StubSettlementService(), timeProvider);
 
     private static DraftDbContext CreateDbContext()
     {
@@ -205,5 +316,14 @@ public class MarketCycleAdminServiceTests
         }
 
         await context.SaveChangesAsync();
+    }
+
+    private sealed class StubSettlementService : IAuctionSettlementService
+    {
+        public Task<AuctionSettlementResult> SettleExpiredItemsAsync(Guid cycleId, CancellationToken ct)
+            => Task.FromResult(new AuctionSettlementResult(0, 0));
+
+        public Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, CancellationToken ct)
+            => Task.FromResult(new AuctionSettlementResult(0, 0));
     }
 }

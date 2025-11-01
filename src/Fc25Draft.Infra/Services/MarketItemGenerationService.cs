@@ -260,6 +260,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var query = _dbContext.Players
             .AsNoTracking()
             .Where(p => p.CurrentTeamId == null)
+            .Where(p => !_dbContext.TeamRosters.Any(r => r.PlayerId == p.PlayerId))
             .Where(p => !_dbContext.MarketItems
                 .Any(i => i.PlayerId == p.PlayerId && i.Status == MarketItemStatus.Active && i.Cycle.Status == MarketCycleStatus.Active));
 

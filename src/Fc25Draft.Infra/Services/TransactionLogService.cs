@@ -32,6 +32,13 @@ public class TransactionLogService : ITransactionLogService
             throw new ArgumentException("O identificador de quem realizou a ação é obrigatório.", nameof(performedBy));
         }
 
+        var timestamp = occurredAtUtc.Kind switch
+        {
+            DateTimeKind.Utc => occurredAtUtc,
+            DateTimeKind.Local => occurredAtUtc.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(occurredAtUtc, DateTimeKind.Utc)
+        };
+
         var entry = new MarketTransaction
         {
             TransactionId = Guid.NewGuid(),
@@ -44,7 +51,7 @@ public class TransactionLogService : ITransactionLogService
             Amount = amount,
             PerformedBy = performedBy,
             Notes = notes,
-            CreatedAtUtc = occurredAtUtc
+            CreatedAtUtc = timestamp
         };
 
         await _dbContext.MarketTransactions.AddAsync(entry, ct).ConfigureAwait(false);

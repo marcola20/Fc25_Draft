@@ -12,6 +12,8 @@ public interface IMarketCycleAdminService
     Task<MarketCycleDto?> GetByIdAsync(Guid cycleId, CancellationToken ct);
 
     Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct);
+
+    Task<MarketCycleStatusUpdateResult> ConcludeAsync(Guid cycleId, CancellationToken ct);
 }
 
 public record MarketCycleCreateCommand(

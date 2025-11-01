@@ -5,6 +5,8 @@ using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
+using System.Linq;
 
 namespace Fc25Draft.Tests;
 
@@ -141,6 +143,92 @@ public class MarketItemGenerationServiceTests
         var second = await service.GenerateAsync(cycleId, options, CancellationToken.None);
         Assert.Equal(0, second.CreatedCount);
         Assert.Equal(options.DesiredCount, second.SkippedExistingCount);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_IgnoresPlayersAlreadyAssignedToTeams()
+    {
+        await using var context = CreateDbContext();
+        await SeedPositionAsync(context);
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+
+        context.Teams.Add(new Team
+        {
+            TeamId = teamId,
+            TeamName = "Time A",
+            Token = "TOKEN-A",
+            Budget = 1_000m,
+            BudgetBlocked = 0m
+        });
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Draft",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddHours(8),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        context.Players.AddRange(
+            new Player
+            {
+                PlayerId = 40,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Livre",
+                Overall = 85,
+                PositionId = 1
+            },
+            new Player
+            {
+                PlayerId = 41,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Com Time",
+                Overall = 82,
+                PositionId = 1,
+                CurrentTeamId = teamId
+            },
+            new Player
+            {
+                PlayerId = 42,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "No Roster",
+                Overall = 80,
+                PositionId = 1
+            });
+
+        context.TeamRosters.Add(new TeamRoster
+        {
+            TeamId = teamId,
+            PlayerId = 42
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
+        var options = new MarketItemGenerationOptions(
+            1,
+            777,
+            new MarketItemGenerationFilters(null, null, null, null, null, null),
+            new MarketItemLifecycleOptions(null, null, null));
+
+        var preview = await service.PreviewAsync(cycleId, options, CancellationToken.None);
+        Assert.Equal(1, preview.EligibleCount);
+        Assert.All(preview.Items, item => Assert.Equal(40, item.PlayerId));
+
+        var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
+        Assert.Equal(1, result.CreatedCount);
+        Assert.Equal(0, result.SkippedExistingCount);
+        Assert.Single(result.CreatedItems);
+        Assert.Equal(40, result.CreatedItems[0].PlayerId);
+
+        var persistedItems = await context.MarketItems.AsNoTracking().Where(i => i.CycleId == cycleId).ToListAsync();
+        Assert.Single(persistedItems);
+        Assert.Equal(40, persistedItems[0].PlayerId);
     }
 
     private static DraftDbContext CreateDbContext()

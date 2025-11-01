@@ -13,10 +13,15 @@ public class MarketCycleAdminService : IMarketCycleAdminService
 {
     private readonly DraftDbContext _dbContext;
     private readonly TimeProvider _timeProvider;
+    private readonly IAuctionSettlementService _settlementService;
 
-    public MarketCycleAdminService(DraftDbContext dbContext, TimeProvider? timeProvider = null)
+    public MarketCycleAdminService(
+        DraftDbContext dbContext,
+        IAuctionSettlementService settlementService,
+        TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _settlementService = settlementService ?? throw new ArgumentNullException(nameof(settlementService));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -188,6 +193,51 @@ public class MarketCycleAdminService : IMarketCycleAdminService
 
             return ToDto(cycle);
         });
+    }
+
+    public async Task<MarketCycleStatusUpdateResult> ConcludeAsync(Guid cycleId, CancellationToken ct)
+    {
+        var cycle = await _dbContext.MarketCycles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
+            .ConfigureAwait(false)
+            ?? throw new MarketNotFoundException("Ciclo não encontrado.");
+
+        if (cycle.Status != MarketCycleStatus.Active && cycle.Status != MarketCycleStatus.Closed)
+        {
+            throw new MarketConflictException("Apenas ciclos ativos podem ser concluídos.");
+        }
+
+        if (cycle.Status == MarketCycleStatus.Active)
+        {
+            await _settlementService
+                .SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct)
+                .ConfigureAwait(false);
+
+            var updated = await GetByIdAsync(cycleId, ct).ConfigureAwait(false)
+                ?? throw new MarketNotFoundException("Ciclo não encontrado após conclusão.");
+
+            var summary = await LoadSettlementSummaryAsync(cycleId, ct).ConfigureAwait(false);
+            return new MarketCycleStatusUpdateResult(updated, summary);
+        }
+
+        var existingSummary = await LoadSettlementSummaryAsync(cycleId, ct).ConfigureAwait(false);
+        return new MarketCycleStatusUpdateResult(ToDto(cycle), existingSummary);
+    }
+
+    private async Task<MarketCycleSettlementSummary> LoadSettlementSummaryAsync(Guid cycleId, CancellationToken ct)
+    {
+        var sold = await _dbContext.MarketItems
+            .AsNoTracking()
+            .CountAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Sold, ct)
+            .ConfigureAwait(false);
+
+        var expired = await _dbContext.MarketItems
+            .AsNoTracking()
+            .CountAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Expired, ct)
+            .ConfigureAwait(false);
+
+        return new MarketCycleSettlementSummary(sold, expired);
     }
 
     private static MarketCycleDto ToDto(MarketCycle cycle) => new(

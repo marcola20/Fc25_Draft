@@ -19,11 +19,12 @@ public static class MarketCycleEndpoints
 
     public static RouteGroupBuilder MapMarketCycleEndpoints(this RouteGroupBuilder marketApi)
     {
-        var cycles = marketApi.MapGroup("/cycles").RequireAuthorization("AdminOnly"); 
+        var cycles = marketApi.MapGroup("/cycles").RequireAuthorization("AdminOnly");
         cycles.MapPost("", HandleCreateAsync);
         cycles.MapGet("", HandleQueryAsync);
         cycles.MapGet("/{cycleId:guid}", HandleGetAsync);
         cycles.MapPatch("/{cycleId:guid}/status", HandleStatusUpdateAsync);
+        cycles.MapPost("/{cycleId:guid}:conclude", HandleConcludeAsync);
         cycles.MapPost("/{cycleId:guid}/items:preview", HandlePreviewAsync);
         cycles.MapPost("/{cycleId:guid}/items:generate", HandleGenerateAsync);
         cycles.MapDelete("/{cycleId:guid}/items", HandleDeleteItemsAsync);
@@ -153,6 +154,26 @@ public static class MarketCycleEndpoints
         catch (MarketNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
         catch (MarketConflictException ex) { return Results.Conflict(new { message = ex.Message }); }
         catch (MarketValidationException ex) { return Results.Conflict(new { message = ex.Message }); }
+    }
+
+    private static async Task<IResult> HandleConcludeAsync(
+        Guid cycleId,
+        IMarketCycleAdminService service,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await service.ConcludeAsync(cycleId, ct).ConfigureAwait(false);
+            return TypedResults.Ok(result);
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (MarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
     }
 
     private static string? ExtractIdempotencyKey(HttpContext httpContext)

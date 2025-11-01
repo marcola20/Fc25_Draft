@@ -118,7 +118,7 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
                 x.m.Amount,
                 x.m.PerformedBy,
                 x.m.Notes,
-                x.m.CreatedAtUtc))
+                EnsureUtc(x.m.CreatedAtUtc)))
             .ToListAsync(ct);
 
         return new PagedResult<MarketTransactionDto>(items, total, filter.Page, pageSize);
@@ -218,7 +218,7 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
                 x.m.Amount,
                 x.m.PerformedBy,
                 x.m.Notes,
-                x.m.CreatedAtUtc))
+                EnsureUtc(x.m.CreatedAtUtc)))
             .ToListAsync(ct);
 
         if (items.Count > MaxExportRecords)
