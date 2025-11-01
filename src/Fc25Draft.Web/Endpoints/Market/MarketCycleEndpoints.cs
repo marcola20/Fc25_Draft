@@ -142,10 +142,13 @@ public static class MarketCycleEndpoints
             if (updated.Status == MarketCycleStatus.Closed)
             {
                 var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct);
-                return Results.Ok(new { ciclo = updated, vendidos = summary.Sold, expirados = summary.Expired });
+                var payload = new MarketCycleStatusUpdateResult(
+                    updated,
+                    new MarketCycleSettlementSummary(summary.Sold, summary.Expired));
+                return TypedResults.Ok(payload);
             }
 
-            return Results.Ok(updated);
+            return TypedResults.Ok(new MarketCycleStatusUpdateResult(updated, null));
         }
         catch (MarketNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
         catch (MarketConflictException ex) { return Results.Conflict(new { message = ex.Message }); }

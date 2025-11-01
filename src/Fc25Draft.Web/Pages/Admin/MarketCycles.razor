@@ -456,8 +456,19 @@ else
         await InvokeAsync(StateHasChanged);
         try
         {
-            await MarketCycleClient.UpdateStatusAsync(cycle.CycleId, status, forceClose);
-            Toasts.ShowSuccess(successMessage);
+            var result = await MarketCycleClient.UpdateStatusAsync(cycle.CycleId, status, forceClose);
+            if (result is null)
+            {
+                Toasts.ShowInfo("Esta alteração já havia sido processada. Atualizando dados recentes.");
+            }
+            else
+            {
+                var message = result.SettlementSummary is { } summary
+                    ? CombineSuccessMessage(successMessage, summary)
+                    : successMessage;
+                Toasts.ShowSuccess(message);
+            }
+
             await LoadAsync(_currentPage);
         }
         catch (InvalidOperationException ex)
@@ -475,6 +486,30 @@ else
             await InvokeAsync(StateHasChanged);
         }
     }
+
+    private static string CombineSuccessMessage(string successMessage, MarketCycleSettlementSummary summary)
+    {
+        var baseMessage = string.IsNullOrWhiteSpace(successMessage) ? string.Empty : successMessage.Trim();
+        var separator = baseMessage.Length == 0
+            ? string.Empty
+            : (baseMessage.EndsWith('.') ? " " : ". ");
+        return $"{baseMessage}{separator}Resumo: {FormatSettlementSummary(summary)}".Trim();
+    }
+
+    private static string FormatSettlementSummary(MarketCycleSettlementSummary summary)
+    {
+        var sold = FormatCount(summary.Sold, "item vendido", "itens vendidos", "nenhum item vendido");
+        var expired = FormatCount(summary.Expired, "item expirado", "itens expirados", "nenhum item expirado");
+        return $"{sold}, {expired}.";
+    }
+
+    private static string FormatCount(int value, string singular, string plural, string zeroText)
+        => value switch
+        {
+            0 => zeroText,
+            1 => $"1 {singular}",
+            _ => $"{value} {plural}"
+        };
 
     private async Task BeginEditAsync(MarketCycleDto cycle)
     {

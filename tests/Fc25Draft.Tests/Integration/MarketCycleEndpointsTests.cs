@@ -203,11 +203,12 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         var response = await client.SendAsync(message);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<CloseCycleResponse>();
+        var payload = await response.Content.ReadFromJsonAsync<MarketCycleStatusUpdateResult>();
         Assert.NotNull(payload);
-        Assert.Equal(MarketCycleStatus.Closed, payload!.ciclo.Status);
-        Assert.Equal(1, payload.vendidos);
-        Assert.Equal(0, payload.expirados);
+        Assert.Equal(MarketCycleStatus.Closed, payload!.Cycle.Status);
+        Assert.NotNull(payload.SettlementSummary);
+        Assert.Equal(1, payload.SettlementSummary!.Sold);
+        Assert.Equal(0, payload.SettlementSummary!.Expired);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
@@ -449,8 +450,6 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         await db.SaveChangesAsync();
         return (cycleId, itemId, teamId);
     }
-
-    private sealed record CloseCycleResponse(MarketCycleDto ciclo, int vendidos, int expirados);
 }
 
 public sealed class MarketCycleEndpointsFactory : WebApplicationFactory<Program>

@@ -96,7 +96,7 @@ public class MarketCycleClient
         return dto;
     }
 
-    public async Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct = default)
+    public async Task<MarketCycleStatusUpdateResult?> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct = default)
     {
         var request = new MarketCycleStatusUpdateRequest
         {
@@ -114,10 +114,23 @@ public class MarketCycleClient
         httpRequest.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
 
         using var response = await client.SendAsync(httpRequest, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.Accepted)
+        {
+            return null;
+        }
+
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
-        return await response.Content.ReadFromJsonAsync<MarketCycleDto>(SerializerOptions, ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Resposta inválida do servidor ao atualizar o status do ciclo.");
+        var result = await response.Content
+            .ReadFromJsonAsync<MarketCycleStatusUpdateResult>(SerializerOptions, ct)
+            .ConfigureAwait(false);
+
+        if (result is null || result.Cycle is null)
+        {
+            throw new InvalidOperationException("Resposta inválida do servidor ao atualizar o status do ciclo.");
+        }
+
+        return result;
     }
 
     private static void AppendQueryString(StringBuilder builder, MarketCycleQueryRequest request)
