@@ -56,13 +56,16 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }).RequireAuthorization("AdminOnly");
 
             // GET /api/market/{itemId}
-            marketApi.MapGet("/{itemId:guid}", async (Guid itemId, IMarketService marketService, CancellationToken ct) =>
+            marketApi.MapGet("/{itemId:guid}", async (
+                Guid itemId,
+                IMarketService marketService,
+                IAuctionSettlementService settlementService,
+                CancellationToken ct) =>
             {
-                await marketService.CloseExpiredItemsAsync(ct);
                 var item = await marketService.GetItemAsync(itemId, ct);
                 return item is null
                     ? Results.NotFound(new { message = "Item não encontrado." })
-                    : Results.Ok(item);
+                    : await ApplyPostSettlementRefreshAsync(item, marketService, settlementService, ct);
             }).AllowAnonymous();
 
             // POST /api/market/{itemId}/buy-now
@@ -128,10 +131,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return Results.Ok(cycle);
             });
 
-            adminMarketApi.MapPost("/close-expired", async (IMarketService marketService, CancellationToken ct) =>
+            adminMarketApi.MapPost("/close-expired", async (
+                IMarketCycleService cycleService,
+                IAuctionSettlementService settlementService,
+                CancellationToken ct) =>
             {
-                var closed = await marketService.CloseExpiredItemsAsync(ct);
-                return Results.Ok(new { itensFechados = closed });
+                var cycle = await cycleService.ResolveAsync(null, ct).ConfigureAwait(false);
+                if (cycle is null)
+                {
+                    return Results.NotFound(new { message = "Nenhum ciclo ativo encontrado." });
+                }
+
+                var summary = await settlementService.SettleExpiredItemsAsync(cycle.CycleId, ct).ConfigureAwait(false);
+                return Results.Ok(new { cicloId = cycle.CycleId, vendidos = summary.Sold, expirados = summary.Expired });
             });
 
             adminMarketApi.MapPost("/cancel/{itemId:guid}", async (
@@ -182,6 +194,30 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
             var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
             return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
+        }
+
+        private static async Task<IResult> ApplyPostSettlementRefreshAsync(
+            MarketItemDto item,
+            IMarketService marketService,
+            IAuctionSettlementService settlementService,
+            CancellationToken ct)
+        {
+            var current = item;
+
+            if (SettlementThrottle.TryAcquire())
+            {
+                var summary = await settlementService.SettleExpiredItemsAsync(item.CycleId, ct).ConfigureAwait(false);
+                if (summary.Total > 0)
+                {
+                    var refreshed = await marketService.GetItemAsync(item.ItemId, ct).ConfigureAwait(false);
+                    if (refreshed is not null)
+                    {
+                        current = refreshed;
+                    }
+                }
+            }
+
+            return Results.Ok(current);
         }
 
         record MarketBuyNowRequest(string? TeamToken);

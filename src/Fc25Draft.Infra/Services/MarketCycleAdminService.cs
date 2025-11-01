@@ -192,20 +192,6 @@ public class MarketCycleAdminService : IMarketCycleAdminService
 
             if (hasActiveItems && !forceClose)
                 throw new MarketValidationException("Existem itens ativos neste ciclo. Utilize o fechamento forçado para continuar.");
-
-            if (hasActiveItems && forceClose)
-            {
-                var items = await _dbContext.MarketItems
-                    .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active)
-                    .ToListAsync(ct)
-                    .ConfigureAwait(false);
-
-                foreach (var item in items)
-                {
-                    item.Status = MarketItemStatus.Canceled;
-                    item.LastUpdateUtc = now;
-                }
-            }
         }
 
         cycle.Status = status;

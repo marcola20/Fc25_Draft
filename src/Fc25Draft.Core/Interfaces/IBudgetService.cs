@@ -10,6 +10,8 @@ public interface IBudgetService
 
     Task<decimal> GetSaldoDisponivelAsync(Guid teamId, CancellationToken ct);
 
+    Task<decimal> GetAvailableAsync(Guid teamId, Guid? excludeItemId, CancellationToken ct);
+
     Task RegistrarAjusteAsync(Guid teamId, decimal valor, string origem, string? descricao, bool credito, CancellationToken ct);
 
     decimal CalculateMatchRewardAmount(MatchRewardRequestDto request);

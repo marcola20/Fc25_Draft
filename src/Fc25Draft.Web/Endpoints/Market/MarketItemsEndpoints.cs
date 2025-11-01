@@ -43,6 +43,7 @@ public static class MarketItemsEndpoints
         HttpContext http,
         [AsParameters] MarketItemsRequest request,
         IMarketCycleService cycleService,
+        IAuctionSettlementService settlementService,
         IMarketItemsQueryService queryService,
         IWebHostEnvironment env,
         ILoggerFactory loggerFactory,
@@ -61,6 +62,11 @@ public static class MarketItemsEndpoints
 
             if (!request.TryBuildQuery(cycle.CycleId, out var query, out var errorResult))
                 return errorResult!;
+
+            if (SettlementThrottle.TryAcquire())
+            {
+                await settlementService.SettleExpiredItemsAsync(cycle.CycleId, ct).ConfigureAwait(false);
+            }
 
             var result = await queryService.QueryAsync(query, ct).ConfigureAwait(false);
 

@@ -32,10 +32,16 @@ public static class MarketHistoryTextFormatter
                 => player is null
                     ? $"Compra imediata por {origin} ({amountText})."
                     : $"Compra imediata por {origin} em {player} ({amountText}).",
+            MarketTransactionType.AuctionSettled when player is not null && amountText is not null
+                => $"Leilão concluído: {player} para {destination} por {amountText}.",
+            MarketTransactionType.AuctionSettled when amountText is not null
+                => $"Leilão concluído para {destination} por {amountText}.",
             MarketTransactionType.AuctionSettled
                 => $"Leilão concluído para {destination}.",
+            MarketTransactionType.AuctionExpired when player is not null
+                => $"Leilão de {player} expirou sem vencedor.",
             MarketTransactionType.AuctionExpired
-                => "Leilão expirado sem vencedor.",
+                => "Leilão expirou sem vencedor.",
             _ when !string.IsNullOrWhiteSpace(destination)
                 => $"{origin} → {destination}",
             _ => origin

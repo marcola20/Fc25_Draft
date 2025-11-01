@@ -1,6 +1,5 @@
 @using System
 @using System.Globalization
-@using System.Reflection
 @using System.Threading
 @using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components.Forms
@@ -72,12 +71,13 @@
                 <div class="input-group input-group-sm">
                     <InputText @key="Item.ItemId"
                                @bind-Value="_model.AmountText"
-                               @bind-Value:event="onchange"
+                               @bind-Value:event="oninput"
                                class="form-control me-2"
                                id="@BidInputId"
                                inputmode="decimal"
                                placeholder="Ex.: R$ 30.000.000,00"
-                               @onblur="HandleBidBlur" />
+                               @onfocus="BeginEditing"
+                               @onblur="EndEditing" />
                     <button type="submit"
                             class="btn btn-primary"
                             disabled="@IsBidDisabled"
@@ -155,6 +155,12 @@
     [Parameter]
     public EventCallback OnTeamTokenMissing { get; set; }
 
+    [Parameter]
+    public EventCallback<Guid> OnEditStart { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnEditEnd { get; set; }
+
     private readonly BidFormModel _model = new();
     private EditContext? _editContext;
     private ValidationMessageStore? _validationMessageStore;
@@ -169,8 +175,9 @@
     private bool _showBuyConfirm;
     private string? _infoMessage;
     private string? _errorMessage;
-    private bool _touched;
-    private string? _lastFormatted;
+    private bool _isEditing;
+    private Guid _itemId;
+    private bool _allowRenderWhileEditing;
 
     private string BidInputId => $"bid-amount-{Item.ItemId}";
 
@@ -242,6 +249,7 @@
             throw new InvalidOperationException("Item parameter is required.");
         }
 
+        _itemId = Item.ItemId;
         _model.AmountText = string.Empty;
         _model.ParsedAmount = null;
         _lifetimeCts = new CancellationTokenSource();
@@ -264,6 +272,11 @@
             _validationMessageStore = new ValidationMessageStore(_editContext);
             _editContext.OnValidationRequested += HandleValidationRequested;
             _editContext.OnFieldChanged += HandleFieldChanged;
+        }
+
+        if (_itemId != Item.ItemId)
+        {
+            _itemId = Item.ItemId;
         }
 
         EnsureTimer();
@@ -318,6 +331,11 @@
         }
 
         _editContext.NotifyValidationStateChanged();
+
+        if (_isEditing)
+        {
+            RequestRender();
+        }
     }
 
     private static bool TryParseAmount(string? input, out decimal amount)
@@ -346,41 +364,51 @@
             out amount);
     }
 
-    private void SetBidToMinimum()
+    private async Task BeginEditing(FocusEventArgs _)
     {
-        var formatted = FormatCurrency(Item.RequiredMinBid);
-        if (string.Equals(_model.AmountText, formatted, StringComparison.Ordinal))
+        if (_isEditing)
+        {
+            return;
+        }
+
+        _isEditing = true;
+
+        if (OnEditStart.HasDelegate)
+        {
+            await OnEditStart.InvokeAsync(Item.ItemId);
+        }
+    }
+
+    private async Task EndEditing(FocusEventArgs _)
+    {
+        if (!_isEditing)
+        {
+            return;
+        }
+
+        _isEditing = false;
+
+        if (TryParseAmount(_model.AmountText, out var parsed) && parsed >= Item.RequiredMinBid)
+        {
+            var formatted = FormatCurrency(parsed);
+            if (!string.Equals(_model.AmountText, formatted, StringComparison.Ordinal))
+            {
+                _model.AmountText = formatted;
+                NotifyAmountChanged();
+            }
+
+            _model.ParsedAmount = parsed;
+            ClearValidation();
+        }
+        else
         {
             ValidateAmount();
-            return;
         }
 
-        _model.AmountText = formatted;
-        NotifyAmountChanged();
-    }
-
-    private void MarkTouched(string _)
-    {
-        _touched = true;
-    }
-
-    private void HandleBidBlur(FocusEventArgs _)
-    {
-        if (!TryParseAmount(_model.AmountText, out var parsed) || parsed < Item.RequiredMinBid)
+        if (OnEditEnd.HasDelegate)
         {
-            ValidateAmount(); 
-            return;
+            await OnEditEnd.InvokeAsync(Item.ItemId);
         }
-
-        var formatted = FormatCurrency(parsed);
-        if (!string.Equals(_model.AmountText, formatted, StringComparison.Ordinal))
-        {
-            _model.AmountText = formatted;
-            NotifyAmountChanged();
-            return;
-        }
-
-        ValidateAmount();
     }
 
     private void NotifyAmountChanged()
@@ -394,7 +422,39 @@
         _editContext.NotifyFieldChanged(field);
     }
 
+    private void ClearValidation()
+    {
+        if (_validationMessageStore is null || _editContext is null)
+        {
+            return;
+        }
+
+        var field = new FieldIdentifier(_model, nameof(BidFormModel.AmountText));
+        _validationMessageStore.Clear(field);
+        _editContext.NotifyValidationStateChanged();
+
+        if (_isEditing)
+        {
+            RequestRender();
+        }
+    }
+
     private static string FormatCurrency(decimal value) => value.ToString("C", CurrencyCulture);
+
+    protected override bool ShouldRender()
+        => !_isEditing || _allowRenderWhileEditing;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _allowRenderWhileEditing = false;
+    }
+
+    private void RequestRender()
+    {
+        _allowRenderWhileEditing = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     private void EnsureTimer()
     {

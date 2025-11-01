@@ -156,7 +156,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
     public async Task Patch_ReturnsConflict_WhenCycleHasActiveItems()
     {
         var factory = CreateIsolatedFactory();
-        var (cycleId, _) = await SeedCycleWithActiveItemAsync(factory);
+        var (cycleId, _, _) = await SeedCycleWithActiveItemAsync(factory);
         var token = await SeedAdminTokenAsync(factory);
         var client = factory.CreateClient();
 
@@ -184,7 +184,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
     public async Task Patch_ClosesCycle_WhenForceCloseIsEnabled()
     {
         var factory = CreateIsolatedFactory();
-        var (cycleId, itemId) = await SeedCycleWithActiveItemAsync(factory);
+        var (cycleId, itemId, teamId) = await SeedCycleWithActiveItemAsync(factory);
         var token = await SeedAdminTokenAsync(factory);
         var client = factory.CreateClient();
 
@@ -203,14 +203,21 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         var response = await client.SendAsync(message);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var dto = await response.Content.ReadFromJsonAsync<MarketCycleDto>();
-        Assert.NotNull(dto);
-        Assert.Equal(MarketCycleStatus.Closed, dto!.Status);
+        var payload = await response.Content.ReadFromJsonAsync<CloseCycleResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(MarketCycleStatus.Closed, payload!.ciclo.Status);
+        Assert.Equal(1, payload.vendidos);
+        Assert.Equal(0, payload.expirados);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
         var item = await db.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
-        Assert.Equal(MarketItemStatus.Canceled, item.Status);
+        Assert.Equal(MarketItemStatus.Sold, item.Status);
+        Assert.Equal(teamId, item.WinnerTeamId);
+
+        var team = await db.Teams.AsNoTracking().FirstAsync(t => t.TeamId == teamId);
+        Assert.Equal(3000m, team.Budget);
+        Assert.Equal(0m, team.BudgetBlocked);
     }
 
     private WebApplicationFactory<Program> CreateIsolatedFactory()
@@ -301,7 +308,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         await db.SaveChangesAsync();
     }
 
-    private static async Task<(Guid cycleId, Guid itemId)> SeedCycleWithActiveItemAsync(WebApplicationFactory<Program> factory)
+    private static async Task<(Guid cycleId, Guid itemId, Guid teamId)> SeedCycleWithActiveItemAsync(WebApplicationFactory<Program> factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
@@ -327,6 +334,7 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         var now = DateTime.UtcNow;
         var cycleId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
 
         db.MarketCycles.Add(new MarketCycle
         {
@@ -338,6 +346,18 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
             CreatedAtUtc = now.AddHours(-3),
             UpdatedAtUtc = now.AddHours(-1)
         });
+
+        if (!await db.Teams.AnyAsync(t => t.TeamId == teamId))
+        {
+            db.Teams.Add(new Team
+            {
+                TeamId = teamId,
+                TeamName = "Time Teste",
+                Token = "TOKEN-TESTE",
+                Budget = 5000m,
+                BudgetBlocked = 2000m
+            });
+        }
 
         db.MarketItems.Add(new MarketItem
         {
@@ -351,12 +371,16 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
             Status = MarketItemStatus.Active,
             PublishedAtUtc = now,
             CreatedAtUtc = now,
-            LastUpdateUtc = now
+            LastUpdateUtc = now,
+            CurrentLeaderTeamId = teamId,
+            CurrentLeaderAmount = 2000m
         });
 
         await db.SaveChangesAsync();
-        return (cycleId, itemId);
+        return (cycleId, itemId, teamId);
     }
+
+    private sealed record CloseCycleResponse(MarketCycleDto ciclo, int vendidos, int expirados);
 }
 
 public sealed class MarketCycleEndpointsFactory : WebApplicationFactory<Program>

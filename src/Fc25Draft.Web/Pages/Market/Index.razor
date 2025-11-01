@@ -103,7 +103,9 @@
                                     ServerTimeOffset="ServerTimeOffset"
                                     OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
                                     OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
-                                    OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))" />
+                                    OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))"
+                                    OnEditStart="HandleEditStart"
+                                    OnEditEnd="HandleEditEnd" />
                 </div>
             }
         </div>
@@ -278,6 +280,7 @@ else
     };
 
     private readonly List<MarketPositionOption> _positionOptions = new();
+    private readonly HashSet<Guid> _editing = new();
     private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
     private PagedResult<CoreItemVm>? PageData;
     private TimeSpan ServerTimeOffset = TimeSpan.Zero;
@@ -537,12 +540,22 @@ else
             return;
         }
 
+        if (_editing.Contains(itemId))
+        {
+            return;
+        }
+
         await LoadPageAsync(Query.Page, ct);
     }
 
     private void MergeItem(CoreItemVm incoming)
     {
         if (PageData is null || PageData.Items is null || PageData.Items.Count == 0)
+        {
+            return;
+        }
+
+        if (_editing.Contains(incoming.ItemId))
         {
             return;
         }
@@ -558,13 +571,21 @@ else
 
     private async Task HandleRealtimeUpdateAsync(CoreItemVm incoming)
     {
-        MergeItem(incoming);
+        var isEditing = _editing.Contains(incoming.ItemId);
 
-        if (IsItemClosed(incoming) && _lifetimeCts is not null && !_lifetimeCts.IsCancellationRequested)
+        if (!isEditing)
+        {
+            MergeItem(incoming);
+        }
+
+        if (!isEditing && IsItemClosed(incoming) && _lifetimeCts is not null && !_lifetimeCts.IsCancellationRequested)
         {
             Logger.LogInformation("Realtime update indicates item {ItemId} is closed. Reloading page {Page}.", incoming.ItemId, Query.Page);
             var ct = PrepareNewLoadCts();
-            await LoadPageAsync(Query.Page, ct);
+            if (_editing.Count == 0)
+            {
+                await LoadPageAsync(Query.Page, ct);
+            }
         }
 
         await RefreshHistoryAsync();
@@ -575,6 +596,18 @@ else
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleEditStart(Guid itemId)
+    {
+        _editing.Add(itemId);
+        return Task.CompletedTask;
+    }
+
+    private Task HandleEditEnd(Guid itemId)
+    {
+        _editing.Remove(itemId);
+        return Task.CompletedTask;
     }
 
     private bool IsItemClosed(CoreItemVm item)
@@ -973,7 +1006,7 @@ else
             return null;
 
         var latest = _historyLatestUtc.Value;
-        return latest == DateTime.MinValue ? latest : latest.AddTicks(-1);
+        return latest == DateTime.MaxValue ? latest : latest.AddTicks(1);
     }
 
     private async Task EnsureHistoryInitializedAsync()

@@ -33,6 +33,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<IMarketCycleService, MarketCycleService>();
             services.AddScoped<IMarketItemGenerationService, MarketItemGenerationService>();
             services.AddScoped<IMarketService, MarketService>();
+            services.AddScoped<IAuctionSettlementService, AuctionSettlementService>();
             services.AddScoped<ITransactionLogService, TransactionLogService>();
             services.AddScoped<IMarketItemPublicationService, MarketItemPublicationService>();
             services.AddScoped<IMarketItemsQueryService, MarketItemsQueryService>();

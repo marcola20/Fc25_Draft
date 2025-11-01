@@ -12,7 +12,8 @@ using Microsoft.Extensions.Options;
 using System.Data;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -25,17 +26,21 @@ public class MarketService : IMarketService
     private readonly MarketOptions _marketOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
-    private static readonly TimeZoneInfo SaoPauloTz =
-    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-        ? TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time")
-        : TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+    private readonly IBudgetService _budgetService;
 
-    public MarketService(DraftDbContext dbContext, IMarketCycleGenerator cycleGenerator, IOptions<MarketOptions> options, ITransactionLogService transactionLogService, TimeProvider? timeProvider = null)
+    public MarketService(
+        DraftDbContext dbContext,
+        IMarketCycleGenerator cycleGenerator,
+        IOptions<MarketOptions> options,
+        ITransactionLogService transactionLogService,
+        IBudgetService budgetService,
+        TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cycleGenerator = cycleGenerator ?? throw new ArgumentNullException(nameof(cycleGenerator));
         _marketOptions = options.Value ?? throw new ArgumentNullException(nameof(options));
         _transactionLogService = transactionLogService ?? throw new ArgumentNullException(nameof(transactionLogService));
+        _budgetService = budgetService ?? throw new ArgumentNullException(nameof(budgetService));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -137,8 +142,6 @@ public class MarketService : IMarketService
         var normalizedToken = NormalizeToken(teamToken);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
-        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, SaoPauloTz);
-
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
             var item = await _dbContext.MarketItems
@@ -151,7 +154,7 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc <= nowBr)
+            if (item.ExpiresAtUtc <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
@@ -185,9 +188,11 @@ public class MarketService : IMarketService
 
             await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct2);
 
-            var availableBudget = team.Budget - team.BudgetBlocked;
+            var availableBudget = await _budgetService.GetAvailableAsync(team.TeamId, null, ct2).ConfigureAwait(false);
             if (availableBudget < amount)
-                throw new MarketConflictException("Saldo insuficiente para registrar o lance.");
+            {
+                throw new MarketValidationException("Saldo insuficiente para este lance considerando lances líderes ativos em outros itens.");
+            }
 
             var previousLeaderId = item.CurrentLeaderTeamId;
             var previousAmount = item.CurrentLeaderAmount ?? 0m;
@@ -204,11 +209,11 @@ public class MarketService : IMarketService
                     var previousTeamName = string.IsNullOrWhiteSpace(previousTeam.TeamName)
                         ? previousTeam.TeamId.ToString()
                         : previousTeam.TeamName;
-                    outbidNotes = $"Time {previousTeamName} foi superado no leilão.";
+                    outbidNotes = string.Format(culture, "Time {0} foi superado no leilão de {1}.", previousTeamName, item.Player.Name);
                 }
                 else
                 {
-                    outbidNotes = "Líder anterior não encontrado ao liberar orçamento.";
+                    outbidNotes = string.Format(culture, "Líder anterior não encontrado ao liberar orçamento do leilão de {0}.", item.Player.Name);
                 }
             }
 
@@ -220,20 +225,20 @@ public class MarketService : IMarketService
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
                 Amount = amount,
-                CreatedAtUtc = nowBr
+                CreatedAtUtc = nowUtc
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
             item.CurrentLeaderAmount = amount;
-            item.LastUpdateUtc = nowBr;
+            item.LastUpdateUtc = nowUtc;
 
-            var bidNotes = FormattableString.Invariant($"Lance de {amount:0.00} registrado.");
+            var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", amount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
                 bidNotes = $"{bidNotes} {outbidNotes}";
 
             await _transactionLogService.LogMarketAsync(
                 item, MarketTransactionType.BidPlaced, team.TeamId, previousLeaderId,
-                amount, team.TeamId.ToString(), bidNotes, nowBr, ct2);
+                amount, team.TeamId.ToString(), bidNotes, nowUtc, ct2);
 
             await _dbContext.MarketBids.AddAsync(bid, ct2);
 
@@ -373,193 +378,6 @@ public class MarketService : IMarketService
 
             return new BuyNowResultDto(true, "Compra realizada com sucesso.");
         }, ct);
-    }
-
-    public async Task<int> CloseExpiredItemsAsync(CancellationToken ct)
-    {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        var itemIds = await _dbContext.MarketItems
-            .AsNoTracking()
-            .Where(i => i.Status == MarketItemStatus.Active && i.ExpiresAtUtc <= now)
-            .Select(i => i.ItemId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        if (itemIds.Count == 0)
-        {
-            return 0;
-        }
-
-        var processed = 0;
-
-        foreach (var itemId in itemIds)
-        {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
-
-            var item = await _dbContext.MarketItems
-                .Include(i => i.Player)
-                .FirstOrDefaultAsync(i => i.ItemId == itemId, ct)
-                .ConfigureAwait(false);
-
-            if (item is null)
-            {
-                continue;
-            }
-
-            if (item.Status != MarketItemStatus.Active)
-            {
-                continue;
-            }
-
-            if (item.ExpiresAtUtc > now)
-            {
-                continue;
-            }
-
-            var previousLeaderId = item.CurrentLeaderTeamId;
-            var previousLeaderAmount = item.CurrentLeaderAmount;
-
-            if (item.CurrentLeaderTeamId.HasValue && item.CurrentLeaderAmount.HasValue)
-            {
-                var team = await _dbContext.Teams
-                    .FirstOrDefaultAsync(t => t.TeamId == item.CurrentLeaderTeamId.Value, ct)
-                    .ConfigureAwait(false);
-
-                if (team is null)
-                {
-                    item.Status = MarketItemStatus.Expired;
-                    item.CurrentLeaderTeamId = null;
-                    item.CurrentLeaderAmount = null;
-                    item.WinnerTeamId = null;
-
-                    await _transactionLogService.LogMarketAsync(
-                        item,
-                        MarketTransactionType.AuctionExpired,
-                        null,
-                        previousLeaderId,
-                        previousLeaderAmount,
-                        "sistema",
-                        "Leilão encerrado sem vencedor válido.",
-                        now,
-                        ct).ConfigureAwait(false);
-                }
-                else
-                {
-                    await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct, includeCurrentItem: true).ConfigureAwait(false);
-
-                    var value = item.CurrentLeaderAmount.Value;
-                    team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - value);
-                    team.Budget -= value;
-                    if (team.Budget < 0m)
-                    {
-                        team.Budget = 0m;
-                    }
-
-                    var player = await _dbContext.Players
-                        .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)
-                        .ConfigureAwait(false);
-
-                    if (player is not null)
-                    {
-                        player.CurrentTeamId = team.TeamId;
-                        await SyncRosterAsync(team.TeamId, player.PlayerId, ct).ConfigureAwait(false);
-                    }
-
-                    item.Status = MarketItemStatus.Sold;
-                    item.WinnerTeamId = team.TeamId;
-
-                    await _dbContext.TransferHistories.AddAsync(new TransferHistory
-                    {
-                        TransferId = Guid.NewGuid(),
-                        PlayerId = item.PlayerId,
-                        FromTeamId = null,
-                        ToTeamId = team.TeamId,
-                        Amount = value,
-                        Type = TransferType.MarketAuction,
-                        Notes = "Leilão encerrado",
-                        PerformedBy = "sistema",
-                        PerformedAtUtc = now
-                    }, ct).ConfigureAwait(false);
-
-                    var settleNotes = FormattableString.Invariant($"Leilão encerrado por {value:0.00}.");
-
-                    await _transactionLogService.LogMarketAsync(
-                        item,
-                        MarketTransactionType.AuctionSettled,
-                        team.TeamId,
-                        previousLeaderId,
-                        value,
-                        "sistema",
-                        settleNotes,
-                        now,
-                        ct).ConfigureAwait(false);
-                }
-            }
-            else
-            {
-                item.Status = MarketItemStatus.Expired;
-                item.CurrentLeaderTeamId = null;
-                item.CurrentLeaderAmount = null;
-                item.WinnerTeamId = null;
-
-                await _transactionLogService.LogMarketAsync(
-                    item,
-                    MarketTransactionType.AuctionExpired,
-                    null,
-                    null,
-                    null,
-                    "sistema",
-                    "Leilão expirado sem lances válidos.",
-                    now,
-                    ct).ConfigureAwait(false);
-            }
-
-            item.LastUpdateUtc = now;
-            item.ExpiresAtUtc = now;
-
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-            processed++;
-        }
-
-        await UpdateCycleStatusesAsync(now, ct).ConfigureAwait(false);
-
-        return processed;
-    }
-
-    private async Task UpdateCycleStatusesAsync(DateTime now, CancellationToken ct)
-    {
-        var cycleIds = await _dbContext.MarketItems
-            .AsNoTracking()
-            .Select(i => i.CycleId)
-            .Distinct()
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        foreach (var cycleId in cycleIds)
-        {
-            var hasActive = await _dbContext.MarketItems
-                .AsNoTracking()
-                .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active, ct)
-                .ConfigureAwait(false);
-
-            if (!hasActive)
-            {
-                var cycle = await _dbContext.MarketCycles
-                    .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
-                    .ConfigureAwait(false);
-
-                if (cycle is not null && cycle.Status == MarketCycleStatus.Active)
-                {
-                    cycle.Status = MarketCycleStatus.Closed;
-                    cycle.UpdatedAtUtc = now;
-                    _dbContext.MarketCycles.Update(cycle);
-                }
-            }
-        }
-
-        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     private async Task EnsureSquadLimitAsync(Guid teamId, Guid itemId, Guid? currentLeaderTeamId, CancellationToken ct, bool includeCurrentItem = false)

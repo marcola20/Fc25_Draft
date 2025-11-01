@@ -9,5 +9,4 @@ public interface IMarketService
     Task<MarketItemDto?> GetItemAsync(Guid itemId, CancellationToken ct);
     Task<MarketItemDto> PlaceBidAsync(Guid itemId, string teamToken, decimal amount, uint expectedRowVersion, CancellationToken ct);
     Task<BuyNowResultDto> BuyNowAsync(Guid itemId, string teamToken, uint expectedRowVersion, CancellationToken ct);
-    Task<int> CloseExpiredItemsAsync(CancellationToken ct);
 }

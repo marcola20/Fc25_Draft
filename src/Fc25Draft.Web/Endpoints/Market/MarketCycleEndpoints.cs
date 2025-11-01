@@ -3,6 +3,7 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Models.MarketCycles;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -25,9 +26,9 @@ public static class MarketCycleEndpoints
     }
 
     private static async Task<IResult> HandleCreateAsync(
-     MarketCycleCreateRequest request,
-     IMarketCycleAdminService service,
-     CancellationToken ct)
+        MarketCycleCreateRequest request,
+        IMarketCycleAdminService service,
+        CancellationToken ct)
     {
         if (!TryValidate(request, out var validationError))
             return validationError!;
@@ -104,6 +105,7 @@ public static class MarketCycleEndpoints
         Guid cycleId,
         MarketCycleStatusUpdateRequest request,
         IMarketCycleAdminService service,
+        IAuctionSettlementService settlementService,
         CancellationToken ct)
     {
         if (!TryValidate(request, out var validationError))
@@ -116,6 +118,12 @@ public static class MarketCycleEndpoints
         try
         {
             var updated = await service.UpdateStatusAsync(cycleId, status, request.ForceClose, ct).ConfigureAwait(false);
+            if (updated.Status == MarketCycleStatus.Closed)
+            {
+                var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct).ConfigureAwait(false);
+                return Results.Ok(new { ciclo = updated, vendidos = summary.Sold, expirados = summary.Expired });
+            }
+
             return Results.Ok(updated);
         }
         catch (MarketNotFoundException ex)

@@ -6,11 +6,10 @@ namespace Fc25Draft.Web.Utilities;
 
 public static class BrazilTime
 {
-    public const string TimeZoneDisplayName = "UTC-3";
 
     public static CultureInfo Culture { get; } = new("pt-BR");
 
-    public static TimeZoneInfo TimeZone { get; } = TimeZoneInfo.FindSystemTimeZoneById(
+    public static TimeZoneInfo Zone { get; } = TimeZoneInfo.FindSystemTimeZoneById(
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? "E. South America Standard Time"
             : "America/Sao_Paulo");
@@ -18,7 +17,7 @@ public static class BrazilTime
     public static DateTime ConvertFromUtc(DateTime utc)
     {
         var normalized = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-        return TimeZoneInfo.ConvertTimeFromUtc(normalized, TimeZone);
+        return TimeZoneInfo.ConvertTimeFromUtc(normalized, Zone);
     }
 
     public static string FormatDateTime(DateTime utc, string format = "dd/MM/yyyy HH:mm")
@@ -31,18 +30,15 @@ public static class BrazilTime
         => FormatDateTime(utc, format);
 
     public static string FormatDateTimeWithZone(DateTime utc)
-    {
-        var local = ConvertFromUtc(utc);
-        return $"{local:dd/MM/yyyy HH:mm} ({TimeZoneDisplayName})";
-    }
+        => FormatDateTime(utc);
 
     public static DateTime ConvertToUtc(DateTime local)
     {
         return local.Kind switch
         {
             DateTimeKind.Utc => local,
-            DateTimeKind.Local => TimeZoneInfo.ConvertTimeToUtc(local, TimeZone),
-            _ => TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), TimeZone)
+            DateTimeKind.Local => TimeZoneInfo.ConvertTimeToUtc(local, Zone),
+            _ => TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Zone)
         };
     }
 

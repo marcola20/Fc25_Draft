@@ -56,6 +56,32 @@ public class BudgetService : IBudgetService
         return saldo - bloqueado;
     }
 
+    public async Task<decimal> GetAvailableAsync(Guid teamId, Guid? excludeItemId, CancellationToken ct)
+    {
+        var saldo = await _dbContext.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == teamId)
+            .Select(t => (decimal?)t.Budget)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false) ?? 0m;
+
+        var query = _dbContext.MarketItems
+            .AsNoTracking()
+            .Where(i => i.Status == MarketItemStatus.Active && i.CurrentLeaderTeamId == teamId);
+
+        if (excludeItemId.HasValue)
+        {
+            query = query.Where(i => i.ItemId != excludeItemId.Value);
+        }
+
+        var reserved = await query
+            .Select(i => i.CurrentLeaderAmount ?? 0m)
+            .SumAsync(ct)
+            .ConfigureAwait(false);
+
+        return saldo - reserved;
+    }
+
     public async Task RegistrarAjusteAsync(Guid teamId, decimal valor, string origem, string? descricao, bool credito, CancellationToken ct)
     {
         if (teamId == Guid.Empty)
