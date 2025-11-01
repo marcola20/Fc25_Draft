@@ -107,53 +107,49 @@ public static class MarketCycleEndpoints
     }
 
     private static async Task<IResult> HandleStatusUpdateAsync(
-        Guid cycleId,
-        MarketCycleStatusUpdateRequest request,
-        IMarketCycleAdminService service,
-        IAuctionSettlementService settlementService,
-        IIdempotencyStore idempotencyStore,
-        HttpContext httpContext,
-        ILogger<MarketCycleEndpoints> logger,
-        CancellationToken ct)
+    [FromRoute] Guid cycleId,
+    [FromBody] MarketCycleStatusUpdateRequest request,
+    [FromServices] IMarketCycleAdminService service,
+    [FromServices] IAuctionSettlementService settlementService,
+    [FromServices] IIdempotencyStore idempotencyStore,
+    [FromServices] ILoggerFactory loggerFactory,
+    HttpContext httpContext,
+    CancellationToken ct)
     {
+        var logger = loggerFactory.CreateLogger("MarketCycleEndpoints");
+
         if (!TryValidate(request, out var validationError))
-        {
             return validationError!;
-        }
 
         var status = request.Status ?? MarketCycleStatus.Draft;
         var idempotencyKey = ExtractIdempotencyKey(httpContext);
 
-        if (!string.IsNullOrEmpty(idempotencyKey) && !idempotencyStore.TryRegister(idempotencyKey, StatusUpdateIdempotencyTtl))
+        if (!string.IsNullOrEmpty(idempotencyKey) &&
+            !idempotencyStore.TryRegister(idempotencyKey, StatusUpdateIdempotencyTtl))
         {
-            logger.LogInformation("Ignoring duplicate status update for cycle {CycleId} to {Status} with key {IdempotencyKey}", cycleId, status, idempotencyKey);
-            return TypedResults.Accepted();
+            logger.LogInformation(
+                "Ignoring duplicate status update for cycle {CycleId} to {Status} with key {IdempotencyKey}",
+                cycleId, status, idempotencyKey);
+            return TypedResults.AcceptedAtRoute();
         }
 
         try
         {
-            var updated = await service.UpdateStatusAsync(cycleId, status, request.ForceClose, ct).ConfigureAwait(false);
-            logger.LogInformation("Updated cycle {CycleId} to {Status} with key {IdempotencyKey}", cycleId, updated.Status, idempotencyKey);
+            var updated = await service.UpdateStatusAsync(cycleId, status, request.ForceClose, ct);
+            logger.LogInformation("Updated cycle {CycleId} to {Status} with key {IdempotencyKey}",
+                cycleId, updated.Status, idempotencyKey);
+
             if (updated.Status == MarketCycleStatus.Closed)
             {
-                var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct).ConfigureAwait(false);
+                var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct);
                 return Results.Ok(new { ciclo = updated, vendidos = summary.Sold, expirados = summary.Expired });
             }
 
             return Results.Ok(updated);
         }
-        catch (MarketNotFoundException ex)
-        {
-            return Results.NotFound(new { message = ex.Message });
-        }
-        catch (MarketConflictException ex)
-        {
-            return Results.Conflict(new { message = ex.Message });
-        }
-        catch (MarketValidationException ex)
-        {
-            return Results.Conflict(new { message = ex.Message });
-        }
+        catch (MarketNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
+        catch (MarketConflictException ex) { return Results.Conflict(new { message = ex.Message }); }
+        catch (MarketValidationException ex) { return Results.Conflict(new { message = ex.Message }); }
     }
 
     private static string? ExtractIdempotencyKey(HttpContext httpContext)
