@@ -18,7 +18,7 @@ public class TransfersClient
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
+        var client = await _clientFactory.CreateAsync().ConfigureAwait(false);
 
         var query = BuildQuery(request);
         var url = QueryHelpers.AddQueryString("api/transfers/history", query);
@@ -34,7 +34,7 @@ public class TransfersClient
 
     public async Task<TransferListItemDto?> GetByIdAsync(Guid transferId, CancellationToken ct)
     {
-        var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
+        var client = await _clientFactory.CreateAsync().ConfigureAwait(false);
         using var response = await client.GetAsync($"api/transfers/{transferId}", ct).ConfigureAwait(false);
 
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -94,7 +94,7 @@ public class TransfersClient
 
         if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
-            message = "Acesso restrito a administradores.";
+            message = "Você não tem permissão para acessar este recurso.";
         }
 
         throw new HttpRequestException(message, null, response.StatusCode);

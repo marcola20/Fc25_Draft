@@ -47,6 +47,34 @@ a, .btn-link {
     align-items: center;
 }
 
+.table-transfer-history .transfer-player,
+.table-transfer-history .transfer-team {
+    max-width: 18rem;
+}
+
+.table-transfer-history .transfer-player .text-truncate,
+.table-transfer-history .transfer-team .text-truncate {
+    display: block;
+}
+
+.table-transfer-history .transfer-date {
+    white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+    .table-transfer-history .transfer-player,
+    .table-transfer-history .transfer-team {
+        max-width: 14rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .table-transfer-history .transfer-player,
+    .table-transfer-history .transfer-team {
+        max-width: 10rem;
+    }
+}
+
 .draft-filter-group label {
     font-size: 0.95rem;
 }

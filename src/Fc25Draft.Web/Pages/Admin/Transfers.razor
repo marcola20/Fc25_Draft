@@ -1,10 +1,10 @@
+@page "/transferencias"
 @page "/admin/transferencias"
 @using System.Globalization
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Utilities
-@inject AdminAuthService AdminAuth
 @inject TransfersClient TransfersClient
 @inject TeamsApiClient TeamsApiClient
 @inject PlayersApiClient PlayersApiClient
@@ -16,183 +16,194 @@
 
 <h1 class="h3 mb-3">Histórico de Transferências</h1>
 
-@if (!AdminAuth.IsAuthenticated)
-{
-    <div class="alert alert-warning" role="alert">
-        Entre como administrador para visualizar o histórico de transferências.
-    </div>
-}
-else
-{
-    <EditForm EditContext="_filterContext" OnValidSubmit="ApplyFiltersAsync">
-        <DataAnnotationsValidator />
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="filter-team">Time</label>
-                        <InputSelect id="filter-team" class="form-select" @bind-Value="_filter.TeamId" TValue="Guid?">
-                            <option value="">Todos os times</option>
-                            @foreach (var team in _teams)
+<EditForm EditContext="_filterContext" OnValidSubmit="ApplyFiltersAsync">
+    <DataAnnotationsValidator />
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="filter-team">Time</label>
+                    <InputSelect id="filter-team" class="form-select" @bind-Value="_filter.TeamId" TValue="Guid?">
+                        <option value="">Todos os times</option>
+                        @foreach (var team in _teams)
+                        {
+                            <option value="@team.TeamId">@team.TeamName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="filter-player">Jogador</label>
+                    <input id="filter-player"
+                           class="form-control"
+                           placeholder="Busque pelo nome"
+                           value="@_playerSearch"
+                           @oninput="OnPlayerSearchChanged"
+                           autocomplete="off" />
+                    @if (_selectedPlayer is not null)
+                    {
+                        <div class="form-text text-success">Selecionado: @_selectedPlayer.Name</div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearSelectedPlayer">Remover jogador</button>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_playerSearch) && _playerSuggestions.Count > 0)
+                    {
+                        <div class="list-group shadow-sm mt-2">
+                            @foreach (var suggestion in _playerSuggestions)
                             {
-                                <option value="@team.TeamId">@team.TeamName</option>
+                                <button type="button" class="list-group-item list-group-item-action"
+                                        @onclick="() => SelectPlayer(suggestion)">
+                                    @suggestion.Name (@suggestion.Position) - OVR @suggestion.Overall
+                                </button>
                             }
-                        </InputSelect>
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="filter-player">Jogador</label>
-                        <input id="filter-player"
-                               class="form-control"
-                               placeholder="Busque pelo nome"
-                               value="@_playerSearch"
-                               @oninput="OnPlayerSearchChanged"
-                               autocomplete="off" />
-                        @if (_selectedPlayer is not null)
-                        {
-                            <div class="form-text text-success">Selecionado: @_selectedPlayer.Name</div>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearSelectedPlayer">Remover jogador</button>
-                            </div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(_playerSearch) && _playerSuggestions.Count > 0)
-                        {
-                            <div class="list-group shadow-sm mt-2">
-                                @foreach (var suggestion in _playerSuggestions)
-                                {
-                                    <button type="button" class="list-group-item list-group-item-action"
-                                            @onclick="() => SelectPlayer(suggestion)">
-                                        @suggestion.Name (@suggestion.Position) - OVR @suggestion.Overall
-                                    </button>
-                                }
-                            </div>
-                        }
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="filter-start">Início do período</label>
-                        <input id="filter-start" type="date" class="form-control" @bind="_filter.StartDate" />
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="filter-end">Fim do período</label>
-                        <input id="filter-end" type="date" class="form-control" @bind="_filter.EndDate" />
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="filter-texto">Busca textual</label>
-                        <InputText id="filter-texto" class="form-control" @bind-Value="_filter.Query" />
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="filter-pagesize">Itens por página</label>
-                        <InputNumber id="filter-pagesize" class="form-control" @bind-Value="_filter.PageSize" />
-                        <ValidationMessage For="@(() => _filter.PageSize)" />
-                    </div>
-                    <div class="col-12 col-md-3 d-flex gap-2 justify-content-md-end">
-                        <button type="submit" class="btn btn-primary" disabled="@_isLoading">Aplicar</button>
-                        <button type="button" class="btn btn-outline-secondary" @onclick="ClearFiltersAsync" disabled="@_isLoading">Limpar</button>
-                    </div>
+                        </div>
+                    }
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="filter-start">Início do período</label>
+                    <input id="filter-start" type="date" class="form-control" @bind="_filter.StartDate" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="filter-end">Fim do período</label>
+                    <input id="filter-end" type="date" class="form-control" @bind="_filter.EndDate" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="filter-texto">Busca textual</label>
+                    <InputText id="filter-texto" class="form-control" @bind-Value="_filter.Query" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="filter-pagesize">Itens por página</label>
+                    <InputNumber id="filter-pagesize" class="form-control" @bind-Value="_filter.PageSize" />
+                    <ValidationMessage For="@(() => _filter.PageSize)" />
+                </div>
+                <div class="col-12 col-md-3 d-flex gap-2 justify-content-md-end">
+                    <button type="submit" class="btn btn-primary" disabled="@_isLoading">Aplicar</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ClearFiltersAsync" disabled="@_isLoading">Limpar</button>
                 </div>
             </div>
         </div>
-    </EditForm>
+    </div>
+</EditForm>
 
-    @if (!string.IsNullOrEmpty(_error))
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_isLoading && _transfers is null)
+{
+    <div class="alert alert-info" role="status">Carregando transferências...</div>
+}
+else if (_transfers is null)
+{
+    <div class="alert alert-info" role="status">Carregando transferências...</div>
+}
+else if (_transfers.Total == 0)
+{
+    <div class="alert alert-warning" role="status">Nenhuma transferência encontrada para os filtros informados.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle table-transfer-history">
+            <thead>
+                <tr>
+                    <th scope="col">
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Date))">
+                            Data/Hora @SortIcon(nameof(TransferSort.Date))
+                        </button>
+                    </th>
+                    <th scope="col">
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Player))">
+                            Jogador @SortIcon(nameof(TransferSort.Player))
+                        </button>
+                    </th>
+                    <th scope="col">
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.FromTeam))">
+                            Saiu do time @SortIcon(nameof(TransferSort.FromTeam))
+                        </button>
+                    </th>
+                    <th scope="col">
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.ToTeam))">
+                            Foi para o time @SortIcon(nameof(TransferSort.ToTeam))
+                        </button>
+                    </th>
+                    <th scope="col" class="text-end">
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Amount))">
+                            Valor @SortIcon(nameof(TransferSort.Amount))
+                        </button>
+                    </th>
+                    <th scope="col">Observações</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in GetSortedItems())
+            {
+                <tr>
+                    <td class="transfer-date text-nowrap text-muted small">@BrazilTime.FormatDateTime(item.OccurredAtUtc)</td>
+                    <td class="transfer-player">
+                        <div class="fw-semibold text-truncate" title="@item.PlayerName">@item.PlayerName</div>
+                    </td>
+                    <td class="transfer-team">
+                        @if (string.IsNullOrWhiteSpace(item.FromTeamName))
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                        else
+                        {
+                            <span class="d-block text-truncate" title="@item.FromTeamName">@item.FromTeamName</span>
+                        }
+                    </td>
+                    <td class="transfer-team">
+                        @if (string.IsNullOrWhiteSpace(item.ToTeamName))
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                        else
+                        {
+                            <span class="d-block text-truncate" title="@item.ToTeamName">@item.ToTeamName</span>
+                        }
+                    </td>
+                    <td class="text-end">@item.Amount.ToString("C0", CultureInfo.GetCultureInfo("pt-BR"))</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                        {
+                            var shortText = item.Notes.Length > 60 ? item.Notes[..60] + "…" : item.Notes;
+                            <span title="@item.Notes">@shortText</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_transfers.TotalPages > 1)
     {
-        <div class="alert alert-danger" role="alert">@_error</div>
-    }
-    else if (_isLoading && _transfers is null)
-    {
-        <div class="alert alert-info" role="status">Carregando transferências...</div>
-    }
-    else if (_transfers is null)
-    {
-        <div class="alert alert-info" role="status">Carregando transferências...</div>
-    }
-    else if (_transfers.Total == 0)
-    {
-        <div class="alert alert-warning" role="status">Nenhuma transferência encontrada para os filtros informados.</div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>
-                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Date))">
-                                Data/Hora @SortIcon(nameof(TransferSort.Date))
-                            </button>
-                        </th>
-                        <th>
-                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Player))">
-                                Jogador @SortIcon(nameof(TransferSort.Player))
-                            </button>
-                        </th>
-                        <th>
-                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.FromTeam))">
-                                Saiu do time @SortIcon(nameof(TransferSort.FromTeam))
-                            </button>
-                        </th>
-                        <th>
-                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.ToTeam))">
-                                Foi para o time @SortIcon(nameof(TransferSort.ToTeam))
-                            </button>
-                        </th>
-                        <th class="text-end">
-                            <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ChangeSort(nameof(TransferSort.Amount))">
-                                Valor @SortIcon(nameof(TransferSort.Amount))
-                            </button>
-                        </th>
-                        <th>Observações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var item in GetSortedItems())
+        <nav class="mt-3" aria-label="Paginação do histórico de transferências">
+            <ul class="pagination pagination-sm flex-wrap mb-0">
+                <li class="page-item @(_currentPage <= 1 ? "disabled" : null)">
+                    <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage - 1)" disabled="@(_currentPage <= 1)">Anterior</button>
+                </li>
+                @foreach (var page in VisiblePages)
                 {
-                    <tr>
-                        <td class="text-nowrap">@BrazilTime.FormatDateTime(item.OccurredAtUtc)</td>
-                        <td class="fw-semibold">@item.PlayerName</td>
-                        <td>@item.FromTeamName</td>
-                        <td>@item.ToTeamName</td>
-                        <td class="text-end">@item.Amount.ToString("C0", CultureInfo.GetCultureInfo("pt-BR"))</td>
-                        <td>
-                            @if (!string.IsNullOrWhiteSpace(item.Notes))
-                            {
-                                var shortText = item.Notes.Length > 60 ? item.Notes[..60] + "…" : item.Notes;
-                                <span title="@item.Notes">@shortText</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">—</span>
-                            }
-                        </td>
-                    </tr>
+                    <li class="page-item @(page == _currentPage ? "active" : null)">
+                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@(page)</button>
+                    </li>
                 }
-                </tbody>
-            </table>
-        </div>
+                <li class="page-item @(_currentPage >= _transfers.TotalPages ? "disabled" : null)">
+                    <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage + 1)" disabled="@(_currentPage >= _transfers.TotalPages)">Próxima</button>
+                </li>
+            </ul>
+        </nav>
+    }
 
-        @if (_transfers.TotalPages > 1)
-        {
-            <nav class="mt-3" aria-label="Paginação do histórico de transferências">
-                <ul class="pagination pagination-sm flex-wrap mb-0">
-                    <li class="page-item @(_currentPage <= 1 ? "disabled" : null)">
-                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage - 1)" disabled="@(_currentPage <= 1)">Anterior</button>
-                    </li>
-                    @foreach (var page in VisiblePages)
-                    {
-                        <li class="page-item @(page == _currentPage ? "active" : null)">
-                            <button class="page-link" type="button" @onclick="async () => await LoadAsync(page)">@(page)</button>
-                        </li>
-                    }
-                    <li class="page-item @(_currentPage >= _transfers.TotalPages ? "disabled" : null)">
-                        <button class="page-link" type="button" @onclick="async () => await LoadAsync(_currentPage + 1)" disabled="@(_currentPage >= _transfers.TotalPages)">Próxima</button>
-                    </li>
-                </ul>
-            </nav>
-        }
-
-        @if (_isLoading)
-        {
-            <div class="alert alert-info mt-3" role="status">Atualizando dados...</div>
-        }
+    @if (_isLoading)
+    {
+        <div class="alert alert-info mt-3" role="status">Atualizando dados...</div>
     }
 }
 
@@ -236,13 +247,7 @@ else
         _filterContext = new EditContext(_filter);
         _filterContext.OnFieldChanged += (_, __) => InvokeAsync(StateHasChanged);
 
-        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
-        await AdminAuth.EnsureInitializedAsync();
-
-        if (AdminAuth.IsAuthenticated)
-        {
-            await LoadInitialDataAsync();
-        }
+        await LoadInitialDataAsync();
     }
 
     private async Task LoadInitialDataAsync()
@@ -289,11 +294,6 @@ else
 
     private async Task LoadAsync(int page = 1)
     {
-        if (!AdminAuth.IsAuthenticated)
-        {
-            return;
-        }
-
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
@@ -431,23 +431,6 @@ else
         _playerSuggestions.Clear();
     }
 
-    private void OnAuthenticationChanged()
-    {
-        InvokeAsync(async () =>
-        {
-            if (!AdminAuth.IsAuthenticated)
-            {
-                _transfers = null;
-                _error = null;
-                CancelPendingRequests();
-            }
-            else
-            {
-                await LoadInitialDataAsync();
-            }
-        });
-    }
-
     private void CancelPendingRequests()
     {
         _loadCts?.Cancel();
@@ -461,7 +444,6 @@ else
 
     public void Dispose()
     {
-        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
         CancelPendingRequests();
     }
 

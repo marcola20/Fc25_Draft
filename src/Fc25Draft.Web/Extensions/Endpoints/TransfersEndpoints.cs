@@ -12,8 +12,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
         {
             var transfersApi = api.MapGroup("/transfers");
 
-            transfersApi.MapGet("/history", HandleHistoryAsync).RequireAuthorization("AdminOnly");
-            transfersApi.MapGet("/{transferId:guid}", HandleGetAsync).RequireAuthorization("AdminOnly");
+            transfersApi.MapGet("/history", HandleHistoryAsync);
+            transfersApi.MapGet("/{transferId:guid}", HandleGetAsync);
 
             return api;
         }
