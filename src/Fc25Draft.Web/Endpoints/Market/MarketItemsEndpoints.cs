@@ -54,14 +54,10 @@ public static class MarketItemsEndpoints
         {
             var cycle = await cycleService.ResolveAsync(request.CycleId, ct).ConfigureAwait(false);
             if (cycle is null)
-            {
                 return Results.NotFound(new { message = "Ciclo de mercado não encontrado." });
-            }
 
             if (!request.TryBuildQuery(cycle.CycleId, out var query, out var errorResult))
-            {
                 return errorResult!;
-            }
 
             var result = await queryService.QueryAsync(query, ct).ConfigureAwait(false);
 
@@ -93,20 +89,14 @@ public static class MarketItemsEndpoints
         CancellationToken ct)
     {
         if (request is null)
-        {
             return Results.BadRequest(new { message = "Payload inválido." });
-        }
 
         var token = ResolveTeamToken(http, request.TeamToken);
         if (token is null)
-        {
             return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
-        }
 
         if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
-        {
             return errorResult!;
-        }
 
         try
         {
@@ -214,15 +204,9 @@ public static class MarketItemsEndpoints
             var buffer = new HashSet<short>();
 
             if (Positions is { Length: > 0 })
-            {
                 foreach (var value in Positions)
-                {
-                    if (value is >= short.MinValue and <= short.MaxValue)
-                    {
+                    if (value >= short.MinValue && value <= short.MaxValue)
                         buffer.Add((short)value);
-                    }
-                }
-            }
 
             if (!string.IsNullOrWhiteSpace(PositionsRaw))
             {
@@ -230,12 +214,9 @@ public static class MarketItemsEndpoints
                 foreach (var token in tokens)
                 {
                     if (string.IsNullOrWhiteSpace(token))
-                    {
                         continue;
-                    }
 
-                    if (short.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric) &&
-                        numeric is >= short.MinValue and <= short.MaxValue)
+                    if (short.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric) && numeric >= short.MinValue && numeric <= short.MaxValue)
                     {
                         buffer.Add(numeric);
                         continue;
@@ -249,9 +230,7 @@ public static class MarketItemsEndpoints
 
                     var nameId = PositionExtensions.ToPositionId(token);
                     if (nameId > 0)
-                    {
                         buffer.Add((short)nameId);
-                    }
                 }
             }
 
@@ -261,17 +240,13 @@ public static class MarketItemsEndpoints
     private static IReadOnlyList<MarketItemStatus> ParseStatuses(string? raw)
     {
             if (string.IsNullOrWhiteSpace(raw))
-            {
                 return Array.Empty<MarketItemStatus>();
-            }
 
             var tokens = raw
                 .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             if (tokens.Length == 0)
-            {
                 return Array.Empty<MarketItemStatus>();
-            }
 
             var result = new HashSet<MarketItemStatus>();
 
@@ -287,9 +262,7 @@ public static class MarketItemsEndpoints
                 }
 
                 if (StatusLookup.TryGetValue(token, out var status))
-                {
                     result.Add(status);
-                }
             }
 
             return result.Count == 0 ? Array.Empty<MarketItemStatus>() : result.ToArray();
@@ -319,13 +292,9 @@ public static class MarketItemsEndpoints
             {
                 var normalizedOrder = sortOrder.Trim().ToLowerInvariant();
                 if (normalizedOrder is "asc" or "ascending")
-                {
                     descending = false;
-                }
                 else if (normalizedOrder is "desc" or "descending")
-                {
                     descending = true;
-                }
             }
 
             return (field, descending);

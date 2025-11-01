@@ -172,9 +172,9 @@ namespace Fc25Draft.Web.Services
 
             if (!resp.IsSuccessStatusCode)
             {
-                var message = await ExtractProblemMessageAsync(resp, ct)
+                var message2 = await ExtractProblemMessageAsync(resp, ct)
                     ?? $"Falha ao concluir a compra. Código {(int)resp.StatusCode}.";
-                throw new MarketClientException(message, resp.StatusCode);
+                throw new MarketClientException(message2, resp.StatusCode);
             }
 
             resp.EnsureSuccessStatusCode();
