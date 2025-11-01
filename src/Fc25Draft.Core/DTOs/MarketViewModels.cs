@@ -34,6 +34,8 @@ public class MarketItemVm
 
     public int Overall { get; set; }
 
+    public decimal BasePrice { get; set; }
+
     public Guid? CurrentLeaderTeamId { get; set; }
 
     public string? CurrentLeaderTeamName { get; set; }
@@ -43,6 +45,8 @@ public class MarketItemVm
     public decimal? BuyNowPrice { get; set; }
 
     public decimal MinIncrement { get; set; }
+
+    public decimal RequiredMinBid { get; set; }
 
     public DateTime ExpiresAtUtc { get; set; }
 

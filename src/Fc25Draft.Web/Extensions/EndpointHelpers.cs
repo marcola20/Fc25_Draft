@@ -185,11 +185,13 @@ namespace Fc25Draft.Web.Extensions
             PlayerName = dto.PlayerName,
             PositionId = dto.Position.ToPositionId(),
             Overall = dto.Ovr,
+            BasePrice = dto.BasePrice,
             CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
             CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
             CurrentLeaderAmount = dto.CurrentLeaderAmount,
             BuyNowPrice = dto.BuyNowPrice,
             MinIncrement = dto.MinIncrement,
+            RequiredMinBid = dto.RequiredMinBid,
             ExpiresAtUtc = dto.ExpiresAtUtc,
             Status = dto.Status.ToString(),
             RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)

@@ -4,6 +4,7 @@ using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -95,6 +96,7 @@ public class MarketItemsQueryService : IMarketItemsQueryService
                 i.CurrentLeaderAmount,
                 i.BuyNowPrice,
                 i.MinIncrement,
+                MarketPricing.ComputeRequiredMinBid(i.BasePrice, i.MinIncrement, i.CurrentLeaderAmount, i.BuyNowPrice),
                 i.ExpiresAtUtc,
                 i.Status,
                 i.Status.ToDisplayName(),

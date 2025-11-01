@@ -23,10 +23,12 @@ namespace Fc25Draft.Web.Services
     public class MarketClient
     {
         private readonly ApiClientFactory _clientFactory;
+        private readonly TeamAccessService _teamAccess;
 
-        public MarketClient(ApiClientFactory clientFactory)
+        public MarketClient(ApiClientFactory clientFactory, TeamAccessService teamAccess)
         {
             _clientFactory = clientFactory;
+            _teamAccess = teamAccess;
         }
 
         public async Task<PagedResult<CoreItemVm>> GetItemsAsync(Guid? cycleId, CoreQueryVm query, CancellationToken ct)
@@ -40,7 +42,8 @@ namespace Fc25Draft.Web.Services
             if (!string.IsNullOrWhiteSpace(query.Name)) qs.Add($"q={Uri.EscapeDataString(query.Name)}");
             if (query.Positions?.Any() == true)
             {
-                foreach (var id in query.Positions.Distinct()) qs.Add($"pos={id}");
+                var positionsParam = string.Join(',', query.Positions.Distinct());
+                qs.Add($"positions={positionsParam}");
             }
             if (query.OverallMin.HasValue) qs.Add($"overallMin={query.OverallMin.Value}");
             if (query.OverallMax.HasValue) qs.Add($"overallMax={query.OverallMax.Value}");
@@ -105,10 +108,17 @@ namespace Fc25Draft.Web.Services
 
         public async Task<MarketClientActionResult<CoreItemVm>> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
+            var teamToken = await _teamAccess.GetTokenAsync();
+            if (string.IsNullOrWhiteSpace(teamToken))
+            {
+                throw new TeamTokenMissingException();
+            }
+
             var http = await _clientFactory.CreateAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/bid");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{req.ItemId}/bids");
             ApplyRowVersionHeaders(request, req.RowVersion);
-            request.Content = JsonContent.Create(req);
+            request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken);
+            request.Content = JsonContent.Create(new { amount = req.Amount });
             using var resp = await http.SendAsync(request, ct);
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
@@ -118,21 +128,38 @@ namespace Fc25Draft.Web.Services
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
-            resp.EnsureSuccessStatusCode();
-            var result = await resp.Content.ReadFromJsonAsync<BidResultDto>(cancellationToken: ct);
-            var message = result?.Message ?? "Lance registrado com sucesso.";
+            if (!resp.IsSuccessStatusCode)
+            {
+                var message = await ExtractProblemMessageAsync(resp, ct)
+                    ?? $"Falha ao registrar o lance. Código {(int)resp.StatusCode}.";
+                throw new MarketClientException(message, resp.StatusCode);
+            }
 
-            var updatedItem = await FetchItemAsync(http, req.ItemId, ct)
-                ?? throw new InvalidOperationException("Failed to reload market item after bid.");
+            var dto = await resp.Content.ReadFromJsonAsync<MarketItemDto>(
+                options: new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                cancellationToken: ct);
 
-            return new MarketClientActionResult<CoreItemVm>(updatedItem, message);
+            if (dto is null)
+            {
+                throw new InvalidOperationException("Resposta inválida ao registrar o lance.");
+            }
+
+            var viewModel = MapToViewModel(dto);
+            return new MarketClientActionResult<CoreItemVm>(viewModel, "Lance registrado com sucesso.");
         }
 
         public async Task<MarketClientActionResult<CoreItemVm>> BuyNowAsync(BuyNowRequest req, CancellationToken ct)
         {
+            var teamToken = await _teamAccess.GetTokenAsync();
+            if (string.IsNullOrWhiteSpace(teamToken))
+            {
+                throw new TeamTokenMissingException();
+            }
+
             var http = await _clientFactory.CreateAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/buy-now");
             ApplyRowVersionHeaders(request, req.RowVersion);
+            request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
 
@@ -141,6 +168,13 @@ namespace Fc25Draft.Web.Services
                 var errorMessage = await ExtractProblemMessageAsync(resp, ct)
                     ?? "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var message = await ExtractProblemMessageAsync(resp, ct)
+                    ?? $"Falha ao concluir a compra. Código {(int)resp.StatusCode}.";
+                throw new MarketClientException(message, resp.StatusCode);
             }
 
             resp.EnsureSuccessStatusCode();
@@ -268,11 +302,13 @@ namespace Fc25Draft.Web.Services
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
                 Overall = dto.Overall,
+                BasePrice = dto.BasePrice,
                 CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
                 CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
                 CurrentLeaderAmount = dto.CurrentBid,
                 BuyNowPrice = dto.BuyNowPrice,
                 MinIncrement = dto.MinIncrement,
+                RequiredMinBid = dto.RequiredMinBid,
                 ExpiresAtUtc = dto.ExpiresAtUtc,
                 Status = dto.StatusText,
                 RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
@@ -288,11 +324,13 @@ namespace Fc25Draft.Web.Services
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
                 Overall = dto.Ovr,
+                BasePrice = dto.BasePrice,
                 CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
                 CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
                 CurrentLeaderAmount = dto.CurrentLeaderAmount,
                 BuyNowPrice = dto.BuyNowPrice,
                 MinIncrement = dto.MinIncrement,
+                RequiredMinBid = dto.RequiredMinBid,
                 ExpiresAtUtc = dto.ExpiresAtUtc,
                 Status = dto.Status,
                 RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)

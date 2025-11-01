@@ -20,6 +20,7 @@
 @inject MarketHubClient Hub
 @inject IPositionService PositionService
 @inject ILogger<Index> Logger
+@inject TeamAccessService TeamAccess
 @implements IAsyncDisposable
 
 <PageTitle>Mercado</PageTitle>
@@ -31,6 +32,14 @@
         {
             <span class="text-muted small">@GetResultsSummary()</span>
         }
+        <button type="button"
+                class="btn btn-outline-primary btn-sm"
+                @onclick="OpenTeamTokenModal">
+            Token do time
+            <span class="badge @( _teamTokenConfigured ? "bg-success" : "bg-warning text-dark") ms-2">
+                @(_teamTokenConfigured ? "Configurado" : "Não configurado")
+            </span>
+        </button>
         <NavLink class="btn btn-outline-secondary btn-sm" href="market/historico">
             Histórico do Mercado
         </NavLink>
@@ -91,7 +100,8 @@
                         Item="item"
                         ServerTimeOffset="ServerTimeOffset"
                         OnBidPlaced="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBidPlacedAsync))"
-                        OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))" />
+                        OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
+                        OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))" />
                 </div>
             }
         </div>
@@ -184,6 +194,43 @@ else
     </section>
 }
 
+@if (_teamTokenModalOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Token do time</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseTeamTokenModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="teamTokenInput">Token</label>
+                        <input id="teamTokenInput"
+                               class="form-control"
+                               @bind="_teamTokenInput"
+                               @bind:event="oninput"
+                               autocomplete="one-time-code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_teamTokenError))
+                    {
+                        <div class="alert alert-danger" role="alert">@_teamTokenError</div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">Informe o token fornecido pelo administrador do seu time.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseTeamTokenModal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ClearTeamTokenAsync" disabled="@(!_teamTokenConfigured)">Remover</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveTeamTokenAsync">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public Guid? CycleId { get; set; }
@@ -221,6 +268,10 @@ else
     private string? _errorMessage;
     private string? _realTimeWarning;
     private MarketTab _activeTab = MarketTab.Items;
+    private bool _teamTokenConfigured;
+    private bool _teamTokenModalOpen;
+    private string _teamTokenInput = string.Empty;
+    private string? _teamTokenError;
 
     private readonly List<MarketTransactionDto> _historyEvents = new();
     private readonly HashSet<Guid> _historyIds = new();
@@ -259,6 +310,7 @@ else
     {
         _lifetimeCts = new CancellationTokenSource();
         ActiveCycleId = CycleId ?? Guid.Empty;
+        TeamAccess.TokenChanged += OnTeamTokenChanged;
         await LoadPositionsAsync();
     }
 
@@ -312,6 +364,8 @@ else
             _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
             StateHasChangedSafe();
         }
+
+        await LoadTeamTokenStatusAsync();
 
         _bidUpdatedHandler = HandleRealtimeUpdateAsync;
         _itemBoughtHandler = HandleRealtimeUpdateAsync;
@@ -870,8 +924,127 @@ else
         };
     }
 
+    private async Task OpenTeamTokenModal()
+    {
+        _teamTokenError = null;
+
+        try
+        {
+            var token = await TeamAccess.GetTokenAsync();
+            _teamTokenInput = token ?? string.Empty;
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar token do time.");
+            _teamTokenInput = string.Empty;
+            _teamTokenError = "Não foi possível carregar o token atual.";
+        }
+
+        _teamTokenModalOpen = true;
+        StateHasChangedSafe();
+    }
+
+    private void CloseTeamTokenModal()
+    {
+        _teamTokenModalOpen = false;
+        _teamTokenError = null;
+    }
+
+    private async Task SaveTeamTokenAsync()
+    {
+        try
+        {
+            await TeamAccess.SetTokenAsync(_teamTokenInput);
+            _teamTokenConfigured = true;
+            _teamTokenModalOpen = false;
+            _teamTokenError = null;
+            StateHasChangedSafe();
+        }
+        catch (ArgumentException ex)
+        {
+            _teamTokenError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao salvar token do time.");
+            _teamTokenError = "Não foi possível salvar o token. Tente novamente.";
+        }
+    }
+
+    private async Task ClearTeamTokenAsync()
+    {
+        try
+        {
+            await TeamAccess.ClearTokenAsync();
+            _teamTokenConfigured = false;
+            _teamTokenModalOpen = false;
+            _teamTokenInput = string.Empty;
+            _teamTokenError = null;
+            StateHasChangedSafe();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao remover token do time.");
+            _teamTokenError = "Não foi possível remover o token. Tente novamente.";
+        }
+    }
+
+    private async Task HandleTeamTokenMissingAsync()
+    {
+        try
+        {
+            var token = await TeamAccess.GetTokenAsync();
+            _teamTokenInput = token ?? string.Empty;
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar token do time.");
+            _teamTokenInput = string.Empty;
+        }
+
+        _teamTokenError = "Informe o token do seu time para registrar lances.";
+        _teamTokenModalOpen = true;
+        StateHasChangedSafe();
+    }
+
+    private async Task LoadTeamTokenStatusAsync()
+    {
+        try
+        {
+            var token = await TeamAccess.GetTokenAsync();
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignorado durante o pré-render.
+        }
+    }
+
+    private void OnTeamTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var token = await TeamAccess.GetTokenAsync();
+                _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Falha ao atualizar status do token do time.");
+                _teamTokenConfigured = false;
+            }
+
+            StateHasChanged();
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
+        TeamAccess.TokenChanged -= OnTeamTokenChanged;
+
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = null;

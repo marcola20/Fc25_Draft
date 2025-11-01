@@ -1,8 +1,12 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Web.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fc25Draft.Web.Endpoints.Market;
@@ -31,6 +35,7 @@ public static class MarketItemsEndpoints
     public static RouteGroupBuilder MapMarketItemsEndpoints(this RouteGroupBuilder marketApi)
     {
         marketApi.MapGet("/items", HandleQueryAsync).AllowAnonymous();
+        marketApi.MapPost("/items/{itemId:guid}/bids", HandleBidAsync).AllowAnonymous();
         return marketApi;
     }
 
@@ -80,10 +85,72 @@ public static class MarketItemsEndpoints
         }
     }
 
+    private static async Task<IResult> HandleBidAsync(
+        Guid itemId,
+        PlaceBidRequest request,
+        HttpContext http,
+        IMarketService marketService,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new { message = "Payload inválido." });
+        }
+
+        var token = ResolveTeamToken(http, request.TeamToken);
+        if (token is null)
+        {
+            return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
+        {
+            return errorResult!;
+        }
+
+        try
+        {
+            var updated = await marketService.PlaceBidAsync(itemId, token, request.Amount, rowVersion, ct).ConfigureAwait(false);
+
+            EndpointHelpers.ApplyEtag(http.Response, updated.RowVersion);
+            http.Response.Headers["X-RowVersion"] = updated.RowVersion.ToString(CultureInfo.InvariantCulture);
+
+            return Results.Ok(updated);
+        }
+        catch (MarketForbiddenException ex)
+        {
+            return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (MarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (MarketConflictException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+        catch (MarketPreconditionFailedException ex)
+        {
+            return EndpointHelpers.CreatePreconditionFailedProblem(ex.Message);
+        }
+        catch (MarketNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    }
+
+    private static string? ResolveTeamToken(HttpContext context, string? payloadToken)
+    {
+        var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
+        var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
+        return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
+    }
+
     private sealed record MarketItemsRequest(
         [property: FromQuery(Name = "cycleId")] Guid? CycleId,
         [property: FromQuery(Name = "q")] string? Search,
         [property: FromQuery(Name = "pos")] int[]? Positions,
+        [property: FromQuery(Name = "positions")] string? PositionsRaw,
         [property: FromQuery(Name = "overallMin")] int? OverallMin,
         [property: FromQuery(Name = "overallMax")] int? OverallMax,
         [property: FromQuery(Name = "status")] string? Status,
@@ -119,13 +186,7 @@ public static class MarketItemsEndpoints
 
             var search = string.IsNullOrWhiteSpace(Search) ? null : Search.Trim();
 
-            var positionIds = Positions is { Length: > 0 }
-                ? Positions
-                    .Where(p => p is >= short.MinValue and <= short.MaxValue)
-                    .Select(p => (short)p)
-                    .Distinct()
-                    .ToArray()
-                : Array.Empty<short>();
+            var positionIds = ParsePositionIds();
 
             var statuses = ParseStatuses(Status);
             var (sortField, sortDescending) = ResolveSort(SortBy, SortOrder);
@@ -148,8 +209,57 @@ public static class MarketItemsEndpoints
             return true;
         }
 
-        private static IReadOnlyList<MarketItemStatus> ParseStatuses(string? raw)
+        private short[] ParsePositionIds()
         {
+            var buffer = new HashSet<short>();
+
+            if (Positions is { Length: > 0 })
+            {
+                foreach (var value in Positions)
+                {
+                    if (value is >= short.MinValue and <= short.MaxValue)
+                    {
+                        buffer.Add((short)value);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(PositionsRaw))
+            {
+                var tokens = PositionsRaw.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var token in tokens)
+                {
+                    if (string.IsNullOrWhiteSpace(token))
+                    {
+                        continue;
+                    }
+
+                    if (short.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric) &&
+                        numeric is >= short.MinValue and <= short.MaxValue)
+                    {
+                        buffer.Add(numeric);
+                        continue;
+                    }
+
+                    if (PositionExtensions.TryParsePositionCode(token, out var codeId))
+                    {
+                        buffer.Add(codeId);
+                        continue;
+                    }
+
+                    var nameId = PositionExtensions.ToPositionId(token);
+                    if (nameId > 0)
+                    {
+                        buffer.Add((short)nameId);
+                    }
+                }
+            }
+
+            return buffer.Count == 0 ? Array.Empty<short>() : buffer.ToArray();
+        }
+
+    private static IReadOnlyList<MarketItemStatus> ParseStatuses(string? raw)
+    {
             if (string.IsNullOrWhiteSpace(raw))
             {
                 return Array.Empty<MarketItemStatus>();
@@ -221,4 +331,6 @@ public static class MarketItemsEndpoints
             return (field, descending);
         }
     }
+
+    private sealed record PlaceBidRequest(decimal Amount, string? TeamToken);
 }

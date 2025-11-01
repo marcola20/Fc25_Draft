@@ -77,13 +77,12 @@ public record MarketItemDto(
     decimal BasePrice,
     decimal? BuyNowPrice,
     decimal MinIncrement,
+    decimal RequiredMinBid,
     DateTime ExpiresAtUtc,
     string Status,
     decimal? CurrentLeaderAmount,
     string? CurrentLeaderTeamName,
     Guid? CurrentLeaderTeamId,
     uint RowVersion);
-
-public record BidResultDto(bool Ok, string Message, decimal? LeaderAmount);
 
 public record BuyNowResultDto(bool Ok, string Message);

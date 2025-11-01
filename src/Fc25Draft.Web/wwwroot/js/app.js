@@ -22,6 +22,30 @@ window.fc25Auth = {
     }
 };
 
+window.fc25Team = {
+    getToken: () => {
+        try {
+            return window.localStorage.getItem('fc25-team-token');
+        } catch {
+            return null;
+        }
+    },
+    setToken: (token) => {
+        try {
+            window.localStorage.setItem('fc25-team-token', token);
+        } catch {
+            // ignorado
+        }
+    },
+    clearToken: () => {
+        try {
+            window.localStorage.removeItem('fc25-team-token');
+        } catch {
+            // ignorado
+        }
+    }
+};
+
 window.fc25Share = {
     openWhatsapp: function (shareUrl, groupLink, message) {
         try {

@@ -9,6 +9,7 @@
 @using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Utilities
 @inject Fc25Draft.Web.Services.MarketClient Client
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
@@ -23,20 +24,35 @@
             <span class="badge @StatusBadgeClass">@StatusDisplay</span>
         </div>
 
-        <div class="d-flex justify-content-between flex-wrap gap-3">
-            <div class="text-muted small">
-                @if (Item.CurrentLeaderAmount.HasValue)
-                {
-                    <div class="fw-semibold text-body">Lance atual: @Item.CurrentLeaderAmount.Value.ToString("F2", CultureInfo.InvariantCulture)</div>
-                    @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+        <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+            <div class="d-flex flex-column gap-3">
+                <div>
+                    <div class="text-muted small">Líder atual</div>
+                    @if (Item.CurrentLeaderAmount.HasValue)
                     {
-                        <div>por @Item.CurrentLeaderTeamName</div>
+                        <div class="fw-semibold text-body">@FormatCurrency(Item.CurrentLeaderAmount.Value)</div>
+                        @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+                        {
+                            <div class="small text-muted">por @Item.CurrentLeaderTeamName</div>
+                        }
                     }
-                }
-                else
+                    else
+                    {
+                        <div class="fw-semibold text-body">Nenhum lance ainda</div>
+                        <div class="small text-muted">Seja o primeiro a dar um lance.</div>
+                    }
+                </div>
+                <div>
+                    <div class="text-muted small">Lance mínimo</div>
+                    <div class="fw-semibold text-body">@FormatCurrency(Item.RequiredMinBid)</div>
+                    <div class="small text-muted">Incremento mínimo: @FormatCurrency(Item.MinIncrement)</div>
+                </div>
+                @if (CanBuyNow)
                 {
-                    <div class="fw-semibold text-body">Nenhum lance ainda</div>
-                    <div>Seja o primeiro a dar um lance.</div>
+                    <div>
+                        <div class="text-muted small">Comprar agora</div>
+                        <div class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</div>
+                    </div>
                 }
             </div>
             <div class="text-end" aria-live="polite">
@@ -56,14 +72,14 @@
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-sm-6 col-lg-5">
                     <label class="form-label" for="@BidInputId">Valor do lance</label>
-                    <InputNumber @bind-Value="_model.Amount"
-                                 class="form-control form-control-sm"
-                                 id="@BidInputId"
-                                 step="0.01"
-                                 disabled="@IsBidDisabled"
-                                 aria-describedby="@BidValidationId"
-                                 placeholder="Insira seu lance" />
-                    <ValidationMessage class="text-danger small" id="@BidValidationId" For="() => _model.Amount" />
+                    <InputText @bind-Value="_model.AmountText"
+                               class="form-control form-control-sm"
+                               id="@BidInputId"
+                               inputmode="decimal"
+                               disabled="@IsBidDisabled"
+                               aria-describedby="@BidValidationId"
+                               placeholder="Ex.: R$ 30.000.000,00" />
+                    <ValidationMessage class="text-danger small" id="@BidValidationId" For="() => _model.AmountText" />
                 </div>
                 <div class="col-12 col-sm-auto">
                     <label class="form-label d-none d-sm-block">&nbsp;</label>
@@ -76,8 +92,7 @@
         {
             <div class="d-flex flex-column gap-2">
                 <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="text-muted small">Preço de compra imediata:</span>
-                    <span class="fw-semibold">@Item.BuyNowPrice!.Value.ToString("F2", CultureInfo.InvariantCulture)</span>
+                    <span class="text-muted small">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)</span>
                     <button type="button"
                             class="btn btn-outline-success btn-sm ms-auto"
                             disabled="@IsBidDisabled"
@@ -134,6 +149,9 @@
     [Parameter]
     public EventCallback<CoreItemVm> OnBought { get; set; }
 
+    [Parameter]
+    public EventCallback OnTeamTokenMissing { get; set; }
+
     private readonly BidFormModel _model = new();
     private EditContext? _editContext;
     private ValidationMessageStore? _validationMessageStore;
@@ -142,6 +160,7 @@
     private CancellationTokenSource? _timerCts;
     private PeriodicTimer? _timer;
     private static readonly Func<PeriodicTimer, ValueTask>? _disposeTimerDelegate = CreateDisposeTimerDelegate();
+    private static readonly CultureInfo CurrencyCulture = CultureInfo.GetCultureInfo("pt-BR");
     private Task? _timerTask;
     private bool _isSubmitting;
     private bool _showBuyConfirm;
@@ -214,6 +233,8 @@
             throw new InvalidOperationException("Item parameter is required.");
         }
 
+        _model.AmountText = string.Empty;
+        _model.ParsedAmount = null;
         _lifetimeCts = new CancellationTokenSource();
         _editContext = new EditContext(_model);
         _validationMessageStore = new ValidationMessageStore(_editContext);
@@ -247,7 +268,7 @@
 
     private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
     {
-        if (e.FieldIdentifier.FieldName == nameof(BidFormModel.Amount))
+        if (e.FieldIdentifier.FieldName == nameof(BidFormModel.AmountText))
         {
             ValidateAmount();
         }
@@ -260,17 +281,49 @@
             return;
         }
 
-        var field = new FieldIdentifier(_model, nameof(BidFormModel.Amount));
+        var field = new FieldIdentifier(_model, nameof(BidFormModel.AmountText));
         _validationMessageStore.Clear(field);
 
-        var minimum = (Item.CurrentLeaderAmount ?? 0m) + Item.MinIncrement;
-        if (_model.Amount.HasValue && _model.Amount.Value < minimum)
+        _model.ParsedAmount = null;
+
+        var raw = _model.AmountText;
+        if (string.IsNullOrWhiteSpace(raw))
         {
-            _validationMessageStore.Add(field, $"O lance deve ser de pelo menos {minimum.ToString("F2", CultureInfo.InvariantCulture)}.");
+            _validationMessageStore.Add(field, "Informe o valor do lance.");
+        }
+        else if (!TryParseAmount(raw, out var parsed))
+        {
+            _validationMessageStore.Add(field, "Informe um valor válido.");
+        }
+        else
+        {
+            _model.ParsedAmount = parsed;
+            var minimum = Item.RequiredMinBid;
+            if (parsed < minimum)
+            {
+                _validationMessageStore.Add(field, $"O lance deve ser de pelo menos {FormatCurrency(minimum)}.");
+            }
         }
 
         _editContext.NotifyValidationStateChanged();
     }
+
+    private static bool TryParseAmount(string? input, out decimal amount)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            amount = 0m;
+            return false;
+        }
+
+        return decimal.TryParse(
+            input.Trim(),
+            NumberStyles.Number | NumberStyles.AllowCurrencySymbol,
+            CurrencyCulture,
+            out amount);
+    }
+
+    private static string FormatCurrency(decimal value) => value.ToString("C", CurrencyCulture);
 
     private void EnsureTimer()
     {
@@ -360,7 +413,7 @@
             return;
         }
 
-        if (!_model.Amount.HasValue)
+        if (!_model.ParsedAmount.HasValue)
         {
             return;
         }
@@ -375,15 +428,16 @@
             var request = new BidRequest
             {
                 ItemId = Item.ItemId,
-                Amount = _model.Amount.Value,
+                Amount = _model.ParsedAmount.Value,
                 RowVersion = Item.RowVersion
             };
 
             var response = await Client.PlaceBidAsync(request, _submitCts.Token);
             Item = response.Payload;
             _infoMessage = response.Message;
-            _model.Amount = null;
-            var field = new FieldIdentifier(_model, nameof(BidFormModel.Amount));
+            _model.AmountText = string.Empty;
+            _model.ParsedAmount = null;
+            var field = new FieldIdentifier(_model, nameof(BidFormModel.AmountText));
             _editContext.NotifyFieldChanged(field);
             _validationMessageStore?.Clear();
             _editContext.NotifyValidationStateChanged();
@@ -399,6 +453,24 @@
             {
                 await OnBidPlaced.InvokeAsync(Item);
             }
+        }
+        catch (TeamTokenMissingException ex)
+        {
+            _errorMessage = ex.Message;
+            if (OnTeamTokenMissing.HasDelegate)
+            {
+                await OnTeamTokenMissing.InvokeAsync();
+            }
+        }
+        catch (MarketClientException ex)
+        {
+            Logger.LogWarning(ex, "Bid rejected for item {ItemId}", Item.ItemId);
+            _errorMessage = ex.Message;
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "HTTP error placing bid for item {ItemId}", Item.ItemId);
+            _errorMessage = ex.Message;
         }
         catch (Exception ex)
         {
@@ -475,6 +547,27 @@
             {
                 await OnBought.InvokeAsync(Item);
             }
+        }
+        catch (TeamTokenMissingException ex)
+        {
+            _showBuyConfirm = false;
+            _errorMessage = ex.Message;
+            if (OnTeamTokenMissing.HasDelegate)
+            {
+                await OnTeamTokenMissing.InvokeAsync();
+            }
+        }
+        catch (MarketClientException ex)
+        {
+            Logger.LogWarning(ex, "Buy now rejected for item {ItemId}", Item.ItemId);
+            _showBuyConfirm = false;
+            _errorMessage = ex.Message;
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "HTTP error buying item {ItemId}", Item.ItemId);
+            _showBuyConfirm = false;
+            _errorMessage = ex.Message;
         }
         catch (Exception ex)
         {
@@ -555,8 +648,9 @@
 
     private class BidFormModel
     {
-        [Required]
-        public decimal? Amount { get; set; }
+        public string AmountText { get; set; } = string.Empty;
+
+        public decimal? ParsedAmount { get; set; }
     }
 
     private static string TranslateStatus(string status)

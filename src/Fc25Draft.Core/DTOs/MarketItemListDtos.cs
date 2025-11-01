@@ -14,6 +14,7 @@ public sealed record MarketItemListDto(
     decimal? CurrentBid,
     decimal? BuyNowPrice,
     decimal MinIncrement,
+    decimal RequiredMinBid,
     DateTime ExpiresAtUtc,
     MarketItemStatus Status,
     string StatusText,

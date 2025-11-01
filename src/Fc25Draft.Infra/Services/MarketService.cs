@@ -10,6 +10,8 @@ using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Fc25Draft.Core.Utilities;
+using System.Globalization;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -120,7 +122,7 @@ public class MarketService : IMarketService
         return item is null ? null : ToDto(item);
     }
 
-    public async Task<BidResultDto> PlaceBidAsync(Guid itemId, string teamToken, decimal amount, uint expectedRowVersion, CancellationToken ct)
+    public async Task<MarketItemDto> PlaceBidAsync(Guid itemId, string teamToken, decimal amount, uint expectedRowVersion, CancellationToken ct)
     {
         if (amount <= 0)
             throw new MarketValidationException("O valor do lance deve ser maior que zero.");
@@ -130,7 +132,7 @@ public class MarketService : IMarketService
         var normalizedToken = NormalizeToken(teamToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        return await InSerializableTxAsync<BidResultDto>(async ct2 =>
+        return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
             var item = await _dbContext.MarketItems
                 .Include(i => i.Player).ThenInclude(p => p.Position)
@@ -149,12 +151,24 @@ public class MarketService : IMarketService
                 .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
 
-            var minimumBid = item.CurrentLeaderAmount.HasValue
-                ? item.CurrentLeaderAmount.Value + item.MinIncrement
-                : item.BasePrice;
+            var requiredMinimum = MarketPricing.ComputeRequiredMinBid(
+                item.BasePrice,
+                item.MinIncrement,
+                item.CurrentLeaderAmount,
+                item.BuyNowPrice);
 
-            if (amount < minimumBid)
-                throw new MarketValidationException($"O lance mínimo permitido é {minimumBid:0.00}.");
+            var culture = CultureInfo.GetCultureInfo("pt-BR");
+
+            if (amount < requiredMinimum)
+            {
+                throw new MarketValidationException($"O lance mínimo permitido é {requiredMinimum.ToString("C", culture)}.");
+            }
+
+            if (item.BuyNowPrice.HasValue && amount >= item.BuyNowPrice.Value)
+            {
+                var buyNowFormatted = item.BuyNowPrice.Value.ToString("C", culture);
+                throw new MarketValidationException($"Utilize a opção de compra imediata para valores a partir de {buyNowFormatted}.");
+            }
 
             await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct2);
 
@@ -220,7 +234,15 @@ public class MarketService : IMarketService
                     "O item foi atualizado por outro time. Atualize a página e tente novamente.", ex);
             }
 
-            return new BidResultDto(true, "Lance registrado com sucesso.", amount);
+            await _dbContext.Entry(item).ReloadAsync(ct2);
+            await _dbContext.Entry(item).Reference(i => i.Player).LoadAsync(ct2);
+            if (item.Player is not null)
+            {
+                await _dbContext.Entry(item.Player).Reference(p => p.Position).LoadAsync(ct2);
+            }
+            await _dbContext.Entry(item).Reference(i => i.CurrentLeaderTeam).LoadAsync(ct2);
+
+            return ToDto(item);
         }, ct);
     }
 
@@ -589,10 +611,11 @@ public class MarketService : IMarketService
 
     private static MarketItemDto ToDto(MarketItem item)
     {
-        var statusText = item.Status.ToDisplayName();
-
         var positionName = item.Player.Position?.Name ?? string.Empty;
         var age = item.Player.Age ?? 0;
+        var leaderName = item.CurrentLeaderTeam is not null && !string.IsNullOrWhiteSpace(item.CurrentLeaderTeam.TeamName)
+            ? item.CurrentLeaderTeam.TeamName
+            : item.CurrentLeaderTeamId?.ToString();
 
         return new MarketItemDto(
             item.ItemId,
@@ -605,10 +628,11 @@ public class MarketService : IMarketService
             item.BasePrice,
             item.BuyNowPrice,
             item.MinIncrement,
+            MarketPricing.ComputeRequiredMinBid(item.BasePrice, item.MinIncrement, item.CurrentLeaderAmount, item.BuyNowPrice),
             item.ExpiresAtUtc,
-            statusText,
+            item.Status.ToString(),
             item.CurrentLeaderAmount,
-            item.CurrentLeaderTeam?.TeamName,
+            leaderName,
             item.CurrentLeaderTeamId,
             item.RowVersion);
     }

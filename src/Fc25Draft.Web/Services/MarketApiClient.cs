@@ -186,6 +186,7 @@ public class MarketApiClient
             source.BasePrice,
             source.BuyNowPrice,
             source.MinIncrement,
+            source.RequiredMinBid,
             source.ExpiresAtUtc,
             source.StatusText,
             source.CurrentBid,

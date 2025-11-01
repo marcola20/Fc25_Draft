@@ -65,52 +65,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     : Results.Ok(item);
             }).AllowAnonymous();
 
-            // POST /api/market/{itemId}/bid
-            marketApi.MapPost("/{itemId:guid}/bid", async (
-                Guid itemId,
-                MarketBidRequest request,
-                HttpContext context,
-                IMarketService marketService,
-                CancellationToken ct) =>
-            {
-                var token = GetTeamToken(context, request.TeamToken);
-                if (token is null)
-                {
-                    return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
-                }
-
-            if (!EndpointHelpers.TryResolveRowVersion(context.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
-                {
-                    return errorResult!;
-                }
-
-                try
-                {
-                    var result = await marketService.PlaceBidAsync(itemId, token, request.Amount, rowVersion, ct);
-                    return Results.Ok(result);
-                }
-                catch (MarketForbiddenException ex)
-                {
-                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
-                }
-                catch (MarketValidationException ex)
-                {
-                    return Results.BadRequest(new { message = ex.Message });
-                }
-                catch (MarketConflictException ex)
-                {
-                    return Results.Conflict(new { message = ex.Message });
-                }
-                catch (MarketPreconditionFailedException ex)
-                {
-                    return EndpointHelpers.CreatePreconditionFailedProblem(ex.Message);
-                }
-                catch (MarketNotFoundException ex)
-                {
-                    return Results.NotFound(new { message = ex.Message });
-                }
-            }).AllowAnonymous();
-
             // POST /api/market/{itemId}/buy-now
             marketApi.MapPost("/{itemId:guid}/buy-now", async (
                 Guid itemId,
@@ -229,8 +183,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
             return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
         }
-
-        record MarketBidRequest(decimal Amount, string? TeamToken);
 
         record MarketBuyNowRequest(string? TeamToken);
     }

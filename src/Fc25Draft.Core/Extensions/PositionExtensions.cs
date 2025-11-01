@@ -1,14 +1,25 @@
 ﻿using Fc25Draft.Core.Enums;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Fc25Draft.Core.Extensions
 {
     public static class PositionExtensions
     {
+        private static readonly Dictionary<string, short> PositionCodeLookup = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["GOL"] = (short)PositionType.Goleiro,
+            ["ZAG"] = (short)PositionType.Zagueiro,
+            ["LE"] = (short)PositionType.LateralAlaEsquerdo,
+            ["LD"] = (short)PositionType.LateralAlaDireito,
+            ["VOL"] = (short)PositionType.Volante,
+            ["MEI"] = (short)PositionType.MeiaCentral,
+            ["MAT"] = (short)PositionType.MeiaAtacante,
+            ["MPE"] = (short)PositionType.MeiaPontaEsquerda,
+            ["MPD"] = (short)PositionType.MeiaPontaDireita,
+            ["ATA"] = (short)PositionType.Atacante
+        };
+
         public static int ToPositionId(this string positionName)
         {
             if (string.IsNullOrWhiteSpace(positionName))
@@ -48,6 +59,36 @@ namespace Fc25Draft.Core.Extensions
                 (int)PositionType.Atacante => "Atacante",
                 _ => "Desconhecida"
             };
+        }
+
+        public static string ToPositionCode(this int positionId)
+        {
+            return positionId switch
+            {
+                (int)PositionType.Goleiro => "GOL",
+                (int)PositionType.Zagueiro => "ZAG",
+                (int)PositionType.LateralAlaEsquerdo => "LE",
+                (int)PositionType.LateralAlaDireito => "LD",
+                (int)PositionType.Volante => "VOL",
+                (int)PositionType.MeiaCentral => "MEI",
+                (int)PositionType.MeiaAtacante => "MAT",
+                (int)PositionType.MeiaPontaEsquerda => "MPE",
+                (int)PositionType.MeiaPontaDireita => "MPD",
+                (int)PositionType.Atacante => "ATA",
+                _ => positionId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            };
+        }
+
+        public static bool TryParsePositionCode(string? code, out short positionId)
+        {
+            positionId = 0;
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return false;
+            }
+
+            return PositionCodeLookup.TryGetValue(code.Trim(), out positionId);
         }
     }
 }

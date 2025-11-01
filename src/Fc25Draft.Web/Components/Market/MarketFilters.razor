@@ -3,6 +3,7 @@
 @using System.Linq
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
+@using Fc25Draft.Core.Extensions
 @using Fc25Draft.Web.Models.Market
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
@@ -124,12 +125,38 @@
     public IReadOnlyList<MarketSortOption> SortOptions { get; set; } = Array.Empty<MarketSortOption>();
 
     private string PositionsDisplayText
-    => Model.Positions.Count switch
     {
-        0 => "Todas",
-        1 => PositionOptions.FirstOrDefault(p => p.Id == Model.Positions[0])?.Name ?? "1 posição",
-        _ => $"{Model.Positions.Count} posições"
-    };
+        get
+        {
+            if (Model.Positions is null || Model.Positions.Count == 0)
+            {
+                return "Todas";
+            }
+
+            var codes = Model.Positions
+                .Select(PositionExtensions.ToPositionCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .ToList();
+
+            if (codes.Count == Model.Positions.Count)
+            {
+                return string.Join(", ", codes);
+            }
+
+            var names = PositionOptions
+                .Where(option => Model.Positions.Contains(option.Id))
+                .Select(option => option.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+
+            if (names.Count > 0)
+            {
+                return string.Join(", ", names);
+            }
+
+            return string.Join(", ", Model.Positions);
+        }
+    }
 
     private async Task ApplyAsync()
     {
