@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -24,45 +25,60 @@ public class MarketApiClient
     public async Task<IReadOnlyList<MarketItemDto>> GetActiveItemsAsync(CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, "api/market");
-        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        var page = 1;
+        const int PageSize = 200;
+        var collected = new List<MarketItemListDto>();
 
-        using var response = await client.SendAsync(req, ct);
-
-        if (!response.IsSuccessStatusCode)
+        while (true)
         {
-            await EnsureSuccessAsync(response); 
-            return Array.Empty<MarketItemDto>(); 
+            var url = $"/api/market/items?status={Uri.EscapeDataString("Ativo")}&page={page}&pageSize={PageSize}";
+            using var response = await client.GetAsync(url, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                await EnsureSuccessAsync(response);
+                return Array.Empty<MarketItemDto>();
+            }
+
+            var payload = await response.Content.ReadAsStringAsync(ct);
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                break;
+            }
+
+            PagedResult<MarketItemListDto>? pageResult;
+            try
+            {
+                pageResult = JsonSerializer.Deserialize<PagedResult<MarketItemListDto>>(payload, options);
+            }
+            catch (JsonException jex)
+            {
+                throw new InvalidOperationException(
+                    $"Falha ao ler JSON de /api/market/items. Prévia do corpo: {payload.Substring(0, Math.Min(200, payload.Length))}",
+                    jex);
+            }
+
+            if (pageResult is null || pageResult.Items is null || pageResult.Items.Count == 0)
+            {
+                break;
+            }
+
+            collected.AddRange(pageResult.Items);
+
+            if (collected.Count >= pageResult.Total || pageResult.Items.Count < PageSize)
+            {
+                break;
+            }
+
+            page++;
         }
 
-        var mediaType = response.Content.Headers.ContentType?.MediaType;
-
-        if (!string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(mediaType, "text/json", StringComparison.OrdinalIgnoreCase))
-        {
-            var text = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException(
-                $"A API /api/market retornou conteúdo não-JSON ({mediaType ?? "desconhecido"}). " +
-                $"Prévia: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}");
-        }
-
-        try
-        {
-            // Desserialização resiliente
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            var items = await JsonSerializer.DeserializeAsync<IReadOnlyList<MarketItemDto>>(
-                stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
-
-            return items ?? Array.Empty<MarketItemDto>();
-        }
-        catch (JsonException jex)
-        {
-            var preview = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException(
-                $"Falha ao ler JSON de /api/market. Prévia do corpo: {preview.Substring(0, Math.Min(200, preview.Length))}",
-                jex);
-        }
+        return collected
+            .Select(MapToLegacyDto)
+            .OrderBy(i => i.PlayerName)
+            .ToList();
     }
 
     public async Task<PagedResult<MarketTransactionDto>> GetHistoryAsync(MarketHistoryQueryOptions query, CancellationToken ct = default)
@@ -156,4 +172,25 @@ public class MarketApiClient
     private sealed record ApiMessageResponse(string? Message);
 
     public sealed record FileDownloadResult(byte[] Content, string FileName, string ContentType);
+
+    private static MarketItemDto MapToLegacyDto(MarketItemListDto source)
+    {
+        return new MarketItemDto(
+            source.ItemId,
+            source.CycleId,
+            source.PlayerId,
+            source.PlayerName,
+            source.Position,
+            source.Overall,
+            source.Age,
+            source.BasePrice,
+            source.BuyNowPrice,
+            source.MinIncrement,
+            source.ExpiresAtUtc,
+            source.StatusText,
+            source.CurrentBid,
+            source.CurrentLeaderTeamName,
+            source.CurrentLeaderTeamId,
+            source.RowVersion);
+    }
 }

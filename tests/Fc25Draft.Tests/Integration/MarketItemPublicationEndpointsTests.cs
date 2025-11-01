@@ -251,7 +251,7 @@ public class MarketItemPublicationEndpointsTests : IClassFixture<MarketItemPubli
             fakeTime.Advance(TimeSpan.FromMinutes(10));
         }
 
-        var listResponse = await client.GetAsync("/api/market/items?page=1&pageSize=2");
+        var listResponse = await client.GetAsync("/api/market/items/drafts?page=1&pageSize=2");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
         var items = await listResponse.Content.ReadFromJsonAsync<List<MarketItemPublicationDto>>();

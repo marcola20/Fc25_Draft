@@ -29,20 +29,31 @@ namespace Fc25Draft.Web.Services
             _clientFactory = clientFactory;
         }
 
-        public async Task<PagedResult<CoreItemVm>> GetItemsAsync(CoreQueryVm query, CancellationToken ct)
+        public async Task<PagedResult<CoreItemVm>> GetItemsAsync(Guid? cycleId, CoreQueryVm query, CancellationToken ct)
         {
             var qs = new List<string>();
-            if (!string.IsNullOrWhiteSpace(query.Name)) qs.Add($"name={Uri.EscapeDataString(query.Name)}");
+            if (cycleId.HasValue && cycleId.Value != Guid.Empty)
+            {
+                qs.Add($"cycleId={cycleId.Value:D}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Name)) qs.Add($"q={Uri.EscapeDataString(query.Name)}");
             if (query.Positions?.Any() == true)
+            {
                 foreach (var id in query.Positions.Distinct()) qs.Add($"pos={id}");
+            }
             if (query.OverallMin.HasValue) qs.Add($"overallMin={query.OverallMin.Value}");
             if (query.OverallMax.HasValue) qs.Add($"overallMax={query.OverallMax.Value}");
             if (!string.IsNullOrWhiteSpace(query.Status)) qs.Add($"status={Uri.EscapeDataString(query.Status)}");
             qs.Add($"page={Math.Max(1, query.Page)}");
             qs.Add($"pageSize={Math.Max(1, query.PageSize)}");
-            if (!string.IsNullOrWhiteSpace(query.Sort)) qs.Add($"sort={Uri.EscapeDataString(query.Sort)}");
+            if (TryResolveSort(query.Sort) is { } sort)
+            {
+                qs.Add($"sortBy={Uri.EscapeDataString(sort.SortBy)}");
+                qs.Add($"sortOrder={sort.SortOrder}");
+            }
 
-            var url = "/api/market";
+            var url = "/api/market/items";
             if (qs.Count > 0) url += "?" + string.Join("&", qs);
 
             var http = await _clientFactory.CreateAsync();
@@ -58,9 +69,6 @@ namespace Fc25Draft.Web.Services
                 LastServerTimeUtc = serverUtc;
             }
 
-            if (resp.StatusCode == System.Net.HttpStatusCode.NoContent)
-                return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
-
             var json = body ?? string.Empty;
             var trimmed = json.AsSpan().Trim();
 
@@ -72,19 +80,11 @@ namespace Fc25Draft.Web.Services
                 PropertyNameCaseInsensitive = true,
                 NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
             };
-            options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(allowIntegerValues: true));
 
             try
             {
-                // FIX: The API currently returns MarketItemDto payloads while the client expects MarketItemVm instances.
-                if (trimmed[0] == '[')
-                {
-                    var dtoList = JsonSerializer.Deserialize<List<MarketItemDto>>(json, options) ?? new List<MarketItemDto>();
-                    var items = dtoList.Select(MapToViewModel).ToList();
-                    return new PagedResult<CoreItemVm>(items, items.Count, query.Page, query.PageSize);
-                }
-
-                var dtoResult = JsonSerializer.Deserialize<PagedResult<MarketItemDto>>(json, options);
+                var dtoResult = JsonSerializer.Deserialize<PagedResult<MarketItemListDto>>(json, options);
 
                 return dtoResult is null
                     ? PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize)
@@ -197,6 +197,39 @@ namespace Fc25Draft.Web.Services
             request.Headers.TryAddWithoutValidation(HeaderNames.IfMatch, $"W/\"{sanitized}\"");
         }
 
+        private static (string SortBy, string SortOrder)? TryResolveSort(string? rawSort)
+        {
+            if (string.IsNullOrWhiteSpace(rawSort))
+            {
+                return null;
+            }
+
+            var trimmed = rawSort.Trim();
+            var descending = trimmed.StartsWith('-', StringComparison.Ordinal);
+            var token = descending ? trimmed[1..] : trimmed;
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            var normalized = token.ToLowerInvariant();
+            var sortBy = normalized switch
+            {
+                "expiresatutc" or "expires_at_utc" or "expiresat" => "expiresAtUtc",
+                "currentbid" or "current_bid" => "currentBid",
+                _ => null
+            };
+
+            if (sortBy is null)
+            {
+                return null;
+            }
+
+            var sortOrder = descending ? "desc" : "asc";
+            return (sortBy, sortOrder);
+        }
+
         private static async Task<string?> ExtractProblemMessageAsync(HttpResponseMessage response, CancellationToken ct)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
@@ -220,10 +253,30 @@ namespace Fc25Draft.Web.Services
             }
         }
 
-        private static PagedResult<CoreItemVm> MapToViewModel(PagedResult<MarketItemDto> source)
+        private static PagedResult<CoreItemVm> MapToViewModel(PagedResult<MarketItemListDto> source)
         {
             var items = source.Items?.Select(MapToViewModel).ToList() ?? new List<CoreItemVm>();
             return new PagedResult<CoreItemVm>(items, source.Total, source.Page, source.PageSize);
+        }
+
+        private static CoreItemVm MapToViewModel(MarketItemListDto dto)
+        {
+            return new CoreItemVm
+            {
+                ItemId = dto.ItemId,
+                PlayerId = dto.PlayerId,
+                PlayerName = dto.PlayerName,
+                PositionId = dto.Position.ToPositionId(),
+                Overall = dto.Overall,
+                CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
+                CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
+                CurrentLeaderAmount = dto.CurrentBid,
+                BuyNowPrice = dto.BuyNowPrice,
+                MinIncrement = dto.MinIncrement,
+                ExpiresAtUtc = dto.ExpiresAtUtc,
+                Status = dto.StatusText,
+                RowVersion = dto.RowVersion.ToString(CultureInfo.InvariantCulture)
+            };
         }
 
         private static CoreItemVm MapToViewModel(MarketItemDto dto)

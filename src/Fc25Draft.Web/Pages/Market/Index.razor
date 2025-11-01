@@ -347,7 +347,8 @@ else
 
         try
         {
-            var result = await Client.GetItemsAsync(Query, ct);
+            var cycleFilter = ActiveCycleId == Guid.Empty ? (Guid?)null : ActiveCycleId;
+            var result = await Client.GetItemsAsync(cycleFilter, Query, ct);
             var items = result?.Items ?? Array.Empty<CoreItemVm>();
             var total = result?.Total ?? 0;
             PageData = new PagedResult<CoreItemVm>(items, total, Query.Page, Query.PageSize);

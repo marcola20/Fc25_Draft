@@ -23,7 +23,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var itemsApi = marketApi.MapGroup("/items")
                                     .RequireAuthorization("AdminOnly");
 
-            itemsApi.MapGet(string.Empty, async (IMarketItemPublicationService service, CancellationToken ct) =>
+            itemsApi.MapGet("/drafts", async (IMarketItemPublicationService service, CancellationToken ct) =>
             {
                 var items = await service.ListAsync(ct).ConfigureAwait(false);
                 return Results.Ok(items);

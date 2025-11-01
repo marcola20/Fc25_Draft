@@ -4,6 +4,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
 using Fc25Draft.Infra.Data;
@@ -588,15 +589,7 @@ public class MarketService : IMarketService
 
     private static MarketItemDto ToDto(MarketItem item)
     {
-        var statusText = item.Status switch
-        {
-            MarketItemStatus.Draft => "Rascunho",
-            MarketItemStatus.Active => "Ativo",
-            MarketItemStatus.Sold => "Vendido",
-            MarketItemStatus.Canceled => "Cancelado",
-            MarketItemStatus.Expired => "Expirado",
-            _ => item.Status.ToString()
-        };
+        var statusText = item.Status.ToDisplayName();
 
         var positionName = item.Player.Position?.Name ?? string.Empty;
         var age = item.Player.Age ?? 0;

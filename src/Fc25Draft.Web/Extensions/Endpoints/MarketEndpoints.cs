@@ -2,7 +2,6 @@
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
-using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Endpoints.Market;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,36 +14,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var marketApi = api.MapGroup("/market");
 
             marketApi.MapMarketItemPublicationEndpoints();
-
-            // GET /api/market
-            marketApi.MapGet(string.Empty, async (IMarketService market, ILoggerFactory lf, IWebHostEnvironment env, HttpContext http, CancellationToken ct) =>
-            {
-                var log = lf.CreateLogger("MarketList");
-
-                try
-                {
-                    var items = await market.GetActiveItemsAsync(ct);
-                    http.Response.Headers["x-server-time-utc"] = DateTime.UtcNow.ToString("O");
-                    return Results.Ok(items);
-                }
-                catch (Exception ex)
-                {
-                    log.LogError(ex, "❌ Erro interno em GET /api/market: {Message}", ex.Message);
-
-                    var problem = new ProblemDetails
-                    {
-                        Title = "Failed to load market items.",
-                        Detail = env.IsDevelopment() ? ex.ToString() : ex.Message,
-                        Status = StatusCodes.Status500InternalServerError
-                    };
-
-                    return Results.Problem(
-                        title: problem.Title,
-                        detail: problem.Detail,
-                        statusCode: problem.Status);
-                }
-            }).AllowAnonymous();
-
+            marketApi.MapMarketItemsEndpoints();
 
             // POST /api/market/history  (Admin)
             marketApi.MapPost("/history", async (RegisterTransferHistoryRequestDto request, ITransferHistoryService transferHistoryService) =>
