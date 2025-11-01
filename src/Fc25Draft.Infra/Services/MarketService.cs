@@ -161,7 +161,7 @@ public class MarketService : IMarketService
 
             if (item.CurrentLeaderTeamId == team.TeamId)
             {
-                throw new MarketValidationException("Your team already leads this item.");
+                throw new MarketValidationException("Sua equipe já lidera este item.");
             }
 
             var requiredMinimum = MarketPricing.ComputeRequiredMinBid(
