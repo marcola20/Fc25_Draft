@@ -153,14 +153,10 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             .ConfigureAwait(false);
 
         if (cycle is null)
-        {
             throw new MarketNotFoundException("Ciclo não encontrado.");
-        }
 
         if (cycle.Status == status)
-        {
             return ToDto(cycle);
-        }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -172,9 +168,7 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                 .ConfigureAwait(false);
 
             if (hasOtherOpen)
-            {
                 throw new MarketConflictException("Já existe um ciclo ativo.");
-            }
 
             var items = await _dbContext.MarketItems
                 .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Draft)
@@ -190,7 +184,6 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                     continue;
                 }
 
-                // FIX: Promote draft market items when activating a cycle so they appear in the active market.
                 item.Status = MarketItemStatus.Active;
                 item.PublishedAtUtc = now;
                 item.LastUpdateUtc = now;
@@ -205,13 +198,10 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                 .ConfigureAwait(false);
 
             if (hasActiveItems && !forceClose)
-            {
                 throw new MarketValidationException("Existem itens ativos neste ciclo. Utilize o fechamento forçado para continuar.");
-            }
 
             if (hasActiveItems && forceClose)
             {
-                var now = _timeProvider.GetUtcNow().UtcDateTime;
                 var items = await _dbContext.MarketItems
                     .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active)
                     .ToListAsync(ct)
@@ -229,7 +219,6 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         cycle.UpdatedAtUtc = now;
 
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-
         return ToDto(cycle);
     }
 
