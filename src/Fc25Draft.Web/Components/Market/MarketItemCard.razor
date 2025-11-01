@@ -161,7 +161,6 @@
         get
         {
             var status = Item.Status?.Trim() ?? string.Empty;
-            // FIX: Recognize localized published/active statuses as active to keep bidding enabled.
             return status.Equals("active", StringComparison.OrdinalIgnoreCase)
                 || status.Equals("published", StringComparison.OrdinalIgnoreCase)
                 || status.Equals("publicado", StringComparison.OrdinalIgnoreCase)
