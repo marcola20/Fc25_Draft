@@ -148,103 +148,46 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         return cycle;
     }
 
-    public async Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct)
+    public async Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus newStatus, bool forceClose, CancellationToken ct)
     {
-        await using var transaction = await BeginSerializableTransactionAsync(ct).ConfigureAwait(false);
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
+            await using var tx = await _dbContext.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
             var cycle = await _dbContext.MarketCycles
-                .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
-                .ConfigureAwait(false);
+                .SingleOrDefaultAsync(c => c.CycleId == cycleId, ct)
+                ?? throw new MarketNotFoundException("Ciclo não encontrado.");
 
-            if (cycle is null)
-                throw new MarketNotFoundException("Ciclo não encontrado.");
-
-            if (cycle.Status == status)
+            if (newStatus == MarketCycleStatus.Active)
             {
-                await CommitIfNeededAsync(transaction, ct).ConfigureAwait(false);
-                return ToDto(cycle);
+                if (cycle.Status == MarketCycleStatus.Closed)
+                    throw new MarketConflictException("Não é possível reabrir um ciclo encerrado.");
+
+                cycle.Status = MarketCycleStatus.Active;
+            }
+            else if (newStatus == MarketCycleStatus.Closed)
+            {
+                if (!forceClose && cycle.Status != MarketCycleStatus.Active)
+                    throw new MarketConflictException("Apenas ciclos ativos podem ser encerrados sem 'force'.");
+
+                cycle.Status = MarketCycleStatus.Closed;
+            }
+            else
+            {
+                cycle.Status = newStatus;
             }
 
-            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            cycle.UpdatedAtUtc = nowUtc;
 
-            if (status == MarketCycleStatus.Active)
-            {
-                var hasOtherOpen = await _dbContext.MarketCycles
-                    .AsNoTracking()
-                    .AnyAsync(c => c.CycleId != cycleId && c.Status == MarketCycleStatus.Active, ct)
-                    .ConfigureAwait(false);
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
 
-                if (hasOtherOpen)
-                    throw new MarketConflictException("Já existe um ciclo ativo.");
-
-                var items = await _dbContext.MarketItems
-                    .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Draft)
-                    .ToListAsync(ct)
-                    .ConfigureAwait(false);
-
-                foreach (var item in items)
-                {
-                    item.Status = MarketItemStatus.Active;
-                    item.PublishedAtUtc ??= now;
-                    item.LastUpdateUtc = now;
-                }
-            }
-
-            if (status == MarketCycleStatus.Closed)
-            {
-                var hasActiveItems = await _dbContext.MarketItems
-                    .AsNoTracking()
-                    .AnyAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Active, ct)
-                    .ConfigureAwait(false);
-
-                if (hasActiveItems && !forceClose)
-                    throw new MarketValidationException("Existem itens ativos neste ciclo. Utilize o fechamento forçado para continuar.");
-            }
-
-            await _dbContext.Entry(cycle).ReloadAsync(ct).ConfigureAwait(false);
-
-            if (cycle.Status == status)
-            {
-                await CommitIfNeededAsync(transaction, ct).ConfigureAwait(false);
-                return ToDto(cycle);
-            }
-
-            cycle.Status = status;
-            cycle.UpdatedAtUtc = now;
-
-            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-            await CommitIfNeededAsync(transaction, ct).ConfigureAwait(false);
             return ToDto(cycle);
-        }
-        catch
-        {
-            if (transaction is not null)
-            {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
-            }
-
-            throw;
-        }
-    }
-
-    private async ValueTask<IDbContextTransaction?> BeginSerializableTransactionAsync(CancellationToken ct)
-    {
-        if (!_dbContext.Database.IsRelational())
-        {
-            return null;
-        }
-
-        return await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
-    }
-
-    private static async ValueTask CommitIfNeededAsync(IDbContextTransaction? transaction, CancellationToken ct)
-    {
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-        }
+        });
     }
 
     private static MarketCycleDto ToDto(MarketCycle cycle) => new(

@@ -506,24 +506,19 @@ public class MarketService : IMarketService
         }
     }
 
-    private async Task<T> InSerializableTxAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct)
+    public async Task<T> InSerializableTxAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct = default)
     {
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
         return await strategy.ExecuteAsync(async () =>
         {
-            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-            try
-            {
-                var result = await work(ct);
-                await tx.CommitAsync(ct);
-                return result;
-            }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
+            await using var tx = await _dbContext.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+
+            var result = await action(ct);
+
+            await tx.CommitAsync(ct);
+            return result;
         });
     }
 }

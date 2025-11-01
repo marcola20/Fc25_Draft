@@ -2,6 +2,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Web.Models.MarketCycles;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -105,7 +106,9 @@ public class MarketCycleClient
         };
 
         var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"api/admin/market/cycles/{cycleId}/status")
+
+        using var httpRequest = new HttpRequestMessage(
+            HttpMethod.Patch, $"api/admin/market/cycles/{cycleId}/status")
         {
             Content = JsonContent.Create(request)
         };
@@ -114,10 +117,15 @@ public class MarketCycleClient
         httpRequest.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
 
         using var response = await client.SendAsync(httpRequest, ct).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.Accepted)
+
+        if (response.StatusCode == HttpStatusCode.InternalServerError)
         {
-            return null;
+            var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            throw new HttpRequestException($"500 from server while updating cycle. Body:\n{body}");
         }
+
+        if (response.StatusCode == HttpStatusCode.Accepted)
+            return null;
 
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
@@ -126,9 +134,7 @@ public class MarketCycleClient
             .ConfigureAwait(false);
 
         if (result is null || result.Cycle is null)
-        {
-            throw new InvalidOperationException("Resposta inválida do servidor ao atualizar o status do ciclo.");
-        }
+            throw new InvalidOperationException("Invalid response from server when updating cycle status.");
 
         return result;
     }
