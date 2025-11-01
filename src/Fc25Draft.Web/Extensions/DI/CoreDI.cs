@@ -53,6 +53,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketCycleClient>();
             services.AddScoped<IMarketItemGenerationClient, MarketItemGenerationClient>();
             services.AddScoped<MarketHubClient>();
+            services.AddScoped<TeamAccessService>();
             services.AddScoped<ToastService>();
 
             services.AddHttpClient();

@@ -1,6 +1,6 @@
 namespace Fc25Draft.Core.Options;
 
-public class MarketOptions
+public class  MarketOptions
 {
     public const string SectionName = "Market";
 
