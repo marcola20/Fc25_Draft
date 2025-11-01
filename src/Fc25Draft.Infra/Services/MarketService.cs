@@ -147,7 +147,6 @@ public class MarketService : IMarketService
 
         var normalizedToken = NormalizeToken(teamToken);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
-        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, SaoPauloTz);
 
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
@@ -161,7 +160,7 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc <= nowBr)
+            if (item.ExpiresAtUtc <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
@@ -232,12 +231,12 @@ public class MarketService : IMarketService
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
                 Amount = amount,
-                CreatedAtUtc = nowBr
+                CreatedAtUtc = nowUtc
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
             item.CurrentLeaderAmount = amount;
-            item.LastUpdateUtc = nowBr;
+            item.LastUpdateUtc = nowUtc;
 
             var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", amount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
@@ -245,7 +244,7 @@ public class MarketService : IMarketService
 
             await _transactionLogService.LogMarketAsync(
                 item, MarketTransactionType.BidPlaced, team.TeamId, previousLeaderId,
-                amount, team.TeamId.ToString(), bidNotes, nowBr, ct2);
+                amount, team.TeamId.ToString(), bidNotes, nowUtc, ct2);
 
             await _dbContext.MarketBids.AddAsync(bid, ct2);
 
