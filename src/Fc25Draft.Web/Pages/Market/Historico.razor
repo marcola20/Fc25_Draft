@@ -75,7 +75,7 @@ else
                     <td>@FormatTeam(item.TeamName, fallback:"Mercado")</td>
                     <td>@FormatTeam(item.TargetTeamName)</td>
                     <td>@FormatAmount(item.Amount)</td>
-                    <td>@FormatNotes(item.Notes)</td>
+                    <td>@FormatObservation(item)</td>
                 </tr>
             }
             </tbody>
@@ -195,8 +195,11 @@ else
     private static string FormatAmount(decimal? amount)
         => amount.HasValue ? string.Format(BrazilTime.Culture, "{0:C}", amount.Value) : "-";
 
-    private static string FormatNotes(string? notes)
-        => string.IsNullOrWhiteSpace(notes) ? "-" : notes!;
+    private static string FormatObservation(MarketTransactionDto entry)
+    {
+        var text = MarketHistoryTextFormatter.FormatObservation(entry);
+        return string.IsNullOrWhiteSpace(text) ? "-" : text;
+    }
 
     private static string BuildEventSummary(MarketTransactionDto item)
     {

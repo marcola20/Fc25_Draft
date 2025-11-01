@@ -12,6 +12,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Web.Models.Market;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
 using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest;
@@ -22,13 +23,19 @@ namespace Fc25Draft.Web.Services
 {
     public class MarketClient
     {
+        private const string InvalidTeamTokenMessage = "Token do time inválido ou expirado. Informe novamente.";
+
         private readonly ApiClientFactory _clientFactory;
         private readonly TeamAccessService _teamAccess;
+        private readonly ToastService _toasts;
+        private readonly ILogger<MarketClient> _logger;
 
-        public MarketClient(ApiClientFactory clientFactory, TeamAccessService teamAccess)
+        public MarketClient(ApiClientFactory clientFactory, TeamAccessService teamAccess, ToastService toasts, ILogger<MarketClient> logger)
         {
             _clientFactory = clientFactory;
             _teamAccess = teamAccess;
+            _toasts = toasts;
+            _logger = logger;
         }
 
         public async Task<PagedResult<CoreItemVm>> GetItemsAsync(Guid? cycleId, CoreQueryVm query, CancellationToken ct)
@@ -108,18 +115,18 @@ namespace Fc25Draft.Web.Services
 
         public async Task<MarketClientActionResult<CoreItemVm>> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
-            var teamToken = await _teamAccess.GetTokenAsync();
-            if (string.IsNullOrWhiteSpace(teamToken))
-            {
-                throw new TeamTokenMissingException();
-            }
-
             var http = await _clientFactory.CreateAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/items/{req.ItemId}/bids");
             ApplyRowVersionHeaders(request, req.RowVersion);
-            request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken);
+            await AttachTeamTokenAsync(request);
             request.Content = JsonContent.Create(new { amount = req.Amount });
             using var resp = await http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await HandleInvalidTokenAsync(InvalidTeamTokenMessage);
+                throw new TeamTokenMissingException();
+            }
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
@@ -150,18 +157,18 @@ namespace Fc25Draft.Web.Services
 
         public async Task<MarketClientActionResult<CoreItemVm>> BuyNowAsync(BuyNowRequest req, CancellationToken ct)
         {
-            var teamToken = await _teamAccess.GetTokenAsync();
-            if (string.IsNullOrWhiteSpace(teamToken))
-            {
-                throw new TeamTokenMissingException();
-            }
-
             var http = await _clientFactory.CreateAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/market/{req.ItemId}/buy-now");
             ApplyRowVersionHeaders(request, req.RowVersion);
-            request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken);
+            await AttachTeamTokenAsync(request);
             request.Content = JsonContent.Create(req);
             using var resp = await http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await HandleInvalidTokenAsync(InvalidTeamTokenMessage);
+                throw new TeamTokenMissingException();
+            }
 
             if (resp.StatusCode == HttpStatusCode.Conflict || resp.StatusCode == HttpStatusCode.PreconditionFailed)
             {
@@ -189,9 +196,16 @@ namespace Fc25Draft.Web.Services
 
         public async Task<TeamIdentityDto?> GetMyTeamAsync(string? tokenOverride = null, CancellationToken ct = default)
         {
-            var token = string.IsNullOrWhiteSpace(tokenOverride)
-                ? await _teamAccess.GetTokenAsync()
-                : tokenOverride;
+            string? token;
+
+            if (string.IsNullOrWhiteSpace(tokenOverride))
+            {
+                token = await _teamAccess.GetTokenAsync();
+            }
+            else
+            {
+                token = tokenOverride.Trim();
+            }
 
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -206,6 +220,7 @@ namespace Fc25Draft.Web.Services
 
             if (resp.StatusCode == HttpStatusCode.Unauthorized)
             {
+                await HandleInvalidTokenAsync(InvalidTeamTokenMessage);
                 return null;
             }
 
@@ -253,6 +268,34 @@ namespace Fc25Draft.Web.Services
             var basePath = "/api/market/history/export";
             var qs = query.ToQueryString(includePaging: false);
             return string.IsNullOrEmpty(qs) ? basePath : $"{basePath}?{qs}";
+        }
+
+        private async Task AttachTeamTokenAsync(HttpRequestMessage request)
+        {
+            var token = await _teamAccess.GetTokenAsync();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                throw new TeamTokenMissingException();
+            }
+
+            request.Headers.TryAddWithoutValidation("X-Team-Token", token);
+        }
+
+        private async Task HandleInvalidTokenAsync(string message)
+        {
+            _logger.LogWarning("Team token rejected by the server. Clearing local token.");
+            _teamAccess.ReportInvalidToken(message);
+
+            try
+            {
+                await _teamAccess.ClearTokenAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clear team token after invalidation.");
+            }
+
+            _toasts.ShowError(message);
         }
 
         private static void ApplyRowVersionHeaders(HttpRequestMessage request, string? rowVersion)

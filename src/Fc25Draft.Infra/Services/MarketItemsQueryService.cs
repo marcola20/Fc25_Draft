@@ -1,3 +1,4 @@
+using System;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Extensions;
@@ -61,23 +62,49 @@ public class MarketItemsQueryService : IMarketItemsQueryService
 
         var total = await itemsQuery.CountAsync(ct).ConfigureAwait(false);
 
-        IOrderedQueryable<MarketItem> orderedQuery = query.SortBy switch
+        IQueryable<MarketItem> orderedQuery;
+
+        if (query.SortBy == MarketItemsSortField.ExpiresAtUtc && !query.SortDescending)
         {
-            MarketItemsSortField.CurrentBid when query.SortDescending => itemsQuery
-                .OrderByDescending(i => i.CurrentLeaderAmount ?? i.BasePrice)
-                .ThenBy(i => i.ExpiresAtUtc)
-                .ThenBy(i => i.ItemId),
-            MarketItemsSortField.CurrentBid => itemsQuery
-                .OrderBy(i => i.CurrentLeaderAmount ?? i.BasePrice)
-                .ThenBy(i => i.ExpiresAtUtc)
-                .ThenBy(i => i.ItemId),
-            _ when query.SortDescending => itemsQuery
-                .OrderByDescending(i => i.ExpiresAtUtc)
-                .ThenBy(i => i.ItemId),
-            _ => itemsQuery
-                .OrderBy(i => i.ExpiresAtUtc)
-                .ThenBy(i => i.ItemId)
-        };
+            var nowUtc = DateTime.UtcNow;
+
+            orderedQuery = itemsQuery
+                .Select(i => new
+                {
+                    Item = i,
+                    StatusPriority = i.ExpiresAtUtc <= nowUtc
+                        ? 0
+                        : i.Status == MarketItemStatus.Active ? 3
+                        : i.Status == MarketItemStatus.Draft ? 2
+                        : i.Status == MarketItemStatus.Canceled ? 1
+                        : 0
+                })
+                .OrderByDescending(x => x.StatusPriority)
+                .ThenBy(x => x.Item.ExpiresAtUtc)
+                .ThenByDescending(x => x.Item.CreatedAtUtc)
+                .ThenBy(x => x.Item.ItemId)
+                .Select(x => x.Item);
+        }
+        else
+        {
+            orderedQuery = query.SortBy switch
+            {
+                MarketItemsSortField.CurrentBid when query.SortDescending => itemsQuery
+                    .OrderByDescending(i => i.CurrentLeaderAmount ?? i.BasePrice)
+                    .ThenBy(i => i.ExpiresAtUtc)
+                    .ThenBy(i => i.ItemId),
+                MarketItemsSortField.CurrentBid => itemsQuery
+                    .OrderBy(i => i.CurrentLeaderAmount ?? i.BasePrice)
+                    .ThenBy(i => i.ExpiresAtUtc)
+                    .ThenBy(i => i.ItemId),
+                _ when query.SortDescending => itemsQuery
+                    .OrderByDescending(i => i.ExpiresAtUtc)
+                    .ThenBy(i => i.ItemId),
+                _ => itemsQuery
+                    .OrderBy(i => i.ExpiresAtUtc)
+                    .ThenBy(i => i.ItemId)
+            };
+        }
 
         var skip = (normalizedPage - 1) * normalizedPageSize;
 

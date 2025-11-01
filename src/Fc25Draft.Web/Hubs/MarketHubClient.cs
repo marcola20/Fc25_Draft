@@ -24,6 +24,10 @@ public class MarketHubClient : IAsyncDisposable
     public Func<MarketItemVm, Task>? OnItemClosed { get; set; }
     public Func<MarketItemVm, Task>? OnItemBought { get; set; }
 
+    public bool IsConnected => _connection?.State == HubConnectionState.Connected;
+
+    public HubConnectionState? State => _connection?.State;
+
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         if (_connection is not null)

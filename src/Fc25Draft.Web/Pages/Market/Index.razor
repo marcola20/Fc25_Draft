@@ -115,7 +115,21 @@
 
     @if (!string.IsNullOrEmpty(_realTimeWarning))
     {
-        <div class="alert alert-warning mt-3" role="status">@_realTimeWarning</div>
+        <div class="alert alert-warning mt-3" role="status">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span>@_realTimeWarning</span>
+                <button type="button"
+                        class="btn btn-outline-warning btn-sm"
+                        @onclick="TryReconnectAsync"
+                        disabled="@_reconnecting">
+                    @if (_reconnecting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Tentar reconectar
+                </button>
+            </div>
+        </div>
     }
 
     @if (TotalPages > 1 && PageData is not null)
@@ -165,7 +179,7 @@ else
                         <div class="ms-4">
                             <div class="fw-semibold">@entry.TypeName</div>
                             <div class="text-muted small">@FormatHistoryTimestamp(entry.OccurredAtUtc)</div>
-                            <div class="small">@BuildHistoryDescription(entry)</div>
+                            <div class="small">@MarketHistoryTextFormatter.FormatDescription(entry)</div>
                         </div>
                     </article>
                 }
@@ -253,6 +267,14 @@ else
     }
 
     private const int HistoryPageSize = 25;
+    private const string RealTimeWarningMessage = "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
+    private static readonly TimeSpan[] HubReconnectDelays =
+    {
+        TimeSpan.Zero,
+        TimeSpan.FromMilliseconds(250),
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(2)
+    };
 
     private readonly List<MarketPositionOption> _positionOptions = new();
     private CoreQueryVm Query = new() { Page = 1, PageSize = 20 };
@@ -261,6 +283,11 @@ else
     private Guid ActiveCycleId;
     private CancellationTokenSource? _lifetimeCts;
     private CancellationTokenSource? _loadCts;
+    private readonly SemaphoreSlim _joinSemaphore = new(1, 1);
+    private Guid? _currentJoinedCycleId;
+    private bool _hubConnected;
+    private Task? _pendingReloadTask;
+    private bool _reconnecting;
     private Func<CoreItemVm, Task>? _bidUpdatedHandler;
     private Func<CoreItemVm, Task>? _itemBoughtHandler;
     private Func<CoreItemVm, Task>? _itemClosedHandler;
@@ -325,11 +352,14 @@ else
         }
 
         ActiveCycleId = incomingCycle;
+        _currentJoinedCycleId = null;
         ResetHistoryState();
         if (_initialized)
         {
-            _ = InvokeAsync(async () =>
+            _pendingReloadTask = InvokeAsync(async () =>
             {
+                Logger.LogInformation("Cycle changed to {CycleId}. Re-establishing hub join.", ActiveCycleId);
+                await EnsureHubConnectedAsync();
                 await JoinCycleAsync();
                 var ct = PrepareNewLoadCts();
                 await LoadPageAsync(1, ct);
@@ -354,17 +384,26 @@ else
 
         try
         {
-            await Hub.ConnectAsync(_lifetimeCts?.Token ?? CancellationToken.None);
-            await JoinCycleAsync();
+            var connected = await EnsureHubConnectedAsync();
+            if (connected)
+            {
+                await JoinCycleAsync();
+            }
+            else
+            {
+                UpdateRealTimeWarning(RealTimeWarningMessage);
+            }
         }
         catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
         {
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Falha ao estabelecer conexão com o hub do mercado.");
-            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
-            StateHasChangedSafe();
+            UpdateRealTimeWarning(RealTimeWarningMessage);
         }
 
         await LoadTeamTokenStatusAsync();
@@ -503,9 +542,40 @@ else
 
     private async Task HandleRealtimeUpdateAsync(CoreItemVm incoming)
     {
+        var closed = IsItemClosed(incoming);
         MergeItem(incoming);
-        StateHasChangedSafe();
+
+        if (closed && _lifetimeCts is not null && !_lifetimeCts.IsCancellationRequested)
+        {
+            Logger.LogInformation("Realtime update indicates item {ItemId} is closed. Reloading page {Page}.", incoming.ItemId, Query.Page);
+            var ct = PrepareNewLoadCts();
+            await LoadPageAsync(Query.Page, ct);
+        }
+        else
+        {
+            StateHasChangedSafe();
+        }
+
         await RefreshHistoryAsync();
+    }
+
+    private bool IsItemClosed(CoreItemVm item)
+    {
+        var serverNow = DateTime.UtcNow + ServerTimeOffset;
+        if (item.ExpiresAtUtc <= serverNow)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Status))
+        {
+            return false;
+        }
+
+        return item.Status.Equals("Encerrado", StringComparison.OrdinalIgnoreCase)
+            || item.Status.Equals("Vendido", StringComparison.OrdinalIgnoreCase)
+            || item.Status.Equals("Cancelado", StringComparison.OrdinalIgnoreCase)
+            || item.Status.Equals("Expirado", StringComparison.OrdinalIgnoreCase);
     }
 
     private IEnumerable<int> GetVisiblePages()
@@ -542,29 +612,230 @@ else
         return _loadCts.Token;
     }
 
-    private async Task JoinCycleAsync()
+    private async Task<bool> JoinCycleAsync()
     {
+        if (_lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+        {
+            Logger.LogDebug("Join cycle skipped because the component is disposing.");
+            return false;
+        }
+
+        if (ActiveCycleId == Guid.Empty)
+        {
+            Logger.LogInformation("Skipping hub join because no active cycle is selected.");
+            _currentJoinedCycleId = null;
+            UpdateRealTimeWarning(null);
+            return true;
+        }
+
+        var acquired = false;
+
         try
         {
-            var joined = await Hub.JoinCycle(ActiveCycleId, _lifetimeCts?.Token ?? CancellationToken.None);
-            if (!joined)
-            {
-                _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
-                StateHasChangedSafe();
-            }
+            await _joinSemaphore.WaitAsync(_lifetimeCts.Token);
+            acquired = true;
         }
         catch (OperationCanceledException)
         {
+            Logger.LogDebug("Join semaphore wait canceled for cycle {CycleId}.", ActiveCycleId);
+            return false;
         }
-        catch (Exception ex)
+        catch (ObjectDisposedException)
         {
-            Logger.LogError(ex, "Falha ao ingressar no ciclo de mercado {CycleId}", ActiveCycleId);
-            _realTimeWarning ??= "As atualizações em tempo real estão temporariamente indisponíveis. Recarregue a página para tentar novamente.";
-            StateHasChangedSafe();
+            return false;
+        }
+
+        try
+        {
+            if (_currentJoinedCycleId == ActiveCycleId && _hubConnected && Hub.IsConnected)
+            {
+                Logger.LogDebug("Already joined to cycle {CycleId}; skipping join.", ActiveCycleId);
+                UpdateRealTimeWarning(null);
+                return true;
+            }
+
+            var connected = await EnsureHubConnectedAsync();
+            if (!connected)
+            {
+                Logger.LogWarning("Unable to join cycle {CycleId} because the hub connection is unavailable.", ActiveCycleId);
+                UpdateRealTimeWarning(RealTimeWarningMessage);
+                return false;
+            }
+
+            try
+            {
+                Logger.LogInformation("Joining market cycle {CycleId} on hub.", ActiveCycleId);
+                var joined = await Hub.JoinCycle(ActiveCycleId, _lifetimeCts.Token);
+                if (joined)
+                {
+                    Logger.LogInformation("Successfully joined market cycle {CycleId} on hub.", ActiveCycleId);
+                    _currentJoinedCycleId = ActiveCycleId;
+                    UpdateRealTimeWarning(null);
+                    return true;
+                }
+
+                Logger.LogWarning("Hub returned false when joining cycle {CycleId}.", ActiveCycleId);
+                UpdateRealTimeWarning(RealTimeWarningMessage);
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogDebug("Join operation canceled for cycle {CycleId}.", ActiveCycleId);
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                Logger.LogDebug("Join operation aborted because the hub client was disposed.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to join market cycle {CycleId} on hub.", ActiveCycleId);
+                UpdateRealTimeWarning(RealTimeWarningMessage);
+                return false;
+            }
+        }
+        finally
+        {
+            if (acquired)
+            {
+                _joinSemaphore.Release();
+            }
         }
     }
 
-    private void StateHasChangedSafe() => _ = InvokeAsync(StateHasChanged);
+    private void StateHasChangedSafe()
+    {
+        if (_lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (_lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async Task<bool> EnsureHubConnectedAsync()
+    {
+        if (_lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        if (Hub.IsConnected)
+        {
+            if (!_hubConnected)
+            {
+                Logger.LogInformation("Market hub already connected (state: {State}).", Hub.State);
+            }
+
+            _hubConnected = true;
+            return true;
+        }
+
+        _hubConnected = false;
+
+        for (var attempt = 0; attempt < HubReconnectDelays.Length; attempt++)
+        {
+            var delay = HubReconnectDelays[attempt];
+            if (delay > TimeSpan.Zero)
+            {
+                try
+                {
+                    await Task.Delay(delay, _lifetimeCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _hubConnected = false;
+                    return false;
+                }
+            }
+
+            try
+            {
+                Logger.LogInformation("Attempting to connect to market hub (attempt {Attempt}).", attempt + 1);
+                await Hub.ConnectAsync(_lifetimeCts.Token);
+
+                if (Hub.IsConnected)
+                {
+                    _hubConnected = true;
+                    Logger.LogInformation("Connected to market hub on attempt {Attempt}.", attempt + 1);
+                    return true;
+                }
+
+                Logger.LogWarning("Market hub connection attempt {Attempt} completed with state {State}.", attempt + 1, Hub.State);
+                _hubConnected = false;
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogDebug("Market hub connection attempt canceled.");
+                _hubConnected = false;
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                Logger.LogDebug("Market hub connection aborted because the client was disposed.");
+                _hubConnected = false;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to connect to market hub on attempt {Attempt}.", attempt + 1);
+            }
+        }
+
+        _hubConnected = false;
+        Logger.LogWarning("Unable to establish market hub connection after {Attempts} attempts.", HubReconnectDelays.Length);
+        return false;
+    }
+
+    private void UpdateRealTimeWarning(string? message)
+    {
+        if (string.Equals(_realTimeWarning, message, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _realTimeWarning = message;
+        StateHasChangedSafe();
+    }
+
+    private async Task TryReconnectAsync()
+    {
+        if (_reconnecting || _lifetimeCts is null || _lifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _reconnecting = true;
+        StateHasChangedSafe();
+
+        try
+        {
+            Logger.LogInformation("Manual reconnection requested for cycle {CycleId}.", ActiveCycleId);
+            var connected = await EnsureHubConnectedAsync();
+            if (!connected)
+            {
+                UpdateRealTimeWarning(RealTimeWarningMessage);
+                return;
+            }
+
+            await JoinCycleAsync();
+        }
+        finally
+        {
+            _reconnecting = false;
+            StateHasChangedSafe();
+        }
+    }
 
     private string GetResultsSummary()
     {
@@ -897,35 +1168,6 @@ else
     private static string FormatHistoryTimestamp(DateTime utc)
         => BrazilTime.FormatDateTimeWithZone(utc);
 
-    private static string FormatHistoryTeam(string? teamName, string fallback = "-")
-        => string.IsNullOrWhiteSpace(teamName) ? fallback : teamName!;
-
-    private static string BuildHistoryDescription(MarketTransactionDto entry)
-    {
-        var origin = FormatHistoryTeam(entry.TeamName, "Mercado");
-        var destination = FormatHistoryTeam(entry.TargetTeamName);
-        var amountText = entry.Amount.HasValue
-            ? string.Format(BrazilTime.Culture, "{0:C}", entry.Amount.Value)
-            : null;
-
-        return entry.Type switch
-        {
-            MarketTransactionType.BidPlaced when amountText is not null
-                => $"Lance de {amountText} por {origin}.",
-            MarketTransactionType.Outbid when amountText is not null
-                => $"{origin} superou {destination} com {amountText}.",
-            MarketTransactionType.BuyNow when amountText is not null
-                => $"Compra imediata por {origin} ({amountText}).",
-            MarketTransactionType.AuctionSettled
-                => $"Leilão concluído para {destination}.",
-            MarketTransactionType.AuctionExpired
-                => "Leilão expirado sem vencedor.",
-            _ when !string.IsNullOrWhiteSpace(destination)
-                => $"{origin} → {destination}",
-            _ => origin
-        };
-    }
-
     private async Task OpenTeamTokenModal()
     {
         _teamTokenError = null;
@@ -934,7 +1176,7 @@ else
         {
             var token = await TeamAccess.GetTokenAsync();
             _teamTokenInput = token ?? string.Empty;
-            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+            _teamTokenConfigured = Guid.TryParse(token, out _);
         }
         catch (Exception ex)
         {
@@ -957,7 +1199,9 @@ else
     {
         try
         {
-            await TeamAccess.SetTokenAsync(_teamTokenInput);
+            var trimmed = _teamTokenInput.Trim();
+            await TeamAccess.SetTokenAsync(trimmed);
+            _teamTokenInput = trimmed;
             _teamTokenConfigured = true;
             _teamTokenModalOpen = false;
             _teamTokenError = null;
@@ -999,7 +1243,7 @@ else
         {
             var token = await TeamAccess.GetTokenAsync();
             _teamTokenInput = token ?? string.Empty;
-            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+            _teamTokenConfigured = Guid.TryParse(token, out _);
         }
         catch (Exception ex)
         {
@@ -1007,7 +1251,10 @@ else
             _teamTokenInput = string.Empty;
         }
 
-        _teamTokenError = "Informe o token do seu time para registrar lances.";
+        var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
+        _teamTokenError = string.IsNullOrWhiteSpace(invalidMessage)
+            ? "Informe o token do seu time para registrar lances."
+            : invalidMessage;
         _teamTokenModalOpen = true;
         StateHasChangedSafe();
     }
@@ -1032,7 +1279,8 @@ else
             return;
         }
 
-        _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
+        _teamTokenInput = token ?? string.Empty;
+        _teamTokenConfigured = Guid.TryParse(token, out _);
 
         if (_teamTokenConfigured && token is not null)
         {
@@ -1108,6 +1356,22 @@ else
             _historyPollingTask = null;
         }
 
+        if (_pendingReloadTask is not null)
+        {
+            try
+            {
+                await _pendingReloadTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            _pendingReloadTask = null;
+        }
+
         if (_bidUpdatedHandler is not null)
             Hub.OnBidUpdated -= _bidUpdatedHandler;
 
@@ -1125,6 +1389,7 @@ else
         }
 
         _historySemaphore.Dispose();
+        _joinSemaphore.Dispose();
 
         await Hub.DisposeAsync();
     }

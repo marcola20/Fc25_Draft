@@ -6,6 +6,7 @@ using System.Text;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Web.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fc25Draft.Web.Endpoints.Market;
@@ -132,8 +133,9 @@ public static class MarketHistoryEndpoints
             ct.ThrowIfCancellationRequested();
 
             var amount = item.Amount.HasValue
-                ? item.Amount.Value.ToString("F2", CultureInfo.InvariantCulture)
+                ? string.Format(BrazilTime.Culture, "{0:C}", item.Amount.Value)
                 : string.Empty;
+            var observation = MarketHistoryTextFormatter.FormatObservation(item);
 
             var lineBuilder = new StringBuilder();
             lineBuilder
@@ -143,7 +145,7 @@ public static class MarketHistoryEndpoints
                 .Append(Escape(item.TeamName ?? string.Empty)).Append(';')
                 .Append(Escape(item.TargetTeamName ?? string.Empty)).Append(';')
                 .Append(Escape(amount)).Append(';')
-                .Append(Escape(item.Notes ?? string.Empty));
+                .Append(Escape(observation));
 
             await writer.WriteLineAsync(lineBuilder.ToString()).ConfigureAwait(false);
         }
