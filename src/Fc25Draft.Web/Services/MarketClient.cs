@@ -1,17 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Web.Models.Market;
-using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using BidRequest = Fc25Draft.Core.DTOs.BidRequest;
 using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest;
@@ -89,9 +81,8 @@ namespace Fc25Draft.Web.Services
             }
 
             var json = body ?? string.Empty;
-            var trimmed = json.AsSpan().Trim();
-
-            if (trimmed.Length == 0 || trimmed.SequenceEqual("null".AsSpan()))
+            var trimmedJson = (body ?? string.Empty).Trim();
+            if (trimmedJson.Length == 0 || string.Equals(trimmedJson, "null", StringComparison.Ordinal))
                 return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
 
             var options = new JsonSerializerOptions
