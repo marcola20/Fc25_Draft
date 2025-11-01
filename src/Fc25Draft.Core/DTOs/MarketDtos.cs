@@ -15,9 +15,7 @@ public record MarketCycleDto
         string? notes)
     {
         if (string.IsNullOrWhiteSpace(name))
-        {
             throw new ArgumentException("O nome do ciclo é obrigatório.", nameof(name));
-        }
 
         var normalizedStart = EnsureUtc(startsAtUtc);
         var normalizedEnd = EnsureUtc(endsAtUtc);
@@ -25,9 +23,7 @@ public record MarketCycleDto
         var normalizedUpdated = EnsureUtc(updatedAtUtc);
 
         if (normalizedStart >= normalizedEnd)
-        {
             throw new ArgumentException("A data de início deve ser anterior à data de término.", nameof(endsAtUtc));
-        }
 
         CycleId = cycleId;
         Name = name;

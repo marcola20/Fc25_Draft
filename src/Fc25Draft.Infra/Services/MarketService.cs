@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,6 +28,11 @@ public class MarketService : IMarketService
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
     private readonly IBudgetService _budgetService;
+    private static readonly TimeZoneInfo SaoPauloTz =
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time")
+            : TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
 
     public MarketService(
         DraftDbContext dbContext,
@@ -141,6 +147,7 @@ public class MarketService : IMarketService
 
         var normalizedToken = NormalizeToken(teamToken);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, SaoPauloTz);
 
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
@@ -154,7 +161,7 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc <= nowUtc)
+            if (item.ExpiresAtUtc <= nowBr)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
@@ -225,12 +232,12 @@ public class MarketService : IMarketService
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
                 Amount = amount,
-                CreatedAtUtc = nowUtc
+                CreatedAtUtc = nowBr
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
             item.CurrentLeaderAmount = amount;
-            item.LastUpdateUtc = nowUtc;
+            item.LastUpdateUtc = nowBr;
 
             var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", amount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
@@ -238,7 +245,7 @@ public class MarketService : IMarketService
 
             await _transactionLogService.LogMarketAsync(
                 item, MarketTransactionType.BidPlaced, team.TeamId, previousLeaderId,
-                amount, team.TeamId.ToString(), bidNotes, nowUtc, ct2);
+                amount, team.TeamId.ToString(), bidNotes, nowBr, ct2);
 
             await _dbContext.MarketBids.AddAsync(bid, ct2);
 
@@ -269,7 +276,8 @@ public class MarketService : IMarketService
         EnsureExpectedRowVersion(expectedRowVersion);
 
         var normalizedToken = NormalizeToken(teamToken);
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, SaoPauloTz);
 
         return await InSerializableTxAsync<BuyNowResultDto>(async ct2 =>
         {
@@ -290,8 +298,8 @@ public class MarketService : IMarketService
 
             var buyNowPrice = item.BuyNowPrice.Value;
 
-            if (item.ExpiresAtUtc <= now)
-                throw new MarketConflictException("O item já expirou. Atualize e tente novamente.");
+            if (item.ExpiresAtUtc <= nowBr)
+                throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
                 .FirstOrDefaultAsync(t => t.Token == normalizedToken, ct2)
@@ -342,8 +350,8 @@ public class MarketService : IMarketService
 
             item.Status = MarketItemStatus.Sold;
             item.WinnerTeamId = team.TeamId;
-            item.LastUpdateUtc = now;
-            item.ExpiresAtUtc = now;
+            item.LastUpdateUtc = nowBr;
+            item.ExpiresAtUtc = nowBr;
 
             var buyNowNotes = FormattableString.Invariant($"Compra imediata por {buyNowPrice:0.00}.");
             if (!string.IsNullOrWhiteSpace(takeoverNotes))
@@ -351,7 +359,7 @@ public class MarketService : IMarketService
 
             await _transactionLogService.LogMarketAsync(
                 item, MarketTransactionType.BuyNow, team.TeamId, previousLeaderId,
-                buyNowPrice, team.TeamId.ToString(), buyNowNotes, now, ct2);
+                buyNowPrice, team.TeamId.ToString(), buyNowNotes, nowBr, ct2);
 
             await _dbContext.TransferHistories.AddAsync(new TransferHistory
             {
@@ -363,7 +371,7 @@ public class MarketService : IMarketService
                 Type = TransferType.MarketAuction,
                 Notes = "Compra imediata",
                 PerformedBy = "sistema",
-                PerformedAtUtc = now
+                PerformedAtUtc = nowBr
             }, ct2);
 
             try

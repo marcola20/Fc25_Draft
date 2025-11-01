@@ -52,23 +52,28 @@ public static class BrazilTime
 
         var formats = new[]
         {
-            "yyyy-MM-dd'T'HH:mm",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mmK",
-            "yyyy-MM-dd'T'HH:mm:ssK"
-        };
+        "yyyy-MM-dd'T'HH:mm",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mmK",
+        "yyyy-MM-dd'T'HH:mm:ssK"
+    };
 
-        if (DateTime.TryParseExact(input, formats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsedUtc))
+        if (DateTime.TryParseExact(input, formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsedUtc))
         {
             resultUtc = DateTime.SpecifyKind(parsedUtc, DateTimeKind.Utc);
             return true;
         }
 
-        if (DateTime.TryParseExact(input, formats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedLocal))
+        if (DateTime.TryParseExact(input, formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeLocal, out var parsedLocal))
         {
             var unspecified = DateTime.SpecifyKind(parsedLocal, DateTimeKind.Unspecified);
-            var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, TimeZone);
+
+            var saoPauloTz = TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
+
+            var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, saoPauloTz);
             resultUtc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
             return true;
         }
@@ -76,4 +81,5 @@ public static class BrazilTime
         resultUtc = default;
         return false;
     }
+
 }

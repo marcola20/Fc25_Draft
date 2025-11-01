@@ -9,6 +9,7 @@
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
+@using System.Reflection
 @inject Fc25Draft.Web.Services.MarketClient Client
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
@@ -71,7 +72,7 @@
                 <div class="input-group input-group-sm">
                     <InputText @key="Item.ItemId"
                                @bind-Value="_model.AmountText"
-                               @bind-Value:event="oninput"
+                               @bind-Value:event="@oninput"
                                class="form-control me-2"
                                id="@BidInputId"
                                inputmode="decimal"
