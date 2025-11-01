@@ -76,15 +76,19 @@ namespace Fc25Draft.Web.Services
 
             try
             {
+                // FIX: The API currently returns MarketItemDto payloads while the client expects MarketItemVm instances.
                 if (trimmed[0] == '[')
                 {
-                    var list = JsonSerializer.Deserialize<List<CoreItemVm>>(json, options) ?? new List<CoreItemVm>();
-                    return new PagedResult<CoreItemVm>(list, list.Count, query.Page, query.PageSize);
+                    var dtoList = JsonSerializer.Deserialize<List<MarketItemDto>>(json, options) ?? new List<MarketItemDto>();
+                    var items = dtoList.Select(MapToViewModel).ToList();
+                    return new PagedResult<CoreItemVm>(items, items.Count, query.Page, query.PageSize);
                 }
 
-                var result = JsonSerializer.Deserialize<PagedResult<CoreItemVm>>(json, options);
+                var dtoResult = JsonSerializer.Deserialize<PagedResult<MarketItemDto>>(json, options);
 
-                return result ?? PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
+                return dtoResult is null
+                    ? PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize)
+                    : MapToViewModel(dtoResult);
             }
             catch (JsonException jex)
             {
@@ -214,6 +218,12 @@ namespace Fc25Draft.Web.Services
             {
                 return body;
             }
+        }
+
+        private static PagedResult<CoreItemVm> MapToViewModel(PagedResult<MarketItemDto> source)
+        {
+            var items = source.Items?.Select(MapToViewModel).ToList() ?? new List<CoreItemVm>();
+            return new PagedResult<CoreItemVm>(items, source.Total, source.Page, source.PageSize);
         }
 
         private static CoreItemVm MapToViewModel(MarketItemDto dto)
