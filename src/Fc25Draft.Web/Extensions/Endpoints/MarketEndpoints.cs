@@ -2,6 +2,7 @@
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Endpoints.Market;
 using Microsoft.AspNetCore.Mvc;
 

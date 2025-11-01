@@ -205,7 +205,7 @@ namespace Fc25Draft.Web.Services
             }
 
             var trimmed = rawSort.Trim();
-            var descending = trimmed.StartsWith('-', StringComparison.Ordinal);
+            var descending = trimmed.StartsWith("-", StringComparison.Ordinal); 
             var token = descending ? trimmed[1..] : trimmed;
 
             if (string.IsNullOrWhiteSpace(token))
