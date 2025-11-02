@@ -76,7 +76,11 @@
                 </div>
             }
             <div class="text-end" aria-live="polite">
-                @if (IsExpired)
+                @if (IsSold)
+                {
+                    <span class="badge bg-danger">(Vendido)</span>
+                }
+                else if (IsExpired)
                 {
                     <span class="badge bg-secondary">Encerrado</span>
                 }
@@ -239,13 +243,15 @@
             return status switch
             {
                 "active" or "published" or "ativo" or "publicado" => "bg-success",
-                "sold" or "settled" or "vendido" or "finalizado" => "bg-primary",
+                "sold" or "settled" or "vendido" or "finalizado" => "bg-danger",
                 "closed" or "encerrado" => "bg-secondary",
                 "canceled" or "cancelled" or "cancelado" => "bg-secondary",
                 _ => "bg-secondary"
             };
         }
     }
+
+    private bool IsSold => IsSoldStatus(Item.Status);
 
     private TimeSpan Remaining
     {
@@ -829,6 +835,20 @@
             "expired" or "expirado" => "Expirado",
             "closed" or "encerrado" => "Encerrado",
             _ => CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(normalized)
+        };
+    }
+
+    private static bool IsSoldStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        return status.ToLowerInvariant() switch
+        {
+            "sold" or "settled" or "vendido" or "finalizado" => true,
+            _ => false
         };
     }
 }
