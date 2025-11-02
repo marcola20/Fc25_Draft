@@ -246,6 +246,85 @@ public class MarketItemGenerationServiceTests
         Assert.True(groupedByTeam.GetValueOrDefault(teamB) <= 1);
     }
 
+    [Fact]
+    public async Task GenerateAsync_IgnoresPlayersAssignedToTeams()
+    {
+        await using var context = CreateDbContext();
+        await SeedPositionAsync(context);
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+
+        context.Teams.Add(new Team
+        {
+            TeamId = teamId,
+            TeamName = "Time A",
+            Token = "TOKEN-A",
+            Budget = 1_000m,
+            BudgetBlocked = 0m
+        });
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Draft",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddHours(8),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        var availablePlayer = new Player
+        {
+            PlayerId = 50,
+            PlayerGuid = Guid.NewGuid(),
+            Name = "Disponível",
+            Overall = 83,
+            PositionId = 1
+        };
+
+        var rosteredPlayer = new Player
+        {
+            PlayerId = 51,
+            PlayerGuid = Guid.NewGuid(),
+            Name = "Escalado",
+            Overall = 84,
+            PositionId = 1
+        };
+
+        context.Players.AddRange(availablePlayer, rosteredPlayer);
+        await context.SaveChangesAsync();
+
+        context.TeamRosters.Add(new TeamRoster
+        {
+            TeamId = teamId,
+            PlayerId = rosteredPlayer.PlayerId
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
+        var options = new MarketItemGenerationOptions(
+            1,
+            null,
+            null,
+            null,
+            null,
+            true,
+            true,
+            321,
+            null,
+            null,
+            true);
+
+        var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
+
+        Assert.Equal(1, result.CreatedCount);
+        Assert.Contains(result.Items, item => item.PlayerId == availablePlayer.PlayerId);
+        Assert.DoesNotContain(result.Items, item => item.PlayerId == rosteredPlayer.PlayerId);
+    }
+
     private static DraftDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<DraftDbContext>()
