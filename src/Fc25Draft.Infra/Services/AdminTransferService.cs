@@ -64,6 +64,9 @@ public partial class AdminTransferService
         }, ct).ConfigureAwait(false);
     }
 
+    private static string FormatPlayerList(IReadOnlyCollection<Player> players)
+        => players.Count == 0 ? "Sem jogadores" : string.Join(", ", players.Select(p => p.Name));
+
     public async Task SellAsync(string adminToken, Guid fromTeamId, Guid toTeamId, Guid[] playerIds, decimal amount, string? reason, CancellationToken ct)
     {
         if (fromTeamId == Guid.Empty) throw new ArgumentException("Time de origem inválido.", nameof(fromTeamId));
@@ -196,6 +199,12 @@ public partial class AdminTransferService
         var culture = CultureInfo.GetCultureInfo("pt-BR");
 
         var allPlayerGuids = playersFromAIds.Concat(playersFromBIds).ToArray();
+        var orderA = playersFromAIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(x => x.id, x => x.index);
+        var orderB = playersFromBIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(x => x.id, x => x.index);
 
         await RunInExecutionStrategyAsync(async ctoken =>
         {
@@ -218,8 +227,14 @@ public partial class AdminTransferService
             if (players.Count != allPlayerGuids.Length)
                 throw new InvalidOperationException("Um ou mais jogadores informados não foram encontrados.");
 
-            var aEntities = players.Where(p => playersFromAIds.Contains(p.PlayerGuid)).ToList();
-            var bEntities = players.Where(p => playersFromBIds.Contains(p.PlayerGuid)).ToList();
+            var aEntities = players
+                .Where(p => orderA.ContainsKey(p.PlayerGuid))
+                .OrderBy(p => orderA[p.PlayerGuid])
+                .ToList();
+            var bEntities = players
+                .Where(p => orderB.ContainsKey(p.PlayerGuid))
+                .OrderBy(p => orderB[p.PlayerGuid])
+                .ToList();
 
             if (aEntities.Count != playersFromAIds.Length)
                 throw new InvalidOperationException("Jogadores de Time A não encontrados.");
@@ -322,19 +337,35 @@ public partial class AdminTransferService
             else
                 adjustmentDescription = "Ajuste líquido: 0,00.";
 
-            var notes = $"Troca {teamA.TeamName} ({playersFromAIds.Length}) ↔ {teamB.TeamName} ({playersFromBIds.Length}). {adjustmentDescription}";
+            var notes = $"Troca {teamA.TeamName} ({FormatPlayerList(aEntities)}) ↔ {teamB.TeamName} ({FormatPlayerList(bEntities)}). {adjustmentDescription}";
+
+            var sharedTransferId = Guid.NewGuid();
+            var cashAdjustAmount = Math.Abs(normalizedCashAdjust);
+            var hasCashAdjust = cashAdjustAmount > 0m;
+            var amountCarrierPlayerId = hasCashAdjust
+                ? players
+                    .OrderByDescending(p => p.Overall)
+                    .ThenBy(p => p.PlayerId)
+                    .First().PlayerId
+                : (int?)null;
 
             var histories = new List<TransferHistory>();
             foreach (var p in aEntities)
             {
+                var amount = !hasCashAdjust
+                    ? (decimal?)null
+                    : amountCarrierPlayerId == p.PlayerId
+                        ? cashAdjustAmount
+                        : 0m;
+
                 histories.Add(new TransferHistory
                 {
-                    TransferId = Guid.NewGuid(),
+                    TransferId = sharedTransferId,
                     Type = TransferType.TeamTrade,
                     PlayerId = p.PlayerId,
                     FromTeamId = teamAId,
                     ToTeamId = teamBId,
-                    Amount = null,
+                    Amount = amount,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
                     PerformedAtUtc = now
@@ -342,14 +373,20 @@ public partial class AdminTransferService
             }
             foreach (var p in bEntities)
             {
+                var amount = !hasCashAdjust
+                    ? (decimal?)null
+                    : amountCarrierPlayerId == p.PlayerId
+                        ? cashAdjustAmount
+                        : 0m;
+
                 histories.Add(new TransferHistory
                 {
-                    TransferId = Guid.NewGuid(),
+                    TransferId = sharedTransferId,
                     Type = TransferType.TeamTrade,
                     PlayerId = p.PlayerId,
                     FromTeamId = teamBId,
                     ToTeamId = teamAId,
-                    Amount = null,
+                    Amount = amount,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
                     PerformedAtUtc = now
