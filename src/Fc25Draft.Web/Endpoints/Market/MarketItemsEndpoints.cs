@@ -88,6 +88,18 @@ public static class MarketItemsEndpoints
 
             http.Response.Headers["x-server-time-utc"] = DateTime.UtcNow.ToString("O");
 
+            var distinctCycles = cycles
+                .Select(c => c.CycleId)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Select(id => id.ToString("D"))
+                .ToArray();
+
+            if (distinctCycles.Length > 0)
+            {
+                http.Response.Headers["x-market-cycle-ids"] = string.Join(',', distinctCycles);
+            }
+
             return Results.Ok(result);
         }
         catch (OperationCanceledException)

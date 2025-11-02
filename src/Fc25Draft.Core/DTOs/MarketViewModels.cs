@@ -26,6 +26,8 @@ public class MarketItemVm
 {
     public Guid ItemId { get; set; }
 
+    public Guid CycleId { get; set; }
+
     public int PlayerId { get; set; }
 
     public string PlayerName { get; set; } = string.Empty;

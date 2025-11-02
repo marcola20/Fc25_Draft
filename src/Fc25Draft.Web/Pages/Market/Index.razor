@@ -291,7 +291,8 @@ else
     private CancellationTokenSource? _lifetimeCts;
     private CancellationTokenSource? _loadCts;
     private readonly SemaphoreSlim _joinSemaphore = new(1, 1);
-    private Guid? _currentJoinedCycleId;
+    private readonly HashSet<Guid> _currentJoinedCycleIds = new();
+    private readonly HashSet<Guid> _visibleCycleIds = new();
     private bool _hubConnected;
     private Task? _pendingReloadTask;
     private bool _reconnecting;
@@ -361,7 +362,8 @@ else
         }
 
         ActiveCycleId = incomingCycle;
-        _currentJoinedCycleId = null;
+        _currentJoinedCycleIds.Clear();
+        _visibleCycleIds.Clear();
         ResetHistoryState();
         if (_initialized)
         {
@@ -461,7 +463,13 @@ else
             var items = result?.Items ?? Array.Empty<CoreItemVm>();
             var total = result?.Total ?? 0;
             PageData = new PagedResult<CoreItemVm>(items, total, Query.Page, Query.PageSize);
+            UpdateVisibleCycleIds(items);
             ComputeServerOffsetFromClient();
+
+            if (_hubConnected || Hub.IsConnected)
+            {
+                await JoinCycleAsync();
+            }
         }
         catch (MarketCycleUnavailableException ex)
         {
@@ -470,6 +478,11 @@ else
                 ? "Este ciclo ainda não está ativo."
                 : ex.Message;
             PageData = PagedResult<CoreItemVm>.Empty(Query.Page, Query.PageSize);
+            _visibleCycleIds.Clear();
+            if (ActiveCycleId != Guid.Empty)
+            {
+                _visibleCycleIds.Add(ActiveCycleId);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -658,6 +671,35 @@ else
         }
     }
 
+    private void UpdateVisibleCycleIds(IEnumerable<CoreItemVm> items)
+    {
+        _visibleCycleIds.Clear();
+
+        foreach (var item in items)
+        {
+            if (item.CycleId != Guid.Empty)
+            {
+                _visibleCycleIds.Add(item.CycleId);
+            }
+        }
+
+        if (Client.LastCycleIds.Count > 0)
+        {
+            foreach (var cycleId in Client.LastCycleIds)
+            {
+                if (cycleId != Guid.Empty)
+                {
+                    _visibleCycleIds.Add(cycleId);
+                }
+            }
+        }
+
+        if (ActiveCycleId != Guid.Empty)
+        {
+            _visibleCycleIds.Add(ActiveCycleId);
+        }
+    }
+
     private CancellationToken PrepareNewLoadCts()
     {
         _loadCts?.Cancel();
@@ -674,10 +716,12 @@ else
             return false;
         }
 
-        if (ActiveCycleId == Guid.Empty)
+        var targetCycles = GetTargetCycleIds();
+        var cycleLabel = string.Join(", ", targetCycles);
+        if (targetCycles.Count == 0)
         {
             Logger.LogInformation("Skipping hub join because no active cycle is selected.");
-            _currentJoinedCycleId = null;
+            _currentJoinedCycleIds.Clear();
             UpdateRealTimeWarning(null);
             return true;
         }
@@ -691,7 +735,9 @@ else
         }
         catch (OperationCanceledException)
         {
-            Logger.LogDebug("Join semaphore wait canceled for cycle {CycleId}.", ActiveCycleId);
+            Logger.LogDebug(
+                "Join semaphore wait canceled while targeting cycles {CycleIds}.",
+                cycleLabel);
             return false;
         }
         catch (ObjectDisposedException)
@@ -701,53 +747,65 @@ else
 
         try
         {
-            if (_currentJoinedCycleId == ActiveCycleId && _hubConnected && Hub.IsConnected)
-            {
-                Logger.LogDebug("Already joined to cycle {CycleId}; skipping join.", ActiveCycleId);
-                UpdateRealTimeWarning(null);
-                return true;
-            }
-
             var connected = await EnsureHubConnectedAsync();
             if (!connected)
             {
-                Logger.LogWarning("Unable to join cycle {CycleId} because the hub connection is unavailable.", ActiveCycleId);
+                Logger.LogWarning(
+                    "Unable to join cycles {CycleIds} because the hub connection is unavailable.",
+                    cycleLabel);
                 UpdateRealTimeWarning(RealTimeWarningMessage);
                 return false;
             }
 
-            try
+            var success = true;
+
+            foreach (var cycleId in targetCycles)
             {
-                Logger.LogInformation("Joining market cycle {CycleId} on hub.", ActiveCycleId);
-                var joined = await Hub.JoinCycle(ActiveCycleId, _lifetimeCts.Token);
-                if (joined)
+                if (_currentJoinedCycleIds.Contains(cycleId))
                 {
-                    Logger.LogInformation("Successfully joined market cycle {CycleId} on hub.", ActiveCycleId);
-                    _currentJoinedCycleId = ActiveCycleId;
-                    UpdateRealTimeWarning(null);
-                    return true;
+                    continue;
                 }
 
-                Logger.LogWarning("Hub returned false when joining cycle {CycleId}.", ActiveCycleId);
-                UpdateRealTimeWarning(RealTimeWarningMessage);
-                return false;
+                try
+                {
+                    Logger.LogInformation("Joining market cycle {CycleId} on hub.", cycleId);
+                    var joined = await Hub.JoinCycle(cycleId, _lifetimeCts.Token);
+                    if (joined)
+                    {
+                        Logger.LogInformation("Successfully joined market cycle {CycleId} on hub.", cycleId);
+                        _currentJoinedCycleIds.Add(cycleId);
+                    }
+                    else
+                    {
+                        Logger.LogWarning("Hub returned false when joining cycle {CycleId}.", cycleId);
+                        success = false;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogDebug("Join operation canceled for cycle {CycleId}.", cycleId);
+                    return false;
+                }
+                catch (ObjectDisposedException)
+                {
+                    Logger.LogDebug("Join operation aborted because the hub client was disposed.");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Failed to join market cycle {CycleId} on hub.", cycleId);
+                    success = false;
+                }
             }
-            catch (OperationCanceledException)
+
+            var staleCycles = _currentJoinedCycleIds.Where(id => !targetCycles.Contains(id)).ToList();
+            foreach (var cycleId in staleCycles)
             {
-                Logger.LogDebug("Join operation canceled for cycle {CycleId}.", ActiveCycleId);
-                return false;
+                _currentJoinedCycleIds.Remove(cycleId);
             }
-            catch (ObjectDisposedException)
-            {
-                Logger.LogDebug("Join operation aborted because the hub client was disposed.");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to join market cycle {CycleId} on hub.", ActiveCycleId);
-                UpdateRealTimeWarning(RealTimeWarningMessage);
-                return false;
-            }
+
+            UpdateRealTimeWarning(success ? null : RealTimeWarningMessage);
+            return success;
         }
         finally
         {
@@ -756,6 +814,21 @@ else
                 _joinSemaphore.Release();
             }
         }
+    }
+
+    private IReadOnlyCollection<Guid> GetTargetCycleIds()
+    {
+        if (ActiveCycleId != Guid.Empty)
+        {
+            return new[] { ActiveCycleId };
+        }
+
+        if (_visibleCycleIds.Count == 0)
+        {
+            return Array.Empty<Guid>();
+        }
+
+        return _visibleCycleIds.ToArray();
     }
 
     private void StateHasChangedSafe()

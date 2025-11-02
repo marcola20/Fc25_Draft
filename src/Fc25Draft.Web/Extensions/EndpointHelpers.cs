@@ -181,6 +181,7 @@ namespace Fc25Draft.Web.Extensions
         public static MarketItemVm MapToMarketItemVm(MarketItemDto dto) => new MarketItemVm
         {
             ItemId = dto.ItemId,
+            CycleId = dto.CycleId,
             PlayerId = dto.PlayerId,
             PlayerName = dto.PlayerName,
             PositionId = dto.Position.ToPositionId(),

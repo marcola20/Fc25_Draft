@@ -80,6 +80,15 @@ namespace Fc25Draft.Web.Services
                 LastServerTimeUtc = serverUtc;
             }
 
+            if (resp.Headers.TryGetValues("x-market-cycle-ids", out var cycleHeaderValues))
+            {
+                LastCycleIds = ParseCycleIds(cycleHeaderValues);
+            }
+            else
+            {
+                LastCycleIds = Array.Empty<Guid>();
+            }
+
             var json = body ?? string.Empty;
             var trimmedJson = (body ?? string.Empty).Trim();
             if (trimmedJson.Length == 0 || string.Equals(trimmedJson, "null", StringComparison.Ordinal))
@@ -112,6 +121,8 @@ namespace Fc25Draft.Web.Services
         }
 
         public DateTime? LastServerTimeUtc { get; private set; }
+
+        public IReadOnlyList<Guid> LastCycleIds { get; private set; } = Array.Empty<Guid>();
 
         public async Task<MarketClientActionResult<CoreItemVm>> PlaceBidAsync(BidRequest req, CancellationToken ct)
         {
@@ -416,6 +427,7 @@ namespace Fc25Draft.Web.Services
             return new CoreItemVm
             {
                 ItemId = dto.ItemId,
+                CycleId = dto.CycleId,
                 PlayerId = dto.PlayerId,
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
@@ -441,6 +453,7 @@ namespace Fc25Draft.Web.Services
             return new CoreItemVm
             {
                 ItemId = dto.ItemId,
+                CycleId = dto.CycleId,
                 PlayerId = dto.PlayerId,
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
@@ -488,6 +501,33 @@ namespace Fc25Draft.Web.Services
                 cancellationToken: ct);
 
             return dto is null ? null : MapToViewModel(dto);
+        }
+
+        private static IReadOnlyList<Guid> ParseCycleIds(IEnumerable<string> headerValues)
+        {
+            var buffer = new HashSet<Guid>();
+
+            foreach (var value in headerValues)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                var tokens = value.Split(
+                    ',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                foreach (var token in tokens)
+                {
+                    if (Guid.TryParse(token, out var parsed) && parsed != Guid.Empty)
+                    {
+                        buffer.Add(parsed);
+                    }
+                }
+            }
+
+            return buffer.Count == 0 ? Array.Empty<Guid>() : buffer.ToArray();
         }
 
         private static string BuildHistoryUrl(string basePath, MarketHistoryQueryOptions query, bool includePaging)
