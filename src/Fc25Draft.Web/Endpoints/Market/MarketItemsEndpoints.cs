@@ -1,13 +1,15 @@
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Extensions;
+using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Net;
 
 namespace Fc25Draft.Web.Endpoints.Market;
 
@@ -174,7 +176,7 @@ public static class MarketItemsEndpoints
 
             if (cycle.Status == MarketCycleStatus.Draft)
             {
-                throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.");
+                throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.", HttpStatusCode.Conflict);
             }
 
             return new[] { cycle };
@@ -194,7 +196,7 @@ public static class MarketItemsEndpoints
 
         if (fallback.Status == MarketCycleStatus.Draft)
         {
-            throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.");
+            throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.", HttpStatusCode.Conflict);
         }
 
         return new[] { fallback };
