@@ -62,20 +62,25 @@ else
 
                     <fieldset disabled="@(!IsDraftCycle || IsBusy)">
                         <div class="row g-3">
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-count">Quantidade desejada</label>
                                 <InputNumber id="generation-count" class="form-control" @bind-Value="_model!.DesiredCount" />
                                 <ValidationMessage For="@(() => _model!.DesiredCount)" />
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-seed">Semente (opcional)</label>
                                 <InputNumber id="generation-seed" class="form-control" @bind-Value="_model!.Seed" />
                                 <ValidationMessage For="@(() => _model!.Seed)" />
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-max-team">Máx. por time</label>
                                 <InputNumber id="generation-max-team" class="form-control" @bind-Value="_model!.MaxPerTeam" />
                                 <ValidationMessage For="@(() => _model!.MaxPerTeam)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-max-position">Máx. por posição</label>
+                                <InputNumber id="generation-max-position" class="form-control" @bind-Value="_model!.MaxPerPosition" />
+                                <ValidationMessage For="@(() => _model!.MaxPerPosition)" />
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-ovr-min">Overall mínimo</label>

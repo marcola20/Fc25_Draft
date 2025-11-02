@@ -30,6 +30,9 @@ public class MarketItemGenerationFormModel : IValidatableObject
     [Range(0, 50, ErrorMessage = "O máximo por time deve estar entre 0 e 50.")]
     public int? MaxPerTeam { get; set; }
 
+    [Range(0, 50, ErrorMessage = "O máximo por posição deve estar entre 0 e 50.")]
+    public int? MaxPerPosition { get; set; }
+
     public bool ExcludeAlreadyListedInOpenCycles { get; set; } = true;
 
     public bool EnsureUniquePlayerPerCycle { get; set; } = true;
@@ -86,6 +89,7 @@ public class MarketItemGenerationFormModel : IValidatableObject
             MinAge = MinAge,
             MaxAge = MaxAge,
             MaxPerTeam = MaxPerTeam,
+            MaxPerPosition = MaxPerPosition,
             ExcludeAlreadyListedInOpenCycles = ExcludeAlreadyListedInOpenCycles,
             EnsureUniquePlayerPerCycle = EnsureUniquePlayerPerCycle,
             Seed = Seed,

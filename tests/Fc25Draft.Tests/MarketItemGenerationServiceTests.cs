@@ -4,8 +4,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +43,7 @@ public class MarketItemGenerationServiceTests
             PlayerGuid = Guid.NewGuid(),
             Name = "Jogador",
             Overall = 80,
+            Age = 25,
             PositionId = 1
         });
         await context.SaveChangesAsync();
@@ -46,6 +51,7 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             1,
+            null,
             null,
             null,
             null,
@@ -87,6 +93,7 @@ public class MarketItemGenerationServiceTests
             PlayerGuid = Guid.NewGuid(),
             Name = "Elegível",
             Overall = 78,
+            Age = 25,
             PositionId = 1
         });
         await context.SaveChangesAsync();
@@ -94,6 +101,7 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             2,
+            null,
             null,
             null,
             null,
@@ -138,6 +146,7 @@ public class MarketItemGenerationServiceTests
                 PlayerGuid = Guid.NewGuid(),
                 Name = "Primeiro",
                 Overall = 81,
+                Age = 25,
                 PositionId = 1
             },
             new Player
@@ -146,6 +155,7 @@ public class MarketItemGenerationServiceTests
                 PlayerGuid = Guid.NewGuid(),
                 Name = "Segundo",
                 Overall = 82,
+                Age = 25,
                 PositionId = 1
             });
         await context.SaveChangesAsync();
@@ -153,6 +163,7 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             2,
+            null,
             null,
             null,
             null,
@@ -207,6 +218,7 @@ public class MarketItemGenerationServiceTests
                 PlayerGuid = Guid.NewGuid(),
                 Name = "Jogador A1",
                 Overall = 85,
+                Age = 25,
                 PositionId = 1,
                 CurrentTeamId = teamA
             },
@@ -216,6 +228,7 @@ public class MarketItemGenerationServiceTests
                 PlayerGuid = Guid.NewGuid(),
                 Name = "Jogador A2",
                 Overall = 82,
+                Age = 25,
                 PositionId = 1,
                 CurrentTeamId = teamA
             },
@@ -225,6 +238,7 @@ public class MarketItemGenerationServiceTests
                 PlayerGuid = Guid.NewGuid(),
                 Name = "Jogador B1",
                 Overall = 80,
+                Age = 25,
                 PositionId = 1,
                 CurrentTeamId = teamB
             });
@@ -239,6 +253,7 @@ public class MarketItemGenerationServiceTests
             null,
             null,
             1,
+            null,
             true,
             true,
             888,
@@ -289,6 +304,7 @@ public class MarketItemGenerationServiceTests
             PlayerGuid = Guid.NewGuid(),
             Name = "Disponível",
             Overall = 83,
+            Age = 25,
             PositionId = 1
         };
 
@@ -298,6 +314,7 @@ public class MarketItemGenerationServiceTests
             PlayerGuid = Guid.NewGuid(),
             Name = "Escalado",
             Overall = 84,
+            Age = 25,
             PositionId = 1
         };
 
@@ -321,6 +338,7 @@ public class MarketItemGenerationServiceTests
             null,
             null,
             null,
+            null,
             true,
             true,
             321,
@@ -333,6 +351,169 @@ public class MarketItemGenerationServiceTests
         Assert.Equal(1, result.CreatedCount);
         Assert.Contains(result.Items, item => item.PlayerId == availablePlayer.PlayerId);
         Assert.DoesNotContain(result.Items, item => item.PlayerId == rosteredPlayer.PlayerId);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_RespectsMaxPerPosition()
+    {
+        await using var context = CreateDbContext();
+        await SeedPositionAsync(context);
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Draft",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddHours(6),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        context.Players.AddRange(
+            new Player
+            {
+                PlayerId = 80,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Atacante 1",
+                Overall = 90,
+                Age = 25,
+                PositionId = 1
+            },
+            new Player
+            {
+                PlayerId = 81,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Atacante 2",
+                Overall = 88,
+                Age = 25,
+                PositionId = 1
+            },
+            new Player
+            {
+                PlayerId = 82,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Meia",
+                Overall = 87,
+                Age = 25,
+                PositionId = 2
+            },
+            new Player
+            {
+                PlayerId = 83,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Zagueiro",
+                Overall = 86,
+                Age = 25,
+                PositionId = 3
+            });
+
+        await context.SaveChangesAsync();
+
+        var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
+        var options = new MarketItemGenerationOptions(
+            3,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            true,
+            true,
+            77,
+            null,
+            null,
+            true);
+
+        var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
+
+        Assert.Equal(3, result.CreatedCount);
+        var byPosition = result.Items.GroupBy(item => item.PositionId).ToDictionary(group => group.Key, group => group.Count());
+        Assert.True(byPosition.GetValueOrDefault(1) <= 1);
+        Assert.True(byPosition.GetValueOrDefault(2) <= 1);
+        Assert.True(byPosition.GetValueOrDefault(3) <= 1);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_AppliesScarcityMultiplier()
+    {
+        await using var context = CreateDbContext();
+        await SeedPositionAsync(context);
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Draft",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddHours(4),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        context.Players.AddRange(
+            new Player
+            {
+                PlayerId = 90,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Topo",
+                Overall = 90,
+                Age = 25,
+                PositionId = 1
+            },
+            new Player
+            {
+                PlayerId = 91,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Meio",
+                Overall = 85,
+                Age = 25,
+                PositionId = 1
+            },
+            new Player
+            {
+                PlayerId = 92,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Base",
+                Overall = 80,
+                Age = 25,
+                PositionId = 1
+            });
+
+        await context.SaveChangesAsync();
+
+        var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
+        var options = new MarketItemGenerationOptions(
+            3,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            true,
+            123,
+            null,
+            null,
+            true);
+
+        var preview = await service.PreviewAsync(cycleId, options, CancellationToken.None);
+
+        Assert.Equal(3, preview.Items.Count);
+        var basePrices = preview.Items.ToDictionary(item => item.PlayerId, item => item.BasePrice);
+        var weight = MarketWeightResolver.GetByPositionId(1);
+
+        Assert.Equal(Math.Round(weight * 1.5m * 90, 2), basePrices[90]);
+        Assert.Equal(Math.Round(weight * 1.4m * 85, 2), basePrices[91]);
+        Assert.Equal(Math.Round(weight * 1.3m * 80, 2), basePrices[92]);
     }
 
     [Fact]
@@ -394,6 +575,7 @@ public class MarketItemGenerationServiceTests
             24,
             28,
             null,
+            null,
             true,
             true,
             42,
@@ -420,16 +602,52 @@ public class MarketItemGenerationServiceTests
     {
         if (!await context.Positions.AnyAsync())
         {
-            context.Positions.Add(new Position { PositionId = 1, PositionName = "Atacante" });
+            context.Positions.AddRange(
+                new Position { PositionId = 1, PositionName = "Atacante" },
+                new Position { PositionId = 2, PositionName = "Meia" },
+                new Position { PositionId = 3, PositionName = "Zagueiro" });
             await context.SaveChangesAsync();
         }
     }
 
     private sealed class FakePricingService : IPricingService
     {
+        public PricingResult Calculate(decimal positionWeight, int overall, int age)
+        {
+            var basePrice = Math.Round(positionWeight * overall, 2);
+            return new PricingResult(basePrice, basePrice * 0.1m, basePrice * 1.5m);
+        }
+
+        public Task<PricingResult> CalculateForPositionAsync(string? positionCode, short? positionId, int age, int overall, CancellationToken ct)
+        {
+            return Task.FromResult(Calculate(1m, overall, age));
+        }
+
         public Task<PricingResult> CalculateForPlayerAsync(int playerId, CancellationToken ct = default)
         {
-            return Task.FromResult(new PricingResult(100m + playerId, 200m + playerId, 10m));
+            return Task.FromResult(new PricingResult(100m + playerId, 10m, 200m + playerId));
+        }
+
+        public decimal RoundUp(decimal value, decimal step)
+        {
+            if (step <= 0)
+            {
+                return 0m;
+            }
+
+            var factor = Math.Ceiling(value / step);
+            return factor * step;
+        }
+
+        public decimal Round(decimal value, decimal step)
+        {
+            if (step <= 0)
+            {
+                return 0m;
+            }
+
+            var factor = Math.Round(value / step, MidpointRounding.AwayFromZero);
+            return factor * step;
         }
     }
 }

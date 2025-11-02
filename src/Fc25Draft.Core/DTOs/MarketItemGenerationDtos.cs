@@ -11,6 +11,7 @@ public record MarketItemGenerationOptions(
     int? MinAge,
     int? MaxAge,
     int? MaxPerTeam,
+    int? MaxPerPosition,
     bool ExcludeAlreadyListedInOpenCycles,
     bool EnsureUniquePlayerPerCycle,
     int? Seed,

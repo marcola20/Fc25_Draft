@@ -26,6 +26,9 @@ public class MarketItemGenerationRequestDto
     [Range(0, 50)]
     public int? MaxPerTeam { get; set; }
 
+    [Range(0, 50)]
+    public int? MaxPerPosition { get; set; }
+
     public bool ExcludeAlreadyListedInOpenCycles { get; set; } = true;
 
     public bool EnsureUniquePlayerPerCycle { get; set; } = true;

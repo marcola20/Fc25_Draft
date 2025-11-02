@@ -6,6 +6,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +31,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     public async Task<MarketItemGenerationPreview> PreviewAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
     {
         var context = await PrepareAsync(cycleId, options, ct).ConfigureAwait(false);
-        var items = await BuildItemsAsync(context.SelectedPlayers, ct).ConfigureAwait(false);
+        var items = await BuildItemsAsync(context, ct).ConfigureAwait(false);
 
         return new MarketItemGenerationPreview(
             context.CycleId,
@@ -75,7 +76,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                         continue;
                     }
 
-                    var pricing = await _pricingService.CalculateForPlayerAsync(playerId, ct).ConfigureAwait(false);
+                    var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
 
                     var entity = new MarketItem
                     {
@@ -100,7 +101,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                         selected.Candidate.PositionId,
                         selected.Candidate.PositionName,
                         selected.Candidate.Overall,
-                        selected.Candidate.Age,
+                        selected.Candidate.Age ?? age,
                         selected.Candidate.TeamId,
                         selected.Candidate.TeamName,
                         pricing.BasePrice,
@@ -224,6 +225,11 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             throw new MarketValidationException("O limite por time deve ser maior ou igual a zero.");
         }
 
+        if (options.MaxPerPosition.HasValue && options.MaxPerPosition.Value < 0)
+        {
+            throw new MarketValidationException("O limite por posição deve ser maior ou igual a zero.");
+        }
+
         var cycle = await _dbContext.MarketCycles
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
@@ -244,7 +250,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             throw new MarketValidationException("Nenhum jogador elegível para os filtros informados.");
         }
 
-        var maxSelectable = CalculateMaxSelectable(eligiblePlayers, options.MaxPerTeam);
+        var maxSelectable = CalculateMaxSelectable(eligiblePlayers, options.MaxPerTeam, options.MaxPerPosition);
         if (maxSelectable == 0)
         {
             throw new MarketValidationException("Nenhum jogador atende às regras de geração.");
@@ -258,12 +264,16 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var selectedCandidates = SelectCandidates(eligiblePlayers, options, seed);
         if (selectedCandidates.Count < options.DesiredCount)
         {
-            throw new MarketValidationException("Não foi possível selecionar jogadores suficientes respeitando o limite por time.");
+            throw new MarketValidationException("Não foi possível selecionar jogadores suficientes respeitando os limites configurados.");
         }
 
         var expirations = BuildExpirationSchedule(selectedCandidates.Count, cycle, options, seed);
+        var multipliers = CalculateScarcityMultipliers(eligiblePlayers, selectedCandidates);
         var selected = selectedCandidates
-            .Select((candidate, index) => new SelectedCandidate(candidate, expirations[index]))
+            .Select((candidate, index) => new SelectedCandidate(
+                candidate,
+                expirations[index],
+                multipliers.TryGetValue(candidate.PlayerId, out var multiplier) ? multiplier : 1m))
             .ToList();
 
         return new GenerationContext(
@@ -385,6 +395,9 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var perTeam = new Dictionary<Guid, int>();
         var limit = options.MaxPerTeam.GetValueOrDefault();
         var hasLimit = options.MaxPerTeam.HasValue && options.MaxPerTeam.Value > 0;
+        var perPosition = new Dictionary<short, int>();
+        var positionLimit = options.MaxPerPosition.GetValueOrDefault();
+        var hasPositionLimit = options.MaxPerPosition.HasValue && options.MaxPerPosition.Value > 0;
 
         foreach (var candidate in pool)
         {
@@ -405,10 +418,99 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                 perTeam[teamId] = count + 1;
             }
 
+            if (hasPositionLimit)
+            {
+                perPosition.TryGetValue(candidate.PositionId, out var positionCount);
+                if (positionCount >= positionLimit)
+                {
+                    continue;
+                }
+
+                perPosition[candidate.PositionId] = positionCount + 1;
+            }
+
             selected.Add(candidate);
         }
 
         return selected;
+    }
+
+    private static IReadOnlyDictionary<int, decimal> CalculateScarcityMultipliers(
+        IReadOnlyList<MarketItemGenerationCandidate> pool,
+        IReadOnlyList<MarketItemGenerationCandidate> selected)
+    {
+        var result = new Dictionary<int, decimal>(selected.Count);
+        if (selected.Count == 0)
+        {
+            return result;
+        }
+
+        var groupedByPosition = pool
+            .GroupBy(player => player.PositionId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(candidate => candidate.Overall)
+                    .OrderBy(value => value)
+                    .ToArray());
+
+        var scarcity = new List<(int PlayerId, int Count)>(selected.Count);
+        foreach (var candidate in selected)
+        {
+            if (!groupedByPosition.TryGetValue(candidate.PositionId, out var overalls) || overalls.Length == 0)
+            {
+                scarcity.Add((candidate.PlayerId, 0));
+                continue;
+            }
+
+            var count = CountGreaterOrEqual(overalls, candidate.Overall);
+            scarcity.Add((candidate.PlayerId, count));
+        }
+
+        var multipliers = new[] { 1.5m, 1.4m, 1.3m, 1.1m, 1.0m, 0.9m };
+        var ordered = scarcity
+            .OrderBy(entry => entry.Count)
+            .ThenBy(entry => entry.PlayerId)
+            .ToList();
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var multiplier = i < multipliers.Length ? multipliers[i] : multipliers[^1];
+            result[ordered[i].PlayerId] = multiplier;
+        }
+
+        return result;
+    }
+
+    private static int CountGreaterOrEqual(int[] sortedValues, int threshold)
+    {
+        if (sortedValues.Length == 0)
+        {
+            return 0;
+        }
+
+        var index = LowerBound(sortedValues, threshold);
+        return sortedValues.Length - index;
+    }
+
+    private static int LowerBound(int[] values, int threshold)
+    {
+        var left = 0;
+        var right = values.Length;
+        while (left < right)
+        {
+            var mid = left + ((right - left) / 2);
+            if (values[mid] < threshold)
+            {
+                left = mid + 1;
+            }
+            else
+            {
+                right = mid;
+            }
+        }
+
+        return left;
     }
 
     private IReadOnlyList<DateTime> BuildExpirationSchedule(int count, MarketCycle cycle, MarketItemGenerationOptions options, int seed)
@@ -481,49 +583,88 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         return expirations;
     }
 
-    private async Task<IReadOnlyList<MarketItemGenerationItem>> BuildItemsAsync(IReadOnlyList<SelectedCandidate> selected, CancellationToken ct)
+    private async Task<IReadOnlyList<MarketItemGenerationItem>> BuildItemsAsync(GenerationContext context, CancellationToken ct)
     {
-        var items = new List<MarketItemGenerationItem>(selected.Count);
-        foreach (var candidate in selected)
+        var items = new List<MarketItemGenerationItem>(context.SelectedPlayers.Count);
+        foreach (var selected in context.SelectedPlayers)
         {
-            var pricing = await _pricingService.CalculateForPlayerAsync(candidate.Candidate.PlayerId, ct).ConfigureAwait(false);
+            var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
             items.Add(new MarketItemGenerationItem(
-                candidate.Candidate.PlayerId,
-                candidate.Candidate.PlayerName,
-                candidate.Candidate.PositionId,
-                candidate.Candidate.PositionName,
-                candidate.Candidate.Overall,
-                candidate.Candidate.Age,
-                candidate.Candidate.TeamId,
-                candidate.Candidate.TeamName,
+                selected.Candidate.PlayerId,
+                selected.Candidate.PlayerName,
+                selected.Candidate.PositionId,
+                selected.Candidate.PositionName,
+                selected.Candidate.Overall,
+                selected.Candidate.Age ?? age,
+                selected.Candidate.TeamId,
+                selected.Candidate.TeamName,
                 pricing.BasePrice,
                 pricing.BuyNowPrice,
                 pricing.MinIncrement,
-                candidate.ExpiresAtUtc));
+                selected.ExpiresAtUtc));
         }
 
         return items;
     }
 
-    private static int CalculateMaxSelectable(IReadOnlyList<MarketItemGenerationCandidate> eligible, int? maxPerTeam)
+    private async Task<(PricingResult Pricing, int Age)> CalculatePricingAsync(SelectedCandidate selected, CancellationToken ct)
     {
-        if (!maxPerTeam.HasValue || maxPerTeam.Value <= 0)
+        var age = selected.Candidate.Age;
+        if (!age.HasValue)
         {
-            return eligible.Count;
+            age = await _dbContext.Players
+                .AsNoTracking()
+                .Where(player => player.PlayerId == selected.Candidate.PlayerId)
+                .Select(player => player.Age)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
         }
 
-        var limit = maxPerTeam.Value;
-        var total = 0;
-        foreach (var group in eligible.GroupBy(p => p.TeamId))
+        if (!age.HasValue)
         {
-            if (group.Key.HasValue)
+            throw new InvalidOperationException($"Jogador {selected.Candidate.PlayerName} não possui idade cadastrada.");
+        }
+
+        var weight = MarketWeightResolver.GetByPositionId(selected.Candidate.PositionId);
+        var multiplier = selected.PriceMultiplier <= 0 ? 1m : selected.PriceMultiplier;
+        var pricing = _pricingService.Calculate(weight * multiplier, selected.Candidate.Overall, age.Value);
+        return (pricing, age.Value);
+    }
+
+    private static int CalculateMaxSelectable(
+        IReadOnlyList<MarketItemGenerationCandidate> eligible,
+        int? maxPerTeam,
+        int? maxPerPosition)
+    {
+        var total = eligible.Count;
+
+        if (maxPerTeam.HasValue && maxPerTeam.Value > 0)
+        {
+            var limit = maxPerTeam.Value;
+            var teamTotal = 0;
+            foreach (var group in eligible.GroupBy(p => p.TeamId))
             {
-                total += Math.Min(group.Count(), limit);
+                if (group.Key.HasValue)
+                {
+                    teamTotal += Math.Min(group.Count(), limit);
+                }
+                else
+                {
+                    teamTotal += group.Count();
+                }
             }
-            else
-            {
-                total += group.Count();
-            }
+
+            total = Math.Min(total, teamTotal);
+        }
+
+        if (maxPerPosition.HasValue && maxPerPosition.Value > 0)
+        {
+            var positionLimit = maxPerPosition.Value;
+            var positionTotal = eligible
+                .GroupBy(p => p.PositionId)
+                .Sum(group => Math.Min(group.Count(), positionLimit));
+
+            total = Math.Min(total, positionTotal);
         }
 
         return total;
@@ -548,7 +689,10 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
         };
 
-    private sealed record SelectedCandidate(MarketItemGenerationCandidate Candidate, DateTime ExpiresAtUtc);
+    private sealed record SelectedCandidate(
+        MarketItemGenerationCandidate Candidate,
+        DateTime ExpiresAtUtc,
+        decimal PriceMultiplier);
 
     private sealed record GenerationContext(
         Guid CycleId,

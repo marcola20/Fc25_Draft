@@ -273,6 +273,7 @@ public static class MarketCycleEndpoints
             request.MinAge,
             request.MaxAge,
             request.MaxPerTeam,
+            request.MaxPerPosition,
             request.ExcludeAlreadyListedInOpenCycles,
             request.EnsureUniquePlayerPerCycle,
             request.Seed,
