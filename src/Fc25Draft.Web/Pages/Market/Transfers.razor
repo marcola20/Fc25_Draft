@@ -31,7 +31,6 @@
         <div class="col-12 col-md-3">
             <label class="form-label" for="filter-player">Jogador (GUID)</label>
             <InputText id="filter-player" class="form-control" @bind-Value="_playerIdText" placeholder="Cole o identificador do jogador" />
-            <div class="form-text">Use o identificador único do jogador para filtrar.</div>
         </div>
         <div class="col-12 col-md-3">
             <label class="form-label" for="filter-from">Período - início</label>
@@ -120,7 +119,7 @@ else
             @foreach (var page in VisiblePages)
             {
                 <li class="page-item @(page == _currentPage ? "active" : null)">
-                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)">@page</button>
+                    <button class="page-link" type="button" @onclick="async () => await GoToPageAsync(page)">@(page)</button>
                 </li>
             }
             <li class="page-item @(_currentPage >= TotalPages ? "disabled" : null)">
@@ -199,13 +198,13 @@ else
     {
         if (!TryParsePlayerId())
         {
-            Toasts.Error("Informe um GUID válido para o jogador ou deixe o campo vazio.");
+            Toasts.ShowError("Informe um GUID válido para o jogador ou deixe o campo vazio.");
             return;
         }
 
         if (!TryParseTeamId())
         {
-            Toasts.Error("Selecione um time válido.");
+            Toasts.ShowError("Selecione um time válido.");
             return;
         }
 
@@ -281,7 +280,7 @@ else
         {
             Console.Error.WriteLine(ex);
             _errorMessage = "Não foi possível carregar o histórico de transferências. Tente novamente.";
-            Toasts.Error(_errorMessage);
+            Toasts.ShowError(_errorMessage);
         }
         finally
         {

@@ -10,6 +10,7 @@
           <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />
         </ItemGroup>
         <ItemGroup>
+          <PackageReference Include="Blazored.Toast" Version="4.2.1" />
           <PackageReference Include="ClosedXML" Version="0.105.0" />
           <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.6" />
           <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.6" />

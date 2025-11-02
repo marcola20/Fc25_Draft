@@ -8,6 +8,7 @@
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Components.Forms
+@using Blazored.Toast.Services
 @implements IDisposable
 
 @if (Cycle is null)
@@ -123,16 +124,16 @@ else
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Modo de expiração</label>
-                                <div class="d-flex flex-column flex-md-row gap-2">
+                                <InputRadioGroup @bind-Value="_model!.AutoSpreadExpirationsAcrossCycle" class="d-flex flex-column flex-md-row gap-2">
                                     <label class="form-check form-check-inline">
-                                        <InputRadio @bind-Value="_model!.AutoSpreadExpirationsAcrossCycle" Value="true" class="form-check-input" />
+                                        <InputRadio Value="true" class="form-check-input" />
                                         <span class="form-check-label">Automático (espalhar pelo ciclo)</span>
                                     </label>
                                     <label class="form-check form-check-inline">
-                                        <InputRadio @bind-Value="_model!.AutoSpreadExpirationsAcrossCycle" Value="false" class="form-check-input" />
+                                        <InputRadio Value="false" class="form-check-input" />
                                         <span class="form-check-label">Manual (definir duração)</span>
                                     </label>
-                                </div>
+                                </InputRadioGroup>
                             </div>
                             @if (!_model!.AutoSpreadExpirationsAcrossCycle)
                             {
@@ -312,11 +313,14 @@ else
 
 @code {
     [Parameter] public MarketCycleDto? Cycle { get; set; }
+
+    private const bool __arg0 = true;
+
     [Parameter] public EventCallback<MarketCycleDto?> CycleUpdated { get; set; }
 
     [Inject] public IMarketItemGenerationClient GenerationClient { get; set; } = default!;
     [Inject] public IPositionService PositionService { get; set; } = default!;
-    [Inject] public ToastService Toasts { get; set; } = default!;
+    [Inject] public Blazored.Toast.Services.ToastService Toasts { get; set; } = default!;
 
     private MarketItemGenerationFormModel? _model;
     private EditContext? _editContext;
@@ -365,9 +369,9 @@ else
         try
         {
             _isLoadingPositions = true;
-            var positions = await PositionService.GetAllAsync(CancellationToken.None).ConfigureAwait(false);
+            var positions = await PositionService.GetAllAsync().ConfigureAwait(false);
             _positionOptions.Clear();
-            _positionOptions.AddRange(positions.Select(p => new PositionOption(p.PositionId, p.PositionName)));
+            _positionOptions.AddRange(positions.Select(p => new PositionOption(p.PositionId, p.Name)));
         }
         catch (Exception ex)
         {
@@ -437,7 +441,7 @@ else
         catch (Exception ex)
         {
             Console.Error.WriteLine(ex);
-            Toasts.Error("Não foi possível pré-visualizar a geração de itens.");
+            Toasts.ShowError("Não foi possível pré-visualizar a geração de itens.");
         }
         finally
         {
@@ -456,7 +460,7 @@ else
         if (!_editContext.Validate())
         {
             _showValidationSummary = true;
-            Toasts.Error("Corrija os campos destacados antes de gerar os itens.");
+            Toasts.ShowError("Corrija os campos destacados antes de gerar os itens.");
             return;
         }
 
@@ -471,7 +475,7 @@ else
             var request = _model.ToRequestDto();
             var result = await GenerationClient.GenerateAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
             _resultSummary = result;
-            Toasts.Success($"{result.CreatedCount} itens gerados com sucesso.");
+            Toasts.ShowSuccess($"{result.CreatedCount} itens gerados com sucesso.");
             await RefreshCycleAsync();
         }
         catch (OperationCanceledException)
@@ -480,7 +484,7 @@ else
         catch (Exception ex)
         {
             Console.Error.WriteLine(ex);
-            Toasts.Error("Falha ao gerar os itens. Tente novamente.");
+            Toasts.ShowError("Falha ao gerar os itens. Tente novamente.");
         }
         finally
         {
@@ -509,7 +513,7 @@ else
         try
         {
             var response = await GenerationClient.DeleteDraftsAsync(Cycle.CycleId, _cts.Token).ConfigureAwait(false);
-            Toasts.Success(response.RemovedCount > 0
+            Toasts.ShowSuccess(response.RemovedCount > 0
                 ? $"{response.RemovedCount} itens em rascunho foram removidos."
                 : "Nenhum item em rascunho foi encontrado.");
             await RefreshCycleAsync();
@@ -520,7 +524,7 @@ else
         catch (Exception ex)
         {
             Console.Error.WriteLine(ex);
-            Toasts.Error("Não foi possível limpar os itens do ciclo.");
+            Toasts.ShowError("Não foi possível limpar os itens do ciclo.");
         }
         finally
         {

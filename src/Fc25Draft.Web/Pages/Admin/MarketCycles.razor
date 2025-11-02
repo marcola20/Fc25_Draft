@@ -687,17 +687,18 @@ else
         }
     }
 
-    private async Task OnGenerationCycleUpdated(Guid cycleId)
+    private async Task OnGenerationCycleUpdated()
     {
         await LoadAsync(_currentPage);
 
+        if (_generationCycle is null)
+            return;
+
         try
         {
-            var updated = await MarketCycleClient.GetByIdAsync(cycleId);
+            var updated = await MarketCycleClient.GetByIdAsync(_generationCycle.CycleId);
             if (updated is not null)
-            {
                 _generationCycle = updated;
-            }
         }
         catch (Exception ex)
         {
