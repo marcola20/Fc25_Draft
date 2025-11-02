@@ -467,7 +467,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             scarcity.Add((candidate.PlayerId, count));
         }
 
-        var multipliers = new[] { 1.5m, 1.4m, 1.3m, 1.1m, 1.0m, 0.9m };
+        var multipliers = new[] { 1.25m, 1.2m, 1.1m, 1.05m, 1.0m, 0.95m };
         var ordered = scarcity
             .OrderBy(entry => entry.Count)
             .ThenBy(entry => entry.PlayerId)

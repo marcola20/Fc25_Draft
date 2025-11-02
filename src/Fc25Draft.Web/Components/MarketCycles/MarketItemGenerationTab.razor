@@ -256,7 +256,6 @@ else
                                         <th scope="col">Posição</th>
                                         <th scope="col">Idade</th>
                                         <th scope="col">Overall</th>
-                                        <th scope="col">Time atual</th>
                                         <th scope="col">Preço base</th>
                                         <th scope="col">Compra imediata</th>
                                         <th scope="col">Expira em</th>
@@ -270,7 +269,6 @@ else
                                             <td>@item.PositionName</td>
                                             <td>@(item.Age?.ToString() ?? "-")</td>
                                             <td>@item.Overall</td>
-                                            <td>@FormatTeam(item.TeamName)</td>
                                             <td>@FormatCurrency(item.BasePrice)</td>
                                             <td>@FormatCurrency(item.BuyNowPrice)</td>
                                             <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
