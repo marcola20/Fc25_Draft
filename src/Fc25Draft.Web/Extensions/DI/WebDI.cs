@@ -17,6 +17,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketApiClient>();
             services.AddScoped<TeamAccessService>();
             services.AddScoped<MarketClient>();
+            services.AddScoped<TransfersClient>();
             services.AddScoped<MarketHubClient>();
             return services;
         }

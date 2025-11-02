@@ -13,6 +13,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var transfersApi = api.MapGroup("/transfers");
 
             transfersApi.MapGet("/history", HandleHistoryAsync).AllowAnonymous();
+            transfersApi.MapGet("/{transferId:guid}", HandleGetByIdAsync).AllowAnonymous();
 
             return api;
         }
@@ -38,13 +39,30 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }
         }
 
+        private static async Task<IResult> HandleGetByIdAsync(
+            Guid transferId,
+            ITransfersQueryService transfersQueryService,
+            CancellationToken ct)
+        {
+            if (transferId == Guid.Empty)
+            {
+                return Results.BadRequest(new { message = "Identificador de transferência inválido." });
+            }
+
+            var transfer = await transfersQueryService.GetByIdAsync(transferId, ct).ConfigureAwait(false);
+            return transfer is null
+                ? Results.NotFound(new { message = "Transferência não encontrada." })
+                : Results.Ok(transfer);
+        }
+
         private sealed record TransfersHistoryQueryParameters
         {
             [FromQuery(Name = "teamId")] public string? TeamIdRaw { get; init; }
             [FromQuery(Name = "playerId")] public string? PlayerIdRaw { get; init; }
             [FromQuery(Name = "type")] public string? TypeRaw { get; init; }
-            [FromQuery(Name = "from")] public string? FromUtcRaw { get; init; }
-            [FromQuery(Name = "to")] public string? ToUtcRaw { get; init; }
+            [FromQuery(Name = "dateFromUtc")] public string? FromUtcRaw { get; init; }
+            [FromQuery(Name = "dateToUtc")] public string? ToUtcRaw { get; init; }
+            [FromQuery(Name = "q")] public string? NotesQuery { get; init; }
             [FromQuery(Name = "page")] public string? PageRaw { get; init; }
             [FromQuery(Name = "pageSize")] public string? PageSizeRaw { get; init; }
 
@@ -92,6 +110,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     Type = type,
                     FromUtc = fromUtc,
                     ToUtc = toUtc,
+                    NotesQuery = string.IsNullOrWhiteSpace(NotesQuery) ? null : NotesQuery.Trim(),
                     Page = sanitizedPage,
                     PageSize = sanitizedPageSize
                 };

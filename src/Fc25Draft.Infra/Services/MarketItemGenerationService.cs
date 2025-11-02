@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using Fc25Draft.Core.DTOs;
@@ -29,14 +30,17 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     public async Task<MarketItemGenerationPreview> PreviewAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
     {
         var context = await PrepareAsync(cycleId, options, ct).ConfigureAwait(false);
-        var items = await BuildItemsAsync(context.SelectedPlayers, context.ExpiresAtUtc, ct).ConfigureAwait(false);
+        var items = await BuildItemsAsync(context.SelectedPlayers, ct).ConfigureAwait(false);
 
         return new MarketItemGenerationPreview(
             context.CycleId,
             options.DesiredCount,
             context.EligibleCount,
             context.Seed,
-            items);
+            items,
+            Array.Empty<MarketItemGenerationSkip>(),
+            context.FirstExpirationUtc,
+            context.LastExpirationUtc);
     }
 
     public async Task<MarketItemGenerationResult> GenerateAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
@@ -45,81 +49,110 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
         return await strategy.ExecuteAsync(async () =>
         {
-            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
             try
             {
-                var context = await PrepareAsync(cycleId, options, ct);
+                var context = await PrepareAsync(cycleId, options, ct).ConfigureAwait(false);
 
-                var existingPlayers = await _dbContext.MarketItems
+                var existingPlayerIds = await _dbContext.MarketItems
+                    .AsNoTracking()
                     .Where(i => i.CycleId == cycleId)
                     .Select(i => i.PlayerId)
-                    .ToListAsync(ct);
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false);
 
-                var existingSet = new HashSet<int>(existingPlayers);
-                var createdItems = new List<MarketItemGenerationItem>();
-                var skipped = 0;
+                var existingSet = new HashSet<int>(existingPlayerIds);
+                var createdItems = new List<MarketItemGenerationItem>(context.SelectedPlayers.Count);
+                var skipped = new List<MarketItemGenerationSkip>();
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-                foreach (var candidate in context.SelectedPlayers)
+                foreach (var selected in context.SelectedPlayers)
                 {
-                    if (existingSet.Contains(candidate.PlayerId))
+                    var playerId = selected.Candidate.PlayerId;
+                    if (existingSet.Contains(playerId))
                     {
-                        skipped++;
+                        skipped.Add(new MarketItemGenerationSkip(playerId, selected.Candidate.PlayerName, "Jogador já listado no ciclo."));
                         continue;
                     }
 
-                    var pricing = await _pricingService.CalculateForPlayerAsync(candidate.PlayerId, ct);
+                    var pricing = await _pricingService.CalculateForPlayerAsync(playerId, ct).ConfigureAwait(false);
 
-                    var item = new MarketItem
+                    var entity = new MarketItem
                     {
                         ItemId = Guid.NewGuid(),
                         CycleId = cycleId,
-                        PlayerId = candidate.PlayerId,
+                        PlayerId = playerId,
                         BasePrice = pricing.BasePrice,
                         BuyNowPrice = pricing.BuyNowPrice,
                         MinIncrement = pricing.MinIncrement,
-                        ExpiresAtUtc = context.ExpiresAtUtc,
+                        ExpiresAtUtc = selected.ExpiresAtUtc,
                         Status = MarketItemStatus.Draft,
                         CreatedAtUtc = now,
                         LastUpdateUtc = now
                     };
 
-                    await _dbContext.MarketItems.AddAsync(item, ct);
-                    existingSet.Add(candidate.PlayerId);
+                    await _dbContext.MarketItems.AddAsync(entity, ct).ConfigureAwait(false);
+                    existingSet.Add(playerId);
 
                     createdItems.Add(new MarketItemGenerationItem(
-                        candidate.PlayerId,
-                        candidate.PlayerName,
-                        candidate.PositionId,
-                        candidate.PositionName,
-                        candidate.Overall,
-                        candidate.Age,
+                        playerId,
+                        selected.Candidate.PlayerName,
+                        selected.Candidate.PositionId,
+                        selected.Candidate.PositionName,
+                        selected.Candidate.Overall,
+                        selected.Candidate.Age,
+                        selected.Candidate.TeamId,
+                        selected.Candidate.TeamName,
                         pricing.BasePrice,
                         pricing.BuyNowPrice,
                         pricing.MinIncrement,
-                        context.ExpiresAtUtc));
+                        selected.ExpiresAtUtc));
                 }
 
                 if (createdItems.Count > 0)
                 {
                     try
                     {
-                        await _dbContext.SaveChangesAsync(ct);
+                        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
                     }
                     catch (DbUpdateException)
                     {
-                        var already = await _dbContext.MarketItems
-                            .Where(i => i.CycleId == cycleId)
+                        var pendingIds = createdItems.Select(i => i.PlayerId).ToArray();
+                        var duplicatedPlayers = await _dbContext.MarketItems
+                            .AsNoTracking()
+                            .Where(i => i.CycleId == cycleId && pendingIds.Contains(i.PlayerId))
                             .Select(i => i.PlayerId)
-                            .ToListAsync(ct);
+                            .ToListAsync(ct)
+                            .ConfigureAwait(false);
 
-                        var alreadySet = new HashSet<int>(already);
-                        skipped += createdItems.Count(ci => alreadySet.Contains(ci.PlayerId));
-                        createdItems.RemoveAll(ci => alreadySet.Contains(ci.PlayerId));
+                        if (duplicatedPlayers.Count > 0)
+                        {
+                            foreach (var entry in _dbContext.ChangeTracker.Entries<MarketItem>()
+                                         .Where(e => e.State == EntityState.Added && duplicatedPlayers.Contains(e.Entity.PlayerId))
+                                         .ToList())
+                            {
+                                entry.State = EntityState.Detached;
+                            }
+
+                            foreach (var duplicate in createdItems.Where(i => duplicatedPlayers.Contains(i.PlayerId)).ToList())
+                            {
+                                skipped.Add(new MarketItemGenerationSkip(duplicate.PlayerId, duplicate.PlayerName, "Jogador já listado no ciclo."));
+                                createdItems.Remove(duplicate);
+                            }
+                        }
+
+                        if (createdItems.Count > 0)
+                        {
+                            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                        }
                     }
                 }
+                else
+                {
+                    await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                }
 
-                await tx.CommitAsync(ct);
+                await tx.CommitAsync(ct).ConfigureAwait(false);
 
                 return new MarketItemGenerationResult(
                     context.CycleId,
@@ -127,15 +160,17 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                     context.EligibleCount,
                     context.Seed,
                     createdItems.Count,
+                    createdItems,
                     skipped,
-                    createdItems);
+                    createdItems.Count == 0 ? null : createdItems.Min(i => i.ExpiresAtUtc),
+                    createdItems.Count == 0 ? null : createdItems.Max(i => i.ExpiresAtUtc));
             }
             catch
             {
-                await tx.RollbackAsync(ct);
+                await tx.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     public async Task<int> DeleteDraftsAsync(Guid cycleId, CancellationToken ct)
@@ -172,249 +207,343 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
     private async Task<GenerationContext> PrepareAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
     {
-        if (options is null)
-        {
-            throw new ArgumentNullException(nameof(options));
-        }
+        ArgumentNullException.ThrowIfNull(options);
 
         if (options.DesiredCount <= 0)
         {
             throw new MarketValidationException("A quantidade desejada deve ser maior que zero.");
         }
 
+        if (options.MinOverall.HasValue && options.MaxOverall.HasValue && options.MinOverall.Value > options.MaxOverall.Value)
+        {
+            throw new MarketValidationException("O overall mínimo deve ser menor ou igual ao máximo.");
+        }
+
+        if (options.MaxPerTeam.HasValue && options.MaxPerTeam.Value < 0)
+        {
+            throw new MarketValidationException("O limite por time deve ser maior ou igual a zero.");
+        }
+
         var cycle = await _dbContext.MarketCycles
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
-            .ConfigureAwait(false);
-
-        if (cycle is null)
-        {
-            throw new MarketNotFoundException("Ciclo não encontrado.");
-        }
+            .ConfigureAwait(false)
+            ?? throw new MarketNotFoundException("Ciclo não encontrado.");
 
         if (cycle.Status != MarketCycleStatus.Draft)
         {
             throw new MarketValidationException("Itens só podem ser gerados para ciclos em rascunho.");
         }
 
-        var lifecycle = NormalizeLifecycle(options.LifecycleOptions, cycle);
-        var excludedPlayers = await LoadExcludedPlayersAsync(cycleId, ct).ConfigureAwait(false);
-        var eligiblePlayers = await QueryEligiblePlayersAsync(options.Filters, excludedPlayers, ct).ConfigureAwait(false);
+        var seed = options.Seed ?? Random.Shared.Next();
+        var excluded = await LoadExcludedPlayersAsync(cycleId, options, ct).ConfigureAwait(false);
+        var eligiblePlayers = await QueryEligiblePlayersAsync(options, excluded, ct).ConfigureAwait(false);
 
         if (eligiblePlayers.Count == 0)
         {
             throw new MarketValidationException("Nenhum jogador elegível para os filtros informados.");
         }
 
-        if (options.DesiredCount > eligiblePlayers.Count)
+        var maxSelectable = CalculateMaxSelectable(eligiblePlayers, options.MaxPerTeam);
+        if (maxSelectable == 0)
         {
-            throw new MarketValidationException($"A quantidade desejada ({options.DesiredCount}) é maior do que o total elegível ({eligiblePlayers.Count}).");
+            throw new MarketValidationException("Nenhum jogador atende às regras de geração.");
         }
 
-        var seed = options.Seed ?? Random.Shared.Next();
-        var selected = SelectPlayers(eligiblePlayers, options.DesiredCount, seed);
+        if (options.DesiredCount > maxSelectable)
+        {
+            throw new MarketValidationException($"A quantidade desejada ({options.DesiredCount}) é maior do que o total elegível ({maxSelectable}).");
+        }
+
+        var selectedCandidates = SelectCandidates(eligiblePlayers, options, seed);
+        if (selectedCandidates.Count < options.DesiredCount)
+        {
+            throw new MarketValidationException("Não foi possível selecionar jogadores suficientes respeitando o limite por time.");
+        }
+
+        var expirations = BuildExpirationSchedule(selectedCandidates.Count, cycle, options, seed);
+        var selected = selectedCandidates
+            .Select((candidate, index) => new SelectedCandidate(candidate, expirations[index]))
+            .ToList();
 
         return new GenerationContext(
             cycle.CycleId,
             seed,
-            lifecycle.PublishAtUtc,
-            lifecycle.ExpiresAtUtc,
             eligiblePlayers.Count,
-            selected);
+            selected,
+            selected.Count == 0 ? null : selected.Min(s => s.ExpiresAtUtc),
+            selected.Count == 0 ? null : selected.Max(s => s.ExpiresAtUtc));
     }
 
-    private async Task<HashSet<int>> LoadExcludedPlayersAsync(Guid cycleId, CancellationToken ct)
+    private async Task<HashSet<int>> LoadExcludedPlayersAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
     {
-        var excluded = await _dbContext.MarketItems
-            .AsNoTracking()
-            .Where(i => i.CycleId == cycleId)
-            .Select(i => i.PlayerId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+        var excluded = new HashSet<int>();
 
-        var openCyclePlayers = await _dbContext.MarketItems
-            .AsNoTracking()
-            .Where(i => i.Cycle.Status == MarketCycleStatus.Active && i.Status == MarketItemStatus.Active)
-            .Select(i => i.PlayerId)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        var result = new HashSet<int>(excluded);
-        foreach (var playerId in openCyclePlayers)
+        if (options.EnsureUniquePlayerPerCycle)
         {
-            result.Add(playerId);
+            var playersInCycle = await _dbContext.MarketItems
+                .AsNoTracking()
+                .Where(i => i.CycleId == cycleId)
+                .Select(i => i.PlayerId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            foreach (var playerId in playersInCycle)
+            {
+                excluded.Add(playerId);
+            }
         }
 
-        return result;
+        if (options.ExcludeAlreadyListedInOpenCycles)
+        {
+            var openCyclePlayers = await _dbContext.MarketItems
+                .AsNoTracking()
+                .Where(i => i.Cycle.Status == MarketCycleStatus.Active && i.Status == MarketItemStatus.Active)
+                .Select(i => i.PlayerId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            foreach (var playerId in openCyclePlayers)
+            {
+                excluded.Add(playerId);
+            }
+        }
+
+        return excluded;
     }
 
     private async Task<List<MarketItemGenerationCandidate>> QueryEligiblePlayersAsync(
-        MarketItemGenerationFilters filters,
+        MarketItemGenerationOptions options,
         HashSet<int> excluded,
         CancellationToken ct)
     {
-        filters ??= new MarketItemGenerationFilters(null, null, null, null, null, null);
-
-        var excludedIds = excluded.Count > 0 ? excluded.ToArray() : Array.Empty<int>();
-
         var query = _dbContext.Players
             .AsNoTracking()
-            .Where(p => p.CurrentTeamId == null)
-            .Where(p => !_dbContext.TeamRosters.Any(r => r.PlayerId == p.PlayerId))
-            .Where(p => !_dbContext.MarketItems
-                .Any(i => i.PlayerId == p.PlayerId && i.Status == MarketItemStatus.Active && i.Cycle.Status == MarketCycleStatus.Active));
+            .Select(player => new
+            {
+                Player = player,
+                Team = player.TeamRosters
+                    .Select(r => new { r.TeamId, r.Team.TeamName })
+                    .FirstOrDefault()
+            });
 
-        if (excludedIds.Length > 0)
+        if (excluded.Count > 0)
         {
-            query = query.Where(p => !excludedIds.Contains(p.PlayerId));
+            query = query.Where(p => !excluded.Contains(p.Player.PlayerId));
         }
 
-        if (filters.PlayerIds is { Count: > 0 })
+        if (options.PositionIds is { Count: > 0 })
         {
-            var ids = filters.PlayerIds.Distinct().ToArray();
-            query = query.Where(p => ids.Contains(p.PlayerId));
+            var positions = options.PositionIds.Distinct().ToArray();
+            query = query.Where(p => positions.Contains(p.Player.PositionId));
         }
 
-        if (filters.PositionIds is { Count: > 0 })
+        if (options.MinOverall.HasValue)
         {
-            var positions = filters.PositionIds.Distinct().ToArray();
-            query = query.Where(p => positions.Contains(p.PositionId));
+            query = query.Where(p => p.Player.Overall >= options.MinOverall.Value);
         }
 
-        if (filters.MinOverall.HasValue)
+        if (options.MaxOverall.HasValue)
         {
-            query = query.Where(p => p.Overall >= filters.MinOverall.Value);
-        }
-
-        if (filters.MaxOverall.HasValue)
-        {
-            query = query.Where(p => p.Overall <= filters.MaxOverall.Value);
-        }
-
-        if (filters.MinAge.HasValue)
-        {
-            query = query.Where(p => p.Age.HasValue && p.Age.Value >= filters.MinAge.Value);
-        }
-
-        if (filters.MaxAge.HasValue)
-        {
-            query = query.Where(p => p.Age.HasValue && p.Age.Value <= filters.MaxAge.Value);
+            query = query.Where(p => p.Player.Overall <= options.MaxOverall.Value);
         }
 
         return await query
-            .OrderBy(p => p.PlayerId)
+            .OrderBy(p => p.Player.PlayerId)
             .Select(p => new MarketItemGenerationCandidate(
-                p.PlayerId,
-                p.Name,
-                p.PositionId,
-                p.Position.Name,
-                p.Overall,
-                p.Age))
+                p.Player.PlayerId,
+                p.Player.Name,
+                p.Player.PositionId,
+                p.Player.Position.Name,
+                p.Player.Overall,
+                p.Player.Age,
+                p.Team != null ? p.Team.TeamId : null,
+                p.Team != null ? p.Team.TeamName : null))
             .ToListAsync(ct)
             .ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<MarketItemGenerationItem>> BuildItemsAsync(
-        IReadOnlyList<MarketItemGenerationCandidate> selected,
-        DateTime expiresAtUtc,
-        CancellationToken ct)
-    {
-        var items = new List<MarketItemGenerationItem>(selected.Count);
-        foreach (var candidate in selected)
-        {
-            var pricing = await _pricingService
-                .CalculateForPlayerAsync(candidate.PlayerId, ct)
-                .ConfigureAwait(false);
-
-            items.Add(new MarketItemGenerationItem(
-                candidate.PlayerId,
-                candidate.PlayerName,
-                candidate.PositionId,
-                candidate.PositionName,
-                candidate.Overall,
-                candidate.Age,
-                pricing.BasePrice,
-                pricing.BuyNowPrice,
-                pricing.MinIncrement,
-                expiresAtUtc));
-        }
-
-        return items;
-    }
-
-    private static IReadOnlyList<MarketItemGenerationCandidate> SelectPlayers(
-        IReadOnlyList<MarketItemGenerationCandidate> source,
-        int desiredCount,
+    private static List<MarketItemGenerationCandidate> SelectCandidates(
+        List<MarketItemGenerationCandidate> eligible,
+        MarketItemGenerationOptions options,
         int seed)
     {
         var rng = new Random(seed);
-        var pool = source.ToList();
-        var selected = new List<MarketItemGenerationCandidate>(desiredCount);
+        var pool = eligible.OrderBy(_ => rng.NextDouble()).ToList();
+        var selected = new List<MarketItemGenerationCandidate>(options.DesiredCount);
+        var perTeam = new Dictionary<Guid, int>();
+        var limit = options.MaxPerTeam.GetValueOrDefault();
+        var hasLimit = options.MaxPerTeam.HasValue && options.MaxPerTeam.Value > 0;
 
-        for (var i = 0; i < desiredCount; i++)
+        foreach (var candidate in pool)
         {
-            var index = rng.Next(pool.Count);
-            selected.Add(pool[index]);
-            pool.RemoveAt(index);
+            if (selected.Count >= options.DesiredCount)
+            {
+                break;
+            }
+
+            if (hasLimit && candidate.TeamId.HasValue)
+            {
+                var teamId = candidate.TeamId.Value;
+                perTeam.TryGetValue(teamId, out var count);
+                if (count >= limit)
+                {
+                    continue;
+                }
+
+                perTeam[teamId] = count + 1;
+            }
+
+            selected.Add(candidate);
         }
 
         return selected;
     }
 
-    private static NormalizedLifecycle NormalizeLifecycle(MarketItemLifecycleOptions lifecycle, MarketCycle cycle)
+    private IReadOnlyList<DateTime> BuildExpirationSchedule(int count, MarketCycle cycle, MarketItemGenerationOptions options, int seed)
     {
-        lifecycle ??= new MarketItemLifecycleOptions(null, null, null);
-
-        if (lifecycle.DurationHours.HasValue && lifecycle.DurationHours.Value <= 0)
+        if (count == 0)
         {
-            throw new MarketValidationException("A duração deve ser maior que zero.");
+            return Array.Empty<DateTime>();
         }
 
-        var publishAt = lifecycle.PublishAtUtc.HasValue
-            ? EnsureUtc(lifecycle.PublishAtUtc.Value)
-            : (DateTime?)null;
-
-        DateTime expiresAt;
-
-        if (lifecycle.ExpiresAtUtc.HasValue)
+        var start = EnsureUtc(cycle.StartsAtUtc);
+        var end = EnsureUtc(cycle.EndsAtUtc);
+        if (end <= start)
         {
-            expiresAt = EnsureUtc(lifecycle.ExpiresAtUtc.Value);
-        }
-        else if (lifecycle.DurationHours.HasValue)
-        {
-            var baseDate = publishAt ?? cycle.StartsAtUtc;
-            expiresAt = EnsureUtc(baseDate).AddHours(lifecycle.DurationHours.Value);
-        }
-        else
-        {
-            expiresAt = cycle.EndsAtUtc;
+            throw new MarketValidationException("A data de término do ciclo deve ser posterior ao início.");
         }
 
-        if (expiresAt <= cycle.StartsAtUtc)
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var effectiveStart = now > start ? now : start;
+        var effectiveEnd = end;
+
+        if (options.AutoSpreadExpirationsAcrossCycle)
         {
-            throw new MarketValidationException("A data de expiração deve ser posterior ao início do ciclo.");
+            var totalSeconds = (effectiveEnd - effectiveStart).TotalSeconds;
+            if (totalSeconds <= count)
+            {
+                throw new MarketValidationException("Não há janela suficiente no ciclo para distribuir as expirações.");
+            }
+
+            var interval = totalSeconds / (count + 1);
+            var schedule = new List<DateTime>(count);
+            for (var i = 0; i < count; i++)
+            {
+                var seconds = interval * (i + 1);
+                var expiration = effectiveStart.AddSeconds(seconds);
+                schedule.Add(ClampExpiration(expiration, effectiveStart, effectiveEnd));
+            }
+            return schedule;
         }
 
-        return new NormalizedLifecycle(publishAt, expiresAt);
+        if (!options.MinItemLifespan.HasValue || !options.MaxItemLifespan.HasValue)
+        {
+            throw new MarketValidationException("Informe as durações mínima e máxima para o modo manual.");
+        }
+
+        var min = options.MinItemLifespan.Value;
+        var max = options.MaxItemLifespan.Value;
+
+        if (min <= TimeSpan.Zero || max <= TimeSpan.Zero)
+        {
+            throw new MarketValidationException("As durações devem ser positivas.");
+        }
+
+        if (max < min)
+        {
+            throw new MarketValidationException("A duração máxima deve ser maior ou igual à mínima.");
+        }
+
+        var random = new Random(seed);
+        var expirations = new List<DateTime>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var spanSeconds = max == min
+                ? min.TotalSeconds
+                : min.TotalSeconds + random.NextDouble() * (max - min).TotalSeconds;
+            var expiration = effectiveStart.AddSeconds(spanSeconds);
+            expirations.Add(ClampExpiration(expiration, effectiveStart, effectiveEnd));
+        }
+
+        expirations.Sort();
+        return expirations;
+    }
+
+    private async Task<IReadOnlyList<MarketItemGenerationItem>> BuildItemsAsync(IReadOnlyList<SelectedCandidate> selected, CancellationToken ct)
+    {
+        var items = new List<MarketItemGenerationItem>(selected.Count);
+        foreach (var candidate in selected)
+        {
+            var pricing = await _pricingService.CalculateForPlayerAsync(candidate.Candidate.PlayerId, ct).ConfigureAwait(false);
+            items.Add(new MarketItemGenerationItem(
+                candidate.Candidate.PlayerId,
+                candidate.Candidate.PlayerName,
+                candidate.Candidate.PositionId,
+                candidate.Candidate.PositionName,
+                candidate.Candidate.Overall,
+                candidate.Candidate.Age,
+                candidate.Candidate.TeamId,
+                candidate.Candidate.TeamName,
+                pricing.BasePrice,
+                pricing.BuyNowPrice,
+                pricing.MinIncrement,
+                candidate.ExpiresAtUtc));
+        }
+
+        return items;
+    }
+
+    private static int CalculateMaxSelectable(IReadOnlyList<MarketItemGenerationCandidate> eligible, int? maxPerTeam)
+    {
+        if (!maxPerTeam.HasValue || maxPerTeam.Value <= 0)
+        {
+            return eligible.Count;
+        }
+
+        var limit = maxPerTeam.Value;
+        var total = 0;
+        foreach (var group in eligible.GroupBy(p => p.TeamId))
+        {
+            if (group.Key.HasValue)
+            {
+                total += Math.Min(group.Count(), limit);
+            }
+            else
+            {
+                total += group.Count();
+            }
+        }
+
+        return total;
+    }
+
+    private static DateTime ClampExpiration(DateTime expiration, DateTime start, DateTime end)
+    {
+        var adjusted = expiration <= start ? start.AddMinutes(5) : expiration;
+        if (adjusted >= end)
+        {
+            adjusted = end.AddSeconds(-1);
+        }
+
+        return adjusted;
     }
 
     private static DateTime EnsureUtc(DateTime value)
-    {
-        return value.Kind switch
+        => value.Kind switch
         {
             DateTimeKind.Utc => value,
             DateTimeKind.Local => value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
         };
-    }
+
+    private sealed record SelectedCandidate(MarketItemGenerationCandidate Candidate, DateTime ExpiresAtUtc);
 
     private sealed record GenerationContext(
         Guid CycleId,
         int Seed,
-        DateTime? PublishAtUtc,
-        DateTime ExpiresAtUtc,
         int EligibleCount,
-        IReadOnlyList<MarketItemGenerationCandidate> SelectedPlayers);
-
-    private sealed record NormalizedLifecycle(DateTime? PublishAtUtc, DateTime ExpiresAtUtc);
+        IReadOnlyList<SelectedCandidate> SelectedPlayers,
+        DateTime? FirstExpirationUtc,
+        DateTime? LastExpirationUtc);
 }

@@ -20,7 +20,7 @@ public class TransfersQueryService : ITransfersQueryService
         _dbContext = dbContext;
     }
 
-    public async Task<PagedResult<TransferHistoryDto>> QueryHistoryAsync(TransfersFilter filter, CancellationToken ct)
+    public async Task<PagedResult<TransferListItemDto>> QueryHistoryAsync(TransfersFilter filter, CancellationToken ct)
     {
         if (filter is null)
         {
@@ -72,6 +72,12 @@ public class TransfersQueryService : ITransfersQueryService
             query = query.Where(h => h.PerformedAtUtc <= to);
         }
 
+        if (!string.IsNullOrWhiteSpace(filter.NotesQuery))
+        {
+            var term = filter.NotesQuery.Trim();
+            query = query.Where(h => h.Notes != null && EF.Functions.ILike(h.Notes, $"%{term}%"));
+        }
+
         var total = await query.CountAsync(ct).ConfigureAwait(false);
         var skip = (filter.Page - 1) * size;
 
@@ -79,25 +85,49 @@ public class TransfersQueryService : ITransfersQueryService
             .OrderByDescending(h => h.PerformedAtUtc)
             .Skip(skip)
             .Take(size)
-            .Select(h => new TransferHistoryDto(
-                h.TransferId,
-                h.PerformedAtUtc,
-                h.Player.PlayerGuid,
-                h.PlayerId,
-                h.Player.Name,
-                h.FromTeamId,
-                h.FromTeam != null ? h.FromTeam.TeamName : null,
-                h.ToTeamId,
-                h.ToTeam != null ? h.ToTeam.TeamName : null,
-                h.Amount,
-                (int)h.Type,
-                h.Type.ToDisplayName(),
-                h.Notes,
-                h.PerformedBy))
+            .Select(h => new TransferListItemDto
+            {
+                TransferId = h.TransferId,
+                PlayerName = h.Player.Name,
+                FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : string.Empty,
+                ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : string.Empty,
+                Amount = h.Amount ?? 0m,
+                Notes = h.Notes,
+                OccurredAtUtc = h.PerformedAtUtc
+            })
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        return new PagedResult<TransferHistoryDto>(items, total, filter.Page, size);
+        return new PagedResult<TransferListItemDto>(items, total, filter.Page, size);
+    }
+
+    public async Task<TransferDetailsDto?> GetByIdAsync(Guid transferId, CancellationToken ct)
+    {
+        if (transferId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _dbContext.TransferHistories
+            .AsNoTracking()
+            .Where(h => h.TransferId == transferId)
+            .Select(h => new TransferDetailsDto
+            {
+                TransferId = h.TransferId,
+                OccurredAtUtc = h.PerformedAtUtc,
+                PlayerName = h.Player.Name,
+                PlayerExternalId = h.Player.PlayerGuid,
+                PlayerId = h.PlayerId,
+                FromTeamId = h.FromTeamId,
+                FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : null,
+                ToTeamId = h.ToTeamId,
+                ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
+                Amount = h.Amount ?? 0m,
+                Notes = h.Notes,
+                PerformedBy = h.PerformedBy
+            })
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
     }
 
     private static DateTime EnsureUtc(DateTime value)

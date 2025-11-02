@@ -1,11 +1,13 @@
 @using System.Globalization
 @using System.Linq
+@using System.Threading
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Models.MarketCycles
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
+@using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
 @if (Cycle is null)
@@ -54,7 +56,7 @@ else
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
-                    <fieldset disabled="@(!IsDraftCycle || IsBusy || _model is null)">
+                    <fieldset disabled="@(!IsDraftCycle || IsBusy)">
                         <div class="row g-3">
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="generation-count">Quantidade desejada</label>
@@ -67,49 +69,19 @@ else
                                 <ValidationMessage For="@(() => _model!.Seed)" />
                             </div>
                             <div class="col-12 col-md-4">
-                                <label class="form-label" for="generation-duration">Duração (horas)</label>
-                                <InputNumber id="generation-duration" class="form-control" @bind-Value="_model!.Lifecycle.DurationHours" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.DurationHours)" />
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="generation-publish">Publicar em (horário local, opcional)</label>
-                                <input id="generation-publish"
-                                       class="form-control"
-                                       type="datetime-local"
-                                       @bind="_model!.Lifecycle.PublishAtLocal"
-                                       @bind:format="yyyy-MM-ddTHH:mm"
-                                       @bind:event="oninput" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.PublishAtLocal)" />
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="generation-expire">Expira em (horário local, opcional)</label>
-                                <input id="generation-expire"
-                                       class="form-control"
-                                       type="datetime-local"
-                                       @bind="_model!.Lifecycle.ExpiresAtLocal"
-                                       @bind:format="yyyy-MM-ddTHH:mm"
-                                       @bind:event="oninput" />
-                                <ValidationMessage For="@(() => _model!.Lifecycle.ExpiresAtLocal)" />
+                                <label class="form-label" for="generation-max-team">Máx. por time</label>
+                                <InputNumber id="generation-max-team" class="form-control" @bind-Value="_model!.MaxPerTeam" />
+                                <ValidationMessage For="@(() => _model!.MaxPerTeam)" />
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-ovr-min">Overall mínimo</label>
-                                <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.Filters.MinOverall" />
-                                <ValidationMessage For="@(() => _model!.Filters.MinOverall)" />
+                                <InputNumber id="generation-ovr-min" class="form-control" @bind-Value="_model!.MinOverall" />
+                                <ValidationMessage For="@(() => _model!.MinOverall)" />
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label" for="generation-ovr-max">Overall máximo</label>
-                                <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.Filters.MaxOverall" />
-                                <ValidationMessage For="@(() => _model!.Filters.MaxOverall)" />
-                            </div>
-                            <div class="col-12 col-md-3">
-                                <label class="form-label" for="generation-age-min">Idade mínima</label>
-                                <InputNumber id="generation-age-min" class="form-control" @bind-Value="_model!.Filters.MinAge" />
-                                <ValidationMessage For="@(() => _model!.Filters.MinAge)" />
-                            </div>
-                            <div class="col-12 col-md-3">
-                                <label class="form-label" for="generation-age-max">Idade máxima</label>
-                                <InputNumber id="generation-age-max" class="form-control" @bind-Value="_model!.Filters.MaxAge" />
-                                <ValidationMessage For="@(() => _model!.Filters.MaxAge)" />
+                                <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.MaxOverall" />
+                                <ValidationMessage For="@(() => _model!.MaxOverall)" />
                             </div>
                             <div class="col-12">
                                 <label class="form-label d-block">Posições</label>
@@ -139,6 +111,42 @@ else
                                     </div>
                                 }
                             </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <InputCheckbox id="generation-exclude-open" class="form-check-input" @bind-Value="_model!.ExcludeAlreadyListedInOpenCycles" />
+                                    <label class="form-check-label" for="generation-exclude-open">Excluir jogadores já listados em ciclos abertos</label>
+                                </div>
+                                <div class="form-check mt-1">
+                                    <InputCheckbox id="generation-ensure-unique" class="form-check-input" @bind-Value="_model!.EnsureUniquePlayerPerCycle" />
+                                    <label class="form-check-label" for="generation-ensure-unique">Garantir apenas um anúncio por ciclo</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Modo de expiração</label>
+                                <div class="d-flex flex-column flex-md-row gap-2">
+                                    <label class="form-check form-check-inline">
+                                        <InputRadio @bind-Value="_model!.AutoSpreadExpirationsAcrossCycle" Value="true" class="form-check-input" />
+                                        <span class="form-check-label">Automático (espalhar pelo ciclo)</span>
+                                    </label>
+                                    <label class="form-check form-check-inline">
+                                        <InputRadio @bind-Value="_model!.AutoSpreadExpirationsAcrossCycle" Value="false" class="form-check-input" />
+                                        <span class="form-check-label">Manual (definir duração)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            @if (!_model!.AutoSpreadExpirationsAcrossCycle)
+                            {
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="generation-lifespan-min">Duração mínima (horas)</label>
+                                    <InputNumber id="generation-lifespan-min" class="form-control" @bind-Value="_model!.MinLifespanHours" />
+                                    <ValidationMessage For="@(() => _model!.MinLifespanHours)" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="generation-lifespan-max">Duração máxima (horas)</label>
+                                    <InputNumber id="generation-lifespan-max" class="form-control" @bind-Value="_model!.MaxLifespanHours" />
+                                    <ValidationMessage For="@(() => _model!.MaxLifespanHours)" />
+                                </div>
+                            }
                         </div>
                     </fieldset>
 
@@ -207,6 +215,10 @@ else
                         <dd class="col-sm-9">@_preview.EligibleCount</dd>
                         <dt class="col-sm-3">Semente utilizada</dt>
                         <dd class="col-sm-9">@_preview.Seed</dd>
+                        <dt class="col-sm-3">Primeira expiração</dt>
+                        <dd class="col-sm-9">@FormatOptionalDate(_preview.FirstExpirationUtc)</dd>
+                        <dt class="col-sm-3">Última expiração</dt>
+                        <dd class="col-sm-9">@FormatOptionalDate(_preview.LastExpirationUtc)</dd>
                     </dl>
 
                     @if (_preview.Items.Count == 0)
@@ -218,56 +230,47 @@ else
                     else
                     {
                         <div class="table-responsive">
-                            <table class="table table-sm table-hover align-middle">
+                            <table class="table table-sm table-striped align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Jogador</th>
-                                        <th>Posição</th>
-                                        <th class="text-center">Overall</th>
-                                        <th class="text-center">Idade</th>
-                                        <th class="text-end">Preço inicial</th>
-                                        <th class="text-end">Comprar já</th>
-                                        <th class="text-end">Incremento mínimo</th>
-                                        <th class="text-nowrap">Expira em</th>
+                                        <th scope="col">Jogador</th>
+                                        <th scope="col">Posição</th>
+                                        <th scope="col">Overall</th>
+                                        <th scope="col">Time atual</th>
+                                        <th scope="col">Preço base</th>
+                                        <th scope="col">Compra imediata</th>
+                                        <th scope="col">Expira em</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                @foreach (var item in CurrentPreviewPageItems)
+                                @foreach (var item in _preview.Items)
                                 {
                                     <tr>
                                         <td>@item.PlayerName</td>
                                         <td>@item.PositionName</td>
-                                        <td class="text-center">@item.Overall</td>
-                                        <td class="text-center">@(item.Age?.ToString() ?? "–")</td>
-                                        <td class="text-end">@item.BasePrice.ToString("C0", BrazilTime.Culture)</td>
-                                        <td class="text-end">@(item.BuyNowPrice.HasValue ? item.BuyNowPrice.Value.ToString("C0", BrazilTime.Culture) : "–")</td>
-                                        <td class="text-end">@item.MinIncrement.ToString("C0", BrazilTime.Culture)</td>
-                                        <td class="text-nowrap">@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
+                                        <td>@item.Overall</td>
+                                        <td>@FormatTeam(item.TeamName)</td>
+                                        <td>@FormatCurrency(item.BasePrice)</td>
+                                        <td>@FormatCurrency(item.BuyNowPrice)</td>
+                                        <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
                                     </tr>
                                 }
                                 </tbody>
                             </table>
                         </div>
+                    }
 
-                        @if (TotalPreviewPages > 1)
-                        {
-                            <nav class="mt-2" aria-label="Paginação da pré-visualização">
-                                <ul class="pagination pagination-sm mb-0">
-                                    <li class="page-item @(_previewPage <= 1 ? "disabled" : null)">
-                                        <button class="page-link" type="button" @onclick="() => ChangePreviewPage(_previewPage - 1)" disabled="@(_previewPage <= 1)">Anterior</button>
-                                    </li>
-                                    @for (var page = 1; page <= TotalPreviewPages; page++)
-                                    {
-                                        <li class="page-item @(page == _previewPage ? "active" : null)">
-                                            <button class="page-link" type="button" @onclick="() => ChangePreviewPage(page)">@(page)</button>
-                                        </li>
-                                    }
-                                    <li class="page-item @(_previewPage >= TotalPreviewPages ? "disabled" : null)">
-                                        <button class="page-link" type="button" @onclick="() => ChangePreviewPage(_previewPage + 1)" disabled="@(_previewPage >= TotalPreviewPages)">Próxima</button>
-                                    </li>
-                                </ul>
-                            </nav>
-                        }
+                    @if (_preview.Skipped.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <h6 class="h6">Itens ignorados (@_preview.Skipped.Count)</h6>
+                            <ul class="small mb-0">
+                                @foreach (var skip in _preview.Skipped)
+                                {
+                                    <li><strong>@skip.PlayerName</strong>: @skip.Reason</li>
+                                }
+                            </ul>
+                        </div>
                     }
                 </div>
                 <div class="modal-footer">
@@ -278,242 +281,133 @@ else
     </div>
 }
 
+@if (_resultSummary is not null)
+{
+    <div class="alert alert-success mt-3" role="alert">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
+            <div>
+                <div><strong>Itens gerados:</strong> @_resultSummary.CreatedCount</div>
+                <div><strong>Solicitados:</strong> @_resultSummary.RequestedCount</div>
+                <div><strong>Elegíveis:</strong> @_resultSummary.EligibleCount</div>
+            </div>
+            <div>
+                <div><strong>Primeira expiração:</strong> @FormatOptionalDate(_resultSummary.FirstExpirationUtc)</div>
+                <div><strong>Última expiração:</strong> @FormatOptionalDate(_resultSummary.LastExpirationUtc)</div>
+            </div>
+        </div>
+
+        @if (_resultSummary.Skipped.Count > 0)
+        {
+            <hr class="my-2" />
+            <p class="mb-1"><strong>Ignorados:</strong></p>
+            <ul class="small mb-0">
+                @foreach (var skip in _resultSummary.Skipped)
+                {
+                    <li><strong>@skip.PlayerName</strong>: @skip.Reason</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
 @code {
-    private const int PreviewPageSize = 10;
+    [Parameter] public MarketCycleDto? Cycle { get; set; }
+    [Parameter] public EventCallback<MarketCycleDto?> CycleUpdated { get; set; }
+
+    [Inject] public IMarketItemGenerationClient GenerationClient { get; set; } = default!;
+    [Inject] public IPositionService PositionService { get; set; } = default!;
+    [Inject] public ToastService Toasts { get; set; } = default!;
 
     private MarketItemGenerationFormModel? _model;
     private EditContext? _editContext;
-    private readonly List<PositionOption> _positionOptions = new();
     private bool _isLoadingPositions;
-    private string? _positionsError;
+    private bool _showValidationSummary;
     private bool _isPreviewing;
     private bool _isGenerating;
     private bool _isClearing;
-    private bool _showValidationSummary;
     private MarketItemGenerationPreviewDto? _preview;
+    private MarketItemGenerationResultDto? _resultSummary;
+    private CancellationTokenSource? _cts;
+    private readonly List<PositionOption> _positionOptions = new();
+    private string? _positionsError;
     private bool _showPreviewModal;
-    private int _previewPage = 1;
-    private CancellationTokenSource? _operationCts;
 
-    [Parameter]
-    public MarketCycleDto? Cycle { get; set; }
-
-    [Parameter]
-    public EventCallback<Guid> CycleUpdated { get; set; }
-
-    [Inject]
-    public IPositionService PositionService { get; set; } = default!;
-
-    [Inject]
-    public IMarketItemGenerationClient GenerationClient { get; set; } = default!;
-
-    [Inject]
-    public ToastService Toasts { get; set; } = default!;
-
-    [Inject]
-    public IJSRuntime JSRuntime { get; set; } = default!;
-
-    private bool IsDraftCycle => Cycle?.Status == MarketCycleStatus.Draft;
-
-    private bool IsBusy => _isPreviewing || _isGenerating || _isClearing;
-
-    private bool CanPreview => IsDraftCycle && !IsBusy && _model is not null && _editContext is not null;
-
-    private bool CanGenerate => IsDraftCycle && !IsBusy && _model is not null && _editContext is not null;
-
-    private bool CanClear => IsDraftCycle && !_isClearing && Cycle is not null;
-
-    private IReadOnlyList<MarketItemGenerationItemDto> CurrentPreviewPageItems
+    protected override async Task OnParametersSetAsync()
     {
-        get
+        if (Cycle is not null)
         {
-            if (_preview is null)
-            {
-                return Array.Empty<MarketItemGenerationItemDto>();
-            }
-
-            var skip = (_previewPage - 1) * PreviewPageSize;
-            return _preview.Items.Skip(skip).Take(PreviewPageSize).ToList();
+            await EnsureModelAsync();
+        }
+        else
+        {
+            _model = null;
+            _editContext = null;
         }
     }
 
-    private int TotalPreviewPages
-        => _preview is null || _preview.Items.Count == 0
-            ? 1
-            : Math.Max(1, (int)Math.Ceiling(_preview.Items.Count / (double)PreviewPageSize));
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadPositionsAsync();
-    }
-
-    protected override void OnParametersSet()
+    private async Task EnsureModelAsync()
     {
         if (Cycle is null)
         {
-            ResetModel(null);
             return;
         }
 
         if (_model is null || _model.CycleId != Cycle.CycleId)
         {
-            ResetModel(Cycle.CycleId);
+            _model = MarketItemGenerationFormModel.Create(Cycle.CycleId);
+            _editContext = new EditContext(_model);
+            await LoadPositionsAsync();
         }
     }
 
     private async Task LoadPositionsAsync()
     {
-        if (_positionOptions.Count > 0)
-        {
-            return;
-        }
-
-        _isLoadingPositions = true;
-        _positionsError = null;
-
         try
         {
-            var positions = await PositionService.GetAllAsync().ConfigureAwait(false);
+            _isLoadingPositions = true;
+            var positions = await PositionService.GetAllAsync(CancellationToken.None).ConfigureAwait(false);
             _positionOptions.Clear();
-            _positionOptions.AddRange(positions
-                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
-                .Select(p => new PositionOption(p.PositionId, p.Name)));
+            _positionOptions.AddRange(positions.Select(p => new PositionOption(p.PositionId, p.PositionName)));
         }
         catch (Exception ex)
         {
-            _positionsError = "Não foi possível carregar as posições disponíveis.";
             Console.Error.WriteLine(ex);
+            _positionsError = "Não foi possível carregar as posições disponíveis.";
         }
         finally
         {
             _isLoadingPositions = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private void ResetModel(Guid? cycleId)
-    {
-        CancelOperation();
-        DisposeEditContext();
-        _preview = null;
-        _showPreviewModal = false;
-        _previewPage = 1;
-        _showValidationSummary = false;
+    private bool IsPositionSelected(short positionId)
+        => _model?.PositionIds.Contains(positionId) == true;
 
-        if (!cycleId.HasValue)
-        {
-            _model = null;
-            return;
-        }
-
-        _model = MarketItemGenerationFormModel.Create(cycleId.Value);
-        _model.Lifecycle.PublishAtLocal = BrazilTime.ConvertFromUtc(DateTime.UtcNow);
-        ConfigureEditContext();
-    }
-
-    private void ConfigureEditContext()
+    private void OnPositionToggled(short positionId, ChangeEventArgs args)
     {
         if (_model is null)
         {
             return;
         }
 
-        _editContext = new EditContext(_model);
-        _editContext.OnFieldChanged += OnFieldChanged;
-        _editContext.OnValidationStateChanged += OnValidationStateChanged;
-    }
-
-    private void DisposeEditContext()
-    {
-        if (_editContext is not null)
-        {
-            _editContext.OnFieldChanged -= OnFieldChanged;
-            _editContext.OnValidationStateChanged -= OnValidationStateChanged;
-        }
-
-        _editContext = null;
-    }
-
-    private void OnFieldChanged(object? sender, FieldChangedEventArgs e)
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
-
-    private void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e)
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
-
-    private bool IsPositionSelected(short positionId)
-        => _model?.Filters.PositionIds.Contains(positionId) ?? false;
-
-    private void OnPositionToggled(short positionId, ChangeEventArgs args)
-    {
-        if (_model is null || _editContext is null)
-        {
-            return;
-        }
-
-        var isChecked = args.Value is bool b && b;
-        var list = _model.Filters.PositionIds;
-
+        var isChecked = args.Value is bool checkedValue && checkedValue;
         if (isChecked)
         {
-            if (!list.Contains(positionId))
+            if (!_model.PositionIds.Contains(positionId))
             {
-                list.Add(positionId);
+                _model.PositionIds.Add(positionId);
             }
         }
         else
         {
-            list.Remove(positionId);
+            _model.PositionIds.RemoveAll(p => p == positionId);
         }
-
-        _editContext.NotifyFieldChanged(new FieldIdentifier(_model.Filters, nameof(_model.Filters.PositionIds)));
     }
 
     private async Task HandlePreviewAsync()
     {
-        if (!IsDraftCycle || Cycle is null || _model is null)
-        {
-            return;
-        }
-
-        _showValidationSummary = false;
-        _isPreviewing = true;
-        var token = BeginOperation();
-
-        try
-        {
-            var request = _model.ToRequestDto();
-            var preview = await GenerationClient.PreviewAsync(Cycle.CycleId, request, token).ConfigureAwait(false);
-            _preview = preview;
-            _previewPage = 1;
-            _showPreviewModal = true;
-        }
-        catch (OperationCanceledException)
-        {
-            // ignorado
-        }
-        catch (HttpRequestException ex)
-        {
-            Toasts.ShowError(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            Toasts.ShowError("Não foi possível pré-visualizar os itens.");
-            Console.Error.WriteLine(ex);
-        }
-        finally
-        {
-            _isPreviewing = false;
-            CompleteOperation();
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task HandleGenerateAsync()
-    {
-        if (!IsDraftCycle || Cycle is null || _model is null || _editContext is null)
+        if (_model is null || _editContext is null)
         {
             return;
         }
@@ -525,108 +419,72 @@ else
         }
 
         _showValidationSummary = false;
-
-        var confirmed = await ConfirmAsync($"Deseja gerar {_model.DesiredCount} itens para o ciclo '{Cycle.Name}'?").ConfigureAwait(false);
-        if (!confirmed)
-        {
-            return;
-        }
-
-        _isGenerating = true;
-        var token = BeginOperation();
+        _isPreviewing = true;
+        _preview = null;
+        _resultSummary = null;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
 
         try
         {
             var request = _model.ToRequestDto();
-            var result = await GenerationClient.GenerateAsync(Cycle.CycleId, request, token).ConfigureAwait(false);
-            var message = $"Gerados {result.CreatedCount} itens (solicitados {result.RequestedCount}).";
-            if (result.SkippedExistingCount > 0)
-            {
-                message += $" {result.SkippedExistingCount} itens existentes foram ignorados.";
-            }
-
-            Toasts.ShowSuccess(message);
-
-            _preview = new MarketItemGenerationPreviewDto(result.RequestedCount, result.EligibleCount, result.Seed, result.Items);
-            _previewPage = 1;
+            _preview = await GenerationClient.PreviewAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
             _showPreviewModal = true;
-
-            if (CycleUpdated.HasDelegate)
-            {
-                await CycleUpdated.InvokeAsync(Cycle.CycleId).ConfigureAwait(false);
-            }
         }
         catch (OperationCanceledException)
         {
-            // ignorado
-        }
-        catch (HttpRequestException ex)
-        {
-            Toasts.ShowError(ex.Message);
         }
         catch (Exception ex)
         {
-            Toasts.ShowError("Falha ao gerar itens para o ciclo.");
             Console.Error.WriteLine(ex);
+            Toasts.Error("Não foi possível pré-visualizar a geração de itens.");
         }
         finally
         {
-            _isGenerating = false;
-            CompleteOperation();
+            _isPreviewing = false;
             await InvokeAsync(StateHasChanged);
         }
     }
 
-    private async Task HandleClearAsync()
+    private async Task HandleGenerateAsync()
     {
-        if (!IsDraftCycle || Cycle is null)
+        if (_model is null || _editContext is null)
         {
             return;
         }
 
-        var confirmed = await ConfirmAsync("Deseja remover todos os itens em rascunho deste ciclo?").ConfigureAwait(false);
-        if (!confirmed)
+        if (!_editContext.Validate())
         {
+            _showValidationSummary = true;
+            Toasts.Error("Corrija os campos destacados antes de gerar os itens.");
             return;
         }
 
-        _isClearing = true;
-        var token = BeginOperation();
+        _showValidationSummary = false;
+        _isGenerating = true;
+        _resultSummary = null;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
 
         try
         {
-            var result = await GenerationClient.DeleteDraftsAsync(Cycle.CycleId, token).ConfigureAwait(false);
-            if (result.RemovedCount > 0)
-            {
-                Toasts.ShowSuccess($"{result.RemovedCount} itens foram removidos do ciclo.");
-            }
-            else
-            {
-                Toasts.ShowInfo("Nenhum item em rascunho foi encontrado para remoção.");
-            }
-
-            if (CycleUpdated.HasDelegate)
-            {
-                await CycleUpdated.InvokeAsync(Cycle.CycleId).ConfigureAwait(false);
-            }
+            var request = _model.ToRequestDto();
+            var result = await GenerationClient.GenerateAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
+            _resultSummary = result;
+            Toasts.Success($"{result.CreatedCount} itens gerados com sucesso.");
+            await RefreshCycleAsync();
         }
         catch (OperationCanceledException)
         {
-            // ignorado
-        }
-        catch (HttpRequestException ex)
-        {
-            Toasts.ShowError(ex.Message);
         }
         catch (Exception ex)
         {
-            Toasts.ShowError("Falha ao limpar os itens do ciclo.");
             Console.Error.WriteLine(ex);
+            Toasts.Error("Falha ao gerar os itens. Tente novamente.");
         }
         finally
         {
-            _isClearing = false;
-            CompleteOperation();
+            _isGenerating = false;
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -634,87 +492,93 @@ else
     private void ClosePreview()
     {
         _showPreviewModal = false;
+        _preview = null;
     }
 
-    private void ChangePreviewPage(int page)
+    private async Task HandleClearAsync()
     {
-        if (page < 1 || page > TotalPreviewPages)
+        if (Cycle is null)
         {
             return;
         }
 
-        _previewPage = page;
-    }
-
-    private CancellationToken BeginOperation()
-    {
-        CancelOperation();
-        _operationCts = new CancellationTokenSource();
-        return _operationCts.Token;
-    }
-
-    private void CancelOperation()
-    {
-        if (_operationCts is null)
-        {
-            return;
-        }
+        _isClearing = true;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
 
         try
         {
-            _operationCts.Cancel();
+            var response = await GenerationClient.DeleteDraftsAsync(Cycle.CycleId, _cts.Token).ConfigureAwait(false);
+            Toasts.Success(response.RemovedCount > 0
+                ? $"{response.RemovedCount} itens em rascunho foram removidos."
+                : "Nenhum item em rascunho foi encontrado.");
+            await RefreshCycleAsync();
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // ignorado
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            Toasts.Error("Não foi possível limpar os itens do ciclo.");
         }
         finally
         {
-            _operationCts.Dispose();
-            _operationCts = null;
+            _isClearing = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private void CompleteOperation()
+    private async Task RefreshCycleAsync()
     {
-        _operationCts?.Dispose();
-        _operationCts = null;
-    }
-
-    private async Task<bool> ConfirmAsync(string message)
-    {
-        try
+        if (CycleUpdated.HasDelegate)
         {
-            return await JSRuntime.InvokeAsync<bool>("confirm", message);
-        }
-        catch (JSException)
-        {
-            return true;
+            await CycleUpdated.InvokeAsync(null);
         }
     }
 
-    private static string GetStatusLabel(MarketCycleStatus status) => status switch
-    {
-        MarketCycleStatus.Draft => "Rascunho",
-        MarketCycleStatus.Active => "Ativo",
-        MarketCycleStatus.Closed => "Encerrado",
-        MarketCycleStatus.Archived => "Arquivado",
-        _ => status.ToString()
-    };
+    private string GetStatusBadgeClass(MarketCycleStatus status)
+        => status switch
+        {
+            MarketCycleStatus.Draft => "bg-secondary",
+            MarketCycleStatus.Active => "bg-success",
+            MarketCycleStatus.Closed => "bg-danger",
+            _ => "bg-secondary"
+        };
 
-    private static string GetStatusBadgeClass(MarketCycleStatus status) => status switch
-    {
-        MarketCycleStatus.Draft => "bg-secondary",
-        MarketCycleStatus.Active => "bg-success",
-        MarketCycleStatus.Closed => "bg-dark",
-        MarketCycleStatus.Archived => "bg-secondary",
-        _ => "bg-secondary"
-    };
+    private static string GetStatusLabel(MarketCycleStatus status)
+        => status switch
+        {
+            MarketCycleStatus.Draft => "Rascunho",
+            MarketCycleStatus.Active => "Ativo",
+            MarketCycleStatus.Closed => "Encerrado",
+            MarketCycleStatus.Archived => "Arquivado",
+            _ => status.ToString()
+        };
+
+    private static string FormatTeam(string? teamName)
+        => string.IsNullOrWhiteSpace(teamName) ? "-" : teamName;
+
+    private static string FormatCurrency(decimal? value)
+        => value.HasValue ? string.Format(BrazilTime.Culture, "{0:C}", value.Value) : "-";
+
+    private static string FormatOptionalDate(DateTime? utc)
+        => utc.HasValue ? BrazilTime.FormatDateTime(utc.Value) : "-";
+
+    private bool IsDraftCycle => Cycle?.Status == MarketCycleStatus.Draft;
+
+    private bool IsBusy => _isPreviewing || _isGenerating || _isClearing;
+
+    private bool CanPreview => _model is not null && !_isPreviewing && !_isGenerating && !_isClearing;
+
+    private bool CanGenerate => CanPreview;
+
+    private bool CanClear => !_isClearing && Cycle?.Status == MarketCycleStatus.Draft;
 
     public void Dispose()
     {
-        CancelOperation();
-        DisposeEditContext();
+        _cts?.Cancel();
+        _cts?.Dispose();
     }
 
     private sealed record PositionOption(short Id, string Name);

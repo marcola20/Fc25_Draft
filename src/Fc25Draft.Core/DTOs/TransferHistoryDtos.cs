@@ -34,6 +34,33 @@ public record TransferHistoryDto(
     string? Notes,
     string? PerformedBy);
 
+public class TransferListItemDto
+{
+    public Guid TransferId { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public string FromTeamName { get; set; } = string.Empty;
+    public string ToTeamName { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string? Notes { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+}
+
+public class TransferDetailsDto
+{
+    public Guid TransferId { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public Guid PlayerExternalId { get; set; }
+    public int PlayerId { get; set; }
+    public Guid? FromTeamId { get; set; }
+    public string? FromTeamName { get; set; }
+    public Guid? ToTeamId { get; set; }
+    public string? ToTeamName { get; set; }
+    public decimal Amount { get; set; }
+    public string? Notes { get; set; }
+    public string? PerformedBy { get; set; }
+}
+
 public record RegisterTransferHistoryRequestDto(
     Guid? TransferId,
     int PlayerId,

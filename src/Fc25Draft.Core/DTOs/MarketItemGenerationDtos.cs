@@ -1,23 +1,20 @@
+using System;
+using System.Collections.Generic;
+
 namespace Fc25Draft.Core.DTOs;
-
-public record MarketItemGenerationFilters(
-    IReadOnlyCollection<int>? PlayerIds,
-    IReadOnlyCollection<short>? PositionIds,
-    int? MinOverall,
-    int? MaxOverall,
-    int? MinAge,
-    int? MaxAge);
-
-public record MarketItemLifecycleOptions(
-    DateTime? PublishAtUtc,
-    DateTime? ExpiresAtUtc,
-    int? DurationHours);
 
 public record MarketItemGenerationOptions(
     int DesiredCount,
+    IReadOnlyCollection<short>? PositionIds,
+    int? MinOverall,
+    int? MaxOverall,
+    int? MaxPerTeam,
+    bool ExcludeAlreadyListedInOpenCycles,
+    bool EnsureUniquePlayerPerCycle,
     int? Seed,
-    MarketItemGenerationFilters Filters,
-    MarketItemLifecycleOptions LifecycleOptions);
+    TimeSpan? MinItemLifespan,
+    TimeSpan? MaxItemLifespan,
+    bool AutoSpreadExpirationsAcrossCycle);
 
 public record MarketItemGenerationCandidate(
     int PlayerId,
@@ -25,7 +22,9 @@ public record MarketItemGenerationCandidate(
     short PositionId,
     string PositionName,
     int Overall,
-    int? Age);
+    int? Age,
+    Guid? TeamId,
+    string? TeamName);
 
 public record MarketItemGenerationItem(
     int PlayerId,
@@ -34,17 +33,27 @@ public record MarketItemGenerationItem(
     string PositionName,
     int Overall,
     int? Age,
+    Guid? TeamId,
+    string? TeamName,
     decimal BasePrice,
     decimal? BuyNowPrice,
     decimal MinIncrement,
     DateTime ExpiresAtUtc);
+
+public record MarketItemGenerationSkip(
+    int PlayerId,
+    string PlayerName,
+    string Reason);
 
 public record MarketItemGenerationPreview(
     Guid CycleId,
     int RequestedCount,
     int EligibleCount,
     int Seed,
-    IReadOnlyList<MarketItemGenerationItem> Items);
+    IReadOnlyList<MarketItemGenerationItem> Items,
+    IReadOnlyList<MarketItemGenerationSkip> Skipped,
+    DateTime? FirstExpirationUtc,
+    DateTime? LastExpirationUtc);
 
 public record MarketItemGenerationResult(
     Guid CycleId,
@@ -52,5 +61,7 @@ public record MarketItemGenerationResult(
     int EligibleCount,
     int Seed,
     int CreatedCount,
-    int SkippedExistingCount,
-    IReadOnlyList<MarketItemGenerationItem> Items);
+    IReadOnlyList<MarketItemGenerationItem> Items,
+    IReadOnlyList<MarketItemGenerationSkip> Skipped,
+    DateTime? FirstExpirationUtc,
+    DateTime? LastExpirationUtc);

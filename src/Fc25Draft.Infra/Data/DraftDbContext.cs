@@ -331,7 +331,10 @@ public class DraftDbContext : DbContext
             e.Property(x => x.PerformedBy).HasMaxLength(120);
             e.Property(x => x.PerformedAtUtc).IsRequired();
 
+            e.HasIndex(x => x.PerformedAtUtc);
             e.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+            e.HasIndex(x => x.FromTeamId);
+            e.HasIndex(x => x.ToTeamId);
 
             e.HasOne(x => x.Player)
                 .WithMany()

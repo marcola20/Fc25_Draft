@@ -36,7 +36,7 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         ArgumentNullException.ThrowIfNull(request);
 
         var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
-        using var response = await client.PostAsJsonAsync($"api/admin/market/cycles/{cycleId}/items:preview", request, SerializerOptions, ct).ConfigureAwait(false);
+        using var response = await client.PostAsJsonAsync($"api/admin/market/cycles/{cycleId}/items/preview", request, SerializerOptions, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         return await ReadJsonAsync<MarketItemGenerationPreviewDto>(response, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Resposta inválida do servidor ao pré-visualizar a geração de itens.");
@@ -50,7 +50,7 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         {
             var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
             using var response = await client.PostAsJsonAsync(
-                $"api/admin/market/cycles/{cycleId}/items:generate",
+                $"api/admin/market/cycles/{cycleId}/items/generate",
                 request, SerializerOptions, ct).ConfigureAwait(false);
 
             await EnsureSuccessAsync(response, ct).ConfigureAwait(false);

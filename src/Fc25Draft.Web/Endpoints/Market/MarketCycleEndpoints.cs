@@ -25,8 +25,8 @@ public static class MarketCycleEndpoints
         cycles.MapGet("/{cycleId:guid}", HandleGetAsync);
         cycles.MapPatch("/{cycleId:guid}/status", HandleStatusUpdateAsync);
         cycles.MapPost("/{cycleId:guid}:conclude", HandleConcludeAsync);
-        cycles.MapPost("/{cycleId:guid}/items:preview", HandlePreviewAsync);
-        cycles.MapPost("/{cycleId:guid}/items:generate", HandleGenerateAsync);
+        cycles.MapPost("/{cycleId:guid}/items/preview", HandlePreviewAsync);
+        cycles.MapPost("/{cycleId:guid}/items/generate", HandleGenerateAsync);
         cycles.MapDelete("/{cycleId:guid}/items", HandleDeleteItemsAsync);
         return marketApi;
     }
@@ -263,26 +263,20 @@ public static class MarketCycleEndpoints
 
     private static MarketItemGenerationOptions ToOptions(MarketItemGenerationRequestDto request)
     {
-        var filters = request.Filters ?? new MarketItemGenerationFiltersDto();
-        var lifecycle = request.Lifecycle ?? new MarketItemGenerationLifecycleDto();
-
-        var playerIds = filters.PlayerIds?.Where(id => id > 0).Distinct().ToArray();
-        var positionIds = filters.PositionIds?.Distinct().ToArray();
+        var positions = request.PositionIds?.Distinct().ToArray();
 
         return new MarketItemGenerationOptions(
             request.DesiredCount,
+            positions is { Length: > 0 } ? positions : null,
+            request.MinOverall,
+            request.MaxOverall,
+            request.MaxPerTeam,
+            request.ExcludeAlreadyListedInOpenCycles,
+            request.EnsureUniquePlayerPerCycle,
             request.Seed,
-            new MarketItemGenerationFilters(
-                playerIds?.Length > 0 ? playerIds : null,
-                positionIds?.Length > 0 ? positionIds : null,
-                filters.MinOverall,
-                filters.MaxOverall,
-                filters.MinAge,
-                filters.MaxAge),
-            new MarketItemLifecycleOptions(
-                lifecycle.PublishAtUtc,
-                lifecycle.ExpiresAtUtc,
-                lifecycle.DurationHours));
+            request.MinItemLifespan,
+            request.MaxItemLifespan,
+            request.AutoSpreadExpirationsAcrossCycle);
     }
 
     private static MarketItemGenerationPreviewDto ToDto(MarketItemGenerationPreview preview)
@@ -291,7 +285,10 @@ public static class MarketCycleEndpoints
             preview.RequestedCount,
             preview.EligibleCount,
             preview.Seed,
-            preview.Items.Select(ToDto).ToList());
+            preview.Items.Select(ToDto).ToList(),
+            preview.Skipped.Select(ToDto).ToList(),
+            preview.FirstExpirationUtc,
+            preview.LastExpirationUtc);
     }
 
     private static MarketItemGenerationResultDto ToDto(MarketItemGenerationResult result)
@@ -301,8 +298,10 @@ public static class MarketCycleEndpoints
             result.EligibleCount,
             result.Seed,
             result.CreatedCount,
-            result.SkippedExistingCount,
-            result.Items.Select(ToDto).ToList());
+            result.Items.Select(ToDto).ToList(),
+            result.Skipped.Select(ToDto).ToList(),
+            result.FirstExpirationUtc,
+            result.LastExpirationUtc);
     }
 
     private static MarketItemGenerationItemDto ToDto(MarketItemGenerationItem item)
@@ -314,11 +313,16 @@ public static class MarketCycleEndpoints
             item.PositionName,
             item.Overall,
             item.Age,
+            item.TeamId,
+            item.TeamName,
             item.BasePrice,
             item.BuyNowPrice,
             item.MinIncrement,
             item.ExpiresAtUtc);
     }
+
+    private static MarketItemGenerationSkipDto ToDto(MarketItemGenerationSkip skip)
+        => new(skip.PlayerId, skip.PlayerName, skip.Reason);
 
     private static bool TryValidate<T>(T model, out IResult? errorResult)
     {

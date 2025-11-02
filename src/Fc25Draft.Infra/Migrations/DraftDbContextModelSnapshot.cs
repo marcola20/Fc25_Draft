@@ -587,6 +587,8 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("TransferId");
 
+                    b.HasIndex("PerformedAtUtc");
+
                     b.HasIndex("FromTeamId");
 
                     b.HasIndex("ToTeamId");
