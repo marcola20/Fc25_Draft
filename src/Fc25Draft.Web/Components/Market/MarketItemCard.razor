@@ -7,6 +7,7 @@
 @using BidRequest = Fc25Draft.Core.DTOs.BidRequest
 @using BuyNowRequest = Fc25Draft.Core.DTOs.BuyNowRequest
 @using CoreItemVm = Fc25Draft.Core.DTOs.MarketItemVm
+@using Fc25Draft.Core.Extensions
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
 @using System.Reflection
@@ -19,8 +20,13 @@
         <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start">
             <div>
                 <h3 class="h5 mb-1">@Item.PlayerName</h3>
-                <span class="badge bg-secondary" aria-label="Classificação geral">OVR @Item.Overall</span>
+
+                <div class="d-flex gap-2">
+                    <span class="badge bg-primary">@Item.PositionId.ToPositionName()</span>
+                    <span class="badge bg-secondary">OVR @Item.Overall</span>
+                </div>
             </div>
+
             <span class="badge @StatusBadgeClass">@StatusDisplay</span>
         </div>
 
@@ -96,7 +102,7 @@
                     <span class="text-muted small">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)</span>
                     <button type="button"
                             class="btn btn-outline-success btn-sm ms-auto"
-                            disabled="@IsBidDisabled"
+                            disabled="@IsBuyNowDisabled"
                             @onclick="ShowBuyNowConfirm">
                         Comprar agora
                     </button>
@@ -185,6 +191,7 @@
     private bool IsExpired => Remaining <= TimeSpan.Zero;
 
     private bool IsBidDisabled => _isSubmitting || IsExpired || !Item.IsActive || !_model.ParsedAmount.HasValue || IsCurrentTeamLeader;
+    private bool IsBuyNowDisabled => _isSubmitting || IsExpired || !Item.IsActive;
 
     private bool CanBuyNow => Item.IsActive && Item.BuyNowPrice.HasValue;
 
@@ -613,10 +620,8 @@
 
     private void ShowBuyNowConfirm()
     {
-        if (IsBidDisabled || !CanBuyNow)
-        {
+        if (IsBuyNowDisabled || !CanBuyNow)
             return;
-        }
 
         _showBuyConfirm = true;
     }

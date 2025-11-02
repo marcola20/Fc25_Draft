@@ -16,53 +16,27 @@
 <EditForm Model="Model" OnValidSubmit="ApplyAsync">
     <div class="market-filters border rounded-3 p-3 bg-body">
         <div class="row g-2 align-items-end">
-            <div class="col-12 col-md">
+            <div class="col-12 col-md-6">
                 <label class="form-label" for="market-filter-name">Nome do jogador</label>
-                <div class="d-flex flex-wrap align-items-end gap-2 justify-content-start">
-                    <div class="flex-grow-1 min-w-0">
-                        <InputText id="market-filter-name"
-                                   class="form-control form-control-sm"
-                                   @bind-Value="Model.Name"
-                                   placeholder="Filtrar pelo nome"
-                                   aria-label="Filtrar pelo nome" />
-                    </div>
-                </div>
+                <InputText id="market-filter-name"
+                           class="form-control form-control-sm"
+                           @bind-Value="Model.Name"
+                           placeholder="Filtrar pelo nome"
+                           aria-label="Filtrar pelo nome" />
             </div>
 
-            <div class="col-12 col-md">
-                <label class="form-label" for="market-filter-positions">Posições</label>
-                <div class="dropdown w-100">
-                    <button type="button"
-                            id="market-filter-positions"
-                            class="form-select form-select-sm text-start d-flex justify-content-between align-items-center"
-                            data-bs-toggle="dropdown"
-                            data-bs-auto-close="outside"
-                            aria-haspopup="listbox"
-                            aria-expanded="false"
-                            aria-label="Filtrar por posições">
-                        <span class="text-truncate">@PositionsDisplayText</span>
-                        <span class="ms-2 text-secondary" aria-hidden="true">&#9662;</span>
-                    </button>
-                    <div class="dropdown-menu w-100 p-2" role="listbox">
-                        @if (PositionOptions.Count == 0)
-                        {
-                            <span class="dropdown-item-text text-muted">Nenhuma posição disponível</span>
-                        }
-                        else
-                        {
-                            @foreach (var option in PositionOptions)
-                            {
-                                var isChecked = Model.Positions.Contains(option.Id);
-                                <label class="dropdown-item d-flex align-items-center gap-2" role="option">
-                                    <input class="form-check-input m-0" type="checkbox" checked="@isChecked" @onchange="args => OnPositionChanged(option.Id, args)" />
-                                    <span>@option.Name</span>
-                                </label>
-                            }
-                        }
-                    </div>
-                </div>
-            </div>
+            <div class="col-12 col-md-6">
+                <PositionMultiSelect Label="Posições"
+                                     WrapperClass="w-100"
+                                     ToggleClass="form-select form-select-sm text-start"
+                                     IdPrefix="market-pos"
+                                     Options="@(PositionOptions.Select(p => new PositionMultiSelect.OptionItem(p.Id, p.Name)).ToList())"
+                                     @bind-SelectedIds="Model.Positions" />
 
+            </div>
+        </div>
+
+        <div class="row g-2 align-items-end mt-2">
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-status">Status</label>
                 <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
@@ -88,19 +62,11 @@
             <div class="col-12 col-md">
                 <label class="form-label" for="market-filter-overall-min">Overall</label>
                 <div class="input-group input-group-sm">
-                    <InputNumber TValue="int?"
-                                 id="market-filter-overall-min"
-                                 class="form-control"
-                                 @bind-Value="Model.OverallMin"
-                                 min="0"
-                                 aria-label="Overall mínimo" />
+                    <InputNumber TValue="int?" id="market-filter-overall-min" class="form-control"
+                                 @bind-Value="Model.OverallMin" min="0" aria-label="Overall mínimo" />
                     <span class="input-group-text">até</span>
-                    <InputNumber TValue="int?"
-                                 id="market-filter-overall-max"
-                                 class="form-control"
-                                 @bind-Value="Model.OverallMax"
-                                 min="0"
-                                 aria-label="Overall máximo" />
+                    <InputNumber TValue="int?" id="market-filter-overall-max" class="form-control"
+                                 @bind-Value="Model.OverallMax" min="0" aria-label="Overall máximo" />
                 </div>
             </div>
         </div>
@@ -110,14 +76,18 @@
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <button type="submit" class="btn btn-primary btn-sm">Aplicar filtros</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
-
-                    @if (!string.IsNullOrWhiteSpace(ResultsSummary))
-                    {
-                        <span class="text-muted small ms-auto">@ResultsSummary</span>
-                    }
                 </div>
             </div>
         </div>
+
+        @if (!string.IsNullOrWhiteSpace(ResultsSummary))
+        {
+            <div class="row mt-1">
+                <div class="col-12">
+                    <span class="text-muted small float-end">@ResultsSummary</span>
+                </div>
+            </div>
+        }
     </div>
 </EditForm>
 
@@ -200,23 +170,32 @@
         await ApplyAsync();
     }
 
-    private void OnPositionChanged(int positionId, ChangeEventArgs args)
+    private void OnPositionChanged(int positionId, ChangeEventArgs e)
     {
-        var isChecked = args.Value is bool value && value;
+        var isChecked =
+            e.Value is bool b ? b :
+            string.Equals(e.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(e.Value?.ToString(), "on", StringComparison.OrdinalIgnoreCase);
+
         var positions = Model.Positions ??= new List<int>();
 
         if (isChecked)
         {
-            if (!positions.Contains(positionId))
-            {
-                positions.Add(positionId);
-            }
+            if (!positions.Contains(positionId)) positions.Add(positionId);
         }
         else
         {
             positions.Remove(positionId);
         }
 
-        _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
+
+    private void OnPositionsSelectChanged(ChangeEventArgs e)
+    {
+        var values = e.Value as IEnumerable<string>;      // Blazor envia string[]
+        Model.Positions = values?.Select(int.Parse).ToList() ?? new();
+        StateHasChanged();
+    }
+
 }
