@@ -453,14 +453,9 @@ else
     => cycle.Status == MarketCycleStatus.Draft
        && !IsUpdating(cycle.CycleId);
 
-    private bool CanClose(MarketCycleDto cycle)
-        => cycle.Status == MarketCycleStatus.Active
-           && !IsUpdating(cycle.CycleId);
+    private bool CanClose(MarketCycleDto cycle)  => cycle.Status == MarketCycleStatus.Active && !IsUpdating(cycle.CycleId);
 
-    private bool CanConclude(MarketCycleDto cycle)
-        => cycle.Status == MarketCycleStatus.Closed
-           && !IsUpdating(cycle.CycleId);
-
+    private bool CanConclude(MarketCycleDto cycle) => (cycle.Status == MarketCycleStatus.Closed || cycle.Status == MarketCycleStatus.Active) && !IsUpdating(cycle.CycleId);
 
     private bool IsUpdating(Guid cycleId) => _updatingStatus.Contains(cycleId);
 
