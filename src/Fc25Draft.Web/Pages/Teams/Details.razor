@@ -38,6 +38,12 @@ else
         <dt class="col-sm-3">Jogadores</dt>
         <dd class="col-sm-9">@team.Jogadores</dd>
 
+        <dt class="col-sm-3">Caixa</dt>
+        <dd class="col-sm-9">@team.Caixa</dd>
+
+        <dt class="col-sm-3">Valor do Time</dt>
+        <dd class="col-sm-9">@FormatCurrency(teamAmount ?? 0m)</dd>
+
         @if (AdminAuth.IsAuthenticated)
         {
             <dt class="col-sm-3">Token do Time</dt>
@@ -130,7 +136,7 @@ else
         }
     </section>
 
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 mt-4">
         @if (AdminAuth.IsAuthenticated)
         {
             <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")'>
@@ -142,7 +148,6 @@ else
             Voltar
         </button>
     </div>
-
 }
 
 @code {
@@ -150,6 +155,7 @@ else
     public Guid Id { get; set; }
 
     private TeamDetailsDto? team;
+    private decimal? teamAmount;
     private TeamRosterDto? roster;
     private string? errorMessage;
     private bool isLoading = true;
@@ -258,6 +264,7 @@ else
                 basePrice));
         }
 
+        teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
         ApplyRosterSort();
     }
 

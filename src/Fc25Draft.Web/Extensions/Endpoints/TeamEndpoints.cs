@@ -63,7 +63,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.TeamName,
                         t.OwnerName,
                         t.Token,
-                        Jogadores = t.Roster.Count
+                        Jogadores = t.Roster.Count,
+                        t.Budget
                     })
                     .FirstOrDefaultAsync(ct);
 
@@ -71,8 +72,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 var includeToken = httpContext.User.IsInRole("Admin");
                 var teamToken = includeToken ? team.Token : string.Empty;
+                var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
 
-                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores);
+                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado);
                 return Results.Ok(dto);
             });
 
