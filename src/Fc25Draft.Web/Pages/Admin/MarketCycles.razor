@@ -11,11 +11,13 @@
 @using Fc25Draft.Web.Components.MarketCycles
 @using Fc25Draft.Web.Models.MarketCycles
 @using Fc25Draft.Web.Utilities
+@using Blazored.Toast.Services
 @inject AdminAuthService AdminAuth
 @inject MarketCycleClient MarketCycleClient
-@inject ToastService Toasts
+@inject IToastService Toasts
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+
 @implements IDisposable
 
 <PageTitle>Administração de Ciclos do Mercado</PageTitle>

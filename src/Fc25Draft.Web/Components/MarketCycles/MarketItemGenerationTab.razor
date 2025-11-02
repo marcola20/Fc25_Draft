@@ -1,6 +1,7 @@
 @using System.Globalization
 @using System.Linq
 @using System.Threading
+@using Blazored.Toast.Services
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using Fc25Draft.Core.Interfaces
@@ -8,7 +9,9 @@
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Components.Forms
-@using Blazored.Toast.Services
+@using Blazored.Toast;
+@inject IToastService Toasts
+
 @implements IDisposable
 
 @if (Cycle is null)
@@ -320,8 +323,6 @@ else
 
     [Inject] public IMarketItemGenerationClient GenerationClient { get; set; } = default!;
     [Inject] public IPositionService PositionService { get; set; } = default!;
-    [Inject] public Blazored.Toast.Services.ToastService Toasts { get; set; } = default!;
-
     private MarketItemGenerationFormModel? _model;
     private EditContext? _editContext;
     private bool _isLoadingPositions;

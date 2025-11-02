@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @inject AdminAuthService AdminAuth
 @implements IDisposable
+@using Blazored.Toast
+@using Blazored.Toast.Configuration
 
 <PageTitle>CBFV</PageTitle>
 
@@ -36,7 +38,7 @@
     </main>
 </div>
 
-<ToastContainer />
+<BlazoredToasts Position="ToastPosition.TopRight" />
 
 @if (showAdminModal)
 {
