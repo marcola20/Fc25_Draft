@@ -142,10 +142,10 @@ public static class MarketCycleEndpoints
 
             if (updated.Status == MarketCycleStatus.Closed)
             {
-                var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct);
+                var summary = await settlementService.SettleAllOpenItemsOnCycleCloseAsync(cycleId, request.ForceClose, ct);
                 var payload = new MarketCycleStatusUpdateResult(
                     updated,
-                    new MarketCycleSettlementSummary(summary.Sold, summary.Expired));
+                    new MarketCycleSettlementSummary(summary.Sold, summary.Expired, summary.Canceled));
                 return TypedResults.Ok(payload);
             }
 
@@ -270,6 +270,8 @@ public static class MarketCycleEndpoints
             positions is { Length: > 0 } ? positions : null,
             request.MinOverall,
             request.MaxOverall,
+            request.MinAge,
+            request.MaxAge,
             request.MaxPerTeam,
             request.ExcludeAlreadyListedInOpenCycles,
             request.EnsureUniquePlayerPerCycle,

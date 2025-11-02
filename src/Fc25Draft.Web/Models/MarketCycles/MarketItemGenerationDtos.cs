@@ -17,6 +17,12 @@ public class MarketItemGenerationRequestDto
     [Range(0, 200)]
     public int? MaxOverall { get; set; }
 
+    [Range(10, 60)]
+    public int? MinAge { get; set; }
+
+    [Range(10, 60)]
+    public int? MaxAge { get; set; }
+
     [Range(0, 50)]
     public int? MaxPerTeam { get; set; }
 

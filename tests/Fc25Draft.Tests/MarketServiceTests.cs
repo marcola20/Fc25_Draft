@@ -115,6 +115,107 @@ public class MarketServiceTests
     }
 
     [Fact]
+    public async Task PlaceBidAsync_ReleasesBudgetBlockedForPreviousLeader()
+    {
+        var fakeNow = new DateTimeOffset(2024, 8, 10, 14, 0, 0, TimeSpan.Zero);
+        var fakeTime = new FakeTimeProvider(fakeNow);
+
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<DraftDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var cycleId = Guid.NewGuid();
+        var teamA = Guid.NewGuid();
+        var teamB = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        const int playerId = 4321;
+
+        await using (var setup = new DraftDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+
+            setup.Positions.Add(new Position { PositionId = 1, Name = "Meia" });
+            setup.Players.Add(new Player
+            {
+                PlayerId = playerId,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Craque",
+                Overall = 89,
+                PositionId = 1
+            });
+
+            setup.Teams.AddRange(
+                new Team
+                {
+                    TeamId = teamA,
+                    TeamName = "Time A",
+                    Token = "TOKEN-A",
+                    Budget = 1_000_000m,
+                    BudgetBlocked = 0m
+                },
+                new Team
+                {
+                    TeamId = teamB,
+                    TeamName = "Time B",
+                    Token = "TOKEN-B",
+                    Budget = 1_000_000m,
+                    BudgetBlocked = 0m
+                });
+
+            setup.MarketCycles.Add(new MarketCycle
+            {
+                CycleId = cycleId,
+                Name = "Ciclo",
+                Status = MarketCycleStatus.Active,
+                StartsAtUtc = fakeNow.UtcDateTime.AddHours(-2),
+                EndsAtUtc = fakeNow.UtcDateTime.AddHours(2),
+                CreatedAtUtc = fakeNow.UtcDateTime.AddHours(-3),
+                UpdatedAtUtc = fakeNow.UtcDateTime.AddHours(-3)
+            });
+
+            setup.MarketItems.Add(new MarketItem
+            {
+                ItemId = itemId,
+                CycleId = cycleId,
+                PlayerId = playerId,
+                BasePrice = 50_000m,
+                MinIncrement = 5_000m,
+                ExpiresAtUtc = fakeNow.UtcDateTime.AddHours(1),
+                Status = MarketItemStatus.Active,
+                CreatedAtUtc = fakeNow.UtcDateTime.AddHours(-4),
+                LastUpdateUtc = fakeNow.UtcDateTime.AddHours(-4),
+                RowVersion = 1
+            });
+
+            await setup.SaveChangesAsync();
+        }
+
+        var log = new RecordingTransactionLogService();
+        var optionsWrapper = Options.Create(new MarketOptions());
+        var budget = new FixedBudgetService(available: 2_000_000m);
+
+        await using var context = new DraftDbContext(options);
+        var service = new MarketService(
+            context,
+            new NoopMarketCycleGenerator(),
+            optionsWrapper,
+            log,
+            budget,
+            fakeTime);
+
+        await service.PlaceBidAsync(itemId, "TOKEN-A", 18_000m, 1, CancellationToken.None);
+        var itemAfterFirst = await context.MarketItems.AsNoTracking().SingleAsync(i => i.ItemId == itemId);
+        await service.PlaceBidAsync(itemId, "token-b", 19_000m, itemAfterFirst.RowVersion, CancellationToken.None);
+
+        var teams = await context.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId);
+        Assert.Equal(0m, teams[teamA].BudgetBlocked);
+        Assert.Equal(19_000m, teams[teamB].BudgetBlocked);
+    }
+
+    [Fact]
     public void BrazilTimeFormatter_HandlesDstBoundary()
     {
         var beforeDst = new DateTime(2018, 11, 4, 2, 30, 0, DateTimeKind.Utc);

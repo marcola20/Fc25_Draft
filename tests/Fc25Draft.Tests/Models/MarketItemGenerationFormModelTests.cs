@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Fc25Draft.Web.Models.MarketCycles;
-using Fc25Draft.Web.Utilities;
 
 namespace Fc25Draft.Tests.Models;
 
@@ -15,7 +14,9 @@ public class MarketItemGenerationFormModelTests
 
         Assert.Equal(cycleId, model.CycleId);
         Assert.Equal(10, model.DesiredCount);
-        Assert.Equal(24, model.Lifecycle.DurationHours);
+        Assert.True(model.AutoSpreadExpirationsAcrossCycle);
+        Assert.True(model.ExcludeAlreadyListedInOpenCycles);
+        Assert.True(model.EnsureUniquePlayerPerCycle);
     }
 
     [Fact]
@@ -30,45 +31,53 @@ public class MarketItemGenerationFormModelTests
     }
 
     [Fact]
-    public void FiltersValidateOverallRange()
+    public void ValidateOverallRange()
     {
-        var filters = new MarketItemGenerationFiltersModel
-        {
-            MinOverall = 90,
-            MaxOverall = 80
-        };
+        var model = MarketItemGenerationFormModel.Create(Guid.NewGuid());
+        model.MinOverall = 90;
+        model.MaxOverall = 80;
 
-        var results = ValidateModel(filters);
+        var results = ValidateModel(model);
 
-        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationFiltersModel.MinOverall)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationFormModel.MinOverall)));
     }
 
     [Fact]
-    public void LifecycleRequiresDuration()
+    public void ValidateAgeRange()
     {
-        var lifecycle = new MarketItemGenerationLifecycleModel
-        {
-            DurationHours = null
-        };
+        var model = MarketItemGenerationFormModel.Create(Guid.NewGuid());
+        model.MinAge = 30;
+        model.MaxAge = 20;
 
-        var results = ValidateModel(lifecycle);
+        var results = ValidateModel(model);
 
-        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationLifecycleModel.DurationHours)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationFormModel.MinAge)));
     }
 
     [Fact]
-    public void LifecycleValidatesPublishBeforeExpire()
+    public void ManualModeRequiresDurations()
     {
-        var lifecycle = new MarketItemGenerationLifecycleModel
-        {
-            PublishAtLocal = new DateTime(2024, 1, 2, 10, 0, 0),
-            ExpiresAtLocal = new DateTime(2024, 1, 2, 9, 0, 0),
-            DurationHours = 2
-        };
+        var model = MarketItemGenerationFormModel.Create(Guid.NewGuid());
+        model.AutoSpreadExpirationsAcrossCycle = false;
+        model.MinLifespanHours = null;
+        model.MaxLifespanHours = null;
 
-        var results = ValidateModel(lifecycle);
+        var results = ValidateModel(model);
 
-        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationLifecycleModel.PublishAtLocal)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationFormModel.MinLifespanHours)));
+    }
+
+    [Fact]
+    public void ManualModeValidatesDurationRange()
+    {
+        var model = MarketItemGenerationFormModel.Create(Guid.NewGuid());
+        model.AutoSpreadExpirationsAcrossCycle = false;
+        model.MinLifespanHours = 24;
+        model.MaxLifespanHours = 12;
+
+        var results = ValidateModel(model);
+
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(MarketItemGenerationFormModel.MinLifespanHours)));
     }
 
     [Fact]
@@ -77,19 +86,25 @@ public class MarketItemGenerationFormModelTests
         var cycleId = Guid.NewGuid();
         var model = MarketItemGenerationFormModel.Create(cycleId);
         model.DesiredCount = 5;
-        model.Filters.PositionIds.Add(3);
-        model.Filters.MinOverall = 70;
-        model.Filters.MaxOverall = 90;
-        model.Lifecycle.PublishAtLocal = new DateTime(2024, 1, 10, 12, 0, 0);
-        model.Lifecycle.DurationHours = 12;
+        model.PositionIds.Add(3);
+        model.MinOverall = 70;
+        model.MaxOverall = 90;
+        model.MinAge = 22;
+        model.MaxAge = 28;
+        model.AutoSpreadExpirationsAcrossCycle = false;
+        model.MinLifespanHours = 12;
+        model.MaxLifespanHours = 24;
 
         var dto = model.ToRequestDto();
 
         Assert.Equal(model.DesiredCount, dto.DesiredCount);
-        Assert.Contains((short)3, dto.Filters.PositionIds);
-        Assert.Equal(model.Filters.MinOverall, dto.Filters.MinOverall);
-        Assert.Equal(BrazilTime.ConvertToUtc(model.Lifecycle.PublishAtLocal!.Value), dto.Lifecycle.PublishAtUtc);
-        Assert.Equal(model.Lifecycle.DurationHours, dto.Lifecycle.DurationHours);
+        Assert.Contains((short)3, dto.PositionIds);
+        Assert.Equal(model.MinOverall, dto.MinOverall);
+        Assert.Equal(model.MaxOverall, dto.MaxOverall);
+        Assert.Equal(model.MinAge, dto.MinAge);
+        Assert.Equal(model.MaxAge, dto.MaxAge);
+        Assert.Equal(TimeSpan.FromHours(model.MinLifespanHours!.Value), dto.MinItemLifespan);
+        Assert.Equal(TimeSpan.FromHours(model.MaxLifespanHours!.Value), dto.MaxItemLifespan);
     }
 
     private static List<ValidationResult> ValidateModel(object model)

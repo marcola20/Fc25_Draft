@@ -37,12 +37,12 @@ public class AuctionSettlementService : IAuctionSettlementService
     }
 
     public Task<AuctionSettlementResult> SettleExpiredItemsAsync(Guid cycleId, CancellationToken ct)
-        => SettleAsync(cycleId, onlyExpired: true, ct);
+        => SettleAsync(cycleId, onlyExpired: true, forceClose: false, ct);
 
-    public Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, CancellationToken ct)
-        => SettleAsync(cycleId, onlyExpired: false, ct);
+    public Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, bool forceClose, CancellationToken ct)
+        => SettleAsync(cycleId, onlyExpired: false, forceClose: forceClose, ct);
 
-    private async Task<AuctionSettlementResult> SettleAsync(Guid cycleId, bool onlyExpired, CancellationToken ct)
+    private async Task<AuctionSettlementResult> SettleAsync(Guid cycleId, bool onlyExpired, bool forceClose, CancellationToken ct)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var strategy = _dbContext.Database.CreateExecutionStrategy();
@@ -70,12 +70,13 @@ public class AuctionSettlementService : IAuctionSettlementService
 
             var sold = 0;
             var expired = 0;
+            var canceled = 0;
 
             foreach (var item in items)
             {
                 try
                 {
-                    var outcome = await ProcessItemAsync(item, now, onlyExpired, ct).ConfigureAwait(false);
+                    var outcome = await ProcessItemAsync(item, now, onlyExpired, forceClose, ct).ConfigureAwait(false);
 
                     switch (outcome)
                     {
@@ -85,6 +86,10 @@ public class AuctionSettlementService : IAuctionSettlementService
                             break;
                         case SettlementOutcome.Expired:
                             expired++;
+                            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                            break;
+                        case SettlementOutcome.Canceled:
+                            canceled++;
                             await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
                             break;
                     }
@@ -117,15 +122,20 @@ public class AuctionSettlementService : IAuctionSettlementService
             }
 
             await tx.CommitAsync(ct).ConfigureAwait(false);
-            return new AuctionSettlementResult(sold, expired);
+            return new AuctionSettlementResult(sold, expired, canceled);
         });
     }
 
-    private async Task<SettlementOutcome> ProcessItemAsync(MarketItem item, DateTime now, bool onlyExpired, CancellationToken ct)
+    private async Task<SettlementOutcome> ProcessItemAsync(MarketItem item, DateTime now, bool onlyExpired, bool forceClose, CancellationToken ct)
     {
         if (item.Status == MarketItemStatus.Sold || item.Status == MarketItemStatus.Canceled)
         {
             return SettlementOutcome.None;
+        }
+
+        if (forceClose)
+        {
+            return await CancelItemAsync(item, now, ct).ConfigureAwait(false);
         }
 
         if (onlyExpired && item.ExpiresAtUtc > now)
@@ -260,6 +270,49 @@ public class AuctionSettlementService : IAuctionSettlementService
         return SettlementOutcome.Expired;
     }
 
+    private async Task<SettlementOutcome> CancelItemAsync(MarketItem item, DateTime now, CancellationToken ct)
+    {
+        var previousLeaderId = item.CurrentLeaderTeamId;
+        var previousLeaderAmount = item.CurrentLeaderAmount;
+
+        decimal? roundedAmount = null;
+
+        if (previousLeaderId.HasValue && previousLeaderAmount.HasValue)
+        {
+            var team = await _dbContext.Teams
+                .FirstOrDefaultAsync(t => t.TeamId == previousLeaderId.Value, ct)
+                .ConfigureAwait(false);
+
+            if (team is not null)
+            {
+                roundedAmount = decimal.Round(previousLeaderAmount.Value, 2, MidpointRounding.AwayFromZero);
+                team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - roundedAmount.Value);
+            }
+        }
+
+        item.Status = MarketItemStatus.Canceled;
+        item.CurrentLeaderTeamId = null;
+        item.CurrentLeaderAmount = null;
+        item.WinnerTeamId = null;
+        item.LastUpdateUtc = now;
+        item.ExpiresAtUtc = now;
+
+        var playerName = item.Player?.Name ?? item.PlayerId.ToString();
+
+        await _transactionLogService.LogMarketAsync(
+            item,
+            MarketTransactionType.ItemCanceled,
+            null,
+            previousLeaderId,
+            roundedAmount,
+            "sistema",
+            $"Leilão do jogador {playerName} cancelado no encerramento do ciclo.",
+            now,
+            ct).ConfigureAwait(false);
+
+        return SettlementOutcome.Canceled;
+    }
+
     private async Task UpdateCycleStatusAsync(Guid cycleId, DateTime now, CancellationToken ct)
     {
         var hasActive = await _dbContext.MarketItems
@@ -333,6 +386,7 @@ public class AuctionSettlementService : IAuctionSettlementService
     {
         None,
         Sold,
-        Expired
+        Expired,
+        Canceled
     }
 }

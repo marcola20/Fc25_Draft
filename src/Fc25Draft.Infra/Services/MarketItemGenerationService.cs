@@ -349,6 +349,16 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             query = query.Where(p => p.Player.Overall <= options.MaxOverall.Value);
         }
 
+        if (options.MinAge.HasValue)
+        {
+            query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value >= options.MinAge.Value);
+        }
+
+        if (options.MaxAge.HasValue)
+        {
+            query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value <= options.MaxAge.Value);
+        }
+
         return await query
             .OrderBy(p => p.Player.PlayerId)
             .Select(p => new MarketItemGenerationCandidate(

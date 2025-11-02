@@ -8,6 +8,8 @@ public record MarketItemGenerationOptions(
     IReadOnlyCollection<short>? PositionIds,
     int? MinOverall,
     int? MaxOverall,
+    int? MinAge,
+    int? MaxAge,
     int? MaxPerTeam,
     bool ExcludeAlreadyListedInOpenCycles,
     bool EnsureUniquePlayerPerCycle,

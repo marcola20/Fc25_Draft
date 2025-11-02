@@ -50,6 +50,8 @@ public class MarketItemGenerationServiceTests
             null,
             null,
             null,
+            null,
+            null,
             true,
             true,
             123,
@@ -92,6 +94,8 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             2,
+            null,
+            null,
             null,
             null,
             null,
@@ -149,6 +153,8 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             2,
+            null,
+            null,
             null,
             null,
             null,
@@ -227,6 +233,8 @@ public class MarketItemGenerationServiceTests
         var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
         var options = new MarketItemGenerationOptions(
             2,
+            null,
+            null,
             null,
             null,
             null,
@@ -311,6 +319,8 @@ public class MarketItemGenerationServiceTests
             null,
             null,
             null,
+            null,
+            null,
             true,
             true,
             321,
@@ -323,6 +333,79 @@ public class MarketItemGenerationServiceTests
         Assert.Equal(1, result.CreatedCount);
         Assert.Contains(result.Items, item => item.PlayerId == availablePlayer.PlayerId);
         Assert.DoesNotContain(result.Items, item => item.PlayerId == rosteredPlayer.PlayerId);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_FiltersByAgeRange()
+    {
+        await using var context = CreateDbContext();
+        await SeedPositionAsync(context);
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        context.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Draft",
+            Status = MarketCycleStatus.Draft,
+            StartsAtUtc = now,
+            EndsAtUtc = now.AddHours(6),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        context.Players.AddRange(
+            new Player
+            {
+                PlayerId = 70,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Veterano",
+                Overall = 84,
+                PositionId = 1,
+                Age = 33
+            },
+            new Player
+            {
+                PlayerId = 71,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Jovem",
+                Overall = 82,
+                PositionId = 1,
+                Age = 21
+            },
+            new Player
+            {
+                PlayerId = 72,
+                PlayerGuid = Guid.NewGuid(),
+                Name = "Alvo",
+                Overall = 83,
+                PositionId = 1,
+                Age = 26
+            });
+
+        await context.SaveChangesAsync();
+
+        var service = new MarketItemGenerationService(context, new FakePricingService(), new FakeTimeProvider(DateTimeOffset.UtcNow));
+        var options = new MarketItemGenerationOptions(
+            2,
+            null,
+            null,
+            null,
+            24,
+            28,
+            null,
+            true,
+            true,
+            42,
+            null,
+            null,
+            true);
+
+        var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
+
+        Assert.Equal(1, result.CreatedCount);
+        var generated = Assert.Single(result.Items);
+        Assert.Equal(72, generated.PlayerId);
     }
 
     private static DraftDbContext CreateDbContext()

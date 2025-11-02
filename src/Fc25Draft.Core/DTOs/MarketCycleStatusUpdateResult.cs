@@ -15,7 +15,7 @@ public sealed record MarketCycleStatusUpdateResult
     public MarketCycleSettlementSummary? SettlementSummary { get; }
 }
 
-public sealed record MarketCycleSettlementSummary(int Sold, int Expired)
+public sealed record MarketCycleSettlementSummary(int Sold, int Expired, int Canceled)
 {
-    public int Total => Sold + Expired;
+    public int Total => Sold + Expired + Canceled;
 }

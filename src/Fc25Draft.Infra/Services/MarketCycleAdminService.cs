@@ -218,7 +218,7 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         if (cycle.Status == MarketCycleStatus.Active)
         {
             await _settlementService
-                .SettleAllOpenItemsOnCycleCloseAsync(cycleId, ct)
+                .SettleAllOpenItemsOnCycleCloseAsync(cycleId, forceClose: false, ct)
                 .ConfigureAwait(false);
 
             var updated = await GetByIdAsync(cycleId, ct).ConfigureAwait(false)
@@ -244,7 +244,12 @@ public class MarketCycleAdminService : IMarketCycleAdminService
             .CountAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Expired, ct)
             .ConfigureAwait(false);
 
-        return new MarketCycleSettlementSummary(sold, expired);
+        var canceled = await _dbContext.MarketItems
+            .AsNoTracking()
+            .CountAsync(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Canceled, ct)
+            .ConfigureAwait(false);
+
+        return new MarketCycleSettlementSummary(sold, expired, canceled);
     }
 
     private static MarketCycleDto ToDto(MarketCycle cycle) => new(

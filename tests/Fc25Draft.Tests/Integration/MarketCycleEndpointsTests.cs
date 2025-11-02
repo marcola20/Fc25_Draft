@@ -207,18 +207,19 @@ public class MarketCycleEndpointsTests : IClassFixture<MarketCycleEndpointsFacto
         Assert.NotNull(payload);
         Assert.Equal(MarketCycleStatus.Closed, payload!.Cycle.Status);
         Assert.NotNull(payload.SettlementSummary);
-        Assert.Equal(1, payload.SettlementSummary!.Sold);
+        Assert.Equal(0, payload.SettlementSummary!.Sold);
         Assert.Equal(0, payload.SettlementSummary!.Expired);
+        Assert.Equal(1, payload.SettlementSummary!.Canceled);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
         var item = await db.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
-        Assert.Equal(MarketItemStatus.Sold, item.Status);
-        Assert.Equal(teamId, item.WinnerTeamId);
+        Assert.Equal(MarketItemStatus.Canceled, item.Status);
+        Assert.Null(item.WinnerTeamId);
 
         var team = await db.Teams.AsNoTracking().FirstAsync(t => t.TeamId == teamId);
-        Assert.Equal(3000m, team.Budget);
         Assert.Equal(0m, team.BudgetBlocked);
+        Assert.Equal(5000m, team.Budget);
     }
 
     [Fact]

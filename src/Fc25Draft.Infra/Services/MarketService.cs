@@ -180,12 +180,14 @@ public class MarketService : IMarketService
 
             var culture = CultureInfo.GetCultureInfo("pt-BR");
 
-            if (amount < requiredMinimum)
+            var normalizedAmount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+
+            if (normalizedAmount < requiredMinimum)
             {
                 throw new MarketValidationException($"O lance mínimo permitido é {requiredMinimum.ToString("C", culture)}.");
             }
 
-            if (item.BuyNowPrice.HasValue && amount >= item.BuyNowPrice.Value)
+            if (item.BuyNowPrice.HasValue && normalizedAmount >= item.BuyNowPrice.Value)
             {
                 var buyNowFormatted = item.BuyNowPrice.Value.ToString("C", culture);
                 throw new MarketValidationException($"Utilize a opção de compra imediata para valores a partir de {buyNowFormatted}.");
@@ -194,7 +196,7 @@ public class MarketService : IMarketService
             await EnsureSquadLimitAsync(team.TeamId, item.ItemId, item.CurrentLeaderTeamId, ct2);
 
             var availableBudget = await _budgetService.GetAvailableAsync(team.TeamId, null, ct2).ConfigureAwait(false);
-            if (availableBudget < amount)
+            if (availableBudget < normalizedAmount)
             {
                 throw new MarketValidationException("Saldo insuficiente para este lance considerando lances líderes ativos em outros itens.");
             }
@@ -210,7 +212,8 @@ public class MarketService : IMarketService
 
                 if (previousTeam is not null)
                 {
-                    previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - previousAmount);
+                    var previousRounded = decimal.Round(previousAmount, 2, MidpointRounding.AwayFromZero);
+                    previousTeam.BudgetBlocked = Math.Max(0m, previousTeam.BudgetBlocked - previousRounded);
                     var previousTeamName = string.IsNullOrWhiteSpace(previousTeam.TeamName)
                         ? previousTeam.TeamId.ToString()
                         : previousTeam.TeamName;
@@ -222,22 +225,22 @@ public class MarketService : IMarketService
                 }
             }
 
-            team.BudgetBlocked += amount;
+            team.BudgetBlocked += normalizedAmount;
 
             var bid = new MarketBid
             {
                 BidId = Guid.NewGuid(),
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
-                Amount = amount,
+                Amount = normalizedAmount,
                 CreatedAtUtc = nowUtc
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
-            item.CurrentLeaderAmount = amount;
+            item.CurrentLeaderAmount = normalizedAmount;
             item.LastUpdateUtc = nowUtc;
 
-            var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", amount, item.Player.Name);
+            var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", normalizedAmount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
                 bidNotes = $"{bidNotes} {outbidNotes}";
 

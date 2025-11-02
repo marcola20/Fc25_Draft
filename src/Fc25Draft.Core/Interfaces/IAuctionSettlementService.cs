@@ -8,5 +8,5 @@ namespace Fc25Draft.Core.Interfaces;
 public interface IAuctionSettlementService
 {
     Task<AuctionSettlementResult> SettleExpiredItemsAsync(Guid cycleId, CancellationToken ct);
-    Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, CancellationToken ct);
+    Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, bool forceClose, CancellationToken ct);
 }

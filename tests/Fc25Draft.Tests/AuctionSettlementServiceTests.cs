@@ -80,7 +80,7 @@ public class AuctionSettlementServiceTests
 
         var summary = await service.SettleExpiredItemsAsync(cycleId, CancellationToken.None);
 
-        Assert.Equal(new AuctionSettlementResult(1, 0), summary);
+        Assert.Equal(new AuctionSettlementResult(1, 0, 0), summary);
 
         var updatedItem = await context.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
         Assert.Equal(MarketItemStatus.Sold, updatedItem.Status);
@@ -159,7 +159,7 @@ public class AuctionSettlementServiceTests
 
         var summary = await service.SettleExpiredItemsAsync(cycleId, CancellationToken.None);
 
-        Assert.Equal(new AuctionSettlementResult(0, 1), summary);
+        Assert.Equal(new AuctionSettlementResult(0, 1, 0), summary);
 
         var updatedItem = await context.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
         Assert.Equal(MarketItemStatus.Expired, updatedItem.Status);
@@ -236,9 +236,9 @@ public class AuctionSettlementServiceTests
         var logService = new TransactionLogService(context);
         var service = new AuctionSettlementService(context, logService, NullLogger<AuctionSettlementService>.Instance);
 
-        var summary = await service.SettleAllOpenItemsOnCycleCloseAsync(cycleId, CancellationToken.None);
+        var summary = await service.SettleAllOpenItemsOnCycleCloseAsync(cycleId, forceClose: false, CancellationToken.None);
 
-        Assert.Equal(new AuctionSettlementResult(1, 0), summary);
+        Assert.Equal(new AuctionSettlementResult(1, 0, 0), summary);
 
         var updatedItem = await context.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
         Assert.Equal(MarketItemStatus.Sold, updatedItem.Status);
@@ -250,6 +250,82 @@ public class AuctionSettlementServiceTests
 
         var rosterEntry = await context.TeamRosters.AsNoTracking().FirstOrDefaultAsync(r => r.TeamId == team.TeamId && r.PlayerId == player.PlayerId);
         Assert.NotNull(rosterEntry);
+    }
+
+    [Fact]
+    public async Task SettleAllOpenItemsOnCycleCloseAsync_ForceCloseCancelsItemsAndUnblocksBudget()
+    {
+        using var context = CreateContext();
+        var now = DateTime.UtcNow;
+
+        var position = new Position { PositionId = 4, Name = "Lateral" };
+        var cycleId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var player = new Player
+        {
+            PlayerId = 60,
+            Name = "Jogador Cancelado",
+            PositionId = position.PositionId,
+            Overall = 85,
+            PlayerGuid = Guid.NewGuid()
+        };
+
+        var team = new Team
+        {
+            TeamId = Guid.NewGuid(),
+            TeamName = "Equipe Cancelada",
+            Token = "TOKEN-CANCEL",
+            Budget = 5000m,
+            BudgetBlocked = 1500m
+        };
+
+        var cycle = new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Ciclo Ativo",
+            Status = MarketCycleStatus.Active,
+            StartsAtUtc = now.AddHours(-2),
+            EndsAtUtc = now.AddHours(2),
+            CreatedAtUtc = now.AddHours(-3),
+            UpdatedAtUtc = now.AddHours(-1)
+        };
+
+        var item = new MarketItem
+        {
+            ItemId = itemId,
+            CycleId = cycleId,
+            PlayerId = player.PlayerId,
+            BasePrice = 900m,
+            MinIncrement = 90m,
+            ExpiresAtUtc = now.AddHours(1),
+            Status = MarketItemStatus.Active,
+            CreatedAtUtc = now.AddHours(-2),
+            LastUpdateUtc = now.AddHours(-1),
+            CurrentLeaderTeamId = team.TeamId,
+            CurrentLeaderAmount = 1500m
+        };
+
+        context.Positions.Add(position);
+        context.Teams.Add(team);
+        context.Players.Add(player);
+        context.MarketCycles.Add(cycle);
+        context.MarketItems.Add(item);
+        await context.SaveChangesAsync();
+
+        var logService = new TransactionLogService(context);
+        var service = new AuctionSettlementService(context, logService, NullLogger<AuctionSettlementService>.Instance);
+
+        var summary = await service.SettleAllOpenItemsOnCycleCloseAsync(cycleId, forceClose: true, CancellationToken.None);
+
+        Assert.Equal(new AuctionSettlementResult(0, 0, 1), summary);
+
+        var updatedItem = await context.MarketItems.AsNoTracking().FirstAsync(i => i.ItemId == itemId);
+        Assert.Equal(MarketItemStatus.Canceled, updatedItem.Status);
+        Assert.Null(updatedItem.WinnerTeamId);
+
+        var updatedTeam = await context.Teams.AsNoTracking().FirstAsync(t => t.TeamId == team.TeamId);
+        Assert.Equal(5000m, updatedTeam.Budget);
+        Assert.Equal(0m, updatedTeam.BudgetBlocked);
     }
 
     private static DraftDbContext CreateContext()

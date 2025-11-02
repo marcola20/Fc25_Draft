@@ -231,6 +231,7 @@ public class MarketCycleAdminServiceTests
         Assert.NotNull(result.SettlementSummary);
         Assert.Equal(1, result.SettlementSummary!.Sold);
         Assert.Equal(0, result.SettlementSummary!.Expired);
+        Assert.Equal(0, result.SettlementSummary!.Canceled);
 
         var updatedCycle = await context.MarketCycles.AsNoTracking().SingleAsync(c => c.CycleId == cycleId);
         Assert.Equal(MarketCycleStatus.Closed, updatedCycle.Status);
@@ -268,6 +269,7 @@ public class MarketCycleAdminServiceTests
         var secondCall = await service.ConcludeAsync(cycleId, CancellationToken.None);
         Assert.NotNull(secondCall.SettlementSummary);
         Assert.Equal(1, secondCall.SettlementSummary!.Sold);
+        Assert.Equal(0, secondCall.SettlementSummary!.Canceled);
         Assert.Equal(1, await context.TransferHistories.CountAsync());
     }
 
@@ -321,9 +323,9 @@ public class MarketCycleAdminServiceTests
     private sealed class StubSettlementService : IAuctionSettlementService
     {
         public Task<AuctionSettlementResult> SettleExpiredItemsAsync(Guid cycleId, CancellationToken ct)
-            => Task.FromResult(new AuctionSettlementResult(0, 0));
+            => Task.FromResult(new AuctionSettlementResult(0, 0, 0));
 
-        public Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, CancellationToken ct)
-            => Task.FromResult(new AuctionSettlementResult(0, 0));
+        public Task<AuctionSettlementResult> SettleAllOpenItemsOnCycleCloseAsync(Guid cycleId, bool forceClose, CancellationToken ct)
+            => Task.FromResult(new AuctionSettlementResult(0, 0, 0));
     }
 }

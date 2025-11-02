@@ -87,6 +87,16 @@ else
                                 <InputNumber id="generation-ovr-max" class="form-control" @bind-Value="_model!.MaxOverall" />
                                 <ValidationMessage For="@(() => _model!.MaxOverall)" />
                             </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-age-min">Idade mínima</label>
+                                <InputNumber id="generation-age-min" class="form-control" @bind-Value="_model!.MinAge" />
+                                <ValidationMessage For="@(() => _model!.MinAge)" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="generation-age-max">Idade máxima</label>
+                                <InputNumber id="generation-age-max" class="form-control" @bind-Value="_model!.MaxAge" />
+                                <ValidationMessage For="@(() => _model!.MaxAge)" />
+                            </div>
                             <div class="col-12">
                                 <label class="form-label d-block">Posições</label>
                                 @if (_isLoadingPositions)
@@ -239,6 +249,7 @@ else
                                     <tr>
                                         <th scope="col">Jogador</th>
                                         <th scope="col">Posição</th>
+                                        <th scope="col">Idade</th>
                                         <th scope="col">Overall</th>
                                         <th scope="col">Time atual</th>
                                         <th scope="col">Preço base</th>
@@ -248,15 +259,16 @@ else
                                 </thead>
                                 <tbody>
                                 @foreach (var item in _preview.Items)
-                                {
-                                    <tr>
-                                        <td>@item.PlayerName</td>
-                                        <td>@item.PositionName</td>
-                                        <td>@item.Overall</td>
-                                        <td>@FormatTeam(item.TeamName)</td>
-                                        <td>@FormatCurrency(item.BasePrice)</td>
-                                        <td>@FormatCurrency(item.BuyNowPrice)</td>
-                                        <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
+                                    {
+                                        <tr>
+                                            <td>@item.PlayerName</td>
+                                            <td>@item.PositionName</td>
+                                            <td>@(item.Age?.ToString() ?? "-")</td>
+                                            <td>@item.Overall</td>
+                                            <td>@FormatTeam(item.TeamName)</td>
+                                            <td>@FormatCurrency(item.BasePrice)</td>
+                                            <td>@FormatCurrency(item.BuyNowPrice)</td>
+                                            <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
                                     </tr>
                                 }
                                 </tbody>

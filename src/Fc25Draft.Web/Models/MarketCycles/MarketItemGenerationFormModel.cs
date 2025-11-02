@@ -21,6 +21,12 @@ public class MarketItemGenerationFormModel : IValidatableObject
     [Range(0, 200, ErrorMessage = "O overall máximo deve estar entre 0 e 200.")]
     public int? MaxOverall { get; set; }
 
+    [Range(10, 60, ErrorMessage = "A idade mínima deve estar entre 10 e 60 anos.")]
+    public int? MinAge { get; set; }
+
+    [Range(10, 60, ErrorMessage = "A idade máxima deve estar entre 10 e 60 anos.")]
+    public int? MaxAge { get; set; }
+
     [Range(0, 50, ErrorMessage = "O máximo por time deve estar entre 0 e 50.")]
     public int? MaxPerTeam { get; set; }
 
@@ -51,6 +57,11 @@ public class MarketItemGenerationFormModel : IValidatableObject
             yield return new ValidationResult("O overall mínimo deve ser menor ou igual ao máximo.", new[] { nameof(MinOverall), nameof(MaxOverall) });
         }
 
+        if (MinAge.HasValue && MaxAge.HasValue && MinAge.Value > MaxAge.Value)
+        {
+            yield return new ValidationResult("A idade mínima deve ser menor ou igual à máxima.", new[] { nameof(MinAge), nameof(MaxAge) });
+        }
+
         if (!AutoSpreadExpirationsAcrossCycle)
         {
             if (!MinLifespanHours.HasValue || !MaxLifespanHours.HasValue)
@@ -72,6 +83,8 @@ public class MarketItemGenerationFormModel : IValidatableObject
             PositionIds = PositionIds,
             MinOverall = MinOverall,
             MaxOverall = MaxOverall,
+            MinAge = MinAge,
+            MaxAge = MaxAge,
             MaxPerTeam = MaxPerTeam,
             ExcludeAlreadyListedInOpenCycles = ExcludeAlreadyListedInOpenCycles,
             EnsureUniquePlayerPerCycle = EnsureUniquePlayerPerCycle,

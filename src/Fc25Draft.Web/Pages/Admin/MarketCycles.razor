@@ -570,7 +570,8 @@ else
     {
         var sold = FormatCount(summary.Sold, "item vendido", "itens vendidos", "nenhum item vendido");
         var expired = FormatCount(summary.Expired, "item expirado", "itens expirados", "nenhum item expirado");
-        return $"{sold}, {expired}.";
+        var canceled = FormatCount(summary.Canceled, "item cancelado", "itens cancelados", "nenhum item cancelado");
+        return $"{sold}, {expired}, {canceled}.";
     }
 
     private static string FormatCount(int value, string singular, string plural, string zeroText)
