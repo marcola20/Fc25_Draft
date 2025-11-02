@@ -75,20 +75,19 @@
                     }
                 </div>
             }
-            <div class="text-end" aria-live="polite">
-                @if (IsSold)
-                {
-                    <span class="badge bg-danger">(Vendido)</span>
-                }
-                else if (IsExpired)
-                {
-                    <span class="badge bg-secondary">Encerrado</span>
-                }
-                else
-                {
-                    <span class="fw-semibold">Tempo restante: @CountdownText</span>
-                }
-            </div>
+            @if (!IsSold)
+            {
+                <div class="text-end" aria-live="polite">
+                    @if (IsExpired)
+                    {
+                        <span class="badge bg-secondary">Encerrado</span>
+                    }
+                    else
+                    {
+                        <span class="fw-semibold">Tempo restante: @CountdownText</span>
+                    }
+                </div>
+            }
         </div>
 
         @if (!ShowBuyNowSummary)
@@ -232,12 +231,21 @@
         ? Item.CurrentLeaderTeamName!
         : Item.CurrentLeaderTeamId?.ToString() ?? "Time desconhecido";
 
-    private string StatusDisplay => IsExpired ? "Encerrado" : TranslateStatus(Item.Status);
+    private string StatusDisplay => IsSold
+        ? "Vendido"
+        : IsExpired
+            ? "Encerrado"
+            : TranslateStatus(Item.Status);
 
     private string StatusBadgeClass
     {
         get
         {
+            if (IsSold)
+            {
+                return "bg-danger";
+            }
+
             var rawStatus = IsExpired ? "encerrado" : Item.Status ?? string.Empty;
             var status = rawStatus.ToLowerInvariant();
             return status switch
