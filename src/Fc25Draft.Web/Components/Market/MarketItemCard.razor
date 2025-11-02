@@ -35,9 +35,11 @@
             {
                 <div class="d-flex flex-column gap-2">
                     <div>
-                        <div class="text-muted small">Comprar agora</div>
+                        <div class="text-muted small">Contratado por</div>
                         <div class="fw-semibold text-body">@FormatCurrency(BuyNowSummaryAmount)</div>
-                        <div class="small text-muted">Compra por @BuyNowWinnerDisplay</div>
+                        <div class="small text-muted">
+                            pelo @((MarkupString)$"<strong>{BuyNowWinnerDisplay}</strong>")
+                        </div>
                     </div>
                 </div>
             }
