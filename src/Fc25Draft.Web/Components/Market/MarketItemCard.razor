@@ -34,12 +34,13 @@
             @if (ShowBuyNowSummary)
             {
                 <div class="d-flex flex-column gap-2">
+                    <div class="text-muted small">Adquirido por</div>
                     <div>
-                        <div class="text-muted small">Contratado por</div>
-                        <div class="fw-semibold text-body">@FormatCurrency(BuyNowSummaryAmount)</div>
-                        <div class="small text-muted">
-                            pelo @((MarkupString)$"<strong>{BuyNowWinnerDisplay}</strong>")
-                        </div>
+                        <div class="text-muted small">Valor</div>
+                        <div class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</div>
+                    </div>
+                    <div class="small text-muted">
+                        pelo @((MarkupString)$"<strong>{BuyNowWinnerDisplay}</strong>")
                     </div>
                 </div>
             }
@@ -223,8 +224,6 @@
         && Item.BuyNowPrice.HasValue
         && Item.CurrentLeaderAmount.HasValue
         && AreAmountsEqual(Item.CurrentLeaderAmount.Value, Item.BuyNowPrice.Value);
-
-    private decimal BuyNowSummaryAmount => Item.CurrentLeaderAmount ?? Item.BuyNowPrice ?? 0m;
 
     private string BuyNowWinnerDisplay => !string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName)
         ? Item.CurrentLeaderTeamName!
