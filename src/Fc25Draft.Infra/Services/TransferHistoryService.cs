@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -36,14 +35,12 @@ public class TransferHistoryService : ITransferHistoryService
             throw new ArgumentException("Tipo de transferência inválido.", nameof(entry));
         }
 
-        var playerInfo = await _dbContext.Players
+        var playerExists = await _dbContext.Players
             .AsNoTracking()
-            .Where(p => p.PlayerId == entry.PlayerId)
-            .Select(p => new { p.PlayerId, p.Overall })
-            .FirstOrDefaultAsync()
+            .AnyAsync(p => p.PlayerId == entry.PlayerId)
             .ConfigureAwait(false);
 
-        if (playerInfo is null)
+        if (!playerExists)
         {
             throw new ArgumentException($"Jogador {entry.PlayerId} não encontrado.", nameof(entry));
         }
@@ -82,8 +79,6 @@ public class TransferHistoryService : ITransferHistoryService
         entry.Notes = Normalize(entry.Notes, MaxNotesLength);
         entry.PerformedBy = Normalize(entry.PerformedBy, MaxPerformedByLength);
         entry.PerformedAtUtc = NormalizeToUtc(entry.PerformedAtUtc);
-
-        await ReconcileTransferAmountAsync(entry, playerInfo.Overall).ConfigureAwait(false);
 
         _dbContext.TransferHistories.Add(entry);
         await _dbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -172,58 +167,4 @@ public class TransferHistoryService : ITransferHistoryService
             ? trimmed
             : trimmed[..maxLength];
     }
-
-    private async Task ReconcileTransferAmountAsync(TransferHistory entry, int playerOverall)
-    {
-        var existingEntries = await _dbContext.TransferHistories
-            .Include(h => h.Player)
-            .Where(h => h.TransferId == entry.TransferId)
-            .ToListAsync()
-            .ConfigureAwait(false);
-
-        if (existingEntries.Count == 0)
-        {
-            entry.Amount ??= 0m;
-            return;
-        }
-
-        var candidates = existingEntries
-            .Select(h => new TransferAmountCandidate(h, h.Player?.Overall ?? 0, false))
-            .ToList();
-
-        candidates.Add(new TransferAmountCandidate(entry, playerOverall, true));
-
-        var amountToAssign = candidates.Max(c => c.Entry.Amount ?? 0m);
-        if (entry.Amount is > 0m && entry.Amount.Value > amountToAssign)
-        {
-            amountToAssign = entry.Amount.Value;
-        }
-
-        if (amountToAssign <= 0m)
-        {
-            entry.Amount ??= 0m;
-            return;
-        }
-
-        var target = candidates
-            .OrderByDescending(c => c.Overall)
-            .ThenByDescending(c => c.Entry.Amount ?? 0m)
-            .ThenBy(c => c.IsNew ? 1 : 0)
-            .First();
-
-        foreach (var candidate in candidates)
-        {
-            var value = ReferenceEquals(candidate, target) ? amountToAssign : 0m;
-            if (candidate.IsNew)
-            {
-                entry.Amount = value;
-            }
-            else
-            {
-                candidate.Entry.Amount = value;
-            }
-        }
-    }
-
-    private sealed record TransferAmountCandidate(TransferHistory Entry, int Overall, bool IsNew);
 }

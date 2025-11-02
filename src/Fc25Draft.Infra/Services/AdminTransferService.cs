@@ -339,7 +339,6 @@ public partial class AdminTransferService
 
             var notes = $"Troca {teamA.TeamName} ({FormatPlayerList(aEntities)}) ↔ {teamB.TeamName} ({FormatPlayerList(bEntities)}). {adjustmentDescription}";
 
-            var sharedTransferId = Guid.NewGuid();
             var cashAdjustAmount = Math.Abs(normalizedCashAdjust);
             var hasCashAdjust = cashAdjustAmount > 0m;
             var amountCarrierPlayerId = hasCashAdjust
@@ -360,7 +359,7 @@ public partial class AdminTransferService
 
                 histories.Add(new TransferHistory
                 {
-                    TransferId = sharedTransferId,
+                    TransferId = Guid.NewGuid(),
                     Type = TransferType.TeamTrade,
                     PlayerId = p.PlayerId,
                     FromTeamId = teamAId,
@@ -381,7 +380,7 @@ public partial class AdminTransferService
 
                 histories.Add(new TransferHistory
                 {
-                    TransferId = sharedTransferId,
+                    TransferId = Guid.NewGuid(),
                     Type = TransferType.TeamTrade,
                     PlayerId = p.PlayerId,
                     FromTeamId = teamBId,
