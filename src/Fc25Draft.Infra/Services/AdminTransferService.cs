@@ -331,13 +331,13 @@ public partial class AdminTransferService
 
             string adjustmentDescription;
             if (normalizedCashAdjust > 0m)
-                adjustmentDescription = $"Ajuste líquido: +{normalizedCashAdjust.ToString("N2", culture)} para {teamB.TeamName}.";
+                adjustmentDescription = $"{teamB.TeamName} recebe {normalizedCashAdjust.ToString("N2", culture)}";
             else if (normalizedCashAdjust < 0m)
-                adjustmentDescription = $"Ajuste líquido: +{Math.Abs(normalizedCashAdjust).ToString("N2", culture)} para {teamA.TeamName}.";
+                adjustmentDescription = $"{teamA.TeamName} recebe{Math.Abs(normalizedCashAdjust).ToString("N2", culture)}";
             else
-                adjustmentDescription = "Ajuste líquido: 0,00.";
+                adjustmentDescription = "";
 
-            var notes = $"Troca {teamA.TeamName} ({FormatPlayerList(aEntities)}) ↔ {teamB.TeamName} ({FormatPlayerList(bEntities)}). {adjustmentDescription}";
+            var notes = $"Troca! {teamA.TeamName} recebe ({FormatPlayerList(bEntities)}), {teamB.TeamName} recebe ({FormatPlayerList(aEntities)}). {adjustmentDescription}";
 
             var cashAdjustAmount = Math.Abs(normalizedCashAdjust);
             var hasCashAdjust = cashAdjustAmount > 0m;

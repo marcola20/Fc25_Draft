@@ -138,12 +138,6 @@ else
                             <dt class="col-sm-4">Jogador</dt>
                             <dd class="col-sm-8">@_selectedTransfer.PlayerName</dd>
 
-                            <dt class="col-sm-4">GUID do Jogador</dt>
-                            <dd class="col-sm-8">@_selectedTransfer.PlayerExternalId</dd>
-
-                            <dt class="col-sm-4">ID do Jogador</dt>
-                            <dd class="col-sm-8">@_selectedTransfer.PlayerId</dd>
-
                             <dt class="col-sm-4">Saiu do time</dt>
                             <dd class="col-sm-8">@FormatTeam(_selectedTransfer.FromTeamName)</dd>
 
@@ -155,12 +149,6 @@ else
 
                             <dt class="col-sm-4">Observações</dt>
                             <dd class="col-sm-8">@FormatNotes(_selectedTransfer.Notes)</dd>
-
-                            <dt class="col-sm-4">Registrado por</dt>
-                            <dd class="col-sm-8">@FormatNotes(_selectedTransfer.PerformedBy)</dd>
-
-                            <dt class="col-sm-4">Transferência</dt>
-                            <dd class="col-sm-8">@_selectedTransfer.TransferId</dd>
                         </dl>
                     }
                     else
