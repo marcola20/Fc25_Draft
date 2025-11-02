@@ -108,6 +108,27 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
         Assert.False(soldItem.IsActive);
     }
 
+    [Fact]
+    public async Task GetItems_WithoutCycleId_ReturnsItemsFromAllActiveCycles()
+    {
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var firstCycleId = await SeedCycleAsync(factory);
+        var secondCycleId = await SeedAdditionalCycleAsync(factory);
+
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/market/items?page=1&pageSize=10");
+        response.EnsureSuccessStatusCode();
+
+        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var result = await response.Content.ReadFromJsonAsync<PagedResult<MarketItemListDto>>(options);
+
+        Assert.NotNull(result);
+        var cycleIds = result!.Items.Select(i => i.CycleId).Distinct().ToList();
+        Assert.Contains(firstCycleId, cycleIds);
+        Assert.Contains(secondCycleId, cycleIds);
+    }
+
     private static async Task<Guid> SeedCycleAsync(WebApplicationFactory<Program> factory)
     {
         using var scope = factory.Services.CreateScope();
@@ -190,6 +211,83 @@ public class MarketItemsEndpointsTests : IClassFixture<MarketItemsEndpointsFacto
                 BuyNowPrice = 800m,
                 MinIncrement = 25m,
                 ExpiresAtUtc = now.AddHours(4),
+                Status = MarketItemStatus.Active,
+                CreatedAtUtc = now,
+                LastUpdateUtc = now,
+                PublishedAtUtc = now,
+                CurrentLeaderAmount = null,
+                RowVersion = 1
+            });
+
+        await db.SaveChangesAsync();
+        return cycleId;
+    }
+
+    private static async Task<Guid> SeedAdditionalCycleAsync(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Positions.AnyAsync(p => p.PositionId == 55))
+        {
+            db.Positions.Add(new Position { PositionId = 55, Name = "Teste Extra" });
+        }
+
+        var now = DateTime.UtcNow;
+        var cycleId = Guid.NewGuid();
+
+        db.MarketCycles.Add(new MarketCycle
+        {
+            CycleId = cycleId,
+            Name = "Ciclo Secundário",
+            Status = MarketCycleStatus.Active,
+            StartsAtUtc = now.AddHours(-2),
+            EndsAtUtc = now.AddDays(1),
+            CreatedAtUtc = now.AddHours(-3),
+            UpdatedAtUtc = now.AddMinutes(-45)
+        });
+
+        var players = new[]
+        {
+            new Player { PlayerId = 300, Name = "Jogador 300", Overall = 83, PositionId = 55, PlayerGuid = Guid.NewGuid() },
+            new Player { PlayerId = 301, Name = "Jogador 301", Overall = 78, PositionId = 55, PlayerGuid = Guid.NewGuid() }
+        };
+
+        foreach (var player in players)
+        {
+            if (!await db.Players.AnyAsync(p => p.PlayerId == player.PlayerId))
+            {
+                db.Players.Add(player);
+            }
+        }
+
+        db.MarketItems.AddRange(
+            new MarketItem
+            {
+                ItemId = Guid.NewGuid(),
+                CycleId = cycleId,
+                PlayerId = 300,
+                BasePrice = 280m,
+                BuyNowPrice = 850m,
+                MinIncrement = 35m,
+                ExpiresAtUtc = now.AddHours(7),
+                Status = MarketItemStatus.Active,
+                CreatedAtUtc = now,
+                LastUpdateUtc = now,
+                PublishedAtUtc = now,
+                CurrentLeaderAmount = 450m,
+                RowVersion = 1
+            },
+            new MarketItem
+            {
+                ItemId = Guid.NewGuid(),
+                CycleId = cycleId,
+                PlayerId = 301,
+                BasePrice = 260m,
+                BuyNowPrice = 780m,
+                MinIncrement = 30m,
+                ExpiresAtUtc = now.AddHours(8),
                 Status = MarketItemStatus.Active,
                 CreatedAtUtc = now,
                 LastUpdateUtc = now,

@@ -347,6 +347,9 @@ public class MarketService : IMarketService
 
             item.Status = MarketItemStatus.Sold;
             item.WinnerTeamId = team.TeamId;
+            item.CurrentLeaderTeamId = team.TeamId;
+            item.CurrentLeaderAmount = buyNowPrice;
+            item.CurrentLeaderTeam = team;
             item.LastUpdateUtc = nowUtc;
             item.ExpiresAtUtc = nowUtc;
 

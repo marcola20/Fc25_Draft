@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Extensions;
@@ -26,13 +27,16 @@ public class MarketItemsQueryService : IMarketItemsQueryService
         var normalizedPage = query.Page < 1 ? 1 : query.Page;
         var normalizedPageSize = query.PageSize < 1 ? 20 : Math.Min(query.PageSize, MaxPageSize);
 
+        var cycleIds = query.CycleIds?.Where(id => id != Guid.Empty).Distinct().ToArray() ?? Array.Empty<Guid>();
+
         var itemsQuery = _dbContext.MarketItems
             .AsNoTracking()
-            .Where(i => i.CycleId == query.CycleId)
+            .Where(i => cycleIds.Length == 0 || cycleIds.Contains(i.CycleId))
             .Where(i => i.Cycle.Status != MarketCycleStatus.Draft)
             .Include(i => i.Player)
                 .ThenInclude(p => p.Position)
             .Include(i => i.CurrentLeaderTeam)
+            .Include(i => i.WinnerTeam)
             .AsQueryable();
 
         var nowUtc = DateTime.UtcNow;
@@ -129,9 +133,7 @@ public class MarketItemsQueryService : IMarketItemsQueryService
                 i.Status,
                 i.Status.ToDisplayName(),
                 i.CurrentLeaderTeamId,
-                i.CurrentLeaderTeam != null && !string.IsNullOrWhiteSpace(i.CurrentLeaderTeam.TeamName)
-                    ? i.CurrentLeaderTeam.TeamName
-                    : i.CurrentLeaderTeamId.HasValue ? i.CurrentLeaderTeamId.Value.ToString() : null,
+                ResolveTeamName(i.CurrentLeaderTeam, i.CurrentLeaderTeamId) ?? ResolveTeamName(i.WinnerTeam, i.WinnerTeamId),
                 i.RowVersion,
                 i.Cycle.Status == MarketCycleStatus.Active
                     && i.Status == MarketItemStatus.Active
@@ -140,5 +142,15 @@ public class MarketItemsQueryService : IMarketItemsQueryService
             .ConfigureAwait(false);
 
         return new PagedResult<MarketItemListDto>(results, total, normalizedPage, normalizedPageSize);
+    }
+
+    private static string? ResolveTeamName(Team? team, Guid? teamId)
+    {
+        if (team is not null && !string.IsNullOrWhiteSpace(team.TeamName))
+        {
+            return team.TeamName;
+        }
+
+        return teamId?.ToString();
     }
 }

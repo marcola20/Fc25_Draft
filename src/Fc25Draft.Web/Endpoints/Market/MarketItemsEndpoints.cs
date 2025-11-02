@@ -53,19 +53,33 @@ public static class MarketItemsEndpoints
 
         try
         {
-            var cycle = await cycleService.ResolveAsync(request.CycleId, ct).ConfigureAwait(false);
-            if (cycle is null)
+            IReadOnlyList<MarketCycleDto>? cycles;
+            try
+            {
+                cycles = await ResolveTargetCyclesAsync(request, cycleService, ct).ConfigureAwait(false);
+            }
+            catch (MarketCycleUnavailableException ex)
+            {
+                var message = string.IsNullOrWhiteSpace(ex.Message)
+                    ? "Este ciclo ainda não está ativo."
+                    : ex.Message;
+                return Results.Conflict(new { message });
+            }
+
+            if (cycles is null || cycles.Count == 0)
+            {
                 return Results.NotFound(new { message = "Ciclo de mercado não encontrado." });
+            }
 
-            if (cycle.Status == MarketCycleStatus.Draft && request.CycleId.HasValue && request.CycleId.Value != Guid.Empty)
-                return Results.Conflict(new { message = "Este ciclo ainda não está ativo." });
-
-            if (!request.TryBuildQuery(cycle.CycleId, out var query, out var errorResult))
+            if (!request.TryBuildQuery(cycles.Select(c => c.CycleId).ToArray(), out var query, out var errorResult))
                 return errorResult!;
 
             if (SettlementThrottle.TryAcquire())
             {
-                await settlementService.SettleExpiredItemsAsync(cycle.CycleId, ct).ConfigureAwait(false);
+                foreach (var cycleId in cycles.Select(c => c.CycleId).Distinct())
+                {
+                    await settlementService.SettleExpiredItemsAsync(cycleId, ct).ConfigureAwait(false);
+                }
             }
 
             var result = await queryService.QueryAsync(query, ct).ConfigureAwait(false);
@@ -145,6 +159,47 @@ public static class MarketItemsEndpoints
         return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
 
+    private static async Task<IReadOnlyList<MarketCycleDto>?> ResolveTargetCyclesAsync(
+        MarketItemsRequest request,
+        IMarketCycleService cycleService,
+        CancellationToken ct)
+    {
+        if (request.CycleId.HasValue && request.CycleId.Value != Guid.Empty)
+        {
+            var cycle = await cycleService.ResolveAsync(request.CycleId, ct).ConfigureAwait(false);
+            if (cycle is null)
+            {
+                return null;
+            }
+
+            if (cycle.Status == MarketCycleStatus.Draft)
+            {
+                throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.");
+            }
+
+            return new[] { cycle };
+        }
+
+        var activeCycles = await cycleService.ListActiveAsync(ct).ConfigureAwait(false);
+        if (activeCycles.Count > 0)
+        {
+            return activeCycles;
+        }
+
+        var fallback = await cycleService.ResolveAsync(null, ct).ConfigureAwait(false);
+        if (fallback is null)
+        {
+            return null;
+        }
+
+        if (fallback.Status == MarketCycleStatus.Draft)
+        {
+            throw new MarketCycleUnavailableException("Este ciclo ainda não está ativo.");
+        }
+
+        return new[] { fallback };
+    }
+
     private sealed record MarketItemsRequest(
         [property: FromQuery(Name = "cycleId")] Guid? CycleId,
         [property: FromQuery(Name = "q")] string? Search,
@@ -160,7 +215,7 @@ public static class MarketItemsEndpoints
     {
         private const int MaxOverall = 150;
 
-        public bool TryBuildQuery(Guid cycleId, out MarketItemsQuery query, out IResult? errorResult)
+        public bool TryBuildQuery(IReadOnlyList<Guid> cycleIds, out MarketItemsQuery query, out IResult? errorResult)
         {
             query = default!;
             errorResult = null;
@@ -193,8 +248,16 @@ public static class MarketItemsEndpoints
             var page = Page < 1 ? 1 : Page;
             var pageSize = PageSize < 1 ? 20 : PageSize;
 
+            var normalizedCycles = cycleIds?.Where(id => id != Guid.Empty).Distinct().ToArray() ?? Array.Empty<Guid>();
+
+            if (normalizedCycles.Length == 0)
+            {
+                errorResult = Results.BadRequest(new { message = "Nenhum ciclo válido informado." });
+                return false;
+            }
+
             query = new MarketItemsQuery(
-                cycleId,
+                normalizedCycles,
                 search,
                 positionIds,
                 OverallMin,

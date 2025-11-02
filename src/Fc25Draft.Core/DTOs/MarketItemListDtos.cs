@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.DTOs;
@@ -30,7 +32,7 @@ public enum MarketItemsSortField
 }
 
 public sealed record MarketItemsQuery(
-    Guid CycleId,
+    IReadOnlyList<Guid> CycleIds,
     string? Search,
     IReadOnlyList<short> PositionIds,
     int? OverallMin,

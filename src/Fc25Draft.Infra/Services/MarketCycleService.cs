@@ -64,6 +64,20 @@ public class MarketCycleService : IMarketCycleService
         return last is null ? null : ToDto(last);
     }
 
+    public async Task<IReadOnlyList<MarketCycleDto>> ListActiveAsync(CancellationToken ct)
+    {
+        var cycles = await _dbContext.MarketCycles
+            .AsNoTracking()
+            .Where(c => c.Status == MarketCycleStatus.Active)
+            .OrderBy(c => c.StartsAtUtc)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return cycles.Count == 0
+            ? Array.Empty<MarketCycleDto>()
+            : cycles.Select(ToDto).ToArray();
+    }
+
     private static MarketCycleDto ToDto(MarketCycle cycle)
     {
         return new MarketCycleDto(

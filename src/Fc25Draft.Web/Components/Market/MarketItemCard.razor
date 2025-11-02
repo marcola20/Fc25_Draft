@@ -31,35 +31,48 @@
         </div>
 
         <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
-            <div class="d-flex flex-column gap-3">
-                <div>
-                    <div class="text-muted small">Líder atual</div>
-                    @if (Item.CurrentLeaderAmount.HasValue)
-                    {
-                        <div class="fw-semibold text-body">@FormatCurrency(Item.CurrentLeaderAmount.Value)</div>
-                        @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
-                        {
-                            <div class="small text-muted">por @Item.CurrentLeaderTeamName</div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="fw-semibold text-body">Nenhum lance ainda</div>
-                        <div class="small text-muted">Seja o primeiro a dar um lance.</div>
-                    }
-                </div>
-                <div>
-                    <div class="text-muted small" title="@MinIncrementTooltip">Lance mínimo</div>
-                    <div class="fw-semibold text-body">@FormatCurrency(Item.RequiredMinBid)</div>
-                </div>
-                @if (CanBuyNow)
-                {
+            @if (ShowBuyNowSummary)
+            {
+                <div class="d-flex flex-column gap-2">
                     <div>
                         <div class="text-muted small">Comprar agora</div>
-                        <div class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</div>
+                        <div class="fw-semibold text-body">@FormatCurrency(BuyNowSummaryAmount)</div>
+                        <div class="small text-muted">Compra por @BuyNowWinnerDisplay</div>
                     </div>
-                }
-            </div>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3">
+                    <div>
+                        <div class="text-muted small">Líder atual</div>
+                        @if (Item.CurrentLeaderAmount.HasValue)
+                        {
+                            <div class="fw-semibold text-body">@FormatCurrency(Item.CurrentLeaderAmount.Value)</div>
+                            @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
+                            {
+                                <div class="small text-muted">por @Item.CurrentLeaderTeamName</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="fw-semibold text-body">Nenhum lance ainda</div>
+                            <div class="small text-muted">Seja o primeiro a dar um lance.</div>
+                        }
+                    </div>
+                    <div>
+                        <div class="text-muted small" title="@MinIncrementTooltip">Lance mínimo</div>
+                        <div class="fw-semibold text-body">@FormatCurrency(Item.RequiredMinBid)</div>
+                    </div>
+                    @if (CanBuyNow)
+                    {
+                        <div>
+                            <div class="text-muted small">Comprar agora</div>
+                            <div class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</div>
+                        </div>
+                    }
+                </div>
+            }
             <div class="text-end" aria-live="polite">
                 @if (IsExpired)
                 {
@@ -72,63 +85,66 @@
             </div>
         </div>
 
-        <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
-            <div class="mb-2">
-                <label class="form-label" for="@BidInputId">Valor do lance</label>
-                <div class="input-group input-group-sm">
-                    <InputText @key="Item.ItemId"
-                               @bind-Value="_model.AmountText"
-                               @bind-Value:event="@oninput"
-                               class="form-control me-2"
-                               id="@BidInputId"
-                               inputmode="decimal"
-                               placeholder="Ex.: R$ 30.000.000,00"
-                               @onfocus="BeginEditing"
-                               @onblur="EndEditing" />
-                    <button type="submit"
-                            class="btn btn-primary"
-                            disabled="@IsBidDisabled"
-                            title="@LeaderTooltip">
-                        Dar lance
-                    </button>
-                </div>
-            </div>
-        </EditForm>
-
-        @if (CanBuyNow)
+        @if (!ShowBuyNowSummary)
         {
-            <div class="d-flex flex-column gap-2">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="text-muted small">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)</span>
-                    <button type="button"
-                            class="btn btn-outline-success btn-sm ms-auto"
-                            disabled="@IsBuyNowDisabled"
-                            @onclick="ShowBuyNowConfirm">
-                        Comprar agora
-                    </button>
-                </div>
-
-                @if (_showBuyConfirm)
-                {
-                    <div class="alert alert-warning py-2 mb-0" role="alert">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <span class="me-auto">Confirmar compra imediata?</span>
-                            <button type="button"
-                                    class="btn btn-warning btn-sm"
-                                    disabled="@_isSubmitting"
-                                    @onclick="ConfirmBuyNowAsync">
-                                Confirmar
-                            </button>
-                            <button type="button"
-                                    class="btn btn-outline-secondary btn-sm"
-                                    disabled="@_isSubmitting"
-                                    @onclick="CancelBuyNow">
-                                Cancelar
-                            </button>
-                        </div>
+            <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
+                <div class="mb-2">
+                    <label class="form-label" for="@BidInputId">Valor do lance</label>
+                    <div class="input-group input-group-sm">
+                        <InputText @key="Item.ItemId"
+                                   @bind-Value="_model.AmountText"
+                                   @bind-Value:event="@oninput"
+                                   class="form-control me-2"
+                                   id="@BidInputId"
+                                   inputmode="decimal"
+                                   placeholder="Ex.: R$ 30.000.000,00"
+                                   @onfocus="BeginEditing"
+                                   @onblur="EndEditing" />
+                        <button type="submit"
+                                class="btn btn-primary"
+                                disabled="@IsBidDisabled"
+                                title="@LeaderTooltip">
+                            Dar lance
+                        </button>
                     </div>
-                }
-            </div>
+                </div>
+            </EditForm>
+
+            @if (CanBuyNow)
+            {
+                <div class="d-flex flex-column gap-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="text-muted small">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)</span>
+                        <button type="button"
+                                class="btn btn-outline-success btn-sm ms-auto"
+                                disabled="@IsBuyNowDisabled"
+                                @onclick="ShowBuyNowConfirm">
+                            Comprar agora
+                        </button>
+                    </div>
+
+                    @if (_showBuyConfirm)
+                    {
+                        <div class="alert alert-warning py-2 mb-0" role="alert">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="me-auto">Confirmar compra imediata?</span>
+                                <button type="button"
+                                        class="btn btn-warning btn-sm"
+                                        disabled="@_isSubmitting"
+                                        @onclick="ConfirmBuyNowAsync">
+                                    Confirmar
+                                </button>
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        disabled="@_isSubmitting"
+                                        @onclick="CancelBuyNow">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
         }
 
         @if (!string.IsNullOrEmpty(_infoMessage))
@@ -200,6 +216,17 @@
     private string? LeaderTooltip => IsCurrentTeamLeader ? "Seu time já é o líder do lance atual." : null;
 
     private string? MinIncrementTooltip => Item.MinIncrement > 0m ? $"Incremento mínimo: {FormatCurrency(Item.MinIncrement)}" : null;
+
+    private bool ShowBuyNowSummary => !Item.IsActive
+        && Item.BuyNowPrice.HasValue
+        && Item.CurrentLeaderAmount.HasValue
+        && AreAmountsEqual(Item.CurrentLeaderAmount.Value, Item.BuyNowPrice.Value);
+
+    private decimal BuyNowSummaryAmount => Item.CurrentLeaderAmount ?? Item.BuyNowPrice ?? 0m;
+
+    private string BuyNowWinnerDisplay => !string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName)
+        ? Item.CurrentLeaderTeamName!
+        : Item.CurrentLeaderTeamId?.ToString() ?? "Time desconhecido";
 
     private string StatusDisplay => IsExpired ? "Encerrado" : TranslateStatus(Item.Status);
 
@@ -441,6 +468,8 @@
     }
 
     private static string FormatCurrency(decimal value) => value.ToString("C", CurrencyCulture);
+
+    private static bool AreAmountsEqual(decimal left, decimal right) => Math.Abs(left - right) < 0.01m;
 
     protected override bool ShouldRender()
         => !_isEditing || _allowRenderWhileEditing;
