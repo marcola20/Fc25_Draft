@@ -853,6 +853,33 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("ToTeam");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferSwapPlayer", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.TransferOffer", "Offer")
+                        .WithMany("SwapPlayers")
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("Team");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOffer", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Team", "FromTeam")
@@ -880,33 +907,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("SwapPlayers");
 
                     b.Navigation("ToTeam");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferSwapPlayer", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.TransferOffer", "Offer")
-                        .WithMany("SwapPlayers")
-                        .HasForeignKey("OfferId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Offer");
-
-                    b.Navigation("Player");
-
-                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
