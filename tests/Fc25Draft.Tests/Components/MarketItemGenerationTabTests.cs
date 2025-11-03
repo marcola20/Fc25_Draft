@@ -83,10 +83,25 @@ public class MarketItemGenerationTabTests
     private sealed class StubGenerationClient : IMarketItemGenerationClient
     {
         public Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct)
-            => Task.FromResult(new MarketItemGenerationPreviewDto(request.DesiredCount, 0, request.Seed ?? 0, Array.Empty<MarketItemGenerationItemDto>()));
+            => Task.FromResult(new MarketItemGenerationPreviewDto(
+                request.DesiredCount,
+                0,
+                request.Seed ?? 0,
+                Array.Empty<MarketItemGenerationItemDto>(),
+                Array.Empty<MarketItemGenerationSkipDto>(),
+                null,
+                null));
 
         public Task<MarketItemGenerationResultDto> GenerateAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct)
-            => Task.FromResult(new MarketItemGenerationResultDto(request.DesiredCount, 0, request.Seed ?? 0, 0, 0, Array.Empty<MarketItemGenerationItemDto>()));
+            => Task.FromResult(new MarketItemGenerationResultDto(
+                request.DesiredCount,
+                0,
+                request.Seed ?? 0,
+                0,
+                Array.Empty<MarketItemGenerationItemDto>(),
+                Array.Empty<MarketItemGenerationSkipDto>(),
+                null,
+                null));
 
         public Task<MarketItemGenerationDeleteResultDto> DeleteDraftsAsync(Guid cycleId, CancellationToken ct)
             => Task.FromResult(new MarketItemGenerationDeleteResultDto(0));

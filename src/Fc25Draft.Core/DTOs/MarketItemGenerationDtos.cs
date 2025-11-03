@@ -17,7 +17,9 @@ public record MarketItemGenerationOptions(
     int? Seed,
     TimeSpan? MinItemLifespan,
     TimeSpan? MaxItemLifespan,
-    bool AutoSpreadExpirationsAcrossCycle);
+    bool AutoSpreadExpirationsAcrossCycle,
+    IReadOnlyCollection<int>? ManualPlayerIds,
+    IReadOnlyCollection<int>? ExcludedPlayerIds);
 
 public record MarketItemGenerationCandidate(
     int PlayerId,

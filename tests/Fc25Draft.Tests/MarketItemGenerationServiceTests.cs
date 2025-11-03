@@ -63,7 +63,9 @@ public class MarketItemGenerationServiceTests
             123,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         await Assert.ThrowsAsync<MarketValidationException>(
             () => service.PreviewAsync(cycleId, options, CancellationToken.None));
@@ -113,7 +115,9 @@ public class MarketItemGenerationServiceTests
             555,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var ex = await Assert.ThrowsAsync<MarketValidationException>(
             () => service.PreviewAsync(cycleId, options, CancellationToken.None));
@@ -175,7 +179,9 @@ public class MarketItemGenerationServiceTests
             99,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var first = await service.GenerateAsync(cycleId, options, CancellationToken.None);
         Assert.Equal(2, first.CreatedCount);
@@ -259,7 +265,9 @@ public class MarketItemGenerationServiceTests
             888,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
 
@@ -344,7 +352,9 @@ public class MarketItemGenerationServiceTests
             321,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
 
@@ -427,7 +437,9 @@ public class MarketItemGenerationServiceTests
             77,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
 
@@ -503,7 +515,9 @@ public class MarketItemGenerationServiceTests
             123,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var preview = await service.PreviewAsync(cycleId, options, CancellationToken.None);
 
@@ -581,7 +595,9 @@ public class MarketItemGenerationServiceTests
             42,
             null,
             null,
-            true);
+            true,
+            null,
+            null);
 
         var result = await service.GenerateAsync(cycleId, options, CancellationToken.None);
 

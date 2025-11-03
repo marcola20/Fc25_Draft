@@ -230,6 +230,23 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             throw new MarketValidationException("O limite por posição deve ser maior ou igual a zero.");
         }
 
+        if (options.ManualPlayerIds is { Count: > 0 })
+        {
+            if (options.ManualPlayerIds.Count > options.DesiredCount)
+            {
+                throw new MarketValidationException("A quantidade de jogadores selecionados manualmente não pode exceder a quantidade desejada.");
+            }
+
+            if (options.ExcludedPlayerIds is { Count: > 0 })
+            {
+                var excluded = new HashSet<int>(options.ExcludedPlayerIds);
+                if (options.ManualPlayerIds.Any(excluded.Contains))
+                {
+                    throw new MarketValidationException("Remova o jogador das exclusões antes de selecioná-lo manualmente.");
+                }
+            }
+        }
+
         var cycle = await _dbContext.MarketCycles
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
@@ -319,6 +336,14 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             }
         }
 
+        if (options.ExcludedPlayerIds is { Count: > 0 })
+        {
+            foreach (var playerId in options.ExcludedPlayerIds)
+            {
+                excluded.Add(playerId);
+            }
+        }
+
         return excluded;
     }
 
@@ -389,15 +414,53 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         MarketItemGenerationOptions options,
         int seed)
     {
-        var rng = new Random(seed);
-        var pool = eligible.OrderBy(_ => rng.NextDouble()).ToList();
+        var manualIds = options.ManualPlayerIds is { Count: > 0 }
+            ? options.ManualPlayerIds.Distinct().ToArray()
+            : Array.Empty<int>();
+
+        if (manualIds.Length > 0 && manualIds.Length != options.ManualPlayerIds!.Count)
+        {
+            throw new MarketValidationException("Jogadores selecionados manualmente não podem se repetir.");
+        }
+
+        var manualSet = manualIds.Length > 0 ? new HashSet<int>(manualIds) : null;
         var selected = new List<MarketItemGenerationCandidate>(options.DesiredCount);
         var perTeam = new Dictionary<Guid, int>();
-        var limit = options.MaxPerTeam.GetValueOrDefault();
-        var hasLimit = options.MaxPerTeam.HasValue && options.MaxPerTeam.Value > 0;
         var perPosition = new Dictionary<short, int>();
-        var positionLimit = options.MaxPerPosition.GetValueOrDefault();
-        var hasPositionLimit = options.MaxPerPosition.HasValue && options.MaxPerPosition.Value > 0;
+
+        if (manualIds.Length > 0)
+        {
+            foreach (var playerId in manualIds)
+            {
+                var candidate = eligible.FirstOrDefault(c => c.PlayerId == playerId)
+                    ?? throw new MarketValidationException("Jogador selecionado manualmente não é elegível para os filtros informados.");
+
+                if (!CanAddCandidate(candidate, perTeam, perPosition, options.MaxPerTeam, options.MaxPerPosition))
+                {
+                    throw new MarketValidationException($"A seleção manual excede os limites configurados ao incluir {candidate.PlayerName}.");
+                }
+
+                selected.Add(candidate);
+                IncrementCounts(candidate, perTeam, perPosition);
+            }
+        }
+
+        var remaining = options.DesiredCount - selected.Count;
+        if (remaining < 0)
+        {
+            throw new MarketValidationException("A quantidade de jogadores selecionados manualmente excede a quantidade desejada.");
+        }
+
+        if (remaining == 0)
+        {
+            return selected;
+        }
+
+        var rng = new Random(seed);
+        var pool = eligible
+            .Where(candidate => manualSet is null || !manualSet.Contains(candidate.PlayerId))
+            .OrderBy(_ => rng.NextDouble())
+            .ToList();
 
         foreach (var candidate in pool)
         {
@@ -406,33 +469,61 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                 break;
             }
 
-            if (hasLimit && candidate.TeamId.HasValue)
+            if (!CanAddCandidate(candidate, perTeam, perPosition, options.MaxPerTeam, options.MaxPerPosition))
             {
-                var teamId = candidate.TeamId.Value;
-                perTeam.TryGetValue(teamId, out var count);
-                if (count >= limit)
-                {
-                    continue;
-                }
-
-                perTeam[teamId] = count + 1;
-            }
-
-            if (hasPositionLimit)
-            {
-                perPosition.TryGetValue(candidate.PositionId, out var positionCount);
-                if (positionCount >= positionLimit)
-                {
-                    continue;
-                }
-
-                perPosition[candidate.PositionId] = positionCount + 1;
+                continue;
             }
 
             selected.Add(candidate);
+            IncrementCounts(candidate, perTeam, perPosition);
         }
 
         return selected;
+    }
+
+    private static bool CanAddCandidate(
+        MarketItemGenerationCandidate candidate,
+        Dictionary<Guid, int> perTeam,
+        Dictionary<short, int> perPosition,
+        int? maxPerTeam,
+        int? maxPerPosition)
+    {
+        if (maxPerTeam.HasValue && maxPerTeam.Value > 0 && candidate.TeamId.HasValue)
+        {
+            var teamId = candidate.TeamId.Value;
+            perTeam.TryGetValue(teamId, out var count);
+            if (count >= maxPerTeam.Value)
+            {
+                return false;
+            }
+        }
+
+        if (maxPerPosition.HasValue && maxPerPosition.Value > 0)
+        {
+            perPosition.TryGetValue(candidate.PositionId, out var count);
+            if (count >= maxPerPosition.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void IncrementCounts(
+        MarketItemGenerationCandidate candidate,
+        Dictionary<Guid, int> perTeam,
+        Dictionary<short, int> perPosition)
+    {
+        if (candidate.TeamId.HasValue)
+        {
+            var teamId = candidate.TeamId.Value;
+            perTeam.TryGetValue(teamId, out var current);
+            perTeam[teamId] = current + 1;
+        }
+
+        perPosition.TryGetValue(candidate.PositionId, out var positionCount);
+        perPosition[candidate.PositionId] = positionCount + 1;
     }
 
     private static IReadOnlyDictionary<int, decimal> CalculateScarcityMultipliers(

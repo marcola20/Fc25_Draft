@@ -1,5 +1,8 @@
+@using System
+@using System.Collections.Generic
 @using System.Globalization
 @using System.Linq
+@using System.Net.Http
 @using System.Threading
 @using Blazored.Toast.Services
 @using Fc25Draft.Core.DTOs
@@ -11,6 +14,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Blazored.Toast;
 @inject IToastService Toasts
+@inject PlayersApiClient PlayersApiClient
 
 @implements IDisposable
 
@@ -248,6 +252,11 @@ else
                     }
                     else
                     {
+                        @if (_isPreviewUpdating)
+                        {
+                            <div class="alert alert-info" role="status">Atualizando pré-visualização...</div>
+                        }
+
                         <div class="table-responsive">
                             <table class="table table-sm table-striped align-middle">
                                 <thead>
@@ -259,23 +268,99 @@ else
                                         <th scope="col">Preço base</th>
                                         <th scope="col">Compra imediata</th>
                                         <th scope="col">Expira em</th>
+                                        <th scope="col" class="text-end">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 @foreach (var item in _preview.Items)
-                                    {
-                                        <tr>
-                                            <td>@item.PlayerName</td>
-                                            <td>@item.PositionName</td>
-                                            <td>@(item.Age?.ToString() ?? "-")</td>
-                                            <td>@item.Overall</td>
-                                            <td>@FormatCurrency(item.BasePrice)</td>
-                                            <td>@FormatCurrency(item.BuyNowPrice)</td>
-                                            <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <span>@item.PlayerName</span>
+                                                @if (IsManualOverride(item.PlayerId))
+                                                {
+                                                    <span class="badge bg-info text-dark">Manual</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>@item.PositionName</td>
+                                        <td>@(item.Age?.ToString() ?? "-")</td>
+                                        <td>@item.Overall</td>
+                                        <td>@FormatCurrency(item.BasePrice)</td>
+                                        <td>@FormatCurrency(item.BuyNowPrice)</td>
+                                        <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
+                                        <td class="text-end">
+                                            <button type="button"
+                                                    class="btn btn-link btn-sm text-danger"
+                                                    @onclick="async () => await RemovePlayerAsync(item.PlayerId)"
+                                                    disabled="@(!CanModifyPreview)">
+                                                Remover
+                                            </button>
+                                        </td>
                                     </tr>
                                 }
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div class="mt-4">
+                            <h6 class="h6">Adicionar jogador manualmente</h6>
+                            <div class="input-group input-group-sm mb-2">
+                                <input class="form-control"
+                                       placeholder="Buscar por nome ou ID"
+                                       @bind="_playerSearchTerm"
+                                       @bind:event="oninput"
+                                       disabled="@(!CanModifyPreview)" />
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        @onclick="SearchPlayersAsync"
+                                        disabled="@(!CanModifyPreview || _isSearchingPlayers)">
+                                    @if (_isSearchingPlayers)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Buscando...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Buscar</span>
+                                    }
+                                </button>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_playerSearchError))
+                            {
+                                <div class="text-danger small">@_playerSearchError</div>
+                            }
+
+                            @if (_playerSearchResults.Count > 0)
+                            {
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var player in _playerSearchResults)
+                                    {
+                                        var isInPreview = IsPlayerInPreview(player.PlayerId);
+                                        var isManual = IsManualOverride(player.PlayerId);
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div class="fw-semibold">@player.Name (@player.Overall)</div>
+                                                <div class="small text-muted">
+                                                    @player.PositionName &bull; Idade: @(player.Age?.ToString() ?? "-")
+                                                </div>
+                                            </div>
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm"
+                                                    disabled="@(!CanModifyPreview || isManual)"
+                                                    @onclick="async () => await AddManualPlayerAsync(player)">
+                                                @(isInPreview ? (isManual ? "Adicionado" : "Fixar") : "Adicionar")
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else if (_playerSearchExecuted && string.IsNullOrWhiteSpace(_playerSearchError))
+                            {
+                                <div class="form-text">Nenhum jogador disponível encontrado para o termo informado.</div>
+                            }
                         </div>
                     }
 
@@ -293,6 +378,20 @@ else
                     }
                 </div>
                 <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="HandleGenerateFromPreviewAsync"
+                            disabled="@(!CanGenerateFromPreview)">
+                        @if (_isGenerating && _isGeneratingFromPreview)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Gerando itens...</span>
+                        }
+                        else
+                        {
+                            <span>Gerar itens desta prévia</span>
+                        }
+                    </button>
                     <button type="button" class="btn btn-secondary" @onclick="ClosePreview">Fechar</button>
                 </div>
             </div>
@@ -338,18 +437,29 @@ else
 
     [Inject] public IMarketItemGenerationClient GenerationClient { get; set; } = default!;
     [Inject] public IPositionService PositionService { get; set; } = default!;
+
     private MarketItemGenerationFormModel? _model;
     private EditContext? _editContext;
     private bool _isLoadingPositions;
     private bool _showValidationSummary;
     private bool _isPreviewing;
+    private bool _isPreviewUpdating;
     private bool _isGenerating;
+    private bool _isGeneratingFromPreview;
     private bool _isClearing;
+    private bool _isSearchingPlayers;
+    private bool _playerSearchExecuted;
     private MarketItemGenerationPreviewDto? _preview;
     private MarketItemGenerationResultDto? _resultSummary;
+    private MarketItemGenerationRequestDto? _lastPreviewRequest;
     private CancellationTokenSource? _cts;
     private readonly List<PositionOption> _positionOptions = new();
+    private readonly List<PlayerListItemDto> _playerSearchResults = new();
+    private HashSet<int> _manualOverrideIds = new();
+    private HashSet<int> _excludedPlayerIds = new();
     private string? _positionsError;
+    private string _playerSearchTerm = string.Empty;
+    private string? _playerSearchError;
     private bool _showPreviewModal;
 
     protected override async Task OnParametersSetAsync()
@@ -362,6 +472,7 @@ else
         {
             _model = null;
             _editContext = null;
+            ResetGenerationState();
         }
     }
 
@@ -374,10 +485,37 @@ else
 
         if (_model is null || _model.CycleId != Cycle.CycleId)
         {
+            ResetGenerationState();
             _model = MarketItemGenerationFormModel.Create(Cycle.CycleId);
             _editContext = new EditContext(_model);
             await LoadPositionsAsync();
         }
+        else if (_positionOptions.Count == 0 && !_isLoadingPositions)
+        {
+            await LoadPositionsAsync();
+        }
+    }
+
+    private void ResetGenerationState()
+    {
+        _preview = null;
+        _resultSummary = null;
+        _lastPreviewRequest = null;
+        _showPreviewModal = false;
+        _isPreviewUpdating = false;
+        _isGeneratingFromPreview = false;
+        ResetManualAdjustments();
+    }
+
+    private void ResetManualAdjustments()
+    {
+        _manualOverrideIds.Clear();
+        _excludedPlayerIds.Clear();
+        _playerSearchResults.Clear();
+        _playerSearchTerm = string.Empty;
+        _playerSearchError = null;
+        _playerSearchExecuted = false;
+        _isSearchingPlayers = false;
     }
 
     private async Task LoadPositionsAsync()
@@ -448,7 +586,10 @@ else
         try
         {
             var request = _model.ToRequestDto();
-            _preview = await GenerationClient.PreviewAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
+            _lastPreviewRequest = CloneRequest(request);
+            ResetManualAdjustments();
+            var preview = await GenerationClient.PreviewAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
+            _preview = preview;
             _showPreviewModal = true;
         }
         catch (OperationCanceledException)
@@ -468,6 +609,22 @@ else
 
     private async Task HandleGenerateAsync()
     {
+        await HandleGenerateAsyncInternal(preferPreviewSeed: _preview is not null, triggeredFromPreview: false);
+    }
+
+    private async Task HandleGenerateFromPreviewAsync()
+    {
+        if (_preview is null)
+        {
+            Toasts.ShowWarning("Pré-visualize a geração antes de criar os itens.");
+            return;
+        }
+
+        await HandleGenerateAsyncInternal(preferPreviewSeed: true, triggeredFromPreview: true);
+    }
+
+    private async Task HandleGenerateAsyncInternal(bool preferPreviewSeed, bool triggeredFromPreview)
+    {
         if (_model is null || _editContext is null)
         {
             return;
@@ -482,13 +639,14 @@ else
 
         _showValidationSummary = false;
         _isGenerating = true;
+        _isGeneratingFromPreview = triggeredFromPreview;
         _resultSummary = null;
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
         try
         {
-            var request = _model.ToRequestDto();
+            var request = CreateGenerationRequest(preferPreviewSeed);
             var result = await GenerationClient.GenerateAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
             _resultSummary = result;
             Toasts.ShowSuccess($"{result.CreatedCount} itens gerados com sucesso.");
@@ -505,14 +663,33 @@ else
         finally
         {
             _isGenerating = false;
+            _isGeneratingFromPreview = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private MarketItemGenerationRequestDto CreateGenerationRequest(bool preferPreviewSeed)
+    {
+        if (_lastPreviewRequest is not null && _model?.CycleId is not null)
+        {
+            var request = CloneRequest(_lastPreviewRequest);
+            request.ManualPlayerIds = _manualOverrideIds.Count > 0 ? _manualOverrideIds.ToList() : null;
+            request.ExcludedPlayerIds = _excludedPlayerIds.Count > 0 ? _excludedPlayerIds.ToList() : null;
+
+            if (preferPreviewSeed && _preview is not null)
+            {
+                request.Seed = _preview.Seed;
+            }
+
+            return request;
+        }
+
+        return _model!.ToRequestDto();
     }
 
     private void ClosePreview()
     {
         _showPreviewModal = false;
-        _preview = null;
     }
 
     private async Task HandleClearAsync()
@@ -532,6 +709,7 @@ else
             Toasts.ShowSuccess(response.RemovedCount > 0
                 ? $"{response.RemovedCount} itens em rascunho foram removidos."
                 : "Nenhum item em rascunho foi encontrado.");
+            ResetGenerationState();
             await RefreshCycleAsync();
         }
         catch (OperationCanceledException)
@@ -549,6 +727,205 @@ else
         }
     }
 
+    private async Task RefreshPreviewWithOverridesAsync()
+    {
+        if (_model?.CycleId is null || _lastPreviewRequest is null)
+        {
+            return;
+        }
+
+        var request = CloneRequest(_lastPreviewRequest);
+        request.ManualPlayerIds = _manualOverrideIds.Count > 0 ? _manualOverrideIds.ToList() : null;
+        request.ExcludedPlayerIds = _excludedPlayerIds.Count > 0 ? _excludedPlayerIds.ToList() : null;
+        request.Seed = _preview?.Seed ?? request.Seed;
+
+        _isPreviewUpdating = true;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var preview = await GenerationClient.PreviewAsync(_model.CycleId.Value, request, _cts.Token).ConfigureAwait(false);
+            _preview = preview;
+            _showPreviewModal = true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        finally
+        {
+            _isPreviewUpdating = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RemovePlayerAsync(int playerId)
+    {
+        if (!CanModifyPreview || _preview is null)
+        {
+            return;
+        }
+
+        if (!_preview.Items.Any(i => i.PlayerId == playerId))
+        {
+            return;
+        }
+
+        var previousManual = _manualOverrideIds.ToList();
+        var previousExcluded = _excludedPlayerIds.ToList();
+        var previousPreview = _preview;
+
+        _manualOverrideIds.Remove(playerId);
+        _excludedPlayerIds.Add(playerId);
+
+        try
+        {
+            await RefreshPreviewWithOverridesAsync();
+            Toasts.ShowInfo("Jogador removido da pré-visualização.");
+        }
+        catch (OperationCanceledException)
+        {
+            _manualOverrideIds = previousManual.ToHashSet();
+            _excludedPlayerIds = previousExcluded.ToHashSet();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            _manualOverrideIds = previousManual.ToHashSet();
+            _excludedPlayerIds = previousExcluded.ToHashSet();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+            Toasts.ShowError("Não foi possível atualizar a pré-visualização após remover o jogador.");
+        }
+    }
+
+    private async Task AddManualPlayerAsync(PlayerListItemDto player)
+    {
+        if (!CanModifyPreview || _preview is null)
+        {
+            return;
+        }
+
+        if (_manualOverrideIds.Contains(player.PlayerId))
+        {
+            Toasts.ShowInfo("Este jogador já está fixado na pré-visualização.");
+            return;
+        }
+
+        var previousManual = _manualOverrideIds.ToList();
+        var previousExcluded = _excludedPlayerIds.ToList();
+        var previousPreview = _preview;
+
+        _manualOverrideIds.Add(player.PlayerId);
+        _excludedPlayerIds.Remove(player.PlayerId);
+
+        try
+        {
+            await RefreshPreviewWithOverridesAsync();
+            Toasts.ShowSuccess($"{player.Name} adicionado à pré-visualização.");
+        }
+        catch (OperationCanceledException)
+        {
+            _manualOverrideIds = previousManual.ToHashSet();
+            _excludedPlayerIds = previousExcluded.ToHashSet();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            _manualOverrideIds = previousManual.ToHashSet();
+            _excludedPlayerIds = previousExcluded.ToHashSet();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+            Toasts.ShowError($"Não foi possível adicionar {player.Name} à pré-visualização.");
+        }
+    }
+
+    private async Task SearchPlayersAsync()
+    {
+        if (!CanModifyPreview)
+        {
+            return;
+        }
+
+        var term = _playerSearchTerm?.Trim();
+        _playerSearchResults.Clear();
+        _playerSearchError = null;
+
+        if (string.IsNullOrWhiteSpace(term))
+        {
+            _playerSearchExecuted = false;
+            _playerSearchError = "Informe um termo para busca.";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _playerSearchExecuted = true;
+        _isSearchingPlayers = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            if (int.TryParse(term, out var playerId))
+            {
+                var details = await PlayersApiClient.GetByIdAsync(playerId).ConfigureAwait(false);
+                if (details is null
+                    || details.TeamId.HasValue
+                    || !string.Equals(details.Status, "Livre", StringComparison.OrdinalIgnoreCase))
+                {
+                    _playerSearchError = "Jogador não encontrado ou indisponível.";
+                    return;
+                }
+
+                _playerSearchResults.Add(new PlayerListItemDto(
+                    details.PlayerId,
+                    details.Name,
+                    details.PositionId,
+                    details.PositionName,
+                    details.Overall,
+                    details.Age,
+                    details.Status,
+                    details.TeamName));
+            }
+            else
+            {
+                var result = await PlayersApiClient.GetAsync(
+                    term,
+                    null,
+                    onlyAvailable: true,
+                    overallMin: null,
+                    overallMax: null,
+                    sortBy: "overall",
+                    sortOrder: "desc",
+                    page: 1,
+                    pageSize: 10).ConfigureAwait(false);
+
+                if (result.Items.Count == 0)
+                {
+                    _playerSearchError = "Nenhum jogador disponível encontrado para o termo informado.";
+                }
+                else
+                {
+                    _playerSearchResults.AddRange(result.Items);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            _playerSearchError = "Não foi possível buscar jogadores.";
+        }
+        finally
+        {
+            _isSearchingPlayers = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
     private async Task RefreshCycleAsync()
     {
         if (CycleUpdated.HasDelegate)
@@ -556,6 +933,12 @@ else
             await CycleUpdated.InvokeAsync(null);
         }
     }
+
+    private bool IsManualOverride(int playerId)
+        => _manualOverrideIds.Contains(playerId);
+
+    private bool IsPlayerInPreview(int playerId)
+        => _preview?.Items.Any(i => i.PlayerId == playerId) == true;
 
     private string GetStatusBadgeClass(MarketCycleStatus status)
         => status switch
@@ -587,11 +970,15 @@ else
 
     private bool IsDraftCycle => Cycle?.Status == MarketCycleStatus.Draft;
 
-    private bool IsBusy => _isPreviewing || _isGenerating || _isClearing;
+    private bool IsBusy => _isPreviewing || _isPreviewUpdating || _isGenerating || _isClearing;
 
-    private bool CanPreview => _model is not null && !_isPreviewing && !_isGenerating && !_isClearing;
+    private bool CanPreview => _model is not null && !_isPreviewing && !_isPreviewUpdating && !_isGenerating && !_isClearing;
 
-    private bool CanGenerate => CanPreview;
+    private bool CanGenerate => _model is not null && !_isPreviewing && !_isPreviewUpdating && !_isGenerating && !_isClearing;
+
+    private bool CanGenerateFromPreview => CanGenerate && _preview is not null;
+
+    private bool CanModifyPreview => IsDraftCycle && _preview is not null && !_isPreviewing && !_isPreviewUpdating && !_isGenerating && !_isClearing;
 
     private bool CanClear => !_isClearing && Cycle?.Status == MarketCycleStatus.Draft;
 
@@ -599,6 +986,29 @@ else
     {
         _cts?.Cancel();
         _cts?.Dispose();
+    }
+
+    private static MarketItemGenerationRequestDto CloneRequest(MarketItemGenerationRequestDto source)
+    {
+        return new MarketItemGenerationRequestDto
+        {
+            DesiredCount = source.DesiredCount,
+            PositionIds = source.PositionIds?.ToList() ?? new List<short>(),
+            MinOverall = source.MinOverall,
+            MaxOverall = source.MaxOverall,
+            MinAge = source.MinAge,
+            MaxAge = source.MaxAge,
+            MaxPerTeam = source.MaxPerTeam,
+            MaxPerPosition = source.MaxPerPosition,
+            ExcludeAlreadyListedInOpenCycles = source.ExcludeAlreadyListedInOpenCycles,
+            EnsureUniquePlayerPerCycle = source.EnsureUniquePlayerPerCycle,
+            Seed = source.Seed,
+            MinItemLifespan = source.MinItemLifespan,
+            MaxItemLifespan = source.MaxItemLifespan,
+            AutoSpreadExpirationsAcrossCycle = source.AutoSpreadExpirationsAcrossCycle,
+            ManualPlayerIds = source.ManualPlayerIds is { Count: > 0 } ? source.ManualPlayerIds.ToList() : null,
+            ExcludedPlayerIds = source.ExcludedPlayerIds is { Count: > 0 } ? source.ExcludedPlayerIds.ToList() : null
+        };
     }
 
     private sealed record PositionOption(short Id, string Name);

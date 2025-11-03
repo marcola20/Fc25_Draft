@@ -1,3 +1,4 @@
+using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
@@ -264,6 +265,8 @@ public static class MarketCycleEndpoints
     private static MarketItemGenerationOptions ToOptions(MarketItemGenerationRequestDto request)
     {
         var positions = request.PositionIds?.Distinct().ToArray();
+        var manualPlayers = request.ManualPlayerIds?.Distinct().ToArray();
+        var excludedPlayers = request.ExcludedPlayerIds?.Distinct().ToArray();
 
         return new MarketItemGenerationOptions(
             request.DesiredCount,
@@ -279,7 +282,9 @@ public static class MarketCycleEndpoints
             request.Seed,
             request.MinItemLifespan,
             request.MaxItemLifespan,
-            request.AutoSpreadExpirationsAcrossCycle);
+            request.AutoSpreadExpirationsAcrossCycle,
+            manualPlayers is { Length: > 0 } ? manualPlayers : null,
+            excludedPlayers is { Length: > 0 } ? excludedPlayers : null);
     }
 
     private static MarketItemGenerationPreviewDto ToDto(MarketItemGenerationPreview preview)

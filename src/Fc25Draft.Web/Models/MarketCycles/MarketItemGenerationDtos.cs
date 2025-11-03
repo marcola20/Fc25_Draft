@@ -40,6 +40,10 @@ public class MarketItemGenerationRequestDto
     public TimeSpan? MaxItemLifespan { get; set; }
 
     public bool AutoSpreadExpirationsAcrossCycle { get; set; } = true;
+
+    public List<int>? ManualPlayerIds { get; set; }
+
+    public List<int>? ExcludedPlayerIds { get; set; }
 }
 
 public record MarketItemGenerationPreviewDto(
