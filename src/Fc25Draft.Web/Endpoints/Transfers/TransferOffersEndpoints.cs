@@ -5,6 +5,7 @@ using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace Fc25Draft.Web.Endpoints.Transfers;
 
@@ -34,14 +35,13 @@ public static class TransferOffersEndpoints
         CancellationToken ct)
     {
         if (request is null)
-        {
             return Results.BadRequest(new { message = "Payload inválido." });
-        }
 
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var result = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!result.Success)
+            return result.Error!;
+
+        var team = result.Team;
 
         try
         {
@@ -58,9 +58,7 @@ public static class TransferOffersEndpoints
             var detail = await ProjectDetailAsync(db, created.OfferId, ct).ConfigureAwait(false);
 
             if (detail is null)
-            {
                 return Results.Created($"/api/transfers/offers/{created.OfferId}", new { offerId = created.OfferId });
-            }
 
             ApplyConcurrencyHeaders(http.Response, detail.RowVersion);
 
@@ -76,15 +74,11 @@ public static class TransferOffersEndpoints
         }
     }
 
-    private static async Task<IResult> QueryReceivedAsync(
-        HttpContext http,
-        DraftDbContext db,
-        CancellationToken ct)
+    private static async Task<IResult> QueryReceivedAsync(HttpContext http, DraftDbContext db, CancellationToken ct)
     {
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         var offers = await db.TransferOffers
             .AsNoTracking()
@@ -97,15 +91,12 @@ public static class TransferOffersEndpoints
         return Results.Ok(offers);
     }
 
-    private static async Task<IResult> QuerySentAsync(
-        HttpContext http,
-        DraftDbContext db,
-        CancellationToken ct)
+
+    private static async Task<IResult> QuerySentAsync(HttpContext http, DraftDbContext db,CancellationToken ct)
     {
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         var offers = await db.TransferOffers
             .AsNoTracking()
@@ -129,10 +120,9 @@ public static class TransferOffersEndpoints
             return EndpointHelpers.CreateValidationProblem("Identificador de proposta inválido.");
         }
 
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         var detail = await db.TransferOffers
             .AsNoTracking()
@@ -153,10 +143,9 @@ public static class TransferOffersEndpoints
         ITransferOfferService offerService,
         CancellationToken ct)
     {
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var rowError, allowFallbackToRowVersionHeader: true))
         {
@@ -210,10 +199,9 @@ public static class TransferOffersEndpoints
         ITransferOfferService offerService,
         CancellationToken ct)
     {
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var rowError, allowFallbackToRowVersionHeader: true))
         {
@@ -266,10 +254,9 @@ public static class TransferOffersEndpoints
         ITransferOfferService offerService,
         CancellationToken ct)
     {
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var rowError, allowFallbackToRowVersionHeader: true))
         {
@@ -328,10 +315,9 @@ public static class TransferOffersEndpoints
             return Results.BadRequest(new { message = "Payload inválido." });
         }
 
-        if (!await TryResolveTeamAsync(http, db, ct, out var team, out var errorResult).ConfigureAwait(false))
-        {
-            return errorResult!;
-        }
+        var (success, team, error) = await TryResolveTeamAsync(http, db, ct).ConfigureAwait(false);
+        if (!success)
+            return error!;
 
         if (!EndpointHelpers.TryResolveRowVersion(http.Request, out var rowVersion, out var rowError, allowFallbackToRowVersionHeader: true))
         {
@@ -401,67 +387,69 @@ public static class TransferOffersEndpoints
         return Results.Created($"/api/transfers/offers/{detail.OfferId}", detail);
     }
 
-    private static Func<TransferOffer, TransferOfferSummaryDto> ProjectSummary()
-        => offer => new TransferOfferSummaryDto(
-            offer.OfferId,
-            offer.Status,
-            offer.FromTeamId,
-            offer.FromTeam.TeamName,
-            offer.ToTeamId,
-            offer.ToTeam.TeamName,
-            new TransferOfferParticipantDto(
-                offer.PlayerId,
-                offer.Player.PlayerGuid,
-                offer.Player.Name,
-                offer.Player.Position.Name,
-                offer.Player.Overall),
-            offer.OfferedFee,
-            offer.CreatedAtUtc,
-            offer.UpdatedAtUtc,
-            offer.ExpiresAtUtc,
-            offer.RespondedAtUtc,
-            offer.RowVersion,
-            offer.SwapPlayers
-                .OrderBy(sp => sp.Player.Name)
-                .Select(sp => new TransferOfferSwapPlayerDto(
-                    sp.PlayerId,
-                    sp.Player.PlayerGuid,
-                    sp.Player.Name,
-                    sp.Player.Position.Name,
-                    sp.Player.Overall))
-                .ToList());
+    private static Expression<Func<TransferOffer, TransferOfferSummaryDto>> ProjectSummary() =>
+    offer => new TransferOfferSummaryDto(
+        offer.OfferId,
+        offer.Status,
+        offer.FromTeamId,
+        offer.FromTeam.TeamName,
+        offer.ToTeamId,
+        offer.ToTeam.TeamName,
+        new TransferOfferParticipantDto(
+            offer.PlayerId,
+            offer.Player.PlayerGuid,
+            offer.Player.Name,
+            offer.Player.Position.Name,
+            offer.Player.Overall),
+        offer.OfferedFee,
+        offer.CreatedAtUtc,
+        offer.UpdatedAtUtc,
+        offer.ExpiresAtUtc,
+        offer.RespondedAtUtc,
+        offer.RowVersion,
+        offer.SwapPlayers
+            .OrderBy(sp => sp.Player.Name)
+            .Select(sp => new TransferOfferSwapPlayerDto(
+                sp.PlayerId,
+                sp.Player.PlayerGuid,
+                sp.Player.Name,
+                sp.Player.Position.Name,
+                sp.Player.Overall))
+            .ToList() 
+    );
 
-    private static Func<TransferOffer, TransferOfferDetailDto> ProjectDetail()
-        => offer => new TransferOfferDetailDto(
-            offer.OfferId,
-            offer.Status,
-            offer.FromTeamId,
-            offer.FromTeam.TeamName,
-            offer.ToTeamId,
-            offer.ToTeam.TeamName,
-            new TransferOfferParticipantDto(
-                offer.PlayerId,
-                offer.Player.PlayerGuid,
-                offer.Player.Name,
-                offer.Player.Position.Name,
-                offer.Player.Overall),
-            offer.OfferedFee,
-            offer.Message,
-            offer.ResponseMessage,
-            offer.CreatedAtUtc,
-            offer.UpdatedAtUtc,
-            offer.ExpiresAtUtc,
-            offer.RespondedAtUtc,
-            offer.RowVersion,
-            offer.SwapPlayers
-                .OrderBy(sp => sp.Player.Name)
-                .Select(sp => new TransferOfferSwapPlayerDto(
-                    sp.PlayerId,
-                    sp.Player.PlayerGuid,
-                    sp.Player.Name,
-                    sp.Player.Position.Name,
-                    sp.Player.Overall))
-                .ToList());
+    private static Expression<Func<TransferOffer, TransferOfferDetailDto>> ProjectDetail() =>
+    offer => new TransferOfferDetailDto(
+        offer.OfferId,
+        offer.Status,
+        offer.FromTeamId,
+        offer.FromTeam.TeamName,
+        offer.ToTeamId,
+        offer.ToTeam.TeamName,
+        new TransferOfferParticipantDto(
+            offer.PlayerId,
+            offer.Player.PlayerGuid,
+            offer.Player.Name,
+            offer.Player.Position.Name,
+            offer.Player.Overall),
+        offer.OfferedFee,
+        offer.Message,
+        offer.ResponseMessage,
+        offer.CreatedAtUtc,
+        offer.UpdatedAtUtc,
+        offer.ExpiresAtUtc,
+        offer.RespondedAtUtc,
+        offer.RowVersion,
+        offer.SwapPlayers
+            .OrderBy(sp => sp.Player.Name)
+            .Select(sp => new TransferOfferSwapPlayerDto(
+                sp.PlayerId,
+                sp.Player.PlayerGuid,
+                sp.Player.Name,
+                sp.Player.Position.Name,
+                sp.Player.Overall))
+            .ToList() 
+    );
 
     private static async Task<TransferOfferDetailDto?> ProjectDetailAsync(DraftDbContext db, Guid offerId, CancellationToken ct)
         => await db.TransferOffers
@@ -518,22 +506,17 @@ public static class TransferOffersEndpoints
         return EndpointHelpers.CreateConflictProblem(message);
     }
 
-    private static async Task<bool> TryResolveTeamAsync(
-        HttpContext http,
-        DraftDbContext db,
-        CancellationToken ct,
-        out (Guid TeamId, string TeamName)? team,
-        out IResult? error)
+    private static async Task<(bool Success, (Guid TeamId, string TeamName)? Team, IResult? Error)> TryResolveTeamAsync(HttpContext http, DraftDbContext db, CancellationToken ct)
     {
-        team = null;
-        error = null;
+        (Guid TeamId, string TeamName)? team = null;
+        IResult? error = null;
 
         var token = http.Request.Headers["X-Team-Token"].FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(token))
         {
             error = Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
-            return false;
+            return (false, null, error);
         }
 
         var normalized = token.Trim();
@@ -548,11 +531,11 @@ public static class TransferOffersEndpoints
         if (identity is null)
         {
             error = Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status403Forbidden);
-            return false;
+            return (false, null, error);
         }
 
         team = new(identity.TeamId, identity.TeamName);
-        return true;
+        return (true, team, null);
     }
 
     private sealed record CreateTransferOfferRequest(
