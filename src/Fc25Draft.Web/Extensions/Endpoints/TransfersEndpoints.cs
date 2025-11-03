@@ -2,6 +2,7 @@ using System.Globalization;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Web.Endpoints.Transfers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fc25Draft.Web.Extensions.Endpoints
@@ -14,6 +15,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             transfersApi.MapGet("/history", HandleHistoryAsync).AllowAnonymous();
             transfersApi.MapGet("/{transferId:guid}", HandleGetByIdAsync).AllowAnonymous();
+            transfersApi.MapTransferOffersEndpoints();
 
             return api;
         }
