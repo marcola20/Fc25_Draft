@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -143,6 +144,12 @@ public class MarketService : IMarketService
         var normalizedToken = NormalizeToken(teamToken);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
+        var tz = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time")
+            : TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+
         return await InSerializableTxAsync<MarketItemDto>(async ct2 =>
         {
             var item = await _dbContext.MarketItems
@@ -159,33 +166,25 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            if (item.ExpiresAtUtc.AddHours(3) <= nowUtc)
+            var expiresBrBefore = DateTime.SpecifyKind(item.ExpiresAtUtc, DateTimeKind.Unspecified);
+            if (expiresBrBefore <= nowBr)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
             var team = await _dbContext.Teams
                 .FirstOrDefaultAsync(t => t.Token != null && t.Token.ToUpper() == normalizedToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
 
-
             if (item.CurrentLeaderTeamId == team.TeamId)
-            {
                 throw new MarketValidationException("Sua equipe já lidera este item.");
-            }
 
             var requiredMinimum = MarketPricing.ComputeRequiredMinBid(
-                item.BasePrice,
-                item.MinIncrement,
-                item.CurrentLeaderAmount,
-                item.BuyNowPrice);
+                item.BasePrice, item.MinIncrement, item.CurrentLeaderAmount, item.BuyNowPrice);
 
             var culture = CultureInfo.GetCultureInfo("pt-BR");
-
             var normalizedAmount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
 
             if (normalizedAmount < requiredMinimum)
-            {
                 throw new MarketValidationException($"O lance mínimo permitido é {requiredMinimum.ToString("C", culture)}.");
-            }
 
             if (item.BuyNowPrice.HasValue && normalizedAmount >= item.BuyNowPrice.Value)
             {
@@ -197,9 +196,7 @@ public class MarketService : IMarketService
 
             var availableBudget = await _budgetService.GetAvailableAsync(team.TeamId, null, ct2).ConfigureAwait(false);
             if (availableBudget < normalizedAmount)
-            {
                 throw new MarketValidationException("Saldo insuficiente para este lance considerando lances líderes ativos em outros itens.");
-            }
 
             var previousLeaderId = item.CurrentLeaderTeamId;
             var previousAmount = item.CurrentLeaderAmount ?? 0m;
@@ -233,14 +230,14 @@ public class MarketService : IMarketService
                 ItemId = item.ItemId,
                 TeamId = team.TeamId,
                 Amount = normalizedAmount,
-                CreatedAtUtc = nowUtc
+                CreatedAtUtc = nowUtc 
             };
 
             item.CurrentLeaderTeamId = team.TeamId;
             item.CurrentLeaderAmount = normalizedAmount;
             item.LastUpdateUtc = nowUtc;
 
-            AdjustExpirationAfterBid(item, previousLeaderId, nowUtc);
+            AdjustExpirationAfterBid(item, previousLeaderId, nowUtc, tz);
 
             var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", normalizedAmount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
@@ -265,9 +262,7 @@ public class MarketService : IMarketService
             await _dbContext.Entry(item).ReloadAsync(ct2);
             await _dbContext.Entry(item).Reference(i => i.Player).LoadAsync(ct2);
             if (item.Player is not null)
-            {
                 await _dbContext.Entry(item.Player).Reference(p => p.Position).LoadAsync(ct2);
-            }
             await _dbContext.Entry(item).Reference(i => i.CurrentLeaderTeam).LoadAsync(ct2);
 
             return ToDto(item);
@@ -443,34 +438,33 @@ public class MarketService : IMarketService
         }
     }
 
-    private static void AdjustExpirationAfterBid(MarketItem item, Guid? previousLeaderId, DateTime nowUtc)
+    private static void AdjustExpirationAfterBid(MarketItem item, Guid? previousLeaderId, DateTime nowUtc, TimeZoneInfo tz)
     {
-        if (item is null)
+        if (item is null) throw new ArgumentNullException(nameof(item));
+
+        var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+        var expiresBr = DateTime.SpecifyKind(item.ExpiresAtUtc, DateTimeKind.Unspecified);
+
+        var isFirstBid = !previousLeaderId.HasValue || previousLeaderId.Value == Guid.Empty;
+
+        if (isFirstBid)
         {
-            throw new ArgumentNullException(nameof(item));
+            var capBr = nowBr.AddHours(3);
+            if (expiresBr > capBr)
+                expiresBr = capBr;
         }
 
-        var wasFirstBid = !previousLeaderId.HasValue;
-        if (wasFirstBid)
+        var remaining = expiresBr - nowBr;
+        if (remaining > TimeSpan.Zero && remaining <= TimeSpan.FromMinutes(30))
         {
-            var firstBidTarget = nowUtc.AddHours(3);
-            if (item.ExpiresAtUtc > firstBidTarget)
-            {
-                item.ExpiresAtUtc = firstBidTarget;
-            }
+            var ext = CalculateBidExtension(remaining);
+            if (ext > TimeSpan.Zero)
+                expiresBr = expiresBr.Add(ext);
         }
 
-        var remaining = item.ExpiresAtUtc - nowUtc;
-        if (remaining <= TimeSpan.Zero || remaining > TimeSpan.FromMinutes(30))
-        {
-            return;
-        }
+        expiresBr = expiresBr.AddHours(3);
 
-        var extension = CalculateBidExtension(remaining);
-        if (extension > TimeSpan.Zero)
-        {
-            item.ExpiresAtUtc = item.ExpiresAtUtc.Add(extension);
-        }
+        item.ExpiresAtUtc = expiresBr;
     }
 
     private static TimeSpan CalculateBidExtension(TimeSpan remaining)

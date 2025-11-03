@@ -1,9 +1,3 @@
-using System;
-using System.Data;
-using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
@@ -12,6 +6,13 @@ using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Data;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -60,8 +61,14 @@ public class AuctionSettlementService : IAuctionSettlementService
 
             if (onlyExpired)
             {
-                itemsQuery = itemsQuery.Where(i => i.ExpiresAtUtc <= now);
+                var tz = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time")
+                    : TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+                var nowBr = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
+                itemsQuery = itemsQuery.Where(i => i.ExpiresAtUtc <= nowBr);
             }
+
 
             var items = await itemsQuery
                 .OrderBy(i => i.CreatedAtUtc)

@@ -31,16 +31,22 @@
         </div>
 
         <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
-            @if (ShowBuyNowSummary)
+            @if (ShowWinnerSummary)
             {
                 <div class="d-flex flex-column gap-2 mt-2">
                     <div class="text-muted small">
-                        Adquirido por @((MarkupString)$"<strong>{BuyNowWinnerDisplay}</strong>")
+                        Adquirido por @((MarkupString)$"<strong>{WinnerDisplay}</strong>")
                     </div>
                     <div>
                         <span class="text-muted small">pelo valor de </span>
-                        <span class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</span>
+                        <span class="fw-semibold text-body">@FormatCurrency(FinalSoldAmount)</span>
                     </div>
+                </div>
+            }
+            else if (ShowExpiredNoBids)
+            {
+                <div class="d-flex flex-column gap-2 mt-2">
+                    <div class="fw-semibold text-body">Nenhum lance recebido.</div>
                 </div>
             }
             else
@@ -75,22 +81,16 @@
                     }
                 </div>
             }
-            @if (!IsSold)
+
+            @if (!IsExpired && !TreatAsSoldVisual)
             {
                 <div class="text-end" aria-live="polite">
-                    @if (IsExpired)
-                    {
-                        <span class="badge bg-secondary">Encerrado</span>
-                    }
-                    else
-                    {
-                        <span class="fw-semibold">Tempo restante: @CountdownText</span>
-                    }
+                    <span class="fw-semibold">Tempo restante: @CountdownText</span>
                 </div>
             }
         </div>
 
-        @if (!ShowBuyNowSummary)
+        @if (!IsExpired && !IsSold)
         {
             <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
                 <div class="mb-2">
@@ -231,20 +231,32 @@
         ? Item.CurrentLeaderTeamName!
         : Item.CurrentLeaderTeamId?.ToString() ?? "Time desconhecido";
 
-    private string StatusDisplay => IsSold
-        ? "Vendido"
-        : IsExpired
-            ? "Encerrado"
-            : TranslateStatus(Item.Status);
+    private string StatusDisplay =>
+        TreatAsSoldVisual ? "Vendido"
+        : IsExpired ? "Encerrado"
+        : TranslateStatus(Item.Status);
+
+    private bool ShowSoldSummary => IsSold && Item.CurrentLeaderAmount.HasValue; 
+
+    private bool ShowWinnerSummary => (IsSold || IsExpired) && Item.CurrentLeaderAmount.HasValue;
+
+    private bool ShowExpiredNoBids => IsExpired && !Item.CurrentLeaderAmount.HasValue;
+
+    private decimal FinalSoldAmount => Item.CurrentLeaderAmount!.Value;
+
+    private string WinnerDisplay => !string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName)
+        ? Item.CurrentLeaderTeamName!
+        : Item.CurrentLeaderTeamId?.ToString() ?? "Time desconhecido";
+
+    private bool TreatAsSoldVisual => IsSold || (IsExpired && Item.CurrentLeaderAmount.HasValue);
+
+    private bool IsSold => IsSoldStatus(Item.Status);
 
     private string StatusBadgeClass
     {
         get
         {
-            if (IsSold)
-            {
-                return "bg-danger";
-            }
+            if (TreatAsSoldVisual) return "bg-danger"; 
 
             var rawStatus = IsExpired ? "encerrado" : Item.Status ?? string.Empty;
             var status = rawStatus.ToLowerInvariant();
@@ -258,8 +270,6 @@
             };
         }
     }
-
-    private bool IsSold => IsSoldStatus(Item.Status);
 
     private TimeSpan Remaining
     {
@@ -287,9 +297,7 @@
     protected override void OnInitialized()
     {
         if (Item is null)
-        {
             throw new InvalidOperationException("Item parameter is required.");
-        }
 
         _itemId = Item.ItemId;
         _model.AmountText = string.Empty;
