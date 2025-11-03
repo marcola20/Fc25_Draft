@@ -506,9 +506,8 @@ public static class TransferOffersEndpoints
         return EndpointHelpers.CreateConflictProblem(message);
     }
 
-    private static async Task<(bool Success, (Guid TeamId, string TeamName)? Team, IResult? Error)> TryResolveTeamAsync(HttpContext http, DraftDbContext db, CancellationToken ct)
+    private static async Task<(bool Success, (Guid TeamId, string TeamName)? Team, IResult? Error)>TryResolveTeamAsync(HttpContext http, DraftDbContext db, CancellationToken ct)
     {
-        (Guid TeamId, string TeamName)? team = null;
         IResult? error = null;
 
         var token = http.Request.Headers["X-Team-Token"].FirstOrDefault();
@@ -519,11 +518,12 @@ public static class TransferOffersEndpoints
             return (false, null, error);
         }
 
-        var normalized = token.Trim();
+        var normalized = new string(token.Trim().ToLowerInvariant()
+            .Where(ch => !char.IsWhiteSpace(ch)).ToArray());
 
         var identity = await db.Teams
             .AsNoTracking()
-            .Where(t => t.Token == normalized)
+            .Where(t => t.Token != null && t.Token.ToLower() == normalized) 
             .Select(t => new { t.TeamId, t.TeamName })
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
@@ -534,8 +534,7 @@ public static class TransferOffersEndpoints
             return (false, null, error);
         }
 
-        team = new(identity.TeamId, identity.TeamName);
-        return (true, team, null);
+        return (true, (identity.TeamId, identity.TeamName), null);
     }
 
     private sealed record CreateTransferOfferRequest(
