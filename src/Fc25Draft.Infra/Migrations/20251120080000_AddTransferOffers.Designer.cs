@@ -961,9 +961,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("WonMarketItems");
                 });
             #pragma warning restore 612, 618
-            }
-            }
-            }
         }
     }
 }
