@@ -211,39 +211,27 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         ArgumentNullException.ThrowIfNull(options);
 
         if (options.DesiredCount <= 0)
-        {
             throw new MarketValidationException("A quantidade desejada deve ser maior que zero.");
-        }
 
         if (options.MinOverall.HasValue && options.MaxOverall.HasValue && options.MinOverall.Value > options.MaxOverall.Value)
-        {
             throw new MarketValidationException("O overall mínimo deve ser menor ou igual ao máximo.");
-        }
 
         if (options.MaxPerTeam.HasValue && options.MaxPerTeam.Value < 0)
-        {
             throw new MarketValidationException("O limite por time deve ser maior ou igual a zero.");
-        }
 
         if (options.MaxPerPosition.HasValue && options.MaxPerPosition.Value < 0)
-        {
             throw new MarketValidationException("O limite por posição deve ser maior ou igual a zero.");
-        }
 
         if (options.ManualPlayerIds is { Count: > 0 })
         {
             if (options.ManualPlayerIds.Count > options.DesiredCount)
-            {
                 throw new MarketValidationException("A quantidade de jogadores selecionados manualmente não pode exceder a quantidade desejada.");
-            }
 
             if (options.ExcludedPlayerIds is { Count: > 0 })
             {
-                var excluded = new HashSet<int>(options.ExcludedPlayerIds);
-                if (options.ManualPlayerIds.Any(excluded.Contains))
-                {
+                var excludedPlayersIds = new HashSet<int>(options.ExcludedPlayerIds!);
+                if (options.ManualPlayerIds.Any(excludedPlayersIds.Contains))
                     throw new MarketValidationException("Remova o jogador das exclusões antes de selecioná-lo manualmente.");
-                }
             }
         }
 
@@ -254,9 +242,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             ?? throw new MarketNotFoundException("Ciclo não encontrado.");
 
         if (cycle.Status != MarketCycleStatus.Draft)
-        {
             throw new MarketValidationException("Itens só podem ser gerados para ciclos em rascunho.");
-        }
 
         var seed = options.Seed ?? Random.Shared.Next();
         var excluded = await LoadExcludedPlayersAsync(cycleId, options, ct).ConfigureAwait(false);
