@@ -462,7 +462,8 @@ public class MarketService : IMarketService
                 expiresBr = expiresBr.Add(ext);
         }
 
-        expiresBr = expiresBr.AddHours(3);
+        if (isFirstBid)
+            expiresBr = expiresBr.AddHours(3);
 
         item.ExpiresAtUtc = expiresBr;
     }
