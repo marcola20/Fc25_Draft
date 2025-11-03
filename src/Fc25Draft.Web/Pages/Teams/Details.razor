@@ -1,13 +1,20 @@
 @page "/teams/details/{Id:guid}"
+@using System.ComponentModel.DataAnnotations
 @using System.Linq
 @using System.Globalization
+@using System.Threading
 @using Fc25Draft.Core.Extensions
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Components.Transfers
+@using Fc25Draft.Web.Models.Transfers
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IPricingService PricingService
+@inject TransferOffersClient TransferOffersClient
+@inject TeamAccessService TeamAccess
+@inject ToastService Toasts
 
 @implements IDisposable
 
@@ -117,6 +124,7 @@ else
                                     }
                                 </button>
                             </th>
+                            <th scope="col" class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -128,11 +136,170 @@ else
                                 <td class="text-end">@player.Overall</td>
                                 <td class="text-end">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
                                 <td class="text-end">@FormatCurrency(player.BasePrice)</td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-sm"
+                                            @onclick="() => OpenOfferEditorAsync(player)"
+                                            disabled="@_offerEditorSubmitting">
+                                        Propor
+                                    </button>
+                                </td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+        }
+    </section>
+
+    <section class="mt-5">
+        <h4>Propostas de Transferência</h4>
+
+        @if (!teamAccessInitialized)
+        {
+            <p><em>Carregando informações do token do time...</em></p>
+        }
+        else
+        {
+            <EditForm Model="_teamTokenForm" OnValidSubmit="SaveTeamTokenAsync">
+                <DataAnnotationsValidator />
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-lg-6">
+                                <label class="form-label" for="teamTokenInput">Token do seu time</label>
+                                <InputText id="teamTokenInput" class="form-control" @bind-Value="_teamTokenForm.Token" disabled="@_tokenSaving" />
+                                <ValidationMessage For="() => _teamTokenForm.Token" />
+                            </div>
+                            <div class="col-lg-3">
+                                <button type="submit" class="btn btn-primary w-100" disabled="@_tokenSaving">Salvar token</button>
+                            </div>
+                            <div class="col-lg-3">
+                                <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearTeamTokenAsync" disabled="@(_tokenSaving || !teamTokenConfigured)">Limpar token</button>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_teamTokenStatusMessage))
+                        {
+                            <div class="text-muted small mt-2">@_teamTokenStatusMessage</div>
+                        }
+                    </div>
+                </div>
+            </EditForm>
+
+            if (!teamTokenConfigured)
+            {
+                <p class="text-muted mb-0">Informe o token do seu time para visualizar e gerenciar propostas de transferência.</p>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <span class="fw-semibold">Atuando como:</span>
+                    <span class="ms-1">@(_myTeamIdentity?.TeamName ?? "Time não identificado")</span>
+                </div>
+
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button type="button"
+                                class="nav-link @(_activeOfferTab == OfferTab.Received ? "active" : string.Empty)"
+                                role="tab"
+                                @onclick="() => SetActiveOfferTab(OfferTab.Received)">
+                            Recebidas
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button type="button"
+                                class="nav-link @(_activeOfferTab == OfferTab.Sent ? "active" : string.Empty)"
+                                role="tab"
+                                @onclick="() => SetActiveOfferTab(OfferTab.Sent)">
+                            Enviadas
+                        </button>
+                    </li>
+                </ul>
+
+                if (!string.IsNullOrEmpty(_offersError))
+                {
+                    <div class="alert alert-danger" role="alert">@_offersError</div>
+                }
+                else if (offersLoading)
+                {
+                    <p><em>Carregando propostas...</em></p>
+                }
+                else
+                {
+                    var offers = GetActiveOffers();
+                    if (offers.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Nenhuma proposta encontrada.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Origem</th>
+                                        <th scope="col">Destino</th>
+                                        <th scope="col">Jogador</th>
+                                        <th scope="col" class="text-end">Valor</th>
+                                        <th scope="col" class="text-end">Atualizado</th>
+                                        <th scope="col" class="text-center">Status</th>
+                                        <th scope="col" class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var offer in offers)
+                                    {
+                                        <tr>
+                                            <td>@offer.FromTeamName</td>
+                                            <td>@offer.ToTeamName</td>
+                                            <td>
+                                                <div>@offer.Player.Name</div>
+                                                <div class="text-muted small">@offer.Player.Position</div>
+                                                @if (offer.SwapPlayers?.Count > 0)
+                                                {
+                                                    <div class="text-muted small mt-1">
+                                                        <span class="fw-semibold">Troca:</span>
+                                                        @string.Join(", ", offer.SwapPlayers.Select(p => p.Name))
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td class="text-end">@FormatOfferValue(offer.OfferedFee)</td>
+                                            <td class="text-end">@FormatOfferDate(offer.UpdatedAtUtc)</td>
+                                            <td class="text-center">
+                                                <span class="badge @GetStatusBadgeClass(offer.Status)">@FormatOfferStatus(offer.Status)</span>
+                                            </td>
+                                            <td class="text-end">
+                                                @if (offer.Status == TransferOfferStatus.Pending)
+                                                {
+                                                    if (_activeOfferTab == OfferTab.Received)
+                                                    {
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button type="button" class="btn btn-success" @onclick="() => AcceptOfferAsync(offer)" disabled="@(_offerActionInProgress || _offerEditorSubmitting)">Aceitar</button>
+                                                            <button type="button" class="btn btn-outline-danger" @onclick="() => RejectOfferAsync(offer)" disabled="@(_offerActionInProgress || _offerEditorSubmitting)">Rejeitar</button>
+                                                            <button type="button" class="btn btn-outline-primary" @onclick="() => OpenCounterOfferAsync(offer)" disabled="@(_offerActionInProgress || _offerEditorSubmitting)">Contrapropor</button>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button type="button" class="btn btn-outline-warning" @onclick="() => WithdrawOfferAsync(offer)" disabled="@(_offerActionInProgress || _offerEditorSubmitting)">Cancelar</button>
+                                                            <button type="button" class="btn btn-outline-primary" @onclick="() => OpenCounterOfferAsync(offer)" disabled="@(_offerActionInProgress || _offerEditorSubmitting)">Atualizar</button>
+                                                        </div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+            }
         }
     </section>
 
@@ -150,6 +317,15 @@ else
     </div>
 }
 
+<OfferEditor Visible="@_offerEditorVisible"
+             Title="@_offerEditorTitle"
+             Model="@_offerEditorModel"
+             SwapCandidates="@_myTeamRosterPlayers"
+             IsBusy="@_offerEditorSubmitting"
+             ErrorMessage="@_offerEditorError"
+             OnCancel="CloseOfferEditor"
+             OnSubmit="HandleOfferEditorSubmitAsync" />
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
@@ -160,15 +336,41 @@ else
     private string? errorMessage;
     private bool isLoading = true;
     private bool authInitialized;
+    private bool teamAccessInitialized;
+    private bool teamTokenConfigured;
     private readonly List<RosterPlayerViewModel> _rosterPlayers = new();
     private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
     private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
+    private readonly TeamTokenFormModel _teamTokenForm = new();
+    private bool _tokenSaving;
+    private string? _teamTokenStatusMessage;
+    private TeamIdentityDto? _myTeamIdentity;
+    private IReadOnlyList<TeamRosterPlayerDto> _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+    private OfferTab _activeOfferTab = OfferTab.Received;
+    private IReadOnlyList<TransferOfferSummaryDto> _receivedOffers = Array.Empty<TransferOfferSummaryDto>();
+    private IReadOnlyList<TransferOfferSummaryDto> _sentOffers = Array.Empty<TransferOfferSummaryDto>();
+    private bool offersLoading;
+    private string? _offersError;
+    private bool _offerActionInProgress;
+    private OfferEditorModel _offerEditorModel = new();
+    private bool _offerEditorVisible;
+    private bool _offerEditorSubmitting;
+    private string? _offerEditorError;
+    private string _offerEditorTitle = "Nova proposta";
+    private OfferEditorMode _offerEditorMode = OfferEditorMode.Create;
+    private Guid? _counterOfferId;
+    private uint _counterOfferRowVersion;
+    private CancellationTokenSource? _loadTeamCts;
+    private CancellationTokenSource? _offersCts;
+    private CancellationTokenSource? _actionCts;
+    private CancellationTokenSource? _myTeamContextCts;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        TeamAccess.TokenChanged += OnTeamTokenChanged;
     }
 
     protected override async Task OnInitializedAsync()
@@ -185,11 +387,30 @@ else
 
         await AdminAuth.EnsureInitializedAsync();
         authInitialized = true;
+
+        await LoadTeamTokenStatusAsync();
+        teamAccessInitialized = true;
+
+        if (teamTokenConfigured)
+        {
+            await ReloadMyTeamContextAsync(CancellationToken.None);
+            await RefreshOffersAsync();
+        }
+
+        var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
+        if (!string.IsNullOrWhiteSpace(invalidMessage))
+        {
+            _teamTokenStatusMessage = invalidMessage;
+        }
+
         StateHasChanged();
     }
 
     private async Task LoadTeamAsync()
     {
+        var cts = ReplaceCancellation(ref _loadTeamCts);
+        var ct = cts.Token;
+
         isLoading = true;
         errorMessage = null;
         roster = null;
@@ -198,23 +419,26 @@ else
 
         try
         {
-            team = await TeamsApiClient.GetByIdAsync(Id);
+            team = await TeamsApiClient.GetByIdAsync(Id, ct).ConfigureAwait(false);
             if (team is null)
             {
                 errorMessage = "Time não encontrado.";
                 return;
             }
 
-            roster = await TeamsApiClient.GetRosterByIdAsync(Id);
+            roster = await TeamsApiClient.GetRosterByIdAsync(Id, ct).ConfigureAwait(false);
 
             if (roster is not null)
             {
-                await PopulateRosterPlayersAsync(roster.Jogadores);
+                await PopulateRosterPlayersAsync(roster.Jogadores, ct).ConfigureAwait(false);
             }
             else
             {
                 ApplyRosterSort();
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
@@ -223,6 +447,7 @@ else
         finally
         {
             isLoading = false;
+            CompleteCancellation(cts, ref _loadTeamCts);
         }
     }
 
@@ -236,17 +461,526 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    private async Task PopulateRosterPlayersAsync(IReadOnlyList<TeamRosterPlayerDto> players)
+    private void OnTeamTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadTeamTokenStatusAsync().ConfigureAwait(false);
+
+            if (teamTokenConfigured)
+            {
+                await ReloadMyTeamContextAsync(CancellationToken.None).ConfigureAwait(false);
+                await RefreshOffersAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                _receivedOffers = Array.Empty<TransferOfferSummaryDto>();
+                _sentOffers = Array.Empty<TransferOfferSummaryDto>();
+            }
+
+            var message = TeamAccess.ConsumeInvalidTokenMessage();
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _teamTokenStatusMessage = message;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadTeamTokenStatusAsync()
+    {
+        string? token;
+        try
+        {
+            token = await TeamAccess.GetTokenAsync().ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch
+        {
+            token = null;
+        }
+
+        _teamTokenForm.Token = token ?? string.Empty;
+        teamTokenConfigured = Guid.TryParse(token, out _);
+
+        if (!teamTokenConfigured)
+        {
+            _myTeamIdentity = null;
+            _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+        }
+    }
+
+    private async Task SaveTeamTokenAsync()
+    {
+        _tokenSaving = true;
+        _teamTokenStatusMessage = null;
+
+        try
+        {
+            var trimmed = (_teamTokenForm.Token ?? string.Empty).Trim();
+            await TeamAccess.SetTokenAsync(trimmed).ConfigureAwait(false);
+            _teamTokenForm.Token = trimmed;
+            teamTokenConfigured = true;
+            _teamTokenStatusMessage = "Token atualizado com sucesso.";
+            Toasts.ShowSuccess("Token atualizado com sucesso.");
+
+            await ReloadMyTeamContextAsync(CancellationToken.None).ConfigureAwait(false);
+            await RefreshOffersAsync().ConfigureAwait(false);
+        }
+        catch (ArgumentException ex)
+        {
+            _teamTokenStatusMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _teamTokenStatusMessage = "Não foi possível salvar o token.";
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _tokenSaving = false;
+        }
+    }
+
+    private async Task ClearTeamTokenAsync()
+    {
+        _tokenSaving = true;
+        try
+        {
+            await TeamAccess.ClearTokenAsync().ConfigureAwait(false);
+            teamTokenConfigured = false;
+            _teamTokenForm.Token = string.Empty;
+            _teamTokenStatusMessage = "Token removido.";
+            Toasts.ShowSuccess("Token removido com sucesso.");
+            _myTeamIdentity = null;
+            _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+            _receivedOffers = Array.Empty<TransferOfferSummaryDto>();
+            _sentOffers = Array.Empty<TransferOfferSummaryDto>();
+        }
+        catch (Exception ex)
+        {
+            _teamTokenStatusMessage = "Não foi possível remover o token.";
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _tokenSaving = false;
+        }
+    }
+
+    private async Task RefreshOffersAsync()
+    {
+        if (!teamTokenConfigured)
+        {
+            _receivedOffers = Array.Empty<TransferOfferSummaryDto>();
+            _sentOffers = Array.Empty<TransferOfferSummaryDto>();
+            return;
+        }
+
+        var cts = ReplaceCancellation(ref _offersCts);
+        var ct = cts.Token;
+
+        offersLoading = true;
+        _offersError = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _receivedOffers = await TransferOffersClient.GetReceivedAsync(ct).ConfigureAwait(false);
+            _sentOffers = await TransferOffersClient.GetSentAsync(ct).ConfigureAwait(false);
+        }
+        catch (TeamTokenMissingException)
+        {
+            await HandleMissingTeamTokenAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _offersError = ex.Message;
+        }
+        finally
+        {
+            offersLoading = false;
+            CompleteCancellation(cts, ref _offersCts);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private IReadOnlyList<TransferOfferSummaryDto> GetActiveOffers()
+        => _activeOfferTab == OfferTab.Received ? _receivedOffers : _sentOffers;
+
+    private void SetActiveOfferTab(OfferTab tab)
+    {
+        if (_activeOfferTab != tab)
+        {
+            _activeOfferTab = tab;
+        }
+    }
+
+    private Task AcceptOfferAsync(TransferOfferSummaryDto offer)
+        => ExecuteOfferActionAsync(ct => TransferOffersClient.AcceptAsync(offer.OfferId, offer.RowVersion, ct));
+
+    private Task RejectOfferAsync(TransferOfferSummaryDto offer)
+        => ExecuteOfferActionAsync(ct => TransferOffersClient.RejectAsync(offer.OfferId, offer.RowVersion, null, ct));
+
+    private Task WithdrawOfferAsync(TransferOfferSummaryDto offer)
+        => ExecuteOfferActionAsync(ct => TransferOffersClient.WithdrawAsync(offer.OfferId, offer.RowVersion, ct));
+
+    private async Task ExecuteOfferActionAsync(Func<CancellationToken, Task<TransferOfferActionResult>> action)
+    {
+        var cts = ReplaceCancellation(ref _actionCts);
+        var ct = cts.Token;
+        _offerActionInProgress = true;
+
+        try
+        {
+            var result = await action(ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(result.Message))
+            {
+                Toasts.ShowSuccess(result.Message);
+            }
+
+            await RefreshOffersAsync().ConfigureAwait(false);
+        }
+        catch (TeamTokenMissingException)
+        {
+            await HandleMissingTeamTokenAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _offerActionInProgress = false;
+            CompleteCancellation(cts, ref _actionCts);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OpenCounterOfferAsync(TransferOfferSummaryDto offer)
+    {
+        _offerEditorError = null;
+        _offerEditorMode = OfferEditorMode.Counter;
+        _counterOfferId = offer.OfferId;
+        _counterOfferRowVersion = offer.RowVersion;
+        _offerEditorTitle = $"Contraproposta para {offer.Player.Name}";
+
+        var cts = ReplaceCancellation(ref _actionCts);
+        var ct = cts.Token;
+
+        try
+        {
+            var detail = await TransferOffersClient.GetByIdAsync(offer.OfferId, ct).ConfigureAwait(false);
+            if (detail is null)
+            {
+                Toasts.ShowError("Não foi possível carregar os detalhes da oferta.");
+                return;
+            }
+
+            _offerEditorModel = new OfferEditorModel
+            {
+                TargetPlayerId = detail.Player.PlayerId,
+                TargetPlayerGuid = detail.Player.PlayerGuid,
+                TargetPlayerName = detail.Player.Name,
+                Cash = detail.OfferedFee,
+                Message = detail.Message,
+                SellOnPercentage = null,
+                TeamToken = await GetCurrentTokenOrEmptyAsync().ConfigureAwait(false)
+            };
+            _offerEditorModel.ResetSwapPlayers(detail.SwapPlayers.Select(sp => sp.PlayerId));
+
+            await EnsureMyTeamRosterAsync().ConfigureAwait(false);
+            _offerEditorVisible = true;
+        }
+        catch (TeamTokenMissingException)
+        {
+            await HandleMissingTeamTokenAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _offerEditorError = ex.Message;
+            Toasts.ShowError("Não foi possível abrir a contraproposta.");
+        }
+        finally
+        {
+            CompleteCancellation(cts, ref _actionCts);
+        }
+    }
+
+    private async Task OpenOfferEditorAsync(RosterPlayerViewModel player)
+    {
+        _offerEditorError = null;
+        _offerEditorMode = OfferEditorMode.Create;
+        _offerEditorTitle = $"Nova proposta para {player.Name}";
+        _counterOfferId = null;
+        _counterOfferRowVersion = 0;
+
+        _offerEditorModel = new OfferEditorModel
+        {
+            TargetPlayerId = player.PlayerId,
+            TargetPlayerGuid = player.PlayerGuid,
+            TargetPlayerName = player.Name,
+            Cash = null,
+            SellOnPercentage = null,
+            TeamToken = await GetCurrentTokenOrEmptyAsync().ConfigureAwait(false)
+        };
+        _offerEditorModel.SwapPlayerIds.Clear();
+
+        await EnsureMyTeamRosterAsync().ConfigureAwait(false);
+        _offerEditorVisible = true;
+    }
+
+    private async Task HandleOfferEditorSubmitAsync(OfferEditorModel model)
+    {
+        if (model is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(model.TeamToken))
+        {
+            _offerEditorError = "Informe o token do time emissor.";
+            return;
+        }
+
+        var trimmedToken = model.TeamToken.Trim();
+        _offerEditorSubmitting = true;
+        _offerEditorError = null;
+
+        var cts = ReplaceCancellation(ref _actionCts);
+        var ct = cts.Token;
+
+        try
+        {
+            await TeamAccess.SetTokenAsync(trimmedToken).ConfigureAwait(false);
+            teamTokenConfigured = true;
+            _teamTokenForm.Token = trimmedToken;
+            _teamTokenStatusMessage = null;
+
+            TransferOfferActionResult result;
+            if (_offerEditorMode == OfferEditorMode.Create)
+            {
+                if (team is null)
+                {
+                    throw new InvalidOperationException("Time alvo não encontrado.");
+                }
+
+                var request = new CreateTransferOfferClientRequest(
+                    team.TeamId,
+                    model.TargetPlayerId,
+                    model.Cash,
+                    model.SellOnPercentage,
+                    model.SwapPlayerIds.Count > 0 ? model.SwapPlayerIds.ToArray() : Array.Empty<int>(),
+                    model.Message,
+                    null);
+
+                result = await TransferOffersClient.CreateAsync(request, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                if (!_counterOfferId.HasValue)
+                {
+                    throw new InvalidOperationException("Oferta inválida para contraproposta.");
+                }
+
+                var request = new CounterTransferOfferClientRequest(
+                    model.Cash,
+                    model.SellOnPercentage,
+                    model.SwapPlayerIds.Count > 0 ? model.SwapPlayerIds.ToArray() : Array.Empty<int>(),
+                    model.Message,
+                    null);
+
+                result = await TransferOffersClient.CounterAsync(_counterOfferId.Value, _counterOfferRowVersion, request, ct)
+                    .ConfigureAwait(false);
+                _activeOfferTab = OfferTab.Sent;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Message))
+            {
+                Toasts.ShowSuccess(result.Message);
+            }
+
+            _offerEditorVisible = false;
+            _offerEditorMode = OfferEditorMode.Create;
+            _offerEditorModel = new OfferEditorModel();
+
+            await ReloadMyTeamContextAsync(CancellationToken.None).ConfigureAwait(false);
+            await RefreshOffersAsync().ConfigureAwait(false);
+        }
+        catch (ArgumentException ex)
+        {
+            _offerEditorError = ex.Message;
+        }
+        catch (TeamTokenMissingException)
+        {
+            await HandleMissingTeamTokenAsync().ConfigureAwait(false);
+            _offerEditorError = "Informe o token do time emissor.";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _offerEditorError = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _offerEditorSubmitting = false;
+            CompleteCancellation(cts, ref _actionCts);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private Task CloseOfferEditor()
+    {
+        _offerEditorVisible = false;
+        _offerEditorError = null;
+        _offerEditorMode = OfferEditorMode.Create;
+        _counterOfferId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task EnsureMyTeamRosterAsync()
+    {
+        if (!teamTokenConfigured)
+        {
+            _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+            return;
+        }
+
+        if (_myTeamRosterPlayers.Count == 0)
+        {
+            await ReloadMyTeamContextAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ReloadMyTeamContextAsync(CancellationToken ct)
+    {
+        var cts = ReplaceCancellation(ref _myTeamContextCts);
+        CancellationTokenSource? linked = null;
+
+        try
+        {
+            linked = CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token);
+            var token = linked.Token;
+
+            string? rawToken;
+            try
+            {
+                rawToken = await TeamAccess.GetTokenAsync().ConfigureAwait(false);
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
+            catch
+            {
+                rawToken = null;
+            }
+
+            if (string.IsNullOrWhiteSpace(rawToken))
+            {
+                teamTokenConfigured = false;
+                _teamTokenForm.Token = string.Empty;
+                _myTeamIdentity = null;
+                _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+                return;
+            }
+
+            _teamTokenForm.Token = rawToken;
+            teamTokenConfigured = Guid.TryParse(rawToken, out _);
+
+            var identity = await TransferOffersClient.GetMyTeamAsync(token).ConfigureAwait(false);
+            _myTeamIdentity = identity;
+
+            if (identity is not null)
+            {
+                var rosterDto = await TeamsApiClient.GetRosterByIdAsync(identity.TeamId, token).ConfigureAwait(false);
+                _myTeamRosterPlayers = rosterDto?.Jogadores ?? Array.Empty<TeamRosterPlayerDto>();
+            }
+            else
+            {
+                _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+        }
+        finally
+        {
+            linked?.Dispose();
+            CompleteCancellation(cts, ref _myTeamContextCts);
+        }
+    }
+
+    private async Task HandleMissingTeamTokenAsync()
+    {
+        var message = TeamAccess.ConsumeInvalidTokenMessage();
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            message = "Informe o token do seu time para continuar.";
+        }
+
+        _teamTokenStatusMessage = message;
+        teamTokenConfigured = false;
+        _teamTokenForm.Token = string.Empty;
+        _myTeamIdentity = null;
+        _myTeamRosterPlayers = Array.Empty<TeamRosterPlayerDto>();
+        _receivedOffers = Array.Empty<TransferOfferSummaryDto>();
+        _sentOffers = Array.Empty<TransferOfferSummaryDto>();
+
+        Toasts.ShowError(message);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<string> GetCurrentTokenOrEmptyAsync()
+    {
+        try
+        {
+            return await TeamAccess.GetTokenAsync().ConfigureAwait(false) ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private async Task PopulateRosterPlayersAsync(IReadOnlyList<TeamRosterPlayerDto> players, CancellationToken ct)
     {
         _rosterPlayers.Clear();
 
         foreach (var player in players)
         {
+            ct.ThrowIfCancellationRequested();
+
             decimal basePrice = 0m;
             try
             {
-                var pricing = await PricingService.CalculateForPlayerAsync(player.PlayerId, default);
+                var pricing = await PricingService.CalculateForPlayerAsync(player.PlayerId, ct).ConfigureAwait(false);
                 basePrice = pricing.BasePrice;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
@@ -256,6 +990,8 @@ else
             var positionId = player.Posicao.ToPositionId();
 
             _rosterPlayers.Add(new RosterPlayerViewModel(
+                player.PlayerId,
+                player.PlayerGuid,
                 player.Nome,
                 player.Posicao,
                 positionId,
@@ -351,11 +1087,89 @@ else
         return _sortDescending ? "Ordenado em ordem decrescente" : "Ordenado em ordem crescente";
     }
 
+    private static string FormatOfferValue(decimal? value)
+        => value.HasValue ? FormatCurrency(value.Value) : "-";
+
+    private static string FormatOfferDate(DateTime utc)
+        => utc.ToLocalTime().ToString("g", BrazilCulture);
+
+    private static string FormatOfferStatus(TransferOfferStatus status) => status switch
+    {
+        TransferOfferStatus.Pending => "Pendente",
+        TransferOfferStatus.Accepted => "Aceita",
+        TransferOfferStatus.Rejected => "Rejeitada",
+        TransferOfferStatus.Canceled => "Cancelada",
+        TransferOfferStatus.Expired => "Expirada",
+        _ => status.ToString()
+    };
+
+    private static string GetStatusBadgeClass(TransferOfferStatus status) => status switch
+    {
+        TransferOfferStatus.Accepted => "bg-success",
+        TransferOfferStatus.Rejected or TransferOfferStatus.Canceled => "bg-danger",
+        TransferOfferStatus.Expired => "bg-secondary",
+        _ => "bg-warning text-dark"
+    };
+
     private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
 
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        TeamAccess.TokenChanged -= OnTeamTokenChanged;
+        CancelAndDispose(ref _loadTeamCts);
+        CancelAndDispose(ref _offersCts);
+        CancelAndDispose(ref _actionCts);
+        CancelAndDispose(ref _myTeamContextCts);
+    }
+
+    private static void CancelAndDispose(ref CancellationTokenSource? cts)
+    {
+        var current = Interlocked.Exchange(ref cts, null);
+        if (current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            current.Cancel();
+        }
+        catch
+        {
+        }
+
+        current.Dispose();
+    }
+
+    private static CancellationTokenSource ReplaceCancellation(ref CancellationTokenSource? field)
+    {
+        var cts = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref field, cts);
+        if (previous is not null)
+        {
+            try
+            {
+                previous.Cancel();
+            }
+            catch
+            {
+            }
+
+            previous.Dispose();
+        }
+
+        return cts;
+    }
+
+    private static void CompleteCancellation(CancellationTokenSource cts, ref CancellationTokenSource? field)
+    {
+        if (ReferenceEquals(field, cts))
+        {
+            field = null;
+        }
+
+        cts.Dispose();
     }
 
     private enum RosterSortColumn
@@ -366,5 +1180,31 @@ else
         BasePrice
     }
 
-    private sealed record RosterPlayerViewModel(string Name, string Position, int PositionId, int Overall, int? Age, decimal BasePrice);
+    private enum OfferTab
+    {
+        Received,
+        Sent
+    }
+
+    private enum OfferEditorMode
+    {
+        Create,
+        Counter
+    }
+
+    private sealed record RosterPlayerViewModel(
+        int PlayerId,
+        Guid PlayerGuid,
+        string Name,
+        string Position,
+        int PositionId,
+        int Overall,
+        int? Age,
+        decimal BasePrice);
+
+    private sealed class TeamTokenFormModel
+    {
+        [Required(ErrorMessage = "Informe o token do seu time.")]
+        public string Token { get; set; } = string.Empty;
+    }
 }
