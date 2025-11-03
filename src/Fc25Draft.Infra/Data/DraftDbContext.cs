@@ -24,6 +24,8 @@ public class DraftDbContext : DbContext
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
     public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
+    public DbSet<TransferOffer> TransferOffers => Set<TransferOffer>();
+    public DbSet<TransferOfferSwapPlayer> TransferOfferSwapPlayers => Set<TransferOfferSwapPlayer>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -351,6 +353,96 @@ public class DraftDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ToTeamId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        mb.Entity<TransferOffer>(e =>
+        {
+            e.HasKey(x => x.OfferId);
+
+            e.Property(x => x.OfferedFee)
+                .HasColumnType("numeric(18,2)");
+
+            e.Property(x => x.CreatedAtUtc)
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            e.Property(x => x.UpdatedAtUtc)
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            e.Property(x => x.RespondedAtUtc)
+                .HasColumnType("timestamp with time zone");
+
+            e.Property(x => x.ExpiresAtUtc)
+                .HasColumnType("timestamp with time zone");
+
+            e.Property(x => x.Status)
+                .HasConversion<int>()
+                .IsRequired();
+
+            e.Property(x => x.Message)
+                .HasMaxLength(400);
+
+            e.Property(x => x.ResponseMessage)
+                .HasMaxLength(400);
+
+            e.Property(x => x.RowVersion)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .IsConcurrencyToken()
+                .ValueGeneratedOnAddOrUpdate();
+
+            e.HasOne(x => x.Player)
+                .WithMany()
+                .HasForeignKey(x => x.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasOne(x => x.FromTeam)
+                .WithMany()
+                .HasForeignKey(x => x.FromTeamId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasOne(x => x.ToTeam)
+                .WithMany()
+                .HasForeignKey(x => x.ToTeamId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasIndex(x => new { x.PlayerId, x.Status });
+            e.HasIndex(x => x.FromTeamId);
+            e.HasIndex(x => new { x.ToTeamId, x.Status, x.CreatedAtUtc })
+                .HasDatabaseName("IX_TransferOffers_ToTeam_Status_CreatedAtUtc")
+                .IsDescending(false, false, true);
+        });
+
+        mb.Entity<TransferOfferSwapPlayer>(e =>
+        {
+            e.HasKey(x => x.SwapPlayerId);
+
+            e.HasOne(x => x.Offer)
+                .WithMany(o => o.SwapPlayers)
+                .HasForeignKey(x => x.OfferId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            e.HasOne(x => x.Player)
+                .WithMany()
+                .HasForeignKey(x => x.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasOne(x => x.Team)
+                .WithMany()
+                .HasForeignKey(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            e.HasIndex(x => new { x.OfferId, x.PlayerId })
+                .IsUnique();
+
+            e.HasIndex(x => x.TeamId);
         });
 
         //mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);
