@@ -240,6 +240,8 @@ public class MarketService : IMarketService
             item.CurrentLeaderAmount = normalizedAmount;
             item.LastUpdateUtc = nowUtc;
 
+            AdjustExpirationAfterBid(item, previousLeaderId, nowUtc);
+
             var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", normalizedAmount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))
                 bidNotes = $"{bidNotes} {outbidNotes}";
@@ -439,6 +441,76 @@ public class MarketService : IMarketService
                 TeamId = teamId
             }, ct).ConfigureAwait(false);
         }
+    }
+
+    private static void AdjustExpirationAfterBid(MarketItem item, Guid? previousLeaderId, DateTime nowUtc)
+    {
+        if (item is null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        var wasFirstBid = !previousLeaderId.HasValue;
+        if (wasFirstBid)
+        {
+            var firstBidTarget = nowUtc.AddHours(3);
+            if (item.ExpiresAtUtc > firstBidTarget)
+            {
+                item.ExpiresAtUtc = firstBidTarget;
+            }
+        }
+
+        var remaining = item.ExpiresAtUtc - nowUtc;
+        if (remaining <= TimeSpan.Zero || remaining > TimeSpan.FromMinutes(30))
+        {
+            return;
+        }
+
+        var extension = CalculateBidExtension(remaining);
+        if (extension > TimeSpan.Zero)
+        {
+            item.ExpiresAtUtc = item.ExpiresAtUtc.Add(extension);
+        }
+    }
+
+    private static TimeSpan CalculateBidExtension(TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(5))
+        {
+            return TimeSpan.FromMinutes(30);
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(10))
+        {
+            return TimeSpan.FromMinutes(25);
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(15))
+        {
+            return TimeSpan.FromMinutes(20);
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(20))
+        {
+            return TimeSpan.FromMinutes(15);
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(25))
+        {
+            return TimeSpan.FromMinutes(10);
+        }
+
+        if (remaining <= TimeSpan.FromMinutes(30))
+        {
+            return TimeSpan.FromMinutes(5);
+        }
+
+        return TimeSpan.Zero;
     }
 
     private static string NormalizeToken(string token)
