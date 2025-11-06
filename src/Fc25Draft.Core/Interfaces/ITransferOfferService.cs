@@ -7,11 +7,13 @@ public interface ITransferOfferService
     Task<TransferOffer> CreateOfferAsync(
         Guid fromTeamId,
         Guid toTeamId,
-        int playerId,
+        IEnumerable<int> targetPlayerIds,
         decimal? offeredFee,
+        decimal? sellOnPercent,
         IEnumerable<int> swapPlayerIds,
         string? message,
         DateTime? expiresAtUtc,
+        Guid? counterOfferId,
         CancellationToken ct);
 
     Task<TransferOffer> AcceptOfferAsync(Guid offerId, uint expectedRowVersion, CancellationToken ct);

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -88,9 +89,9 @@ public class TransferOffersClient
             Content = JsonContent.Create(new
             {
                 toTeamId = request.ToTeamId,
-                playerId = request.PlayerId,
+                targetPlayerIds = request.TargetPlayerIds?.ToArray() ?? Array.Empty<int>(),
                 offeredFee = request.OfferedFee,
-                sellOnFeePercentage = request.SellOnFeePercentage,
+                sellOnPercentage = request.SellOnFeePercentage,
                 swapPlayerIds = request.SwapPlayerIds ?? Array.Empty<int>(),
                 message = SanitizeOptional(request.Message),
                 expiresAtUtc = request.ExpiresAtUtc
@@ -164,7 +165,7 @@ public class TransferOffersClient
             Content = JsonContent.Create(new
             {
                 offeredFee = request.OfferedFee,
-                sellOnFeePercentage = request.SellOnFeePercentage,
+                sellOnPercentage = request.SellOnFeePercentage,
                 swapPlayerIds = request.SwapPlayerIds ?? Array.Empty<int>(),
                 message = SanitizeOptional(request.Message),
                 expiresAtUtc = request.ExpiresAtUtc
@@ -392,7 +393,7 @@ public class TransferOffersClient
 
 public sealed record CreateTransferOfferClientRequest(
     Guid ToTeamId,
-    int PlayerId,
+    IReadOnlyCollection<int> TargetPlayerIds,
     decimal? OfferedFee,
     decimal? SellOnFeePercentage,
     IReadOnlyCollection<int>? SwapPlayerIds,

@@ -5,6 +5,7 @@ using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace Fc25Draft.Web.Endpoints.Transfers;
@@ -43,16 +44,23 @@ public static class TransferOffersEndpoints
 
         var team = result.Team;
 
+        if (request.TargetPlayerIds is null || request.TargetPlayerIds.Count == 0)
+        {
+            return EndpointHelpers.CreateValidationProblem("Informe ao menos um jogador alvo.");
+        }
+
         try
         {
             var created = await offerService.CreateOfferAsync(
                 team!.Value.TeamId,
                 request.ToTeamId,
-                request.PlayerId,
+                request.TargetPlayerIds ?? Array.Empty<int>(),
                 request.OfferedFee,
+                request.SellOnPercentage,
                 request.SwapPlayerIds ?? Array.Empty<int>(),
                 request.Message,
                 request.ExpiresAtUtc,
+                null,
                 ct).ConfigureAwait(false);
 
             var detail = await ProjectDetailAsync(db, created.OfferId, ct).ConfigureAwait(false);
@@ -158,12 +166,12 @@ public static class TransferOffersEndpoints
             return EndpointHelpers.CreateNotFoundProblem("Oferta não encontrada.");
         }
 
-        if (snapshot.Value.ToTeamId != team!.Value.TeamId)
+        if (snapshot.ToTeamId != team!.Value.TeamId)
         {
             return Results.Json(new { message = "Apenas o time destinatário pode aceitar a proposta." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        if (snapshot.Value.Status != TransferOfferStatus.Pending)
+        if (snapshot.Status != TransferOfferStatus.Pending)
         {
             return EndpointHelpers.CreateConflictProblem("A oferta não está mais pendente.");
         }
@@ -214,12 +222,12 @@ public static class TransferOffersEndpoints
             return EndpointHelpers.CreateNotFoundProblem("Oferta não encontrada.");
         }
 
-        if (snapshot.Value.ToTeamId != team!.Value.TeamId)
+        if (snapshot.ToTeamId != team!.Value.TeamId)
         {
             return Results.Json(new { message = "Apenas o time destinatário pode rejeitar a proposta." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        if (snapshot.Value.Status != TransferOfferStatus.Pending)
+        if (snapshot.Status != TransferOfferStatus.Pending)
         {
             return EndpointHelpers.CreateConflictProblem("A oferta não está mais pendente.");
         }
@@ -269,12 +277,12 @@ public static class TransferOffersEndpoints
             return EndpointHelpers.CreateNotFoundProblem("Oferta não encontrada.");
         }
 
-        if (snapshot.Value.FromTeamId != team!.Value.TeamId)
+        if (snapshot.FromTeamId != team!.Value.TeamId)
         {
             return Results.Json(new { message = "Apenas o time ofertante pode retirar a proposta." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        if (snapshot.Value.Status != TransferOfferStatus.Pending)
+        if (snapshot.Status != TransferOfferStatus.Pending)
         {
             return EndpointHelpers.CreateConflictProblem("A oferta não está mais pendente.");
         }
@@ -330,12 +338,12 @@ public static class TransferOffersEndpoints
             return EndpointHelpers.CreateNotFoundProblem("Oferta não encontrada.");
         }
 
-        if (snapshot.Value.FromTeamId != team!.Value.TeamId)
+        if (snapshot.FromTeamId != team!.Value.TeamId)
         {
             return Results.Json(new { message = "Apenas o time ofertante pode enviar uma contraproposta." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        if (snapshot.Value.Status != TransferOfferStatus.Pending)
+        if (snapshot.Status != TransferOfferStatus.Pending)
         {
             return EndpointHelpers.CreateConflictProblem("A oferta não está mais pendente.");
         }
@@ -359,12 +367,14 @@ public static class TransferOffersEndpoints
         {
             var created = await offerService.CreateOfferAsync(
                 team.Value.TeamId,
-                snapshot.Value.ToTeamId,
-                snapshot.Value.PlayerId,
+                snapshot.ToTeamId,
+                snapshot.TargetPlayerIds,
                 request.OfferedFee,
+                request.SellOnPercentage,
                 request.SwapPlayerIds ?? Array.Empty<int>(),
                 request.Message,
                 request.ExpiresAtUtc,
+                snapshot.OfferId,
                 ct).ConfigureAwait(false);
 
             detail = await ProjectDetailAsync(db, created.OfferId, ct).ConfigureAwait(false);
@@ -390,18 +400,24 @@ public static class TransferOffersEndpoints
     private static Expression<Func<TransferOffer, TransferOfferSummaryDto>> ProjectSummary() =>
     offer => new TransferOfferSummaryDto(
         offer.OfferId,
+        offer.ThreadId,
+        offer.CounterOfOfferId,
         offer.Status,
         offer.FromTeamId,
         offer.FromTeam.TeamName,
         offer.ToTeamId,
         offer.ToTeam.TeamName,
-        new TransferOfferParticipantDto(
-            offer.PlayerId,
-            offer.Player.PlayerGuid,
-            offer.Player.Name,
-            offer.Player.Position.Name,
-            offer.Player.Overall),
+        offer.Targets
+            .OrderBy(t => t.Player.Name)
+            .Select(t => new TransferOfferParticipantDto(
+                t.PlayerId,
+                t.Player.PlayerGuid,
+                t.Player.Name,
+                t.Player.Position.Name,
+                t.Player.Overall))
+            .ToList(),
         offer.OfferedFee,
+        offer.SellOnPercent,
         offer.CreatedAtUtc,
         offer.UpdatedAtUtc,
         offer.ExpiresAtUtc,
@@ -415,24 +431,30 @@ public static class TransferOffersEndpoints
                 sp.Player.Name,
                 sp.Player.Position.Name,
                 sp.Player.Overall))
-            .ToList() 
+            .ToList()
     );
 
     private static Expression<Func<TransferOffer, TransferOfferDetailDto>> ProjectDetail() =>
     offer => new TransferOfferDetailDto(
         offer.OfferId,
+        offer.ThreadId,
+        offer.CounterOfOfferId,
         offer.Status,
         offer.FromTeamId,
         offer.FromTeam.TeamName,
         offer.ToTeamId,
         offer.ToTeam.TeamName,
-        new TransferOfferParticipantDto(
-            offer.PlayerId,
-            offer.Player.PlayerGuid,
-            offer.Player.Name,
-            offer.Player.Position.Name,
-            offer.Player.Overall),
+        offer.Targets
+            .OrderBy(t => t.Player.Name)
+            .Select(t => new TransferOfferParticipantDto(
+                t.PlayerId,
+                t.Player.PlayerGuid,
+                t.Player.Name,
+                t.Player.Position.Name,
+                t.Player.Overall))
+            .ToList(),
         offer.OfferedFee,
+        offer.SellOnPercent,
         offer.Message,
         offer.ResponseMessage,
         offer.CreatedAtUtc,
@@ -448,7 +470,7 @@ public static class TransferOffersEndpoints
                 sp.Player.Name,
                 sp.Player.Position.Name,
                 sp.Player.Overall))
-            .ToList() 
+            .ToList()
     );
 
     private static async Task<TransferOfferDetailDto?> ProjectDetailAsync(DraftDbContext db, Guid offerId, CancellationToken ct)
@@ -459,7 +481,7 @@ public static class TransferOffersEndpoints
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-    private static async Task<(Guid OfferId, Guid FromTeamId, Guid ToTeamId, int PlayerId, TransferOfferStatus Status)?> LoadOfferSnapshotAsync(
+    private static async Task<TransferOfferSnapshot?> LoadOfferSnapshotAsync(
         Guid offerId,
         DraftDbContext db,
         CancellationToken ct)
@@ -472,11 +494,15 @@ public static class TransferOffersEndpoints
         return await db.TransferOffers
             .AsNoTracking()
             .Where(o => o.OfferId == offerId)
-            .Select(o => new ValueTuple<Guid, Guid, Guid, int, TransferOfferStatus>(
+            .Select(o => new TransferOfferSnapshot(
                 o.OfferId,
+                o.ThreadId,
                 o.FromTeamId,
                 o.ToTeamId,
-                o.PlayerId,
+                o.Targets
+                    .OrderBy(t => t.PlayerId)
+                    .Select(t => t.PlayerId)
+                    .ToList(),
                 o.Status))
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
@@ -488,6 +514,14 @@ public static class TransferOffersEndpoints
         response.Headers["X-RowVersion"] = rowVersion.ToString();
         response.Headers["X-Server-Time-Utc"] = DateTime.UtcNow.ToString("O");
     }
+
+    private sealed record TransferOfferSnapshot(
+        Guid OfferId,
+        Guid ThreadId,
+        Guid FromTeamId,
+        Guid ToTeamId,
+        IReadOnlyList<int> TargetPlayerIds,
+        TransferOfferStatus Status);
 
     private static IResult MapInvalidOperationToResult(InvalidOperationException ex)
     {
@@ -539,8 +573,9 @@ public static class TransferOffersEndpoints
 
     private sealed record CreateTransferOfferRequest(
         Guid ToTeamId,
-        int PlayerId,
+        IReadOnlyList<int>? TargetPlayerIds,
         decimal? OfferedFee,
+        decimal? SellOnPercentage,
         IReadOnlyList<int>? SwapPlayerIds,
         string? Message,
         DateTime? ExpiresAtUtc);
@@ -549,6 +584,7 @@ public static class TransferOffersEndpoints
 
     private sealed record CounterTransferOfferRequest(
         decimal? OfferedFee,
+        decimal? SellOnPercentage,
         IReadOnlyList<int>? SwapPlayerIds,
         string? Message,
         DateTime? ExpiresAtUtc);

@@ -22,11 +22,13 @@ public class TransferOfferService : ITransferOfferService
     public async Task<TransferOffer> CreateOfferAsync(
         Guid fromTeamId,
         Guid toTeamId,
-        int playerId,
+        IEnumerable<int> targetPlayerIds,
         decimal? offeredFee,
+        decimal? sellOnPercent,
         IEnumerable<int> swapPlayerIds,
         string? message,
         DateTime? expiresAtUtc,
+        Guid? counterOfferId,
         CancellationToken ct)
     {
         if (fromTeamId == Guid.Empty)
@@ -44,24 +46,33 @@ public class TransferOfferService : ITransferOfferService
             throw new ArgumentException("Os times da oferta devem ser diferentes.");
         }
 
-        if (playerId <= 0)
+        var normalizedTargets = targetPlayerIds?.Distinct().ToList() ?? new List<int>();
+        if (normalizedTargets.Count == 0)
         {
-            throw new ArgumentException("playerId é obrigatório.", nameof(playerId));
+            throw new ArgumentException("É necessário informar ao menos um jogador alvo.", nameof(targetPlayerIds));
         }
 
-        var player = await _dbContext.Players
+        var targetPlayers = await _dbContext.Players
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.PlayerId == playerId, ct)
+            .Where(p => normalizedTargets.Contains(p.PlayerId))
+            .Select(p => new { p.PlayerId, p.CurrentTeamId })
+            .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        if (player is null)
+        if (targetPlayers.Count != normalizedTargets.Count)
         {
-            throw new InvalidOperationException($"Jogador {playerId} não encontrado.");
+            var missing = normalizedTargets.Except(targetPlayers.Select(p => p.PlayerId)).ToArray();
+            throw new InvalidOperationException($"Jogadores alvo inválidos: {string.Join(", ", missing)}.");
         }
 
-        if (player.CurrentTeamId != toTeamId)
+        var invalidTargets = targetPlayers
+            .Where(p => p.CurrentTeamId != toTeamId)
+            .Select(p => p.PlayerId)
+            .ToArray();
+
+        if (invalidTargets.Length > 0)
         {
-            throw new InvalidOperationException("O jogador informado não pertence ao time de destino.");
+            throw new InvalidOperationException($"Jogadores {string.Join(", ", invalidTargets)} não pertencem ao time de destino.");
         }
 
         var fromTeamExists = await _dbContext.Teams
@@ -82,6 +93,11 @@ public class TransferOfferService : ITransferOfferService
         if (!toTeamExists)
         {
             throw new InvalidOperationException($"Time destinatário {toTeamId} não encontrado.");
+        }
+
+        if (sellOnPercent.HasValue && (sellOnPercent.Value < 0 || sellOnPercent.Value > 100))
+        {
+            throw new ArgumentException("O percentual de sell-on deve estar entre 0 e 100.", nameof(sellOnPercent));
         }
 
         var normalizedSwapIds = swapPlayerIds?.Distinct().ToList() ?? new List<int>();
@@ -117,6 +133,27 @@ public class TransferOfferService : ITransferOfferService
             throw new ArgumentException("O valor oferecido não pode ser negativo.", nameof(offeredFee));
         }
 
+        var counterOfferThreadId = Guid.Empty;
+        if (counterOfferId.HasValue)
+        {
+            var previousOffer = await _dbContext.TransferOffers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.OfferId == counterOfferId.Value, ct)
+                .ConfigureAwait(false);
+
+            if (previousOffer is null)
+            {
+                throw new InvalidOperationException($"Oferta {counterOfferId} não encontrada para contraproposta.");
+            }
+
+            if (previousOffer.FromTeamId != fromTeamId || previousOffer.ToTeamId != toTeamId)
+            {
+                throw new InvalidOperationException("A contraproposta deve envolver os mesmos times da oferta original.");
+            }
+
+            counterOfferThreadId = previousOffer.ThreadId == Guid.Empty ? previousOffer.OfferId : previousOffer.ThreadId;
+        }
+
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         var normalizedExpiresAtUtc = expiresAtUtc.HasValue
@@ -131,16 +168,28 @@ public class TransferOfferService : ITransferOfferService
         var offer = new TransferOffer
         {
             OfferId = Guid.NewGuid(),
+            ThreadId = counterOfferThreadId != Guid.Empty ? counterOfferThreadId : Guid.NewGuid(),
             FromTeamId = fromTeamId,
             ToTeamId = toTeamId,
-            PlayerId = playerId,
             OfferedFee = offeredFee,
+            SellOnPercent = sellOnPercent,
+            CounterOfOfferId = counterOfferId,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
             ExpiresAtUtc = normalizedExpiresAtUtc,
             Status = TransferOfferStatus.Pending,
             Message = Normalize(message),
         };
+
+        foreach (var targetId in normalizedTargets)
+        {
+            offer.Targets.Add(new TransferOfferTarget
+            {
+                OfferTargetId = Guid.NewGuid(),
+                OfferId = offer.OfferId,
+                PlayerId = targetId,
+            });
+        }
 
         foreach (var swap in swapPlayers)
         {
@@ -156,6 +205,7 @@ public class TransferOfferService : ITransferOfferService
         await _dbContext.TransferOffers.AddAsync(offer, ct).ConfigureAwait(false);
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
+        await _dbContext.Entry(offer).Collection(o => o.Targets).LoadAsync(ct).ConfigureAwait(false);
         await _dbContext.Entry(offer).Collection(o => o.SwapPlayers).LoadAsync(ct).ConfigureAwait(false);
 
         return offer;
@@ -252,6 +302,7 @@ public class TransferOfferService : ITransferOfferService
         }
 
         var offer = await _dbContext.TransferOffers
+            .Include(o => o.Targets)
             .Include(o => o.SwapPlayers)
             .FirstOrDefaultAsync(o => o.OfferId == offerId, ct)
             .ConfigureAwait(false);

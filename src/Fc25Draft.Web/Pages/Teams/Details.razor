@@ -253,8 +253,25 @@ else
                                             <td>@offer.FromTeamName</td>
                                             <td>@offer.ToTeamName</td>
                                             <td>
-                                                <div>@offer.Player.Name</div>
-                                                <div class="text-muted small">@offer.Player.Position</div>
+                                                @if (offer.Targets?.Count > 0)
+                                                {
+                                                    var index = 0;
+                                                    foreach (var target in offer.Targets)
+                                                    {
+                                                        <div>@target.Name</div>
+                                                        <div class="text-muted small">@target.Position</div>
+                                                        index++;
+                                                        if (index < offer.Targets.Count)
+                                                        {
+                                                            <div class="text-muted small">&nbsp;</div>
+                                                        }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <div class="text-muted small">Sem jogadores</div>
+                                                }
+
                                                 @if (offer.SwapPlayers?.Count > 0)
                                                 {
                                                     <div class="text-muted small mt-1">
@@ -673,7 +690,10 @@ else
         _offerEditorMode = OfferEditorMode.Counter;
         _counterOfferId = offer.OfferId;
         _counterOfferRowVersion = offer.RowVersion;
-        _offerEditorTitle = $"Contraproposta para {offer.Player.Name}";
+        var primaryTarget = offer.Targets?.FirstOrDefault();
+        _offerEditorTitle = primaryTarget is not null
+            ? $"Contraproposta para {primaryTarget.Name}"
+            : "Contraproposta";
 
         var cts = ReplaceCancellation(ref _actionCts);
         var ct = cts.Token;
@@ -687,14 +707,22 @@ else
                 return;
             }
 
+            var detailTarget = detail.Targets.FirstOrDefault();
+            if (detailTarget is null)
+            {
+                _offerEditorError = "A oferta não possui jogadores alvo.";
+                Toasts.ShowError(_offerEditorError);
+                return;
+            }
+
             _offerEditorModel = new OfferEditorModel
             {
-                TargetPlayerId = detail.Player.PlayerId,
-                TargetPlayerGuid = detail.Player.PlayerGuid,
-                TargetPlayerName = detail.Player.Name,
+                TargetPlayerId = detailTarget.PlayerId,
+                TargetPlayerGuid = detailTarget.PlayerGuid,
+                TargetPlayerName = detailTarget.Name,
                 Cash = detail.OfferedFee,
                 Message = detail.Message,
-                SellOnPercentage = null,
+                SellOnPercentage = detail.SellOnPercent,
                 TeamToken = await GetCurrentTokenOrEmptyAsync().ConfigureAwait(false)
             };
             _offerEditorModel.ResetSwapPlayers(detail.SwapPlayers.Select(sp => sp.PlayerId));
@@ -780,7 +808,7 @@ else
 
                 var request = new CreateTransferOfferClientRequest(
                     team.TeamId,
-                    model.TargetPlayerId,
+                    new[] { model.TargetPlayerId },
                     model.Cash,
                     model.SellOnPercentage,
                     model.SwapPlayerIds.Count > 0 ? model.SwapPlayerIds.ToArray() : Array.Empty<int>(),
