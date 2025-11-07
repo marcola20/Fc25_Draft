@@ -156,6 +156,34 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return roster is null ? Results.NotFound() : Results.Ok(roster);
             });
 
+            teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:guid}", async (
+                Guid teamId,
+                Guid playerId,
+                HttpContext httpContext,
+                ITeamQuickSellService quickSellService,
+                CancellationToken ct) =>
+            {
+                var token = httpContext.Request.Headers["X-Team-Token"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+                }
+
+                try
+                {
+                    var result = await quickSellService.QuickSellAsync(teamId, playerId, token, ct);
+                    return Results.Ok(result);
+                }
+                catch (QuickSellException ex)
+                {
+                    return Results.Json(new { message = ex.Message }, statusCode: ex.StatusCode);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+            });
+
             teamsApi.MapGet("/export/json", async (DraftDbContext db, CancellationToken ct) =>
             {
                 var roster = await db.Teams

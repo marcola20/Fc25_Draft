@@ -569,6 +569,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");
 
+                    b.Property<int?>("NewOverall")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("PerformedAtUtc")
                         .HasColumnType("timestamp without time zone");
 
@@ -577,6 +580,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("character varying(120)");
 
                     b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OldOverall")
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("ToTeamId")

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using Fc25Draft.Core.DTOs;
 using Microsoft.AspNetCore.WebUtilities;
@@ -62,6 +63,35 @@ public class TeamsApiClient
         return result ?? Array.Empty<TeamRosterDto>();
     }
 
+    public async Task<TeamIdentityDto?> ResolveIdentityAsync(string teamToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(teamToken))
+        {
+            throw new ArgumentException("Token do time é obrigatório.", nameof(teamToken));
+        }
+
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/teams/me");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+
+        using var response = await client.SendAsync(request, ct);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            var message = await ReadErrorMessageAsync(response, ct) ?? "Token do time inválido.";
+            throw new InvalidOperationException(message);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await ReadErrorMessageAsync(response, ct)
+                ?? $"Erro ao comunicar com o servidor ({response.StatusCode}).";
+            throw new InvalidOperationException(message);
+        }
+
+        return await response.Content.ReadFromJsonAsync<TeamIdentityDto>(cancellationToken: ct);
+    }
+
     public async Task<TeamRosterDto?> GetRosterByIdAsync(Guid id, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync();
@@ -74,6 +104,48 @@ public class TeamsApiClient
 
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<TeamRosterDto>(cancellationToken: ct);
+    }
+
+    public async Task<QuickSellResultDto> QuickSellAsync(Guid teamId, Guid playerId, string teamToken, CancellationToken ct = default)
+    {
+        if (teamId == Guid.Empty)
+        {
+            throw new ArgumentException("Time inválido.", nameof(teamId));
+        }
+
+        if (playerId == Guid.Empty)
+        {
+            throw new ArgumentException("Jogador inválido.", nameof(playerId));
+        }
+
+        if (string.IsNullOrWhiteSpace(teamToken))
+        {
+            throw new InvalidOperationException("Token do time é obrigatório.");
+        }
+
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/teams/{teamId}/quick-sell/{playerId}");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+
+        using var response = await client.SendAsync(request, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await ReadErrorMessageAsync(response, ct)
+                ?? $"Falha ao processar a venda rápida ({response.StatusCode}).";
+
+            throw response.StatusCode switch
+            {
+                HttpStatusCode.NotFound => new KeyNotFoundException(message),
+                HttpStatusCode.Conflict => new InvalidOperationException(message),
+                HttpStatusCode.Unauthorized => new InvalidOperationException(message),
+                HttpStatusCode.Forbidden => new InvalidOperationException(message),
+                _ => new InvalidOperationException(message)
+            };
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<QuickSellResultDto>(cancellationToken: ct);
+        return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
     }
 
     public async Task CreateAsync(TeamCreateDto dto, CancellationToken ct = default)
@@ -122,6 +194,19 @@ public class TeamsApiClient
         }
 
         throw new InvalidOperationException(message);
+    }
+
+    private static async Task<string?> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(cancellationToken: ct);
+            return error?.Message;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private sealed record ApiErrorResponse(string? Message);

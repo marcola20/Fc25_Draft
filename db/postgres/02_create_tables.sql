@@ -129,6 +129,8 @@ create table "TransferHistories"
     "Type" integer not null,
     "Amount" numeric(18,2),
     "Notes" varchar(400),
+    "OldOverall" integer,
+    "NewOverall" integer,
     "PerformedBy" varchar(120),
     "PerformedAtUtc" timestamptz not null
 );

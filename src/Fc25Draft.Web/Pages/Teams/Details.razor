@@ -8,6 +8,7 @@
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IPricingService PricingService
+@inject TeamAccessService TeamAccess
 
 @implements IDisposable
 
@@ -16,6 +17,16 @@
 @if (!string.IsNullOrEmpty(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(_quickSellSuccessMessage))
+{
+    <div class="alert alert-success" role="status">@_quickSellSuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(_teamTokenErrorMessage))
+{
+    <div class="alert alert-warning" role="alert">@_teamTokenErrorMessage</div>
 }
 
 @if (isLoading)
@@ -117,6 +128,10 @@ else
                                     }
                                 </button>
                             </th>
+                            @if (_canQuickSell)
+                            {
+                                <th scope="col" class="text-end">Ações</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -128,6 +143,18 @@ else
                                 <td class="text-end">@player.Overall</td>
                                 <td class="text-end">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
                                 <td class="text-end">@FormatCurrency(player.BasePrice)</td>
+                                @if (_canQuickSell)
+                                {
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                @onclick="() => OpenQuickSellModal(player)"
+                                                title="Vender jogador imediatamente"
+                                                aria-label="Vender rapidamente @player.Name">
+                                            Venda rápida
+                                        </button>
+                                    </td>
+                                }
                             </tr>
                         }
                     </tbody>
@@ -150,6 +177,54 @@ else
     </div>
 }
 
+@if (_quickSellModalOpen && _quickSellTarget is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar venda rápida</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseQuickSellModal" disabled="@_quickSellProcessing"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Confirma a venda rápida de <strong>@_quickSellTarget.Name</strong>
+                        por <strong>@FormatCurrency(_quickSellPayout)</strong>?
+                    </p>
+                    <ul class="list-unstyled small mb-0">
+                        <li><strong>Overall:</strong> @_quickSellTarget.Overall</li>
+                        <li><strong>Preço base:</strong> @FormatCurrency(_quickSellTarget.BasePrice)</li>
+                        <li><strong>Pagamento (80%):</strong> @FormatCurrency(_quickSellPayout)</li>
+                    </ul>
+                    @if (!string.IsNullOrEmpty(_quickSellErrorMessage))
+                    {
+                        <div class="alert alert-danger mt-3" role="alert">@_quickSellErrorMessage</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="CloseQuickSellModal"
+                            disabled="@_quickSellProcessing">
+                        Cancelar
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="ConfirmQuickSellAsync"
+                            disabled="@_quickSellProcessing">
+                        @if (_quickSellProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Confirmar venda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
@@ -164,16 +239,27 @@ else
     private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
     private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
+    private string? _quickSellSuccessMessage;
+    private string? _teamTokenErrorMessage;
+    private bool _canQuickSell;
+    private RosterPlayerViewModel? _quickSellTarget;
+    private bool _quickSellModalOpen;
+    private decimal _quickSellPayout;
+    private bool _quickSellProcessing;
+    private string? _quickSellErrorMessage;
+    private string? _currentTeamToken;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        TeamAccess.TokenChanged += OnTeamTokenChanged;
     }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadTeamAsync();
+        await RefreshTeamTokenStateAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -236,6 +322,15 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void OnTeamTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshTeamTokenStateAsync();
+            StateHasChanged();
+        });
+    }
+
     private async Task PopulateRosterPlayersAsync(IReadOnlyList<TeamRosterPlayerDto> players)
     {
         _rosterPlayers.Clear();
@@ -256,6 +351,8 @@ else
             var positionId = player.Posicao.ToPositionId();
 
             _rosterPlayers.Add(new RosterPlayerViewModel(
+                player.PlayerGuid,
+                player.PlayerId,
                 player.Nome,
                 player.Posicao,
                 positionId,
@@ -266,6 +363,73 @@ else
 
         teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
         ApplyRosterSort();
+    }
+
+    private async Task RefreshTeamTokenStateAsync()
+    {
+        _teamTokenErrorMessage = null;
+        _canQuickSell = false;
+        _currentTeamToken = null;
+
+        string? token;
+        try
+        {
+            token = await TeamAccess.GetTokenAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch
+        {
+            _teamTokenErrorMessage = "Não foi possível verificar o token do time.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _teamTokenErrorMessage = "Informe o token do seu time para utilizar a venda rápida.";
+            return;
+        }
+
+        _currentTeamToken = token.Trim();
+
+        try
+        {
+            var identity = await TeamsApiClient.ResolveIdentityAsync(_currentTeamToken, default);
+            if (identity is not null && identity.TeamId == Id)
+            {
+                _canQuickSell = true;
+                _teamTokenErrorMessage = null;
+            }
+            else if (identity is not null)
+            {
+                _teamTokenErrorMessage = "O token configurado pertence a outro time.";
+            }
+            else
+            {
+                _teamTokenErrorMessage = "Token do time inválido.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            _teamTokenErrorMessage = ex.Message;
+        }
+        catch
+        {
+            _teamTokenErrorMessage = "Não foi possível validar o token do time.";
+        }
+
+        var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
+        if (!string.IsNullOrWhiteSpace(invalidMessage))
+        {
+            _teamTokenErrorMessage = invalidMessage;
+        }
+
+        if (!string.IsNullOrEmpty(_teamTokenErrorMessage))
+        {
+            _canQuickSell = false;
+        }
     }
 
     private void ToggleRosterSort(RosterSortColumn column)
@@ -320,6 +484,88 @@ else
         _sortedRosterPlayers = query.ToList();
     }
 
+    private void OpenQuickSellModal(RosterPlayerViewModel player)
+    {
+        if (!_canQuickSell)
+        {
+            return;
+        }
+
+        _quickSellTarget = player;
+        _quickSellPayout = decimal.Round(player.BasePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
+        _quickSellErrorMessage = null;
+        _quickSellModalOpen = true;
+    }
+
+    private void CloseQuickSellModal()
+    {
+        if (_quickSellProcessing)
+        {
+            return;
+        }
+
+        _quickSellModalOpen = false;
+        _quickSellTarget = null;
+        _quickSellErrorMessage = null;
+    }
+
+    private async Task ConfirmQuickSellAsync()
+    {
+        if (_quickSellTarget is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_currentTeamToken))
+        {
+            _quickSellErrorMessage = "Token do time não configurado.";
+            return;
+        }
+
+        _quickSellProcessing = true;
+        _quickSellErrorMessage = null;
+
+        try
+        {
+            var result = await TeamsApiClient.QuickSellAsync(Id, _quickSellTarget.PlayerGuid, _currentTeamToken, default);
+            var formattedBudget = result.TeamBudgetAfter.ToString("C", BrazilCulture);
+            if (team is not null)
+            {
+                var remainingPlayers = Math.Max(0, team.Jogadores - 1);
+                team = team with { Caixa = formattedBudget, Jogadores = remainingPlayers };
+            }
+
+            var newAmount = (teamAmount ?? 0m) - _quickSellTarget.BasePrice;
+            teamAmount = newAmount < 0m ? 0m : newAmount;
+
+            _rosterPlayers.RemoveAll(p => p.PlayerGuid == _quickSellTarget.PlayerGuid);
+            ApplyRosterSort();
+
+            _quickSellSuccessMessage = $"Jogador {_quickSellTarget.Name} vendido por {FormatCurrency(result.Payout)}. Caixa atualizado.";
+            _quickSellModalOpen = false;
+            _quickSellTarget = null;
+            _quickSellPayout = 0m;
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _quickSellErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _quickSellErrorMessage = ex.Message;
+
+            if (ex.Message.Contains("token", StringComparison.OrdinalIgnoreCase))
+            {
+                TeamAccess.ReportInvalidToken(ex.Message);
+                await RefreshTeamTokenStateAsync();
+            }
+        }
+        finally
+        {
+            _quickSellProcessing = false;
+        }
+    }
+
     private string GetSortButtonClass(RosterSortColumn column)
     {
         var classes = "btn btn-link btn-sm p-0 text-decoration-none text-body";
@@ -356,6 +602,7 @@ else
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        TeamAccess.TokenChanged -= OnTeamTokenChanged;
     }
 
     private enum RosterSortColumn
@@ -366,5 +613,13 @@ else
         BasePrice
     }
 
-    private sealed record RosterPlayerViewModel(string Name, string Position, int PositionId, int Overall, int? Age, decimal BasePrice);
+    private sealed record RosterPlayerViewModel(
+        Guid PlayerGuid,
+        int PlayerId,
+        string Name,
+        string Position,
+        int PositionId,
+        int Overall,
+        int? Age,
+        decimal BasePrice);
 }

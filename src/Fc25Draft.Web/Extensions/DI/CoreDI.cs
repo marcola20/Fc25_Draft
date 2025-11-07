@@ -41,8 +41,9 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<AdminTransferService>();
             services.AddScoped<ITransfersQueryService, TransfersQueryService>();
             services.AddScoped<ITransferHistoryService, TransferHistoryService>();
+            services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
 
-            // Web layer 
+            // Web layer
             services.AddScoped<AdminAuthService>();
             services.AddScoped<ApiClientFactory>();
             services.AddScoped<PlayersApiClient>();

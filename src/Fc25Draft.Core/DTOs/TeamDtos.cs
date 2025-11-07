@@ -46,3 +46,13 @@ public record TeamExportDto(
     string Time,
     string? Responsavel,
     int TotalJogadores);
+
+public record QuickSellResultDto(
+    Guid TeamId,
+    Guid PlayerId,
+    int OldOverall,
+    int NewOverall,
+    decimal BasePrice,
+    decimal Payout,
+    decimal TeamBudgetAfter,
+    DateTime OccurredAtUtc);
