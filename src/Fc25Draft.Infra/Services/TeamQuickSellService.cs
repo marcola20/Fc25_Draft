@@ -60,9 +60,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                 ?? throw new QuickSellException("Time não encontrado.", StatusCodes.Status404NotFound);
 
             if (!string.Equals(team.Token, normalizedToken, StringComparison.OrdinalIgnoreCase))
-            {
                 throw new QuickSellException("Token do time inválido.", StatusCodes.Status403Forbidden);
-            }
 
             var player = await _dbContext.Players
                 .Include(p => p.TeamRosters)
@@ -70,21 +68,23 @@ public class TeamQuickSellService : ITeamQuickSellService
                 .ConfigureAwait(false)
                 ?? throw new QuickSellException("Jogador não encontrado.", StatusCodes.Status404NotFound);
 
-            if (player.CurrentTeamId != teamId || player.TeamRosters.All(r => r.TeamId != teamId))
-            {
+            var teamRoster = player.TeamRosters.FirstOrDefault(r => r.TeamId == teamId);
+            if (teamRoster != null)
+                player.CurrentTeamId = teamRoster.TeamId;
+            else
                 throw new QuickSellException("Jogador não pertence ao time informado.", StatusCodes.Status404NotFound);
-            }
+
+            if (player.TeamRosters.All(r => r.TeamId != teamId))
+                throw new QuickSellException("Jogador não pertence ao time informado.", StatusCodes.Status404NotFound);
 
             var rosterCount = await _dbContext.TeamRosters
                 .CountAsync(r => r.TeamId == teamId, ct)
                 .ConfigureAwait(false);
 
             if (rosterCount <= 18)
-            {
                 throw new QuickSellException(
                     "Você não pode realizar esta ação. O time ficaria com menos de 18 jogadores.",
                     StatusCodes.Status409Conflict);
-            }
 
             PricingResult pricing;
             try
@@ -98,9 +98,7 @@ public class TeamQuickSellService : ITeamQuickSellService
 
             var basePrice = pricing.BasePrice;
             if (basePrice <= 0m)
-            {
                 throw new QuickSellException("Preço base inválido para o jogador.", StatusCodes.Status400BadRequest);
-            }
 
             var payout = decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
             var oldOverall = player.Overall;
@@ -119,9 +117,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                     .FirstOrDefaultAsync(r => r.TeamId == teamId && r.PlayerId == player.PlayerId, ct)
                     .ConfigureAwait(false);
                 if (trackedEntry is not null)
-                {
                     _dbContext.TeamRosters.Remove(trackedEntry);
-                }
             }
 
             team.Budget = decimal.Round(team.Budget + payout, 2, MidpointRounding.AwayFromZero);
