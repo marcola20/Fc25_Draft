@@ -1,13 +1,12 @@
-using System;
 using System.Threading.Tasks;
 
 namespace Fc25Draft.Web.Services;
 
 public interface ITeamTokenStore
 {
-    Task<Guid?> GetAsync();
+    Task<string?> GetAsync();
 
-    Task SetAsync(Guid token);
+    Task SetAsync(string token);
 
     Task ClearAsync();
 

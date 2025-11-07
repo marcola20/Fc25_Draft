@@ -231,7 +231,9 @@ public class AuctionSettlementService : IAuctionSettlementService
                 Type = TransferType.MarketAuction,
                 Notes = $"Leilão encerrado por {amount.ToString("C", culture)}.",
                 PerformedBy = "sistema",
-                PerformedAtUtc = now
+                PerformedAtUtc = now,
+                OldOverall = player?.Overall,
+                NewOverall = player?.Overall
             }, ct).ConfigureAwait(false);
 
             var winnerName = string.IsNullOrWhiteSpace(team.TeamName) ? team.TeamId.ToString() : team.TeamName;

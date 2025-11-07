@@ -24,11 +24,6 @@
     <div class="alert alert-success" role="status">@_quickSellSuccessMessage</div>
 }
 
-@if (!string.IsNullOrEmpty(_teamTokenErrorMessage))
-{
-    <div class="alert alert-warning" role="alert">@_teamTokenErrorMessage</div>
-}
-
 @if (isLoading)
 {
     <p><em>Carregando...</em></p>
@@ -61,6 +56,37 @@ else
             <dd class="col-sm-9"><code>@team.Token</code></dd>
         }
     </dl>
+
+    <section class="mt-4" aria-labelledby="team-token-heading">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                    <div class="flex-grow-1">
+                        <h5 id="team-token-heading" class="card-title mb-2">Token do time</h5>
+                        <p class="mb-2">Informe o token compartilhado pelo administrador para liberar ações restritas como a venda rápida neste dispositivo.</p>
+                        <span class="badge @(_teamTokenConfigured ? "bg-success" : "bg-secondary")">
+                            @(_teamTokenConfigured ? "Token configurado" : "Token não configurado")
+                        </span>
+                        @if (!string.IsNullOrEmpty(_teamTokenErrorMessage))
+                        {
+                            <div class="alert alert-warning mt-3 mb-0" role="alert">@_teamTokenErrorMessage</div>
+                        }
+                        else if (!_teamTokenConfigured)
+                        {
+                            <p class="text-muted small mb-0 mt-3">Configure o token do time para habilitar a venda rápida.</p>
+                        }
+                    </div>
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button type="button"
+                                class="btn btn-outline-primary"
+                                @onclick="OpenTeamTokenModal">
+                            Configurar token
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <section class="mt-4">
         <h4>Elenco</h4>
@@ -177,6 +203,51 @@ else
     </div>
 }
 
+@if (_teamTokenModalOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configurar token do time</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseTeamTokenModal" disabled="@_teamTokenSaving"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="teamTokenInput">Token</label>
+                        <input id="teamTokenInput"
+                               class="form-control"
+                               @bind="_teamTokenInput"
+                               @bind:event="oninput"
+                               autocomplete="one-time-code"
+                               disabled="@_teamTokenSaving" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_teamTokenModalError))
+                    {
+                        <div class="alert alert-danger" role="alert">@_teamTokenModalError</div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">O token diferencia maiúsculas de minúsculas. Ele será armazenado de forma segura neste navegador.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseTeamTokenModal" disabled="@_teamTokenSaving">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ClearTeamTokenAsync" disabled="@(!_teamTokenConfigured || _teamTokenSaving)">Remover token</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveTeamTokenAsync" disabled="@_teamTokenSaving">
+                        @if (_teamTokenSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Salvar token
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @if (_quickSellModalOpen && _quickSellTarget is not null)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
@@ -241,6 +312,7 @@ else
     private bool _sortDescending;
     private string? _quickSellSuccessMessage;
     private string? _teamTokenErrorMessage;
+    private bool _teamTokenConfigured;
     private bool _canQuickSell;
     private RosterPlayerViewModel? _quickSellTarget;
     private bool _quickSellModalOpen;
@@ -248,6 +320,10 @@ else
     private bool _quickSellProcessing;
     private string? _quickSellErrorMessage;
     private string? _currentTeamToken;
+    private bool _teamTokenModalOpen;
+    private string _teamTokenInput = string.Empty;
+    private string? _teamTokenModalError;
+    private bool _teamTokenSaving;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
     protected override void OnInitialized()
@@ -370,6 +446,7 @@ else
         _teamTokenErrorMessage = null;
         _canQuickSell = false;
         _currentTeamToken = null;
+        _teamTokenConfigured = false;
 
         string? token;
         try
@@ -393,6 +470,7 @@ else
         }
 
         _currentTeamToken = token.Trim();
+        _teamTokenConfigured = true;
 
         try
         {
@@ -450,6 +528,110 @@ else
         }
 
         ApplyRosterSort();
+    }
+
+    private async Task OpenTeamTokenModal()
+    {
+        if (_teamTokenSaving)
+        {
+            return;
+        }
+
+        _teamTokenModalError = null;
+
+        try
+        {
+            var token = await TeamAccess.GetTokenAsync();
+            _teamTokenInput = token ?? string.Empty;
+        }
+        catch (InvalidOperationException)
+        {
+            _teamTokenModalError = "O armazenamento seguro ainda não está disponível. Aguarde o carregamento completo da página e tente novamente.";
+            _teamTokenInput = string.Empty;
+        }
+        catch
+        {
+            _teamTokenModalError = "Não foi possível carregar o token atual.";
+            _teamTokenInput = string.Empty;
+        }
+
+        _teamTokenModalOpen = true;
+    }
+
+    private void CloseTeamTokenModal()
+    {
+        if (_teamTokenSaving)
+        {
+            return;
+        }
+
+        _teamTokenModalOpen = false;
+        _teamTokenModalError = null;
+    }
+
+    private async Task SaveTeamTokenAsync()
+    {
+        if (_teamTokenSaving)
+        {
+            return;
+        }
+
+        _teamTokenSaving = true;
+        _teamTokenModalError = null;
+
+        try
+        {
+            var trimmed = _teamTokenInput.Trim();
+            await TeamAccess.SetTokenAsync(trimmed);
+            await RefreshTeamTokenStateAsync();
+            _teamTokenModalOpen = false;
+        }
+        catch (ArgumentException ex)
+        {
+            _teamTokenModalError = ex.Message;
+        }
+        catch (InvalidOperationException)
+        {
+            _teamTokenModalError = "Não foi possível acessar o armazenamento seguro. Recarregue a página e tente novamente.";
+        }
+        catch
+        {
+            _teamTokenModalError = "Não foi possível salvar o token. Tente novamente.";
+        }
+        finally
+        {
+            _teamTokenSaving = false;
+        }
+    }
+
+    private async Task ClearTeamTokenAsync()
+    {
+        if (_teamTokenSaving)
+        {
+            return;
+        }
+
+        _teamTokenSaving = true;
+        _teamTokenModalError = null;
+
+        try
+        {
+            await TeamAccess.ClearTokenAsync();
+            await RefreshTeamTokenStateAsync();
+            _teamTokenModalOpen = false;
+        }
+        catch (InvalidOperationException)
+        {
+            _teamTokenModalError = "Não foi possível acessar o armazenamento seguro. Recarregue a página e tente novamente.";
+        }
+        catch
+        {
+            _teamTokenModalError = "Não foi possível remover o token. Tente novamente.";
+        }
+        finally
+        {
+            _teamTokenSaving = false;
+        }
     }
 
     private void ApplyRosterSort()

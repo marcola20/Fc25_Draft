@@ -1275,7 +1275,7 @@ else
         {
             var token = await TeamAccess.GetTokenAsync();
             _teamTokenInput = token ?? string.Empty;
-            _teamTokenConfigured = Guid.TryParse(token, out _);
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
         }
         catch (Exception ex)
         {
@@ -1301,7 +1301,7 @@ else
             var trimmed = _teamTokenInput.Trim();
             await TeamAccess.SetTokenAsync(trimmed);
             _teamTokenInput = trimmed;
-            _teamTokenConfigured = true;
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(trimmed);
             _teamTokenModalOpen = false;
             _teamTokenError = null;
             StateHasChangedSafe();
@@ -1342,7 +1342,7 @@ else
         {
             var token = await TeamAccess.GetTokenAsync();
             _teamTokenInput = token ?? string.Empty;
-            _teamTokenConfigured = Guid.TryParse(token, out _);
+            _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
         }
         catch (Exception ex)
         {
@@ -1379,7 +1379,7 @@ else
         }
 
         _teamTokenInput = token ?? string.Empty;
-        _teamTokenConfigured = Guid.TryParse(token, out _);
+        _teamTokenConfigured = !string.IsNullOrWhiteSpace(token);
 
         if (_teamTokenConfigured && token is not null)
         {

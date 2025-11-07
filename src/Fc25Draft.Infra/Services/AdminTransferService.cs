@@ -151,7 +151,9 @@ public partial class AdminTransferService
                 Amount = normalizedAmount,
                 Notes = notes,
                 PerformedBy = adminTokenGuid.ToString(),
-                PerformedAtUtc = now
+                PerformedAtUtc = now,
+                OldOverall = player.Overall,
+                NewOverall = player.Overall
             }).ToList();
 
             await _dbContext.TransferHistories.AddRangeAsync(historyEntries, ctoken).ConfigureAwait(false);
@@ -367,7 +369,9 @@ public partial class AdminTransferService
                     Amount = amount,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
-                    PerformedAtUtc = now
+                    PerformedAtUtc = now,
+                    OldOverall = p.Overall,
+                    NewOverall = p.Overall
                 });
             }
             foreach (var p in bEntities)
@@ -388,7 +392,9 @@ public partial class AdminTransferService
                     Amount = amount,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
-                    PerformedAtUtc = now
+                    PerformedAtUtc = now,
+                    OldOverall = p.Overall,
+                    NewOverall = p.Overall
                 });
             }
             if (histories.Count > 0)
@@ -470,7 +476,9 @@ public partial class AdminTransferService
                 Amount = null,
                 Notes = normalizedReason,
                 PerformedBy = adminTokenGuid.ToString(),
-                PerformedAtUtc = now
+                PerformedAtUtc = now,
+                OldOverall = player.Overall,
+                NewOverall = player.Overall
             };
 
             await _dbContext.TransferHistories.AddAsync(historyEntry, ctoken).ConfigureAwait(false);

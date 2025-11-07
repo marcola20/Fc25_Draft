@@ -11,7 +11,7 @@ public class ProtectedLocalStorageTeamTokenStore : ITeamTokenStore
 
     private readonly ProtectedLocalStorage _storage;
 
-    private Guid? _cachedToken;
+    private string? _cachedToken;
     private bool _initialReadCompleted;
 
     public ProtectedLocalStorageTeamTokenStore(ProtectedLocalStorage storage)
@@ -19,13 +19,13 @@ public class ProtectedLocalStorageTeamTokenStore : ITeamTokenStore
         _storage = storage;
     }
 
-    public async Task<Guid?> GetAsync()
+    public async Task<string?> GetAsync()
     {
         await EnsureInitialReadAsync();
         return _cachedToken;
     }
 
-    public async Task SetAsync(Guid token)
+    public async Task SetAsync(string token)
     {
         _cachedToken = token;
 
@@ -64,7 +64,7 @@ public class ProtectedLocalStorageTeamTokenStore : ITeamTokenStore
     public async Task<bool> IsConfiguredAsync()
     {
         await EnsureInitialReadAsync();
-        return _cachedToken.HasValue;
+        return !string.IsNullOrWhiteSpace(_cachedToken);
     }
 
     private async Task EnsureInitialReadAsync()
@@ -76,10 +76,12 @@ public class ProtectedLocalStorageTeamTokenStore : ITeamTokenStore
 
         try
         {
-            var result = await _storage.GetAsync<Guid?>(StorageKey);
+            var result = await _storage.GetAsync<string?>(StorageKey);
             if (result.Success)
             {
-                _cachedToken = result.Value;
+                _cachedToken = string.IsNullOrWhiteSpace(result.Value)
+                    ? null
+                    : result.Value;
             }
 
             _initialReadCompleted = true;

@@ -6,10 +6,12 @@ namespace Fc25Draft.Web.Services;
 
 public class TeamAccessService
 {
+    private const int MaxTokenLength = 80;
+
     private readonly ITeamTokenStore _store;
     private readonly ILogger<TeamAccessService> _logger;
 
-    private Guid? _token;
+    private string? _token;
     private bool _initialized;
     private string? _invalidTokenMessage;
 
@@ -24,13 +26,13 @@ public class TeamAccessService
     public async Task<string?> GetTokenAsync()
     {
         await EnsureInitializedAsync();
-        return _token?.ToString();
+        return _token;
     }
 
     public async Task<bool> IsConfiguredAsync()
     {
         await EnsureInitializedAsync();
-        return _token.HasValue;
+        return !string.IsNullOrWhiteSpace(_token);
     }
 
     public async Task SetTokenAsync(string token)
@@ -40,18 +42,19 @@ public class TeamAccessService
             throw new ArgumentException("Token inválido.", nameof(token));
         }
 
-        if (!Guid.TryParse(token.Trim(), out var parsed))
+        var normalized = token.Trim();
+        if (normalized.Length > MaxTokenLength)
         {
-            throw new ArgumentException("Token inválido.", nameof(token));
+            throw new ArgumentException($"Token deve ter no máximo {MaxTokenLength} caracteres.", nameof(token));
         }
 
         await EnsureInitializedAsync();
 
-        _token = parsed;
+        _token = normalized;
 
         try
         {
-            await _store.SetAsync(parsed);
+            await _store.SetAsync(normalized);
         }
         catch (InvalidOperationException ex) when (IsPrerenderInteropException(ex))
         {
@@ -113,6 +116,10 @@ public class TeamAccessService
         try
         {
             _token = await _store.GetAsync();
+            if (!string.IsNullOrWhiteSpace(_token))
+            {
+                _token = _token.Trim();
+            }
             _initialized = true;
         }
         catch (InvalidOperationException ex) when (IsPrerenderInteropException(ex))

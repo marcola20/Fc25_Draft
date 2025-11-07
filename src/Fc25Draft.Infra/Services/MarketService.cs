@@ -371,7 +371,9 @@ public class MarketService : IMarketService
                 Type = TransferType.MarketAuction,
                 Notes = "Compra imediata",
                 PerformedBy = "sistema",
-                PerformedAtUtc = nowUtc
+                PerformedAtUtc = nowUtc,
+                OldOverall = player.Overall,
+                NewOverall = player.Overall
             }, ct2);
 
             try
