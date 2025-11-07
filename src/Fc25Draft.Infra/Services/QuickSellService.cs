@@ -126,7 +126,7 @@ public class QuickSellService : IQuickSellService
             Payout = payout,
             OldOverall = oldOverall,
             NewOverall = newOverall,
-            Notes = "Quick sell executado automaticamente.",
+            Notes = $"Quick sell executado automaticamente. Overall: {oldOverall} → {newOverall}.",
             PerformedBy = team.TeamName,
             OccurredAtUtc = occurredAt
         };

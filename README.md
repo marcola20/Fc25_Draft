@@ -50,6 +50,14 @@ Sample success payload:
 - The player's overall receives a deterministic bump and the status changes to `FreeAgent`.
 - The transfer history records the quick sell with `OldOverall`, `NewOverall`, `Payout` and `OccurredAtUtc`.
 
+### Quick Sell na interface web
+
+1. Abra a página **Detalhes do Time** (`/teams/details/{teamId}`) e localize o painel “Token do time (cabeçalho `X-Team-Token`)”.
+2. Clique em **Alterar token** para informar o token do seu time. Ele é validado e salvo no *ProtectedBrowserStorage*, sendo enviado automaticamente no cabeçalho `X-Team-Token` em cada requisição.
+3. Quando o token salvo corresponder ao time exibido, um botão **⚡ Quick Sell** aparecerá na tabela do elenco. Clique nele para visualizar a confirmação com o nome do jogador, overall atual, preço base e payout (80%).
+4. Confirme a operação. Em caso de sucesso o orçamento é atualizado na tela, o jogador some do elenco, o histórico de transferências ganha uma entrada de quick sell com a observação “Overall: antigo → novo” e um toast informa o resultado.
+5. Se o servidor indicar token inválido (401/403) ou conflito (409), um toast é exibido, o token local é limpo automaticamente e você poderá cadastrá-lo novamente pelo mesmo painel.
+
 ## Team Tokens
 
 All authenticated team operations must supply the team token, either through the `X-Team-Token` header or the `teamToken` field in the request body (when supported). The backend normalizes tokens by trimming whitespace and ignoring casing.

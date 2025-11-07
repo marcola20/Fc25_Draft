@@ -1,15 +1,20 @@
 @page "/teams/details/{Id:guid}"
 @using System.Linq
 @using System.Globalization
+@using System.Net
 @using Fc25Draft.Core.Extensions
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Hubs
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IPricingService PricingService
+@inject TeamAccessService TeamAccess
+@inject ToastService Toasts
+@inject MarketHubClient Hub
 
-@implements IDisposable
+@implements IDisposable, IAsyncDisposable
 
 <h3>Detalhes do Time</h3>
 
@@ -50,6 +55,56 @@ else
             <dd class="col-sm-9"><code>@team.Token</code></dd>
         }
     </dl>
+
+    <section class="mt-4">
+        <h4>Token do time (cabeçalho <code>X-Team-Token</code>)</h4>
+
+        <div class="card">
+            <div class="card-body">
+                @if (_teamTokenConfigured)
+                {
+                    <p class="mb-1">
+                        <strong>Token ativo:</strong>
+                        <code>@_storedTeamTokenDisplay</code>
+                    </p>
+
+                    <p class="mb-2">
+                        @if (_teamTokenMatchesTeam)
+                        {
+                            <span class="text-success">Este token corresponde ao time exibido.</span>
+                        }
+                        else
+                        {
+                            <span class="text-warning">O token salvo não pertence a este time.</span>
+                        }
+                    </p>
+                }
+                else
+                {
+                    <p class="mb-2">Nenhum token foi configurado nesta máquina.</p>
+                }
+
+                @if (!string.IsNullOrEmpty(_teamTokenWarning))
+                {
+                    <div class="alert alert-warning py-2" role="alert">@_teamTokenWarning</div>
+                }
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="OpenTeamTokenModal">
+                        Alterar token
+                    </button>
+
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="ClearTeamTokenAsync" disabled="@(!_teamTokenConfigured || _isClearingToken)">
+                        @if (_isClearingToken)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        Limpar token
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <section class="mt-4">
         <h4>Elenco</h4>
@@ -117,6 +172,7 @@ else
                                     }
                                 </button>
                             </th>
+                            <th scope="col" class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -128,6 +184,17 @@ else
                                 <td class="text-end">@player.Overall</td>
                                 <td class="text-end">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
                                 <td class="text-end">@FormatCurrency(player.BasePrice)</td>
+                                <td class="text-end">
+                                    @if (_teamTokenMatchesTeam)
+                                    {
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => OpenQuickSellModal(player)"
+                                                disabled="@_isQuickSellProcessing">
+                                            ⚡ Quick Sell
+                                        </button>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -135,6 +202,79 @@ else
             </div>
         }
     </section>
+
+    @if (_showQuickSellModal && _quickSellContext is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0, 0, 0, 0.5);" @onclick="CloseQuickSellModal">
+            <div class="modal-dialog modal-dialog-centered" role="document" @onclick:stopPropagation>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmar Quick Sell</h5>
+                        <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseQuickSellModal" disabled="@_isQuickSellProcessing"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Tem certeza de que deseja executar o quick sell de <strong>@_quickSellContext.Player.Name</strong> (OVR @_quickSellContext.Player.Overall)?</p>
+                        <ul class="list-unstyled mb-3">
+                            <li><strong>Preço base:</strong> @FormatCurrency(_quickSellContext.Player.BasePrice)</li>
+                            <li><strong>Payout (80%):</strong> @FormatCurrency(_quickSellContext.Payout)</li>
+                        </ul>
+                        <p class="text-muted mb-0">O jogador será liberado imediatamente e receberá o ajuste de overall calculado pelo sistema.</p>
+
+                        @if (!string.IsNullOrEmpty(_quickSellError))
+                        {
+                            <div class="alert alert-danger mt-3" role="alert">@_quickSellError</div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseQuickSellModal" disabled="@_isQuickSellProcessing">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmQuickSellAsync" disabled="@_isQuickSellProcessing">
+                            @if (_isQuickSellProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            Confirmar Quick Sell
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_showTeamTokenModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0, 0, 0, 0.5);" @onclick="CloseTeamTokenModal">
+            <div class="modal-dialog modal-dialog-centered" role="document" @onclick:stopPropagation>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Configurar token do time</h5>
+                        <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseTeamTokenModal" disabled="@_isSavingToken"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Informe o token que deve ser enviado no cabeçalho <code>X-Team-Token</code> para autorizar operações deste time.</p>
+                        <div class="mb-3">
+                            <label class="form-label" for="team-token-input">Token</label>
+                            <input id="team-token-input" class="form-control" @bind="_teamTokenInput" autocomplete="off" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_teamTokenError))
+                        {
+                            <div class="alert alert-danger" role="alert">@_teamTokenError</div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseTeamTokenModal" disabled="@_isSavingToken">Cancelar</button>
+                        <button type="button" class="btn btn-primary" @onclick="SaveTeamTokenAsync" disabled="@_isSavingToken">
+                            @if (_isSavingToken)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            Salvar token
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="d-flex gap-2 mt-4">
         @if (AdminAuth.IsAuthenticated)
@@ -165,10 +305,28 @@ else
     private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
+    private string? _teamTokenFromTeam;
+    private string? _storedTeamTokenDisplay;
+    private string? _storedTeamTokenNormalized;
+    private bool _teamTokenConfigured;
+    private bool _teamTokenMatchesTeam;
+    private bool _showTeamTokenModal;
+    private string _teamTokenInput = string.Empty;
+    private string? _teamTokenError;
+    private string? _teamTokenWarning;
+    private bool _isSavingToken;
+    private bool _isClearingToken;
+    private bool _showQuickSellModal;
+    private QuickSellContext? _quickSellContext;
+    private bool _isQuickSellProcessing;
+    private string? _quickSellError;
+    private bool _hubConnected;
+    private int? _lastQuickSellPlayerId;
 
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        TeamAccess.TokenChanged += OnTeamTokenChanged;
     }
 
     protected override async Task OnInitializedAsync()
@@ -185,7 +343,30 @@ else
 
         await AdminAuth.EnsureInitializedAsync();
         authInitialized = true;
+
+        await EnsureHubConnectedAsync();
+        await LoadStoredTeamTokenAsync();
+
         StateHasChanged();
+    }
+
+    private async Task EnsureHubConnectedAsync()
+    {
+        try
+        {
+            await Hub.ConnectAsync();
+            _hubConnected = Hub.IsConnected;
+
+            if (_hubConnected)
+            {
+                Hub.OnQuickSellPerformed = HandleQuickSellBroadcastAsync;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            _hubConnected = false;
+        }
     }
 
     private async Task LoadTeamAsync()
@@ -195,6 +376,8 @@ else
         roster = null;
         _rosterPlayers.Clear();
         _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
+        _teamTokenFromTeam = null;
+        _teamTokenMatchesTeam = false;
 
         try
         {
@@ -204,6 +387,9 @@ else
                 errorMessage = "Time não encontrado.";
                 return;
             }
+
+            _teamTokenFromTeam = NormalizeToken(team.Token);
+            UpdateTeamTokenMatch();
 
             roster = await TeamsApiClient.GetRosterByIdAsync(Id);
 
@@ -242,7 +428,7 @@ else
 
         foreach (var player in players)
         {
-            decimal basePrice = 0m;
+            decimal basePrice;
             try
             {
                 var pricing = await PricingService.CalculateForPlayerAsync(player.PlayerId, default);
@@ -256,6 +442,8 @@ else
             var positionId = player.Posicao.ToPositionId();
 
             _rosterPlayers.Add(new RosterPlayerViewModel(
+                player.PlayerGuid,
+                player.PlayerId,
                 player.Nome,
                 player.Posicao,
                 positionId,
@@ -320,6 +508,333 @@ else
         _sortedRosterPlayers = query.ToList();
     }
 
+    private void OpenQuickSellModal(RosterPlayerViewModel player)
+    {
+        if (!_teamTokenMatchesTeam)
+        {
+            return;
+        }
+
+        _quickSellContext = new QuickSellContext(player, CalculatePayout(player.BasePrice));
+        _quickSellError = null;
+        _showQuickSellModal = true;
+    }
+
+    private void CloseQuickSellModal()
+    {
+        if (_isQuickSellProcessing)
+        {
+            return;
+        }
+
+        _showQuickSellModal = false;
+        _quickSellError = null;
+        _quickSellContext = null;
+    }
+
+    private async Task ConfirmQuickSellAsync()
+    {
+        if (_quickSellContext is null || team is null)
+        {
+            return;
+        }
+
+        _isQuickSellProcessing = true;
+        _quickSellError = null;
+
+        try
+        {
+            var result = await TeamsApiClient.QuickSellAsync(team.TeamId, _quickSellContext.Player.PlayerId);
+            ApplyQuickSellResult(result);
+            _lastQuickSellPlayerId = result.PlayerId;
+
+            Toasts.ShowSuccess($"Quick sell de {_quickSellContext.Player.Name} concluído. Caixa atualizado para {FormatCurrency(result.BudgetAfter)}.");
+            CloseQuickSellModal();
+        }
+        catch (TeamTokenMissingException ex)
+        {
+            await HandleMissingTokenAsync(ex.Message);
+            CloseQuickSellModal();
+        }
+        catch (QuickSellException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            await HandleInvalidTokenAsync(ex.Message);
+            CloseQuickSellModal();
+        }
+        catch (QuickSellException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            _quickSellError = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        catch (QuickSellException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            _quickSellError = ex.Message;
+            Toasts.ShowError(ex.Message);
+            await LoadTeamAsync();
+            CloseQuickSellModal();
+        }
+        catch (Exception)
+        {
+            _quickSellError = "Não foi possível concluir o quick sell. Tente novamente.";
+            Toasts.ShowError(_quickSellError);
+        }
+        finally
+        {
+            _isQuickSellProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyQuickSellResult(QuickSellResultDto result)
+    {
+        if (team is null || result.TeamId != team.TeamId)
+        {
+            return;
+        }
+
+        var removed = RemovePlayerFromRoster(result.PlayerId);
+
+        if (removed)
+        {
+            teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
+            ApplyRosterSort();
+        }
+
+        var newCount = team.Jogadores - (removed ? 1 : 0);
+        if (newCount < 0)
+        {
+            newCount = 0;
+        }
+
+        team = team with
+        {
+            Jogadores = newCount,
+            Caixa = FormatCurrency(result.BudgetAfter)
+        };
+    }
+
+    private bool RemovePlayerFromRoster(int playerId)
+    {
+        var removedCount = _rosterPlayers.RemoveAll(p => p.PlayerId == playerId);
+        var removed = removedCount > 0;
+
+        if (removed && roster is not null)
+        {
+            var updated = roster.Jogadores.Where(p => p.PlayerId != playerId).ToList();
+            roster = roster with { Jogadores = updated };
+        }
+
+        return removed;
+    }
+
+    private async Task HandleQuickSellBroadcastAsync(QuickSellResultDto result)
+    {
+        if (team is null || result.TeamId != team.TeamId)
+        {
+            return;
+        }
+
+        await InvokeAsync(() =>
+        {
+            var isLocal = _lastQuickSellPlayerId.HasValue && _lastQuickSellPlayerId.Value == result.PlayerId;
+            ApplyQuickSellResult(result);
+
+            if (isLocal)
+            {
+                _lastQuickSellPlayerId = null;
+            }
+            else
+            {
+                Toasts.ShowInfo($"Quick sell de {result.PlayerName} registrado. Caixa atualizado para {FormatCurrency(result.BudgetAfter)}.");
+            }
+
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async Task HandleMissingTokenAsync(string message)
+    {
+        Toasts.ShowError(message);
+        await LoadStoredTeamTokenAsync();
+        _teamTokenWarning = message;
+        _teamTokenInput = _storedTeamTokenDisplay ?? string.Empty;
+        _teamTokenError = message;
+        _showTeamTokenModal = true;
+    }
+
+    private async Task HandleInvalidTokenAsync(string message)
+    {
+        TeamAccess.ReportInvalidToken(message);
+
+        try
+        {
+            await TeamAccess.ClearTokenAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+        }
+
+        await LoadStoredTeamTokenAsync();
+        _teamTokenWarning = message;
+        _teamTokenInput = _storedTeamTokenDisplay ?? string.Empty;
+        _teamTokenError = message;
+        _showTeamTokenModal = true;
+        Toasts.ShowError(message);
+    }
+
+    private async Task OpenTeamTokenModal()
+    {
+        await LoadStoredTeamTokenAsync();
+        _teamTokenInput = _storedTeamTokenDisplay ?? string.Empty;
+        _teamTokenError = null;
+        _teamTokenWarning = null;
+        _showTeamTokenModal = true;
+    }
+
+    private void CloseTeamTokenModal()
+    {
+        if (_isSavingToken)
+        {
+            return;
+        }
+
+        _showTeamTokenModal = false;
+        _teamTokenError = null;
+    }
+
+    private async Task SaveTeamTokenAsync()
+    {
+        if (_isSavingToken)
+        {
+            return;
+        }
+
+        _isSavingToken = true;
+        _teamTokenError = null;
+
+        try
+        {
+            var trimmed = _teamTokenInput?.Trim() ?? string.Empty;
+            await TeamAccess.SetTokenAsync(trimmed);
+            SetStoredToken(trimmed);
+            _teamTokenWarning = null;
+            _showTeamTokenModal = false;
+            Toasts.ShowSuccess("Token do time atualizado.");
+        }
+        catch (ArgumentException ex)
+        {
+            _teamTokenError = ex.Message;
+        }
+        catch (Exception)
+        {
+            _teamTokenError = "Não foi possível salvar o token. Tente novamente.";
+        }
+        finally
+        {
+            _isSavingToken = false;
+            UpdateTeamTokenMatch();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearTeamTokenAsync()
+    {
+        if (!_teamTokenConfigured || _isClearingToken)
+        {
+            return;
+        }
+
+        _isClearingToken = true;
+        _teamTokenWarning = null;
+
+        try
+        {
+            await TeamAccess.ClearTokenAsync();
+            SetStoredToken(null);
+            Toasts.ShowInfo("Token do time removido desta máquina.");
+        }
+        catch (InvalidOperationException)
+        {
+            Toasts.ShowError("Não foi possível remover o token neste momento. Aguarde o carregamento completo da página.");
+        }
+        catch (Exception)
+        {
+            Toasts.ShowError("Não foi possível remover o token. Tente novamente.");
+        }
+        finally
+        {
+            _isClearingToken = false;
+            UpdateTeamTokenMatch();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadStoredTeamTokenAsync()
+    {
+        try
+        {
+            var token = await TeamAccess.GetTokenAsync();
+            SetStoredToken(token);
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            SetStoredToken(null);
+        }
+
+        var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
+        if (!string.IsNullOrWhiteSpace(invalidMessage))
+        {
+            _teamTokenWarning = invalidMessage;
+        }
+    }
+
+    private void SetStoredToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _storedTeamTokenDisplay = null;
+            _storedTeamTokenNormalized = null;
+            _teamTokenConfigured = false;
+        }
+        else
+        {
+            var trimmed = token.Trim();
+            _storedTeamTokenDisplay = trimmed;
+            _storedTeamTokenNormalized = NormalizeToken(trimmed);
+            _teamTokenConfigured = true;
+        }
+
+        UpdateTeamTokenMatch();
+    }
+
+    private void UpdateTeamTokenMatch()
+    {
+        _teamTokenMatchesTeam = _teamTokenFromTeam is not null
+            && _storedTeamTokenNormalized is not null
+            && string.Equals(_teamTokenFromTeam, _storedTeamTokenNormalized, StringComparison.Ordinal);
+
+        if (!_teamTokenConfigured)
+        {
+            _teamTokenWarning = null;
+        }
+    }
+
+    private void OnTeamTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadStoredTeamTokenAsync();
+            StateHasChanged();
+        });
+    }
+
     private string GetSortButtonClass(RosterSortColumn column)
     {
         var classes = "btn btn-link btn-sm p-0 text-decoration-none text-body";
@@ -353,9 +868,34 @@ else
 
     private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
 
+    private static decimal CalculatePayout(decimal basePrice)
+        => decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
+
+    private static string? NormalizeToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        return token.Trim().ToUpperInvariant();
+    }
+
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        TeamAccess.TokenChanged -= OnTeamTokenChanged;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+
+        if (Hub is not null)
+        {
+            Hub.OnQuickSellPerformed = null;
+            await Hub.DisposeAsync();
+        }
     }
 
     private enum RosterSortColumn
@@ -366,5 +906,7 @@ else
         BasePrice
     }
 
-    private sealed record RosterPlayerViewModel(string Name, string Position, int PositionId, int Overall, int? Age, decimal BasePrice);
+    private sealed record RosterPlayerViewModel(Guid PlayerGuid, int PlayerId, string Name, string Position, int PositionId, int Overall, int? Age, decimal BasePrice);
+
+    private sealed record QuickSellContext(RosterPlayerViewModel Player, decimal Payout);
 }
