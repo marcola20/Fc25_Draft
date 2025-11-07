@@ -101,7 +101,9 @@ create index "IX_TransferHistories_FromTeamId" on "TransferHistories" ("FromTeam
 
 create index "IX_TransferHistories_ToTeamId" on "TransferHistories" ("ToTeamId");
 
-create index "IX_TransferHistories_PlayerId_PerformedAtUtc" on "TransferHistories" ("PlayerId", "PerformedAtUtc");
+create index "IX_TransferHistories_OccurredAtUtc" on "TransferHistories" ("OccurredAtUtc");
+
+create index "IX_TransferHistories_PlayerId_OccurredAtUtc" on "TransferHistories" ("PlayerId", "OccurredAtUtc");
 
 create index "IX_MarketBids_TeamId" on "MarketBids" ("TeamId");
 

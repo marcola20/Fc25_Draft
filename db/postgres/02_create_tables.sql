@@ -65,6 +65,8 @@ create table "Players"
     "Name" varchar(80) not null,
     "Age" integer,
     "Overall" integer not null,
+    "PreviousOverall" integer,
+    "Status" integer not null default 1,
     "PositionId" smallint not null,
     "PlayerGuid" uuid not null,
     "CurrentTeamId" uuid
@@ -128,9 +130,12 @@ create table "TransferHistories"
     "ToTeamId" uuid,
     "Type" integer not null,
     "Amount" numeric(18,2),
+    "Payout" numeric(18,2),
+    "OldOverall" integer,
+    "NewOverall" integer,
     "Notes" varchar(400),
     "PerformedBy" varchar(120),
-    "PerformedAtUtc" timestamptz not null
+    "OccurredAtUtc" timestamptz not null
 );
 
 create table "MarketBids"

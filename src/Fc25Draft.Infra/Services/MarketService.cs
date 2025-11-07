@@ -368,10 +368,11 @@ public class MarketService : IMarketService
                 FromTeamId = null,
                 ToTeamId = team.TeamId,
                 Amount = buyNowPrice,
+                Payout = buyNowPrice,
                 Type = TransferType.MarketAuction,
                 Notes = "Compra imediata",
                 PerformedBy = "sistema",
-                PerformedAtUtc = nowUtc
+                OccurredAtUtc = nowUtc
             }, ct2);
 
             try

@@ -32,10 +32,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     FromTeamId = request.FromTeamId,
                     ToTeamId = request.ToTeamId,
                     Amount = request.Amount,
+                    Payout = request.Payout,
+                    OldOverall = request.OldOverall,
+                    NewOverall = request.NewOverall,
                     Type = request.Type,
                     Notes = request.Notes,
                     PerformedBy = request.PerformedBy,
-                    PerformedAtUtc = request.PerformedAtUtc ?? default
+                    OccurredAtUtc = request.OccurredAtUtc ?? default
                 };
 
                 try
@@ -76,10 +79,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 IMarketService marketService,
                 CancellationToken ct) =>
             {
-                var token = GetTeamToken(context, request.TeamToken);
-                if (token is null)
+                if (!EndpointHelpers.TryResolveTeamToken(context, request.TeamToken, out var token, out var errorResult))
                 {
-                    return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+                    return errorResult!;
                 }
 
                 if (!EndpointHelpers.TryResolveRowVersion(context.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
@@ -89,7 +91,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 try
                 {
-                    var result = await marketService.BuyNowAsync(itemId, token, rowVersion, ct);
+                    var result = await marketService.BuyNowAsync(itemId, token!, rowVersion, ct);
                     return Results.Ok(result);
                 }
                 catch (MarketForbiddenException ex)
@@ -147,13 +149,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             });
 
             return api;
-        }
-
-        private static string? GetTeamToken(HttpContext context, string? payloadToken)
-        {
-            var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
-            var token = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
-            return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
         }
 
         private static async Task<IResult> ApplyPostSettlementRefreshAsync(

@@ -3,7 +3,9 @@ using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
+using Fc25Draft.Web.Hubs;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
@@ -182,6 +184,44 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "times.json");
             });
 
+            teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:int}", async (
+                Guid teamId,
+                int playerId,
+                QuickSellRequest? request,
+                HttpContext context,
+                IQuickSellService quickSellService,
+                IHubContext<MarketHub> marketHub,
+                CancellationToken ct) =>
+            {
+                if (!EndpointHelpers.TryResolveTeamToken(context, request?.TeamToken, out var token, out var errorResult))
+                {
+                    return errorResult!;
+                }
+
+                try
+                {
+                    var result = await quickSellService.QuickSellAsync(teamId, playerId, token!, ct).ConfigureAwait(false);
+                    await marketHub.Clients.All.SendAsync("QuickSellPerformed", result, cancellationToken: ct).ConfigureAwait(false);
+                    return Results.Ok(result);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return EndpointHelpers.CreateNotFoundProblem(ex.Message);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return EndpointHelpers.CreateConflictProblem(ex.Message);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
             // ADMIN
             var adminTeamsApi = api.MapGroup("/admin/teams").RequireAuthorization("AdminOnly");
 
@@ -244,5 +284,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             return api;
         }
+
+        private sealed record QuickSellRequest(string? TeamToken);
     }
 }

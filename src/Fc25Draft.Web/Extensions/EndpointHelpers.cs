@@ -45,8 +45,26 @@ namespace Fc25Draft.Web.Extensions
             return true;
         }
 
-        public static void ApplyEtag(HttpResponse response, uint rowVersion)
-            => response.Headers[HeaderNames.ETag] = $"W/\"{rowVersion}\"";
+    public static void ApplyEtag(HttpResponse response, uint rowVersion)
+        => response.Headers[HeaderNames.ETag] = $"W/\"{rowVersion}\"";
+
+    public static bool TryResolveTeamToken(HttpContext context, string? payloadToken, out string? token, out IResult? errorResult)
+    {
+        errorResult = null;
+        token = null;
+
+        var headerToken = context.Request.Headers["X-Team-Token"].FirstOrDefault();
+        var candidate = !string.IsNullOrWhiteSpace(payloadToken) ? payloadToken : headerToken;
+
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            errorResult = Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+            return false;
+        }
+
+        token = candidate.Trim();
+        return true;
+    }
 
         public static bool TryResolveRowVersion(HttpRequest request, out uint rowVersion, out IResult? errorResult, bool allowFallbackToRowVersionHeader = false)
         {
@@ -162,20 +180,23 @@ namespace Fc25Draft.Web.Extensions
             var fromTeamName = history.FromTeam?.TeamName ?? "Mercado Livre";
             var toTeamName = history.ToTeam?.TeamName;
 
-            return new TransferHistoryItemDto(
-                history.TransferId,
-                history.PerformedAtUtc,
-                history.PlayerId,
-                playerName,
-                history.FromTeamId,
-                fromTeamName,
-                history.ToTeamId,
-                toTeamName,
-                history.Amount,
-                (int)history.Type,
-                history.Type.ToDisplayName(),
-                history.Notes,
-                history.PerformedBy);
+        return new TransferHistoryItemDto(
+            history.TransferId,
+            history.OccurredAtUtc,
+            history.PlayerId,
+            playerName,
+            history.FromTeamId,
+            fromTeamName,
+            history.ToTeamId,
+            toTeamName,
+            history.Amount,
+            history.Payout,
+            history.OldOverall,
+            history.NewOverall,
+            (int)history.Type,
+            history.Type.ToDisplayName(),
+            history.Notes,
+            history.PerformedBy);
         }
 
         public static MarketItemVm MapToMarketItemVm(MarketItemDto dto) => new MarketItemVm

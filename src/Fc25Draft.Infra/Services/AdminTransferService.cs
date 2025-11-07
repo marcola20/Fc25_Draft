@@ -149,9 +149,12 @@ public partial class AdminTransferService
                 FromTeamId = fromTeamId,
                 ToTeamId = toTeamId,
                 Amount = normalizedAmount,
+                Payout = normalizedAmount,
+                OldOverall = player.Overall,
+                NewOverall = player.Overall,
                 Notes = notes,
                 PerformedBy = adminTokenGuid.ToString(),
-                PerformedAtUtc = now
+                OccurredAtUtc = now
             }).ToList();
 
             await _dbContext.TransferHistories.AddRangeAsync(historyEntries, ctoken).ConfigureAwait(false);
@@ -365,9 +368,12 @@ public partial class AdminTransferService
                     FromTeamId = teamAId,
                     ToTeamId = teamBId,
                     Amount = amount,
+                    Payout = amount,
+                    OldOverall = p.Overall,
+                    NewOverall = p.Overall,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
-                    PerformedAtUtc = now
+                    OccurredAtUtc = now
                 });
             }
             foreach (var p in bEntities)
@@ -386,9 +392,12 @@ public partial class AdminTransferService
                     FromTeamId = teamBId,
                     ToTeamId = teamAId,
                     Amount = amount,
+                    Payout = amount,
+                    OldOverall = p.Overall,
+                    NewOverall = p.Overall,
                     Notes = notes,
                     PerformedBy = adminTokenGuid.ToString(),
-                    PerformedAtUtc = now
+                    OccurredAtUtc = now
                 });
             }
             if (histories.Count > 0)
@@ -468,9 +477,12 @@ public partial class AdminTransferService
                 FromTeamId = fromTeamId,
                 ToTeamId = toTeamId,
                 Amount = null,
+                Payout = null,
+                OldOverall = player.Overall,
+                NewOverall = player.Overall,
                 Notes = normalizedReason,
                 PerformedBy = adminTokenGuid.ToString(),
-                PerformedAtUtc = now
+                OccurredAtUtc = now
             };
 
             await _dbContext.TransferHistories.AddAsync(historyEntry, ctoken).ConfigureAwait(false);

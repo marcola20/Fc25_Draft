@@ -61,6 +61,11 @@ public class DraftDbContext : DbContext
             e.HasKey(x => x.PlayerId);
             e.Property(x => x.Name).IsRequired().HasMaxLength(80);
             e.Property(x => x.Overall).IsRequired();
+            e.Property(x => x.PreviousOverall);
+            e.Property(x => x.Status)
+             .HasConversion<int>()
+             .HasDefaultValue(PlayerStatus.Active)
+             .IsRequired();
             e.Property(x => x.Age);
             e.Property(x => x.PlayerGuid)
              .IsRequired();
@@ -327,12 +332,15 @@ public class DraftDbContext : DbContext
             e.HasKey(x => x.TransferId);
 
             e.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+            e.Property(x => x.Payout).HasColumnType("numeric(18,2)");
+            e.Property(x => x.OldOverall);
+            e.Property(x => x.NewOverall);
             e.Property(x => x.Notes).HasMaxLength(400);
             e.Property(x => x.PerformedBy).HasMaxLength(120);
-            e.Property(x => x.PerformedAtUtc).IsRequired();
+            e.Property(x => x.OccurredAtUtc).IsRequired();
 
-            e.HasIndex(x => x.PerformedAtUtc);
-            e.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+            e.HasIndex(x => x.OccurredAtUtc);
+            e.HasIndex(x => new { x.PlayerId, x.OccurredAtUtc });
             e.HasIndex(x => x.FromTeamId);
             e.HasIndex(x => x.ToTeamId);
 

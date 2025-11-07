@@ -406,11 +406,18 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Overall")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("PreviousOverall")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("PlayerGuid")
                         .HasColumnType("uuid");
 
                     b.Property<short>("PositionId")
                         .HasColumnType("smallint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.HasKey("PlayerId");
 
@@ -569,7 +576,10 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");
 
-                    b.Property<DateTime>("PerformedAtUtc")
+                    b.Property<int?>("OldOverall")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("PerformedBy")
@@ -579,6 +589,12 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("NewOverall")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("Payout")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<Guid?>("ToTeamId")
                         .HasColumnType("uuid");
 
@@ -587,13 +603,13 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("TransferId");
 
-                    b.HasIndex("PerformedAtUtc");
+                    b.HasIndex("OccurredAtUtc");
 
                     b.HasIndex("FromTeamId");
 
                     b.HasIndex("ToTeamId");
 
-                    b.HasIndex("PlayerId", "PerformedAtUtc");
+                    b.HasIndex("PlayerId", "OccurredAtUtc");
 
                     b.ToTable("TransferHistories");
                 });

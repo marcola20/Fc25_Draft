@@ -9,6 +9,8 @@ public class Player
     public string Name { get; set; } = null!;
     public int? Age { get; set; }
     public int Overall { get; set; }
+    public int? PreviousOverall { get; set; }
+    public PlayerStatus Status { get; set; } = PlayerStatus.Active;
     public short PositionId { get; set; }
     public Guid? CurrentTeamId { get; set; }
 

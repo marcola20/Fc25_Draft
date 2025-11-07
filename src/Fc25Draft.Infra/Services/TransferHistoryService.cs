@@ -78,7 +78,7 @@ public class TransferHistoryService : ITransferHistoryService
 
         entry.Notes = Normalize(entry.Notes, MaxNotesLength);
         entry.PerformedBy = Normalize(entry.PerformedBy, MaxPerformedByLength);
-        entry.PerformedAtUtc = NormalizeToUtc(entry.PerformedAtUtc);
+        entry.OccurredAtUtc = NormalizeToUtc(entry.OccurredAtUtc);
 
         _dbContext.TransferHistories.Add(entry);
         await _dbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -109,7 +109,7 @@ public class TransferHistoryService : ITransferHistoryService
             .Include(h => h.FromTeam)
             .Include(h => h.ToTeam)
             .Where(h => h.FromTeamId == teamId || h.ToTeamId == teamId)
-            .OrderByDescending(h => h.PerformedAtUtc)
+            .OrderByDescending(h => h.OccurredAtUtc)
             .Take(size)
             .ToListAsync()
             .ConfigureAwait(false);
@@ -124,7 +124,7 @@ public class TransferHistoryService : ITransferHistoryService
             .Include(h => h.Player)
             .Include(h => h.FromTeam)
             .Include(h => h.ToTeam)
-            .OrderByDescending(h => h.PerformedAtUtc)
+            .OrderByDescending(h => h.OccurredAtUtc)
             .Take(size)
             .ToListAsync()
             .ConfigureAwait(false);

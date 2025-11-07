@@ -63,13 +63,13 @@ public class TransfersQueryService : ITransfersQueryService
         if (filter.FromUtc.HasValue)
         {
             var from = EnsureUtc(filter.FromUtc.Value);
-            query = query.Where(h => h.PerformedAtUtc >= from);
+            query = query.Where(h => h.OccurredAtUtc >= from);
         }
 
         if (filter.ToUtc.HasValue)
         {
             var to = EnsureUtc(filter.ToUtc.Value);
-            query = query.Where(h => h.PerformedAtUtc <= to);
+            query = query.Where(h => h.OccurredAtUtc <= to);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.NotesQuery))
@@ -82,7 +82,7 @@ public class TransfersQueryService : ITransfersQueryService
         var skip = (filter.Page - 1) * size;
 
         var items = await query
-            .OrderByDescending(h => h.PerformedAtUtc)
+            .OrderByDescending(h => h.OccurredAtUtc)
             .Skip(skip)
             .Take(size)
             .Select(h => new TransferListItemDto
@@ -92,8 +92,11 @@ public class TransfersQueryService : ITransfersQueryService
                 FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : string.Empty,
                 ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : string.Empty,
                 Amount = h.Amount ?? 0m,
+                Payout = h.Payout,
+                OldOverall = h.OldOverall,
+                NewOverall = h.NewOverall,
                 Notes = h.Notes,
-                OccurredAtUtc = h.PerformedAtUtc
+                OccurredAtUtc = h.OccurredAtUtc
             })
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -114,7 +117,7 @@ public class TransfersQueryService : ITransfersQueryService
             .Select(h => new TransferDetailsDto
             {
                 TransferId = h.TransferId,
-                OccurredAtUtc = h.PerformedAtUtc,
+                OccurredAtUtc = h.OccurredAtUtc,
                 PlayerName = h.Player.Name,
                 PlayerExternalId = h.Player.PlayerGuid,
                 PlayerId = h.PlayerId,
@@ -123,6 +126,9 @@ public class TransfersQueryService : ITransfersQueryService
                 ToTeamId = h.ToTeamId,
                 ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : null,
                 Amount = h.Amount ?? 0m,
+                Payout = h.Payout,
+                OldOverall = h.OldOverall,
+                NewOverall = h.NewOverall,
                 Notes = h.Notes,
                 PerformedBy = h.PerformedBy
             })

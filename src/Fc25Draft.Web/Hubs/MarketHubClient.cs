@@ -23,6 +23,7 @@ public class MarketHubClient : IAsyncDisposable
     public Func<MarketItemVm, Task>? OnBidUpdated { get; set; }
     public Func<MarketItemVm, Task>? OnItemClosed { get; set; }
     public Func<MarketItemVm, Task>? OnItemBought { get; set; }
+    public Func<QuickSellResultDto, Task>? OnQuickSellPerformed { get; set; }
 
     public bool IsConnected => _connection?.State == HubConnectionState.Connected;
 
@@ -49,6 +50,7 @@ public class MarketHubClient : IAsyncDisposable
         _connection.On<MarketItemVm>("BidUpdated", async vm => await InvokeSafeAsync(OnBidUpdated, vm));
         _connection.On<MarketItemVm>("ItemClosed", async vm => await InvokeSafeAsync(OnItemClosed, vm));
         _connection.On<MarketItemVm>("ItemBought", async vm => await InvokeSafeAsync(OnItemBought, vm));
+        _connection.On<QuickSellResultDto>("QuickSellPerformed", async dto => await InvokeSafeAsync(OnQuickSellPerformed, dto));
 
         await _connection.StartAsync(ct);
     }
@@ -76,6 +78,23 @@ public class MarketHubClient : IAsyncDisposable
     }
 
     private async Task InvokeSafeAsync(Func<MarketItemVm, Task>? handler, MarketItemVm payload)
+    {
+        if (handler is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await handler(payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while handling market hub message.");
+        }
+    }
+
+    private async Task InvokeSafeAsync(Func<QuickSellResultDto, Task>? handler, QuickSellResultDto payload)
     {
         if (handler is null)
         {

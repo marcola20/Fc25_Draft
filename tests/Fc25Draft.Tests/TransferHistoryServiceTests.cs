@@ -19,7 +19,7 @@ public class TransferHistoryServiceTests
             TransferId = Guid.NewGuid(),
             PlayerId = 999,
             Type = TransferType.TeamSale,
-            PerformedAtUtc = DateTime.UtcNow
+            OccurredAtUtc = DateTime.UtcNow
         };
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.RegisterTransferAsync(entry));
@@ -41,10 +41,13 @@ public class TransferHistoryServiceTests
             FromTeamId = TestData.FromTeamId,
             ToTeamId = TestData.ToTeamId,
             Amount = 150m,
+            Payout = 150m,
+            OldOverall = 80,
+            NewOverall = 81,
             Type = TransferType.TeamSale,
             Notes = new string('n', 450),
             PerformedBy = new string('p', 140),
-            PerformedAtUtc = performedAt
+            OccurredAtUtc = performedAt
         };
 
         await service.RegisterTransferAsync(entry);
@@ -60,7 +63,7 @@ public class TransferHistoryServiceTests
         Assert.Equal(TransferType.TeamSale, saved.Type);
         Assert.Equal(400, saved.Notes!.Length);
         Assert.Equal(120, saved.PerformedBy!.Length);
-        Assert.Equal(DateTimeKind.Utc, saved.PerformedAtUtc.Kind);
+        Assert.Equal(DateTimeKind.Utc, saved.OccurredAtUtc.Kind);
     }
 
     [Fact]
@@ -77,7 +80,7 @@ public class TransferHistoryServiceTests
                 FromTeamId = TestData.FromTeamId,
                 ToTeamId = TestData.ToTeamId,
                 Type = TransferType.TeamSale,
-                PerformedAtUtc = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc)
+                OccurredAtUtc = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc)
             },
             new TransferHistory
             {
@@ -86,7 +89,7 @@ public class TransferHistoryServiceTests
                 FromTeamId = TestData.FromTeamId,
                 ToTeamId = TestData.ToTeamId,
                 Type = TransferType.TeamTrade,
-                PerformedAtUtc = new DateTime(2024, 2, 1, 12, 0, 0, DateTimeKind.Utc)
+                OccurredAtUtc = new DateTime(2024, 2, 1, 12, 0, 0, DateTimeKind.Utc)
             },
             new TransferHistory
             {
@@ -95,7 +98,7 @@ public class TransferHistoryServiceTests
                 FromTeamId = TestData.ToTeamId,
                 ToTeamId = TestData.FromTeamId,
                 Type = TransferType.TeamTrade,
-                PerformedAtUtc = new DateTime(2024, 3, 1, 12, 0, 0, DateTimeKind.Utc)
+                OccurredAtUtc = new DateTime(2024, 3, 1, 12, 0, 0, DateTimeKind.Utc)
             });
 
         await context.SaveChangesAsync();
@@ -105,7 +108,7 @@ public class TransferHistoryServiceTests
         var result = await service.GetTransfersByTeamAsync(TestData.FromTeamId, take: 2);
 
         Assert.Equal(2, result.Count);
-        Assert.True(result[0].PerformedAtUtc >= result[1].PerformedAtUtc);
+        Assert.True(result[0].OccurredAtUtc >= result[1].OccurredAtUtc);
         Assert.All(result, r => Assert.True(r.FromTeamId == TestData.FromTeamId || r.ToTeamId == TestData.FromTeamId));
     }
 

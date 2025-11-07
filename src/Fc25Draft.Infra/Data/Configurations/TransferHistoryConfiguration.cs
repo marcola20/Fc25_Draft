@@ -12,12 +12,15 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
 
         builder.Property(x => x.Type).HasConversion<int>().IsRequired();
         builder.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+        builder.Property(x => x.Payout).HasColumnType("numeric(18,2)");
+        builder.Property(x => x.OldOverall);
+        builder.Property(x => x.NewOverall);
         builder.Property(x => x.Notes).HasMaxLength(400);
         builder.Property(x => x.PerformedBy).HasMaxLength(120);
-        builder.Property(x => x.PerformedAtUtc).IsRequired();
+        builder.Property(x => x.OccurredAtUtc).IsRequired();
 
-        builder.HasIndex(x => x.PerformedAtUtc);
-        builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });
+        builder.HasIndex(x => x.OccurredAtUtc);
+        builder.HasIndex(x => new { x.PlayerId, x.OccurredAtUtc });
         builder.HasIndex(x => x.FromTeamId);
         builder.HasIndex(x => x.ToTeamId);
 

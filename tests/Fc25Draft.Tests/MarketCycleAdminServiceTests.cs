@@ -257,8 +257,8 @@ public class MarketCycleAdminServiceTests
         Assert.Equal(1, transfer.PlayerId);
         Assert.Equal(teamId, transfer.ToTeamId);
         Assert.Equal(2_000m, transfer.Amount);
-        Assert.Equal(DateTimeKind.Utc, transfer.PerformedAtUtc.Kind);
-        Assert.Equal(now, transfer.PerformedAtUtc);
+        Assert.Equal(DateTimeKind.Utc, transfer.OccurredAtUtc.Kind);
+        Assert.Equal(now, transfer.OccurredAtUtc);
 
         var transaction = await context.MarketTransactions.AsNoTracking().SingleAsync();
         Assert.Equal(MarketTransactionType.AuctionSettled, transaction.Type);
