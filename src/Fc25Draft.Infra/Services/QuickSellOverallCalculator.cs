@@ -22,12 +22,15 @@ internal static class QuickSellOverallCalculator
             return 0;
 
         if (currentOverall is >= 85 and <= 86)
-            return randomInclusive(2, 3);
+            return randomInclusive(1, 2);
 
         if (currentOverall is >= 83 and <= 84)
+            return randomInclusive(2, 3);
+
+        if (currentOverall is >= 81 and <= 82)
             return randomInclusive(3, 4);
 
-        if (currentOverall is >= 80 and <= 82)
+        if (currentOverall is 80)
             return randomInclusive(4, 5);
 
         if (currentOverall is >= 77 and <= 79)

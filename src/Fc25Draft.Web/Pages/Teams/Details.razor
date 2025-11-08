@@ -105,58 +105,62 @@ else
                 <table class="table table-striped table-sm mb-0">
                     <thead>
                         <tr>
-                            <th scope="col">Jogador</th>
-                            <th scope="col" class="text-center" aria-sort="@GetAriaSort(RosterSortColumn.Position)">
+                            <th scope="col" class="text-start text-nowrap">Jogador</th> 
+                            <th scope="col" class="text-center text-nowrap"
+                                aria-sort="@GetAriaSort(RosterSortColumn.Position)">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Position)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Position)">
                                     Posição
                                     @if (_activeSortColumn == RosterSortColumn.Position)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Position)</span>
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.Overall)">
+                            <th scope="col" class="text-center"
+                                aria-sort="@GetAriaSort(RosterSortColumn.Overall)">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Overall)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Overall)">
                                     Overall
                                     @if (_activeSortColumn == RosterSortColumn.Overall)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Overall)</span>
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.Age)">
+                            <th scope="col" class="text-center"
+                                aria-sort="@GetAriaSort(RosterSortColumn.Age)">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Age)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Age)">
                                     Idade
                                     @if (_activeSortColumn == RosterSortColumn.Age)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Age)</span>
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-end" aria-sort="@GetAriaSort(RosterSortColumn.BasePrice)">
+                            <th scope="col" class="text-center text-nowrap price-col"
+                                aria-sort="@GetAriaSort(RosterSortColumn.BasePrice)">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
                                     Preço base
                                     @if (_activeSortColumn == RosterSortColumn.BasePrice)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "▼" : "▲")</span>
+                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.BasePrice)</span>
                                     }
                                 </button>
                             </th>
                             @if (_canQuickSell)
                             {
-                                <th scope="col" class="text-end">Ações</th>
+                                <th scope="col" class="text-center text-nowrap">Ações</th>
                             }
                         </tr>
                     </thead>
@@ -164,20 +168,21 @@ else
                         @foreach (var player in _sortedRosterPlayers)
                         {
                             <tr>
-                                <td>@player.Name</td>
-                                <td class="text-center">@player.Position</td>
-                                <td class="text-end">@player.Overall</td>
-                                <td class="text-end">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
-                                <td class="text-end">@FormatCurrency(player.BasePrice)</td>
+                                <td class="text-nowrap name-col">@player.Name</td>
+                                <td class="text-center text-nowrap pos-col">@player.Position</td>
+                                <td class="text-center">@player.Overall</td>
+                                <td class="text-center">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                                <td class="text-center text-nowrap price-col">@FormatCurrency(player.BasePrice)</td>
                                 @if (_canQuickSell)
                                 {
-                                    <td class="text-end">
+                                    <td class="text-center">
                                         <button type="button"
-                                                class="btn btn-outline-danger btn-sm"
-                                                @onclick="() => OpenQuickSellModal(player)"
-                                                title="Vender jogador imediatamente"
-                                                aria-label="Vender rapidamente @player.Name">
-                                            Venda rápida
+                                                class="btn btn-outline-danger btn-sm btn-icon"
+                                                title="Quicksell"
+                                                aria-label="Vender rapidamente @player.Name"
+                                                @onclick="() => OpenQuickSellModal(player)">
+                                            <span aria-hidden="true">⚡</span>
+                                            <span class="visually-hidden">Venda rápida</span>
                                         </button>
                                     </td>
                                 }

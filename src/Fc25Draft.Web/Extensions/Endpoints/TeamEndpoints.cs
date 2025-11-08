@@ -83,9 +83,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             {
                 var token = httpContext.Request.Headers["X-Team-Token"].FirstOrDefault();
                 if (string.IsNullOrWhiteSpace(token))
-                {
                     return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
-                }
 
                 var normalized = token.Trim();
 
@@ -96,9 +94,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     .FirstOrDefaultAsync(ct);
 
                 if (identity is null)
-                {
                     return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status403Forbidden);
-                }
 
                 return Results.Ok(identity);
             });
@@ -165,21 +161,16 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 CancellationToken ct) =>
             {
                 if (teamId == Guid.Empty || playerId == Guid.Empty)
-                {
                     return Results.Json(new { message = "Parâmetros inválidos." }, statusCode: StatusCodes.Status400BadRequest);
-                }
+                
 
                 var token = httpContext.Request.Headers["X-Team-Token"].FirstOrDefault();
                 if (string.IsNullOrWhiteSpace(token))
-                {
                     return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
-                }
 
                 var normalizedToken = token.Trim();
                 if (string.IsNullOrWhiteSpace(normalizedToken))
-                {
                     return Results.Json(new { message = "Parâmetros inválidos." }, statusCode: StatusCodes.Status400BadRequest);
-                }
 
                 try
                 {
