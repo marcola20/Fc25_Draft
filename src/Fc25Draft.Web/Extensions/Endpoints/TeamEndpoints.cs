@@ -201,7 +201,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
                 }
 
-                var normalizedToken = token.Trim();
+                var normalizedToken = token.Trim().ToUpperInvariant();
 
                 try
                 {
@@ -215,7 +215,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         return Results.NotFound(new { message = "Time não encontrado." });
                     }
 
-                    if (!string.Equals(team.Token, normalizedToken, StringComparison.OrdinalIgnoreCase))
+                    var storedToken = (team.Token ?? string.Empty).Trim().ToUpperInvariant();
+
+                    if (!string.Equals(storedToken, normalizedToken, StringComparison.Ordinal))
                     {
                         return Results.Json(new { message = "Token inválido para este time." }, statusCode: StatusCodes.Status403Forbidden);
                     }
