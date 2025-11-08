@@ -162,12 +162,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 Guid playerId,
                 HttpContext httpContext,
                 ITeamQuickSellService quickSellService,
-                ILogger<TeamEndpoints> logger,
                 CancellationToken ct) =>
             {
                 if (teamId == Guid.Empty || playerId == Guid.Empty)
                 {
-                    logger.LogWarning("Parâmetros inválidos para quick sell. TeamId: {TeamId}, PlayerId: {PlayerId}", teamId, playerId);
                     return Results.Json(new { message = "Parâmetros inválidos." }, statusCode: StatusCodes.Status400BadRequest);
                 }
 
@@ -180,7 +178,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 var normalizedToken = token.Trim();
                 if (string.IsNullOrWhiteSpace(normalizedToken))
                 {
-                    logger.LogWarning("Token do time inválido recebido para quick sell. TeamId: {TeamId}, PlayerId: {PlayerId}", teamId, playerId);
                     return Results.Json(new { message = "Parâmetros inválidos." }, statusCode: StatusCodes.Status400BadRequest);
                 }
 
@@ -191,17 +188,14 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
                 catch (QuickSellException ex)
                 {
-                    logger.LogError(ex, "Erro no processamento da venda rápida.");
                     return Results.Json(new { message = ex.Message }, statusCode: ex.StatusCode);
                 }
                 catch (KeyNotFoundException ex)
                 {
-                    logger.LogError(ex, "Jogador ou time não encontrado.");
                     return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    logger.LogError(ex, "Erro inesperado ao processar a venda rápida.");
                     return Results.Json(new { message = "Erro interno no servidor." }, statusCode: StatusCodes.Status500InternalServerError);
                 }
             });
