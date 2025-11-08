@@ -11,6 +11,8 @@ public class TransferHistory
     public string? Notes { get; set; }
     public string? PerformedBy { get; set; }
     public DateTime PerformedAtUtc { get; set; }
+    public int? OldOverall { get; set; }
+    public int? NewOverall { get; set; }
 
     public Player Player { get; set; } = null!;
     public Team? FromTeam { get; set; }

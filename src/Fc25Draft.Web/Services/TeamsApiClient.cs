@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using Fc25Draft.Core.DTOs;
 using Microsoft.AspNetCore.WebUtilities;
@@ -97,6 +98,75 @@ public class TeamsApiClient
         await EnsureSuccessAsync(response);
     }
 
+    public async Task<TeamIdentityDto?> GetIdentityByTokenAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new ArgumentException("Token inválido.", nameof(token));
+        }
+
+        var trimmed = token.Trim();
+        var client = await _clientFactory.CreateAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/teams/me");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", trimmed);
+
+        using var response = await client.SendAsync(request, ct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<TeamIdentityDto>(cancellationToken: ct);
+        }
+
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            var message = await ReadErrorMessageAsync(response, ct) ?? "Token inválido.";
+            throw new TeamApiException(message, response.StatusCode);
+        }
+
+        var error = await ReadErrorMessageAsync(response, ct) ?? $"Falha ao obter identidade do time. Código {(int)response.StatusCode}.";
+        throw new TeamApiException(error, response.StatusCode);
+    }
+
+    public async Task<QuickSellResultDto> QuickSellAsync(Guid teamId, Guid playerId, string teamToken, CancellationToken ct = default)
+    {
+        if (teamId == Guid.Empty)
+        {
+            throw new ArgumentException("teamId inválido.", nameof(teamId));
+        }
+
+        if (playerId == Guid.Empty)
+        {
+            throw new ArgumentException("playerId inválido.", nameof(playerId));
+        }
+
+        if (string.IsNullOrWhiteSpace(teamToken))
+        {
+            throw new ArgumentException("Token inválido.", nameof(teamToken));
+        }
+
+        var client = await _clientFactory.CreateAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/teams/{teamId}/quick-sell/{playerId}");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+
+        using var response = await client.SendAsync(request, ct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<QuickSellResultDto>(cancellationToken: ct);
+            if (result is null)
+            {
+                throw new TeamApiException("Resposta inválida do servidor.", response.StatusCode);
+            }
+
+            return result;
+        }
+
+        var message = await ReadErrorMessageAsync(response, ct) ?? $"Falha ao realizar Quick Sell. Código {(int)response.StatusCode}.";
+        throw new TeamApiException(message, response.StatusCode);
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
@@ -125,4 +195,39 @@ public class TeamsApiClient
     }
 
     private sealed record ApiErrorResponse(string? Message);
+
+    public sealed class TeamApiException : Exception
+    {
+        public TeamApiException(string message, HttpStatusCode statusCode) : base(message)
+        {
+            StatusCode = statusCode;
+        }
+
+        public HttpStatusCode StatusCode { get; }
+    }
+
+    private static async Task<string?> ReadErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(cancellationToken: ct);
+            if (!string.IsNullOrWhiteSpace(error?.Message))
+            {
+                return error!.Message;
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            return string.IsNullOrWhiteSpace(raw) ? null : raw;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

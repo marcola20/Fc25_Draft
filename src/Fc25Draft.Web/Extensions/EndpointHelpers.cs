@@ -175,7 +175,9 @@ namespace Fc25Draft.Web.Extensions
                 (int)history.Type,
                 history.Type.ToDisplayName(),
                 history.Notes,
-                history.PerformedBy);
+                history.PerformedBy,
+                history.OldOverall,
+                history.NewOverall);
         }
 
         public static MarketItemVm MapToMarketItemVm(MarketItemDto dto) => new MarketItemVm

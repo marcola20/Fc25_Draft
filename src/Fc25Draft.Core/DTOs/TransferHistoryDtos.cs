@@ -16,7 +16,9 @@ public record TransferHistoryItemDto(
     int Type,
     string Tipo,
     string? Notes,
-    string? PerformedBy);
+    string? PerformedBy,
+    int? OldOverall,
+    int? NewOverall);
 
 public record TransferHistoryDto(
     Guid TransferId,
@@ -32,7 +34,9 @@ public record TransferHistoryDto(
     int Type,
     string Tipo,
     string? Notes,
-    string? PerformedBy);
+    string? PerformedBy,
+    int? OldOverall,
+    int? NewOverall);
 
 public class TransferListItemDto
 {

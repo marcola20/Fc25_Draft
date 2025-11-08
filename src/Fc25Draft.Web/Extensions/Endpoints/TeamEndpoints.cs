@@ -1,4 +1,5 @@
 ﻿using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Fc25Draft.Web.Extensions.Endpoints
 {
@@ -180,6 +182,118 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 var json = JsonSerializer.Serialize(roster, new JsonSerializerOptions { WriteIndented = true });
                 return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "times.json");
+            });
+
+            teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:guid}", async (
+                Guid teamId,
+                Guid playerId,
+                HttpContext context,
+                DraftDbContext db,
+                IPricingService pricingService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("QuickSellEndpoint");
+                var token = context.Request.Headers["X-Team-Token"].FirstOrDefault();
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+                }
+
+                var normalizedToken = token.Trim();
+
+                try
+                {
+                    var team = await db.Teams
+                        .Include(t => t.Roster)
+                        .ThenInclude(r => r.Player)
+                        .FirstOrDefaultAsync(t => t.TeamId == teamId, ct);
+
+                    if (team is null)
+                    {
+                        return Results.NotFound(new { message = "Time não encontrado." });
+                    }
+
+                    if (!string.Equals(team.Token, normalizedToken, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Results.Json(new { message = "Token inválido para este time." }, statusCode: StatusCodes.Status403Forbidden);
+                    }
+
+                    var rosterEntry = team.Roster.FirstOrDefault(r => r.Player.PlayerGuid == playerId);
+                    if (rosterEntry is null)
+                    {
+                        return Results.NotFound(new { message = "Jogador não encontrado no elenco." });
+                    }
+
+                    if (team.Roster.Count <= 18)
+                    {
+                        return Results.Conflict(new { message = "Seu time ficaria com menos de 18 jogadores após a venda." });
+                    }
+
+                    PricingResult pricing;
+                    try
+                    {
+                        pricing = await pricingService.CalculateForPlayerAsync(rosterEntry.PlayerId, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Falha ao calcular preço base para o jogador {PlayerId} no Quick Sell.", rosterEntry.PlayerId);
+                        return Results.Json(new { message = "Ocorreu um erro ao processar o Quick Sell." }, statusCode: StatusCodes.Status500InternalServerError);
+                    }
+
+                    var basePrice = pricing.BasePrice;
+                    var payout = decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
+                    var occurredAtUtc = TimeProvider.System.GetUtcNow().UtcDateTime;
+                    var overall = rosterEntry.Player.Overall;
+
+                    await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                    try
+                    {
+                        rosterEntry.Player.CurrentTeamId = null;
+                        db.TeamRosters.Remove(rosterEntry);
+                        team.Budget += payout;
+
+                        var historyEntry = new TransferHistory
+                        {
+                            TransferId = Guid.NewGuid(),
+                            Type = TransferType.QuickSell,
+                            PlayerId = rosterEntry.PlayerId,
+                            FromTeamId = team.TeamId,
+                            Amount = payout,
+                            PerformedAtUtc = occurredAtUtc,
+                            OldOverall = overall,
+                            NewOverall = overall
+                        };
+
+                        await db.TransferHistories.AddAsync(historyEntry, ct);
+                        await db.SaveChangesAsync(ct);
+                        await transaction.CommitAsync(ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        logger.LogError(ex, "Erro ao persistir Quick Sell para o jogador {PlayerGuid} do time {TeamId}.", rosterEntry.Player.PlayerGuid, team.TeamId);
+                        return Results.Json(new { message = "Ocorreu um erro ao processar o Quick Sell." }, statusCode: StatusCodes.Status500InternalServerError);
+                    }
+
+                    var result = new QuickSellResultDto(
+                        team.TeamId,
+                        rosterEntry.Player.PlayerGuid,
+                        overall,
+                        overall,
+                        basePrice,
+                        payout,
+                        team.Budget,
+                        occurredAtUtc);
+
+                    return Results.Ok(result);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Erro inesperado ao realizar Quick Sell para o time {TeamId} e jogador {PlayerId}.", teamId, playerId);
+                    return Results.Json(new { message = "Ocorreu um erro ao processar o Quick Sell." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
             });
 
             // ADMIN

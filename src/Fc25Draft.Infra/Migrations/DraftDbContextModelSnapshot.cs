@@ -565,6 +565,12 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid?>("FromTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("NewOverall")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OldOverall")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");

@@ -15,6 +15,8 @@ public class TransferHistoryConfiguration : IEntityTypeConfiguration<TransferHis
         builder.Property(x => x.Notes).HasMaxLength(400);
         builder.Property(x => x.PerformedBy).HasMaxLength(120);
         builder.Property(x => x.PerformedAtUtc).IsRequired();
+        builder.Property(x => x.OldOverall);
+        builder.Property(x => x.NewOverall);
 
         builder.HasIndex(x => x.PerformedAtUtc);
         builder.HasIndex(x => new { x.PlayerId, x.PerformedAtUtc });

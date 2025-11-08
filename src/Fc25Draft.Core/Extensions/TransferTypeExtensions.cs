@@ -9,6 +9,7 @@ public static class TransferTypeExtensions
         TransferType.MarketAuction => "Mercado",
         TransferType.TeamSale => "Venda entre times",
         TransferType.TeamTrade => "Troca entre times",
+        TransferType.QuickSell => "Quick Sell",
         _ => type.ToString()
     };
 }
