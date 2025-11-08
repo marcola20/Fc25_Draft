@@ -36,19 +36,13 @@ public class TeamQuickSellService : ITeamQuickSellService
     public async Task<QuickSellResultDto> QuickSellAsync(Guid teamId, Guid playerId, string teamToken, CancellationToken ct)
     {
         if (teamId == Guid.Empty)
-        {
             throw new QuickSellException("Time inválido.", StatusCodes.Status400BadRequest);
-        }
 
         if (playerId == Guid.Empty)
-        {
             throw new QuickSellException("Jogador inválido.", StatusCodes.Status400BadRequest);
-        }
 
         if (string.IsNullOrWhiteSpace(teamToken))
-        {
             throw new QuickSellException("Token do time é obrigatório.", StatusCodes.Status401Unauthorized);
-        }
 
         var normalizedToken = teamToken.Trim();
         QuickSellResultDto? result = null;
@@ -161,7 +155,7 @@ public class TeamQuickSellService : ITeamQuickSellService
 
                 team.Budget = decimal.Round(team.Budget + payout, 2, MidpointRounding.AwayFromZero);
 
-                var historyNotes = BuildHistoryNotes(player.Name, payout);
+                var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout);
                 var historyEntry = new TransferHistory
                 {
                     TransferId = Guid.NewGuid(),
@@ -217,10 +211,10 @@ public class TeamQuickSellService : ITeamQuickSellService
         return result!;
     }
 
-    private static string BuildHistoryNotes(string playerName, decimal payout)
+    private static string BuildHistoryNotes(string playerName, int oldOver, int newOver, decimal payout)
     {
         var culture = CultureInfo.GetCultureInfo("pt-BR");
         var formatted = payout.ToString("C", culture);
-        return $"Venda rápida de {playerName} por {formatted}";
+        return $"Venda rápida de {playerName} por {formatted}.\n\r\n\r Over evoluído de {oldOver} para {newOver}!";
     }
 }

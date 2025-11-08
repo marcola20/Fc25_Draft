@@ -121,30 +121,24 @@ public class TeamsApiClient
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/teams/{teamId}/quick-sell/{playerId}");
         request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
 
-        try
+        
+        using var response = await client.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
         {
-            using var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
+            var message = await ReadErrorMessageAsync(response, ct) ?? $"Falha ao processar a venda rápida ({response.StatusCode}).";
+
+            throw response.StatusCode switch
             {
-                var message = await ReadErrorMessageAsync(response, ct) ?? $"Falha ao processar a venda rápida ({response.StatusCode}).";
-
-                throw response.StatusCode switch
-                {
-                    HttpStatusCode.NotFound => new KeyNotFoundException(message),
-                    HttpStatusCode.Conflict => new InvalidOperationException(message),
-                    HttpStatusCode.Unauthorized => new InvalidOperationException(message),
-                    HttpStatusCode.Forbidden => new InvalidOperationException(message),
-                    _ => new InvalidOperationException(message)
-                };
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<QuickSellResultDto>(cancellationToken: ct);
-            return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+                HttpStatusCode.NotFound => new KeyNotFoundException(message),
+                HttpStatusCode.Conflict => new InvalidOperationException(message),
+                HttpStatusCode.Unauthorized => new InvalidOperationException(message),
+                HttpStatusCode.Forbidden => new InvalidOperationException(message),
+                _ => new InvalidOperationException(message)
+            };
         }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Erro ao enviar requisição para o servidor.", ex);
-        }
+
+        var payload = await response.Content.ReadFromJsonAsync<QuickSellResultDto>(cancellationToken: ct);
+        return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
     }
 
     public async Task CreateAsync(TeamCreateDto dto, CancellationToken ct = default)
