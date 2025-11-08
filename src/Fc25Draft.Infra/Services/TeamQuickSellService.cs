@@ -106,8 +106,42 @@ public class TeamQuickSellService : ITeamQuickSellService
                     throw new QuickSellException("Preço base inválido para o jogador.", StatusCodes.Status400BadRequest);
 
                 var payout = decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
-                var oldOverall = player.Overall;
-                var newOverall = oldOverall;
+                var hasPendingBump = player.QuickSellTeamId == teamId
+                    && player.QuickSellOldOverall.HasValue
+                    && player.QuickSellNewOverall.HasValue
+                    && player.QuickSellNewOverall.Value == player.Overall;
+
+                var oldOverall = hasPendingBump
+                    ? player.QuickSellOldOverall!.Value
+                    : player.Overall;
+
+                var newOverall = hasPendingBump
+                    ? player.QuickSellNewOverall!.Value
+                    : QuickSellOverallCalculator.CalculateNewOverall(oldOverall);
+
+                if (!hasPendingBump)
+                {
+                    player.Overall = newOverall;
+                    player.QuickSellTeamId = teamId;
+                    player.QuickSellOldOverall = oldOverall;
+                    player.QuickSellNewOverall = newOverall;
+
+                    try
+                    {
+                        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (DbUpdateException dbEx)
+                    {
+                        _logger.LogError(dbEx, "Erro ao persistir o novo overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
+                        throw new QuickSellException("Não foi possível atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Erro inesperado ao atualizar o overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
+                        throw new QuickSellException("Erro inesperado ao atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
+                    }
+                }
+
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 player.CurrentTeamId = null;
@@ -144,6 +178,10 @@ public class TeamQuickSellService : ITeamQuickSellService
                 };
 
                 await _dbContext.TransferHistories.AddAsync(historyEntry, ct).ConfigureAwait(false);
+                player.QuickSellTeamId = null;
+                player.QuickSellOldOverall = null;
+                player.QuickSellNewOverall = null;
+
                 await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
 

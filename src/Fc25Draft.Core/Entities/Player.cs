@@ -11,6 +11,9 @@ public class Player
     public int Overall { get; set; }
     public short PositionId { get; set; }
     public Guid? CurrentTeamId { get; set; }
+    public Guid? QuickSellTeamId { get; set; }
+    public int? QuickSellOldOverall { get; set; }
+    public int? QuickSellNewOverall { get; set; }
 
     public Position Position { get; set; } = null!;
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();

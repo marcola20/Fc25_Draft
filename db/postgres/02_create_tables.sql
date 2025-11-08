@@ -67,7 +67,10 @@ create table "Players"
     "Overall" integer not null,
     "PositionId" smallint not null,
     "PlayerGuid" uuid not null,
-    "CurrentTeamId" uuid
+    "CurrentTeamId" uuid,
+    "QuickSellTeamId" uuid,
+    "QuickSellOldOverall" integer,
+    "QuickSellNewOverall" integer
 );
 
 create table "BudgetLedgers"
