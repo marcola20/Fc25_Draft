@@ -101,13 +101,12 @@ else
         }
         else
         {
-            <div class="table-responsive">
+            <div class="table-responsive-sm p-0">
                 <table class="table table-striped table-sm mb-0">
                     <thead>
-                        <tr>
-                            <th scope="col" class="text-start text-nowrap">Jogador</th> 
-                            <th scope="col" class="text-center text-nowrap"
-                                aria-sort="@GetAriaSort(RosterSortColumn.Position)">
+                        <tr class="align-middle text-center">
+                            <th scope="col" class="text-start text-nowrap">Jogador</th>
+                            <th scope="col" class="text-center text-nowrap">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Position)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Position)">
@@ -119,8 +118,7 @@ else
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-center"
-                                aria-sort="@GetAriaSort(RosterSortColumn.Overall)">
+                            <th scope="col" class="text-center">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Overall)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Overall)">
@@ -132,8 +130,7 @@ else
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-center"
-                                aria-sort="@GetAriaSort(RosterSortColumn.Age)">
+                            <th scope="col" class="text-center">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.Age)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.Age)">
@@ -145,8 +142,7 @@ else
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-center text-nowrap price-col"
-                                aria-sort="@GetAriaSort(RosterSortColumn.BasePrice)">
+                            <th scope="col" class="text-center text-nowrap">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
@@ -160,28 +156,39 @@ else
                             </th>
                             @if (_canQuickSell)
                             {
-                                <th scope="col" class="text-center text-nowrap">Ações</th>
+                                <th scope="col" class="text-center text-nowrap pe-0">Ações</th>
                             }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var player in _sortedRosterPlayers)
                         {
-                            <tr>
-                                <td class="text-nowrap name-col">@player.Name</td>
-                                <td class="text-center text-nowrap pos-col">@player.Position</td>
-                                <td class="text-center">@player.Overall</td>
-                                <td class="text-center">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
-                                <td class="text-center text-nowrap price-col">@FormatCurrency(player.BasePrice)</td>
+                            <tr class="align-middle text-center">
+                                <td class="text-start text-nowrap">@player.Name</td>
+                                <td class="text-center text-nowrap">@player.Position</td>
+                                <td>@player.Overall</td>
+                                <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                                <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
                                 @if (_canQuickSell)
                                 {
-                                    <td class="text-center">
+                                    <td class="text-center pe-0">
                                         <button type="button"
                                                 class="btn btn-outline-danger btn-sm btn-icon"
+                                                style="border-width: 2px;
+                                                       border-color: red;
+                                                       color: red;
+                                                       padding: 2px 4px;
+                                                       line-height: 1;
+                                                       transition: background-color 0.2s ease;"
                                                 title="Quicksell"
                                                 aria-label="Vender rapidamente @player.Name"
+                                                onmouseover="this.style.backgroundColor='rgba(255, 0, 0, 0.1)';"
+                                                onmouseout="this.style.backgroundColor='transparent';"
                                                 @onclick="() => OpenQuickSellModal(player)">
-                                            <span aria-hidden="true">⚡</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                 width="16" height="16" fill="red">
+                                                <path d="M7 2v10h3v10l7-12h-4l4-8z" />
+                                            </svg>
                                             <span class="visually-hidden">Venda rápida</span>
                                         </button>
                                     </td>
