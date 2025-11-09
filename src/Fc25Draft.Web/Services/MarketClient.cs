@@ -132,9 +132,7 @@ namespace Fc25Draft.Web.Services
             {
                 var errorMessage = await ReadErrorMessageAsync(resp);
                 if (string.IsNullOrWhiteSpace(errorMessage))
-                {
                     errorMessage = "Não foi possível registrar o lance porque o item foi atualizado. Atualize os dados e tente novamente.";
-                }
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
@@ -180,9 +178,7 @@ namespace Fc25Draft.Web.Services
             {
                 var errorMessage = await ReadErrorMessageAsync(resp);
                 if (string.IsNullOrWhiteSpace(errorMessage))
-                {
                     errorMessage = "Não foi possível concluir a compra porque o item foi atualizado. Atualize os dados e tente novamente.";
-                }
                 throw new MarketConcurrencyException(errorMessage, resp.StatusCode);
             }
 
@@ -190,9 +186,7 @@ namespace Fc25Draft.Web.Services
             {
                 var message2 = await ReadErrorMessageAsync(resp);
                 if (string.IsNullOrWhiteSpace(message2))
-                {
                     message2 = $"Falha ao concluir a compra. Código {(int)resp.StatusCode}.";
-                }
                 throw new MarketClientException(message2, resp.StatusCode);
             }
 

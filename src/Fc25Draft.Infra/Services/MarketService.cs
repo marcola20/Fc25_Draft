@@ -166,7 +166,7 @@ public class MarketService : IMarketService
             if (item.Status != MarketItemStatus.Active)
                 throw new MarketConflictException("O item não está disponível para lances.");
 
-            var expiresBrBefore = DateTime.SpecifyKind(item.ExpiresAtUtc, DateTimeKind.Unspecified);
+            var expiresBrBefore = TimeZoneInfo.ConvertTimeFromUtc(item.ExpiresAtUtc, tz);
             if (expiresBrBefore <= nowBr)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
@@ -405,14 +405,10 @@ public class MarketService : IMarketService
         var projected = currentPlayers + activeLeads;
 
         if (includeCurrentItem || currentLeaderTeamId != teamId)
-        {
             projected += 1;
-        }
 
         if (projected > SquadLimit)
-        {
             throw new MarketValidationException("O time atingiria o limite de 23 jogadores.");
-        }
     }
 
     private async Task SyncRosterAsync(Guid teamId, int playerId, CancellationToken ct)
@@ -425,9 +421,7 @@ public class MarketService : IMarketService
         foreach (var entry in existingEntries)
         {
             if (entry.TeamId != teamId)
-            {
                 _dbContext.TeamRosters.Remove(entry);
-            }
         }
 
         if (!existingEntries.Any(e => e.TeamId == teamId))
@@ -445,7 +439,7 @@ public class MarketService : IMarketService
         if (item is null) throw new ArgumentNullException(nameof(item));
 
         var nowBr = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-        var expiresBr = DateTime.SpecifyKind(item.ExpiresAtUtc, DateTimeKind.Unspecified);
+        var expiresBr = TimeZoneInfo.ConvertTimeFromUtc(item.ExpiresAtUtc, tz);
 
         var isFirstBid = !previousLeaderId.HasValue || previousLeaderId.Value == Guid.Empty;
 
@@ -453,7 +447,7 @@ public class MarketService : IMarketService
         {
             var capBr = nowBr.AddHours(3);
             if (expiresBr > capBr)
-                expiresBr = capBr;
+                expiresBr = capBr; 
         }
 
         var remaining = expiresBr - nowBr;
@@ -464,48 +458,32 @@ public class MarketService : IMarketService
                 expiresBr = expiresBr.Add(ext);
         }
 
-        if (isFirstBid)
-            expiresBr = expiresBr.AddHours(3);
-
-        item.ExpiresAtUtc = expiresBr;
+        item.ExpiresAtUtc = TimeZoneInfo.ConvertTimeToUtc(expiresBr, tz);
     }
 
     private static TimeSpan CalculateBidExtension(TimeSpan remaining)
     {
         if (remaining <= TimeSpan.Zero)
-        {
             return TimeSpan.Zero;
-        }
 
         if (remaining <= TimeSpan.FromMinutes(5))
-        {
             return TimeSpan.FromMinutes(30);
-        }
 
         if (remaining <= TimeSpan.FromMinutes(10))
-        {
             return TimeSpan.FromMinutes(25);
-        }
 
         if (remaining <= TimeSpan.FromMinutes(15))
-        {
             return TimeSpan.FromMinutes(20);
-        }
 
         if (remaining <= TimeSpan.FromMinutes(20))
-        {
             return TimeSpan.FromMinutes(15);
-        }
+        
 
         if (remaining <= TimeSpan.FromMinutes(25))
-        {
             return TimeSpan.FromMinutes(10);
-        }
 
         if (remaining <= TimeSpan.FromMinutes(30))
-        {
             return TimeSpan.FromMinutes(5);
-        }
 
         return TimeSpan.Zero;
     }
@@ -562,17 +540,13 @@ public class MarketService : IMarketService
     private static void EnsureExpectedRowVersion(uint expectedRowVersion)
     {
         if (expectedRowVersion == 0)
-        {
             throw new MarketPreconditionFailedException("A versão informada do item é inválida.");
-        }
     }
 
     private static void EnsureRowVersion(uint current, uint expected)
     {
         if (current != expected)
-        {
             throw new MarketPreconditionFailedException("O item foi atualizado por outro time. Atualize a página e tente novamente.");
-        }
     }
 
     public async Task<T> InSerializableTxAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct = default)

@@ -579,27 +579,19 @@
     private async Task HandleBidSubmitAsync()
     {
         if (_editContext is null)
-        {
             return;
-        }
 
         if (_isSubmitting)
-        {
             return;
-        }
 
         _infoMessage = null;
         _errorMessage = null;
 
         if (!_editContext.Validate())
-        {
             return;
-        }
 
         if (!_model.ParsedAmount.HasValue)
-        {
             return;
-        }
 
         _isSubmitting = true;
         _submitCts?.Cancel();

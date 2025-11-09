@@ -182,14 +182,10 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             .ConfigureAwait(false);
 
         if (cycle is null)
-        {
             throw new MarketNotFoundException("Ciclo não encontrado.");
-        }
 
         if (cycle.Status != MarketCycleStatus.Draft)
-        {
             throw new MarketValidationException("Apenas ciclos em rascunho podem ter itens removidos.");
-        }
 
         var items = await _dbContext.MarketItems
             .Where(i => i.CycleId == cycleId && i.Status == MarketItemStatus.Draft)
@@ -249,26 +245,18 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var eligiblePlayers = await QueryEligiblePlayersAsync(options, excluded, ct).ConfigureAwait(false);
 
         if (eligiblePlayers.Count == 0)
-        {
             throw new MarketValidationException("Nenhum jogador elegível para os filtros informados.");
-        }
 
         var maxSelectable = CalculateMaxSelectable(eligiblePlayers, options.MaxPerTeam, options.MaxPerPosition);
         if (maxSelectable == 0)
-        {
             throw new MarketValidationException("Nenhum jogador atende às regras de geração.");
-        }
 
         if (options.DesiredCount > maxSelectable)
-        {
             throw new MarketValidationException($"A quantidade desejada ({options.DesiredCount}) é maior do que o total elegível ({maxSelectable}).");
-        }
 
         var selectedCandidates = SelectCandidates(eligiblePlayers, options, seed);
         if (selectedCandidates.Count < options.DesiredCount)
-        {
             throw new MarketValidationException("Não foi possível selecionar jogadores suficientes respeitando os limites configurados.");
-        }
 
         var expirations = BuildExpirationSchedule(selectedCandidates.Count, cycle, options, seed);
         var multipliers = CalculateScarcityMultipliers(eligiblePlayers, selectedCandidates);
@@ -302,9 +290,8 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                 .ConfigureAwait(false);
 
             foreach (var playerId in playersInCycle)
-            {
                 excluded.Add(playerId);
-            }
+            
         }
 
         if (options.ExcludeAlreadyListedInOpenCycles)
@@ -317,17 +304,13 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                 .ConfigureAwait(false);
 
             foreach (var playerId in openCyclePlayers)
-            {
                 excluded.Add(playerId);
-            }
         }
 
         if (options.ExcludedPlayerIds is { Count: > 0 })
         {
             foreach (var playerId in options.ExcludedPlayerIds)
-            {
                 excluded.Add(playerId);
-            }
         }
 
         return excluded;
@@ -350,9 +333,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             });
 
         if (excluded.Count > 0)
-        {
             query = query.Where(p => !excluded.Contains(p.Player.PlayerId));
-        }
 
         if (options.PositionIds is { Count: > 0 })
         {
@@ -361,24 +342,16 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         }
 
         if (options.MinOverall.HasValue)
-        {
             query = query.Where(p => p.Player.Overall >= options.MinOverall.Value);
-        }
 
         if (options.MaxOverall.HasValue)
-        {
             query = query.Where(p => p.Player.Overall <= options.MaxOverall.Value);
-        }
-
+        
         if (options.MinAge.HasValue)
-        {
             query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value >= options.MinAge.Value);
-        }
 
         if (options.MaxAge.HasValue)
-        {
             query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value <= options.MaxAge.Value);
-        }
 
         return await query
             .OrderBy(p => p.Player.PlayerId)
@@ -405,9 +378,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             : Array.Empty<int>();
 
         if (manualIds.Length > 0 && manualIds.Length != options.ManualPlayerIds!.Count)
-        {
             throw new MarketValidationException("Jogadores selecionados manualmente não podem se repetir.");
-        }
 
         var manualSet = manualIds.Length > 0 ? new HashSet<int>(manualIds) : null;
         var selected = new List<MarketItemGenerationCandidate>(options.DesiredCount);
@@ -418,13 +389,10 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         {
             foreach (var playerId in manualIds)
             {
-                var candidate = eligible.FirstOrDefault(c => c.PlayerId == playerId)
-                    ?? throw new MarketValidationException("Jogador selecionado manualmente não é elegível para os filtros informados.");
+                var candidate = eligible.FirstOrDefault(c => c.PlayerId == playerId) ?? throw new MarketValidationException("Jogador selecionado manualmente não é elegível para os filtros informados.");
 
                 if (!CanAddCandidate(candidate, perTeam, perPosition, options.MaxPerTeam, options.MaxPerPosition))
-                {
                     throw new MarketValidationException($"A seleção manual excede os limites configurados ao incluir {candidate.PlayerName}.");
-                }
 
                 selected.Add(candidate);
                 IncrementCounts(candidate, perTeam, perPosition);
@@ -433,14 +401,10 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
         var remaining = options.DesiredCount - selected.Count;
         if (remaining < 0)
-        {
             throw new MarketValidationException("A quantidade de jogadores selecionados manualmente excede a quantidade desejada.");
-        }
 
         if (remaining == 0)
-        {
             return selected;
-        }
 
         var rng = new Random(seed);
         var pool = eligible
@@ -451,14 +415,11 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         foreach (var candidate in pool)
         {
             if (selected.Count >= options.DesiredCount)
-            {
                 break;
-            }
 
             if (!CanAddCandidate(candidate, perTeam, perPosition, options.MaxPerTeam, options.MaxPerPosition))
-            {
                 continue;
-            }
+            
 
             selected.Add(candidate);
             IncrementCounts(candidate, perTeam, perPosition);
@@ -479,18 +440,14 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             var teamId = candidate.TeamId.Value;
             perTeam.TryGetValue(teamId, out var count);
             if (count >= maxPerTeam.Value)
-            {
                 return false;
-            }
         }
 
         if (maxPerPosition.HasValue && maxPerPosition.Value > 0)
         {
             perPosition.TryGetValue(candidate.PositionId, out var count);
             if (count >= maxPerPosition.Value)
-            {
                 return false;
-            }
         }
 
         return true;
@@ -518,9 +475,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     {
         var result = new Dictionary<int, decimal>(selected.Count);
         if (selected.Count == 0)
-        {
             return result;
-        }
 
         var groupedByPosition = pool
             .GroupBy(player => player.PositionId)
@@ -562,9 +517,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     private static int CountGreaterOrEqual(int[] sortedValues, int threshold)
     {
         if (sortedValues.Length == 0)
-        {
             return 0;
-        }
 
         var index = LowerBound(sortedValues, threshold);
         return sortedValues.Length - index;
@@ -578,13 +531,9 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         {
             var mid = left + ((right - left) / 2);
             if (values[mid] < threshold)
-            {
                 left = mid + 1;
-            }
             else
-            {
                 right = mid;
-            }
         }
 
         return left;
@@ -593,16 +542,12 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     private IReadOnlyList<DateTime> BuildExpirationSchedule(int count, MarketCycle cycle, MarketItemGenerationOptions options, int seed)
     {
         if (count == 0)
-        {
             return Array.Empty<DateTime>();
-        }
 
         var start = EnsureUtc(cycle.StartsAtUtc);
         var end = EnsureUtc(cycle.EndsAtUtc);
         if (end <= start)
-        {
             throw new MarketValidationException("A data de término do ciclo deve ser posterior ao início.");
-        }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var effectiveStart = now > start ? now : start;
@@ -612,9 +557,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         {
             var totalSeconds = (effectiveEnd - effectiveStart).TotalSeconds;
             if (totalSeconds <= count)
-            {
                 throw new MarketValidationException("Não há janela suficiente no ciclo para distribuir as expirações.");
-            }
 
             var interval = totalSeconds / (count + 1);
             var schedule = new List<DateTime>(count);
@@ -628,22 +571,16 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         }
 
         if (!options.MinItemLifespan.HasValue || !options.MaxItemLifespan.HasValue)
-        {
             throw new MarketValidationException("Informe as durações mínima e máxima para o modo manual.");
-        }
 
         var min = options.MinItemLifespan.Value;
         var max = options.MaxItemLifespan.Value;
 
         if (min <= TimeSpan.Zero || max <= TimeSpan.Zero)
-        {
             throw new MarketValidationException("As durações devem ser positivas.");
-        }
 
         if (max < min)
-        {
             throw new MarketValidationException("A duração máxima deve ser maior ou igual à mínima.");
-        }
 
         var random = new Random(seed);
         var expirations = new List<DateTime>(count);
@@ -698,9 +635,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         }
 
         if (!age.HasValue)
-        {
             throw new InvalidOperationException($"Jogador {selected.Candidate.PlayerName} não possui idade cadastrada.");
-        }
 
         var weight = MarketWeightResolver.GetByPositionId(selected.Candidate.PositionId);
         var multiplier = selected.PriceMultiplier <= 0 ? 1m : selected.PriceMultiplier;
@@ -722,13 +657,9 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             foreach (var group in eligible.GroupBy(p => p.TeamId))
             {
                 if (group.Key.HasValue)
-                {
                     teamTotal += Math.Min(group.Count(), limit);
-                }
                 else
-                {
                     teamTotal += group.Count();
-                }
             }
 
             total = Math.Min(total, teamTotal);
@@ -751,9 +682,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     {
         var adjusted = expiration <= start ? start.AddMinutes(5) : expiration;
         if (adjusted >= end)
-        {
             adjusted = end.AddSeconds(-1);
-        }
 
         return adjusted;
     }

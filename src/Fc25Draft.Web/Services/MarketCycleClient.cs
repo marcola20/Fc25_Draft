@@ -175,19 +175,13 @@ public class MarketCycleClient
         Append("pageSize", request.PageSize.ToString());
 
         if (request.Status.HasValue)
-        {
             Append("status", request.Status.Value.ToString());
-        }
 
         if (request.StartsAfterUtc.HasValue)
-        {
             Append("startsAfterUtc", request.StartsAfterUtc.Value.ToString("O"));
-        }
 
         if (request.StartsBeforeUtc.HasValue)
-        {
             Append("startsBeforeUtc", request.StartsBeforeUtc.Value.ToString("O"));
-        }
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
