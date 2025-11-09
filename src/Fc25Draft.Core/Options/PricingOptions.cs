@@ -12,24 +12,24 @@ public class PricingOptions
     public Dictionary<string, decimal> MultiplicadoresPosicao { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
         ["GK"] = 0.95m,
-        ["CB"] = 1.00m,
+        ["CB"] = 1.05m,
         ["FB"] = 1.05m,
-        ["LB"] = 1.05m,
+        ["LB"] = 1.1m,
         ["RB"] = 1.05m,
         ["DM"] = 1.05m,
         ["CM"] = 1.10m,
         ["AM"] = 1.15m,
-        ["W"] = 1.15m,
-        ["ST"] = 1.20m
+        ["W"] = 1.2m,
+        ["ST"] = 1.25m
     };
 
     public IList<PricingAgeMultiplier> MultiplicadoresIdade { get; set; } = new List<PricingAgeMultiplier>
     {
-        new(0, 22, 1.20m),
-        new(23, 27, 1.10m),
+        new(0, 22, 1.10m),
+        new(23, 27, 1.05m),
         new(28, 31, 1.00m),
-        new(32, 34, 0.90m),
-        new(35, null, 0.80m)
+        new(32, 34, 0.95m),
+        new(35, null, 0.90m)
     };
 }
 
