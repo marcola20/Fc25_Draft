@@ -81,7 +81,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                     .CountAsync(r => r.TeamId == teamId, ct)
                     .ConfigureAwait(false);
 
-                if (rosterCount <= 17)
+                if (rosterCount <= 16)
                     throw new QuickSellException("Você não pode realizar esta ação. O time ficaria com menos de 17 jogadores.", StatusCodes.Status409Conflict);
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
