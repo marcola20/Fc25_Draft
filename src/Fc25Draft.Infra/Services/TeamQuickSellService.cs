@@ -84,6 +84,22 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (rosterCount <= 17)
                     throw new QuickSellException("Você não pode realizar esta ação. O time ficaria com menos de 17 jogadores.", StatusCodes.Status409Conflict);
 
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+                var windowStart = now.AddHours(-24);
+
+                var quickSellCount = await _dbContext.TransferHistories
+                    .CountAsync(
+                        h => h.FromTeamId == teamId
+                             && h.Type == TransferType.QuickSell
+                             && h.PerformedAtUtc >= windowStart,
+                        ct)
+                    .ConfigureAwait(false);
+
+                if (quickSellCount >= 2)
+                    throw new QuickSellException(
+                        "Limite diário de vendas rápidas atingido. Tente novamente mais tarde.",
+                        StatusCodes.Status429TooManyRequests);
+
                 PricingResult pricing;
                 try
                 {
@@ -135,8 +151,6 @@ public class TeamQuickSellService : ITeamQuickSellService
                         throw new QuickSellException("Erro inesperado ao atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
                     }
                 }
-
-                var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 player.CurrentTeamId = null;
                 var rosterEntry = player.TeamRosters.FirstOrDefault(r => r.TeamId == teamId);

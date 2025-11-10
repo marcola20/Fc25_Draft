@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
@@ -12,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.AspNetCore.Http;
 using Xunit;
 
 namespace Fc25Draft.Tests;
@@ -203,6 +205,95 @@ public class TeamQuickSellServiceTests
         Assert.Equal(85, history.OldOverall);
         Assert.Equal(86, history.NewOverall);
         Assert.Equal(fakeNow.UtcDateTime, history.PerformedAtUtc);
+    }
+
+    [Fact]
+    public async Task QuickSellAsync_ThrowsWhenDailyQuickSellLimitIsReached()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<DraftDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var teamId = Guid.NewGuid();
+        var playerGuid = Guid.NewGuid();
+
+        await using (var setup = new DraftDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+
+            setup.Positions.Add(new Position { PositionId = 1, Name = "Atacante" });
+            setup.Teams.Add(new Team
+            {
+                TeamId = teamId,
+                TeamName = "Time Teste",
+                Token = "TEAMTOKEN",
+                Budget = 1_000_000m,
+                BudgetBlocked = 0m
+            });
+
+            for (var i = 0; i < 19; i++)
+            {
+                var playerId = i + 1;
+                var guid = i == 0 ? playerGuid : Guid.NewGuid();
+
+                setup.Players.Add(new Player
+                {
+                    PlayerId = playerId,
+                    PlayerGuid = guid,
+                    Name = $"Jogador {playerId}",
+                    Overall = 80,
+                    PositionId = 1,
+                    CurrentTeamId = teamId
+                });
+
+                setup.TeamRosters.Add(new TeamRoster
+                {
+                    TeamId = teamId,
+                    PlayerId = playerId
+                });
+            }
+
+            var limitNow = new DateTime(2025, 3, 1, 15, 0, 0, DateTimeKind.Utc);
+            setup.TransferHistories.AddRange(
+                new TransferHistory
+                {
+                    TransferId = Guid.NewGuid(),
+                    Type = TransferType.QuickSell,
+                    PlayerId = 1,
+                    FromTeamId = teamId,
+                    PerformedAtUtc = limitNow.AddHours(-1)
+                },
+                new TransferHistory
+                {
+                    TransferId = Guid.NewGuid(),
+                    Type = TransferType.QuickSell,
+                    PlayerId = 2,
+                    FromTeamId = teamId,
+                    PerformedAtUtc = limitNow.AddHours(-10)
+                });
+
+            await setup.SaveChangesAsync();
+        }
+
+        var fakeNow = new DateTimeOffset(2025, 3, 1, 15, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(fakeNow);
+        var pricingService = new StubPricingService(200_000m);
+
+        await using var context = new DraftDbContext(options);
+        var service = new TeamQuickSellService(
+            context,
+            pricingService,
+            NullLogger<TeamQuickSellService>.Instance,
+            timeProvider);
+
+        var exception = await Assert.ThrowsAsync<QuickSellException>(() =>
+            service.QuickSellAsync(teamId, playerGuid, "TEAMTOKEN", CancellationToken.None));
+
+        Assert.Equal(StatusCodes.Status429TooManyRequests, exception.StatusCode);
+        Assert.Contains("Limite diário de vendas rápidas", exception.Message);
     }
 
     private sealed record EntityStateSnapshot(string EntityName, EntityState State);
