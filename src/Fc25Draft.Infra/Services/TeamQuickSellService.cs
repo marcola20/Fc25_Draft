@@ -95,10 +95,8 @@ public class TeamQuickSellService : ITeamQuickSellService
                         ct)
                     .ConfigureAwait(false);
 
-                if (quickSellCount >= 2)
-                    throw new QuickSellException(
-                        "Limite diário de vendas rápidas atingido. Tente novamente mais tarde.",
-                        StatusCodes.Status429TooManyRequests);
+                if (quickSellCount >= 3)
+                    throw new QuickSellException("Limite diário de vendas rápidas atingido. Tente novamente mais tarde.", StatusCodes.Status429TooManyRequests);
 
                 PricingResult pricing;
                 try
