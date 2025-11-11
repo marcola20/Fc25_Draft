@@ -259,8 +259,8 @@ else
 
     private static string FormatSelectionLine(RoundSelectionPlayerDto player)
     {
-        var prefix = player.PositionOrder >= 999 ? string.Empty : $"{player.PositionOrder} — ";
-        return $"{prefix}{player.PositionName}: {player.PlayerName}";
+        var teamName = string.IsNullOrWhiteSpace(player.TeamName) ? "Sem time" : player.TeamName;
+        return $"{player.PositionName}: {player.PlayerName} — {teamName}";
     }
 
     private sealed class RoundSelectionViewState

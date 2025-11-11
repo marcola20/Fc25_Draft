@@ -115,7 +115,9 @@
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <div class="fw-semibold">@player.PlayerName</div>
-                                        <div class="text-muted small">@player.PositionName</div>
+                                        <div class="text-muted small">
+                                            @player.PositionName — @(string.IsNullOrWhiteSpace(player.TeamName) ? "Sem time" : player.TeamName)
+                                        </div>
                                     </div>
                                     <button class="btn btn-sm btn-outline-danger" type="button" disabled="@(_isSaving || isRemoving)" @onclick="() => RemovePlayerAsync(player.PlayerId)">
                                         @if (isRemoving)
