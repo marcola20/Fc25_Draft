@@ -291,7 +291,7 @@ else
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (var round in _rounds.OrderBy(r => r.Name))
+                                        @foreach (var round in _rounds.OrderBy(r => r.RoundId))
                                         {
                                             <tr>
                                                 <td>

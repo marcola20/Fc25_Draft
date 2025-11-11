@@ -67,7 +67,7 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
         var rounds = await _db.Rounds
             .AsNoTracking()
             .Where(r => r.CompetitionId == competitionId)
-            .OrderBy(r => r.Name)
+            .OrderBy(r => r.RoundId)
             .Select(r => new RoundDto(r.RoundId, r.CompetitionId, r.Name, r.IsCompleted, r.PlayedAtUtc, r.Notes))
             .ToListAsync(ct)
             .ConfigureAwait(false);
