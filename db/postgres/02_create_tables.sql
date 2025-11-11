@@ -147,6 +147,23 @@ create table "MarketBids"
     "CreatedAtUtc" timestamptz not null
 );
 
+create table "RoundSelections"
+(
+    "RoundSelectionId" uuid not null primary key,
+    "RoundId" uuid not null,
+    "CreatedAt" timestamptz not null
+);
+
+create table "RoundSelectionPlayers"
+(
+    "RoundSelectionId" uuid not null,
+    "PlayerGuid" uuid not null,
+    "TeamId" uuid,
+    "TeamName" varchar(80),
+    "AddedAt" timestamptz not null,
+    primary key ("RoundSelectionId", "PlayerGuid")
+);
+
 insert into "Positions" ("PositionId", "Name") values
     (1, 'Goleiro'),
     (2, 'Zagueiro'),

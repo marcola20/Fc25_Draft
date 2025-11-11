@@ -56,6 +56,15 @@ alter table "MarketBids"
 alter table "MarketBids"
     add constraint "FK_MarketBids_Teams_TeamId" foreign key ("TeamId") references "Teams" ("TeamId") on delete restrict;
 
+alter table "RoundSelections"
+    add constraint "FK_RoundSelections_Rounds_RoundId" foreign key ("RoundId") references "Rounds" ("RoundId") on delete cascade;
+
+alter table "RoundSelectionPlayers"
+    add constraint "FK_RoundSelectionPlayers_RoundSelections_RoundSelectionId" foreign key ("RoundSelectionId") references "RoundSelections" ("RoundSelectionId") on delete cascade;
+
+alter table "RoundSelectionPlayers"
+    add constraint "FK_RoundSelectionPlayers_Players_PlayerGuid" foreign key ("PlayerGuid") references "Players" ("PlayerGuid") on delete cascade;
+
 -- Indexes and unique constraints
 create index "IX_AdminActionsLog_ActionType_CreatedAtUtc" on "AdminActionsLog" ("ActionType" asc, "CreatedAtUtc" desc);
 
@@ -106,3 +115,9 @@ create index "IX_TransferHistories_PlayerId_PerformedAtUtc" on "TransferHistorie
 create index "IX_MarketBids_TeamId" on "MarketBids" ("TeamId");
 
 create index "IX_MarketBids_ItemId_CreatedAtUtc" on "MarketBids" ("ItemId", "CreatedAtUtc");
+
+create unique index "IX_RoundSelections_RoundId" on "RoundSelections" ("RoundId");
+
+create index "IX_RoundSelectionPlayers_PlayerGuid" on "RoundSelectionPlayers" ("PlayerGuid");
+
+create index "IX_RoundSelectionPlayers_RoundSelectionId" on "RoundSelectionPlayers" ("RoundSelectionId");
