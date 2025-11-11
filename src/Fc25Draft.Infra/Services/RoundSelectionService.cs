@@ -159,20 +159,25 @@ public sealed class RoundSelectionService : IRoundSelectionService
                     return;
                 }
 
-                var validPlayers = await _db.Players
+                var playerInfos = await _db.Players
                     .AsNoTracking()
                     .Where(p => candidates.Contains(p.PlayerGuid))
-                    .Select(p => p.PlayerGuid)
+                    .Select(p => new
+                    {
+                        p.PlayerGuid,
+                        p.CurrentTeamId,
+                        TeamName = p.CurrentTeam != null ? p.CurrentTeam.TeamName : null
+                    })
                     .ToListAsync(innerCt)
                     .ConfigureAwait(false);
 
-                if (validPlayers.Count == 0)
+                if (playerInfos.Count == 0)
                 {
                     result = new OperationResultDto(false, "Nenhum jogador válido encontrado.");
                     return;
                 }
 
-                if (existingCount + validPlayers.Count > 11)
+                if (existingCount + playerInfos.Count > 11)
                 {
                     result = new OperationResultDto(false, "Você atingiu o limite de 11 jogadores.");
                     return;
@@ -202,12 +207,14 @@ public sealed class RoundSelectionService : IRoundSelectionService
                 }
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
-                foreach (var playerGuid in validPlayers)
+                foreach (var info in playerInfos)
                 {
                     selection.Players.Add(new RoundSelectionPlayer
                     {
                         RoundSelectionId = selection.RoundSelectionId,
-                        PlayerGuid = playerGuid,
+                        PlayerGuid = info.PlayerGuid,
+                        TeamId = info.CurrentTeamId,
+                        TeamName = info.TeamName,
                         AddedAt = now
                     });
                 }
@@ -304,7 +311,10 @@ public sealed class RoundSelectionService : IRoundSelectionService
                         p.Player.PlayerGuid,
                         p.Player.Name,
                         p.Player.Position.Name,
-                        p.Player.PositionId == 0 ? 999 : p.Player.PositionId))
+                        p.Player.PositionId == 0 ? 999 : p.Player.PositionId,
+                        string.IsNullOrEmpty(p.TeamName)
+                            ? (p.Player.CurrentTeam != null ? p.Player.CurrentTeam.TeamName : null)
+                            : p.TeamName))
                     .ToList()))
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);

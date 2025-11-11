@@ -199,6 +199,13 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TeamName")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
                     b.HasKey("RoundSelectionId", "PlayerGuid");
 
                     b.HasIndex("PlayerGuid");

@@ -48,10 +48,10 @@ else
     }
     else
     {
-        <ol class="list-group list-group-numbered">
+        <div class="list-group">
             @foreach (var item in _schedule.OrderBy(s => s.Order))
             {
-                <li class="list-group-item" role="button" tabindex="0" style="cursor: pointer;"
+                <div class="list-group-item list-group-item-action" role="button" tabindex="0"
                     @onclick="async () => await ToggleRoundAsync(item.RoundId)"
                     @onkeydown="async args => await OnRoundKeyDownAsync(args, item.RoundId)">
                     <div class="d-flex justify-content-between align-items-start">
@@ -99,9 +99,9 @@ else
                             }
                         </div>
                     }
-                </li>
+                </div>
             }
-        </ol>
+        </div>
     }
 }
 
@@ -259,8 +259,8 @@ else
 
     private static string FormatSelectionLine(RoundSelectionPlayerDto player)
     {
-        var prefix = player.PositionOrder >= 999 ? string.Empty : $"{player.PositionOrder} — ";
-        return $"{prefix}{player.PositionName}: {player.PlayerName}";
+        var teamName = string.IsNullOrWhiteSpace(player.TeamName) ? "Sem time" : player.TeamName;
+        return $"{player.PositionName} — {player.PlayerName} ({teamName})";
     }
 
     private sealed class RoundSelectionViewState

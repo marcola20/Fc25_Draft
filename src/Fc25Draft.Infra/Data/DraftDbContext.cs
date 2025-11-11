@@ -169,6 +169,9 @@ public class DraftDbContext : DbContext
             e.Property(x => x.AddedAt)
              .IsRequired();
 
+            e.Property(x => x.TeamName)
+             .HasMaxLength(80);
+
             e.HasIndex(x => x.RoundSelectionId);
             e.HasIndex(x => x.PlayerGuid);
 
