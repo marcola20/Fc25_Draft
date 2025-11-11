@@ -45,18 +45,28 @@
                     }
                     else
                     {
-                        @{ var limitReached = _selection.Count + _pendingSelections.Count >= 11; }
+                        @{
+                            var limitReached = _selection.Count + _pendingSelections.Count >= 11;
+                        }
+
                         @foreach (var player in _selectedTeamPlayers)
                         {
                             var alreadySelected = _selection.Any(p => p.PlayerId == player.PlayerGuid);
                             var isPending = _pendingSelections.Contains(player.PlayerGuid);
                             var disabled = alreadySelected || (limitReached && !isPending);
+
                             <label class="list-group-item d-flex align-items-center justify-content-between" for="player-@player.PlayerGuid">
                                 <div>
                                     <div class="fw-semibold">@player.Nome</div>
                                     <div class="text-muted small">@player.Posicao — Overall @player.Overall</div>
                                 </div>
-                                <input id="player-@player.PlayerGuid" class="form-check-input ms-2" type="checkbox" checked="@isPending" disabled="@disabled" @onchange="args => TogglePending(player.PlayerGuid, args.Value)" />
+
+                                <input id="player-@player.PlayerGuid"
+                                        class="form-check-input ms-2"
+                                        type="checkbox"
+                                        checked="@isPending"
+                                        disabled="@disabled"
+                                        @onchange="(args) => TogglePending(player.PlayerGuid, (bool)args.Value!)" />
                             </label>
                         }
                     }
@@ -136,10 +146,12 @@
     private Guid? _lastLoadedRoundId;
 
     private IReadOnlyList<TeamRosterPlayerDto> _selectedTeamPlayers =>
-        _rosters?.FirstOrDefault(r => r.TeamId == _selectedTeamId)?.Jogadores
-            .Where(FilterPlayer)
-            .OrderBy(p => p.Nome)
-            .ToList() ?? Array.Empty<TeamRosterPlayerDto>();
+                    (_rosters?.FirstOrDefault(r => r.TeamId == _selectedTeamId)?.Jogadores
+                        ?? Enumerable.Empty<TeamRosterPlayerDto>())
+                    .Where(FilterPlayer)
+                    .OrderBy(p => p.Nome)
+                    .ToList();
+
 
     private bool _canSave => RoundId.HasValue && _pendingSelections.Count > 0 && !_isSelectionLoading;
 
@@ -168,7 +180,7 @@
         }
         catch (Exception ex)
         {
-            Toasts.ShowError(ex.Message, "Erro ao carregar times");
+            Toasts.ShowError("Erro ao carregar times: " + ex.Message);
             _rosters = Array.Empty<TeamRosterDto>();
         }
     }
@@ -193,7 +205,7 @@
         }
         catch (Exception ex)
         {
-            Toasts.ShowError(ex.Message, "Erro ao carregar seleção");
+            Toasts.ShowError("Erro ao carregar seleção" + ex.Message);
             _selection = new List<RoundSelectionPlayerDto>();
         }
         finally
@@ -256,7 +268,7 @@
         }
         catch (Exception ex)
         {
-            Toasts.ShowError(ex.Message, "Erro ao atualizar seleção");
+            Toasts.ShowError("Erro ao atualizar seleção" + ex.Message);
         }
         finally
         {
@@ -295,7 +307,7 @@
         }
         catch (Exception ex)
         {
-            Toasts.ShowError(ex.Message, "Erro ao remover jogador");
+            Toasts.ShowError("Erro ao remover jogador" + ex.Message);
         }
         finally
         {
