@@ -908,7 +908,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Competition");
-                    b.Navigation("Selection");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.RoundSelection", b =>
@@ -920,7 +919,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Round");
-                    b.Navigation("Players");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.RoundSelectionPlayer", b =>

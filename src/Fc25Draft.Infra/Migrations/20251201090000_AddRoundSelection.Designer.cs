@@ -582,6 +582,8 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("Name", "PositionId");
 
+                    b.HasAlternateKey("PlayerGuid");
+
                     b.ToTable("Players");
                 });
 
@@ -898,7 +900,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("CurrentTeam");
 
                     b.Navigation("Position");
-                    b.Navigation("RoundSelections");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Round", b =>
@@ -910,7 +911,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Competition");
-                    b.Navigation("Selection");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.RoundSelection", b =>
@@ -922,7 +922,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Round");
-                    b.Navigation("Players");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.RoundSelectionPlayer", b =>

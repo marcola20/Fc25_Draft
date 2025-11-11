@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,6 +11,11 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddUniqueConstraint(
+                name: "AK_Players_PlayerGuid",
+                table: "Players",
+                column: "PlayerGuid");
+
             migrationBuilder.CreateTable(
                 name: "RoundSelections",
                 columns: table => new
@@ -75,11 +80,13 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "RoundSelectionPlayers");
+            migrationBuilder.DropTable(name: "RoundSelectionPlayers");
+            migrationBuilder.DropTable(name: "RoundSelections");
 
-            migrationBuilder.DropTable(
-                name: "RoundSelections");
+            migrationBuilder.DropUniqueConstraint(
+                name: "AK_Players_PlayerGuid",
+                table: "Players");
         }
+
     }
 }
