@@ -159,14 +159,16 @@ public sealed class RoundSelectionService : IRoundSelectionService
                     return;
                 }
 
-                var playerInfos = await _db.Players
-                    .AsNoTracking()
-                    .Where(p => candidates.Contains(p.PlayerGuid))
-                    .Select(p => new
+                var playerInfos = await (
+                    from player in _db.Players.AsNoTracking()
+                    where candidates.Contains(player.PlayerGuid)
+                    join team in _db.Teams.AsNoTracking() on player.CurrentTeamId equals team.TeamId into teamGroup
+                    from team in teamGroup.DefaultIfEmpty()
+                    select new
                     {
-                        p.PlayerGuid,
-                        p.CurrentTeamId,
-                        TeamName = p.CurrentTeam != null ? p.CurrentTeam.TeamName : null
+                        player.PlayerGuid,
+                        TeamId = player.CurrentTeamId,
+                        TeamName = team != null ? team.TeamName : null
                     })
                     .ToListAsync(innerCt)
                     .ConfigureAwait(false);
@@ -213,7 +215,7 @@ public sealed class RoundSelectionService : IRoundSelectionService
                     {
                         RoundSelectionId = selection.RoundSelectionId,
                         PlayerGuid = info.PlayerGuid,
-                        TeamId = info.CurrentTeamId,
+                        TeamId = info.TeamId,
                         TeamName = info.TeamName,
                         AddedAt = now
                     });
@@ -299,24 +301,55 @@ public sealed class RoundSelectionService : IRoundSelectionService
 
     private async Task<RoundSelectionDto?> QuerySelectionAsync(Guid roundId, CancellationToken ct)
     {
-        return await _db.RoundSelections
+        var selectionInfo = await _db.RoundSelections
             .AsNoTracking()
             .Where(s => s.RoundId == roundId)
-            .Select(s => new RoundSelectionDto(
-                s.RoundId,
-                s.Players
-                    .OrderBy(p => (int)(p.Player.PositionId == 0 ? 999 : p.Player.PositionId))
-                    .ThenBy(p => p.Player.Name)
-                    .Select(p => new RoundSelectionPlayerDto(
-                        p.Player.PlayerGuid,
-                        p.Player.Name,
-                        p.Player.Position.Name,
-                        p.Player.PositionId == 0 ? 999 : p.Player.PositionId,
-                        string.IsNullOrEmpty(p.TeamName)
-                            ? (p.Player.CurrentTeam != null ? p.Player.CurrentTeam.TeamName : null)
-                            : p.TeamName))
-                    .ToList()))
+            .Select(s => new { s.RoundSelectionId, s.RoundId })
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
+
+        if (selectionInfo is null)
+        {
+            return null;
+        }
+
+        var players = await (
+                from rsp in _db.RoundSelectionPlayers.AsNoTracking()
+                where rsp.RoundSelectionId == selectionInfo.RoundSelectionId
+                join player in _db.Players.AsNoTracking() on rsp.PlayerGuid equals player.PlayerGuid
+                join position in _db.Positions.AsNoTracking() on player.PositionId equals position.PositionId
+                join storedTeam in _db.Teams.AsNoTracking() on rsp.TeamId equals storedTeam.TeamId into storedTeamGroup
+                from storedTeam in storedTeamGroup.DefaultIfEmpty()
+                join currentTeam in _db.Teams.AsNoTracking() on player.CurrentTeamId equals currentTeam.TeamId into currentTeamGroup
+                from currentTeam in currentTeamGroup.DefaultIfEmpty()
+                select new
+                {
+                    player.PlayerGuid,
+                    player.Name,
+                    PositionName = position.Name,
+                    PositionOrder = player.PositionId == 0 ? 999 : player.PositionId,
+                    rsp.TeamName,
+                    StoredTeamLookupName = storedTeam != null ? storedTeam.TeamName : null,
+                    CurrentTeamName = currentTeam != null ? currentTeam.TeamName : null
+                })
+            .OrderBy(p => p.PositionOrder)
+            .ThenBy(p => p.Name)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var playerDtos = players
+            .Select(p => new RoundSelectionPlayerDto(
+                p.PlayerGuid,
+                p.Name,
+                p.PositionName,
+                p.PositionOrder,
+                !string.IsNullOrWhiteSpace(p.TeamName)
+                    ? p.TeamName
+                    : (!string.IsNullOrWhiteSpace(p.StoredTeamLookupName)
+                        ? p.StoredTeamLookupName
+                        : p.CurrentTeamName)))
+            .ToList();
+
+        return new RoundSelectionDto(selectionInfo.RoundId, playerDtos);
     }
 }
