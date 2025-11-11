@@ -11,4 +11,5 @@ public sealed class Round
     public string? Notes { get; set; }
 
     public Competition Competition { get; set; } = default!;
+    public RoundSelection? Selection { get; set; }
 }

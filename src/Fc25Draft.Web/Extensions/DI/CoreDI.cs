@@ -45,6 +45,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ISeasonQueryService, SeasonService>();
             services.AddScoped<ISeasonAdminService, SeasonService>();
             services.AddScoped<IRoundSeedService, RoundSeedService>();
+            services.AddScoped<IRoundSelectionService, RoundSelectionService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();

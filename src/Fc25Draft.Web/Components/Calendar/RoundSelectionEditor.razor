@@ -1,0 +1,428 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.DTOs.Seasons
+@inject SeasonApiClient SeasonApiClient
+@inject TeamsApiClient TeamsApiClient
+@inject Blazored.Toast.Services.IToastService Toasts
+
+<div class="mt-4">
+    <h6 class="fw-semibold mb-3">Seleção da Rodada</h6>
+
+    @if (!RoundId.HasValue)
+    {
+        <div class="alert alert-info" role="status">Selecione uma rodada para editar a seleção.</div>
+    }
+    else if (_isTeamsLoading)
+    {
+        <div class="alert alert-info" role="status">Carregando times e jogadores...</div>
+    }
+    else if (_teams.Count == 0)
+    {
+        <div class="alert alert-warning" role="status">Nenhum time cadastrado.</div>
+    }
+    else
+    {
+        <div class="row g-3 align-items-start">
+            <div class="col-12 col-lg-7">
+                <div class="mb-3">
+                    <label for="round-selection-team" class="form-label">Time</label>
+                    <select id="round-selection-team" class="form-select" @bind="_selectedTeamId">
+                        @foreach (var team in _teams)
+                        {
+                            <option value="@team.TeamId">@team.TeamName</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="round-selection-search" class="form-label">Buscar jogador</label>
+                    <input id="round-selection-search" class="form-control" @bind="_playerSearch" placeholder="Nome do jogador" />
+                </div>
+
+                @if (_isSelectionLoading)
+                {
+                    <div class="alert alert-info" role="status">Carregando seleção...</div>
+                }
+                else
+                {
+                    var availablePlayers = GetFilteredPlayers().ToList();
+                    if (availablePlayers.Count == 0)
+                    {
+                        <div class="alert alert-warning" role="status">Nenhum jogador encontrado para o filtro atual.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group mb-3">
+                            @foreach (var player in availablePlayers)
+                            {
+                                var isChecked = _pendingPlayerIds.Contains(player.PlayerGuid);
+                                var alreadySelected = _selectedPlayers.Any(p => p.PlayerGuid == player.PlayerGuid);
+                                <label class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <input type="checkbox" class="form-check-input me-2" checked="@isChecked" disabled="@alreadySelected" @onchange="(e) => TogglePendingPlayer(player.PlayerGuid, e)" />
+                                        <span>@player.Name</span>
+                                        <span class="text-muted small d-block">@player.PositionName — @player.TeamName</span>
+                                    </div>
+                                    @if (alreadySelected)
+                                    {
+                                        <span class="badge bg-success">Selecionado</span>
+                                    }
+                                </label>
+                            }
+                        </div>
+                    }
+                }
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="button" @onclick="AddSelectedPlayersAsync" disabled="@(!_canAddPlayers || _isSaving)">
+                        @if (_isSaving && _pendingAction == PendingAction.Add)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        <span>Adicionar selecionados</span>
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshSelectionAsync" disabled="@(!_canRefresh || _isSaving)">
+                        @if (_isSaving && _pendingAction == PendingAction.Refresh)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        <span>Salvar seleção</span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="border rounded p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold">Jogadores selecionados (@_selectedPlayers.Count/11)</span>
+                    </div>
+                    @if (_isSelectionLoading)
+                    {
+                        <div class="text-muted">Carregando seleção...</div>
+                    }
+                    else if (_selectedPlayers.Count == 0)
+                    {
+                        <div class="text-muted">Nenhum jogador selecionado ainda.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var player in _selectedPlayers.OrderBy(p => p.PositionOrder).ThenBy(p => p.Name))
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <div class="fw-semibold">@FormatSelectionDisplay(player)</div>
+                                        <div class="text-muted small">@player.PositionName</div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => RemovePlayerAsync(player.PlayerGuid)" disabled="@_isSaving">
+                                        @if (_isSaving && _pendingAction == PendingAction.Remove && _pendingTarget == player.PlayerGuid)
+                                        {
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        }
+                                        else
+                                        {
+                                            <span>Remover</span>
+                                        }
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? RoundId { get; set; }
+
+    private readonly List<TeamRosterDto> _teams = new();
+    private readonly List<RosterPlayer> _rosterPlayers = new();
+    private readonly List<SelectionPlayer> _selectedPlayers = new();
+    private readonly HashSet<Guid> _pendingPlayerIds = new();
+
+    private Guid? _currentRoundId;
+    private Guid? _selectedTeamId;
+    private string? _playerSearch;
+    private bool _isTeamsLoading = true;
+    private bool _isSelectionLoading;
+    private bool _isSaving;
+    private PendingAction _pendingAction = PendingAction.None;
+    private Guid? _pendingTarget;
+
+    private bool _canAddPlayers => RoundId.HasValue && _pendingPlayerIds.Count > 0;
+    private bool _canRefresh => RoundId.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamsAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RoundId == _currentRoundId)
+        {
+            return;
+        }
+
+        _currentRoundId = RoundId;
+        _pendingPlayerIds.Clear();
+
+        if (RoundId.HasValue)
+        {
+            await LoadSelectionAsync(RoundId.Value);
+        }
+        else
+        {
+            _selectedPlayers.Clear();
+        }
+    }
+
+    private async Task LoadTeamsAsync()
+    {
+        _isTeamsLoading = true;
+        try
+        {
+            var rosters = await TeamsApiClient.GetRostersAsync(default).ConfigureAwait(false);
+            _teams.Clear();
+            _rosterPlayers.Clear();
+
+            foreach (var team in rosters.OrderBy(t => t.TeamName, StringComparer.OrdinalIgnoreCase))
+            {
+                _teams.Add(team);
+                foreach (var player in team.Jogadores.OrderBy(p => p.Nome, StringComparer.OrdinalIgnoreCase))
+                {
+                    _rosterPlayers.Add(new RosterPlayer(
+                        player.PlayerGuid,
+                        player.PlayerId,
+                        player.Nome,
+                        player.Posicao,
+                        ResolvePositionOrder(player.Posicao),
+                        team.TeamId,
+                        team.TeamName));
+                }
+            }
+
+            _selectedTeamId ??= _teams.FirstOrDefault()?.TeamId;
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _teams.Clear();
+            _rosterPlayers.Clear();
+        }
+        finally
+        {
+            _isTeamsLoading = false;
+        }
+    }
+
+    private async Task LoadSelectionAsync(Guid roundId)
+    {
+        _isSelectionLoading = true;
+        try
+        {
+            var selection = await SeasonApiClient.GetRoundSelectionAsync(roundId, default).ConfigureAwait(false);
+            _selectedPlayers.Clear();
+
+            if (selection?.Players is { } players)
+            {
+                foreach (var player in players.OrderBy(p => p.PositionOrder).ThenBy(p => p.PlayerName, StringComparer.OrdinalIgnoreCase))
+                {
+                    _selectedPlayers.Add(new SelectionPlayer(
+                        player.PlayerGuid,
+                        player.PlayerName,
+                        player.PositionName,
+                        player.PositionOrder));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _selectedPlayers.Clear();
+        }
+        finally
+        {
+            _isSelectionLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private IEnumerable<RosterPlayer> GetFilteredPlayers()
+    {
+        IEnumerable<RosterPlayer> query = _rosterPlayers;
+
+        if (_selectedTeamId.HasValue)
+        {
+            query = query.Where(p => p.TeamId == _selectedTeamId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_playerSearch))
+        {
+            query = query.Where(p => p.Name.Contains(_playerSearch, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return query.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task AddSelectedPlayersAsync()
+    {
+        if (!RoundId.HasValue || _pendingPlayerIds.Count == 0 || _isSaving)
+        {
+            return;
+        }
+
+        var uniqueSelection = _pendingPlayerIds
+            .Where(id => _selectedPlayers.All(p => p.PlayerGuid != id))
+            .ToList();
+
+        if (_selectedPlayers.Count + uniqueSelection.Count > 11)
+        {
+            Toasts.ShowWarning("Você atingiu o limite de 11 jogadores.");
+            return;
+        }
+
+        if (uniqueSelection.Count == 0)
+        {
+            Toasts.ShowWarning("Todos os jogadores selecionados já fazem parte da seleção.");
+            return;
+        }
+
+        _isSaving = true;
+        _pendingAction = PendingAction.Add;
+        _pendingTarget = null;
+        try
+        {
+            var result = await SeasonApiClient.AddRoundSelectionPlayersAsync(RoundId.Value, uniqueSelection, default).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                Toasts.ShowWarning(result.Message);
+            }
+            else
+            {
+                Toasts.ShowSuccess(result.Message);
+                _pendingPlayerIds.Clear();
+                await LoadSelectionAsync(RoundId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+            _pendingAction = PendingAction.None;
+        }
+    }
+
+    private async Task RemovePlayerAsync(Guid playerGuid)
+    {
+        if (!RoundId.HasValue || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _pendingAction = PendingAction.Remove;
+        _pendingTarget = playerGuid;
+        try
+        {
+            var result = await SeasonApiClient.RemoveRoundSelectionPlayerAsync(RoundId.Value, playerGuid, default).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                Toasts.ShowWarning(result.Message);
+            }
+            else
+            {
+                Toasts.ShowSuccess(result.Message);
+                await LoadSelectionAsync(RoundId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+            _pendingAction = PendingAction.None;
+            _pendingTarget = null;
+        }
+    }
+
+    private async Task RefreshSelectionAsync()
+    {
+        if (!RoundId.HasValue || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _pendingAction = PendingAction.Refresh;
+        try
+        {
+            await LoadSelectionAsync(RoundId.Value);
+            Toasts.ShowSuccess("Seleção atualizada com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+            _pendingAction = PendingAction.None;
+        }
+    }
+
+    private void TogglePendingPlayer(Guid playerGuid, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+        if (isChecked)
+        {
+            _pendingPlayerIds.Add(playerGuid);
+        }
+        else
+        {
+            _pendingPlayerIds.Remove(playerGuid);
+        }
+    }
+
+    private static string FormatSelectionDisplay(SelectionPlayer player)
+    {
+        return player.PositionOrder == 999
+            ? player.Name
+            : $"{player.PositionOrder} — {player.Name}";
+    }
+
+    private static int ResolvePositionOrder(string? position)
+    {
+        return position?.Trim().ToLowerInvariant() switch
+        {
+            "goleiro" => 1,
+            "zagueiro" => 2,
+            "lateral/ala esquerdo" => 3,
+            "lateral/ala direito" => 4,
+            "volante" => 5,
+            "meia central" => 6,
+            "meia atacante" => 7,
+            "meia/ponta esquerda" => 8,
+            "meia/ponta direita" => 9,
+            "atacante" => 10,
+            _ => 999
+        };
+    }
+
+    private sealed record RosterPlayer(Guid PlayerGuid, int PlayerId, string Name, string PositionName, int PositionOrder, Guid TeamId, string TeamName);
+
+    private sealed record SelectionPlayer(Guid PlayerGuid, string Name, string PositionName, int PositionOrder);
+
+    private enum PendingAction
+    {
+        None,
+        Add,
+        Remove,
+        Refresh
+    }
+}

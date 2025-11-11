@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.DTOs.Seasons;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Extensions;
@@ -37,6 +38,11 @@ public static class SeasonEndpoints
         roundsAdmin.MapPut("/{roundId:guid}", UpdateRoundAsync);
         roundsAdmin.MapDelete("/{roundId:guid}", DeleteRoundAsync);
         roundsAdmin.MapPost("/{roundId:guid}/complete", CompleteRoundAsync);
+
+        api.MapGet("/rounds/{roundId:guid}/selection", GetRoundSelectionAsync);
+        var roundSelectionAdmin = api.MapGroup("/rounds/{roundId:guid}/selection").RequireAuthorization("AdminOnly");
+        roundSelectionAdmin.MapPost("/players", AddRoundSelectionPlayersAsync);
+        roundSelectionAdmin.MapDelete("/players/{playerId:guid}", RemoveRoundSelectionPlayerAsync);
 
         return api;
     }
@@ -118,6 +124,87 @@ public static class SeasonEndpoints
         catch (Exception)
         {
             return Results.Problem("Falha ao carregar o calendário da temporada.");
+        }
+    }
+
+    private static async Task<IResult> GetRoundSelectionAsync(Guid roundId, IRoundSelectionService service, CancellationToken ct)
+    {
+        try
+        {
+            var selection = await service.GetByRoundAsync(roundId, ct).ConfigureAwait(false);
+            return selection is null
+                ? Results.NotFound(new { message = "Seleção da rodada ainda não definida." })
+                : Results.Ok(selection);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao carregar a seleção da rodada.");
+        }
+    }
+
+    private static async Task<IResult> AddRoundSelectionPlayersAsync(
+        Guid roundId,
+        [FromBody] RoundSelectionPlayersRequest request,
+        IRoundSelectionService service,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return EndpointHelpers.CreateValidationProblem("Payload inválido.");
+        }
+
+        var playerIds = request.PlayerIds?.Where(id => id != Guid.Empty).ToList() ?? new List<Guid>();
+        if (playerIds.Count == 0)
+        {
+            return EndpointHelpers.CreateValidationProblem("Informe ao menos um jogador.");
+        }
+
+        try
+        {
+            var result = await service.AddPlayersAsync(roundId, playerIds, ct).ConfigureAwait(false);
+            return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return EndpointHelpers.CreateNotFoundProblem(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao atualizar a seleção da rodada.");
+        }
+    }
+
+    private static async Task<IResult> RemoveRoundSelectionPlayerAsync(
+        Guid roundId,
+        Guid playerId,
+        IRoundSelectionService service,
+        CancellationToken ct)
+    {
+        if (playerId == Guid.Empty)
+        {
+            return EndpointHelpers.CreateValidationProblem("Jogador inválido.");
+        }
+
+        try
+        {
+            var result = await service.RemovePlayerAsync(roundId, playerId, ct).ConfigureAwait(false);
+            return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao atualizar a seleção da rodada.");
         }
     }
 

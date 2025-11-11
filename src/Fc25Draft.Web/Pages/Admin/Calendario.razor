@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
 @using Fc25Draft.Core.DTOs.Seasons
+@using Fc25Draft.Web.Components.Calendar
 @using Fc25Draft.Web.Models.Calendar
 @using Fc25Draft.Web.Utilities
 @inject AdminAuthService AdminAuth
@@ -214,6 +215,10 @@ else
                                 </table>
                             </div>
                         }
+
+                        <hr class="my-4" />
+
+                        <RoundSelectionEditor RoundId="@_selectedRoundId" />
                     }
                 </div>
             </div>
@@ -404,6 +409,7 @@ else
     private IReadOnlyList<RoundDto>? _rounds;
     private readonly RoundFormModel _roundForm = new();
     private Guid? _editingRoundId;
+    private Guid? _selectedRoundId;
     private bool _isSavingRound;
     private bool _isRoundsLoading;
 
@@ -469,6 +475,7 @@ else
         _selectedCompetitionId = null;
         _rounds = null;
         _scheduleItems = null;
+        _selectedRoundId = null;
         await LoadCompetitionsAsync(seasonId);
         await LoadScheduleAsync(seasonId);
     }
@@ -606,6 +613,7 @@ else
         }
 
         _selectedCompetitionId = competitionId;
+        _selectedRoundId = null;
         await LoadRoundsAsync(competitionId);
     }
 
@@ -693,11 +701,16 @@ else
         try
         {
             _rounds = await SeasonApiClient.GetRoundsAsync(competitionId);
+            if (_rounds is null || !_rounds.Any(r => r.RoundId == _selectedRoundId))
+            {
+                _selectedRoundId = null;
+            }
         }
         catch (Exception ex)
         {
             Toasts.ShowError(ex.Message);
             _rounds = Array.Empty<RoundDto>();
+            _selectedRoundId = null;
         }
         finally
         {
@@ -713,12 +726,14 @@ else
         _roundForm.IsCompleted = round.IsCompleted;
         _roundForm.PlayedAtLocal = round.PlayedAtUtc.HasValue ? BrazilTime.ConvertFromUtc(round.PlayedAtUtc.Value) : null;
         _roundForm.Notes = round.Notes;
+        _selectedRoundId = round.RoundId;
     }
 
     private void CancelRoundEdit()
     {
         _editingRoundId = null;
         _roundForm.Reset();
+        _selectedRoundId = null;
     }
 
     private async Task SaveRoundAsync()
@@ -803,6 +818,10 @@ else
             if (_selectedSeasonId.HasValue)
             {
                 await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+            if (_selectedRoundId == roundId)
+            {
+                _selectedRoundId = null;
             }
         }
         catch (Exception ex)

@@ -50,18 +50,55 @@ else
         <ol class="list-group list-group-numbered">
             @foreach (var item in _schedule.OrderBy(s => s.Order))
             {
-                <li class="list-group-item d-flex justify-content-between align-items-start">
-                    <div>
-                        <div class="fw-semibold">@item.CompetitionName — @item.RoundName</div>
-                        @if (!string.IsNullOrWhiteSpace(item.Notes))
-                        {
-                            <div class="text-muted small">@item.Notes</div>
-                        }
+                var isExpanded = _expandedRoundId == item.RoundId;
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start" style="cursor: pointer;" @onclick="async () => await ToggleRoundSelectionAsync(item.RoundId)">
+                        <div>
+                            <div class="fw-semibold">@item.CompetitionName — @item.RoundName</div>
+                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                            {
+                                <div class="text-muted small">@item.Notes</div>
+                            }
+                        </div>
+                        <div class="text-end">
+                            <div>@StatusLabel(item)</div>
+                            <div class="text-muted">@FormatDate(item.PlayedAtUtc)</div>
+                            <div class="text-primary small">@(isExpanded ? "Ocultar seleção" : "Ver seleção")</div>
+                        </div>
                     </div>
-                    <div class="text-end">
-                        <div>@StatusLabel(item)</div>
-                        <div class="text-muted">@FormatDate(item.PlayedAtUtc)</div>
-                    </div>
+                    @if (isExpanded)
+                    {
+                        <div class="mt-3 border-top pt-3">
+                            <h6 class="fw-semibold">Seleção da Rodada</h6>
+                            @if (_selectionLoadingRoundId == item.RoundId)
+                            {
+                                <div class="text-muted">Carregando seleção...</div>
+                            }
+                            else if (_selectionCache.TryGetValue(item.RoundId, out var players))
+                            {
+                                if (players is null || players.Count == 0)
+                                {
+                                    <div class="text-muted">Seleção da rodada ainda não definida.</div>
+                                }
+                                else
+                                {
+                                    <ul class="list-group list-group-flush small">
+                                        @foreach (var player in players)
+                                        {
+                                            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                                <span>@FormatSelectionOrder(player.PositionOrder) — @player.PositionName</span>
+                                                <span class="fw-semibold">@player.PlayerName</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-muted">Seleção da rodada ainda não definida.</div>
+                            }
+                        </div>
+                    }
                 </li>
             }
         </ol>
@@ -74,6 +111,9 @@ else
     private IReadOnlyList<SeasonScheduleEntryDto>? _schedule;
     private bool _isScheduleLoading;
     private string? _error;
+    private Guid? _expandedRoundId;
+    private Guid? _selectionLoadingRoundId;
+    private readonly Dictionary<Guid, IReadOnlyList<RoundSelectionPlayerDto>?> _selectionCache = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,6 +156,9 @@ else
     private async Task LoadScheduleAsync(Guid seasonId)
     {
         _isScheduleLoading = true;
+        _expandedRoundId = null;
+        _selectionLoadingRoundId = null;
+        _selectionCache.Clear();
         _schedule = null;
         StateHasChanged();
 
@@ -139,4 +182,53 @@ else
 
     private static string FormatDate(DateTime? utc)
         => utc.HasValue ? BrazilTime.FormatDateTime(utc.Value, "dd/MM/yyyy") : "Sem data";
+
+    private async Task ToggleRoundSelectionAsync(Guid roundId)
+    {
+        if (_expandedRoundId == roundId)
+        {
+            _expandedRoundId = null;
+            return;
+        }
+
+        _expandedRoundId = roundId;
+
+        if (_selectionCache.ContainsKey(roundId))
+        {
+            return;
+        }
+
+        _selectionLoadingRoundId = roundId;
+        StateHasChanged();
+
+        try
+        {
+            var selection = await SeasonApiClient.GetRoundSelectionAsync(roundId).ConfigureAwait(false);
+            if (selection is null)
+            {
+                _selectionCache[roundId] = null;
+                return;
+            }
+
+            var players = selection.Players
+                .OrderBy(p => p.PositionOrder)
+                .ThenBy(p => p.PlayerName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            _selectionCache[roundId] = players;
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _selectionCache[roundId] = Array.Empty<RoundSelectionPlayerDto>();
+        }
+        finally
+        {
+            _selectionLoadingRoundId = null;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatSelectionOrder(int order)
+        => order == 999 ? "-" : order.ToString();
 }

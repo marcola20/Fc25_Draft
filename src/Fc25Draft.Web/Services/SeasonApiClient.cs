@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.DTOs.Seasons;
 using Fc25Draft.Web.Models.Calendar;
 
@@ -182,6 +184,83 @@ public sealed class SeasonApiClient
         using var response = await client.PutAsJsonAsync($"api/seasons/{seasonId}/schedule", request, ct);
         await EnsureSuccessAsync(response);
         return await ReadAsync<IReadOnlyList<SeasonScheduleEntryDto>>(response, ct) ?? Array.Empty<SeasonScheduleEntryDto>();
+    }
+
+    public async Task<RoundSelectionDto?> GetRoundSelectionAsync(Guid roundId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var response = await client.GetAsync($"api/rounds/{roundId}/selection", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        await EnsureSuccessAsync(response);
+        return await ReadAsync<RoundSelectionDto>(response, ct);
+    }
+
+    public async Task<Result> AddRoundSelectionPlayersAsync(Guid roundId, IReadOnlyCollection<Guid> playerIds, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var payload = new RoundSelectionPlayersRequest
+        {
+            PlayerIds = playerIds?.Where(id => id != Guid.Empty).Distinct().ToList() ?? new List<Guid>()
+        };
+
+        using var response = await client.PostAsJsonAsync($"api/rounds/{roundId}/selection/players", payload, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return Result.Fail("Rodada não encontrada.");
+        }
+
+        Result? body = null;
+        try
+        {
+            body = await response.Content.ReadFromJsonAsync<Result>(cancellationToken: ct);
+        }
+        catch
+        {
+            // ignore deserialization issues; fallback to default messages
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = body?.Message ?? await ExtractErrorMessageAsync(response);
+            return Result.Fail(message);
+        }
+
+        return body ?? Result.Ok("Seleção atualizada com sucesso.");
+    }
+
+    public async Task<Result> RemoveRoundSelectionPlayerAsync(Guid roundId, Guid playerId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        using var response = await client.DeleteAsync($"api/rounds/{roundId}/selection/players/{playerId}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return Result.Fail("Rodada não encontrada.");
+        }
+
+        Result? body = null;
+        try
+        {
+            body = await response.Content.ReadFromJsonAsync<Result>(cancellationToken: ct);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = body?.Message ?? await ExtractErrorMessageAsync(response);
+            return Result.Fail(message);
+        }
+
+        return body ?? Result.Ok("Seleção atualizada com sucesso.");
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)

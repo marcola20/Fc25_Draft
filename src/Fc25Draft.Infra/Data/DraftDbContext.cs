@@ -28,6 +28,8 @@ public class DraftDbContext : DbContext
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<Round> Rounds => Set<Round>();
     public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
+    public DbSet<RoundSelection> RoundSelections => Set<RoundSelection>();
+    public DbSet<RoundSelectionPlayer> RoundSelectionPlayers => Set<RoundSelectionPlayer>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -395,6 +397,50 @@ public class DraftDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => new { x.CompetitionId, x.Name }).IsUnique();
+        });
+
+        mb.Entity<RoundSelection>(e =>
+        {
+            e.ToTable("RoundSelections");
+            e.HasKey(x => x.RoundSelectionId);
+
+            e.Property(x => x.RoundSelectionId)
+             .ValueGeneratedNever();
+
+            e.Property(x => x.CreatedAtUtc)
+             .HasColumnName("CreatedAt")
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
+            e.HasIndex(x => x.RoundId).IsUnique();
+
+            e.HasOne(x => x.Round)
+             .WithOne(x => x.Selection)
+             .HasForeignKey<RoundSelection>(x => x.RoundId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<RoundSelectionPlayer>(e =>
+        {
+            e.ToTable("RoundSelectionPlayers");
+            e.HasKey(x => new { x.RoundSelectionId, x.PlayerId });
+
+            e.Property(x => x.AddedAtUtc)
+             .HasColumnName("AddedAt")
+             .HasColumnType("timestamp with time zone")
+             .IsRequired();
+
+            e.HasIndex(x => x.PlayerId);
+
+            e.HasOne(x => x.RoundSelection)
+             .WithMany(x => x.Players)
+             .HasForeignKey(x => x.RoundSelectionId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Player)
+             .WithMany(x => x.RoundSelections)
+             .HasForeignKey(x => x.PlayerId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<SeasonScheduleItem>(e =>
