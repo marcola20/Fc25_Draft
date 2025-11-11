@@ -15,7 +15,7 @@ namespace Fc25Draft.Infra.Migrations
     [Migration("20251125093000_AddSeasonCalendar")]
     partial class AddSeasonCalendar
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

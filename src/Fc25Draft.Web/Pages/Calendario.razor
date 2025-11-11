@@ -28,7 +28,7 @@ else
     <div class="row g-3 mb-3 align-items-end">
         <div class="col-12 col-md-4 col-lg-3">
             <label for="season-select" class="form-label">Temporada</label>
-            <select id="season-select" class="form-select" @bind="_selectedSeasonId" @bind:after="OnSeasonChangedAsync">
+            <select id="season-select" class="form-select" @bind="_selectedSeasonId" @bind:after="@(async () => await OnSeasonChangedAsync(_selectedSeasonId))">
                 @foreach (var season in _seasons)
                 {
                     <option value="@season.SeasonId">@season.Name@(season.IsActive ? " (Ativa)" : string.Empty)</option>
