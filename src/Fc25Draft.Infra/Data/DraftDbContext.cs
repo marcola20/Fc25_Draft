@@ -24,6 +24,10 @@ public class DraftDbContext : DbContext
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
     public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
+    public DbSet<Season> Seasons => Set<Season>();
+    public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<Round> Rounds => Set<Round>();
+    public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -351,6 +355,63 @@ public class DraftDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ToTeamId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        mb.Entity<Season>(e =>
+        {
+            e.ToTable("Seasons");
+            e.HasKey(x => x.SeasonId);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+
+            e.HasMany(x => x.Competitions)
+                .WithOne(x => x.Season)
+                .HasForeignKey(x => x.SeasonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(x => x.Schedule)
+                .WithOne(x => x.Season)
+                .HasForeignKey(x => x.SeasonId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<Competition>(e =>
+        {
+            e.ToTable("Competitions");
+            e.HasKey(x => x.CompetitionId);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            e.HasIndex(x => new { x.SeasonId, x.Name }).IsUnique();
+        });
+
+        mb.Entity<Round>(e =>
+        {
+            e.ToTable("Rounds");
+            e.HasKey(x => x.RoundId);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(400);
+
+            e.HasOne(x => x.Competition)
+                .WithMany(x => x.Rounds)
+                .HasForeignKey(x => x.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.CompetitionId, x.Name }).IsUnique();
+        });
+
+        mb.Entity<SeasonScheduleItem>(e =>
+        {
+            e.ToTable("SeasonSchedule");
+            e.HasKey(x => x.SeasonScheduleItemId);
+
+            e.HasOne(x => x.Season)
+                .WithMany(x => x.Schedule)
+                .HasForeignKey(x => x.SeasonId);
+
+            e.HasOne(x => x.Round)
+                .WithMany()
+                .HasForeignKey(x => x.RoundId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.SeasonId, x.Order }).IsUnique();
         });
 
         //mb.ApplyConfigurationsFromAssembly(typeof(DraftDbContext).Assembly);

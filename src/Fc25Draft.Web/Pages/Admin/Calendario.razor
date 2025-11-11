@@ -1,0 +1,965 @@
+@page "/admin/calendario"
+@using System
+@using System.Collections.Generic
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+@using Fc25Draft.Core.DTOs.Seasons
+@using Fc25Draft.Web.Models.Calendar
+@using Fc25Draft.Web.Utilities
+@inject AdminAuthService AdminAuth
+@inject SeasonApiClient SeasonApiClient
+@inject Blazored.Toast.Services.IToastService Toasts
+
+<PageTitle>Administração do Calendário</PageTitle>
+
+<h1 class="h3 mb-3">Administração do Calendário</h1>
+
+@if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">Entre como administrador para gerenciar o calendário.</div>
+}
+else
+{
+    <div class="mb-4">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSeasonsAsync" disabled="@_isSeasonsLoading">
+            @if (_isSeasonsLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            <span>Recarregar dados</span>
+        </button>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">Temporadas</div>
+                <div class="card-body">
+                    <EditForm Model="_seasonForm" OnValidSubmit="SaveSeasonAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="mb-3">
+                            <label class="form-label" for="season-name">Nome</label>
+                            <InputText id="season-name" class="form-control" @bind-Value="_seasonForm.Name" />
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox id="season-active" class="form-check-input" @bind-Value="_seasonForm.IsActive" />
+                            <label class="form-check-label" for="season-active">Temporada ativa</label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" type="submit" disabled="@_isSavingSeason">
+                                @if (_isSavingSeason)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                }
+                                <span>@(_editingSeasonId.HasValue ? "Atualizar" : "Criar") temporada</span>
+                            </button>
+                            @if (_editingSeasonId.HasValue)
+                            {
+                                <button type="button" class="btn btn-outline-secondary" @onclick="CancelSeasonEdit">Cancelar edição</button>
+                            }
+                        </div>
+                    </EditForm>
+
+                    <hr />
+
+                    @if (_isSeasonsLoading && _seasons is null)
+                    {
+                        <div class="alert alert-info" role="status">Carregando temporadas...</div>
+                    }
+                    else if (_seasons is null || _seasons.Count == 0)
+                    {
+                        <div class="alert alert-warning" role="status">Nenhuma temporada cadastrada.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var season in _seasons)
+                                    {
+                                        var isSelected = _selectedSeasonId == season.SeasonId;
+                                        <tr class="@(isSelected ? "table-primary" : string.Empty)">
+                                            <td>@season.Name</td>
+                                            <td>
+                                                @if (season.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Ativa</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Inativa</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button class="btn btn-outline-primary" type="button" @onclick="async () => await SelectSeasonAsync(season.SeasonId)">Selecionar</button>
+                                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => BeginSeasonEdit(season)">Editar</button>
+                                                    <button class="btn btn-outline-danger" type="button" @onclick="async () => await DeleteSeasonAsync(season.SeasonId)" disabled="@_isSavingSeason">Excluir</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Competições da Temporada</span>
+                    <span class="text-muted small">@SelectedSeasonName</span>
+                </div>
+                <div class="card-body">
+                    @if (!_selectedSeasonId.HasValue)
+                    {
+                        <div class="alert alert-info" role="status">Selecione uma temporada para visualizar as competições.</div>
+                    }
+                    else
+                    {
+                        <EditForm Model="_competitionForm" OnValidSubmit="SaveCompetitionAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label" for="competition-name">Nome</label>
+                                    <InputText id="competition-name" class="form-control" @bind-Value="_competitionForm.Name" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="competition-order">Ordem</label>
+                                    <InputNumber id="competition-order" class="form-control" @bind-Value="_competitionForm.Order" />
+                                </div>
+                                <div class="col-12 col-md-6 d-flex align-items-center">
+                                    <div class="form-check form-switch">
+                                        <InputCheckbox id="competition-active" class="form-check-input" @bind-Value="_competitionForm.IsActive" />
+                                        <label class="form-check-label" for="competition-active">Competição ativa</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-primary" type="submit" disabled="@_isSavingCompetition">
+                                    @if (_isSavingCompetition)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    }
+                                    <span>@(_editingCompetitionId.HasValue ? "Atualizar" : "Criar") competição</span>
+                                </button>
+                                @if (_editingCompetitionId.HasValue)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelCompetitionEdit">Cancelar edição</button>
+                                }
+                            </div>
+                        </EditForm>
+
+                        <hr />
+
+                        @if (_isCompetitionsLoading && _competitions is null)
+                        {
+                            <div class="alert alert-info" role="status">Carregando competições...</div>
+                        }
+                        else if (_competitions is null || _competitions.Count == 0)
+                        {
+                            <div class="alert alert-warning" role="status">Nenhuma competição cadastrada para a temporada selecionada.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Ordem</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var competition in _competitions.OrderBy(c => c.Order).ThenBy(c => c.Name))
+                                        {
+                                            var isSelected = _selectedCompetitionId == competition.CompetitionId;
+                                            <tr class="@(isSelected ? "table-primary" : string.Empty)">
+                                                <td>@competition.Name</td>
+                                                <td>@competition.Order</td>
+                                                <td>
+                                                    @if (competition.IsActive)
+                                                    {
+                                                        <span class="badge bg-success">Ativa</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Inativa</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button class="btn btn-outline-primary" type="button" @onclick="async () => await SelectCompetitionAsync(competition.CompetitionId)">Rodadas</button>
+                                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => BeginCompetitionEdit(competition)">Editar</button>
+                                                        <button class="btn btn-outline-danger" type="button" @onclick="async () => await DeleteCompetitionAsync(competition.CompetitionId)" disabled="@_isSavingCompetition">Excluir</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+        <div class="col-12 col-xl-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Rodadas da Competição</span>
+                    <span class="text-muted small">@SelectedCompetitionName</span>
+                </div>
+                <div class="card-body">
+                    @if (!_selectedCompetitionId.HasValue)
+                    {
+                        <div class="alert alert-info" role="status">Selecione uma competição para gerenciar suas rodadas.</div>
+                    }
+                    else
+                    {
+                        <EditForm Model="_roundForm" OnValidSubmit="SaveRoundAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="mb-3">
+                                <label class="form-label" for="round-name">Nome da rodada</label>
+                                <InputText id="round-name" class="form-control" @bind-Value="_roundForm.Name" />
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <InputCheckbox id="round-completed" class="form-check-input" @bind-Value="_roundForm.IsCompleted" />
+                                <label class="form-check-label" for="round-completed">Rodada concluída</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="round-played">Data (horário local)</label>
+                                <InputDate id="round-played" class="form-control" @bind-Value="_roundForm.PlayedAtLocal" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="round-notes">Observações</label>
+                                <InputTextArea id="round-notes" class="form-control" rows="2" @bind-Value="_roundForm.Notes" />
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" type="submit" disabled="@_isSavingRound">
+                                    @if (_isSavingRound)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    }
+                                    <span>@(_editingRoundId.HasValue ? "Atualizar" : "Criar") rodada</span>
+                                </button>
+                                @if (_editingRoundId.HasValue)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelRoundEdit">Cancelar edição</button>
+                                }
+                            </div>
+                        </EditForm>
+
+                        <hr />
+
+                        @if (_isRoundsLoading && _rounds is null)
+                        {
+                            <div class="alert alert-info" role="status">Carregando rodadas...</div>
+                        }
+                        else if (_rounds is null || _rounds.Count == 0)
+                        {
+                            <div class="alert alert-warning" role="status">Nenhuma rodada cadastrada para a competição selecionada.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Status</th>
+                                            <th>Data</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var round in _rounds.OrderBy(r => r.Name))
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold">@round.Name</div>
+                                                    @if (!string.IsNullOrWhiteSpace(round.Notes))
+                                                    {
+                                                        <div class="text-muted small">@round.Notes</div>
+                                                    }
+                                                </td>
+                                                <td>@(round.IsCompleted ? "✅ Concluída" : "⏳ Aguardando")</td>
+                                                <td>@FormatDate(round.PlayedAtUtc)</td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => BeginRoundEdit(round)">Editar</button>
+                                                        <button class="btn btn-outline-danger" type="button" @onclick="async () => await DeleteRoundAsync(round.RoundId)" disabled="@_isSavingRound">Excluir</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Calendário da Temporada</span>
+                    <span class="text-muted small">@SelectedSeasonName</span>
+                </div>
+                <div class="card-body">
+                    @if (!_selectedSeasonId.HasValue)
+                    {
+                        <div class="alert alert-info" role="status">Selecione uma temporada para ajustar o calendário.</div>
+                    }
+                    else if (_isScheduleLoading && _scheduleItems is null)
+                    {
+                        <div class="alert alert-info" role="status">Carregando calendário...</div>
+                    }
+                    else if (_scheduleItems is null || _scheduleItems.Count == 0)
+                    {
+                        <div class="alert alert-warning" role="status">Nenhuma rodada vinculada ao calendário desta temporada.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Ordem</th>
+                                        <th>Competição</th>
+                                        <th>Rodada</th>
+                                        <th>Status</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in _scheduleItems.OrderBy(i => i.EditableOrder))
+                                    {
+                                        <tr>
+                                            <td class="col-2">
+                                                <input type="number" class="form-control form-control-sm" @bind="item.EditableOrder" min="1" />
+                                            </td>
+                                            <td>@item.CompetitionName</td>
+                                            <td>@item.RoundName</td>
+                                            <td>@(item.IsCompleted ? "✅" : "⏳")</td>
+                                            <td>@FormatDate(item.PlayedAtUtc)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveScheduleAsync" disabled="@_isSavingSchedule">
+                                @if (_isSavingSchedule)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                }
+                                <span>Salvar ordem</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="async () => await LoadScheduleAsync(_selectedSeasonId!.Value)" disabled="@_isSavingSchedule">Recarregar</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<SeasonDto>? _seasons;
+    private Guid? _selectedSeasonId;
+    private readonly SeasonFormModel _seasonForm = new();
+    private Guid? _editingSeasonId;
+    private bool _isSavingSeason;
+    private bool _isSeasonsLoading;
+
+    private IReadOnlyList<CompetitionDto>? _competitions;
+    private Guid? _selectedCompetitionId;
+    private readonly CompetitionFormModel _competitionForm = new();
+    private Guid? _editingCompetitionId;
+    private bool _isSavingCompetition;
+    private bool _isCompetitionsLoading;
+
+    private IReadOnlyList<RoundDto>? _rounds;
+    private readonly RoundFormModel _roundForm = new();
+    private Guid? _editingRoundId;
+    private bool _isSavingRound;
+    private bool _isRoundsLoading;
+
+    private List<ScheduleEditorItem>? _scheduleItems;
+    private bool _isScheduleLoading;
+    private bool _isSavingSchedule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            if (AdminAuth.IsAuthenticated)
+            {
+                await LoadSeasonsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task LoadSeasonsAsync()
+    {
+        _isSeasonsLoading = true;
+        try
+        {
+            _seasons = await SeasonApiClient.GetSeasonsAsync();
+            if (!_selectedSeasonId.HasValue || _seasons.All(s => s.SeasonId != _selectedSeasonId))
+            {
+                _selectedSeasonId = _seasons.FirstOrDefault(s => s.IsActive)?.SeasonId ?? _seasons.FirstOrDefault()?.SeasonId;
+            }
+
+            if (_selectedSeasonId.HasValue)
+            {
+                await LoadCompetitionsAsync(_selectedSeasonId.Value);
+                await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSeasonsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string SelectedSeasonName => _seasons?.FirstOrDefault(s => s.SeasonId == _selectedSeasonId)?.Name ?? "Nenhuma";
+    private string SelectedCompetitionName => _competitions?.FirstOrDefault(c => c.CompetitionId == _selectedCompetitionId)?.Name ?? "Nenhuma";
+
+    private async Task SelectSeasonAsync(Guid seasonId)
+    {
+        if (_selectedSeasonId == seasonId)
+        {
+            return;
+        }
+
+        _selectedSeasonId = seasonId;
+        _selectedCompetitionId = null;
+        _rounds = null;
+        _scheduleItems = null;
+        await LoadCompetitionsAsync(seasonId);
+        await LoadScheduleAsync(seasonId);
+    }
+
+    private void BeginSeasonEdit(SeasonDto season)
+    {
+        _editingSeasonId = season.SeasonId;
+        _seasonForm.Name = season.Name;
+        _seasonForm.IsActive = season.IsActive;
+    }
+
+    private void CancelSeasonEdit()
+    {
+        _editingSeasonId = null;
+        _seasonForm.Reset();
+    }
+
+    private async Task SaveSeasonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_seasonForm.Name))
+        {
+            Toasts.ShowWarning("Informe um nome para a temporada.");
+            return;
+        }
+
+        _isSavingSeason = true;
+        try
+        {
+            var request = new SeasonUpsertRequest
+            {
+                Name = _seasonForm.Name.Trim(),
+                IsActive = _seasonForm.IsActive
+            };
+
+            if (_editingSeasonId.HasValue)
+            {
+                var updated = await SeasonApiClient.UpdateSeasonAsync(_editingSeasonId.Value, request);
+                if (updated is null)
+                {
+                    Toasts.ShowWarning("Temporada não encontrada.");
+                }
+                else
+                {
+                    Toasts.ShowSuccess("Temporada atualizada com sucesso.");
+                }
+            }
+            else
+            {
+                await SeasonApiClient.CreateSeasonAsync(request);
+                Toasts.ShowSuccess("Temporada criada com sucesso.");
+            }
+
+            _editingSeasonId = null;
+            _seasonForm.Reset();
+            await LoadSeasonsAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSavingSeason = false;
+        }
+    }
+
+    private async Task DeleteSeasonAsync(Guid seasonId)
+    {
+        try
+        {
+            await SeasonApiClient.DeleteSeasonAsync(seasonId);
+            Toasts.ShowSuccess("Temporada removida.");
+            if (_selectedSeasonId == seasonId)
+            {
+                _selectedSeasonId = null;
+            }
+            await LoadSeasonsAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task LoadCompetitionsAsync(Guid seasonId)
+    {
+        _isCompetitionsLoading = true;
+        try
+        {
+            _competitions = await SeasonApiClient.GetCompetitionsAsync(seasonId);
+            if (!_selectedCompetitionId.HasValue || _competitions.All(c => c.CompetitionId != _selectedCompetitionId))
+            {
+                _selectedCompetitionId = _competitions.FirstOrDefault()?.CompetitionId;
+            }
+
+            if (_selectedCompetitionId.HasValue)
+            {
+                await LoadRoundsAsync(_selectedCompetitionId.Value);
+            }
+            else
+            {
+                _rounds = Array.Empty<RoundDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isCompetitionsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BeginCompetitionEdit(CompetitionDto competition)
+    {
+        _editingCompetitionId = competition.CompetitionId;
+        _competitionForm.Name = competition.Name;
+        _competitionForm.Order = competition.Order;
+        _competitionForm.IsActive = competition.IsActive;
+    }
+
+    private void CancelCompetitionEdit()
+    {
+        _editingCompetitionId = null;
+        _competitionForm.Reset();
+    }
+
+    private async Task SelectCompetitionAsync(Guid competitionId)
+    {
+        if (_selectedCompetitionId == competitionId)
+        {
+            return;
+        }
+
+        _selectedCompetitionId = competitionId;
+        await LoadRoundsAsync(competitionId);
+    }
+
+    private async Task SaveCompetitionAsync()
+    {
+        if (!_selectedSeasonId.HasValue)
+        {
+            Toasts.ShowWarning("Selecione uma temporada antes de cadastrar competições.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_competitionForm.Name))
+        {
+            Toasts.ShowWarning("Informe o nome da competição.");
+            return;
+        }
+
+        _isSavingCompetition = true;
+        try
+        {
+            var request = new CompetitionUpsertRequest
+            {
+                Name = _competitionForm.Name.Trim(),
+                Order = _competitionForm.Order,
+                IsActive = _competitionForm.IsActive
+            };
+
+            if (_editingCompetitionId.HasValue)
+            {
+                var updated = await SeasonApiClient.UpdateCompetitionAsync(_editingCompetitionId.Value, request);
+                if (updated is null)
+                {
+                    Toasts.ShowWarning("Competição não encontrada.");
+                }
+                else
+                {
+                    Toasts.ShowSuccess("Competição atualizada com sucesso.");
+                }
+            }
+            else
+            {
+                await SeasonApiClient.CreateCompetitionAsync(_selectedSeasonId.Value, request);
+                Toasts.ShowSuccess("Competição criada com sucesso.");
+            }
+
+            _editingCompetitionId = null;
+            _competitionForm.Reset();
+            await LoadCompetitionsAsync(_selectedSeasonId.Value);
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSavingCompetition = false;
+        }
+    }
+
+    private async Task DeleteCompetitionAsync(Guid competitionId)
+    {
+        try
+        {
+            await SeasonApiClient.DeleteCompetitionAsync(competitionId);
+            Toasts.ShowSuccess("Competição removida.");
+            if (_selectedCompetitionId == competitionId)
+            {
+                _selectedCompetitionId = null;
+            }
+            if (_selectedSeasonId.HasValue)
+            {
+                await LoadCompetitionsAsync(_selectedSeasonId.Value);
+                await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task LoadRoundsAsync(Guid competitionId)
+    {
+        _isRoundsLoading = true;
+        try
+        {
+            _rounds = await SeasonApiClient.GetRoundsAsync(competitionId);
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _rounds = Array.Empty<RoundDto>();
+        }
+        finally
+        {
+            _isRoundsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BeginRoundEdit(RoundDto round)
+    {
+        _editingRoundId = round.RoundId;
+        _roundForm.Name = round.Name;
+        _roundForm.IsCompleted = round.IsCompleted;
+        _roundForm.PlayedAtLocal = round.PlayedAtUtc.HasValue ? BrazilTime.ConvertFromUtc(round.PlayedAtUtc.Value) : null;
+        _roundForm.Notes = round.Notes;
+    }
+
+    private void CancelRoundEdit()
+    {
+        _editingRoundId = null;
+        _roundForm.Reset();
+    }
+
+    private async Task SaveRoundAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            Toasts.ShowWarning("Selecione uma competição antes de cadastrar rodadas.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_roundForm.Name))
+        {
+            Toasts.ShowWarning("Informe o nome da rodada.");
+            return;
+        }
+
+        _isSavingRound = true;
+        try
+        {
+            var request = new RoundUpsertRequest
+            {
+                Name = _roundForm.Name.Trim(),
+                IsCompleted = _roundForm.IsCompleted,
+                Notes = string.IsNullOrWhiteSpace(_roundForm.Notes) ? null : _roundForm.Notes.Trim()
+            };
+
+            if (_roundForm.IsCompleted && _roundForm.PlayedAtLocal.HasValue)
+            {
+                request.PlayedAtUtc = BrazilTime.ConvertToUtc(_roundForm.PlayedAtLocal.Value);
+            }
+            else
+            {
+                request.PlayedAtUtc = null;
+            }
+
+            if (_editingRoundId.HasValue)
+            {
+                var updated = await SeasonApiClient.UpdateRoundAsync(_editingRoundId.Value, request);
+                if (updated is null)
+                {
+                    Toasts.ShowWarning("Rodada não encontrada.");
+                }
+                else
+                {
+                    Toasts.ShowSuccess("Rodada atualizada com sucesso.");
+                }
+            }
+            else
+            {
+                await SeasonApiClient.CreateRoundAsync(_selectedCompetitionId.Value, request);
+                Toasts.ShowSuccess("Rodada criada com sucesso.");
+            }
+
+            _editingRoundId = null;
+            _roundForm.Reset();
+            await LoadRoundsAsync(_selectedCompetitionId.Value);
+            if (_selectedSeasonId.HasValue)
+            {
+                await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSavingRound = false;
+        }
+    }
+
+    private async Task DeleteRoundAsync(Guid roundId)
+    {
+        try
+        {
+            await SeasonApiClient.DeleteRoundAsync(roundId);
+            Toasts.ShowSuccess("Rodada removida.");
+            if (_selectedCompetitionId.HasValue)
+            {
+                await LoadRoundsAsync(_selectedCompetitionId.Value);
+            }
+            if (_selectedSeasonId.HasValue)
+            {
+                await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task LoadScheduleAsync(Guid seasonId)
+    {
+        _isScheduleLoading = true;
+        try
+        {
+            var schedule = await SeasonApiClient.GetScheduleAsync(seasonId);
+            _scheduleItems = schedule
+                .Select(item => new ScheduleEditorItem
+                {
+                    RoundId = item.RoundId,
+                    EditableOrder = item.Order,
+                    Order = item.Order,
+                    CompetitionName = item.CompetitionName,
+                    RoundName = item.RoundName,
+                    IsCompleted = item.IsCompleted,
+                    PlayedAtUtc = item.PlayedAtUtc
+                })
+                .OrderBy(i => i.EditableOrder)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+            _scheduleItems = new List<ScheduleEditorItem>();
+        }
+        finally
+        {
+            _isScheduleLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveScheduleAsync()
+    {
+        if (!_selectedSeasonId.HasValue || _scheduleItems is null)
+        {
+            return;
+        }
+
+        _isSavingSchedule = true;
+        try
+        {
+            var request = new SeasonScheduleUpdateRequest
+            {
+                Items = _scheduleItems
+                    .OrderBy(i => i.EditableOrder)
+                    .Select(i => new SeasonScheduleUpdateItemRequest
+                    {
+                        Order = i.EditableOrder,
+                        RoundId = i.RoundId
+                    })
+                    .ToList()
+            };
+
+            var updated = await SeasonApiClient.UpdateScheduleAsync(_selectedSeasonId.Value, request);
+            _scheduleItems = updated
+                .Select(item => new ScheduleEditorItem
+                {
+                    RoundId = item.RoundId,
+                    EditableOrder = item.Order,
+                    Order = item.Order,
+                    CompetitionName = item.CompetitionName,
+                    RoundName = item.RoundName,
+                    IsCompleted = item.IsCompleted,
+                    PlayedAtUtc = item.PlayedAtUtc
+                })
+                .OrderBy(i => i.EditableOrder)
+                .ToList();
+
+            Toasts.ShowSuccess("Calendário atualizado com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSavingSchedule = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatDate(DateTime? utc)
+        => utc.HasValue ? BrazilTime.FormatDateTime(utc.Value, "dd/MM/yyyy") : "-";
+
+    private sealed class SeasonFormModel
+    {
+        [Required]
+        [StringLength(100, MinimumLength = 3)]
+        public string? Name { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Name = null;
+            IsActive = true;
+        }
+    }
+
+    private sealed class CompetitionFormModel
+    {
+        [Required]
+        [StringLength(100, MinimumLength = 3)]
+        public string? Name { get; set; }
+
+        [Range(1, 999)]
+        public int Order { get; set; } = 1;
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Name = null;
+            Order = 1;
+            IsActive = true;
+        }
+    }
+
+    private sealed class RoundFormModel
+    {
+        [Required]
+        [StringLength(100, MinimumLength = 3)]
+        public string? Name { get; set; }
+
+        public bool IsCompleted { get; set; }
+
+        public DateTime? PlayedAtLocal { get; set; }
+
+        [StringLength(400)]
+        public string? Notes { get; set; }
+
+        public void Reset()
+        {
+            Name = null;
+            IsCompleted = false;
+            PlayedAtLocal = null;
+            Notes = null;
+        }
+    }
+
+    private sealed class ScheduleEditorItem
+    {
+        public Guid RoundId { get; set; }
+        public int Order { get; set; }
+        public int EditableOrder { get; set; }
+        public string CompetitionName { get; set; } = string.Empty;
+        public string RoundName { get; set; } = string.Empty;
+        public bool IsCompleted { get; set; }
+        public DateTime? PlayedAtUtc { get; set; }
+    }
+}

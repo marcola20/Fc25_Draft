@@ -1,3 +1,4 @@
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Options;             
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ namespace Fc25Draft.Web.Extensions
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+            var roundSeed = scope.ServiceProvider.GetRequiredService<IRoundSeedService>();
             var appOptions = scope.ServiceProvider.GetRequiredService<IOptions<AppOptions>>();
 
             await db.Database.MigrateAsync(ct);
@@ -24,6 +26,8 @@ namespace Fc25Draft.Web.Extensions
                     await SeedData.SeedTeamBudgetsAsync(db, ct);
                 }
             }
+
+            await roundSeed.EnsureDefaultSeasonAsync(ct);
         }
     }
 }

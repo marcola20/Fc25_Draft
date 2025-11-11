@@ -1,0 +1,143 @@
+@page "/calendario"
+@using System
+@using System.Collections.Generic
+@using System.Linq
+@using Fc25Draft.Core.DTOs.Seasons
+@using Fc25Draft.Web.Utilities
+@inject SeasonApiClient SeasonApiClient
+@inject Blazored.Toast.Services.IToastService Toasts
+
+<PageTitle>Calendário de Rodadas</PageTitle>
+
+<h1 class="h3 mb-3">Calendário de Rodadas</h1>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_seasons is null)
+{
+    <div class="alert alert-info" role="status">Carregando temporadas...</div>
+}
+else if (_seasons.Count == 0)
+{
+    <div class="alert alert-warning" role="status">Nenhuma temporada cadastrada até o momento.</div>
+}
+else
+{
+    <div class="row g-3 mb-3 align-items-end">
+        <div class="col-12 col-md-4 col-lg-3">
+            <label for="season-select" class="form-label">Temporada</label>
+            <select id="season-select" class="form-select" @bind="_selectedSeasonId" @bind:after="OnSeasonChangedAsync">
+                @foreach (var season in _seasons)
+                {
+                    <option value="@season.SeasonId">@season.Name@(season.IsActive ? " (Ativa)" : string.Empty)</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    if (_isScheduleLoading)
+    {
+        <div class="alert alert-info" role="status">Carregando calendário...</div>
+    }
+    else if (_schedule is null || _schedule.Count == 0)
+    {
+        <div class="alert alert-warning" role="status">Nenhuma rodada cadastrada para esta temporada.</div>
+    }
+    else
+    {
+        <ol class="list-group list-group-numbered">
+            @foreach (var item in _schedule.OrderBy(s => s.Order))
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="fw-semibold">@item.CompetitionName — @item.RoundName</div>
+                        <div class="text-muted small">@($"Ordem: {item.Order}")</div>
+                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                        {
+                            <div class="text-muted small">@item.Notes</div>
+                        }
+                    </div>
+                    <div class="text-end">
+                        <div>@StatusLabel(item)</div>
+                        <div class="text-muted">@FormatDate(item.PlayedAtUtc)</div>
+                    </div>
+                </li>
+            }
+        </ol>
+    }
+}
+
+@code {
+    private IReadOnlyList<SeasonDto>? _seasons;
+    private Guid? _selectedSeasonId;
+    private IReadOnlyList<SeasonScheduleEntryDto>? _schedule;
+    private bool _isScheduleLoading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadSeasonsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task LoadSeasonsAsync()
+    {
+        try
+        {
+            _seasons = await SeasonApiClient.GetSeasonsAsync();
+            _selectedSeasonId = _seasons.FirstOrDefault(s => s.IsActive)?.SeasonId ?? _seasons.FirstOrDefault()?.SeasonId;
+            if (_selectedSeasonId.HasValue)
+            {
+                await LoadScheduleAsync(_selectedSeasonId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task OnSeasonChangedAsync(Guid? seasonId)
+    {
+        if (seasonId.HasValue)
+        {
+            _selectedSeasonId = seasonId;
+            await LoadScheduleAsync(seasonId.Value);
+        }
+    }
+
+    private async Task LoadScheduleAsync(Guid seasonId)
+    {
+        _isScheduleLoading = true;
+        _schedule = null;
+        StateHasChanged();
+
+        try
+        {
+            _schedule = await SeasonApiClient.GetScheduleAsync(seasonId);
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isScheduleLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string StatusLabel(SeasonScheduleEntryDto entry)
+        => entry.IsCompleted ? "✅ Concluída" : "⏳ Aguardando";
+
+    private static string FormatDate(DateTime? utc)
+        => utc.HasValue ? BrazilTime.FormatDateTime(utc.Value, "dd/MM/yyyy") : "Sem data";
+}
