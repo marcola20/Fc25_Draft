@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
 @using Fc25Draft.Core.DTOs.Seasons
+@using Fc25Draft.Web.Components.Calendar
 @using Fc25Draft.Web.Models.Calendar
 @using Fc25Draft.Web.Utilities
 @inject AdminAuthService AdminAuth
@@ -267,6 +268,8 @@ else
                                 }
                             </div>
                         </EditForm>
+
+                        <RoundSelectionEditor RoundId="@_editingRoundId" />
 
                         <hr />
 

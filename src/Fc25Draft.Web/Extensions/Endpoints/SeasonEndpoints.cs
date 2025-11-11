@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using Fc25Draft.Core.DTOs.Seasons;
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Models.Calendar;
@@ -33,10 +35,15 @@ public static class SeasonEndpoints
         competitionsAdmin.MapDelete("/{competitionId:guid}", DeleteCompetitionAsync);
         competitionsAdmin.MapPost("/{competitionId:guid}/rounds", CreateRoundAsync);
 
-        var roundsAdmin = api.MapGroup("/rounds").RequireAuthorization("AdminOnly");
+        var rounds = api.MapGroup("/rounds");
+        rounds.MapGet("/{roundId:guid}/selection", GetRoundSelectionAsync);
+
+        var roundsAdmin = rounds.MapGroup(string.Empty).RequireAuthorization("AdminOnly");
         roundsAdmin.MapPut("/{roundId:guid}", UpdateRoundAsync);
         roundsAdmin.MapDelete("/{roundId:guid}", DeleteRoundAsync);
         roundsAdmin.MapPost("/{roundId:guid}/complete", CompleteRoundAsync);
+        roundsAdmin.MapPost("/{roundId:guid}/selection/players", AddPlayersToSelectionAsync);
+        roundsAdmin.MapDelete("/{roundId:guid}/selection/players/{playerId:guid}", RemovePlayerFromSelectionAsync);
 
         return api;
     }
@@ -528,6 +535,96 @@ public static class SeasonEndpoints
         catch (Exception)
         {
             return Results.Problem("Falha ao atualizar o calendário da temporada.");
+        }
+    }
+
+    private static async Task<IResult> GetRoundSelectionAsync(Guid roundId, IRoundSelectionService service, CancellationToken ct)
+    {
+        try
+        {
+            var selection = await service.GetByRoundAsync(roundId, ct).ConfigureAwait(false);
+            if (selection is null)
+            {
+                return EndpointHelpers.CreateValidationProblem("Rodada inválida.");
+            }
+
+            return Results.Ok(selection);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return EndpointHelpers.CreateNotFoundProblem(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao carregar a seleção da rodada.");
+        }
+    }
+
+    private static async Task<IResult> AddPlayersToSelectionAsync(
+        Guid roundId,
+        [FromBody] RoundSelectionPlayersRequest? request,
+        IRoundSelectionService service,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return EndpointHelpers.CreateValidationProblem("Payload inválido.");
+        }
+
+        try
+        {
+            var result = await service.AddPlayersAsync(roundId, request.PlayerIds, ct).ConfigureAwait(false);
+            return Results.Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao atualizar a seleção da rodada.");
+        }
+    }
+
+    private static async Task<IResult> RemovePlayerFromSelectionAsync(
+        Guid roundId,
+        Guid playerId,
+        IRoundSelectionService service,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await service.RemovePlayerAsync(roundId, playerId, ct).ConfigureAwait(false);
+            if (!result.Success && string.Equals(result.Message, "Rodada não encontrada.", StringComparison.OrdinalIgnoreCase))
+            {
+                return EndpointHelpers.CreateNotFoundProblem(result.Message);
+            }
+
+            return Results.Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Results.Problem("Falha ao atualizar a seleção da rodada.");
         }
     }
 

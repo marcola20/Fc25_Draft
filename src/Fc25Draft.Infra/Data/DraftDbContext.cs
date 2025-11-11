@@ -28,6 +28,8 @@ public class DraftDbContext : DbContext
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<Round> Rounds => Set<Round>();
     public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
+    public DbSet<RoundSelection> RoundSelections => Set<RoundSelection>();
+    public DbSet<RoundSelectionPlayer> RoundSelectionPlayers => Set<RoundSelectionPlayer>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -142,6 +144,44 @@ public class DraftDbContext : DbContext
             e.HasOne(x => x.Player)
              .WithMany(p => p.TeamRosters)
              .HasForeignKey(x => x.PlayerId);
+        });
+
+        mb.Entity<RoundSelection>(e =>
+        {
+            e.HasKey(x => x.RoundSelectionId);
+
+            e.Property(x => x.CreatedAt)
+             .IsRequired();
+
+            e.HasIndex(x => x.RoundId)
+             .IsUnique();
+
+            e.HasOne(x => x.Round)
+             .WithOne(r => r.Selection)
+             .HasForeignKey<RoundSelection>(x => x.RoundId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<RoundSelectionPlayer>(e =>
+        {
+            e.HasKey(x => new { x.RoundSelectionId, x.PlayerGuid });
+
+            e.Property(x => x.AddedAt)
+             .IsRequired();
+
+            e.HasIndex(x => x.RoundSelectionId);
+            e.HasIndex(x => x.PlayerGuid);
+
+            e.HasOne(x => x.RoundSelection)
+             .WithMany(s => s.Players)
+             .HasForeignKey(x => x.RoundSelectionId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Player)
+             .WithMany(p => p.RoundSelections)
+             .HasForeignKey(x => x.PlayerGuid)
+             .HasPrincipalKey(p => p.PlayerGuid)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<AdminToken>(e =>

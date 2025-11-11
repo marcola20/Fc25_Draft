@@ -45,6 +45,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ISeasonQueryService, SeasonService>();
             services.AddScoped<ISeasonAdminService, SeasonService>();
             services.AddScoped<IRoundSeedService, RoundSeedService>();
+            services.AddScoped<IRoundSelectionService, RoundSelectionService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();
@@ -60,6 +61,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketCycleClient>();
             services.AddScoped<IMarketItemGenerationClient, MarketItemGenerationClient>();
             services.AddScoped<SeasonApiClient>();
+            services.AddScoped<RoundSelectionApiClient>();
             services.AddScoped<MarketHubClient>();
             services.AddScoped<ProtectedLocalStorage>();
             services.AddScoped<ITeamTokenStore, ProtectedLocalStorageTeamTokenStore>();
