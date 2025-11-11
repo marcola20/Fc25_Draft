@@ -396,6 +396,11 @@ public class DraftDbContext : DbContext
                 .HasForeignKey(x => x.CompetitionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            e.HasOne(x => x.Selection)
+                .WithOne(x => x.Round)
+                .HasForeignKey<RoundSelection>(x => x.RoundId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             e.HasIndex(x => new { x.CompetitionId, x.Name }).IsUnique();
         });
 
@@ -413,11 +418,6 @@ public class DraftDbContext : DbContext
              .IsRequired();
 
             e.HasIndex(x => x.RoundId).IsUnique();
-
-            e.HasOne(x => x.Round)
-             .WithOne(x => x.Selection)
-             .HasForeignKey<RoundSelection>(x => x.RoundId)
-             .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<RoundSelectionPlayer>(e =>
