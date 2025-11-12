@@ -260,7 +260,7 @@ else
     private static string FormatSelectionLine(RoundSelectionPlayerDto player)
     {
         var teamName = string.IsNullOrWhiteSpace(player.TeamName) ? "Sem time" : player.TeamName;
-        return $"{player.PositionName}: {player.PlayerName} — {teamName}";
+        return $"{player.PositionName} | {player.PlayerName} | {teamName}";
     }
 
     private sealed class RoundSelectionViewState
