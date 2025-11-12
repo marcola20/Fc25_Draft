@@ -1,5 +1,6 @@
 ﻿using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Options;
+using Fc25Draft.Core.Services;
 using Fc25Draft.Infra.Repositories;
 using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Hubs;
@@ -43,6 +44,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransferHistoryService, TransferHistoryService>();
             services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
             services.AddSingleton<IFormationSlotFactory, FormationSlotFactory>();
+            services.AddSingleton<IPositionEligibilityService, PositionEligibilityService>();
             services.AddScoped<ITeamLineupService, TeamLineupService>();
             services.AddScoped<IMatchService, MatchService>();
             services.AddScoped<ISeasonQueryService, SeasonService>();

@@ -1,7 +1,10 @@
+@using System.Linq
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject ToastService Toasts
+@inject IPositionEligibilityService PositionEligibility
 
 @if (!_initialized)
 {
@@ -146,7 +149,7 @@ else
     private string _tacticCode = string.Empty;
     private DateTime? _updatedAtUtc;
     private readonly List<LineupSlotViewModel> _slots = new();
-    private readonly HashSet<int> _selectedPlayers = new();
+    private readonly HashSet<int> _selectedPlayerIds = new();
     private IReadOnlyList<PlayerOption> _playerOptions = Array.Empty<PlayerOption>();
     private Dictionary<int, PlayerOption> _playerLookup = new();
     private Guid _loadedTeamId;
@@ -205,7 +208,7 @@ else
             var previousSlots = preservePlayers ? _slots.ToDictionary(s => s.Order) : new Dictionary<int, LineupSlotViewModel>();
 
             _slots.Clear();
-            _selectedPlayers.Clear();
+            _selectedPlayerIds.Clear();
 
             foreach (var slot in template.OrderBy(s => s.Order))
             {
@@ -213,10 +216,15 @@ else
                 if (preservePlayers && previousSlots.TryGetValue(slot.Order, out var previous) && previous.PlayerId.HasValue)
                 {
                     var pid = previous.PlayerId.Value;
-                    if (_playerLookup.TryGetValue(pid, out var player) && IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+                    if (_playerLookup.TryGetValue(pid, out var player))
                     {
-                        playerId = pid;
-                        _selectedPlayers.Add(pid);
+                        var eligible = slot.Role == 1 ||
+                            PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                        if (eligible)
+                        {
+                            playerId = pid;
+                            _selectedPlayerIds.Add(pid);
+                        }
                     }
                 }
 
@@ -246,15 +254,20 @@ else
         _tacticCode = response.TacticCode;
         _updatedAtUtc = response.UpdatedAtUtc;
         _slots.Clear();
-        _selectedPlayers.Clear();
+        _selectedPlayerIds.Clear();
 
         foreach (var slot in response.Slots.OrderBy(s => s.Order))
         {
             int? playerId = null;
-            if (slot.PlayerId.HasValue && _playerLookup.TryGetValue(slot.PlayerId.Value, out var player) && IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+            if (slot.PlayerId.HasValue && _playerLookup.TryGetValue(slot.PlayerId.Value, out var player))
             {
-                playerId = slot.PlayerId.Value;
-                _selectedPlayers.Add(playerId.Value);
+                var eligible = slot.Role == 1 ||
+                    PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                if (eligible)
+                {
+                    playerId = slot.PlayerId.Value;
+                    _selectedPlayerIds.Add(playerId.Value);
+                }
             }
 
             _slots.Add(new LineupSlotViewModel
@@ -289,7 +302,28 @@ else
     private IEnumerable<LineupSlotViewModel> GetSlotsByRole(byte role) => _slots.Where(s => s.Role == role).OrderBy(s => s.Order);
 
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
-        => _playerOptions.Where(p => IsPlayerCompatible(slot.PrimaryPositionId, p.PositionId));
+    {
+        IEnumerable<PlayerOption> baseOptions;
+
+        if (slot.Role == 1)
+        {
+            baseOptions = _playerOptions;
+        }
+        else
+        {
+            var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
+            baseOptions = _playerOptions.Where(p =>
+                eligibles.Contains(p.PositionId) ||
+                (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
+        }
+
+        if (slot.PlayerId is int current)
+        {
+            return baseOptions.Where(p => p.PlayerId == current || !_selectedPlayerIds.Contains(p.PlayerId));
+        }
+
+        return baseOptions.Where(p => !_selectedPlayerIds.Contains(p.PlayerId));
+    }
 
     private void OnSlotPlayerChanged(LineupSlotViewModel slot, ChangeEventArgs args)
     {
@@ -299,7 +333,7 @@ else
         {
             if (slot.PlayerId.HasValue)
             {
-                _selectedPlayers.Remove(slot.PlayerId.Value);
+                _selectedPlayerIds.Remove(slot.PlayerId.Value);
                 slot.PlayerId = null;
             }
             StateHasChanged();
@@ -308,15 +342,23 @@ else
 
         if (!int.TryParse(raw, out var playerId)) return;
 
-        if (!_playerLookup.TryGetValue(playerId, out var player) ||
-            !IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+        if (!_playerLookup.TryGetValue(playerId, out var player))
+        {
+            Toasts.ShowError("Jogador não encontrado.");
+            StateHasChanged();
+            return;
+        }
+
+        var isEligible = slot.Role == 1 ||
+            PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+        if (!isEligible)
         {
             Toasts.ShowError("Jogador não elegível para este slot.");
             StateHasChanged();
             return;
         }
 
-        if (_selectedPlayers.Contains(playerId))
+        if (_selectedPlayerIds.Contains(playerId) && (!previousPlayerId.HasValue || previousPlayerId.Value != playerId))
         {
             Toasts.ShowError("Jogador já selecionado em outro slot.");
             StateHasChanged();
@@ -324,10 +366,12 @@ else
         }
 
         if (previousPlayerId.HasValue)
-            _selectedPlayers.Remove(previousPlayerId.Value);
+        {
+            _selectedPlayerIds.Remove(previousPlayerId.Value);
+        }
 
         slot.PlayerId = playerId;
-        _selectedPlayers.Add(playerId);
+        _selectedPlayerIds.Add(playerId);
         StateHasChanged();
     }
 
@@ -396,7 +440,7 @@ else
 
         _playerOptions = Roster.Jogadores
             .OrderBy(p => p.Nome)
-            .Select(p => new PlayerOption(p.PlayerId, p.PositionId, p.Nome, p.Posicao, p.Overall))
+            .Select(p => new PlayerOption(p.PlayerId, p.PositionId, Array.Empty<int>(), p.Nome, p.Posicao, p.Overall))
             .ToList();
 
         _playerLookup = _playerOptions.ToDictionary(p => p.PlayerId);
@@ -405,22 +449,11 @@ else
         {
             if (slot.PlayerId.HasValue && !_playerLookup.ContainsKey(slot.PlayerId.Value))
             {
-                _selectedPlayers.Remove(slot.PlayerId.Value);
+                _selectedPlayerIds.Remove(slot.PlayerId.Value);
                 slot.PlayerId = null;
             }
         }
     }
-
-    private static bool IsPlayerCompatible(int slotPrimaryPositionId, int playerPositionId) => slotPrimaryPositionId switch
-    {
-        1 => playerPositionId == 1,
-        2 or 3 or 4 => playerPositionId is 2 or 3 or 4,
-        5 or 6 => playerPositionId is 5 or 6,
-        7 => playerPositionId is 6 or 7,
-        8 or 9 => playerPositionId is 7 or 8 or 9,
-        10 => playerPositionId == 10,
-        _ => false
-    };
 
     private sealed class LineupSlotViewModel
     {
@@ -431,7 +464,7 @@ else
         public int? PlayerId { get; set; }
     }
 
-    private sealed record PlayerOption(int PlayerId, int PositionId, string Name, string PositionName, int Overall)
+    private sealed record PlayerOption(int PlayerId, int PositionId, IReadOnlyCollection<int> SecondaryPositionIds, string Name, string PositionName, int Overall)
     {
         public string DisplayName => $"{Name} ({PositionName}, OVR {Overall})";
     }

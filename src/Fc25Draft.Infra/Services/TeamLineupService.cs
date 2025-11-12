@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -16,15 +17,18 @@ public sealed class TeamLineupService : ITeamLineupService
 {
     private readonly DraftDbContext _db;
     private readonly IFormationSlotFactory _formationSlotFactory;
+    private readonly IPositionEligibilityService _eligibilityService;
     private readonly ILogger<TeamLineupService> _logger;
 
     public TeamLineupService(
         DraftDbContext db,
         IFormationSlotFactory formationSlotFactory,
+        IPositionEligibilityService eligibilityService,
         ILogger<TeamLineupService> logger)
     {
         _db = db;
         _formationSlotFactory = formationSlotFactory;
+        _eligibilityService = eligibilityService;
         _logger = logger;
     }
 
@@ -147,7 +151,7 @@ public sealed class TeamLineupService : ITeamLineupService
             throw new KeyNotFoundException("Time não encontrado.");
         }
 
-        var rosterPlayers = await _db.TeamRosters
+        var rosterEntries = await _db.TeamRosters
             .AsNoTracking()
             .Where(r => r.TeamId == teamId)
             .Select(r => new
@@ -156,56 +160,75 @@ public sealed class TeamLineupService : ITeamLineupService
                 r.Player.PositionId,
                 r.Player.Name
             })
-            .ToDictionaryAsync(r => r.PlayerId, ct)
+            .ToListAsync(ct)
             .ConfigureAwait(false);
+
+        var rosterPlayers = rosterEntries.ToDictionary(
+            r => r.PlayerId,
+            r => new RosterPlayer(r.PlayerId, r.PositionId, r.Name, Array.Empty<int>()));
 
         var startersCount = 0;
         var benchCount = 0;
         var gkCount = 0;
         var usedPlayers = new HashSet<int>();
 
+        void FailValidation(string message, string? detail = null)
+        {
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                _logger.LogWarning("Validação da escalação do time {TeamId} falhou: {Detail}", teamId, detail);
+            }
+            else
+            {
+                _logger.LogWarning("Validação da escalação do time {TeamId} falhou: {Message}", teamId, message);
+            }
+
+            throw new InvalidOperationException(message);
+        }
+
         foreach (var slot in request.Slots)
         {
             if (!expectedByOrder.TryGetValue(slot.Order, out var expected))
             {
-                throw new InvalidOperationException($"Slot {slot.Order} não faz parte da formação selecionada.");
+                FailValidation($"Slot {slot.Order} não faz parte da formação selecionada.");
             }
 
             if (slot.Role != expected.Role)
             {
-                throw new InvalidOperationException($"Slot {slot.Order} com papel inválido.");
+                FailValidation($"Slot {slot.Order} com papel inválido.");
             }
 
             if (slot.PrimaryPositionId != expected.PrimaryPositionId)
             {
-                throw new InvalidOperationException($"Slot {slot.Order} com posição incompatível com a formação.");
+                FailValidation($"Slot {slot.Order} com posição incompatível com a formação.");
             }
 
             if (slot.PlayerId is null)
             {
-                throw new InvalidOperationException("Todos os slots devem possuir um jogador selecionado.");
+                FailValidation("Todos os slots devem possuir um jogador selecionado.");
             }
 
             var playerId = slot.PlayerId.Value;
             if (!rosterPlayers.TryGetValue(playerId, out var rosterInfo))
             {
-                throw new InvalidOperationException($"Jogador {playerId} não pertence ao elenco do time.");
+                FailValidation("Jogador não pertence ao time.", $"JogadorId={playerId}");
             }
 
             if (!usedPlayers.Add(playerId))
             {
-                throw new InvalidOperationException("Não é permitido repetir jogadores entre titulares e reservas.");
-            }
-
-            if (!IsPlayerCompatible(slot.PrimaryPositionId, rosterInfo.PositionId))
-            {
-                throw new InvalidOperationException($"Jogador {rosterInfo.Name} não é elegível para o slot {slot.Order}.");
+                FailValidation("Há jogadores repetidos na escalação.", $"JogadorId={playerId}");
             }
 
             if (slot.Role == 0)
             {
                 startersCount++;
-                if (rosterInfo.PositionId == 1)
+
+                if (!_eligibilityService.IsEligible(slot.PrimaryPositionId, rosterInfo.PositionId, rosterInfo.SecondaryPositionIds))
+                {
+                    FailValidation("Jogador não elegível para este slot.", $"Jogador={rosterInfo.Name};Slot={slot.Order}");
+                }
+
+                if (rosterInfo.PositionId == (int)PositionType.Goleiro)
                 {
                     gkCount++;
                 }
@@ -218,82 +241,92 @@ public sealed class TeamLineupService : ITeamLineupService
 
         if (startersCount != 11)
         {
-            throw new InvalidOperationException("Selecione exatamente 11 titulares.");
+            FailValidation("Selecione exatamente 11 titulares.");
         }
 
         if (benchCount != 7)
         {
-            throw new InvalidOperationException("Selecione exatamente 7 reservas.");
+            FailValidation("Selecione exatamente 7 reservas.");
         }
 
         if (gkCount != 1)
         {
-            throw new InvalidOperationException("É obrigatório ter exatamente 1 goleiro entre os titulares.");
+            FailValidation("É obrigatório ter 1 goleiro entre os titulares.");
         }
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var strategy = _db.Database.CreateExecutionStrategy();
+
         try
         {
-            var existingLineups = await _db.TeamLineups
-                .Where(l => l.TeamId == teamId && l.IsActive)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            foreach (var lineup in existingLineups)
+            return await strategy.ExecuteAsync(async () =>
             {
-                lineup.IsActive = false;
-            }
-
-            var now = DateTime.UtcNow;
-            var newLineup = new TeamLineup
-            {
-                LineupId = Guid.NewGuid(),
-                TeamId = teamId,
-                FormationCode = normalizedFormation,
-                TacticCode = tacticCode,
-                IsActive = true,
-                UpdatedAtUtc = now
-            };
-
-            foreach (var slot in request.Slots.OrderBy(s => s.Order))
-            {
-                newLineup.Slots.Add(new TeamLineupSlot
+                await using var transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+                try
                 {
-                    SlotId = Guid.NewGuid(),
-                    LineupId = newLineup.LineupId,
-                    Order = slot.Order,
-                    Role = slot.Role,
-                    PrimaryPositionId = slot.PrimaryPositionId,
-                    PlayerId = slot.PlayerId
-                });
-            }
+                    var existingLineups = await _db.TeamLineups
+                        .Where(l => l.TeamId == teamId && l.IsActive)
+                        .ToListAsync(ct)
+                        .ConfigureAwait(false);
 
-            _db.TeamLineups.Add(newLineup);
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    foreach (var lineup in existingLineups)
+                    {
+                        lineup.IsActive = false;
+                    }
 
-            return await GetActiveAsync(teamId, ct).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("Falha ao carregar a escalação salva.");
+                    var now = DateTime.UtcNow;
+                    var newLineup = new TeamLineup
+                    {
+                        LineupId = Guid.NewGuid(),
+                        TeamId = teamId,
+                        FormationCode = normalizedFormation,
+                        TacticCode = tacticCode,
+                        IsActive = true,
+                        UpdatedAtUtc = now
+                    };
+
+                    foreach (var slot in request.Slots.OrderBy(s => s.Order))
+                    {
+                        newLineup.Slots.Add(new TeamLineupSlot
+                        {
+                            SlotId = Guid.NewGuid(),
+                            LineupId = newLineup.LineupId,
+                            Order = slot.Order,
+                            Role = slot.Role,
+                            PrimaryPositionId = slot.PrimaryPositionId,
+                            PlayerId = slot.PlayerId
+                        });
+                    }
+
+                    _db.TeamLineups.Add(newLineup);
+                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                    throw;
+                }
+
+                var reloaded = await GetActiveAsync(teamId, ct).ConfigureAwait(false);
+                if (reloaded is null)
+                {
+                    _logger.LogError("Falha ao recarregar a escalação salva do time {TeamId}.", teamId);
+                    throw new InvalidOperationException("Ocorreu um erro ao salvar a escalação.");
+                }
+
+                return reloaded;
+            }).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync(ct).ConfigureAwait(false);
-            _logger.LogError(ex, "Erro ao salvar escalação do time {TeamId}.", teamId);
-            throw;
+            _logger.LogError(ex, "Erro inesperado ao salvar escalação do time {TeamId}.", teamId);
+            throw new InvalidOperationException("Ocorreu um erro ao salvar a escalação.", ex);
         }
     }
 
-    private static bool IsPlayerCompatible(int slotPrimaryPositionId, short playerPositionId)
-    {
-        return slotPrimaryPositionId switch
-        {
-            1 => playerPositionId == 1,
-            2 or 3 or 4 => playerPositionId is 2 or 3 or 4,
-            5 or 6 => playerPositionId is 5 or 6,
-            7 => playerPositionId is 6 or 7,
-            8 or 9 => playerPositionId is 7 or 8 or 9,
-            10 => playerPositionId == 10,
-            _ => false
-        };
-    }
+    private sealed record RosterPlayer(int PlayerId, short PositionId, string Name, IReadOnlyCollection<int> SecondaryPositionIds);
 }

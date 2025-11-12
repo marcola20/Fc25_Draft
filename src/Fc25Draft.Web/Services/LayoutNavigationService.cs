@@ -37,6 +37,7 @@ public class LayoutNavigationService
         new("Admin", new List<MenuItem>
         {
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
+            new("Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerar Itens", "/admin/itens/gerar", "oi oi-plus", RequiredRole: "Admin"),
             new("Histórico de Transferências", "/admin/transferencias/historico", "oi oi-transfer", RequiredRole: "Admin"),
             new("Configurações", "/admin/config", "oi oi-wrench", RequiredRole: "Admin", IsOptional: true)
@@ -86,6 +87,7 @@ public class LayoutNavigationService
         ["/admin/mercado/ciclos"] = CreateDefinition("Ciclos do Mercado", "Mercado", "/mercado/ciclos", true),
         ["/admin/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/ciclos", true),
         ["/admin/itens/gerar"] = CreateDefinition("Gerar Itens", "Admin", "/admin/itens/gerar", true),
+        ["/admin/escalacoes"] = CreateDefinition("Escalações dos Times", "Admin", "/admin/escalacoes", true),
         ["/admin/transferencias/historico"] = CreateDefinition("Histórico de Transferências", "Admin", "/admin/transferencias/historico", true),
         ["/admin/mercado/historico"] = CreateDefinition("Histórico de Transferências", "Admin", "/admin/transferencias/historico", true),
         ["/admin/config"] = CreateDefinition("Configurações", "Admin", "/admin/config", true)
