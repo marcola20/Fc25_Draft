@@ -153,7 +153,11 @@ else
                     else
                     {
                         <div class="row g-3 mb-3">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
+                                <strong>Nome da escalação:</strong>
+                                <div>@_selectedLineup.Name</div>
+                            </div>
+                            <div class="col-md-2">
                                 <strong>Formação:</strong>
                                 <div>@_selectedLineup.FormationCode</div>
                             </div>
@@ -162,12 +166,18 @@ else
                                 <div>@_selectedLineup.TacticCode</div>
                             </div>
                             <div class="col-md-3">
+                                <strong>Atualizado em:</strong>
+                                <div>@BrazilTime.FormatDateTimeLocal(_selectedLineup.UpdatedAtUtc)</div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
                                 <strong>Código da escalação:</strong>
                                 <div class="text-truncate">@_selectedLineup.LineupId</div>
                             </div>
-                            <div class="col-md-3">
-                                <strong>Atualizado em:</strong>
-                                <div>@BrazilTime.FormatDateTimeLocal(_selectedLineup.UpdatedAtUtc)</div>
+                            <div class="col-md-6">
+                                <strong>Observação:</strong>
+                                <div>@(!string.IsNullOrWhiteSpace(_selectedLineup.Observation) ? _selectedLineup.Observation : "—")</div>
                             </div>
                         </div>
 
@@ -204,6 +214,47 @@ else
                                             </div>
                                         </li>
                                     }
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mt-3">
+                            <div class="col-md-6">
+                                <h6 class="text-uppercase text-muted">Funções especiais</h6>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Capitão</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.CaptainPlayerName ?? "—")</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Falta perto (esquerda)</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.ShortFreeKickLeftPlayerName ?? "—")</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Falta perto (direita)</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.ShortFreeKickRightPlayerName ?? "—")</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Falta de longe</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.LongFreeKickPlayerName ?? "—")</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-uppercase text-muted">Bolas paradas</h6>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Pênaltis</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.PenaltyKickPlayerName ?? "—")</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Escanteio esquerdo</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.LeftCornerPlayerName ?? "—")</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>Escanteio direito</span>
+                                        <span class="fw-semibold">@(_selectedLineup.SpecialRoles.RightCornerPlayerName ?? "—")</span>
+                                    </li>
                                 </ul>
                             </div>
                         </div>

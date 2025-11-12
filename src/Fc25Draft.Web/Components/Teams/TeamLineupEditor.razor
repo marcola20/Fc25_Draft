@@ -1,3 +1,4 @@
+@using System.Collections.Generic
 @using System.Linq
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
@@ -19,6 +20,43 @@ else
     <div class="card">
         <div class="card-body">
             <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label" for="activeLineupSelect">Escalação ativa</label>
+                    <select id="activeLineupSelect"
+                            class="form-select"
+                            value="@(_activeLineupId?.ToString() ?? string.Empty)"
+                            @onchange="OnActiveLineupChanged"
+                            disabled="@(_isLoading || _isSaving || _lineupSummaries.Count == 0)">
+                        @if (_lineupSummaries.Count == 0)
+                        {
+                            <option value="">Nenhuma escalação salva</option>
+                        }
+                        else
+                        {
+                            @foreach (var summary in _lineupSummaries)
+                            {
+                                <option value="@summary.LineupId">@summary.Name (@summary.FormationCode)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <button type="button"
+                            class="btn btn-outline-primary me-2"
+                            @onclick="StartNewLineupAsync"
+                            disabled="@(_isLoading || _isSaving || _isTemplateLoading)">
+                        Nova escalação
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-danger"
+                            @onclick="DeleteCurrentLineupAsync"
+                            disabled="@(_currentLineupId is null || _isSaving || _isTemplateLoading)">
+                        Excluir escalação
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-end mt-2">
                 <div class="col-md-4">
                     <label class="form-label" for="formationSelect">Formação</label>
                     <select id="formationSelect"
@@ -46,6 +84,29 @@ else
                     {
                         <span class="badge bg-secondary">Atualizado em: @_updatedAtUtc.Value:dd/MM/yyyy HH:mm UTC</span>
                     }
+                </div>
+            </div>
+
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label" for="lineupNameInput">Nome da escalação</label>
+                    <input id="lineupNameInput"
+                           class="form-control"
+                           maxlength="@MaxLineupNameLength"
+                           @bind="_lineupName"
+                           @bind:event="oninput"
+                           disabled="@_isLoading" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="observationInput">Observação</label>
+                    <textarea id="observationInput"
+                              class="form-control"
+                              rows="1"
+                              maxlength="@MaxObservationLength"
+                              @bind="_observation"
+                              @bind:event="oninput"
+                              disabled="@_isLoading"></textarea>
+                    <div class="form-text">Até @MaxObservationLength caracteres.</div>
                 </div>
             </div>
 
@@ -109,6 +170,111 @@ else
                 </div>
             }
 
+            <div class="mt-4">
+                <h5>Funções especiais</h5>
+                <p class="text-muted small">Escolha titulares para cada função abaixo. Um mesmo jogador pode ser escolhido em múltiplas funções.</p>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="captainSelect">Capitão</label>
+                        <select id="captainSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.Captain)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.Captain, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="shortFkLeftSelect">Falta perto (esquerda)</label>
+                        <select id="shortFkLeftSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.ShortFreeKickLeft)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.ShortFreeKickLeft, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="shortFkRightSelect">Falta perto (direita)</label>
+                        <select id="shortFkRightSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.ShortFreeKickRight)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.ShortFreeKickRight, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="longFkSelect">Falta de longe</label>
+                        <select id="longFkSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.LongFreeKick)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.LongFreeKick, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="penaltySelect">Pênaltis</label>
+                        <select id="penaltySelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.Penalty)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.Penalty, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="cornerLeftSelect">Escanteio esquerdo</label>
+                        <select id="cornerLeftSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.CornerLeft)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.CornerLeft, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="cornerRightSelect">Escanteio direito</label>
+                        <select id="cornerRightSelect"
+                                class="form-select"
+                                value="@GetSpecialRoleValue(SpecialRoleType.CornerRight)"
+                                @onchange="e => OnSpecialRoleChanged(SpecialRoleType.CornerRight, e)"
+                                disabled="@(!_hasAllStartersSelected || _isSaving || _isTemplateLoading)">
+                            <option value="">— Selecionar —</option>
+                            @foreach (var option in GetStarterOptions())
+                            {
+                                <option value="@option.PlayerId">@option.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-4 d-flex justify-content-end">
                 <button class="btn btn-primary"
                         @onclick="SaveAsync"
@@ -128,6 +294,63 @@ else
     </div>
 }
 
+@if (_showLineupLimitModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Limite de escalações atingido</h5>
+                    <button type="button" class="btn-close" @onclick="CloseLineupLimitModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>O time já possui 3 escalações salvas. Exclua uma delas para registrar uma nova.</p>
+                    @if (_lineupSummaries.Count == 0)
+                    {
+                        <div class="alert alert-info">Nenhuma escalação encontrada.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Formação</th>
+                                        <th>Atualizado em</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var summary in _lineupSummaries)
+                                    {
+                                        <tr>
+                                            <td>@summary.Name</td>
+                                            <td>@summary.FormationCode</td>
+                                            <td>@summary.UpdatedAtUtc:dd/MM HH:mm</td>
+                                            <td class="text-end">
+                                                <button type="button"
+                                                        class="btn btn-outline-danger btn-sm"
+                                                        @onclick="async () => await DeleteLineupAsync(summary.LineupId)"
+                                                        disabled="@_isDeletingLineup">
+                                                    Excluir
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseLineupLimitModal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public Guid TeamId { get; set; }
@@ -138,12 +361,15 @@ else
     [Parameter]
     public EventCallback<TeamLineupResponse> OnLineupSaved { get; set; }
 
+    private const int MaxLineupNameLength = 60;
+    private const int MaxObservationLength = 500;
     private readonly string[] _supportedFormations = new[] { "4-2-4", "4-2-2-2", "4-3-3", "4-2-3-1", "4-4-2" };
 
     private bool _initialized;
     private bool _isLoading = true;
     private bool _isTemplateLoading;
     private bool _isSaving;
+    private bool _isDeletingLineup;
     private string? _errorMessage;
     private string _selectedFormation = "4-2-4";
     private string _tacticCode = string.Empty;
@@ -152,6 +378,13 @@ else
     private IReadOnlyList<PlayerOption> _playerOptions = Array.Empty<PlayerOption>();
     private Dictionary<int, PlayerOption> _playerLookup = new();
     private Guid _loadedTeamId;
+    private readonly List<TeamLineupSummaryResponse> _lineupSummaries = new();
+    private Guid? _currentLineupId;
+    private Guid? _activeLineupId;
+    private string _lineupName = string.Empty;
+    private string _observation = string.Empty;
+    private LineupSpecialRolesViewModel _specialRoles = new();
+    private bool _showLineupLimitModal;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -174,17 +407,29 @@ else
         _errorMessage = null;
         try
         {
-            var response = await TeamsApiClient.GetActiveLineupAsync(TeamId);
-            if (response is null)
+            var summaries = await TeamsApiClient.GetLineupsAsync(TeamId);
+            _lineupSummaries.Clear();
+            _lineupSummaries.AddRange(summaries);
+            _activeLineupId = _lineupSummaries.FirstOrDefault(s => s.IsActive)?.LineupId;
+
+            if (_activeLineupId.HasValue)
             {
-                _selectedFormation = _supportedFormations.First();
-                _tacticCode = string.Empty;
-                _updatedAtUtc = null;
-                await LoadTemplateAsync(_selectedFormation, preservePlayers: false);
+                await LoadLineupAsync(_activeLineupId.Value);
+            }
+            else if (_lineupSummaries.Count > 0)
+            {
+                await LoadLineupAsync(_lineupSummaries[0].LineupId);
             }
             else
             {
-                ApplyLineup(response);
+                _currentLineupId = null;
+                _lineupName = string.Empty;
+                _observation = string.Empty;
+                _selectedFormation = _supportedFormations.First();
+                _tacticCode = string.Empty;
+                _updatedAtUtc = null;
+                _specialRoles.Clear();
+                await LoadTemplateAsync(_selectedFormation, preservePlayers: false);
             }
         }
         catch (Exception ex)
@@ -194,6 +439,44 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task LoadLineupAsync(Guid lineupId)
+    {
+        try
+        {
+            var lineup = await TeamsApiClient.GetLineupByIdAsync(TeamId, lineupId);
+            if (lineup is null)
+            {
+                Toasts.ShowError("Escalação não encontrada.");
+                return;
+            }
+
+            ApplyLineup(lineup);
+            _currentLineupId = lineup.LineupId;
+            if (lineup.IsActive)
+            {
+                _activeLineupId = lineup.LineupId;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task RefreshSummariesAsync()
+    {
+        try
+        {
+            var summaries = await TeamsApiClient.GetLineupsAsync(TeamId);
+            _lineupSummaries.Clear();
+            _lineupSummaries.AddRange(summaries);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
         }
     }
 
@@ -237,6 +520,8 @@ else
                     PlayerId = playerId
                 });
             }
+
+            PruneSpecialRoles();
         }
         catch (Exception ex)
         {
@@ -253,6 +538,18 @@ else
         _selectedFormation = response.FormationCode;
         _tacticCode = response.TacticCode;
         _updatedAtUtc = response.UpdatedAtUtc;
+        _lineupName = response.Name;
+        _observation = response.Observation ?? string.Empty;
+        _specialRoles = new LineupSpecialRolesViewModel
+        {
+            CaptainPlayerId = response.SpecialRoles.CaptainPlayerId,
+            ShortFreeKickLeftPlayerId = response.SpecialRoles.ShortFreeKickLeftPlayerId,
+            ShortFreeKickRightPlayerId = response.SpecialRoles.ShortFreeKickRightPlayerId,
+            LongFreeKickPlayerId = response.SpecialRoles.LongFreeKickPlayerId,
+            PenaltyKickPlayerId = response.SpecialRoles.PenaltyKickPlayerId,
+            LeftCornerPlayerId = response.SpecialRoles.LeftCornerPlayerId,
+            RightCornerPlayerId = response.SpecialRoles.RightCornerPlayerId
+        };
         _slots.Clear();
         var usedPlayers = new HashSet<int>();
 
@@ -275,6 +572,8 @@ else
                 PlayerId = playerId
             });
         }
+
+        PruneSpecialRoles();
     }
 
     private async Task OnFormationChangedAsync(ChangeEventArgs args)
@@ -297,6 +596,8 @@ else
 
     private static string GetSlotElementId(LineupSlotViewModel slot) => $"slot-{slot.Role}-{slot.Order}";
 
+    private bool _hasAllStartersSelected => _slots.Count(s => s.Role == 0 && s.PlayerId is not null) == 11;
+
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
     {
         var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
@@ -312,6 +613,140 @@ else
         }
 
         return baseOptions.Where(p => !selectedIds.Contains(p.PlayerId));
+    }
+
+    private IEnumerable<PlayerOption> GetStarterOptions()
+    {
+        return _slots
+            .Where(s => s.Role == 0 && s.PlayerId.HasValue)
+            .OrderBy(s => s.Order)
+            .Select(s => _playerLookup.TryGetValue(s.PlayerId!.Value, out var player) ? player : null)
+            .Where(p => p is not null)!
+            .Select(p => p!);
+    }
+
+    private string GetSpecialRoleValue(SpecialRoleType role) => GetSpecialRolePlayerId(role)?.ToString() ?? string.Empty;
+
+    private int? GetSpecialRolePlayerId(SpecialRoleType role) => role switch
+    {
+        SpecialRoleType.Captain => _specialRoles.CaptainPlayerId,
+        SpecialRoleType.ShortFreeKickLeft => _specialRoles.ShortFreeKickLeftPlayerId,
+        SpecialRoleType.ShortFreeKickRight => _specialRoles.ShortFreeKickRightPlayerId,
+        SpecialRoleType.LongFreeKick => _specialRoles.LongFreeKickPlayerId,
+        SpecialRoleType.Penalty => _specialRoles.PenaltyKickPlayerId,
+        SpecialRoleType.CornerLeft => _specialRoles.LeftCornerPlayerId,
+        SpecialRoleType.CornerRight => _specialRoles.RightCornerPlayerId,
+        _ => null
+    };
+
+    private void OnSpecialRoleChanged(SpecialRoleType role, ChangeEventArgs args)
+    {
+        if (args?.Value is not string raw)
+        {
+            SetSpecialRole(role, null);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            SetSpecialRole(role, null);
+            return;
+        }
+
+        if (!int.TryParse(raw, out var playerId))
+        {
+            return;
+        }
+
+        if (!GetStarterIds().Contains(playerId))
+        {
+            Toasts.ShowError("Selecione um titular para esta função.");
+            return;
+        }
+
+        SetSpecialRole(role, playerId);
+    }
+
+    private void SetSpecialRole(SpecialRoleType role, int? playerId)
+    {
+        switch (role)
+        {
+            case SpecialRoleType.Captain:
+                _specialRoles.CaptainPlayerId = playerId;
+                break;
+            case SpecialRoleType.ShortFreeKickLeft:
+                _specialRoles.ShortFreeKickLeftPlayerId = playerId;
+                break;
+            case SpecialRoleType.ShortFreeKickRight:
+                _specialRoles.ShortFreeKickRightPlayerId = playerId;
+                break;
+            case SpecialRoleType.LongFreeKick:
+                _specialRoles.LongFreeKickPlayerId = playerId;
+                break;
+            case SpecialRoleType.Penalty:
+                _specialRoles.PenaltyKickPlayerId = playerId;
+                break;
+            case SpecialRoleType.CornerLeft:
+                _specialRoles.LeftCornerPlayerId = playerId;
+                break;
+            case SpecialRoleType.CornerRight:
+                _specialRoles.RightCornerPlayerId = playerId;
+                break;
+        }
+    }
+
+    private HashSet<int> GetStarterIds()
+    {
+        var ids = new HashSet<int>();
+
+        foreach (var slot in _slots.Where(s => s.Role == 0 && s.PlayerId.HasValue))
+        {
+            ids.Add(slot.PlayerId!.Value);
+        }
+
+        return ids;
+    }
+
+    private void PruneSpecialRoles()
+    {
+        var starters = GetStarterIds();
+
+        if (starters.Count == 0)
+        {
+            _specialRoles.Clear();
+            return;
+        }
+
+        if (!_specialRoles.CaptainPlayerId.HasValue || !starters.Contains(_specialRoles.CaptainPlayerId.Value))
+            _specialRoles.CaptainPlayerId = null;
+        if (!_specialRoles.ShortFreeKickLeftPlayerId.HasValue || !starters.Contains(_specialRoles.ShortFreeKickLeftPlayerId.Value))
+            _specialRoles.ShortFreeKickLeftPlayerId = null;
+        if (!_specialRoles.ShortFreeKickRightPlayerId.HasValue || !starters.Contains(_specialRoles.ShortFreeKickRightPlayerId.Value))
+            _specialRoles.ShortFreeKickRightPlayerId = null;
+        if (!_specialRoles.LongFreeKickPlayerId.HasValue || !starters.Contains(_specialRoles.LongFreeKickPlayerId.Value))
+            _specialRoles.LongFreeKickPlayerId = null;
+        if (!_specialRoles.PenaltyKickPlayerId.HasValue || !starters.Contains(_specialRoles.PenaltyKickPlayerId.Value))
+            _specialRoles.PenaltyKickPlayerId = null;
+        if (!_specialRoles.LeftCornerPlayerId.HasValue || !starters.Contains(_specialRoles.LeftCornerPlayerId.Value))
+            _specialRoles.LeftCornerPlayerId = null;
+        if (!_specialRoles.RightCornerPlayerId.HasValue || !starters.Contains(_specialRoles.RightCornerPlayerId.Value))
+            _specialRoles.RightCornerPlayerId = null;
+    }
+
+    private bool AreSpecialRolesValid()
+    {
+        var starters = GetStarterIds();
+
+        bool HasStarter(int? playerId) => playerId.HasValue && starters.Contains(playerId.Value);
+
+        return starters.Count >= 11 &&
+            HasStarter(_specialRoles.CaptainPlayerId) &&
+            HasStarter(_specialRoles.ShortFreeKickLeftPlayerId) &&
+            HasStarter(_specialRoles.ShortFreeKickRightPlayerId) &&
+            HasStarter(_specialRoles.LongFreeKickPlayerId) &&
+            HasStarter(_specialRoles.PenaltyKickPlayerId) &&
+            HasStarter(_specialRoles.LeftCornerPlayerId) &&
+            HasStarter(_specialRoles.RightCornerPlayerId);
     }
 
     private string GetSlotLabel(LineupSlotViewModel slot)
@@ -380,6 +815,7 @@ else
         }
 
         slot.PlayerId = playerId;
+        PruneSpecialRoles();
         StateHasChanged();
     }
 
@@ -409,6 +845,10 @@ else
         _isSaving ||
         string.IsNullOrWhiteSpace(_tacticCode) ||
         _tacticCode.Trim().Length > 40 ||
+        string.IsNullOrWhiteSpace(_lineupName) ||
+        _lineupName.Trim().Length > MaxLineupNameLength ||
+        !_hasAllStartersSelected ||
+        !AreSpecialRolesValid() ||
         _slots.Any(s => s.PlayerId is null);
 
     private async Task SaveAsync()
@@ -425,8 +865,22 @@ else
         {
             var request = new SaveLineupRequest
             {
+                LineupId = _currentLineupId,
+                Name = _lineupName.Trim(),
                 FormationCode = _selectedFormation,
                 TacticCode = _tacticCode.Trim(),
+                Observation = string.IsNullOrWhiteSpace(_observation) ? null : _observation.Trim(),
+                SetAsActive = true,
+                SpecialRoles = new LineupSpecialRolesDto
+                {
+                    CaptainPlayerId = _specialRoles.CaptainPlayerId,
+                    ShortFreeKickLeftPlayerId = _specialRoles.ShortFreeKickLeftPlayerId,
+                    ShortFreeKickRightPlayerId = _specialRoles.ShortFreeKickRightPlayerId,
+                    LongFreeKickPlayerId = _specialRoles.LongFreeKickPlayerId,
+                    PenaltyKickPlayerId = _specialRoles.PenaltyKickPlayerId,
+                    LeftCornerPlayerId = _specialRoles.LeftCornerPlayerId,
+                    RightCornerPlayerId = _specialRoles.RightCornerPlayerId
+                },
                 Slots = _slots
                     .Select(s => new SaveLineupSlotDto
                     {
@@ -440,6 +894,9 @@ else
 
             var response = await TeamsApiClient.SaveLineupAsync(TeamId, request);
             ApplyLineup(response);
+            _currentLineupId = response.LineupId;
+            _activeLineupId = response.LineupId;
+            await RefreshSummariesAsync();
             Toasts.ShowSuccess("Escalação salva com sucesso.");
             if (OnLineupSaved.HasDelegate)
             {
@@ -449,6 +906,11 @@ else
         catch (Exception ex)
         {
             _errorMessage = ex.Message;
+            if (ex is InvalidOperationException && ex.Message.Contains("3 escalações", StringComparison.OrdinalIgnoreCase))
+            {
+                _showLineupLimitModal = true;
+                await RefreshSummariesAsync();
+            }
             Toasts.ShowError(ex.Message);
         }
         finally
@@ -480,6 +942,89 @@ else
                 slot.PlayerId = null;
             }
         }
+
+        PruneSpecialRoles();
+    }
+
+    private async Task StartNewLineupAsync()
+    {
+        _currentLineupId = null;
+        _lineupName = string.Empty;
+        _observation = string.Empty;
+        _updatedAtUtc = null;
+        _specialRoles.Clear();
+        await LoadTemplateAsync(_selectedFormation, preservePlayers: false);
+        StateHasChanged();
+    }
+
+    private async Task DeleteCurrentLineupAsync()
+    {
+        if (_currentLineupId is null)
+        {
+            return;
+        }
+
+        await DeleteLineupAsync(_currentLineupId.Value);
+    }
+
+    private async Task DeleteLineupAsync(Guid lineupId)
+    {
+        if (lineupId == Guid.Empty)
+        {
+            return;
+        }
+
+        _isDeletingLineup = true;
+        try
+        {
+            await TeamsApiClient.DeleteLineupAsync(TeamId, lineupId);
+            Toasts.ShowSuccess("Escalação excluída com sucesso.");
+            _showLineupLimitModal = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isDeletingLineup = false;
+        }
+    }
+
+    private void CloseLineupLimitModal()
+    {
+        _showLineupLimitModal = false;
+    }
+
+    private async Task OnActiveLineupChanged(ChangeEventArgs args)
+    {
+        if (args?.Value is not string raw || string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(raw, out var lineupId))
+        {
+            return;
+        }
+
+        if (_activeLineupId.HasValue && _activeLineupId.Value == lineupId)
+        {
+            return;
+        }
+
+        try
+        {
+            await TeamsApiClient.SetActiveLineupAsync(TeamId, lineupId);
+            _activeLineupId = lineupId;
+            await LoadLineupAsync(lineupId);
+            await RefreshSummariesAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError(ex.Message);
+        }
     }
 
     private sealed class LineupSlotViewModel
@@ -489,6 +1034,39 @@ else
         public int PrimaryPositionId { get; set; }
         public string PositionLabel { get; set; } = string.Empty;
         public int? PlayerId { get; set; }
+    }
+
+    private sealed class LineupSpecialRolesViewModel
+    {
+        public int? CaptainPlayerId { get; set; }
+        public int? ShortFreeKickLeftPlayerId { get; set; }
+        public int? ShortFreeKickRightPlayerId { get; set; }
+        public int? LongFreeKickPlayerId { get; set; }
+        public int? PenaltyKickPlayerId { get; set; }
+        public int? LeftCornerPlayerId { get; set; }
+        public int? RightCornerPlayerId { get; set; }
+
+        public void Clear()
+        {
+            CaptainPlayerId = null;
+            ShortFreeKickLeftPlayerId = null;
+            ShortFreeKickRightPlayerId = null;
+            LongFreeKickPlayerId = null;
+            PenaltyKickPlayerId = null;
+            LeftCornerPlayerId = null;
+            RightCornerPlayerId = null;
+        }
+    }
+
+    private enum SpecialRoleType
+    {
+        Captain,
+        ShortFreeKickLeft,
+        ShortFreeKickRight,
+        LongFreeKick,
+        Penalty,
+        CornerLeft,
+        CornerRight
     }
 
     private sealed record PlayerOption(int PlayerId, int PositionId, IReadOnlyCollection<int> SecondaryPositionIds, string Name, string PositionName, int Overall)

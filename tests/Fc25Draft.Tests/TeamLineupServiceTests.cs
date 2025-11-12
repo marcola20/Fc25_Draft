@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Services;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.Data.Sqlite;
@@ -17,13 +19,14 @@ namespace Fc25Draft.Tests;
 public class TeamLineupServiceTests
 {
     private static readonly FormationSlotFactory SlotFactory = new();
+    private static readonly IPositionEligibilityService EligibilityService = new PositionEligibilityService();
 
     [Fact]
     public async Task SaveAsync_CreatesActiveLineupAndDeactivatesPrevious()
     {
         await using var context = await CreateContextAsync();
         var teamId = await SeedTeamAsync(context);
-        var service = new TeamLineupService(context, SlotFactory, NullLogger<TeamLineupService>.Instance);
+        var service = new TeamLineupService(context, SlotFactory, EligibilityService, NullLogger<TeamLineupService>.Instance);
 
         var firstRequest = BuildValidRequest();
         var firstResponse = await service.SaveAsync(teamId, firstRequest, CancellationToken.None);
@@ -46,7 +49,7 @@ public class TeamLineupServiceTests
     {
         await using var context = await CreateContextAsync();
         var teamId = await SeedTeamAsync(context);
-        var service = new TeamLineupService(context, SlotFactory, NullLogger<TeamLineupService>.Instance);
+        var service = new TeamLineupService(context, SlotFactory, EligibilityService, NullLogger<TeamLineupService>.Instance);
 
         var request = BuildValidRequest();
         request.Slots[1] = request.Slots[1] with { PlayerId = request.Slots[0].PlayerId };
@@ -60,7 +63,7 @@ public class TeamLineupServiceTests
     {
         await using var context = await CreateContextAsync();
         var teamId = await SeedTeamAsync(context);
-        var service = new TeamLineupService(context, SlotFactory, NullLogger<TeamLineupService>.Instance);
+        var service = new TeamLineupService(context, SlotFactory, EligibilityService, NullLogger<TeamLineupService>.Instance);
 
         var request = BuildValidRequest();
         request.Slots[0] = request.Slots[0] with { PlayerId = request.Slots[2].PlayerId };
@@ -74,7 +77,7 @@ public class TeamLineupServiceTests
     {
         await using var context = await CreateContextAsync();
         var teamId = await SeedTeamAsync(context);
-        var service = new TeamLineupService(context, SlotFactory, NullLogger<TeamLineupService>.Instance);
+        var service = new TeamLineupService(context, SlotFactory, EligibilityService, NullLogger<TeamLineupService>.Instance);
 
         var request = BuildValidRequest();
         request.Slots[0] = request.Slots[0] with { PlayerId = null };
@@ -99,10 +102,26 @@ public class TeamLineupServiceTests
             })
             .ToList();
 
+        var starters = slots.Where(s => s.Role == 0).Select(s => s.PlayerId!.Value).ToArray();
+
         return new SaveLineupRequest
         {
+            LineupId = null,
+            Name = "Escalação Teste",
             FormationCode = "4-2-4",
             TacticCode = tacticCode,
+            Observation = "Observação",
+            SetAsActive = true,
+            SpecialRoles = new LineupSpecialRolesDto
+            {
+                CaptainPlayerId = starters[0],
+                ShortFreeKickLeftPlayerId = starters[1],
+                ShortFreeKickRightPlayerId = starters[2],
+                LongFreeKickPlayerId = starters[3],
+                PenaltyKickPlayerId = starters[4],
+                LeftCornerPlayerId = starters[5],
+                RightCornerPlayerId = starters[6]
+            },
             Slots = slots
         };
     }

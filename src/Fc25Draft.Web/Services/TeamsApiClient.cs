@@ -120,6 +120,30 @@ public class TeamsApiClient
         return await response.Content.ReadFromJsonAsync<TeamLineupResponse>(cancellationToken: ct);
     }
 
+    public async Task<IReadOnlyList<TeamLineupSummaryResponse>> GetLineupsAsync(Guid teamId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.GetAsync($"api/teams/{teamId}/lineups", ct);
+        await EnsureSuccessAsync(response);
+
+        var payload = await response.Content.ReadFromJsonAsync<IReadOnlyList<TeamLineupSummaryResponse>>(cancellationToken: ct);
+        return payload ?? Array.Empty<TeamLineupSummaryResponse>();
+    }
+
+    public async Task<TeamLineupResponse?> GetLineupByIdAsync(Guid teamId, Guid lineupId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.GetAsync($"api/teams/{teamId}/lineup/{lineupId}", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<TeamLineupResponse>(cancellationToken: ct);
+    }
+
     public async Task<IReadOnlyList<LineupSlotTemplateDto>> GetLineupTemplateAsync(Guid teamId, string formationCode, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(formationCode))
@@ -149,6 +173,20 @@ public class TeamsApiClient
 
         var payload = await response.Content.ReadFromJsonAsync<TeamLineupResponse>(cancellationToken: ct);
         return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
+    public async Task SetActiveLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.PostAsync($"api/teams/{teamId}/lineup/{lineupId}/activate", content: null, cancellationToken: ct);
+        await EnsureSuccessAsync(response);
+    }
+
+    public async Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.DeleteAsync($"api/teams/{teamId}/lineup/{lineupId}", ct);
+        await EnsureSuccessAsync(response);
     }
 
     public async Task<QuickSellResultDto> QuickSellAsync(Guid teamId, Guid playerId, string teamToken, CancellationToken ct = default)

@@ -152,9 +152,18 @@ public class DraftDbContext : DbContext
         mb.Entity<TeamLineup>(e =>
         {
             e.HasKey(x => x.LineupId);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(60);
             e.Property(x => x.FormationCode).IsRequired().HasMaxLength(20);
             e.Property(x => x.TacticCode).IsRequired().HasMaxLength(40);
             e.Property(x => x.UpdatedAtUtc).IsRequired();
+            e.Property(x => x.Observation).HasMaxLength(500);
+            e.Property(x => x.CaptainPlayerId);
+            e.Property(x => x.ShortFreeKickLeftPlayerId);
+            e.Property(x => x.ShortFreeKickRightPlayerId);
+            e.Property(x => x.LongFreeKickPlayerId);
+            e.Property(x => x.PenaltyKickPlayerId);
+            e.Property(x => x.LeftCornerPlayerId);
+            e.Property(x => x.RightCornerPlayerId);
 
             e.HasIndex(x => x.TeamId).HasDatabaseName("IX_TeamLineups_TeamId");
 

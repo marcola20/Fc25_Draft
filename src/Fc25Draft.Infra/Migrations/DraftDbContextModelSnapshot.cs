@@ -819,6 +819,15 @@ namespace Fc25Draft.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("CaptainPlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LeftCornerPlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LongFreeKickPlayerId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("FormationCode")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -826,6 +835,27 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Observation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("PenaltyKickPlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RightCornerPlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ShortFreeKickLeftPlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ShortFreeKickRightPlayerId")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid");
