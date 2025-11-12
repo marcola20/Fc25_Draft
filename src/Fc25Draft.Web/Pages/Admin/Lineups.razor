@@ -192,15 +192,15 @@ else
                             <div class="col-md-6">
                                 <h6 class="text-uppercase text-muted">Reservas</h6>
                                 <ul class="list-group list-group-flush">
-                                    @foreach (var slot in GetLineupSlots(1))
+                                    @foreach (var item in GetLineupSlots(1).Select((slot, index) => new { Slot = slot, Index = index + 1 }))
                                     {
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             <div>
-                                                <div class="fw-semibold">@slot.PositionLabel</div>
-                                                <div class="text-muted small">Slot #@slot.Order</div>
+                                                <div class="fw-semibold">@GetReserveLabel(item.Index)</div>
+                                                <div class="text-muted small">Posição original: @item.Slot.PositionLabel</div>
                                             </div>
                                             <div class="text-end">
-                                                <div>@(slot.PlayerName ?? "—")</div>
+                                                <div>@(item.Slot.PlayerName ?? "—")</div>
                                             </div>
                                         </li>
                                     }
@@ -335,6 +335,8 @@ else
             .OrderBy(s => s.Order)
             .ToList();
     }
+
+    private static string GetReserveLabel(int index) => $"Reserva {index}";
 
     private async Task OpenLineupModalAsync(TeamListItemDto team)
     {

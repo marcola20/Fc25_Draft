@@ -70,17 +70,17 @@ else
                         <h5>Titulares (11)</h5>
                         @foreach (var slot in GetSlotsByRole(0))
                         {
-                            <div class="mb-3">
+                            <div class="mb-3" @key="slot.Order">
                                 <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
-                                    <option value="">— Selecionar —</option>
+                                    <option value="" selected="@(!slot.PlayerId.HasValue)">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
                                     {
-                                        <option value="@option.PlayerId">@option.DisplayName</option>
+                                        <option value="@option.PlayerId" selected="@(slot.PlayerId == option.PlayerId)">@option.DisplayName</option>
                                     }
                                 </select>
                             </div>
@@ -90,17 +90,17 @@ else
                         <h5>Reservas (7)</h5>
                         @foreach (var slot in GetSlotsByRole(1))
                         {
-                            <div class="mb-3">
+                            <div class="mb-3" @key="slot.Order">
                                 <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
-                                    <option value="">— Selecionar —</option>
+                                    <option value="" selected="@(!slot.PlayerId.HasValue)">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
                                     {
-                                        <option value="@option.PlayerId">@option.DisplayName</option>
+                                        <option value="@option.PlayerId" selected="@(slot.PlayerId == option.PlayerId)">@option.DisplayName</option>
                                     }
                                 </select>
                             </div>
@@ -329,22 +329,29 @@ else
     {
         if (slot.Role == 1)
         {
-            var startersCount = _slots.Count(s => s.Role == 0);
-            var reserveIndex = slot.Order - startersCount;
+            var reserveIndex = GetReserveIndex(slot);
 
-            if (reserveIndex < 1)
-            {
-                reserveIndex = _slots
-                    .Where(s => s.Role == 1)
-                    .OrderBy(s => s.Order)
-                    .Select((s, index) => new { Slot = s, Index = index + 1 })
-                    .FirstOrDefault(s => ReferenceEquals(s.Slot, slot))?.Index ?? slot.Order;
-            }
-
-            return $"RESERVA {reserveIndex}";
+            return $"Reserva {reserveIndex}";
         }
 
         return $"{slot.PositionLabel} ({slot.Order})";
+    }
+
+    private int GetReserveIndex(LineupSlotViewModel slot)
+    {
+        var startersCount = _slots.Count(s => s.Role == 0);
+        var reserveIndex = slot.Order - startersCount;
+
+        if (reserveIndex < 1)
+        {
+            reserveIndex = _slots
+                .Where(s => s.Role == 1)
+                .OrderBy(s => s.Order)
+                .Select((s, index) => new { Slot = s, Index = index + 1 })
+                .FirstOrDefault(s => ReferenceEquals(s.Slot, slot))?.Index ?? slot.Order;
+        }
+
+        return reserveIndex;
     }
 
     private void OnSlotPlayerChanged(LineupSlotViewModel slot, ChangeEventArgs args)
