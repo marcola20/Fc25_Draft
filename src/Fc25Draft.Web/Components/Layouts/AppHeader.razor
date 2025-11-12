@@ -9,11 +9,11 @@
             <div class="app-header-titles">
                 @if (!string.IsNullOrWhiteSpace(HomeHref))
                 {
-                    <a class="app-header-title-link" href="@HomeHref">@Title</a>
+                    <a class="app-header-title-link text-white text-decoration-none" href="@HomeHref" style="cursor: default;">@Title</a>
                 }
                 else
                 {
-                    <span class="app-header-title-text">@Title</span>
+                    <span class="app-header-title-text text-white">@Title</span>
                 }
 
                 @if (!string.IsNullOrWhiteSpace(Subtitle))

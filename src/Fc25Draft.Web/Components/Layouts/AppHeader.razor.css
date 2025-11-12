@@ -59,19 +59,23 @@
     min-width: 0;
 }
 
+
 .app-header-title-link,
 .app-header-title-text {
     font-size: 1.5rem;
     font-weight: 600;
     line-height: 1.2;
-    color: inherit;
+    color: #fff;
     text-decoration: none;
     cursor: default;
 }
 
-.app-header-title-link:hover {
-    color: inherit;
+.app-header-title-link:hover,
+.app-header-title-link:focus,
+.app-header-title-link:active {
+    color: #fff;
     text-decoration: none;
+    cursor: default;
 }
 
 .app-header-title-link:focus-visible {
