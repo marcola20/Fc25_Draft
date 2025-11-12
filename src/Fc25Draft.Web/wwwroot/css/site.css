@@ -9,7 +9,8 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: #d1d1d1;
+    text-decoration: none !important;
 }
 
 .btn-primary {

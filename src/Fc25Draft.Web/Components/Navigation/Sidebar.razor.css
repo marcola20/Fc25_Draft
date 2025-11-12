@@ -60,6 +60,33 @@
     font-size: 0.9rem;
 }
 
+.app-sidebar a,
+.sidebar-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+    text-decoration: none !important;
+}
+
+    .app-sidebar a:hover,
+    .sidebar-link:hover {
+        color: #ffffff !important;
+        text-decoration: none !important;
+    }
+
+    .sidebar-link.active {
+        color: #0d1b2a !important;
+        background-color: #f4d35e !important;
+        text-decoration: none !important;
+    }
+
+    .app-sidebar a:link,
+    .app-sidebar a:visited,
+    .app-sidebar a:active {
+        color: rgba(255, 255, 255, 0.85) !important;
+        text-decoration: none !important;
+    }
+
+
+
 @media (max-width: 992px) {
     .app-sidebar {
         padding-top: 4.5rem;
