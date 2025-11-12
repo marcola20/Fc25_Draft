@@ -70,9 +70,9 @@ else
                         <h5>Titulares (11)</h5>
                         @foreach (var slot in GetSlotsByRole(0))
                         {
-                            <div class="mb-3" @key="slot.Order">
-                                <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
-                                <select id="slot-@slot.Order"
+                            <div class="mb-3" @key="GetSlotKey(slot)">
+                                <label class="form-label fw-semibold" for="@GetSlotElementId(slot)">@GetSlotLabel(slot)</label>
+                                <select id="@GetSlotElementId(slot)"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
@@ -90,9 +90,9 @@ else
                         <h5>Reservas (7)</h5>
                         @foreach (var slot in GetSlotsByRole(1))
                         {
-                            <div class="mb-3" @key="slot.Order">
-                                <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
-                                <select id="slot-@slot.Order"
+                            <div class="mb-3" @key="GetSlotKey(slot)">
+                                <label class="form-label fw-semibold" for="@GetSlotElementId(slot)">@GetSlotLabel(slot)</label>
+                                <select id="@GetSlotElementId(slot)"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
@@ -204,7 +204,9 @@ else
         try
         {
             var template = await TeamsApiClient.GetLineupTemplateAsync(TeamId, formation);
-            var previousSlots = preservePlayers ? _slots.ToDictionary(s => s.Order) : new Dictionary<int, LineupSlotViewModel>();
+            var previousSlots = preservePlayers
+                ? _slots.ToDictionary(s => (s.Order, s.Role))
+                : new Dictionary<(int Order, byte Role), LineupSlotViewModel>();
             var preservedPlayers = new HashSet<int>();
 
             _slots.Clear();
@@ -212,7 +214,7 @@ else
             foreach (var slot in template.OrderBy(s => s.Order))
             {
                 int? playerId = null;
-                if (preservePlayers && previousSlots.TryGetValue(slot.Order, out var previous) && previous.PlayerId.HasValue)
+                if (preservePlayers && previousSlots.TryGetValue((slot.Order, slot.Role), out var previous) && previous.PlayerId.HasValue)
                 {
                     var pid = previous.PlayerId.Value;
                     if (!preservedPlayers.Contains(pid) && _playerLookup.TryGetValue(pid, out var player))
@@ -298,6 +300,10 @@ else
     }
 
     private IEnumerable<LineupSlotViewModel> GetSlotsByRole(byte role) => _slots.Where(s => s.Role == role).OrderBy(s => s.Order);
+
+    private static string GetSlotKey(LineupSlotViewModel slot) => $"{slot.Role}-{slot.Order}";
+
+    private static string GetSlotElementId(LineupSlotViewModel slot) => $"slot-{slot.Role}-{slot.Order}";
 
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
     {
