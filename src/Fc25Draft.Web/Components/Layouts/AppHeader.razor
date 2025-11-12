@@ -2,42 +2,56 @@
 
 <header class="app-header" role="banner">
     <div class="app-header-main">
-        <button class="btn btn-link toggle-sidebar" @onclick="ToggleSidebar" aria-label="Alternar menu">
-            <span class="oi oi-menu" aria-hidden="true"></span>
-        </button>
-        <div class="app-header-titles">
-            <h1>@Title</h1>
-            @if (!string.IsNullOrWhiteSpace(Subtitle))
-            {
-                <p class="subtitle">@Subtitle</p>
-            }
-        </div>
-        <div class="app-header-actions">
-            @if (Actions is not null)
-            {
-                @Actions
-            }
-        </div>
-    </div>
-    <div class="app-header-status" role="status">
-        <span class="status-label">@AccessLabel</span>
-        @if (ShowAuthProgress)
-        {
-            <span class="spinner-border spinner-border-sm text-light ms-2" role="status" aria-hidden="true"></span>
-        }
-        else
-        {
-            <div class="btn-group" role="group" aria-label="Controles de acesso">
-                @if (IsAdmin)
+        <div class="app-header-brand">
+            <button type="button" class="toggle-sidebar" @onclick="ToggleSidebar" aria-label="Alternar menu">
+                <span class="oi oi-menu" aria-hidden="true"></span>
+            </button>
+            <div class="app-header-titles">
+                @if (!string.IsNullOrWhiteSpace(HomeHref))
                 {
-                    <button class="btn btn-sm btn-outline-light" @onclick="SignOut">Sair</button>
+                    <a class="app-header-title-link" href="@HomeHref">@Title</a>
                 }
                 else
                 {
-                    <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Entrar como Admin</button>
+                    <span class="app-header-title-text">@Title</span>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <span class="subtitle">@Subtitle</span>
                 }
             </div>
-        }
+        </div>
+
+        <div class="app-header-controls">
+            @if (Actions is not null)
+            {
+                <div class="app-header-actions">
+                    @Actions
+                </div>
+            }
+
+            <div class="app-header-status" role="status">
+                <span class="status-label">@AccessLabel</span>
+                @if (ShowAuthProgress)
+                {
+                    <span class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <div class="btn-group" role="group" aria-label="Controles de acesso">
+                        @if (IsAdmin)
+                        {
+                            <button class="btn btn-sm btn-outline-light" @onclick="SignOut">Sair</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Entrar como Admin</button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </header>
 
@@ -48,6 +62,7 @@
     [Parameter] public string AccessLabel { get; set; } = string.Empty;
     [Parameter] public bool ShowAuthProgress { get; set; }
     [Parameter] public bool IsAdmin { get; set; }
+    [Parameter] public string? HomeHref { get; set; }
     [Parameter] public EventCallback ToggleSidebar { get; set; }
     [Parameter] public EventCallback SignIn { get; set; }
     [Parameter] public EventCallback SignOut { get; set; }

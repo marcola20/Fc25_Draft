@@ -17,6 +17,11 @@ public class LayoutNavigationService
         {
             new("Elencos", "/times/elencos", "oi oi-people")
         }),
+        new("Calendário", new List<MenuItem>
+        {
+            new("Ver Calendário", "/calendario", "oi oi-calendar", MatchPrefix: true),
+            new("Gerenciar Calendário", "/calendario/gerenciar", "oi oi-pencil", RequiredRole: "Admin", MatchPrefix: true)
+        }),
         new("Draft", new List<MenuItem>
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
@@ -73,6 +78,10 @@ public class LayoutNavigationService
         ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
         ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
         ["/market/transfers"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
+        ["/calendario"] = CreateDefinition("Calendário", "Calendário", "/calendario"),
+        ["/calendario/gerenciar"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
+        ["/calendario/admin"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
+        ["/admin/calendario"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
         ["/mercado/ciclos"] = CreateDefinition("Ciclos do Mercado", "Mercado", "/mercado/ciclos", true),
         ["/admin/mercado/ciclos"] = CreateDefinition("Ciclos do Mercado", "Mercado", "/mercado/ciclos", true),
         ["/admin/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/ciclos", true),
@@ -128,6 +137,21 @@ public class LayoutNavigationService
         return null;
     }
 
+    public bool HasRoute(string route)
+    {
+        if (string.IsNullOrWhiteSpace(route))
+        {
+            return false;
+        }
+
+        if (!route.StartsWith('/'))
+        {
+            route = "/" + route;
+        }
+
+        return PageDefinitions.ContainsKey(route);
+    }
+
     private static bool IsRoleAllowed(string? requiredRole, bool isAdmin)
     {
         if (string.IsNullOrWhiteSpace(requiredRole))
@@ -162,6 +186,7 @@ public class LayoutNavigationService
         {
             "Times" => "/times/elencos",
             "Draft" => "/draft/controle",
+            "Calendário" => "/calendario",
             "Mercado" => "/mercado",
             "Admin" when admin => "/admin/ciclos",
             "Admin" => "/home",

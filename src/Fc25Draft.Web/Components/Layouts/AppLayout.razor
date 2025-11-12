@@ -21,6 +21,7 @@
                    AccessLabel="@GetAccessLabel()"
                    ShowAuthProgress="@(!authReady)"
                    IsAdmin="@AdminAuth.IsAuthenticated"
+                   HomeHref="@homeRoute"
                    ToggleSidebar="@ToggleSidebar"
                    SignIn="@OpenAdminModal"
                    SignOut="@SignOutAsync" />
@@ -100,6 +101,7 @@
     private bool authReady;
     private bool isLoadingInitial = true;
     private CancellationTokenSource? initializationCts;
+    private string? homeRoute;
 
     protected override void OnInitialized()
     {
@@ -107,6 +109,7 @@
         Navigation.LocationChanged += OnLocationChanged;
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
         LayoutState.StateChanged += OnLayoutStateChanged;
+        homeRoute = NavigationService.HasRoute("/home") ? Navigation.ToAbsoluteUri("/home").ToString() : null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -135,7 +138,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error durante inicialização do layout");
+            Logger.LogError(ex, "LayoutNavV2:Error durante inicialização do layout");
         }
         finally
         {
@@ -153,7 +156,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao montar menu");
+            Logger.LogError(ex, "LayoutNavV2:Error ao montar menu");
             menuGroups = Array.Empty<MenuGroup>();
         }
     }
@@ -185,7 +188,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao atualizar breadcrumb para {Route}", uri);
+            Logger.LogError(ex, "LayoutNavV2:Error ao atualizar breadcrumb para {Route}", uri);
         }
     }
 
@@ -195,7 +198,7 @@
         {
             var context = await GetAuditContextAsync();
             var visibleRoutes = menuGroups.Sum(group => group.Items.Count);
-            Logger.LogInformation("LayoutNav:MenuBuilt UserId={UserId} Role={Role} Routes={Routes} Timestamp={Timestamp}",
+            Logger.LogInformation("LayoutNavV2:MenuBuilt UserId={UserId} Role={Role} Routes={Routes} Timestamp={Timestamp}",
                 context.UserId,
                 context.Role,
                 visibleRoutes,
@@ -203,7 +206,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao registrar menu");
+            Logger.LogError(ex, "LayoutNavV2:Error ao registrar menu");
         }
     }
 
@@ -218,7 +221,7 @@
                 route = "/" + route;
             }
 
-            Logger.LogInformation("LayoutNav:RouteVisited UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
+            Logger.LogInformation("LayoutNavV2:RouteVisited UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
                 context.UserId,
                 context.Role,
                 string.IsNullOrWhiteSpace(route) ? "/" : route,
@@ -226,7 +229,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao registrar rota visitada {Route}", uri);
+            Logger.LogError(ex, "LayoutNavV2:Error ao registrar rota visitada {Route}", uri);
         }
     }
 
@@ -235,7 +238,7 @@
         try
         {
             var context = await GetAuditContextAsync();
-            Logger.LogWarning("LayoutNav:AccessDenied UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
+            Logger.LogWarning("LayoutNavV2:AccessDenied UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
                 context.UserId,
                 context.Role,
                 attemptedRoute,
@@ -243,7 +246,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao registrar acesso negado para {Route}", attemptedRoute);
+            Logger.LogError(ex, "LayoutNavV2:Error ao registrar acesso negado para {Route}", attemptedRoute);
         }
     }
 
@@ -312,7 +315,7 @@
         catch (Exception ex)
         {
             adminModalError = "Não foi possível validar o token. Tente novamente.";
-            Logger.LogError(ex, "LayoutNav:Error ao validar token de admin");
+            Logger.LogError(ex, "LayoutNavV2:Error ao validar token de admin");
         }
     }
 
@@ -327,7 +330,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "LayoutNav:Error ao sair do modo admin");
+            Logger.LogError(ex, "LayoutNavV2:Error ao sair do modo admin");
         }
     }
 
