@@ -219,7 +219,7 @@ else
                     var pid = previous.PlayerId.Value;
                     if (!preservedPlayers.Contains(pid) && _playerLookup.TryGetValue(pid, out var player))
                     {
-                        var eligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                        var eligible = slot.Role == 1 || PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
                         if (eligible)
                         {
                             playerId = pid;
@@ -261,11 +261,9 @@ else
             int? playerId = null;
             if (slot.PlayerId.HasValue && _playerLookup.TryGetValue(slot.PlayerId.Value, out var player))
             {
-                var eligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                var eligible = slot.Role == 1 || PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
                 if (eligible && usedPlayers.Add(slot.PlayerId.Value))
-                {
                     playerId = slot.PlayerId.Value;
-                }
             }
 
             _slots.Add(new LineupSlotViewModel
@@ -282,15 +280,11 @@ else
     private async Task OnFormationChangedAsync(ChangeEventArgs args)
     {
         if (args?.Value is not string value)
-        {
             return;
-        }
 
         var normalized = value.Trim();
         if (string.Equals(_selectedFormation, normalized, StringComparison.OrdinalIgnoreCase))
-        {
             return;
-        }
 
         _selectedFormation = normalized;
         await LoadTemplateAsync(_selectedFormation, preservePlayers: true);
@@ -370,7 +364,7 @@ else
             return;
         }
 
-        var isEligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+        var isEligible = slot.Role == 1 || PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
         if (!isEligible)
         {
             Toasts.ShowError("Jogador não elegível para este slot.");

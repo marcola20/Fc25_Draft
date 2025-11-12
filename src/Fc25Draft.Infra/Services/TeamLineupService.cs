@@ -175,13 +175,9 @@ public sealed class TeamLineupService : ITeamLineupService
         void FailValidation(string message, string? detail = null)
         {
             if (!string.IsNullOrWhiteSpace(detail))
-            {
                 _logger.LogWarning("Validação da escalação do time {TeamId} falhou: {Detail}", teamId, detail);
-            }
             else
-            {
                 _logger.LogWarning("Validação da escalação do time {TeamId} falhou: {Message}", teamId, message);
-            }
 
             throw new InvalidOperationException(message);
         }
@@ -189,70 +185,46 @@ public sealed class TeamLineupService : ITeamLineupService
         foreach (var slot in request.Slots)
         {
             if (!expectedByOrder.TryGetValue(slot.Order, out var expected))
-            {
                 FailValidation($"Slot {slot.Order} não faz parte da formação selecionada.");
-            }
 
             if (slot.Role != expected.Role)
-            {
                 FailValidation($"Slot {slot.Order} com papel inválido.");
-            }
 
             if (slot.PrimaryPositionId != expected.PrimaryPositionId)
-            {
                 FailValidation($"Slot {slot.Order} com posição incompatível com a formação.");
-            }
 
             if (slot.PlayerId is null)
-            {
                 FailValidation("Todos os slots devem possuir um jogador selecionado.");
-            }
 
-            var playerId = slot.PlayerId.Value;
+            var playerId = slot.PlayerId!.Value;
             if (!rosterPlayers.TryGetValue(playerId, out var rosterInfo))
-            {
                 FailValidation("Jogador não pertence ao time.", $"JogadorId={playerId}");
-            }
 
             if (!usedPlayers.Add(playerId))
-            {
                 FailValidation("Há jogadores repetidos na escalação.", $"JogadorId={playerId}");
-            }
 
-            if (!_eligibilityService.IsEligible(slot.PrimaryPositionId, rosterInfo.PositionId, rosterInfo.SecondaryPositionIds))
-            {
+            if (slot.Role == 0 && !_eligibilityService.IsEligible(slot.PrimaryPositionId, rosterInfo.PositionId, rosterInfo.SecondaryPositionIds))
                 FailValidation("Jogador não elegível para este slot.", $"Jogador={rosterInfo.Name};Slot={slot.Order}");
-            }
 
             if (slot.Role == 0)
             {
                 startersCount++;
 
-                if (rosterInfo.PositionId == (int)PositionType.Goleiro)
-                {
+                if (rosterInfo!.PositionId == (int)PositionType.Goleiro)
                     gkCount++;
-                }
             }
             else
-            {
                 benchCount++;
-            }
         }
 
         if (startersCount != 11)
-        {
             FailValidation("Selecione exatamente 11 titulares.");
-        }
 
         if (benchCount != 7)
-        {
             FailValidation("Selecione exatamente 7 reservas.");
-        }
 
         if (gkCount != 1)
-        {
             FailValidation("É obrigatório ter 1 goleiro entre os titulares.");
-        }
 
         var strategy = _db.Database.CreateExecutionStrategy();
 
@@ -269,9 +241,7 @@ public sealed class TeamLineupService : ITeamLineupService
                         .ConfigureAwait(false);
 
                     foreach (var lineup in existingLineups)
-                    {
                         lineup.IsActive = false;
-                    }
 
                     var now = DateTime.UtcNow;
                     var newLineup = new TeamLineup
