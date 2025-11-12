@@ -71,7 +71,7 @@ else
                         @foreach (var slot in GetSlotsByRole(0))
                         {
                             <div class="mb-3">
-                                <label class="form-label fw-semibold" for="slot-@slot.Order">@slot.PositionLabel (@slot.Order)</label>
+                                <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
@@ -91,7 +91,7 @@ else
                         @foreach (var slot in GetSlotsByRole(1))
                         {
                             <div class="mb-3">
-                                <label class="form-label fw-semibold" for="slot-@slot.Order">@slot.PositionLabel (@slot.Order)</label>
+                                <label class="form-label fw-semibold" for="slot-@slot.Order">@GetSlotLabel(slot)</label>
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
@@ -149,7 +149,6 @@ else
     private string _tacticCode = string.Empty;
     private DateTime? _updatedAtUtc;
     private readonly List<LineupSlotViewModel> _slots = new();
-    private readonly HashSet<int> _selectedPlayerIds = new();
     private IReadOnlyList<PlayerOption> _playerOptions = Array.Empty<PlayerOption>();
     private Dictionary<int, PlayerOption> _playerLookup = new();
     private Guid _loadedTeamId;
@@ -206,9 +205,9 @@ else
         {
             var template = await TeamsApiClient.GetLineupTemplateAsync(TeamId, formation);
             var previousSlots = preservePlayers ? _slots.ToDictionary(s => s.Order) : new Dictionary<int, LineupSlotViewModel>();
+            var preservedPlayers = new HashSet<int>();
 
             _slots.Clear();
-            _selectedPlayerIds.Clear();
 
             foreach (var slot in template.OrderBy(s => s.Order))
             {
@@ -216,14 +215,14 @@ else
                 if (preservePlayers && previousSlots.TryGetValue(slot.Order, out var previous) && previous.PlayerId.HasValue)
                 {
                     var pid = previous.PlayerId.Value;
-                    if (_playerLookup.TryGetValue(pid, out var player))
+                    if (!preservedPlayers.Contains(pid) && _playerLookup.TryGetValue(pid, out var player))
                     {
                         var eligible = slot.Role == 1 ||
                             PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
                         if (eligible)
                         {
                             playerId = pid;
-                            _selectedPlayerIds.Add(pid);
+                            preservedPlayers.Add(pid);
                         }
                     }
                 }
@@ -254,7 +253,7 @@ else
         _tacticCode = response.TacticCode;
         _updatedAtUtc = response.UpdatedAtUtc;
         _slots.Clear();
-        _selectedPlayerIds.Clear();
+        var usedPlayers = new HashSet<int>();
 
         foreach (var slot in response.Slots.OrderBy(s => s.Order))
         {
@@ -263,10 +262,9 @@ else
             {
                 var eligible = slot.Role == 1 ||
                     PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
-                if (eligible)
+                if (eligible && usedPlayers.Add(slot.PlayerId.Value))
                 {
                     playerId = slot.PlayerId.Value;
-                    _selectedPlayerIds.Add(playerId.Value);
                 }
             }
 
@@ -317,23 +315,44 @@ else
                 (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
         }
 
+        var selectedIds = GetSelectedPlayerIds(slot);
+
         if (slot.PlayerId is int current)
         {
-            return baseOptions.Where(p => p.PlayerId == current || !_selectedPlayerIds.Contains(p.PlayerId));
+            return baseOptions.Where(p => p.PlayerId == current || !selectedIds.Contains(p.PlayerId));
         }
 
-        return baseOptions.Where(p => !_selectedPlayerIds.Contains(p.PlayerId));
+        return baseOptions.Where(p => !selectedIds.Contains(p.PlayerId));
+    }
+
+    private string GetSlotLabel(LineupSlotViewModel slot)
+    {
+        if (slot.Role == 1)
+        {
+            var startersCount = _slots.Count(s => s.Role == 0);
+            var reserveIndex = slot.Order - startersCount;
+
+            if (reserveIndex < 1)
+            {
+                reserveIndex = _slots
+                    .Where(s => s.Role == 1)
+                    .OrderBy(s => s.Order)
+                    .Select((s, index) => new { Slot = s, Index = index + 1 })
+                    .FirstOrDefault(s => ReferenceEquals(s.Slot, slot))?.Index ?? slot.Order;
+            }
+
+            return $"RESERVA {reserveIndex}";
+        }
+
+        return $"{slot.PositionLabel} ({slot.Order})";
     }
 
     private void OnSlotPlayerChanged(LineupSlotViewModel slot, ChangeEventArgs args)
     {
-        var previousPlayerId = slot.PlayerId;
-
         if (args?.Value is not string raw || string.IsNullOrWhiteSpace(raw))
         {
             if (slot.PlayerId.HasValue)
             {
-                _selectedPlayerIds.Remove(slot.PlayerId.Value);
                 slot.PlayerId = null;
             }
             StateHasChanged();
@@ -358,21 +377,35 @@ else
             return;
         }
 
-        if (_selectedPlayerIds.Contains(playerId) && (!previousPlayerId.HasValue || previousPlayerId.Value != playerId))
+        if (_slots.Any(s => !ReferenceEquals(s, slot) && s.PlayerId == playerId))
         {
             Toasts.ShowError("Jogador já selecionado em outro slot.");
             StateHasChanged();
             return;
         }
 
-        if (previousPlayerId.HasValue)
+        slot.PlayerId = playerId;
+        StateHasChanged();
+    }
+
+    private HashSet<int> GetSelectedPlayerIds(LineupSlotViewModel? excludeSlot)
+    {
+        var ids = new HashSet<int>();
+
+        foreach (var slot in _slots)
         {
-            _selectedPlayerIds.Remove(previousPlayerId.Value);
+            if (excludeSlot is not null && ReferenceEquals(slot, excludeSlot))
+            {
+                continue;
+            }
+
+            if (slot.PlayerId is int playerId)
+            {
+                ids.Add(playerId);
+            }
         }
 
-        slot.PlayerId = playerId;
-        _selectedPlayerIds.Add(playerId);
-        StateHasChanged();
+        return ids;
     }
 
     private bool IsSaveDisabled =>
@@ -449,7 +482,6 @@ else
         {
             if (slot.PlayerId.HasValue && !_playerLookup.ContainsKey(slot.PlayerId.Value))
             {
-                _selectedPlayerIds.Remove(slot.PlayerId.Value);
                 slot.PlayerId = null;
             }
         }
