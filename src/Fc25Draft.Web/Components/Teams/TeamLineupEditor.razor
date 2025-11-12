@@ -1,3 +1,4 @@
+@using System
 @using System.Collections.Generic
 @using System.Linq
 @using Fc25Draft.Core.DTOs
@@ -7,13 +8,17 @@
 @inject ToastService Toasts
 @inject IPositionEligibilityService PositionEligibility
 
-@if (!_initialized)
+@if (Roster is null)
 {
-    <div class="text-muted">Carregando escalação...</div>
+    <div class="text-muted">Carregando elenco...</div>
 }
-else if (Roster is null || Roster.Jogadores.Count == 0)
+else if (Roster.Jogadores.Count == 0)
 {
     <div class="alert alert-warning" role="alert">Carregue o elenco do time para configurar a escalação.</div>
+}
+else if (!_initialized)
+{
+    <div class="text-muted">Carregando escalação...</div>
 }
 else
 {
@@ -111,6 +116,13 @@ else
             </div>
 
             <p class="text-muted mt-3">Selecione 11 titulares e 7 reservas, sem repetir jogadores. É obrigatório ter 1 GK entre os titulares.</p>
+
+            @if (_lineupSummaries.Count == 0 && string.IsNullOrEmpty(_errorMessage) && !_isLoading && !_isTemplateLoading)
+            {
+                <div class="alert alert-info" role="status">
+                    Nenhuma escalação foi salva ainda. Clique em "Nova escalação" para começar.
+                </div>
+            }
 
             @if (!string.IsNullOrEmpty(_errorMessage))
             {
@@ -385,24 +397,53 @@ else
     private string _observation = string.Empty;
     private LineupSpecialRolesViewModel _specialRoles = new();
     private bool _showLineupLimitModal;
+    private int _rosterFingerprint;
+    private bool HasRoster => Roster?.Jogadores is { Count: > 0 };
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!_initialized || _loadedTeamId != TeamId)
+        if (!HasRoster)
         {
-            _loadedTeamId = TeamId;
-            RefreshPlayerOptions();
+            ResetStateForMissingRoster();
+            _initialized = false;
+            _rosterFingerprint = 0;
+            return;
+        }
+
+        var teamChanged = _loadedTeamId != TeamId;
+        var fingerprint = CalculateRosterFingerprint();
+        var rosterChanged = fingerprint != _rosterFingerprint;
+        _loadedTeamId = TeamId;
+        _rosterFingerprint = fingerprint;
+
+        RefreshPlayerOptions();
+
+        if (!_initialized || teamChanged)
+        {
             await LoadAsync();
             _initialized = true;
         }
-        else
+        else if (rosterChanged && _currentLineupId.HasValue)
         {
-            RefreshPlayerOptions();
+            await LoadLineupAsync(_currentLineupId.Value);
         }
     }
 
     private async Task LoadAsync()
     {
+        if (!HasRoster)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        if (TeamId == Guid.Empty)
+        {
+            _errorMessage = "Time inválido.";
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         _errorMessage = null;
         try
@@ -444,6 +485,11 @@ else
 
     private async Task LoadLineupAsync(Guid lineupId)
     {
+        if (!HasRoster || lineupId == Guid.Empty)
+        {
+            return;
+        }
+
         try
         {
             var lineup = await TeamsApiClient.GetLineupByIdAsync(TeamId, lineupId);
@@ -482,6 +528,12 @@ else
 
     private async Task LoadTemplateAsync(string formation, bool preservePlayers)
     {
+        if (!HasRoster)
+        {
+            _isTemplateLoading = false;
+            return;
+        }
+
         _isTemplateLoading = true;
         _errorMessage = null;
         try
@@ -600,10 +652,19 @@ else
 
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
     {
-        var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
-        var baseOptions = _playerOptions.Where(p =>
-            eligibles.Contains(p.PositionId) ||
-            (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
+        IEnumerable<PlayerOption> baseOptions;
+
+        if (slot.Role == 1)
+        {
+            baseOptions = _playerOptions;
+        }
+        else
+        {
+            var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
+            baseOptions = _playerOptions.Where(p =>
+                eligibles.Contains(p.PositionId) ||
+                (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
+        }
 
         var selectedIds = GetSelectedPlayerIds(slot);
 
@@ -921,14 +982,14 @@ else
 
     private void RefreshPlayerOptions()
     {
-        if (Roster?.Jogadores is null)
+        if (!HasRoster)
         {
             _playerOptions = Array.Empty<PlayerOption>();
             _playerLookup = new Dictionary<int, PlayerOption>();
             return;
         }
 
-        _playerOptions = Roster.Jogadores
+        _playerOptions = Roster!.Jogadores
             .OrderBy(p => p.Nome)
             .Select(p => new PlayerOption(p.PlayerId, p.PositionId, Array.Empty<int>(), p.Nome, p.Posicao, p.Overall))
             .ToList();
@@ -944,6 +1005,26 @@ else
         }
 
         PruneSpecialRoles();
+    }
+
+    private void ResetStateForMissingRoster()
+    {
+        _isLoading = false;
+        _isTemplateLoading = false;
+        _playerOptions = Array.Empty<PlayerOption>();
+        _playerLookup = new Dictionary<int, PlayerOption>();
+        _lineupSummaries.Clear();
+        _slots.Clear();
+        _specialRoles.Clear();
+        _currentLineupId = null;
+        _activeLineupId = null;
+        _selectedFormation = _supportedFormations.First();
+        _lineupName = string.Empty;
+        _observation = string.Empty;
+        _tacticCode = string.Empty;
+        _updatedAtUtc = null;
+        _errorMessage = null;
+        _showLineupLimitModal = false;
     }
 
     private async Task StartNewLineupAsync()
@@ -1025,6 +1106,24 @@ else
         {
             Toasts.ShowError(ex.Message);
         }
+    }
+
+    private int CalculateRosterFingerprint()
+    {
+        if (!HasRoster)
+        {
+            return 0;
+        }
+
+        var hash = new HashCode();
+        hash.Add(Roster!.Jogadores.Count);
+        foreach (var player in Roster.Jogadores.OrderBy(p => p.PlayerId))
+        {
+            hash.Add(player.PlayerId);
+            hash.Add(player.PositionId);
+        }
+
+        return hash.ToHashCode();
     }
 
     private sealed class LineupSlotViewModel

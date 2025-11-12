@@ -462,14 +462,14 @@ public sealed class TeamLineupService : ITeamLineupService
                     await _db.SaveChangesAsync(ct).ConfigureAwait(false);
                     await transaction.CommitAsync(ct).ConfigureAwait(false);
 
-                    var reloaded = await GetByIdAsync(teamId, targetLineup.LineupId, ct).ConfigureAwait(false);
-                    if (reloaded is null)
-                    {
-                        _logger.LogError("Falha ao recarregar a escalação salva do time {TeamId}.", teamId);
-                        throw new InvalidOperationException("Ocorreu um erro ao salvar a escalação.");
-                    }
+                    await _db.Entry(targetLineup)
+                        .Collection(l => l.Slots)
+                        .Query()
+                        .Include(s => s.Player)
+                        .LoadAsync(ct)
+                        .ConfigureAwait(false);
 
-                    return reloaded;
+                    return await BuildResponseAsync(targetLineup, ct).ConfigureAwait(false);
                 }
                 catch
                 {
