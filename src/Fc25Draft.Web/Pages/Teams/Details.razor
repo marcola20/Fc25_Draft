@@ -95,7 +95,7 @@ else
             <li class="nav-item" role="presentation">
                 <button type="button"
                         class="nav-link @(IsDetailsTabActive("roster") ? "active" : string.Empty)"
-                        @onclick="() => SetDetailsTab("roster")"
+                        @onclick='() => SetDetailsTab("roster")'
                         role="tab"
                         aria-controls="tab-roster"
                         aria-selected="@(IsDetailsTabActive("roster") ? "true" : "false")">
@@ -105,7 +105,7 @@ else
             <li class="nav-item" role="presentation">
                 <button type="button"
                         class="nav-link @(IsDetailsTabActive("lineup") ? "active" : string.Empty)"
-                        @onclick="() => SetDetailsTab("lineup")"
+                        @onclick='() => SetDetailsTab("lineup")'
                         role="tab"
                         aria-controls="tab-lineup"
                         aria-selected="@(IsDetailsTabActive("lineup") ? "true" : "false")">

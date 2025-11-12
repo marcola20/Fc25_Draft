@@ -67,7 +67,7 @@ public sealed class TeamLineupService : ITeamLineupService
                 s.Role,
                 s.PrimaryPositionId,
                 s.PlayerId,
-                positionNames.TryGetValue(s.PrimaryPositionId, out var name) ? name : $"Posição {s.PrimaryPositionId}",
+                positionNames.TryGetValue((short)s.PrimaryPositionId, out var name) ? name : $"Posição {s.PrimaryPositionId}",
                 s.Player?.Name))
             .ToList();
 
@@ -101,7 +101,7 @@ public sealed class TeamLineupService : ITeamLineupService
                 t.Order,
                 t.Role,
                 t.PrimaryPositionId,
-                positionNames.TryGetValue(t.PrimaryPositionId, out var label) ? label : $"Posição {t.PrimaryPositionId}"))
+                positionNames.TryGetValue((short)t.PrimaryPositionId, out var label) ? label : $"Posição {t.PrimaryPositionId}"))
             .ToList();
     }
 

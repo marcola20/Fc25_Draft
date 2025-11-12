@@ -12,32 +12,34 @@ public static class MatchEndpoints
         var matchesApi = api.MapGroup("/matches");
 
         matchesApi.MapPost("/{matchId:guid}/capture-lineup", async (
-            Guid matchId,
-            IMatchService matchService,
-            ILogger<MatchEndpoints> logger,
-            CancellationToken ct) =>
-        {
-            try
+        Guid matchId,
+        IMatchService matchService,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct) =>
             {
-                await matchService.CaptureLineupsAsync(matchId, ct);
-                return Results.NoContent();
-            }
-            catch (KeyNotFoundException ex)
-            {
-                logger.LogWarning(ex, "Partida {MatchId} não encontrada ao capturar escalações.", matchId);
-                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
-            }
-            catch (ArgumentException ex)
-            {
-                logger.LogWarning(ex, "Parâmetros inválidos ao capturar escalações da partida {MatchId}.", matchId);
-                return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Erro inesperado ao capturar escalações da partida {MatchId}.", matchId);
-                return Results.Json(new { message = "Erro interno no servidor." }, statusCode: StatusCodes.Status500InternalServerError);
-            }
-        });
+                var logger = loggerFactory.CreateLogger("MatchEndpoints");
+
+                try
+                {
+                    await matchService.CaptureLineupsAsync(matchId, ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Partida {MatchId} não encontrada ao capturar escalações.", matchId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (ArgumentException ex)
+                {
+                    logger.LogWarning(ex, "Parâmetros inválidos ao capturar escalações da partida {MatchId}.", matchId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Erro inesperado ao capturar escalações da partida {MatchId}.", matchId);
+                    return Results.Json(new { message = "Erro interno no servidor." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
 
         return api;
     }

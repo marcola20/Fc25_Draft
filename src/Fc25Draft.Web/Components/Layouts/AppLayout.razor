@@ -161,7 +161,7 @@
         }
     }
 
-    private async Task UpdatePageDefinitionAsync(string uri)
+    private Task UpdatePageDefinitionAsync(string uri)
     {
         try
         {
@@ -174,13 +174,10 @@
             {
                 var question = relative.IndexOf('?', StringComparison.Ordinal);
                 if (question >= 0)
-                {
                     relative = relative[..question];
-                }
+
                 if (!relative.StartsWith('/'))
-                {
                     relative = "/" + relative;
-                }
             }
 
             var definition = NavigationService.GetPageDefinition(relative);
@@ -190,6 +187,8 @@
         {
             Logger.LogError(ex, "LayoutNavV2:Error ao atualizar breadcrumb para {Route}", uri);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task LogMenuBuiltAsync()

@@ -156,32 +156,35 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             });
 
             teamsApi.MapGet("/{teamId:guid}/lineup/active", async (
-                Guid teamId,
-                ITeamLineupService lineupService,
-                ILogger<TeamEndpoints> logger,
-                CancellationToken ct) =>
+            Guid teamId,
+            ITeamLineupService lineupService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
             {
+                var logger = loggerFactory.CreateLogger("TeamEndpoints");
+
                 try
                 {
                     var lineup = await lineupService.GetActiveAsync(teamId, ct);
-                    return lineup is null
-                        ? Results.NotFound()
-                        : Results.Ok(lineup);
+                    return lineup is null ? Results.NotFound() : Results.Ok(lineup);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Falha ao carregar escalação ativa do time {TeamId}.", teamId);
-                    return Results.Json(new { message = "Erro ao carregar a escalação ativa." }, statusCode: StatusCodes.Status500InternalServerError);
+                    return Results.Json(new { message = "Erro ao carregar a escalação ativa." },
+                        statusCode: StatusCodes.Status500InternalServerError);
                 }
             });
 
             teamsApi.MapGet("/{teamId:guid}/lineup/template", async (
-                Guid teamId,
-                string formationCode,
-                ITeamLineupService lineupService,
-                ILogger<TeamEndpoints> logger,
-                CancellationToken ct) =>
+             Guid teamId,
+             string formationCode,
+             ITeamLineupService lineupService,
+             ILoggerFactory loggerFactory,
+             CancellationToken ct) =>
             {
+                var logger = loggerFactory.CreateLogger("TeamEndpoints");
+
                 if (string.IsNullOrWhiteSpace(formationCode))
                 {
                     return Results.Json(new { message = "Formação inválida." }, statusCode: StatusCodes.Status400BadRequest);
@@ -205,15 +208,18 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             });
 
             teamsApi.MapPost("/{teamId:guid}/lineup", async (
-                Guid teamId,
-                SaveLineupRequest request,
-                ITeamLineupService lineupService,
-                ILogger<TeamEndpoints> logger,
-                CancellationToken ct) =>
+             Guid teamId,
+             SaveLineupRequest request,
+             ITeamLineupService lineupService,
+             ILoggerFactory loggerFactory,
+             CancellationToken ct) =>
             {
+                var logger = loggerFactory.CreateLogger("TeamEndpoints");
+
                 if (request is null)
                 {
-                    return Results.Json(new { message = "Payload inválido." }, statusCode: StatusCodes.Status400BadRequest);
+                    return Results.Json(new { message = "Payload inválido." },
+                        statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 try
@@ -224,17 +230,20 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 catch (KeyNotFoundException ex)
                 {
                     logger.LogWarning(ex, "Time não encontrado ao salvar escalação {TeamId}.", teamId);
-                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                    return Results.Json(new { message = ex.Message },
+                        statusCode: StatusCodes.Status404NotFound);
                 }
                 catch (InvalidOperationException ex)
                 {
                     logger.LogWarning(ex, "Falha de validação ao salvar escalação do time {TeamId}.", teamId);
-                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                    return Results.Json(new { message = ex.Message },
+                        statusCode: StatusCodes.Status400BadRequest);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Erro inesperado ao salvar escalação do time {TeamId}.", teamId);
-                    return Results.Json(new { message = "Erro interno no servidor." }, statusCode: StatusCodes.Status500InternalServerError);
+                    return Results.Json(new { message = "Erro interno no servidor." },
+                        statusCode: StatusCodes.Status500InternalServerError);
                 }
             });
 

@@ -363,8 +363,6 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Slots");
-
                     b.Navigation("Team");
                 });
 
@@ -1043,7 +1041,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("CurrentTeam");
 
                     b.Navigation("Position");
-                    b.Navigation("RoundSelections");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Round", b =>

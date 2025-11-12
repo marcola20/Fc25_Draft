@@ -72,7 +72,7 @@ else
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
-                                        @onchange="e => OnSlotPlayerChangedAsync(slot, e)"
+                                        @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
                                     <option value="">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
@@ -92,7 +92,7 @@ else
                                 <select id="slot-@slot.Order"
                                         class="form-select"
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
-                                        @onchange="e => OnSlotPlayerChangedAsync(slot, e)"
+                                        @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
                                     <option value="">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
@@ -113,11 +113,11 @@ else
                     @if (_isSaving)
                     {
                         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Salvando...
+                        @:Salvando...
                     }
                     else
                     {
-                        Salvar Escalação
+                        @:Salvar Escalação
                     }
                 </button>
             </div>
@@ -291,7 +291,7 @@ else
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
         => _playerOptions.Where(p => IsPlayerCompatible(slot.PrimaryPositionId, p.PositionId));
 
-    private async Task OnSlotPlayerChangedAsync(LineupSlotViewModel slot, ChangeEventArgs args)
+    private void OnSlotPlayerChanged(LineupSlotViewModel slot, ChangeEventArgs args)
     {
         var previousPlayerId = slot.PlayerId;
 
@@ -306,12 +306,10 @@ else
             return;
         }
 
-        if (!int.TryParse(raw, out var playerId))
-        {
-            return;
-        }
+        if (!int.TryParse(raw, out var playerId)) return;
 
-        if (!_playerLookup.TryGetValue(playerId, out var player) || !IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+        if (!_playerLookup.TryGetValue(playerId, out var player) ||
+            !IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
         {
             Toasts.ShowError("Jogador não elegível para este slot.");
             StateHasChanged();
@@ -326,9 +324,7 @@ else
         }
 
         if (previousPlayerId.HasValue)
-        {
             _selectedPlayers.Remove(previousPlayerId.Value);
-        }
 
         slot.PlayerId = playerId;
         _selectedPlayers.Add(playerId);
