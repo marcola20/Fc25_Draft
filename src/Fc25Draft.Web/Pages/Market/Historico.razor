@@ -5,11 +5,14 @@
 @using Fc25Draft.Web.Models.Market
 @using Fc25Draft.Web.Utilities
 @using System.Runtime.InteropServices
+@using Microsoft.AspNetCore.Authorization
 @inject MarketClient MarketClient
 @inject NavigationManager Navigation
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Market.Historico> Logger
+
+@attribute [Authorize(Roles = "Admin")]
 @implements IDisposable
 
 <PageTitle>Histórico do Mercado</PageTitle>

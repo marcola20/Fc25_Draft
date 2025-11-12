@@ -1,11 +1,10 @@
-@page "/admin/transferencias/historico"
 @page "/market/transfers"
+@page "/admin/transferencias/historico"
 @using System.Threading
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Models.Transfers
 @using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.AspNetCore.Authorization
 @using Blazored.Toast.Services
 @inject TransfersClient TransfersClient
 @inject IToastService Toasts
@@ -14,7 +13,6 @@
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Market.Transfers> Logger
 
-@attribute [Authorize(Roles = "Admin")]
 
 @implements IDisposable
 

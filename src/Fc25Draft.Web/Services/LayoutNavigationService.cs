@@ -19,7 +19,7 @@ public class LayoutNavigationService
         }),
         new("Calendário", new List<MenuItem>
         {
-            new("Ver Calendário", "/calendario", "oi oi-calendar", MatchPrefix: true),
+            new("Calendário", "/calendario", "oi oi-calendar", MatchPrefix: true),
             new("Gerenciar Calendário", "/calendario/gerenciar", "oi oi-pencil", RequiredRole: "Admin", MatchPrefix: true)
         }),
         new("Draft", new List<MenuItem>
@@ -30,16 +30,14 @@ public class LayoutNavigationService
         new("Mercado de Transferências", new List<MenuItem>
         {
             new("Mercado", "/mercado", "oi oi-cart", MatchPrefix: true),
-            new("Negociações", "/mercado/negociacoes", "oi oi-loop"),
-            new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard"),
-            new("Ciclos do Mercado", "/mercado/ciclos", "oi oi-calendar", RequiredRole: "Admin")
+            new("Jogadores", "/players", "oi oi-person"),
+            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true)
         }),
         new("Admin", new List<MenuItem>
         {
-            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
-            new("Gerar Itens", "/admin/itens/gerar", "oi oi-plus", RequiredRole: "Admin"),
-            new("Histórico de Transferências", "/admin/transferencias/historico", "oi oi-transfer", RequiredRole: "Admin"),
-            new("Configurações", "/admin/config", "oi oi-wrench", RequiredRole: "Admin", IsOptional: true)
+            new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
+            new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard", RequiredRole: "Admin"),
+            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
 
@@ -73,22 +71,22 @@ public class LayoutNavigationService
         ["/drafts/manage"] = CreateDefinition("Informações do Draft", "Draft", "/draft/info"),
         ["/mercado"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
         ["/market"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
-        ["/mercado/negociacoes"] = CreateDefinition("Negociações", "Mercado", "/mercado/negociacoes"),
-        ["/admin/negociacoes"] = CreateDefinition("Negociações", "Mercado", "/mercado/negociacoes"),
-        ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
-        ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
-        ["/market/transfers"] = CreateDefinition("Histórico de Mercado", "Mercado", "/mercado/historico"),
+        ["/players"] = CreateDefinition("Jogadores", "Mercado", "/players"),
+        ["/mercado/negociacoes"] = CreateDefinition("Negociações", "Admin", "/mercado/negociacoes", true),
+        ["/admin/negociacoes"] = CreateDefinition("Negociações", "Admin", "/admin/negociacoes", true),
+        ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/mercado/historico", true),
+        ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/market/historico", true),
+        ["/market/transfers"] = CreateDefinition("Histórico de Transferências", "Mercado", "/market/transfers"),
         ["/calendario"] = CreateDefinition("Calendário", "Calendário", "/calendario"),
         ["/calendario/gerenciar"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
         ["/calendario/admin"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
         ["/admin/calendario"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
-        ["/mercado/ciclos"] = CreateDefinition("Ciclos do Mercado", "Mercado", "/mercado/ciclos", true),
-        ["/admin/mercado/ciclos"] = CreateDefinition("Ciclos do Mercado", "Mercado", "/mercado/ciclos", true),
         ["/admin/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/ciclos", true),
-        ["/admin/itens/gerar"] = CreateDefinition("Gerar Itens", "Admin", "/admin/itens/gerar", true),
-        ["/admin/transferencias/historico"] = CreateDefinition("Histórico de Transferências", "Admin", "/admin/transferencias/historico", true),
-        ["/admin/mercado/historico"] = CreateDefinition("Histórico de Transferências", "Admin", "/admin/transferencias/historico", true),
-        ["/admin/config"] = CreateDefinition("Configurações", "Admin", "/admin/config", true)
+        ["/admin/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/mercado/ciclos", true),
+        ["/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/mercado/ciclos", true),
+        ["/admin/itens/gerar"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/itens/gerar", true),
+        ["/admin/transferencias/historico"] = CreateDefinition("Histórico de Transferências", "Mercado", "/admin/transferencias/historico"),
+        ["/admin/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/admin/mercado/historico", true)
     };
 
     public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin)
