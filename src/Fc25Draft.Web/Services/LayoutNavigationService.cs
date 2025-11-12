@@ -11,7 +11,7 @@ public class LayoutNavigationService
     {
         new("Início", new List<MenuItem>
         {
-            new("Central CBFV", "/home", "oi oi-home", matchPrefix: true)
+            new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true)
         }),
         new("Times", new List<MenuItem>
         {
@@ -19,23 +19,23 @@ public class LayoutNavigationService
         }),
         new("Draft", new List<MenuItem>
         {
-            new("Controle do Draft", "/draft/controle", "oi oi-flag", matchPrefix: true),
+            new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document")
         }),
         new("Mercado de Transferências", new List<MenuItem>
         {
-            new("Mercado", "/mercado", "oi oi-cart", matchPrefix: true),
+            new("Mercado", "/mercado", "oi oi-cart", MatchPrefix: true),
             new("Negociações", "/mercado/negociacoes", "oi oi-loop"),
             new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard"),
-            new("Ciclos do Mercado", "/mercado/ciclos", "oi oi-calendar", requiredRole: "Admin")
+            new("Ciclos do Mercado", "/mercado/ciclos", "oi oi-calendar", RequiredRole: "Admin")
         }),
         new("Admin", new List<MenuItem>
         {
-            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", requiredRole: "Admin"),
-            new("Gerar Itens", "/admin/itens/gerar", "oi oi-plus", requiredRole: "Admin"),
-            new("Histórico de Transferências", "/admin/transferencias/historico", "oi oi-transfer", requiredRole: "Admin"),
-            new("Configurações", "/admin/config", "oi oi-wrench", requiredRole: "Admin", isOptional: true)
-        }, requiredRole: "Admin")
+            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
+            new("Gerar Itens", "/admin/itens/gerar", "oi oi-plus", RequiredRole: "Admin"),
+            new("Histórico de Transferências", "/admin/transferencias/historico", "oi oi-transfer", RequiredRole: "Admin"),
+            new("Configurações", "/admin/config", "oi oi-wrench", RequiredRole: "Admin", IsOptional: true)
+        }, RequiredRole: "Admin")
     };
 
     private static readonly Dictionary<string, PageDefinition> PageDefinitions = new(StringComparer.OrdinalIgnoreCase)

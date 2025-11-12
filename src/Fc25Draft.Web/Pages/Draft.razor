@@ -3,6 +3,7 @@
 @using System.Collections.Generic
 @using System.Linq
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Components.Common
 @using Fc25Draft.Web.Services
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.JSInterop
@@ -558,7 +559,7 @@ else
         {
             var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
             var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, roundRules, draftName));
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, false, roundRules, draftName));
 
             if (response.IsSuccessStatusCode)
             {
