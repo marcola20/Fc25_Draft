@@ -219,8 +219,7 @@ else
                     var pid = previous.PlayerId.Value;
                     if (!preservedPlayers.Contains(pid) && _playerLookup.TryGetValue(pid, out var player))
                     {
-                        var eligible = slot.Role == 1 ||
-                            PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                        var eligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
                         if (eligible)
                         {
                             playerId = pid;
@@ -262,8 +261,7 @@ else
             int? playerId = null;
             if (slot.PlayerId.HasValue && _playerLookup.TryGetValue(slot.PlayerId.Value, out var player))
             {
-                var eligible = slot.Role == 1 ||
-                    PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+                var eligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
                 if (eligible && usedPlayers.Add(slot.PlayerId.Value))
                 {
                     playerId = slot.PlayerId.Value;
@@ -307,19 +305,10 @@ else
 
     private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
     {
-        IEnumerable<PlayerOption> baseOptions;
-
-        if (slot.Role == 1)
-        {
-            baseOptions = _playerOptions;
-        }
-        else
-        {
-            var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
-            baseOptions = _playerOptions.Where(p =>
-                eligibles.Contains(p.PositionId) ||
-                (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
-        }
+        var eligibles = PositionEligibility.GetEligiblePositionIdsFor(slot.PrimaryPositionId);
+        var baseOptions = _playerOptions.Where(p =>
+            eligibles.Contains(p.PositionId) ||
+            (p.SecondaryPositionIds?.Any(eligibles.Contains) ?? false));
 
         var selectedIds = GetSelectedPlayerIds(slot);
 
@@ -381,8 +370,7 @@ else
             return;
         }
 
-        var isEligible = slot.Role == 1 ||
-            PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
+        var isEligible = PositionEligibility.IsEligible(slot.PrimaryPositionId, player.PositionId, player.SecondaryPositionIds);
         if (!isEligible)
         {
             Toasts.ShowError("Jogador não elegível para este slot.");

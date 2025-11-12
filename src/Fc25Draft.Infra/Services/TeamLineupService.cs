@@ -219,14 +219,14 @@ public sealed class TeamLineupService : ITeamLineupService
                 FailValidation("Há jogadores repetidos na escalação.", $"JogadorId={playerId}");
             }
 
+            if (!_eligibilityService.IsEligible(slot.PrimaryPositionId, rosterInfo.PositionId, rosterInfo.SecondaryPositionIds))
+            {
+                FailValidation("Jogador não elegível para este slot.", $"Jogador={rosterInfo.Name};Slot={slot.Order}");
+            }
+
             if (slot.Role == 0)
             {
                 startersCount++;
-
-                if (!_eligibilityService.IsEligible(slot.PrimaryPositionId, rosterInfo.PositionId, rosterInfo.SecondaryPositionIds))
-                {
-                    FailValidation("Jogador não elegível para este slot.", $"Jogador={rosterInfo.Name};Slot={slot.Order}");
-                }
 
                 if (rosterInfo.PositionId == (int)PositionType.Goleiro)
                 {
