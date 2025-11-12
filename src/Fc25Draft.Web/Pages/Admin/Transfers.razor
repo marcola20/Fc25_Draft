@@ -1,14 +1,22 @@
+@page "/mercado/negociacoes"
 @page "/admin/negociacoes"
 @using System.Globalization
+@using Microsoft.AspNetCore.Authorization
 @inject AdminAuthService AdminAuth
 @inject TeamsApiClient TeamsApiClient
 @inject AdminTransfersApiClient AdminTransfersApiClient
 @inject BudgetsApiClient BudgetsApiClient
 @inject MarketApiClient MarketApiClient
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject ILogger<Fc25Draft.Web.Pages.Admin.Transfers> Logger
+
+@attribute [Authorize(Roles = "Admin")]
 
 @implements IDisposable
 
-<h3>Negociações (Admin)</h3>
+<PageHeader Title="Negociações"
+            Subtitle="Execute operações administrativas de transferência entre equipes." />
 
 @if (!string.IsNullOrEmpty(pageError))
 {
@@ -488,6 +496,10 @@ else
 
     protected override void OnInitialized()
     {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/mercado/negociacoes"),
+            subtitle: "Execute operações administrativas de transferência entre equipes.");
+
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
 
         sellEditContext = new EditContext(sellModel);

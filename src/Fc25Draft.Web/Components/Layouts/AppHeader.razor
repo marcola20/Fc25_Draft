@@ -1,0 +1,54 @@
+@using Microsoft.AspNetCore.Components
+
+<header class="app-header" role="banner">
+    <div class="app-header-main">
+        <button class="btn btn-link toggle-sidebar" @onclick="ToggleSidebar" aria-label="Alternar menu">
+            <span class="oi oi-menu" aria-hidden="true"></span>
+        </button>
+        <div class="app-header-titles">
+            <h1>@Title</h1>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p class="subtitle">@Subtitle</p>
+            }
+        </div>
+        <div class="app-header-actions">
+            @if (Actions is not null)
+            {
+                @Actions
+            }
+        </div>
+    </div>
+    <div class="app-header-status" role="status">
+        <span class="status-label">@AccessLabel</span>
+        @if (ShowAuthProgress)
+        {
+            <span class="spinner-border spinner-border-sm text-light ms-2" role="status" aria-hidden="true"></span>
+        }
+        else
+        {
+            <div class="btn-group" role="group" aria-label="Controles de acesso">
+                @if (IsAdmin)
+                {
+                    <button class="btn btn-sm btn-outline-light" @onclick="SignOut">Sair</button>
+                }
+                else
+                {
+                    <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Entrar como Admin</button>
+                }
+            </div>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string AccessLabel { get; set; } = string.Empty;
+    [Parameter] public bool ShowAuthProgress { get; set; }
+    [Parameter] public bool IsAdmin { get; set; }
+    [Parameter] public EventCallback ToggleSidebar { get; set; }
+    [Parameter] public EventCallback SignIn { get; set; }
+    [Parameter] public EventCallback SignOut { get; set; }
+}

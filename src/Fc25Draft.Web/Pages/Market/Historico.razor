@@ -1,3 +1,4 @@
+@page "/mercado/historico"
 @page "/market/historico"
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Web.Components.Market
@@ -6,26 +7,16 @@
 @using System.Runtime.InteropServices
 @inject MarketClient MarketClient
 @inject NavigationManager Navigation
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject ILogger<Fc25Draft.Web.Pages.Market.Historico> Logger
 @implements IDisposable
 
 <PageTitle>Histórico do Mercado</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-    <div>
-        <h1 class="h3 mb-1">Histórico do Mercado</h1>
-        <p class="text-muted small mb-0">Visualize os eventos registrados no mercado e acompanhe o movimento dos lances.</p>
-    </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-outline-secondary btn-sm"
-           href="@ExportUrl"
-           target="_blank"
-           rel="noopener noreferrer">Exportar CSV</a>
-        <button type="button"
-                class="btn btn-outline-primary btn-sm"
-                @onclick="ReloadAsync"
-                disabled="@_isLoading">Recarregar</button>
-    </div>
-</div>
+<PageHeader Title="Histórico do Mercado"
+            Subtitle="Visualize os eventos registrados no mercado e acompanhe o movimento dos lances."
+            Actions="@HistoryHeaderActions" />
 
 <MarketHistoryFilters Model="_query" OnApply="LoadAsync" IsLoading="_isLoading" />
 
@@ -116,7 +107,40 @@ else
     private string? _errorMessage;
     private CancellationTokenSource? _loadCts;
 
+    private RenderFragment HistoryHeaderActions => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "d-flex flex-wrap gap-2");
+
+        builder.OpenElement(seq++, "a");
+        builder.AddAttribute(seq++, "class", "btn btn-outline-secondary btn-sm");
+        builder.AddAttribute(seq++, "href", ExportUrl);
+        builder.AddAttribute(seq++, "target", "_blank");
+        builder.AddAttribute(seq++, "rel", "noopener noreferrer");
+        builder.AddContent(seq++, "Exportar CSV");
+        builder.CloseElement();
+
+        builder.OpenElement(seq++, "button");
+        builder.AddAttribute(seq++, "type", "button");
+        builder.AddAttribute(seq++, "class", "btn btn-outline-primary btn-sm");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, ReloadAsync));
+        builder.AddAttribute(seq++, "disabled", _isLoading);
+        builder.AddContent(seq++, "Recarregar");
+        builder.CloseElement();
+
+        builder.CloseElement();
+    };
+
     private string ExportUrl => Navigation.ToAbsoluteUri(MarketClient.GetHistoryExportUrl(_query)).ToString();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/mercado/historico"),
+            subtitle: "Visualize os eventos registrados no mercado e acompanhe o movimento dos lances.",
+            actions: HistoryHeaderActions);
+    }
 
     private int TotalPages
         => _page is null || _page.PageSize <= 0
@@ -165,7 +189,7 @@ else
         catch (Exception ex)
         {
             _errorMessage = "Não foi possível carregar o histórico do mercado. Tente novamente em instantes.";
-            Console.Error.WriteLine(ex);
+            Logger.LogError(ex, "LayoutNav:Error ao carregar histórico do mercado {@Query}", _query);
         }
         finally
         {

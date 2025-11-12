@@ -67,6 +67,8 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITeamTokenStore, ProtectedLocalStorageTeamTokenStore>();
             services.AddScoped<TeamAccessService>();
             services.AddScoped<ToastService>();
+            services.AddScoped<LayoutNavigationService>();
+            services.AddScoped<LayoutState>();
 
             services.AddHttpClient();
             services.AddSignalR();

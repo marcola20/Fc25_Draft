@@ -1,0 +1,74 @@
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+.app-sidebar-container {
+    width: 280px;
+    flex-shrink: 0;
+    background-color: #0d1b2a;
+    color: #fff;
+    transition: transform .3s ease-in-out;
+}
+
+.app-shell.collapsed .app-sidebar-container {
+    transform: translateX(-100%);
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 100vh;
+}
+
+.app-content {
+    padding: 1.5rem;
+}
+
+.app-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 0;
+    justify-content: center;
+}
+
+.sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    .app-shell {
+        flex-direction: column;
+    }
+
+    .app-sidebar-container {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 1040;
+        height: 100vh;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.45);
+        transform: translateX(-100%);
+    }
+
+    .app-shell.collapsed .app-sidebar-container {
+        transform: translateX(0);
+    }
+
+    .app-main {
+        min-height: auto;
+    }
+
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        border: none;
+        padding: 0;
+        margin: 0;
+        z-index: 1035;
+    }
+}

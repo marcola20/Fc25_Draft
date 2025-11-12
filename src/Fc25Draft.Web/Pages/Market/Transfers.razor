@@ -1,18 +1,27 @@
+@page "/admin/transferencias/historico"
 @page "/market/transfers"
 @using System.Threading
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Models.Transfers
 @using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Authorization
 @using Blazored.Toast.Services
 @inject TransfersClient TransfersClient
 @inject IToastService Toasts
 @inject TeamsApiClient TeamsApiClient
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject ILogger<Fc25Draft.Web.Pages.Market.Transfers> Logger
+
+@attribute [Authorize(Roles = "Admin")]
+
 @implements IDisposable
 
 <PageTitle>Histórico de Transferências</PageTitle>
 
-<h1 class="h3 mb-3">Histórico de Transferências</h1>
+<PageHeader Title="Histórico de Transferências"
+            Subtitle="Filtre e acompanhe transações administrativas entre equipes." />
 
 <EditForm EditContext="_editContext" OnValidSubmit="HandleApplyAsync">
     <DataAnnotationsValidator />
@@ -232,6 +241,13 @@ else
         _detailsCts?.Dispose();
     }
 
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/admin/transferencias/historico"),
+            subtitle: "Filtre transações e consulte detalhes completos.");
+    }
+
     protected override async Task OnInitializedAsync()
     {
         _editContext = new EditContext(Model);
@@ -253,7 +269,7 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
+            Logger.LogError(ex, "LayoutNav:Error ao carregar opções de times para histórico de transferências");
             _teamOptions = new List<TeamListItemDto>();
         }
         finally
@@ -326,9 +342,10 @@ else
         _currentPage = page;
         await InvokeAsync(StateHasChanged);
 
+        TransferHistoryQueryRequest? request = null;
         try
         {
-            var request = new TransferHistoryQueryRequest
+            request = new TransferHistoryQueryRequest
             {
                 TeamId = Model.TeamId,
                 PlayerId = Model.PlayerId,
@@ -346,9 +363,9 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _errorMessage = "Não foi possível carregar o histórico de transferências. Tente novamente.";
             Toasts.ShowError(_errorMessage);
+            Logger.LogError(ex, "LayoutNav:Error ao carregar histórico de transferências {@Request}", request);
         }
         finally
         {
@@ -413,9 +430,9 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _detailsErrorMessage = "Não foi possível carregar os detalhes da transferência. Tente novamente.";
             Toasts.ShowError(_detailsErrorMessage);
+            Logger.LogError(ex, "LayoutNav:Error ao carregar detalhes da transferência {TransferId}", item.TransferId);
         }
         finally
         {

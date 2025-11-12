@@ -1,0 +1,27 @@
+.dashboard-card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgba(27, 38, 59, 0.1);
+    transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(27, 38, 59, 0.16);
+}
+
+.dashboard-card-icon {
+    background-color: #e0e5ec;
+    color: #1b263b;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.2rem;
+}
+
+.dashboard-card .btn {
+    align-self: flex-start;
+}

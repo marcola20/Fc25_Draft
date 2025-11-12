@@ -1,0 +1,370 @@
+@using System
+@using System.Linq
+@using Fc25Draft.Web.Models.Navigation
+@using Microsoft.AspNetCore.Components.Routing
+@inject AdminAuthService AdminAuth
+@inject LayoutNavigationService NavigationService
+@inject LayoutState LayoutState
+@inject NavigationManager Navigation
+@inject ILogger<AppLayout> Logger
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+
+<div class="app-shell @(isSidebarCollapsed ? "collapsed" : string.Empty)">
+    <div class="app-sidebar-container">
+        <Sidebar MenuGroups="menuGroups" />
+    </div>
+    <div class="app-main">
+        <AppHeader Title="@LayoutState.Title"
+                   Subtitle="@LayoutState.Subtitle"
+                   Actions="@LayoutState.Actions"
+                   AccessLabel="@GetAccessLabel()"
+                   ShowAuthProgress="@(!authReady)"
+                   IsAdmin="@AdminAuth.IsAuthenticated"
+                   ToggleSidebar="@ToggleSidebar"
+                   SignIn="@OpenAdminModal"
+                   SignOut="@SignOutAsync" />
+
+        @if (!string.IsNullOrEmpty(adminBannerMessage))
+        {
+            <div class="alert @adminBannerCss" role="alert">@adminBannerMessage</div>
+        }
+
+        <Breadcrumbs Items="@LayoutState.Breadcrumbs" />
+
+        <section class="app-content" aria-live="polite">
+            @if (isLoadingInitial)
+            {
+                <div class="app-loading" role="status">
+                    <span class="spinner-border" aria-hidden="true"></span>
+                    <span class="visually-hidden">Carregando layout...</span>
+                </div>
+            }
+            else
+            {
+                @Body
+            }
+        </section>
+    </div>
+</div>
+
+@if (isSidebarCollapsed)
+{
+    <button class="sidebar-overlay" @onclick="ToggleSidebar" aria-label="Fechar menu lateral"></button>
+}
+
+@if (showAdminModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Entrar como Admin</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Informe o token de administrador configurado no servidor.</p>
+                    <div class="mb-3">
+                        <label class="form-label" for="adminTokenInput">Token</label>
+                        <input id="adminTokenInput"
+                               class="form-control"
+                               type="password"
+                               @bind-value="adminTokenInput"
+                               @bind-value:event="oninput"
+                               autocomplete="one-time-code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(adminModalError))
+                    {
+                        <div class="alert alert-danger" role="alert">@adminModalError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseAdminModal">Cancelar</button>
+                    <button class="btn btn-primary" @onclick="SubmitAdminTokenAsync">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? Body { get; set; }
+
+    private IReadOnlyList<MenuGroup> menuGroups = Array.Empty<MenuGroup>();
+    private bool isSidebarCollapsed;
+    private bool showAdminModal;
+    private string adminTokenInput = string.Empty;
+    private string? adminModalError;
+    private string? adminBannerMessage;
+    private string adminBannerCss = "alert-info";
+    private bool authReady;
+    private bool isLoadingInitial = true;
+    private CancellationTokenSource? initializationCts;
+
+    protected override void OnInitialized()
+    {
+        initializationCts = new CancellationTokenSource();
+        Navigation.LocationChanged += OnLocationChanged;
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+        LayoutState.StateChanged += OnLayoutStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
+    {
+        if (initializationCts?.IsCancellationRequested == true)
+        {
+            return;
+        }
+
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            authReady = true;
+            await RebuildMenuAsync();
+            await UpdatePageDefinitionAsync(Navigation.Uri);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error durante inicialização do layout");
+        }
+        finally
+        {
+            isLoadingInitial = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RebuildMenuAsync()
+    {
+        try
+        {
+            menuGroups = NavigationService.BuildMenu(AdminAuth.IsAuthenticated);
+            await LogMenuBuiltAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao montar menu");
+            menuGroups = Array.Empty<MenuGroup>();
+        }
+    }
+
+    private async Task UpdatePageDefinitionAsync(string uri)
+    {
+        try
+        {
+            var relative = Navigation.ToBaseRelativePath(uri);
+            if (string.IsNullOrWhiteSpace(relative))
+            {
+                relative = "/";
+            }
+            else
+            {
+                var question = relative.IndexOf('?', StringComparison.Ordinal);
+                if (question >= 0)
+                {
+                    relative = relative[..question];
+                }
+                if (!relative.StartsWith('/'))
+                {
+                    relative = "/" + relative;
+                }
+            }
+
+            var definition = NavigationService.GetPageDefinition(relative);
+            LayoutState.SetPage(definition);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao atualizar breadcrumb para {Route}", uri);
+        }
+    }
+
+    private async Task LogMenuBuiltAsync()
+    {
+        try
+        {
+            var context = await GetAuditContextAsync();
+            var visibleRoutes = menuGroups.Sum(group => group.Items.Count);
+            Logger.LogInformation("LayoutNav:MenuBuilt UserId={UserId} Role={Role} Routes={Routes} Timestamp={Timestamp}",
+                context.UserId,
+                context.Role,
+                visibleRoutes,
+                DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao registrar menu");
+        }
+    }
+
+    private async Task LogRouteVisitedAsync(string uri)
+    {
+        try
+        {
+            var context = await GetAuditContextAsync();
+            var route = Navigation.ToBaseRelativePath(uri);
+            if (!route.StartsWith('/'))
+            {
+                route = "/" + route;
+            }
+
+            Logger.LogInformation("LayoutNav:RouteVisited UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
+                context.UserId,
+                context.Role,
+                string.IsNullOrWhiteSpace(route) ? "/" : route,
+                DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao registrar rota visitada {Route}", uri);
+        }
+    }
+
+    private async Task LogAccessDeniedAsync(string attemptedRoute)
+    {
+        try
+        {
+            var context = await GetAuditContextAsync();
+            Logger.LogWarning("LayoutNav:AccessDenied UserId={UserId} Role={Role} Route={Route} Timestamp={Timestamp}",
+                context.UserId,
+                context.Role,
+                attemptedRoute,
+                DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao registrar acesso negado para {Route}", attemptedRoute);
+        }
+    }
+
+    private async Task<AuditContext> GetAuditContextAsync()
+    {
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = state.User;
+            var userId = user?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? user?.Identity?.Name
+                         ?? "anonimo";
+
+            var role = AdminAuth.IsAuthenticated
+                ? "Admin"
+                : user?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+
+            return new AuditContext(userId, role);
+        }
+        catch
+        {
+            return new AuditContext("desconhecido", AdminAuth.IsAuthenticated ? "Admin" : "User");
+        }
+    }
+
+    private string GetAccessLabel() => AdminAuth.IsAuthenticated ? "Modo administrador" : "Modo somente leitura";
+
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+    }
+
+    private void OpenAdminModal()
+    {
+        showAdminModal = true;
+        adminTokenInput = string.Empty;
+        adminModalError = null;
+    }
+
+    private void CloseAdminModal()
+    {
+        showAdminModal = false;
+        adminTokenInput = string.Empty;
+        adminModalError = null;
+    }
+
+    private async Task SubmitAdminTokenAsync()
+    {
+        adminModalError = null;
+
+        try
+        {
+            var success = await AdminAuth.SignInAsync(adminTokenInput);
+            if (success)
+            {
+                adminBannerMessage = "Modo administrador ativado.";
+                adminBannerCss = "alert-success";
+                CloseAdminModal();
+                await RebuildMenuAsync();
+            }
+            else
+            {
+                adminModalError = "Informe um token válido.";
+            }
+        }
+        catch (Exception ex)
+        {
+            adminModalError = "Não foi possível validar o token. Tente novamente.";
+            Logger.LogError(ex, "LayoutNav:Error ao validar token de admin");
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        try
+        {
+            await AdminAuth.SignOutAsync();
+            adminBannerMessage = "Modo administrador desativado.";
+            adminBannerCss = "alert-warning";
+            await RebuildMenuAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LayoutNav:Error ao sair do modo admin");
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await UpdatePageDefinitionAsync(e.Location);
+            await LogRouteVisitedAsync(e.Location);
+            StateHasChanged();
+        });
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            authReady = true;
+            await RebuildMenuAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void OnLayoutStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        initializationCts?.Cancel();
+        initializationCts?.Dispose();
+        Navigation.LocationChanged -= OnLocationChanged;
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        LayoutState.StateChanged -= OnLayoutStateChanged;
+    }
+
+    private record struct AuditContext(string UserId, string Role);
+}

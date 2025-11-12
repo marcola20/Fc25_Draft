@@ -1,0 +1,159 @@
+@inherits LayoutComponentBase
+@inject AdminAuthService AdminAuth
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex flex-wrap justify-content-between align-items-center gap-2 app-header">
+            <span class="text-muted">Fase de Controle do Draft</span>
+            <div class="d-flex align-items-center gap-2 access-controls">
+                <small class="text-muted">@GetAccessLabel()</small>
+                @if (AdminAuth.IsAuthenticated)
+                {
+                    <button class="btn btn-sm btn-outline-light" @onclick="SignOutAsync">Sair</button>
+                }
+                else
+                {
+                    <button class="btn btn-sm btn-outline-light" @onclick="OpenAdminModal">Entrar como Admin</button>
+                }
+            </div>
+        </div>
+
+        <article class="content px-4">
+            @if (!string.IsNullOrEmpty(adminBannerMessage))
+            {
+                <div class="alert @adminBannerCss" role="alert">@adminBannerMessage</div>
+            }
+
+            @Body
+        </article>
+    </main>
+</div>
+
+@if (showAdminModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Entrar como Admin</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Informe o token de administrador configurado no servidor.</p>
+                    <div class="mb-3">
+                        <label class="form-label" for="adminTokenInput">Token</label>
+                        <input id="adminTokenInput"
+                               class="form-control"
+                               type="password"
+                               @bind-value="adminTokenInput"
+                               @bind-value:event="oninput"
+                               autocomplete="one-time-code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(adminModalError))
+                    {
+                        <div class="alert alert-danger" role="alert">@adminModalError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseAdminModal">Cancelar</button>
+                    <button class="btn btn-primary" @onclick="SubmitAdminTokenAsync">
+                        Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool showAdminModal;
+    private string adminTokenInput = string.Empty;
+    private string? adminModalError;
+    private string? adminBannerMessage;
+    private string adminBannerCss = "alert-info";
+    private bool authReady;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authReady = true;
+        StateHasChanged();
+    }
+
+    private string GetAccessLabel() => AdminAuth.IsAuthenticated ? "Modo administrador" : "Modo somente leitura";
+
+    private void OpenAdminModal()
+    {
+        showAdminModal = true;
+        adminTokenInput = string.Empty;
+        adminModalError = null;
+    }
+
+    private void CloseAdminModal()
+    {
+        showAdminModal = false;
+        adminTokenInput = string.Empty;
+        adminModalError = null;
+    }
+
+    private async Task SubmitAdminTokenAsync()
+    {
+        adminModalError = null;
+
+        try
+        {
+            var success = await AdminAuth.SignInAsync(adminTokenInput);
+            if (success)
+            {
+                adminBannerMessage = "Modo administrador ativado.";
+                adminBannerCss = "alert-success";
+                CloseAdminModal();
+            }
+            else
+            {
+                adminModalError = "Informe um token válido.";
+            }
+        }
+        catch
+        {
+            adminModalError = "Não foi possível validar o token. Tente novamente.";
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        await AdminAuth.SignOutAsync();
+        adminBannerMessage = "Modo administrador desativado.";
+        adminBannerCss = "alert-warning";
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authReady)
+        {
+            return;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public override void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        base.Dispose();
+    }
+}

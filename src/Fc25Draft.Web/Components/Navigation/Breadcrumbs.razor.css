@@ -1,0 +1,23 @@
+.app-breadcrumbs {
+    padding: 0 1.5rem;
+    margin-top: 1rem;
+}
+
+.app-breadcrumbs .breadcrumb {
+    margin-bottom: 0.5rem;
+    background: transparent;
+}
+
+.app-breadcrumbs .breadcrumb-item + .breadcrumb-item::before {
+    color: #6c757d;
+}
+
+.app-breadcrumbs a {
+    color: #1b263b;
+    text-decoration: none;
+}
+
+.app-breadcrumbs a:hover,
+.app-breadcrumbs a:focus {
+    text-decoration: underline;
+}

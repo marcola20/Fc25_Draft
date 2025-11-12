@@ -1,0 +1,34 @@
+@using Fc25Draft.Web.Models.Navigation
+@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="app-sidebar" aria-label="Seções do sistema">
+    @if (MenuGroups?.Count > 0)
+    {
+        foreach (var group in MenuGroups)
+        {
+            <div class="sidebar-group">
+                <div class="sidebar-group-title">@group.Title</div>
+                <ul class="sidebar-group-list">
+                    @foreach (var item in group.Items)
+                    {
+                        var match = item.MatchPrefix ? NavLinkMatch.Prefix : NavLinkMatch.All;
+                        <li class="sidebar-item">
+                            <NavLink class="sidebar-link" href="@item.Href" Match="@match">
+                                <span class="@item.Icon" aria-hidden="true"></span>
+                                <span class="sidebar-link-text">@item.Title</span>
+                            </NavLink>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="sidebar-empty" role="status">Nenhuma navegação disponível.</div>
+    }
+</nav>
+
+@code {
+    [Parameter] public IReadOnlyList<MenuGroup> MenuGroups { get; set; } = Array.Empty<MenuGroup>();
+}

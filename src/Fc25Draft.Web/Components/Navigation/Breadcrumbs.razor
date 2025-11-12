@@ -1,0 +1,27 @@
+@using Fc25Draft.Web.Models.Navigation
+@using System.Linq
+
+@if (Items?.Any() == true)
+{
+    <nav class="app-breadcrumbs" aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            @foreach (var segment in Items)
+            {
+                <li class="breadcrumb-item">
+                    @if (!string.IsNullOrWhiteSpace(segment.Href))
+                    {
+                        <a href="@segment.Href">@segment.Label</a>
+                    }
+                    else
+                    {
+                        <span aria-current="page">@segment.Label</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<BreadcrumbSegment> Items { get; set; } = Array.Empty<BreadcrumbSegment>();
+}

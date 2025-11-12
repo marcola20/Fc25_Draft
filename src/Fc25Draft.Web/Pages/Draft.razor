@@ -1,4 +1,5 @@
 @page "/draft"
+@page "/draft/controle"
 @using System.Collections.Generic
 @using System.Linq
 @using Fc25Draft.Core.DTOs
@@ -10,9 +11,15 @@
 @inject NavigationManager Navigation
 @inject ILogger<Fc25Draft.Web.Pages.Draft> Logger
 @inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject AdminAuthService AdminAuth
+@inject ApiClientFactory ApiClientFactory
 @implements IAsyncDisposable
 
-<h3>Draft</h3>
+<PageHeader Title="Controle do Draft"
+            Subtitle="Gerencie o andamento do draft em tempo real."
+            Actions="@BuildDraftActions()" />
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
@@ -234,6 +241,8 @@ else
     private string? errorMessage;
     private bool isLoadingState = true;
     private bool isLoadingPlayers = true;
+    private bool isGeneratingDraft;
+    private bool authInitialized;
     private bool isPositionDropdownOpen;
     private bool isModalOpen;
     private AvailablePlayerDto? selectedPlayer;
@@ -248,10 +257,69 @@ else
 
     private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
+    private bool CanGenerateDraft =>
+        AdminAuth.IsAuthenticated &&
+        !isGeneratingDraft &&
+        !isLoadingState &&
+        (state is null || !state.HasDraft || state.DraftCompleted);
+
+    private RenderFragment? BuildDraftActions()
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            return null;
+        }
+
+        return builder =>
+        {
+            var seq = 0;
+            builder.OpenElement(seq++, "button");
+            builder.AddAttribute(seq++, "type", "button");
+            builder.AddAttribute(seq++, "class", "btn btn-warning");
+            builder.AddAttribute(seq++, "disabled", !CanGenerateDraft);
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, GenerateDraftAsync));
+
+            if (isGeneratingDraft)
+            {
+                builder.OpenElement(seq++, "span");
+                builder.AddAttribute(seq++, "class", "spinner-border spinner-border-sm me-2");
+                builder.AddAttribute(seq++, "role", "status");
+                builder.AddAttribute(seq++, "aria-hidden", "true");
+                builder.CloseElement();
+                builder.AddContent(seq++, "Gerando...");
+            }
+            else
+            {
+                builder.AddContent(seq++, "Gerar novo draft");
+            }
+
+            builder.CloseElement();
+        };
+    }
+
+    private void RefreshDraftHeader()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/draft/controle"),
+            subtitle: "Gerencie o andamento do draft em tempo real.",
+            actions: BuildDraftActions());
+    }
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/draft/controle"),
+            subtitle: "Gerencie o andamento do draft em tempo real.",
+            actions: BuildDraftActions());
+
+        AdminAuth.AuthenticationChanged += OnAdminAuthChanged;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadPositionsAsync();
         await RefreshAsync();
+        RefreshDraftHeader();
 
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Navigation.ToAbsoluteUri("/hubs/draft"))
@@ -281,6 +349,13 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            authInitialized = true;
+            RefreshDraftHeader();
+        }
+
         if (!firstRender || hubConnection is null)
         {
             return;
@@ -320,6 +395,227 @@ else
         await LoadPlayersAsync();
     }
 
+    private async Task GenerateDraftAsync()
+    {
+        if (isGeneratingDraft)
+        {
+            return;
+        }
+
+        statusMessage = null;
+        statusCss = "alert-success";
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            statusCss = "alert-warning";
+            statusMessage = "Entre como administrador para gerar o draft.";
+            Logger.LogWarning("LayoutNav:AccessDenied tentativa de geração de draft sem autenticação.");
+            return;
+        }
+
+        if (isLoadingState)
+        {
+            await LoadStateAsync();
+        }
+
+        if (state?.HasDraft == true && !state.DraftCompleted)
+        {
+            statusCss = "alert-warning";
+            statusMessage = "Não é possível gerar um novo draft enquanto o atual não foi concluído.";
+            return;
+        }
+
+        string? nameInput;
+        var defaultName = $"cbfv Draft - {DateTime.Now:yyyy-MM-dd HH:mm}";
+
+        try
+        {
+            nameInput = await JSRuntime.InvokeAsync<string?>("prompt", "Informe o nome do draft:", defaultName);
+        }
+        catch (JSException ex)
+        {
+            statusCss = "alert-danger";
+            statusMessage = $"Não foi possível solicitar o nome do draft: {ex.Message}";
+            Logger.LogError(ex, "LayoutNav:Error ao solicitar nome do draft");
+            return;
+        }
+
+        if (nameInput is null)
+        {
+            return;
+        }
+
+        var draftName = nameInput.Trim();
+        if (string.IsNullOrWhiteSpace(draftName))
+        {
+            statusCss = "alert-warning";
+            statusMessage = "Informe um nome válido para o draft.";
+            return;
+        }
+
+        string? roundsInput;
+
+        try
+        {
+            roundsInput = await JSRuntime.InvokeAsync<string?>("prompt", "Quantas rodadas o draft deve ter?", "19");
+        }
+        catch (JSException ex)
+        {
+            statusCss = "alert-danger";
+            statusMessage = $"Não foi possível solicitar o número de rodadas: {ex.Message}";
+            Logger.LogError(ex, "LayoutNav:Error ao solicitar rodadas do draft");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(roundsInput))
+        {
+            return;
+        }
+
+        if (!int.TryParse(roundsInput, out var totalRounds))
+        {
+            statusCss = "alert-warning";
+            statusMessage = "Informe um número válido de rodadas.";
+            return;
+        }
+
+        if (totalRounds is < 1 or > 50)
+        {
+            statusCss = "alert-warning";
+            statusMessage = "O número de rodadas deve estar entre 1 e 50.";
+            return;
+        }
+
+        var roundRules = new List<DraftRoundRuleDto>(totalRounds);
+
+        for (var round = 1; round <= totalRounds; round++)
+        {
+            string? minInput;
+            string? maxInput;
+
+            try
+            {
+                minInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall mínimo para a rodada {round}:");
+            }
+            catch (JSException ex)
+            {
+                statusCss = "alert-danger";
+                statusMessage = $"Não foi possível solicitar o overall mínimo da rodada {round}: {ex.Message}";
+                Logger.LogError(ex, "LayoutNav:Error ao solicitar overall mínimo da rodada {Round}", round);
+                return;
+            }
+
+            if (minInput is null)
+            {
+                return;
+            }
+
+            if (!int.TryParse(minInput, out var overallMin) || overallMin < 0 || overallMin > 150)
+            {
+                statusCss = "alert-warning";
+                statusMessage = $"Informe um overall mínimo válido (0 a 150) para a rodada {round}.";
+                return;
+            }
+
+            try
+            {
+                maxInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall máximo para a rodada {round}:");
+            }
+            catch (JSException ex)
+            {
+                statusCss = "alert-danger";
+                statusMessage = $"Não foi possível solicitar o overall máximo da rodada {round}: {ex.Message}";
+                Logger.LogError(ex, "LayoutNav:Error ao solicitar overall máximo da rodada {Round}", round);
+                return;
+            }
+
+            if (maxInput is null)
+            {
+                return;
+            }
+
+            if (!int.TryParse(maxInput, out var overallMax) || overallMax < 0 || overallMax > 150)
+            {
+                statusCss = "alert-warning";
+                statusMessage = $"Informe um overall máximo válido (0 a 150) para a rodada {round}.";
+                return;
+            }
+
+            if (overallMin > overallMax)
+            {
+                statusCss = "alert-warning";
+                statusMessage = $"O overall mínimo não pode ser maior que o máximo na rodada {round}.";
+                return;
+            }
+
+            roundRules.Add(new DraftRoundRuleDto(round, overallMin, overallMax));
+        }
+
+        isGeneratingDraft = true;
+        RefreshDraftHeader();
+
+        try
+        {
+            var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
+            var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, roundRules, draftName));
+
+            if (response.IsSuccessStatusCode)
+            {
+                DraftStateDto? updatedState = null;
+                try
+                {
+                    updatedState = await response.Content.ReadFromJsonAsync<DraftStateDto>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "LayoutNav:Error ao interpretar resposta de geração de draft");
+                }
+
+                if (updatedState is not null)
+                {
+                    state = updatedState;
+                    statusCss = "alert-success";
+                    var responseName = string.IsNullOrWhiteSpace(updatedState.DraftName) ? draftName : updatedState.DraftName;
+                    statusMessage = $"{responseName} gerado com {updatedState.TotalRounds} rodadas!";
+                }
+                else
+                {
+                    statusCss = "alert-success";
+                    statusMessage = $"{draftName} gerado com {totalRounds} rodadas!";
+                }
+            }
+            else
+            {
+                ApiErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "LayoutNav:Error ao ler erro de geração de draft");
+                }
+
+                statusCss = "alert-danger";
+                statusMessage = error?.Message ?? $"Erro ao gerar o draft: {response.StatusCode}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusCss = "alert-danger";
+            statusMessage = $"Erro ao gerar o draft: {ex.Message}";
+            Logger.LogError(ex, "LayoutNav:Error inesperado ao gerar draft");
+        }
+        finally
+        {
+            isGeneratingDraft = false;
+            await RefreshAsync();
+            RefreshDraftHeader();
+            StateHasChanged();
+        }
+    }
+
     private async Task LoadStateAsync()
     {
         isLoadingState = true;
@@ -335,6 +631,7 @@ else
         finally
         {
             isLoadingState = false;
+            RefreshDraftHeader();
         }
     }
 
@@ -575,11 +872,30 @@ else
     private string GetProgressWidth()
         => state is null || state.TotalPicks == 0 ? "0%" : $"{GetProgressValue()}%";
 
+    private void OnAdminAuthChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        InvokeAsync(async () =>
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            RefreshDraftHeader();
+            StateHasChanged();
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (hubConnection is not null)
         {
             await hubConnection.DisposeAsync();
         }
+
+        AdminAuth.AuthenticationChanged -= OnAdminAuthChanged;
     }
+
+    private sealed record ApiErrorResponse(string? Message);
 }

@@ -1,3 +1,4 @@
+@page "/mercado"
 @page "/market"
 @page "/market/{cycleId:guid}"
 @using System
@@ -21,29 +22,15 @@
 @inject IPositionService PositionService
 @inject ILogger<Index> Logger
 @inject TeamAccessService TeamAccess
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
 @implements IAsyncDisposable
 
-<PageTitle>Mercado</PageTitle>
+<PageTitle>Mercado de Transferências</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h1 class="h3 mb-0">Mercado</h1>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button type="button"
-                class="btn btn-outline-primary btn-sm"
-                @onclick="OpenTeamTokenModal">
-            Token do time
-            <span class="badge @( _teamTokenConfigured ? "bg-success" : "bg-warning text-dark") ms-2">
-                @(_teamTokenConfigured ? "Configurado" : "Não configurado")
-            </span>
-        </button>
-        <NavLink class="btn btn-outline-secondary btn-sm" href="market/historico">
-            Histórico do Mercado
-        </NavLink>
-        <NavLink class="btn btn-outline-secondary btn-sm" href="market/transfers">
-            Histórico de Transferências
-        </NavLink>
-    </div>
-</div>
+<PageHeader Title="Mercado de Transferências"
+            Subtitle="Negocie jogadores disponíveis e acompanhe o mercado em tempo real."
+            Actions="@HeaderActions" />
 
 <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item" role="presentation">
@@ -326,6 +313,53 @@ else
     private DateTime? _historyLatestUtc;
     private int _historyNextPage = 1;
 
+    private RenderFragment HeaderActions => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "d-flex flex-wrap gap-2");
+
+        builder.OpenElement(seq++, "button");
+        builder.AddAttribute(seq++, "type", "button");
+        builder.AddAttribute(seq++, "class", "btn btn-outline-primary btn-sm");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, OpenTeamTokenModal));
+        builder.AddContent(seq++, "Token do time");
+        var badgeClass = _teamTokenConfigured ? "bg-success" : "bg-warning text-dark";
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", $"badge {badgeClass} ms-2");
+        builder.AddContent(seq++, _teamTokenConfigured ? "Configurado" : "Não configurado");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenComponent<NavLink>(seq++);
+        builder.AddAttribute(seq++, "class", "btn btn-outline-secondary btn-sm");
+        builder.AddAttribute(seq++, "href", "/mercado/historico");
+        builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(builder2 =>
+        {
+            builder2.AddContent(0, "Histórico do Mercado");
+        }));
+        builder.CloseComponent();
+
+        builder.OpenComponent<NavLink>(seq++);
+        builder.AddAttribute(seq++, "class", "btn btn-outline-secondary btn-sm");
+        builder.AddAttribute(seq++, "href", "/admin/transferencias/historico");
+        builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(builder2 =>
+        {
+            builder2.AddContent(0, "Histórico de Transferências");
+        }));
+        builder.CloseComponent();
+
+        builder.CloseElement();
+    };
+
+    private void RefreshLayoutHeader()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/mercado"),
+            subtitle: "Negocie jogadores disponíveis e acompanhe o mercado em tempo real.",
+            actions: HeaderActions);
+    }
+
     private int TotalPages
     {
         get
@@ -342,6 +376,11 @@ else
 
             return (int)Math.Ceiling(PageData.Total / (double)PageData.PageSize);
         }
+    }
+
+    protected override void OnInitialized()
+    {
+        RefreshLayoutHeader();
     }
 
     protected override async Task OnInitializedAsync()
@@ -1285,6 +1324,7 @@ else
         }
 
         _teamTokenModalOpen = true;
+        RefreshLayoutHeader();
         StateHasChangedSafe();
     }
 
@@ -1304,6 +1344,7 @@ else
             _teamTokenConfigured = !string.IsNullOrWhiteSpace(trimmed);
             _teamTokenModalOpen = false;
             _teamTokenError = null;
+            RefreshLayoutHeader();
             StateHasChangedSafe();
         }
         catch (ArgumentException ex)
@@ -1327,6 +1368,7 @@ else
             _teamTokenInput = string.Empty;
             _teamTokenError = null;
             _currentTeamId = null;
+            RefreshLayoutHeader();
             StateHasChangedSafe();
         }
         catch (Exception ex)
@@ -1355,6 +1397,7 @@ else
             ? "Informe o token do seu time para registrar lances."
             : invalidMessage;
         _teamTokenModalOpen = true;
+        RefreshLayoutHeader();
         StateHasChangedSafe();
     }
 
@@ -1390,6 +1433,7 @@ else
             _currentTeamId = null;
         }
 
+        RefreshLayoutHeader();
         StateHasChangedSafe();
     }
 

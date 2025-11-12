@@ -1,3 +1,4 @@
+@page "/draft/info"
 @page "/drafts/manage"
 @using Fc25Draft.Core.DTOs
 @using System.Globalization;
@@ -5,10 +6,14 @@
 @inject DraftAdminApiClient DraftAdminApiClient
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject ILogger<Fc25Draft.Web.Pages.Drafts.Manage> Logger
 
 @implements IDisposable
 
-<h3>Lista de Drafts</h3>
+<PageHeader Title="Informações do Draft"
+            Subtitle="Consulte e gerencie os drafts cadastrados." />
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
@@ -239,6 +244,7 @@ else
 
     private async Task LoadDraftsAndDetailsAsync()
     {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/draft/info"));
         await LoadDraftsAsync();
 
         Guid? draftId = null;
@@ -281,6 +287,7 @@ else
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao carregar lista de drafts");
         }
         finally
         {
@@ -328,6 +335,7 @@ else
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao carregar detalhes do draft {DraftId}", draftId);
         }
         finally
         {
@@ -388,6 +396,7 @@ else
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao adicionar rodada ao draft {DraftId}", selectedDraftId);
         }
         finally
         {
@@ -427,6 +436,7 @@ else
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao remover rodada {Round} do draft {DraftId}", roundNumber, selectedDraftId);
         }
         finally
         {

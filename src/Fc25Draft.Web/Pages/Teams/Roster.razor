@@ -1,11 +1,16 @@
+@page "/times/elencos"
 @page "/teams/roster"
 @using Fc25Draft.Core.DTOs
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject ILogger<Fc25Draft.Web.Pages.Teams.Roster> Logger
 
-<h3>Elencos das Equipes</h3>
+@implements IDisposable
 
-<p class="text-muted">Selecione uma equipe para visualizar a relação completa de jogadores.</p>
+<PageHeader Title="Elencos"
+            Subtitle="Selecione uma equipe para visualizar a relação completa de jogadores." />
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -14,11 +19,14 @@
 
 @if (isLoading)
 {
-    <p><em>Carregando equipes...</em></p>
+    <div class="d-flex align-items-center gap-2" role="status">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>Carregando equipes...</span>
+    </div>
 }
 else if (teams.Count == 0)
 {
-    <p>Nenhuma equipe encontrada.</p>
+    <div class="alert alert-warning" role="status">Nenhuma equipe encontrada.</div>
 }
 else
 {
@@ -52,9 +60,11 @@ else
     private readonly List<TeamListItemDto> teams = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private CancellationTokenSource? loadCts;
 
     protected override async Task OnInitializedAsync()
     {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/times/elencos"));
         await LoadTeamsAsync();
     }
 
@@ -63,19 +73,32 @@ else
         isLoading = true;
         errorMessage = null;
         teams.Clear();
+        loadCts?.Cancel();
+        loadCts = new CancellationTokenSource();
 
         try
         {
-            var result = await TeamsApiClient.GetAsync(search: null, page: 1, pageSize: 100);
+            var result = await TeamsApiClient.GetAsync(search: null, page: 1, pageSize: 100, loadCts.Token);
             teams.AddRange(result.Items);
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "Carregamento cancelado.";
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao carregar elencos de equipes");
+            errorMessage = "Não foi possível carregar as equipes. Tente novamente em instantes.";
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    public void Dispose()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
     }
 }

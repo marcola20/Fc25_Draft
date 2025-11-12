@@ -15,6 +15,7 @@
 @using Blazored.Toast;
 @inject IToastService Toasts
 @inject PlayersApiClient PlayersApiClient
+@inject ILogger<Fc25Draft.Web.Components.MarketCycles.MarketItemGenerationTab> Logger
 
 @implements IDisposable
 
@@ -529,8 +530,8 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _positionsError = "Não foi possível carregar as posições disponíveis.";
+            Logger.LogError(ex, "LayoutNav:Error ao carregar posições para geração de itens");
         }
         finally
         {
@@ -583,9 +584,10 @@ else
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
+        MarketItemGenerationRequestDto? request = null;
         try
         {
-            var request = _model.ToRequestDto();
+            request = _model.ToRequestDto();
             _lastPreviewRequest = CloneRequest(request);
             ResetManualAdjustments();
             var preview = await GenerationClient.PreviewAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
@@ -597,8 +599,8 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             Toasts.ShowError("Não foi possível pré-visualizar a geração de itens.");
+            Logger.LogError(ex, "LayoutNav:Error ao pré-visualizar geração de itens {CycleId} {@Request}", _model?.CycleId, request);
         }
         finally
         {
@@ -644,9 +646,10 @@ else
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
+        MarketItemGenerationRequestDto? request = null;
         try
         {
-            var request = CreateGenerationRequest(preferPreviewSeed);
+            request = CreateGenerationRequest(preferPreviewSeed);
             var result = await GenerationClient.GenerateAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
             _resultSummary = result;
             Toasts.ShowSuccess($"{result.CreatedCount} itens gerados com sucesso.");
@@ -657,8 +660,8 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             Toasts.ShowError("Falha ao gerar os itens. Tente novamente.");
+            Logger.LogError(ex, "LayoutNav:Error ao gerar itens automaticamente {CycleId} {@Request}", _model?.CycleId, request);
         }
         finally
         {
@@ -717,8 +720,8 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             Toasts.ShowError("Não foi possível limpar os itens do ciclo.");
+            Logger.LogError(ex, "LayoutNav:Error ao limpar itens gerados do ciclo {CycleId}", Cycle?.CycleId);
         }
         finally
         {
@@ -793,12 +796,12 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _manualOverrideIds = previousManual.ToHashSet();
             _excludedPlayerIds = previousExcluded.ToHashSet();
             _preview = previousPreview;
             await InvokeAsync(StateHasChanged);
             Toasts.ShowError("Não foi possível atualizar a pré-visualização após remover o jogador.");
+            Logger.LogError(ex, "LayoutNav:Error ao remover jogador manual da pré-visualização {PlayerId}", playerId);
         }
     }
 
@@ -836,12 +839,12 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _manualOverrideIds = previousManual.ToHashSet();
             _excludedPlayerIds = previousExcluded.ToHashSet();
             _preview = previousPreview;
             await InvokeAsync(StateHasChanged);
             Toasts.ShowError($"Não foi possível adicionar {player.Name} à pré-visualização.");
+            Logger.LogError(ex, "LayoutNav:Error ao adicionar jogador manual à pré-visualização {PlayerId}", player.PlayerId);
         }
     }
 
@@ -916,8 +919,8 @@ else
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
             _playerSearchError = "Não foi possível buscar jogadores.";
+            Logger.LogError(ex, "LayoutNav:Error ao buscar jogadores para geração de itens Termo={Term}", term);
         }
         finally
         {

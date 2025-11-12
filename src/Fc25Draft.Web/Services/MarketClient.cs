@@ -103,10 +103,11 @@ namespace Fc25Draft.Web.Services
             catch (JsonException jex)
             {
                 var contentType = resp.Content.Headers.ContentType?.MediaType ?? "(desconhecido)";
-                Console.WriteLine($"⚠️ JSON inválido para {nameof(PagedResult<CoreItemVm>)}: {jex.Message}");
-                Console.WriteLine($"content-type={contentType}");
                 var preview = json.Length > 500 ? json.Substring(0, 500) : json;
-                Console.WriteLine($"payload (até 500 chars): {preview}");
+                _logger.LogError(jex,
+                    "LayoutNav:Error ao desserializar resposta de itens do mercado ContentType={ContentType} Preview={Preview}",
+                    contentType,
+                    preview);
                 return PagedResult<CoreItemVm>.Empty(query.Page, query.PageSize);
             }
         }

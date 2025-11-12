@@ -1,82 +1,60 @@
 @page "/"
-@inject ApiClientFactory ApiClientFactory
-@inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
+@page "/home"
 @inject AdminAuthService AdminAuth
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
 
 @implements IDisposable
 
-<PageTitle>Início</PageTitle>
+<PageHeader Title="Central CBFV"
+            Subtitle="Escolha uma das áreas para navegar pela plataforma." />
 
-<h1 class="mb-3">Central CBFV</h1>
-<p class="text-muted">Gerencie equipes, jogadores e acompanhe o draft.</p>
-
-@if (!string.IsNullOrEmpty(successMessage))
+@if (!authReady)
 {
-    <div class="alert alert-success" role="status">@successMessage</div>
-}
-else if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-}
-
-<div class="mb-4 d-flex flex-wrap gap-2">
-    <button class="btn btn-primary" @onclick="GenerateDraftAsync" disabled="@DisableGenerateButton">
-        @if (isGenerating)
-        {
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            <span>Gerando...</span>
-        }
-        else
-        {
-            <span>Gerar Draft</span>
-        }
-    </button>
-
-</div>
-
-@if (AdminAuth.IsAuthenticated && draftState?.HasDraft == true && !draftState.DraftCompleted)
-{
-    <small class="text-muted d-block mb-3">Finalize o draft atual para gerar um novo.</small>
-}
-
-<section class="row g-3">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Equipes</h5>
-                <p class="card-text">Cadastre, edite e consulte as equipes participantes do draft.</p>
-                <a class="btn btn-outline-primary" href="teams">Gerenciar Equipes</a>
-            </div>
-        </div>
+    <div class="alert alert-info" role="status">
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Carregando preferências de acesso...
     </div>
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Jogadores</h5>
-                <p class="card-text">Mantenha a base de atletas atualizada para as próximas escolhas.</p>
-                <a class="btn btn-outline-primary" href="players">Gerenciar Jogadores</a>
-            </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <DashboardCard Title="Times"
+                           Description="Gerencie elencos e acompanhe a composição das equipes."
+                           Href="/times/elencos"
+                           Icon="oi oi-people" />
         </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <DashboardCard Title="Draft"
+                           Description="Controle as escolhas e visualize informações do draft em andamento."
+                           Href="/draft/controle"
+                           Icon="oi oi-flag" />
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <DashboardCard Title="Mercado de Transferências"
+                           Description="Acompanhe negociações, histórico e itens disponíveis no mercado."
+                           Href="/mercado"
+                           Icon="oi oi-cart" />
+        </div>
+        @if (AdminAuth.IsAuthenticated)
+        {
+            <div class="col-12 col-md-6 col-xl-3">
+                <DashboardCard Title="Administração"
+                               Description="Acesse configurações avançadas, ciclos e geração de itens."
+                               Href="/admin/ciclos"
+                               Icon="oi oi-cog" />
+            </div>
+        }
     </div>
-</section>
+}
 
 @code {
-    private bool isGenerating;
-    private string? successMessage;
-    private string? errorMessage;
-    private bool authInitialized;
-    private DraftStateDto? draftState;
-    private bool isLoadingState = true;
-
-    private bool DisableGenerateButton =>
-        !AdminAuth.IsAuthenticated ||
-        isGenerating ||
-        isLoadingState ||
-        (draftState?.HasDraft == true && !draftState.DraftCompleted);
+    private bool authReady;
 
     protected override void OnInitialized()
     {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/home"));
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
 
@@ -88,260 +66,16 @@ else if (!string.IsNullOrEmpty(errorMessage))
         }
 
         await AdminAuth.EnsureInitializedAsync();
-        authInitialized = true;
-        await LoadDraftStateAsync();
+        authReady = true;
         StateHasChanged();
     }
 
-    private async Task LoadDraftStateAsync()
-    {
-        isLoadingState = true;
-
-        try
-        {
-            var client = await ApiClientFactory.CreateAsync();
-            var response = await client.GetAsync("api/draft/state");
-
-            if (response.IsSuccessStatusCode)
-            {
-                draftState = await response.Content.ReadFromJsonAsync<DraftStateDto>();
-            }
-            else
-            {
-                draftState = null;
-            }
-        }
-        catch
-        {
-            draftState = null;
-        }
-        finally
-        {
-            isLoadingState = false;
-        }
-    }
-
-    private async Task GenerateDraftAsync()
-    {
-        if (isGenerating)
-        {
-            return;
-        }
-
-        successMessage = null;
-        errorMessage = null;
-
-        if (!AdminAuth.IsAuthenticated)
-        {
-            errorMessage = "Entre como administrador para gerar o draft.";
-            return;
-        }
-
-        if (isLoadingState)
-        {
-            await LoadDraftStateAsync();
-        }
-
-        if (draftState?.HasDraft == true && !draftState.DraftCompleted)
-        {
-            errorMessage = "Não é possível gerar um novo draft enquanto o atual não foi concluído.";
-            return;
-        }
-
-        string? nameInput;
-        var defaultName = $"cbfv Draft - {DateTime.Now:yyyy-MM-dd HH:mm}";
-
-        try
-        {
-            nameInput = await JSRuntime.InvokeAsync<string?>("prompt", "Informe o nome do draft:", defaultName);
-        }
-        catch (JSException ex)
-        {
-            errorMessage = $"Não foi possível solicitar o nome do draft: {ex.Message}";
-            return;
-        }
-
-        if (nameInput is null)
-        {
-            return;
-        }
-
-        var draftName = nameInput.Trim();
-        if (string.IsNullOrWhiteSpace(draftName))
-        {
-            errorMessage = "Informe um nome válido para o draft.";
-            return;
-        }
-
-        string? roundsInput;
-
-        try
-        {
-            roundsInput = await JSRuntime.InvokeAsync<string?>("prompt", "Quantas rodadas o draft deve ter?", "19");
-        }
-        catch (JSException ex)
-        {
-            errorMessage = $"Não foi possível solicitar o número de rodadas: {ex.Message}";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(roundsInput))
-        {
-            return;
-        }
-
-        if (!int.TryParse(roundsInput, out var totalRounds))
-        {
-            errorMessage = "Informe um número válido de rodadas.";
-            return;
-        }
-
-        if (totalRounds is < 1 or > 50)
-        {
-            errorMessage = "O número de rodadas deve estar entre 1 e 50.";
-            return;
-        }
-
-        var roundRules = new List<DraftRoundRuleDto>(totalRounds);
-
-        for (var round = 1; round <= totalRounds; round++)
-        {
-            string? minInput;
-            string? maxInput;
-
-            try
-            {
-                minInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall mínimo para a rodada {round}:");
-            }
-            catch (JSException ex)
-            {
-                errorMessage = $"Não foi possível solicitar o overall mínimo da rodada {round}: {ex.Message}";
-                return;
-            }
-
-            if (minInput is null)
-            {
-                return;
-            }
-
-            if (!int.TryParse(minInput, out var overallMin) || overallMin < 0 || overallMin > 150)
-            {
-                errorMessage = $"Informe um overall mínimo válido (0 a 150) para a rodada {round}.";
-                return;
-            }
-
-            try
-            {
-                maxInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall máximo para a rodada {round}:");
-            }
-            catch (JSException ex)
-            {
-                errorMessage = $"Não foi possível solicitar o overall máximo da rodada {round}: {ex.Message}";
-                return;
-            }
-
-            if (maxInput is null)
-            {
-                return;
-            }
-
-            if (!int.TryParse(maxInput, out var overallMax) || overallMax < 0 || overallMax > 150)
-            {
-                errorMessage = $"Informe um overall máximo válido (0 a 150) para a rodada {round}.";
-                return;
-            }
-
-            if (overallMin > overallMax)
-            {
-                errorMessage = $"O overall mínimo não pode ser maior que o máximo na rodada {round}.";
-                return;
-            }
-
-            roundRules.Add(new DraftRoundRuleDto(round, overallMin, overallMax));
-        }
-
-        isGenerating = true;
-        var stateUpdated = false;
-
-        try
-        {
-            var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
-            var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, RoundRules: roundRules, Name: draftName));
-
-            if (response.IsSuccessStatusCode)
-            {
-                DraftStateDto? state = null;
-                try
-                {
-                    state = await response.Content.ReadFromJsonAsync<DraftStateDto>();
-                }
-                catch
-                {
-                }
-
-                if (state is not null)
-                {
-                    draftState = state;
-                    stateUpdated = true;
-                    var responseName = string.IsNullOrWhiteSpace(state.DraftName) ? draftName : state.DraftName;
-                    successMessage = $"{responseName} gerado com {state.TotalRounds} rodadas!";
-                }
-                else
-                {
-                    successMessage = $"{draftName} gerado com {totalRounds} rodadas!";
-                }
-            }
-            else
-            {
-                ApiErrorResponse? error = null;
-                try
-                {
-                    error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                }
-                catch
-                {
-                }
-
-                errorMessage = error?.Message ?? $"Erro ao gerar o draft: {response.StatusCode}.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Erro ao gerar o draft: {ex.Message}";
-        }
-        finally
-        {
-            isGenerating = false;
-
-            if (!stateUpdated)
-            {
-                await LoadDraftStateAsync();
-            }
-            else
-            {
-                isLoadingState = false;
-            }
-        }
-
-        if (!stateUpdated && successMessage is not null)
-        {
-            successMessage = $"{draftName} gerado com {totalRounds} rodadas!";
-        }
-    }
-
-    private sealed record ApiErrorResponse(string? Message);
-
     private void OnAuthenticationChanged()
     {
-        if (!authInitialized)
-        {
-            return;
-        }
-
         InvokeAsync(async () =>
         {
-            await LoadDraftStateAsync();
+            await AdminAuth.EnsureInitializedAsync();
+            authReady = true;
             StateHasChanged();
         });
     }

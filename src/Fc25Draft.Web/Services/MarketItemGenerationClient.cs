@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Fc25Draft.Web.Models.MarketCycles;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace Fc25Draft.Web.Services;
 
@@ -25,10 +26,12 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
     };
 
     private readonly ApiClientFactory _clientFactory;
+    private readonly ILogger<MarketItemGenerationClient> _logger;
 
-    public MarketItemGenerationClient(ApiClientFactory clientFactory)
+    public MarketItemGenerationClient(ApiClientFactory clientFactory, ILogger<MarketItemGenerationClient> logger)
     {
         _clientFactory = clientFactory;
+        _logger = logger;
     }
 
     public async Task<MarketItemGenerationPreviewDto> PreviewAsync(Guid cycleId, MarketItemGenerationRequestDto request, CancellationToken ct)
@@ -60,7 +63,7 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
         }
         catch (HttpRequestException ex)
         {
-            Console.Error.WriteLine(ex.ToString());
+            _logger.LogError(ex, "LayoutNav:Error ao chamar API de geração de itens para o ciclo {CycleId}", cycleId);
             throw;
         }
     }
@@ -74,14 +77,14 @@ public class MarketItemGenerationClient : IMarketItemGenerationClient
             ?? throw new InvalidOperationException("Resposta inválida do servidor ao limpar itens gerados do ciclo.");
     }
 
-    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    private async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
             return;
 
         var (userMessage, fullLog) = await BuildErrorDetailsAsync(response, ct).ConfigureAwait(false);
 
-        Console.Error.WriteLine(fullLog);
+        _logger.LogError("LayoutNav:Error ao consumir API de geração de itens. Detalhes: {Log}", fullLog);
 
         var status = (int)response.StatusCode;
         var prefix = $"(HTTP {status}) ";
