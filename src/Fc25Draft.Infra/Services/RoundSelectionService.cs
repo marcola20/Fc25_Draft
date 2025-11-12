@@ -305,7 +305,9 @@ public sealed class RoundSelectionService : IRoundSelectionService
                         p.Player.Name,
                         p.Player.Position.Name,
                         p.Player.PositionId == 0 ? 999 : p.Player.PositionId,
-                        p.Player.CurrentTeam != null ? p.Player.CurrentTeam.TeamName : null))
+                        p.Player.TeamRosters
+                            .Select(r => r.Team.TeamName)
+                            .FirstOrDefault()))
                     .ToList()))
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
