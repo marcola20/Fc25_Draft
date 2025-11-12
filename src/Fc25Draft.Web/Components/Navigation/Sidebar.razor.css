@@ -40,11 +40,19 @@
 .sidebar-link:focus {
     background-color: rgba(255, 255, 255, 0.1);
     color: #fff;
+    text-decoration: none;
+}
+
+.sidebar-link:visited,
+.sidebar-link:active,
+.sidebar-link:focus-visible {
+    text-decoration: none;
 }
 
 .sidebar-link.active {
     background-color: #f4d35e;
     color: #0d1b2a;
+    text-decoration: none;
 }
 
 .sidebar-link.active .sidebar-link-text {
