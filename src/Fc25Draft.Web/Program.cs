@@ -72,6 +72,7 @@ var api = app.MapGroup("/api");
 api.MapDraftEndpoints()
    .MapPlayerEndpoints()
    .MapTeamEndpoints()
+   .MapMatchEndpoints()
    .MapBudgetEndpoints()
    .MapPricingEndpoints()
    .MapTransfersEndpoints()

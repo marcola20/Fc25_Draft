@@ -30,6 +30,9 @@ public class DraftDbContext : DbContext
     public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
     public DbSet<RoundSelection> RoundSelections => Set<RoundSelection>();
     public DbSet<RoundSelectionPlayer> RoundSelectionPlayers => Set<RoundSelectionPlayer>();
+    public DbSet<TeamLineup> TeamLineups => Set<TeamLineup>();
+    public DbSet<TeamLineupSlot> TeamLineupSlots => Set<TeamLineupSlot>();
+    public DbSet<Match> Matches => Set<Match>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -144,6 +147,57 @@ public class DraftDbContext : DbContext
             e.HasOne(x => x.Player)
              .WithMany(p => p.TeamRosters)
              .HasForeignKey(x => x.PlayerId);
+        });
+
+        mb.Entity<TeamLineup>(e =>
+        {
+            e.HasKey(x => x.LineupId);
+            e.Property(x => x.FormationCode).IsRequired().HasMaxLength(20);
+            e.Property(x => x.TacticCode).IsRequired().HasMaxLength(40);
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            e.HasIndex(x => x.TeamId).HasDatabaseName("IX_TeamLineups_TeamId");
+
+            e.HasMany(x => x.Slots)
+             .WithOne(x => x.Lineup)
+             .HasForeignKey(x => x.LineupId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<TeamLineupSlot>(e =>
+        {
+            e.HasKey(x => x.SlotId);
+            e.Property(x => x.Role).IsRequired();
+            e.Property(x => x.Order).IsRequired();
+            e.Property(x => x.PrimaryPositionId).IsRequired();
+
+            e.HasIndex(x => new { x.LineupId, x.Role, x.Order });
+            e.HasIndex(x => x.PlayerId);
+
+            e.HasOne(x => x.Player)
+             .WithMany(p => p.TeamLineupSlots)
+             .HasForeignKey(x => x.PlayerId)
+             .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        mb.Entity<Match>(e =>
+        {
+            e.HasKey(x => x.MatchId);
+            e.Property(x => x.KickoffAtUtc).IsRequired();
+            e.Property(x => x.HomeLineupSnapshotJson);
+            e.Property(x => x.AwayLineupSnapshotJson);
+
+            e.HasOne(x => x.HomeTeam)
+             .WithMany(t => t.HomeMatches)
+             .HasForeignKey(x => x.HomeTeamId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.AwayTeam)
+             .WithMany(t => t.AwayMatches)
+             .HasForeignKey(x => x.AwayTeamId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => new { x.HomeTeamId, x.AwayTeamId, x.KickoffAtUtc });
         });
 
         mb.Entity<RoundSelection>(e =>

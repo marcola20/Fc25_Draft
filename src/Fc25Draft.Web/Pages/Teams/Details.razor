@@ -1,8 +1,10 @@
 @page "/teams/details/{Id:guid}"
+@using System
 @using System.Linq
 @using System.Globalization
 @using Fc25Draft.Core.Extensions
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Components.Teams
 @using Fc25Draft.Web.Services
 @inject TeamsApiClient TeamsApiClient
 @inject NavigationManager Navigation
@@ -88,118 +90,151 @@ else
         </div>
     </section>
 
-    <section class="mt-4">
-        <h4>Elenco</h4>
-
-        @if (roster is null)
-        {
-            <p class="text-muted">Não foi possível carregar o elenco da equipe.</p>
-        }
-        else if (_sortedRosterPlayers.Count == 0)
-        {
-            <p class="mb-0">Nenhum jogador vinculado.</p>
-        }
-        else
-        {
-            <div class="table-responsive-sm p-0">
-                <table class="table table-striped table-sm mb-0">
-                    <thead>
-                        <tr class="align-middle text-center">
-                            <th scope="col" class="text-start text-nowrap">Jogador</th>
-                            <th scope="col" class="text-center text-nowrap">
-                                <button type="button"
-                                        class="@GetSortButtonClass(RosterSortColumn.Position)"
-                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Position)">
-                                    Posição
-                                    @if (_activeSortColumn == RosterSortColumn.Position)
-                                    {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
-                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Position)</span>
-                                    }
-                                </button>
-                            </th>
-                            <th scope="col" class="text-center">
-                                <button type="button"
-                                        class="@GetSortButtonClass(RosterSortColumn.Overall)"
-                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Overall)">
-                                    Overall
-                                    @if (_activeSortColumn == RosterSortColumn.Overall)
-                                    {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
-                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Overall)</span>
-                                    }
-                                </button>
-                            </th>
-                            <th scope="col" class="text-center">
-                                <button type="button"
-                                        class="@GetSortButtonClass(RosterSortColumn.Age)"
-                                        @onclick="() => ToggleRosterSort(RosterSortColumn.Age)">
-                                    Idade
-                                    @if (_activeSortColumn == RosterSortColumn.Age)
-                                    {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
-                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Age)</span>
-                                    }
-                                </button>
-                            </th>
-                            <th scope="col" class="text-center text-nowrap">
-                                <button type="button"
-                                        class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
-                                        @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
-                                    Preço base
-                                    @if (_activeSortColumn == RosterSortColumn.BasePrice)
-                                    {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
-                                        <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.BasePrice)</span>
-                                    }
-                                </button>
-                            </th>
-                            @if (_canQuickSell)
-                            {
-                                <th scope="col" class="text-center text-nowrap pe-0">Ações</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var player in _sortedRosterPlayers)
-                        {
-                            <tr class="align-middle text-center">
-                                <td class="text-start text-nowrap">@player.Name</td>
-                                <td class="text-center text-nowrap">@player.Position</td>
-                                <td>@player.Overall</td>
-                                <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
-                                <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
-                                @if (_canQuickSell)
-                                {
-                                    <td class="text-center pe-0">
+    <div class="mt-4">
+        <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button type="button"
+                        class="nav-link @(IsDetailsTabActive("roster") ? "active" : string.Empty)"
+                        @onclick="() => SetDetailsTab("roster")"
+                        role="tab"
+                        aria-controls="tab-roster"
+                        aria-selected="@(IsDetailsTabActive("roster") ? "true" : "false")">
+                    Elenco
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button"
+                        class="nav-link @(IsDetailsTabActive("lineup") ? "active" : string.Empty)"
+                        @onclick="() => SetDetailsTab("lineup")"
+                        role="tab"
+                        aria-controls="tab-lineup"
+                        aria-selected="@(IsDetailsTabActive("lineup") ? "true" : "false")">
+                    Escalação
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content border border-top-0 p-3">
+            <div class="tab-pane fade @(IsDetailsTabActive("roster") ? "show active" : string.Empty)"
+                 id="tab-roster"
+                 role="tabpanel">
+                <h4 class="visually-hidden">Elenco</h4>
+                @if (roster is null)
+                {
+                    <p class="text-muted mb-0">Não foi possível carregar o elenco da equipe.</p>
+                }
+                else if (_sortedRosterPlayers.Count == 0)
+                {
+                    <p class="mb-0">Nenhum jogador vinculado.</p>
+                }
+                else
+                {
+                    <div class="table-responsive-sm p-0">
+                        <table class="table table-striped table-sm mb-0">
+                            <thead>
+                                <tr class="align-middle text-center">
+                                    <th scope="col" class="text-start text-nowrap">Jogador</th>
+                                    <th scope="col" class="text-center text-nowrap">
                                         <button type="button"
-                                                class="btn btn-outline-danger btn-sm btn-icon"
-                                                style="border-width: 2px;
-                                                       border-color: red;
-                                                       color: red;
-                                                       padding: 2px 4px;
-                                                       line-height: 1;
-                                                       transition: background-color 0.2s ease;"
-                                                title="Quicksell"
-                                                aria-label="Vender rapidamente @player.Name"
-                                                onmouseover="this.style.backgroundColor='rgba(255, 0, 0, 0.1)';"
-                                                onmouseout="this.style.backgroundColor='transparent';"
-                                                @onclick="() => OpenQuickSellModal(player)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                 width="16" height="16" fill="red">
-                                                <path d="M7 2v10h3v10l7-12h-4l4-8z" />
-                                            </svg>
-                                            <span class="visually-hidden">Venda rápida</span>
+                                                class="@GetSortButtonClass(RosterSortColumn.Position)"
+                                                @onclick="() => ToggleRosterSort(RosterSortColumn.Position)">
+                                            Posição
+                                            @if (_activeSortColumn == RosterSortColumn.Position)
+                                            {
+                                                <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                                <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Position)</span>
+                                            }
                                         </button>
-                                    </td>
+                                    </th>
+                                    <th scope="col" class="text-center">
+                                        <button type="button"
+                                                class="@GetSortButtonClass(RosterSortColumn.Overall)"
+                                                @onclick="() => ToggleRosterSort(RosterSortColumn.Overall)">
+                                            Overall
+                                            @if (_activeSortColumn == RosterSortColumn.Overall)
+                                            {
+                                                <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                                <span class="visualmente-hidden">@GetSortDirectionDescription(RosterSortColumn.Overall)</span>
+                                            }
+                                        </button>
+                                    </th>
+                                    <th scope="col" class="text-center">
+                                        <button type="button"
+                                                class="@GetSortButtonClass(RosterSortColumn.Age)"
+                                                @onclick="() => ToggleRosterSort(RosterSortColumn.Age)">
+                                            Idade
+                                            @if (_activeSortColumn == RosterSortColumn.Age)
+                                            {
+                                                <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                                <span class="visualmente-hidden">@GetSortDirectionDescription(RosterSortColumn.Age)</span>
+                                            }
+                                        </button>
+                                    </th>
+                                    <th scope="col" class="text-center text-nowrap">
+                                        <button type="button"
+                                                class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
+                                                @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
+                                            Preço base
+                                            @if (_activeSortColumn == RosterSortColumn.BasePrice)
+                                            {
+                                                <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                                <span class="visualmente-hidden">@GetSortDirectionDescription(RosterSortColumn.BasePrice)</span>
+                                            }
+                                        </button>
+                                    </th>
+                                    @if (_canQuickSell)
+                                    {
+                                        <th scope="col" class="text-center text-nowrap pe-0">Ações</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var player in _sortedRosterPlayers)
+                                {
+                                    <tr class="align-middle text-center">
+                                        <td class="text-start text-nowrap">@player.Name</td>
+                                        <td class="text-center text-nowrap">@player.Position</td>
+                                        <td>@player.Overall</td>
+                                        <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                                        <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
+                                        @if (_canQuickSell)
+                                        {
+                                            <td class="text-center pe-0">
+                                                <button type="button"
+                                                        class="btn btn-outline-danger btn-sm btn-icon"
+                                                        style="border-width: 2px;
+                                                               border-color: red;
+                                                               color: red;
+                                                               padding: 2px 4px;
+                                                               line-height: 1;
+                                                               transition: background-color 0.2s ease;"
+                                                        title="Quicksell"
+                                                        aria-label="Vender rapidamente @player.Name"
+                                                        onmouseover="this.style.backgroundColor='rgba(255, 0, 0, 0.1)';"
+                                                        onmouseout="this.style.backgroundColor='transparent';"
+                                                        @onclick="() => OpenQuickSellModal(player)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                         width="16" height="16" fill="red">
+                                                        <path d="M7 2v10h3v10l7-12h-4l4-8z" />
+                                                    </svg>
+                                                    <span class="visually-hidden">Venda rápida</span>
+                                                </button>
+                                            </td>
+                                        }
+                                    </tr>
                                 }
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
-        }
-    </section>
+            <div class="tab-pane fade @(IsDetailsTabActive("lineup") ? "show active" : string.Empty)"
+                 id="tab-lineup"
+                 role="tabpanel">
+                <h4 class="visually-hidden">Escalação</h4>
+                <TeamLineupEditor TeamId="Id" Roster="roster" OnLineupSaved="HandleLineupSaved" />
+            </div>
+        </div>
+    </div>
 
     <div class="d-flex gap-2 mt-4">
         @if (AdminAuth.IsAuthenticated)
@@ -323,6 +358,7 @@ else
     private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
     private string? _quickSellSuccessMessage;
+    private string _activeDetailsTab = "roster";
     private string? _teamTokenErrorMessage;
     private bool _teamTokenConfigured;
     private bool _canQuickSell;
@@ -336,6 +372,7 @@ else
     private string _teamTokenInput = string.Empty;
     private string? _teamTokenModalError;
     private bool _teamTokenSaving;
+    private TeamLineupResponse? _lastSavedLineup;
     private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
 
     protected override void OnInitialized()
@@ -400,6 +437,21 @@ else
         }
     }
 
+    private void SetDetailsTab(string tab)
+    {
+        if (!string.Equals(_activeDetailsTab, tab, StringComparison.Ordinal))
+        {
+            _activeDetailsTab = tab;
+        }
+    }
+
+    private bool IsDetailsTabActive(string tab) => string.Equals(_activeDetailsTab, tab, StringComparison.Ordinal);
+
+    private void HandleLineupSaved(TeamLineupResponse response)
+    {
+        _lastSavedLineup = response;
+    }
+
     private void OnAuthenticationChanged()
     {
         if (!authInitialized)
@@ -436,14 +488,12 @@ else
                 basePrice = 0m;
             }
 
-            var positionId = player.Posicao.ToPositionId();
-
             _rosterPlayers.Add(new RosterPlayerViewModel(
                 player.PlayerGuid,
                 player.PlayerId,
                 player.Nome,
                 player.Posicao,
-                positionId,
+                player.PositionId,
                 player.Overall,
                 player.Idade,
                 basePrice));

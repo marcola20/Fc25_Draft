@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215093000_AddTeamLineupsAndMatches")]
+    partial class AddTeamLineupsAndMatches : Migration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -580,27 +582,6 @@ namespace Fc25Draft.Infra.Migrations
                         .HasDatabaseName("IX_MarketTransactions_Item_Type_CreatedAt");
 
                     b.ToTable("MarketTransactions");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.Match", b =>
-                {
-                    b.Navigation("AwayTeam");
-
-                    b.Navigation("HomeTeam");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineup", b =>
-                {
-                    b.Navigation("Slots");
-
-                    b.Navigation("Team");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineupSlot", b =>
-                {
-                    b.Navigation("Lineup");
-
-                    b.Navigation("Player");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>

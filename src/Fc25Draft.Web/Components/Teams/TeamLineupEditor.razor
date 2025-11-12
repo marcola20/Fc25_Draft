@@ -1,0 +1,442 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
+@inject TeamsApiClient TeamsApiClient
+@inject ToastService Toasts
+
+@if (!_initialized)
+{
+    <div class="text-muted">Carregando escalação...</div>
+}
+else if (Roster is null || Roster.Jogadores.Count == 0)
+{
+    <div class="alert alert-warning" role="alert">Carregue o elenco do time para configurar a escalação.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" for="formationSelect">Formação</label>
+                    <select id="formationSelect"
+                            class="form-select"
+                            @onchange="OnFormationChangedAsync"
+                            value="@_selectedFormation"
+                            disabled="@_isLoading">
+                        @foreach (var formation in _supportedFormations)
+                        {
+                            <option value="@formation">@formation</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="tacticInput">Código da tática</label>
+                    <input id="tacticInput"
+                           class="form-control"
+                           maxlength="40"
+                           @bind="_tacticCode"
+                           @bind:event="oninput"
+                           disabled="@_isLoading" />
+                </div>
+                <div class="col-md-4 text-md-end">
+                    @if (_updatedAtUtc.HasValue)
+                    {
+                        <span class="badge bg-secondary">Atualizado em: @_updatedAtUtc.Value:dd/MM/yyyy HH:mm UTC</span>
+                    }
+                </div>
+            </div>
+
+            <p class="text-muted mt-3">Selecione 11 titulares e 7 reservas, sem repetir jogadores. É obrigatório ter 1 GK entre os titulares.</p>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@_errorMessage</div>
+            }
+
+            @if (_isLoading || _isTemplateLoading)
+            {
+                <div class="d-flex align-items-center gap-2 my-4">
+                    <div class="spinner-border" role="status" aria-hidden="true"></div>
+                    <span>Carregando slots da formação...</span>
+                </div>
+            }
+            else
+            {
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6">
+                        <h5>Titulares (11)</h5>
+                        @foreach (var slot in GetSlotsByRole(0))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="slot-@slot.Order">@slot.PositionLabel (@slot.Order)</label>
+                                <select id="slot-@slot.Order"
+                                        class="form-select"
+                                        value="@(slot.PlayerId?.ToString() ?? string.Empty)"
+                                        @onchange="e => OnSlotPlayerChangedAsync(slot, e)"
+                                        disabled="@(_isSaving || _isTemplateLoading)">
+                                    <option value="">— Selecionar —</option>
+                                    @foreach (var option in GetPlayerOptionsForSlot(slot))
+                                    {
+                                        <option value="@option.PlayerId">@option.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <h5>Reservas (7)</h5>
+                        @foreach (var slot in GetSlotsByRole(1))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="slot-@slot.Order">@slot.PositionLabel (@slot.Order)</label>
+                                <select id="slot-@slot.Order"
+                                        class="form-select"
+                                        value="@(slot.PlayerId?.ToString() ?? string.Empty)"
+                                        @onchange="e => OnSlotPlayerChangedAsync(slot, e)"
+                                        disabled="@(_isSaving || _isTemplateLoading)">
+                                    <option value="">— Selecionar —</option>
+                                    @foreach (var option in GetPlayerOptionsForSlot(slot))
+                                    {
+                                        <option value="@option.PlayerId">@option.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="mt-4 d-flex justify-content-end">
+                <button class="btn btn-primary"
+                        @onclick="SaveAsync"
+                        disabled="@IsSaveDisabled">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Salvando...
+                    }
+                    else
+                    {
+                        Salvar Escalação
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid TeamId { get; set; }
+
+    [Parameter]
+    public TeamRosterDto? Roster { get; set; }
+
+    [Parameter]
+    public EventCallback<TeamLineupResponse> OnLineupSaved { get; set; }
+
+    private readonly string[] _supportedFormations = new[] { "4-2-4", "4-2-2-2", "4-3-3", "4-2-3-1", "4-4-2" };
+
+    private bool _initialized;
+    private bool _isLoading = true;
+    private bool _isTemplateLoading;
+    private bool _isSaving;
+    private string? _errorMessage;
+    private string _selectedFormation = "4-2-4";
+    private string _tacticCode = string.Empty;
+    private DateTime? _updatedAtUtc;
+    private readonly List<LineupSlotViewModel> _slots = new();
+    private readonly HashSet<int> _selectedPlayers = new();
+    private IReadOnlyList<PlayerOption> _playerOptions = Array.Empty<PlayerOption>();
+    private Dictionary<int, PlayerOption> _playerLookup = new();
+    private Guid _loadedTeamId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_initialized || _loadedTeamId != TeamId)
+        {
+            _loadedTeamId = TeamId;
+            RefreshPlayerOptions();
+            await LoadAsync();
+            _initialized = true;
+        }
+        else
+        {
+            RefreshPlayerOptions();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var response = await TeamsApiClient.GetActiveLineupAsync(TeamId);
+            if (response is null)
+            {
+                _selectedFormation = _supportedFormations.First();
+                _tacticCode = string.Empty;
+                _updatedAtUtc = null;
+                await LoadTemplateAsync(_selectedFormation, preservePlayers: false);
+            }
+            else
+            {
+                ApplyLineup(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadTemplateAsync(string formation, bool preservePlayers)
+    {
+        _isTemplateLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var template = await TeamsApiClient.GetLineupTemplateAsync(TeamId, formation);
+            var previousSlots = preservePlayers ? _slots.ToDictionary(s => s.Order) : new Dictionary<int, LineupSlotViewModel>();
+
+            _slots.Clear();
+            _selectedPlayers.Clear();
+
+            foreach (var slot in template.OrderBy(s => s.Order))
+            {
+                int? playerId = null;
+                if (preservePlayers && previousSlots.TryGetValue(slot.Order, out var previous) && previous.PlayerId.HasValue)
+                {
+                    var pid = previous.PlayerId.Value;
+                    if (_playerLookup.TryGetValue(pid, out var player) && IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+                    {
+                        playerId = pid;
+                        _selectedPlayers.Add(pid);
+                    }
+                }
+
+                _slots.Add(new LineupSlotViewModel
+                {
+                    Order = slot.Order,
+                    Role = slot.Role,
+                    PrimaryPositionId = slot.PrimaryPositionId,
+                    PositionLabel = slot.PositionLabel,
+                    PlayerId = playerId
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isTemplateLoading = false;
+        }
+    }
+
+    private void ApplyLineup(TeamLineupResponse response)
+    {
+        _selectedFormation = response.FormationCode;
+        _tacticCode = response.TacticCode;
+        _updatedAtUtc = response.UpdatedAtUtc;
+        _slots.Clear();
+        _selectedPlayers.Clear();
+
+        foreach (var slot in response.Slots.OrderBy(s => s.Order))
+        {
+            int? playerId = null;
+            if (slot.PlayerId.HasValue && _playerLookup.TryGetValue(slot.PlayerId.Value, out var player) && IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+            {
+                playerId = slot.PlayerId.Value;
+                _selectedPlayers.Add(playerId.Value);
+            }
+
+            _slots.Add(new LineupSlotViewModel
+            {
+                Order = slot.Order,
+                Role = slot.Role,
+                PrimaryPositionId = slot.PrimaryPositionId,
+                PositionLabel = slot.PositionLabel,
+                PlayerId = playerId
+            });
+        }
+    }
+
+    private async Task OnFormationChangedAsync(ChangeEventArgs args)
+    {
+        if (args?.Value is not string value)
+        {
+            return;
+        }
+
+        var normalized = value.Trim();
+        if (string.Equals(_selectedFormation, normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedFormation = normalized;
+        await LoadTemplateAsync(_selectedFormation, preservePlayers: true);
+        StateHasChanged();
+    }
+
+    private IEnumerable<LineupSlotViewModel> GetSlotsByRole(byte role) => _slots.Where(s => s.Role == role).OrderBy(s => s.Order);
+
+    private IEnumerable<PlayerOption> GetPlayerOptionsForSlot(LineupSlotViewModel slot)
+        => _playerOptions.Where(p => IsPlayerCompatible(slot.PrimaryPositionId, p.PositionId));
+
+    private async Task OnSlotPlayerChangedAsync(LineupSlotViewModel slot, ChangeEventArgs args)
+    {
+        var previousPlayerId = slot.PlayerId;
+
+        if (args?.Value is not string raw || string.IsNullOrWhiteSpace(raw))
+        {
+            if (slot.PlayerId.HasValue)
+            {
+                _selectedPlayers.Remove(slot.PlayerId.Value);
+                slot.PlayerId = null;
+            }
+            StateHasChanged();
+            return;
+        }
+
+        if (!int.TryParse(raw, out var playerId))
+        {
+            return;
+        }
+
+        if (!_playerLookup.TryGetValue(playerId, out var player) || !IsPlayerCompatible(slot.PrimaryPositionId, player.PositionId))
+        {
+            Toasts.ShowError("Jogador não elegível para este slot.");
+            StateHasChanged();
+            return;
+        }
+
+        if (_selectedPlayers.Contains(playerId))
+        {
+            Toasts.ShowError("Jogador já selecionado em outro slot.");
+            StateHasChanged();
+            return;
+        }
+
+        if (previousPlayerId.HasValue)
+        {
+            _selectedPlayers.Remove(previousPlayerId.Value);
+        }
+
+        slot.PlayerId = playerId;
+        _selectedPlayers.Add(playerId);
+        StateHasChanged();
+    }
+
+    private bool IsSaveDisabled =>
+        _isLoading ||
+        _isTemplateLoading ||
+        _isSaving ||
+        string.IsNullOrWhiteSpace(_tacticCode) ||
+        _tacticCode.Trim().Length > 40 ||
+        _slots.Any(s => s.PlayerId is null);
+
+    private async Task SaveAsync()
+    {
+        if (IsSaveDisabled)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new SaveLineupRequest
+            {
+                FormationCode = _selectedFormation,
+                TacticCode = _tacticCode.Trim(),
+                Slots = _slots
+                    .Select(s => new SaveLineupSlotDto
+                    {
+                        Order = s.Order,
+                        Role = s.Role,
+                        PrimaryPositionId = s.PrimaryPositionId,
+                        PlayerId = s.PlayerId
+                    })
+                    .ToList()
+            };
+
+            var response = await TeamsApiClient.SaveLineupAsync(TeamId, request);
+            ApplyLineup(response);
+            Toasts.ShowSuccess("Escalação salva com sucesso.");
+            if (OnLineupSaved.HasDelegate)
+            {
+                await OnLineupSaved.InvokeAsync(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void RefreshPlayerOptions()
+    {
+        if (Roster?.Jogadores is null)
+        {
+            _playerOptions = Array.Empty<PlayerOption>();
+            _playerLookup = new Dictionary<int, PlayerOption>();
+            return;
+        }
+
+        _playerOptions = Roster.Jogadores
+            .OrderBy(p => p.Nome)
+            .Select(p => new PlayerOption(p.PlayerId, p.PositionId, p.Nome, p.Posicao, p.Overall))
+            .ToList();
+
+        _playerLookup = _playerOptions.ToDictionary(p => p.PlayerId);
+
+        foreach (var slot in _slots)
+        {
+            if (slot.PlayerId.HasValue && !_playerLookup.ContainsKey(slot.PlayerId.Value))
+            {
+                _selectedPlayers.Remove(slot.PlayerId.Value);
+                slot.PlayerId = null;
+            }
+        }
+    }
+
+    private static bool IsPlayerCompatible(int slotPrimaryPositionId, int playerPositionId) => slotPrimaryPositionId switch
+    {
+        1 => playerPositionId == 1,
+        2 or 3 or 4 => playerPositionId is 2 or 3 or 4,
+        5 or 6 => playerPositionId is 5 or 6,
+        7 => playerPositionId is 6 or 7,
+        8 or 9 => playerPositionId is 7 or 8 or 9,
+        10 => playerPositionId == 10,
+        _ => false
+    };
+
+    private sealed class LineupSlotViewModel
+    {
+        public int Order { get; set; }
+        public byte Role { get; set; }
+        public int PrimaryPositionId { get; set; }
+        public string PositionLabel { get; set; } = string.Empty;
+        public int? PlayerId { get; set; }
+    }
+
+    private sealed record PlayerOption(int PlayerId, int PositionId, string Name, string PositionName, int Overall)
+    {
+        public string DisplayName => $"{Name} ({PositionName}, OVR {Overall})";
+    }
+}

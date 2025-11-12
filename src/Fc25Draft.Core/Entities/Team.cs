@@ -10,6 +10,9 @@ public class Team
     public decimal BudgetBlocked { get; set; }
 
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
+    public ICollection<TeamLineup> Lineups { get; set; } = new List<TeamLineup>();
+    public ICollection<Match> HomeMatches { get; set; } = new List<Match>();
+    public ICollection<Match> AwayMatches { get; set; } = new List<Match>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();
     public ICollection<MarketBid> MarketBids { get; set; } = new List<MarketBid>();
     public ICollection<MarketItem> LeadingMarketItems { get; set; } = new List<MarketItem>();

@@ -21,4 +21,5 @@ public class Player
     public Team? CurrentTeam { get; set; }
     public ICollection<MarketItem> MarketItems { get; set; } = new List<MarketItem>();
     public ICollection<RoundSelectionPlayer> RoundSelections { get; set; } = new List<RoundSelectionPlayer>();
+    public ICollection<TeamLineupSlot> TeamLineupSlots { get; set; } = new List<TeamLineupSlot>();
 }

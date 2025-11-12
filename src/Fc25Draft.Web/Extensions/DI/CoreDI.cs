@@ -42,6 +42,9 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransfersQueryService, TransfersQueryService>();
             services.AddScoped<ITransferHistoryService, TransferHistoryService>();
             services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
+            services.AddSingleton<IFormationSlotFactory, FormationSlotFactory>();
+            services.AddScoped<ITeamLineupService, TeamLineupService>();
+            services.AddScoped<IMatchService, MatchService>();
             services.AddScoped<ISeasonQueryService, SeasonService>();
             services.AddScoped<ISeasonAdminService, SeasonService>();
             services.AddScoped<IRoundSeedService, RoundSeedService>();

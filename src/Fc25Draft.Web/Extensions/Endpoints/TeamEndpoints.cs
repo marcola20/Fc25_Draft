@@ -113,6 +113,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                             .Select(r => new TeamRosterPlayerDto(
                                 r.Player.PlayerGuid,
                                 r.PlayerId,
+                                r.Player.PositionId,
                                 r.Player.Name,
                                 r.Player.Position.Name,
                                 r.Player.Overall,
@@ -140,6 +141,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                             .Select(r => new TeamRosterPlayerDto(
                                 r.Player.PlayerGuid,
                                 r.PlayerId,
+                                r.Player.PositionId,
                                 r.Player.Name,
                                 r.Player.Position.Name,
                                 r.Player.Overall,
@@ -151,6 +153,89 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     .FirstOrDefaultAsync(ct);
 
                 return roster is null ? Results.NotFound() : Results.Ok(roster);
+            });
+
+            teamsApi.MapGet("/{teamId:guid}/lineup/active", async (
+                Guid teamId,
+                ITeamLineupService lineupService,
+                ILogger<TeamEndpoints> logger,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    var lineup = await lineupService.GetActiveAsync(teamId, ct);
+                    return lineup is null
+                        ? Results.NotFound()
+                        : Results.Ok(lineup);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Falha ao carregar escalação ativa do time {TeamId}.", teamId);
+                    return Results.Json(new { message = "Erro ao carregar a escalação ativa." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            teamsApi.MapGet("/{teamId:guid}/lineup/template", async (
+                Guid teamId,
+                string formationCode,
+                ITeamLineupService lineupService,
+                ILogger<TeamEndpoints> logger,
+                CancellationToken ct) =>
+            {
+                if (string.IsNullOrWhiteSpace(formationCode))
+                {
+                    return Results.Json(new { message = "Formação inválida." }, statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                try
+                {
+                    var template = await lineupService.BuildTemplateAsync(formationCode, ct);
+                    return Results.Ok(template);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Formação inválida ao solicitar template da escalação para o time {TeamId}.", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Falha ao gerar template de escalação para o time {TeamId}.", teamId);
+                    return Results.Json(new { message = "Erro ao gerar slots da escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            teamsApi.MapPost("/{teamId:guid}/lineup", async (
+                Guid teamId,
+                SaveLineupRequest request,
+                ITeamLineupService lineupService,
+                ILogger<TeamEndpoints> logger,
+                CancellationToken ct) =>
+            {
+                if (request is null)
+                {
+                    return Results.Json(new { message = "Payload inválido." }, statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                try
+                {
+                    var response = await lineupService.SaveAsync(teamId, request, ct);
+                    return Results.Ok(response);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Time não encontrado ao salvar escalação {TeamId}.", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Falha de validação ao salvar escalação do time {TeamId}.", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Erro inesperado ao salvar escalação do time {TeamId}.", teamId);
+                    return Results.Json(new { message = "Erro interno no servidor." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
             });
 
             teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:guid}", async (

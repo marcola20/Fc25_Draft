@@ -106,6 +106,51 @@ public class TeamsApiClient
         return await response.Content.ReadFromJsonAsync<TeamRosterDto>(cancellationToken: ct);
     }
 
+    public async Task<TeamLineupResponse?> GetActiveLineupAsync(Guid teamId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.GetAsync($"api/teams/{teamId}/lineup/active", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<TeamLineupResponse>(cancellationToken: ct);
+    }
+
+    public async Task<IReadOnlyList<LineupSlotTemplateDto>> GetLineupTemplateAsync(Guid teamId, string formationCode, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(formationCode))
+        {
+            throw new ArgumentException("Formação inválida.", nameof(formationCode));
+        }
+
+        var client = await _clientFactory.CreateAsync();
+        var encoded = Uri.EscapeDataString(formationCode.Trim());
+        var response = await client.GetAsync($"api/teams/{teamId}/lineup/template?formationCode={encoded}", ct);
+        await EnsureSuccessAsync(response);
+
+        var payload = await response.Content.ReadFromJsonAsync<IReadOnlyList<LineupSlotTemplateDto>>(cancellationToken: ct);
+        return payload ?? Array.Empty<LineupSlotTemplateDto>();
+    }
+
+    public async Task<TeamLineupResponse> SaveLineupAsync(Guid teamId, SaveLineupRequest request, CancellationToken ct = default)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.PostAsJsonAsync($"api/teams/{teamId}/lineup", request, ct);
+        await EnsureSuccessAsync(response);
+
+        var payload = await response.Content.ReadFromJsonAsync<TeamLineupResponse>(cancellationToken: ct);
+        return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
     public async Task<QuickSellResultDto> QuickSellAsync(Guid teamId, Guid playerId, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
