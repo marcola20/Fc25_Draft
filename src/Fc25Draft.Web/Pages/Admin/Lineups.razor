@@ -113,7 +113,7 @@ else
                     @for (var page = 1; page <= TotalPages; page++)
                     {
                         <li class="page-item @(page == _currentPage ? "active" : null)">
-                            <button class="page-link" @onclick="async () => await ChangePageAsync(page)">@page</button>
+                            <button class="page-link" @onclick="async () => await ChangePageAsync(page)">@(page)</button>
                         </li>
                     }
                     <li class="page-item @(_currentPage >= TotalPages ? "disabled" : null)">
