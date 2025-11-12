@@ -77,10 +77,10 @@ else
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
-                                    <option value="" selected="@(!slot.PlayerId.HasValue)">— Selecionar —</option>
+                                    <option value="">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
                                     {
-                                        <option value="@option.PlayerId" selected="@(slot.PlayerId == option.PlayerId)">@option.DisplayName</option>
+                                        <option value="@option.PlayerId">@option.DisplayName</option>
                                     }
                                 </select>
                             </div>
@@ -97,10 +97,10 @@ else
                                         value="@(slot.PlayerId?.ToString() ?? string.Empty)"
                                         @onchange="e => OnSlotPlayerChanged(slot, e)"
                                         disabled="@(_isSaving || _isTemplateLoading)">
-                                    <option value="" selected="@(!slot.PlayerId.HasValue)">— Selecionar —</option>
+                                    <option value="">— Selecionar —</option>
                                     @foreach (var option in GetPlayerOptionsForSlot(slot))
                                     {
-                                        <option value="@option.PlayerId" selected="@(slot.PlayerId == option.PlayerId)">@option.DisplayName</option>
+                                        <option value="@option.PlayerId">@option.DisplayName</option>
                                     }
                                 </select>
                             </div>
