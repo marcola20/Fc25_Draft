@@ -10,6 +10,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Lineups> Logger
 @inject IJSRuntime JSRuntime
+@inject TeamAccessService TeamAccess
 
 @implements IDisposable
 
@@ -26,6 +27,19 @@
     <div class="d-flex align-items-center gap-2" role="status">
         <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
         <span>Carregando escalações...</span>
+    </div>
+}
+else if (!hasAccess)
+{
+    <div class="alert alert-warning" role="alert">
+        @if (!string.IsNullOrWhiteSpace(accessMessage))
+        {
+            @accessMessage
+        }
+        else
+        {
+            <span>Informe o token do seu time para gerenciar as escalações.</span>
+        }
     </div>
 }
 else if (currentEditor is null)
@@ -322,6 +336,9 @@ else
     private bool isLoading = true;
     private bool isSaving;
     private bool isDeleting;
+    private bool hasAccess;
+    private string? accessMessage;
+    private string? currentTeamToken;
     private string? errorMessage;
     private string? pageSubtitle;
     private CancellationTokenSource? loadCts;
@@ -331,11 +348,21 @@ else
     protected override void OnInitialized()
     {
         LayoutState.SetPage(pageDefinition);
+        TeamAccess.TokenChanged += OnTeamTokenChanged;
     }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+    }
+
+    private void OnTeamTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
     }
 
     private async Task LoadAsync()
@@ -344,18 +371,99 @@ else
         loadCts = new CancellationTokenSource();
         isLoading = true;
         errorMessage = null;
+        accessMessage = null;
+        hasAccess = false;
 
         try
         {
+            string? token;
+            try
+            {
+                token = await TeamAccess.GetTokenAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Lineups:Error retrieving team token");
+                accessMessage = "Não foi possível verificar o token do time.";
+                currentTeamToken = null;
+                ClearLocalState();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                accessMessage = "Informe o token do seu time para gerenciar as escalações.";
+                currentTeamToken = null;
+                ClearLocalState();
+                return;
+            }
+
+            currentTeamToken = token.Trim();
+
+            TeamIdentityDto? identity;
+            try
+            {
+                identity = await TeamsApiClient.ResolveIdentityAsync(currentTeamToken, loadCts.Token);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogWarning(ex, "Lineups:Invalid team token");
+                accessMessage = ex.Message;
+                currentTeamToken = null;
+                ClearLocalState();
+                return;
+            }
+
+            if (identity is null)
+            {
+                accessMessage = "Token do time inválido.";
+                currentTeamToken = null;
+                ClearLocalState();
+                return;
+            }
+
+            if (identity.TeamId != TeamId)
+            {
+                TeamId = identity.TeamId;
+                var destination = $"/teams/{TeamId}/lineups";
+                if (!Navigation.Uri.EndsWith(destination, StringComparison.OrdinalIgnoreCase))
+                {
+                    Navigation.NavigateTo(destination, replace: true);
+                }
+            }
+
+            hasAccess = true;
+
             var rosterTask = TeamsApiClient.GetRosterByIdAsync(TeamId, loadCts.Token);
-            var lineupsTask = LineupsApiClient.GetLineupsAsync(TeamId, loadCts.Token);
+            var lineupsTask = LineupsApiClient.GetLineupsAsync(TeamId, currentTeamToken, loadCts.Token);
 
-            await Task.WhenAll(rosterTask, lineupsTask);
+            TeamRosterDto? roster;
+            IReadOnlyList<TeamLineupDto> fetchedLineups;
 
-            var roster = rosterTask.Result;
+            try
+            {
+                await Task.WhenAll(rosterTask, lineupsTask);
+                roster = rosterTask.Result;
+                fetchedLineups = lineupsTask.Result;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogWarning(ex, "Lineups:Access denied for team {TeamId}", TeamId);
+                accessMessage = ex.Message;
+                hasAccess = false;
+                ClearLocalState();
+                return;
+            }
+
             if (roster is null)
             {
-                errorMessage = "Time não encontrado.";
+                accessMessage = "Time não encontrado.";
+                hasAccess = false;
+                ClearLocalState();
                 return;
             }
 
@@ -365,13 +473,19 @@ else
                 .OrderByDescending(p => p.Overall)
                 .ThenBy(p => p.Name));
 
-            lineups = lineupsTask.Result
+            lineups = fetchedLineups
                 .OrderByDescending(l => l.IsActive)
                 .ThenBy(l => l.CreatedAtUtc)
                 .ToList();
 
             pageSubtitle = $"Gerencie as escalações do {roster.TeamName}.";
             LayoutState.SetPage(pageDefinition, subtitle: pageSubtitle);
+
+            var pendingInvalid = TeamAccess.ConsumeInvalidTokenMessage();
+            if (!string.IsNullOrWhiteSpace(pendingInvalid))
+            {
+                errorMessage = pendingInvalid;
+            }
 
             if (lineups.Count > 0)
             {
@@ -473,6 +587,14 @@ else
         {
             SelectExistingLineup(selectedLineupId.Value);
         }
+    }
+
+    private void ClearLocalState()
+    {
+        lineups.Clear();
+        currentEditor = null;
+        selectedLineupId = null;
+        isNewLineup = false;
     }
 
     private void OnNameChanged(ChangeEventArgs args)
@@ -614,6 +736,12 @@ else
             return;
         }
 
+        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        {
+            Toasts.ShowError("Informe o token do seu time para salvar a escalação.");
+            return;
+        }
+
         saveCts?.Cancel();
         saveCts = new CancellationTokenSource();
         isSaving = true;
@@ -625,12 +753,12 @@ else
 
             if (isNewLineup || currentEditor.LineupId == Guid.Empty)
             {
-                result = await LineupsApiClient.CreateAsync(TeamId, request, saveCts.Token);
+                result = await LineupsApiClient.CreateAsync(TeamId, request, currentTeamToken, saveCts.Token);
                 Toasts.ShowSuccess("Escalação criada com sucesso.");
             }
             else
             {
-                result = await LineupsApiClient.UpdateAsync(TeamId, currentEditor.LineupId, request, saveCts.Token);
+                result = await LineupsApiClient.UpdateAsync(TeamId, currentEditor.LineupId, request, currentTeamToken, saveCts.Token);
                 Toasts.ShowSuccess("Escalação atualizada com sucesso.");
             }
 
@@ -677,13 +805,19 @@ else
             return;
         }
 
+        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        {
+            Toasts.ShowError("Informe o token do seu time para excluir a escalação.");
+            return;
+        }
+
         deleteCts?.Cancel();
         deleteCts = new CancellationTokenSource();
         isDeleting = true;
 
         try
         {
-            await LineupsApiClient.DeleteAsync(TeamId, currentEditor.LineupId, deleteCts.Token);
+            await LineupsApiClient.DeleteAsync(TeamId, currentEditor.LineupId, currentTeamToken, deleteCts.Token);
             Toasts.ShowSuccess("Escalação excluída com sucesso.");
             await RefreshLineupsAsync(null, deleteCts.Token);
         }
@@ -704,7 +838,14 @@ else
 
     private async Task RefreshLineupsAsync(Guid? preferredLineupId, CancellationToken ct)
     {
-        var fetched = await LineupsApiClient.GetLineupsAsync(TeamId, ct);
+        if (string.IsNullOrWhiteSpace(currentTeamToken))
+        {
+            hasAccess = false;
+            ClearLocalState();
+            return;
+        }
+
+        var fetched = await LineupsApiClient.GetLineupsAsync(TeamId, currentTeamToken, ct);
         lineups = fetched
             .OrderByDescending(l => l.IsActive)
             .ThenBy(l => l.CreatedAtUtc)
@@ -971,6 +1112,7 @@ else
 
     public void Dispose()
     {
+        TeamAccess.TokenChanged -= OnTeamTokenChanged;
         loadCts?.Cancel();
         loadCts?.Dispose();
         saveCts?.Cancel();

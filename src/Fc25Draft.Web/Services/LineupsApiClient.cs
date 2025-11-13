@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using Fc25Draft.Core.DTOs;
 
@@ -13,14 +14,14 @@ public class LineupsApiClient
         _clientFactory = clientFactory;
     }
 
-    public async Task<IReadOnlyList<TeamLineupDto>> GetLineupsAsync(Guid teamId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TeamLineupDto>> GetLineupsAsync(Guid teamId, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
         {
             throw new ArgumentException("Time inválido.", nameof(teamId));
         }
 
-        var client = await _clientFactory.CreateAsync();
+        var client = await CreateClientWithTokenAsync(teamToken);
         var response = await client.GetAsync($"api/teams/{teamId}/lineups", ct);
         await EnsureSuccessAsync(response, ct);
 
@@ -28,14 +29,19 @@ public class LineupsApiClient
         return payload ?? Array.Empty<TeamLineupDto>();
     }
 
-    public async Task<TeamLineupDto> CreateAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct = default)
+    public async Task<TeamLineupDto> CreateAsync(Guid teamId, TeamLineupSaveRequestDto request, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
         {
             throw new ArgumentException("Time inválido.", nameof(teamId));
         }
 
-        var client = await _clientFactory.CreateAsync();
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var client = await CreateClientWithTokenAsync(teamToken);
         var response = await client.PostAsJsonAsync($"api/teams/{teamId}/lineups", request, ct);
         await EnsureSuccessAsync(response, ct);
 
@@ -43,7 +49,7 @@ public class LineupsApiClient
         return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
     }
 
-    public async Task<TeamLineupDto> UpdateAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, CancellationToken ct = default)
+    public async Task<TeamLineupDto> UpdateAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
         {
@@ -55,7 +61,12 @@ public class LineupsApiClient
             throw new ArgumentException("Escalação inválida.", nameof(lineupId));
         }
 
-        var client = await _clientFactory.CreateAsync();
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var client = await CreateClientWithTokenAsync(teamToken);
         var response = await client.PutAsJsonAsync($"api/teams/{teamId}/lineups/{lineupId}", request, ct);
         await EnsureSuccessAsync(response, ct);
 
@@ -63,7 +74,7 @@ public class LineupsApiClient
         return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
     }
 
-    public async Task DeleteAsync(Guid teamId, Guid lineupId, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid teamId, Guid lineupId, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
         {
@@ -75,12 +86,12 @@ public class LineupsApiClient
             throw new ArgumentException("Escalação inválida.", nameof(lineupId));
         }
 
-        var client = await _clientFactory.CreateAsync();
+        var client = await CreateClientWithTokenAsync(teamToken);
         var response = await client.DeleteAsync($"api/teams/{teamId}/lineups/{lineupId}", ct);
         await EnsureSuccessAsync(response, ct);
     }
 
-    public async Task ActivateAsync(Guid teamId, Guid lineupId, CancellationToken ct = default)
+    public async Task ActivateAsync(Guid teamId, Guid lineupId, string teamToken, CancellationToken ct = default)
     {
         if (teamId == Guid.Empty)
         {
@@ -92,7 +103,7 @@ public class LineupsApiClient
             throw new ArgumentException("Escalação inválida.", nameof(lineupId));
         }
 
-        var client = await _clientFactory.CreateAsync();
+        var client = await CreateClientWithTokenAsync(teamToken);
         var response = await client.PostAsync($"api/teams/{teamId}/lineups/{lineupId}/activate", null, ct);
         await EnsureSuccessAsync(response, ct);
     }
@@ -126,4 +137,17 @@ public class LineupsApiClient
     }
 
     private sealed record ApiErrorResponse(string? Message);
+
+    private async Task<HttpClient> CreateClientWithTokenAsync(string teamToken)
+    {
+        if (string.IsNullOrWhiteSpace(teamToken))
+        {
+            throw new InvalidOperationException("Token do time é obrigatório.");
+        }
+
+        var client = await _clientFactory.CreateAsync();
+        client.DefaultRequestHeaders.Remove("X-Team-Token");
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+        return client;
+    }
 }

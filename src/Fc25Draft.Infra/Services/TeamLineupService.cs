@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
@@ -580,16 +583,6 @@ public class TeamLineupService : ITeamLineupService
             }
         }
 
-        var selectedPlayerIds = assignments.Values
-            .Where(v => v.HasValue)
-            .Select(v => v!.Value)
-            .ToList();
-
-        if (selectedPlayerIds.Count != selectedPlayerIds.Distinct().Count())
-        {
-            throw new InvalidOperationException("Não é permitido repetir um jogador na mesma escalação.");
-        }
-
         return assignments;
     }
 
@@ -602,7 +595,6 @@ public class TeamLineupService : ITeamLineupService
         var selectedPlayerIds = assignments.Values
             .Where(v => v.HasValue)
             .Select(v => v!.Value)
-            .Distinct()
             .ToList();
 
         if (selectedPlayerIds.Count == 0)
@@ -610,16 +602,23 @@ public class TeamLineupService : ITeamLineupService
             return;
         }
 
+        var uniquePlayerIds = selectedPlayerIds
+            .Distinct()
+            .ToList();
+
         var rosterPlayers = await _dbContext.TeamRosters
             .AsNoTracking()
-            .Where(r => r.TeamId == teamId && selectedPlayerIds.Contains(r.PlayerId))
-            .Select(r => new { r.PlayerId, r.Player.PositionId })
+            .Where(r => r.TeamId == teamId && uniquePlayerIds.Contains(r.PlayerId))
+            .Select(r => new { r.PlayerId, r.Player.Name, r.Player.PositionId })
             .ToListAsync(ct);
 
-        if (rosterPlayers.Count != selectedPlayerIds.Count)
+        if (rosterPlayers.Count != uniquePlayerIds.Count)
         {
             throw new InvalidOperationException("Alguns jogadores informados não pertencem ao elenco da equipe.");
         }
+
+        var rosterNames = rosterPlayers.ToDictionary(x => x.PlayerId, x => x.Name);
+        EnsureUniquePlayers(selectedPlayerIds, rosterNames);
 
         var rosterPositions = rosterPlayers.ToDictionary(x => x.PlayerId, x => x.PositionId);
 
@@ -642,6 +641,37 @@ public class TeamLineupService : ITeamLineupService
         }
 
         return;
+    }
+
+    private static void EnsureUniquePlayers(
+        IReadOnlyCollection<int> selectedPlayerIds,
+        IReadOnlyDictionary<int, string?> rosterNames)
+    {
+        var duplicates = selectedPlayerIds
+            .GroupBy(id => id)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+
+        if (duplicates.Count == 0)
+        {
+            return;
+        }
+
+        var duplicateNames = duplicates
+            .Select(id => rosterNames.TryGetValue(id, out var name) ? name : null)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!.Trim())
+            .ToList();
+
+        var message = duplicateNames.Count switch
+        {
+            0 => "Um jogador não pode ocupar mais de uma posição na escalação.",
+            1 => $"O jogador {duplicateNames[0]} não pode ocupar mais de uma posição na escalação.",
+            _ => $"Os jogadores {string.Join(", ", duplicateNames)} não podem ocupar mais de uma posição na escalação."
+        };
+
+        throw new InvalidOperationException(message);
     }
 
     private void ApplyTemplateSlots(TeamLineup lineup, LineupTemplate template, IReadOnlyDictionary<string, int?> assignments)

@@ -6,6 +6,8 @@ using Fc25Draft.Infra.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 
@@ -159,11 +161,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             lineupsApi.MapGet(string.Empty, async (
                 Guid teamId,
+                HttpContext httpContext,
+                DraftDbContext db,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
 
                 try
                 {
@@ -190,11 +200,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             lineupsApi.MapPost(string.Empty, async (
                 Guid teamId,
                 TeamLineupSaveRequestDto request,
+                HttpContext httpContext,
+                DraftDbContext db,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
 
                 try
                 {
@@ -222,11 +240,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 Guid teamId,
                 Guid lineupId,
                 TeamLineupSaveRequestDto request,
+                HttpContext httpContext,
+                DraftDbContext db,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
 
                 try
                 {
@@ -253,11 +279,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             lineupsApi.MapDelete("/{lineupId:guid}", async (
                 Guid teamId,
                 Guid lineupId,
+                HttpContext httpContext,
+                DraftDbContext db,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
 
                 try
                 {
@@ -284,11 +318,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             lineupsApi.MapPost("/{lineupId:guid}/activate", async (
                 Guid teamId,
                 Guid lineupId,
+                HttpContext httpContext,
+                DraftDbContext db,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
 
                 try
                 {
@@ -436,7 +478,50 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 catch (KeyNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
             });
 
-            return api;
-        }
+        return api;
     }
+
+    private static async Task<IResult?> EnsureTeamLineupAccessAsync(
+        DraftDbContext db,
+        HttpContext httpContext,
+        Guid teamId,
+        CancellationToken ct)
+    {
+        if (httpContext.User?.IsInRole("Admin") == true)
+        {
+            return null;
+        }
+
+        if (teamId == Guid.Empty)
+        {
+            return Results.Json(new { message = "Time inválido." }, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var token = httpContext.Request.Headers["X-Team-Token"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return Results.Json(new { message = "Token do time obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var normalized = token.Trim();
+
+        var teamToken = await db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == teamId)
+            .Select(t => t.Token)
+            .FirstOrDefaultAsync(ct);
+
+        if (teamToken is null)
+        {
+            return Results.Json(new { message = "Time não encontrado." }, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        if (!string.Equals(teamToken, normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Json(new { message = "Token do time inválido." }, statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return null;
+    }
+}
 }
