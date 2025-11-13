@@ -23,25 +23,37 @@ public sealed class CompetitionService : ICompetitionService
     {
         var competitions = await _db.Competitions
             .AsNoTracking()
-            .Include(c => c.Season)
-            .Include(c => c.Teams)
-            .Include(c => c.Rounds)
-            .Select(c => new CompetitionSummaryDto(
+            .Select(c => new
+            {
                 c.CompetitionId,
                 c.SeasonId,
-                c.Season.Name,
+                SeasonName = c.Season.Name,
                 c.Name,
                 c.Order,
                 c.Type,
                 c.IsActive,
                 c.CreatedAtUtc,
                 c.UpdatedAtUtc,
-                c.Teams.Count,
-                c.Rounds.Count,
-                c.Matches.Count))
+                TeamCount = c.Teams.Count,
+                RoundCount = c.Rounds.Count,
+                MatchCount = c.Matches.Count
+            })
             .OrderBy(c => c.SeasonName)
             .ThenBy(c => c.Order)
             .ThenBy(c => c.Name)
+            .Select(c => new CompetitionSummaryDto(
+                c.CompetitionId,
+                c.SeasonId,
+                c.SeasonName,
+                c.Name,
+                c.Order,
+                c.Type,
+                c.IsActive,
+                c.CreatedAtUtc,
+                c.UpdatedAtUtc,
+                c.TeamCount,
+                c.RoundCount,
+                c.MatchCount))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
