@@ -11,13 +11,13 @@ public static class LineupTemplateCatalog
         new List<LineupSlotTemplate>
         {
             new("GK", "Goleiro (GK)", false, 1, new short[] { 1 }),
-            new("LB", "Lateral Esquerdo (LE)", false, 2, new short[] { 2, 3, 4, 5 }),
-            new("LCB", "Zagueiro 1", false, 3, new short[] { 2, 3, 4, 5 }),
-            new("RCB", "Zagueiro 2", false, 4, new short[] { 2, 3, 4, 5 }),
-            new("RB", "Lateral Direito (LD)", false, 5, new short[] { 2, 3, 4, 5 }),
+            new("LB", "Lateral Esquerdo (LE)", false, 2, new short[] { 2, 3, 4, 5, 6 }),
+            new("LCB", "Zagueiro 1", false, 3, new short[] { 2, 3, 4, 5, 6 }),
+            new("RCB", "Zagueiro 2", false, 4, new short[] { 2, 3, 4, 5, 6 }),
+            new("RB", "Lateral Direito (LD)", false, 5, new short[] { 2, 3, 4, 5, 6 }),
             new("CDM", "Volante (VOL)", false, 6, new short[] { 5, 6 }),
             new("CM", "Meia Central (MC)", false, 7, new short[] { 5, 6, 7 }),
-            new("CAM", "Meia Atacante (MA)", false, 8, new short[] { 6, 7, 8, 9, 10 }),
+            new("CAM", "Meia Atacante (mei)", false, 8, new short[] { 6, 7, 8, 9, 10 }),
             new("LW", "Ponta Esquerda (PE)", false, 9, new short[] { 7, 8, 9, 10 }),
             new("RW", "Ponta Direita (PD)", false, 10, new short[] { 7, 8, 9, 10 }),
             new("ST", "Atacante (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
@@ -61,8 +61,8 @@ public sealed class LineupTemplate
     public LineupTemplate(string formation, IReadOnlyList<LineupSlotTemplate> starters, IReadOnlyList<LineupSlotTemplate> bench)
     {
         Formation = formation ?? throw new ArgumentNullException(nameof(formation));
-        Starters = new ReadOnlyCollection<LineupSlotTemplate>(starters ?? throw new ArgumentNullException(nameof(starters)));
-        Bench = new ReadOnlyCollection<LineupSlotTemplate>(bench ?? throw new ArgumentNullException(nameof(bench)));
+        Starters = new ReadOnlyCollection<LineupSlotTemplate>(starters?.ToList() ?? throw new ArgumentNullException(nameof(starters)));
+        Bench = new ReadOnlyCollection<LineupSlotTemplate>(bench?.ToList() ?? throw new ArgumentNullException(nameof(bench)));
         _slotsByCode = Starters.Concat(Bench).ToDictionary(s => s.SlotCode, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -72,7 +72,8 @@ public sealed class LineupTemplate
 
     public IReadOnlyList<LineupSlotTemplate> Bench { get; }
 
-    public IReadOnlyCollection<LineupSlotTemplate> AllSlots => _slotsByCode.Values;
+    public IReadOnlyCollection<LineupSlotTemplate> AllSlots => new ReadOnlyCollection<LineupSlotTemplate>(_slotsByCode.Values.ToList());
+
 
     public LineupSlotTemplate GetSlot(string slotCode)
     {
