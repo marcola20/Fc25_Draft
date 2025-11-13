@@ -426,19 +426,43 @@ else
             return;
         }
 
-        PlayerOption? selectedPlayer = null;
-        if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var playerId))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            selectedPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == playerId)
+            slots[index] = slots[index] with { SelectedPlayer = null };
+        }
+        else if (int.TryParse(value, out var playerId))
+        {
+            var selectedPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == playerId)
                 ?? slots[index].SelectedPlayer;
 
             if (selectedPlayer is null)
             {
                 Toasts.ShowError("Jogador não encontrado no elenco.");
+                slots[index] = slots[index] with { SelectedPlayer = null };
+            }
+            else
+            {
+                for (var i = 0; i < slots.Count; i++)
+                {
+                    if (i == index)
+                    {
+                        continue;
+                    }
+
+                    if (slots[i].SelectedPlayer?.PlayerId == selectedPlayer.PlayerId)
+                    {
+                        slots[i] = slots[i] with { SelectedPlayer = null };
+                    }
+                }
+
+                slots[index] = slots[index] with { SelectedPlayer = selectedPlayer };
             }
         }
+        else
+        {
+            slots[index] = slots[index] with { SelectedPlayer = null };
+        }
 
-        slots[index] = slots[index] with { SelectedPlayer = selectedPlayer };
         var recalculated = RecalculateAvailability(slots);
         currentEditor = currentEditor with { Slots = recalculated };
     }
@@ -610,12 +634,7 @@ else
 
     private IReadOnlyList<PlayerOption> BuildAvailability(LineupSlotState slot, IReadOnlyList<LineupSlotState> slots)
     {
-        var used = slots
-            .Where(s => s.SlotId != slot.SlotId && s.SelectedPlayer is not null)
-            .Select(s => s.SelectedPlayer!.PlayerId)
-            .ToHashSet();
-
-        IEnumerable<PlayerOption> candidates = rosterPlayers.Where(p => !used.Contains(p.PlayerId));
+        IEnumerable<PlayerOption> candidates = rosterPlayers;
 
         if (!slot.IsBench && slot.AllowedPositionIds.Count > 0)
         {
