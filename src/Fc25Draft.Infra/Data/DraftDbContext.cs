@@ -105,6 +105,8 @@ public class DraftDbContext : DbContext
             e.Property(x => x.Formation)
              .IsRequired()
              .HasMaxLength(20);
+            e.Property(x => x.TacticCode)
+             .HasMaxLength(40);
             e.Property(x => x.CreatedAt)
              .IsRequired();
             e.Property(x => x.UpdatedAt)

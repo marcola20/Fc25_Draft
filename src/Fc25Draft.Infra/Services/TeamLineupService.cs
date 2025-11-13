@@ -13,6 +13,7 @@ public class TeamLineupService : ITeamLineupService
     private readonly DraftDbContext _dbContext;
     private readonly ILogger<TeamLineupService> _logger;
     private readonly TimeProvider _timeProvider;
+    private const int MaxTacticCodeLength = 40;
 
     public TeamLineupService(
         DraftDbContext dbContext,
@@ -88,6 +89,10 @@ public class TeamLineupService : ITeamLineupService
             await EnsureTeamExistsAsync(teamId.Value, ct);
             query = query.Where(l => l.TeamId == teamId.Value);
         }
+        else
+        {
+            query = query.Where(l => l.IsActive);
+        }
 
         var entities = await query
             .OrderBy(l => l.Team.TeamName)
@@ -113,6 +118,7 @@ public class TeamLineupService : ITeamLineupService
         await EnsureTeamExistsAsync(teamId, ct);
 
         var name = NormalizeName(request.Name);
+        var tacticCode = NormalizeTacticCode(request.TacticCode);
         var template = LineupTemplateCatalog.GetTemplateOrDefault(request.Formation);
         var assignments = BuildAssignments(template, request);
         await ValidatePlayersAsync(teamId, template, assignments, ct);
@@ -137,6 +143,7 @@ public class TeamLineupService : ITeamLineupService
                     TeamId = teamId,
                     Name = name,
                     Formation = template.Formation,
+                    TacticCode = tacticCode,
                     IsActive = false,
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -227,6 +234,7 @@ public class TeamLineupService : ITeamLineupService
         var assignments = BuildAssignments(template, request);
         await ValidatePlayersAsync(teamId, template, assignments, ct);
         var name = NormalizeName(request.Name);
+        var tacticCode = NormalizeTacticCode(request.TacticCode);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
@@ -242,6 +250,7 @@ public class TeamLineupService : ITeamLineupService
 
                 lineup.Name = name;
                 lineup.Formation = template.Formation;
+                lineup.TacticCode = tacticCode;
                 lineup.UpdatedAt = now;
 
                 ApplyTemplateSlots(lineup, template, assignments);
@@ -464,6 +473,22 @@ public class TeamLineupService : ITeamLineupService
         if (trimmed.Length is < 3 or > 80)
         {
             throw new InvalidOperationException("O nome da escalação deve ter entre 3 e 80 caracteres.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? NormalizeTacticCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > MaxTacticCodeLength)
+        {
+            trimmed = trimmed[..MaxTacticCodeLength];
         }
 
         return trimmed;
@@ -731,6 +756,7 @@ public class TeamLineupService : ITeamLineupService
             entity.TeamId,
             entity.Name,
             template.Formation,
+            entity.TacticCode,
             entity.IsActive,
             starters,
             bench,
@@ -786,6 +812,7 @@ public class TeamLineupService : ITeamLineupService
             entity.Team.TeamName,
             dto.Name,
             dto.Formation,
+            dto.TacticCode,
             dto.IsActive,
             dto.Starters,
             dto.Bench,

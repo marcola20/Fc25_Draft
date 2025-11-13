@@ -96,7 +96,7 @@ else
         <div class="card-header">Informações da escalação</div>
         <div class="card-body">
             <div class="row g-3 align-items-center">
-                <div class="col-md-5 col-lg-4">
+                <div class="col-md-4 col-lg-3">
                     <label class="form-label" for="lineup-name">Nome</label>
                     <input id="lineup-name"
                            class="form-control"
@@ -105,7 +105,7 @@ else
                            maxlength="80"
                            disabled="@isSaving" />
                 </div>
-                <div class="col-md-4 col-lg-3">
+                <div class="col-md-3 col-lg-2">
                     <label class="form-label" for="lineup-formation">Formação</label>
                     <select id="lineup-formation"
                             class="form-select"
@@ -118,7 +118,16 @@ else
                         }
                     </select>
                 </div>
-                <div class="col-md-3 col-lg-2">
+                <div class="col-md-3 col-lg-3">
+                    <label class="form-label" for="lineup-tactic-code">Código da tática (FIFA)</label>
+                    <input id="lineup-tactic-code"
+                           class="form-control"
+                           value="@((currentEditor.TacticCode ?? string.Empty))"
+                           @oninput="OnTacticCodeChanged"
+                           maxlength="@MaxTacticCodeLength"
+                           disabled="@isSaving" />
+                </div>
+                <div class="col-md-2 col-lg-2">
                     <div class="form-check mt-4 pt-1">
                         <input id="lineup-active"
                                class="form-check-input"
@@ -287,6 +296,7 @@ else
 
 @code {
     private const int MaxLineupsPerTeam = 3;
+    private const int MaxTacticCodeLength = 40;
     private const string NewLineupValue = "__new__";
     private static readonly IReadOnlyList<string> FormationOptions = LineupTemplateCatalog.GetSupportedFormations();
 
@@ -446,7 +456,7 @@ else
         var suggestedName = $"Escalação {lineups.Count + 1}";
         var roles = SanitizeRoles(CreateEmptyRoles(), recalculated);
 
-        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, lineups.Count == 0, recalculated, roles);
+        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, null, lineups.Count == 0, recalculated, roles);
         selectedLineupId = null;
         isNewLineup = true;
     }
@@ -523,6 +533,21 @@ else
         var recalculated = RecalculateAvailability(slots);
         var sanitizedRoles = SanitizeRoles(currentEditor.Roles, recalculated);
         currentEditor = currentEditor with { Formation = template.Formation, Slots = recalculated, Roles = sanitizedRoles };
+    }
+
+    private void OnTacticCodeChanged(ChangeEventArgs args)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString() ?? string.Empty;
+        var sanitized = value.Length > MaxTacticCodeLength
+            ? value[..MaxTacticCodeLength]
+            : value;
+
+        currentEditor = currentEditor with { TacticCode = sanitized };
     }
 
     private void OnSlotChanged(Guid slotId, string? value)
@@ -734,7 +759,7 @@ else
 
         var recalculated = RecalculateAvailability(slots);
         var roles = BuildRolesState(lineup.Roles, recalculated);
-        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.IsActive, recalculated, roles);
+        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.TacticCode, lineup.IsActive, recalculated, roles);
     }
 
     private IReadOnlyList<LineupSlotState> RecalculateAvailability(IReadOnlyList<LineupSlotState> slots)
@@ -932,7 +957,16 @@ else
             editor.Roles.CornerLeft?.PlayerId,
             editor.Roles.CornerRight?.PlayerId);
 
-        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.IsActive, starters, bench, roles);
+        string? tacticCode = string.IsNullOrWhiteSpace(editor.TacticCode)
+            ? null
+            : editor.TacticCode.Trim();
+
+        if (tacticCode is { Length: > MaxTacticCodeLength })
+        {
+            tacticCode = tacticCode[..MaxTacticCodeLength];
+        }
+
+        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, tacticCode, editor.IsActive, starters, bench, roles);
     }
 
     public void Dispose()
@@ -981,6 +1015,7 @@ else
         Guid LineupId,
         string Name,
         string Formation,
+        string? TacticCode,
         bool IsActive,
         IReadOnlyList<LineupSlotState> Slots,
         LineupRolesState Roles);

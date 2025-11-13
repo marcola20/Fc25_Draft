@@ -5,6 +5,7 @@ public sealed record TeamLineupDto(
     Guid TeamId,
     string Name,
     string Formation,
+    string? TacticCode,
     bool IsActive,
     IReadOnlyList<TeamLineupSlotDto> Starters,
     IReadOnlyList<TeamLineupSlotDto> Bench,
@@ -51,6 +52,7 @@ public sealed record TeamLineupRoleAssignmentsDto(
 public sealed record TeamLineupSaveRequestDto(
     string Name,
     string Formation,
+    string? TacticCode,
     bool IsActive,
     IReadOnlyList<TeamLineupSlotAssignmentDto> Starters,
     IReadOnlyList<TeamLineupSlotAssignmentDto> Bench,
@@ -62,6 +64,7 @@ public sealed record AdminLineupOverviewDto(
     string TeamName,
     string LineupName,
     string Formation,
+    string? TacticCode,
     bool IsActive,
     IReadOnlyList<TeamLineupSlotDto> Starters,
     IReadOnlyList<TeamLineupSlotDto> Bench,

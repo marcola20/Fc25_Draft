@@ -2,6 +2,7 @@
 @page "/admin/escalacoes"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Models.Navigation
+@using System.Linq
 @using Microsoft.AspNetCore.Authorization
 @inject AdminAuthService AdminAuth
 @inject AdminLineupsApiClient AdminLineupsApiClient
@@ -76,67 +77,80 @@ else
     {
         @foreach (var lineup in lineups)
         {
+            var showDetails = IsDetailsVisible(lineup.LineupId);
+            var tacticCode = string.IsNullOrWhiteSpace(lineup.TacticCode) ? "Não definido" : lineup.TacticCode;
             <div class="card mb-3">
-                <div class="card-header d-flex flex-wrap justify-content-between align-items-start gap-2">
-                    <div>
-                        <div class="fw-semibold">@lineup.TeamName</div>
-                        <div class="text-muted small">@lineup.LineupName • Formação @lineup.Formation</div>
-                        <div class="text-muted small">Código: @lineup.LineupId</div>
-                    </div>
-                    <div class="text-end">
-                        @if (lineup.IsActive)
-                        {
-                            <span class="badge bg-success">Ativa</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-secondary">Inativa</span>
-                        }
-                        <div class="text-muted small mt-1">
-                            Atualizada em @lineup.UpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                <div class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div class="me-auto">
+                            <div class="fw-semibold">@lineup.TeamName</div>
+                            <div class="text-muted small">@lineup.LineupName • Formação @lineup.Formation</div>
+                            <div class="text-muted small" title="@lineup.LineupId">Código da tática: @tacticCode</div>
+                        </div>
+                        <div class="text-end ms-auto">
+                            @if (lineup.IsActive)
+                            {
+                                <span class="badge bg-success">Ativa</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inativa</span>
+                            }
+                            <div class="text-muted small mt-1">
+                                Atualizada em @lineup.UpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary mt-2"
+                                    @onclick="() => ToggleDetails(lineup.LineupId)"
+                                    aria-expanded="@showDetails">
+                                @(showDetails ? "Ocultar detalhes" : "Mostrar detalhes")
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="row g-4">
-                        <div class="col-12 col-lg-4">
-                            <h6 class="text-uppercase text-muted small mb-2">Titulares</h6>
-                            <ul class="list-unstyled mb-0">
-                                @foreach (var starter in lineup.Starters.OrderBy(s => s.Order))
-                                {
-                                    <li class="mb-1">
-                                        <strong>@starter.DisplayName:</strong>
-                                        <span>@FormatPlayer(starter.Player)</span>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
-                        <div class="col-12 col-lg-4">
-                            <h6 class="text-uppercase text-muted small mb-2">Reservas</h6>
-                            <ul class="list-unstyled mb-0">
-                                @foreach (var sub in lineup.Bench.OrderBy(s => s.Order))
-                                {
-                                    <li class="mb-1">
-                                        <strong>@sub.DisplayName:</strong>
-                                        <span>@FormatPlayer(sub.Player)</span>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
-                        <div class="col-12 col-lg-4">
-                            <h6 class="text-uppercase text-muted small mb-2">Funções especiais</h6>
-                            <ul class="list-unstyled mb-0">
-                                <li><strong>Capitão:</strong> @FormatPlayer(lineup.Roles.Captain)</li>
-                                <li><strong>Falta de perto - Esquerda:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickLeft)</li>
-                                <li><strong>Falta de perto - Direita:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickRight)</li>
-                                <li><strong>Falta de longa distância:</strong> @FormatPlayer(lineup.Roles.LongFreeKick)</li>
-                                <li><strong>Pênaltis:</strong> @FormatPlayer(lineup.Roles.Penalties)</li>
-                                <li><strong>Escanteios - Esquerda:</strong> @FormatPlayer(lineup.Roles.CornerLeft)</li>
-                                <li><strong>Escanteios - Direita:</strong> @FormatPlayer(lineup.Roles.CornerRight)</li>
-                            </ul>
+                @if (showDetails)
+                {
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-12 col-lg-4">
+                                <h6 class="text-uppercase text-muted small mb-2">Titulares</h6>
+                                <ul class="list-unstyled mb-0">
+                                    @foreach (var starter in lineup.Starters.OrderBy(s => s.Order))
+                                    {
+                                        <li class="mb-1">
+                                            <strong>@starter.DisplayName:</strong>
+                                            <span>@FormatPlayer(starter.Player)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                <h6 class="text-uppercase text-muted small mb-2">Reservas</h6>
+                                <ul class="list-unstyled mb-0">
+                                    @foreach (var sub in lineup.Bench.OrderBy(s => s.Order))
+                                    {
+                                        <li class="mb-1">
+                                            <strong>@sub.DisplayName:</strong>
+                                            <span>@FormatPlayer(sub.Player)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                <h6 class="text-uppercase text-muted small mb-2">Funções especiais</h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Capitão:</strong> @FormatPlayer(lineup.Roles.Captain)</li>
+                                    <li><strong>Falta de perto - Esquerda:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickLeft)</li>
+                                    <li><strong>Falta de perto - Direita:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickRight)</li>
+                                    <li><strong>Falta de longa distância:</strong> @FormatPlayer(lineup.Roles.LongFreeKick)</li>
+                                    <li><strong>Pênaltis:</strong> @FormatPlayer(lineup.Roles.Penalties)</li>
+                                    <li><strong>Escanteios - Esquerda:</strong> @FormatPlayer(lineup.Roles.CornerLeft)</li>
+                                    <li><strong>Escanteios - Direita:</strong> @FormatPlayer(lineup.Roles.CornerRight)</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                </div>
+                }
             </div>
         }
     }
@@ -155,6 +169,7 @@ else
 
     private readonly List<TeamListItemDto> teams = new();
     private readonly List<AdminLineupOverviewDto> lineups = new();
+    private readonly Dictionary<Guid, bool> lineupDetailsState = new();
     private bool isLoading = true;
     private string? errorMessage;
     private Guid selectedTeamId = Guid.Empty;
@@ -196,6 +211,7 @@ else
         if (!AdminAuth.IsAuthenticated)
         {
             lineups.Clear();
+            lineupDetailsState.Clear();
             isLoading = false;
             return;
         }
@@ -272,6 +288,37 @@ else
             .OrderBy(l => l.TeamName)
             .ThenByDescending(l => l.IsActive)
             .ThenBy(l => l.LineupName));
+
+        UpdateDetailsState();
+    }
+
+    private void ToggleDetails(Guid lineupId)
+    {
+        var current = IsDetailsVisible(lineupId);
+        lineupDetailsState[lineupId] = !current;
+    }
+
+    private bool IsDetailsVisible(Guid lineupId)
+        => lineupDetailsState.TryGetValue(lineupId, out var show) && show;
+
+    private void UpdateDetailsState()
+    {
+        var defaultExpanded = selectedTeamId != Guid.Empty;
+        var previous = lineupDetailsState.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
+
+        lineupDetailsState.Clear();
+
+        foreach (var lineup in lineups)
+        {
+            if (previous.TryGetValue(lineup.LineupId, out var show))
+            {
+                lineupDetailsState[lineup.LineupId] = show;
+            }
+            else
+            {
+                lineupDetailsState[lineup.LineupId] = defaultExpanded;
+            }
+        }
     }
 
     private async Task OnTeamFilterChanged(ChangeEventArgs args)
@@ -294,6 +341,7 @@ else
             {
                 loadCts?.Cancel();
                 lineups.Clear();
+                lineupDetailsState.Clear();
                 teams.Clear();
                 teamsLoaded = false;
                 isLoading = false;

@@ -6,6 +6,7 @@ public class TeamLineup
     public Guid TeamId { get; set; }
     public string Name { get; set; } = null!;
     public string Formation { get; set; } = null!;
+    public string? TacticCode { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
