@@ -21,6 +21,31 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
 
+            adminApi.MapGet("/lineups", async (
+                Guid? teamId,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("AdminLineupsEndpoints");
+
+                try
+                {
+                    var lineups = await lineupService.GetAdminLineupsAsync(teamId, ct);
+                    return Results.Ok(lineups);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "AdminLineups:Team not found {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "AdminLineups:Unexpected error for team {TeamId}", teamId);
+                    return Results.Json(new { message = "Não foi possível carregar as escalações." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
             var adminTransferApi = adminApi.MapGroup("/transfer");
 
             adminTransferApi.MapPost("/sell", async (

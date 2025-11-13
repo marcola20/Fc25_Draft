@@ -160,6 +160,89 @@ else
     </div>
 
     <div class="card mb-3">
+        <div class="card-header">Funções especiais</div>
+        <div class="card-body">
+            @{ var starterOptions = GetStarterPlayerOptions(); }
+            @if (starterOptions.Count == 0)
+            {
+                <p class="text-muted">Defina os titulares para escolher capitão e cobradores.</p>
+            }
+            <div class="row g-3">
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-captain">Capitão</label>
+                        <select id="role-captain" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.Captain, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.Captain?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-shortfk-left">Falta de perto - Esquerda</label>
+                        <select id="role-shortfk-left" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKickLeft, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKickLeft?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-shortfk-right">Falta de perto - Direita</label>
+                        <select id="role-shortfk-right" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKickRight, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKickRight?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-longfk">Falta de longa distância</label>
+                        <select id="role-longfk" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.LongFreeKick, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.LongFreeKick?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-penalties">Pênaltis</label>
+                        <select id="role-penalties" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.Penalties, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.Penalties?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-corner-left">Escanteios - Esquerda</label>
+                        <select id="role-corner-left" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.CornerLeft, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.CornerLeft?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-corner-right">Escanteios - Direita</label>
+                        <select id="role-corner-right" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.CornerRight, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.CornerRight?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
         <div class="card-header">Reservas</div>
         <div class="card-body">
             <div class="row g-3">
@@ -362,8 +445,9 @@ else
 
         var recalculated = RecalculateAvailability(slots);
         var suggestedName = $"Escalação {lineups.Count + 1}";
+        var roles = SanitizeRoles(CreateEmptyRoles(), recalculated);
 
-        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, lineups.Count == 0, recalculated);
+        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, lineups.Count == 0, recalculated, roles);
         selectedLineupId = null;
         isNewLineup = true;
     }
@@ -438,7 +522,8 @@ else
 
         var slots = BuildSlotsFromTemplate(template, previousAssignments);
         var recalculated = RecalculateAvailability(slots);
-        currentEditor = currentEditor with { Formation = template.Formation, Slots = recalculated };
+        var sanitizedRoles = SanitizeRoles(currentEditor.Roles, recalculated);
+        currentEditor = currentEditor with { Formation = template.Formation, Slots = recalculated, Roles = sanitizedRoles };
     }
 
     private void OnSlotChanged(Guid slotId, string? value)
@@ -449,6 +534,7 @@ else
         }
 
         var slots = currentEditor.Slots.ToList();
+        var roles = currentEditor.Roles;
         var index = slots.FindIndex(s => s.SlotId == slotId);
         if (index < 0)
         {
@@ -493,7 +579,8 @@ else
         }
 
         var recalculated = RecalculateAvailability(slots);
-        currentEditor = currentEditor with { Slots = recalculated };
+        var sanitizedRoles = SanitizeRoles(roles, recalculated);
+        currentEditor = currentEditor with { Slots = recalculated, Roles = sanitizedRoles };
     }
 
     private async Task SaveAsync()
@@ -647,7 +734,8 @@ else
             .ToList();
 
         var recalculated = RecalculateAvailability(slots);
-        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.IsActive, recalculated);
+        var roles = BuildRolesState(lineup.Roles, recalculated);
+        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.IsActive, recalculated, roles);
     }
 
     private IReadOnlyList<LineupSlotState> RecalculateAvailability(IReadOnlyList<LineupSlotState> slots)
@@ -681,6 +769,114 @@ else
         }
 
         return ordered;
+    }
+
+    private IReadOnlyList<PlayerOption> GetStarterPlayerOptions()
+    {
+        if (currentEditor is null)
+        {
+            return Array.Empty<PlayerOption>();
+        }
+
+        return currentEditor.Slots
+            .Where(s => !s.IsBench && s.SelectedPlayer is not null)
+            .Select(s => s.SelectedPlayer!)
+            .GroupBy(p => p.PlayerId)
+            .Select(g => g.First())
+            .OrderBy(p => p.PositionName)
+            .ThenBy(p => p.Name)
+            .ToList();
+    }
+
+    private LineupRolesState BuildRolesState(TeamLineupRolesDto? dto, IReadOnlyList<LineupSlotState> slots)
+    {
+        var roles = CreateEmptyRoles();
+
+        if (dto is not null)
+        {
+            roles = roles with
+            {
+                Captain = ResolvePlayerOption(dto.Captain),
+                ShortFreeKickLeft = ResolvePlayerOption(dto.ShortFreeKickLeft),
+                ShortFreeKickRight = ResolvePlayerOption(dto.ShortFreeKickRight),
+                LongFreeKick = ResolvePlayerOption(dto.LongFreeKick),
+                Penalties = ResolvePlayerOption(dto.Penalties),
+                CornerLeft = ResolvePlayerOption(dto.CornerLeft),
+                CornerRight = ResolvePlayerOption(dto.CornerRight)
+            };
+        }
+
+        return SanitizeRoles(roles, slots);
+    }
+
+    private PlayerOption? ResolvePlayerOption(TeamLineupSlotPlayerDto? player)
+    {
+        if (player is null)
+        {
+            return null;
+        }
+
+        var rosterPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == player.PlayerId);
+        if (rosterPlayer is not null)
+        {
+            return rosterPlayer;
+        }
+
+        return new PlayerOption(player.PlayerId, player.PlayerGuid, player.Name, player.PositionName, player.PositionId, 0);
+    }
+
+    private void OnRoleChanged(SpecialRoleType role, string? value)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        PlayerOption? selected = null;
+        if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var playerId))
+        {
+            selected = GetStarterPlayerOptions().FirstOrDefault(p => p.PlayerId == playerId);
+        }
+
+        var updatedRoles = role switch
+        {
+            SpecialRoleType.Captain => currentEditor.Roles with { Captain = selected },
+            SpecialRoleType.ShortFreeKickLeft => currentEditor.Roles with { ShortFreeKickLeft = selected },
+            SpecialRoleType.ShortFreeKickRight => currentEditor.Roles with { ShortFreeKickRight = selected },
+            SpecialRoleType.LongFreeKick => currentEditor.Roles with { LongFreeKick = selected },
+            SpecialRoleType.Penalties => currentEditor.Roles with { Penalties = selected },
+            SpecialRoleType.CornerLeft => currentEditor.Roles with { CornerLeft = selected },
+            SpecialRoleType.CornerRight => currentEditor.Roles with { CornerRight = selected },
+            _ => currentEditor.Roles
+        };
+
+        updatedRoles = SanitizeRoles(updatedRoles, currentEditor.Slots);
+        currentEditor = currentEditor with { Roles = updatedRoles };
+    }
+
+    private static LineupRolesState CreateEmptyRoles()
+        => new(null, null, null, null, null, null, null);
+
+    private static LineupRolesState SanitizeRoles(LineupRolesState roles, IReadOnlyList<LineupSlotState> slots)
+    {
+        var starterIds = slots
+            .Where(s => !s.IsBench && s.SelectedPlayer is not null)
+            .Select(s => s.SelectedPlayer!.PlayerId)
+            .ToHashSet();
+
+        PlayerOption? Normalize(PlayerOption? player)
+            => player is not null && starterIds.Contains(player.PlayerId) ? player : null;
+
+        return roles with
+        {
+            Captain = Normalize(roles.Captain),
+            ShortFreeKickLeft = Normalize(roles.ShortFreeKickLeft),
+            ShortFreeKickRight = Normalize(roles.ShortFreeKickRight),
+            LongFreeKick = Normalize(roles.LongFreeKick),
+            Penalties = Normalize(roles.Penalties),
+            CornerLeft = Normalize(roles.CornerLeft),
+            CornerRight = Normalize(roles.CornerRight)
+        };
     }
 
     private static string FormatPlayerOption(PlayerOption option)
@@ -728,7 +924,16 @@ else
             .Select(s => new TeamLineupSlotAssignmentDto(s.SlotCode, s.SelectedPlayer?.PlayerId))
             .ToList();
 
-        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.IsActive, starters, bench);
+        var roles = new TeamLineupRoleAssignmentsDto(
+            editor.Roles.Captain?.PlayerId,
+            editor.Roles.ShortFreeKickLeft?.PlayerId,
+            editor.Roles.ShortFreeKickRight?.PlayerId,
+            editor.Roles.LongFreeKick?.PlayerId,
+            editor.Roles.Penalties?.PlayerId,
+            editor.Roles.CornerLeft?.PlayerId,
+            editor.Roles.CornerRight?.PlayerId);
+
+        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.IsActive, starters, bench, roles);
     }
 
     public void Dispose()
@@ -739,6 +944,17 @@ else
         saveCts?.Dispose();
         deleteCts?.Cancel();
         deleteCts?.Dispose();
+    }
+
+    private enum SpecialRoleType
+    {
+        Captain,
+        ShortFreeKickLeft,
+        ShortFreeKickRight,
+        LongFreeKick,
+        Penalties,
+        CornerLeft,
+        CornerRight
     }
 
     private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall);
@@ -753,10 +969,20 @@ else
         PlayerOption? SelectedPlayer,
         IReadOnlyList<PlayerOption> AvailablePlayers);
 
+    private sealed record LineupRolesState(
+        PlayerOption? Captain,
+        PlayerOption? ShortFreeKickLeft,
+        PlayerOption? ShortFreeKickRight,
+        PlayerOption? LongFreeKick,
+        PlayerOption? Penalties,
+        PlayerOption? CornerLeft,
+        PlayerOption? CornerRight);
+
     private sealed record LineupEditorState(
         Guid LineupId,
         string Name,
         string Formation,
         bool IsActive,
-        IReadOnlyList<LineupSlotState> Slots);
+        IReadOnlyList<LineupSlotState> Slots,
+        LineupRolesState Roles);
 }

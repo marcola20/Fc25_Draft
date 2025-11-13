@@ -9,7 +9,8 @@ public sealed record TeamLineupDto(
     IReadOnlyList<TeamLineupSlotDto> Starters,
     IReadOnlyList<TeamLineupSlotDto> Bench,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    TeamLineupRolesDto Roles);
 
 public sealed record TeamLineupSlotDto(
     Guid SlotId,
@@ -29,9 +30,41 @@ public sealed record TeamLineupSlotPlayerDto(
 
 public sealed record TeamLineupSlotAssignmentDto(string SlotCode, int? PlayerId);
 
+public sealed record TeamLineupRolesDto(
+    TeamLineupSlotPlayerDto? Captain,
+    TeamLineupSlotPlayerDto? ShortFreeKickLeft,
+    TeamLineupSlotPlayerDto? ShortFreeKickRight,
+    TeamLineupSlotPlayerDto? LongFreeKick,
+    TeamLineupSlotPlayerDto? Penalties,
+    TeamLineupSlotPlayerDto? CornerLeft,
+    TeamLineupSlotPlayerDto? CornerRight);
+
+public sealed record TeamLineupRoleAssignmentsDto(
+    int? CaptainPlayerId,
+    int? ShortFreeKickLeftPlayerId,
+    int? ShortFreeKickRightPlayerId,
+    int? LongFreeKickPlayerId,
+    int? PenaltiesPlayerId,
+    int? CornerLeftPlayerId,
+    int? CornerRightPlayerId);
+
 public sealed record TeamLineupSaveRequestDto(
     string Name,
     string Formation,
     bool IsActive,
     IReadOnlyList<TeamLineupSlotAssignmentDto> Starters,
-    IReadOnlyList<TeamLineupSlotAssignmentDto> Bench);
+    IReadOnlyList<TeamLineupSlotAssignmentDto> Bench,
+    TeamLineupRoleAssignmentsDto? Roles);
+
+public sealed record AdminLineupOverviewDto(
+    Guid LineupId,
+    Guid TeamId,
+    string TeamName,
+    string LineupName,
+    string Formation,
+    bool IsActive,
+    IReadOnlyList<TeamLineupSlotDto> Starters,
+    IReadOnlyList<TeamLineupSlotDto> Bench,
+    TeamLineupRolesDto Roles,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);

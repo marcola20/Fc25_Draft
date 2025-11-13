@@ -1,0 +1,318 @@
+@page "/admin/lineups"
+@page "/admin/escalacoes"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Models.Navigation
+@using Microsoft.AspNetCore.Authorization
+@inject AdminAuthService AdminAuth
+@inject AdminLineupsApiClient AdminLineupsApiClient
+@inject TeamsApiClient TeamsApiClient
+@inject LayoutState LayoutState
+@inject ILogger<Fc25Draft.Web.Pages.Admin.Lineups> Logger
+
+@attribute [Authorize(Roles = "Admin")]
+@implements IDisposable
+
+<PageHeader Title="Escalações (Admin)"
+            Subtitle="Visualize as escalações salvas por cada equipe." />
+
+@if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">
+        Entre como administrador para consultar as escalações das equipes.
+    </div>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label" for="team-filter">Equipe</label>
+                    <select id="team-filter"
+                            class="form-select"
+                            value="@TeamFilterValue"
+                            @onchange="OnTeamFilterChanged"
+                            disabled="@isLoading">
+                        <option value="">Todas as equipes</option>
+                        @foreach (var team in teams)
+                        {
+                            <option value="@team.TeamId">@team.TeamName (@team.Jogadores)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-8 text-md-end">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="OnReloadRequested"
+                            disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Carregando...</span>
+                        }
+                        else
+                        {
+                            <span>Recarregar</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+    else if (isLoading && lineups.Count == 0)
+    {
+        <div class="alert alert-info" role="status">Carregando escalações...</div>
+    }
+    else if (lineups.Count == 0)
+    {
+        <div class="alert alert-warning" role="status">Nenhuma escalação encontrada para o filtro selecionado.</div>
+    }
+    else
+    {
+        @foreach (var lineup in lineups)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-semibold">@lineup.TeamName</div>
+                        <div class="text-muted small">@lineup.LineupName • Formação @lineup.Formation</div>
+                        <div class="text-muted small">Código: @lineup.LineupId</div>
+                    </div>
+                    <div class="text-end">
+                        @if (lineup.IsActive)
+                        {
+                            <span class="badge bg-success">Ativa</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inativa</span>
+                        }
+                        <div class="text-muted small mt-1">
+                            Atualizada em @lineup.UpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-12 col-lg-4">
+                            <h6 class="text-uppercase text-muted small mb-2">Titulares</h6>
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var starter in lineup.Starters.OrderBy(s => s.Order))
+                                {
+                                    <li class="mb-1">
+                                        <strong>@starter.DisplayName:</strong>
+                                        <span>@FormatPlayer(starter.Player)</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <h6 class="text-uppercase text-muted small mb-2">Reservas</h6>
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var sub in lineup.Bench.OrderBy(s => s.Order))
+                                {
+                                    <li class="mb-1">
+                                        <strong>@sub.DisplayName:</strong>
+                                        <span>@FormatPlayer(sub.Player)</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <h6 class="text-uppercase text-muted small mb-2">Funções especiais</h6>
+                            <ul class="list-unstyled mb-0">
+                                <li><strong>Capitão:</strong> @FormatPlayer(lineup.Roles.Captain)</li>
+                                <li><strong>Falta de perto - Esquerda:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickLeft)</li>
+                                <li><strong>Falta de perto - Direita:</strong> @FormatPlayer(lineup.Roles.ShortFreeKickRight)</li>
+                                <li><strong>Falta de longa distância:</strong> @FormatPlayer(lineup.Roles.LongFreeKick)</li>
+                                <li><strong>Pênaltis:</strong> @FormatPlayer(lineup.Roles.Penalties)</li>
+                                <li><strong>Escanteios - Esquerda:</strong> @FormatPlayer(lineup.Roles.CornerLeft)</li>
+                                <li><strong>Escanteios - Direita:</strong> @FormatPlayer(lineup.Roles.CornerRight)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private readonly PageDefinition pageDefinition = new()
+    {
+        Title = "Escalações (Admin)",
+        Breadcrumbs = new List<BreadcrumbSegment>
+        {
+            new("Início", "/home"),
+            new("Escalações (Admin)")
+        }
+    };
+
+    private readonly List<TeamListItemDto> teams = new();
+    private readonly List<AdminLineupOverviewDto> lineups = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private Guid selectedTeamId = Guid.Empty;
+    private bool teamsLoaded;
+    private CancellationTokenSource? loadCts;
+
+    private string TeamFilterValue => selectedTeamId == Guid.Empty ? string.Empty : selectedTeamId.ToString();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(pageDefinition);
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AdminAuth.EnsureInitializedAsync();
+        if (AdminAuth.IsAuthenticated)
+        {
+            await ReloadAsync();
+        }
+        else
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        loadCts = new CancellationTokenSource();
+
+        await LoadAsync(loadCts.Token);
+    }
+
+    private async Task LoadAsync(CancellationToken ct)
+    {
+        if (!AdminAuth.IsAuthenticated)
+        {
+            lineups.Clear();
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            if (!teamsLoaded)
+            {
+                await LoadTeamsAsync(ct);
+                teamsLoaded = true;
+
+                if (selectedTeamId != Guid.Empty && teams.All(t => t.TeamId != selectedTeamId))
+                {
+                    selectedTeamId = Guid.Empty;
+                }
+            }
+
+            await LoadLineupsAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignorado
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "AdminLineups: erro ao carregar dados para o time {TeamId}", selectedTeamId);
+            errorMessage = "Não foi possível carregar as escalações. Tente novamente em instantes.";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTeamsAsync(CancellationToken ct)
+    {
+        const int pageSize = 50;
+        var allTeams = new List<TeamListItemDto>();
+        var page = 1;
+
+        while (true)
+        {
+            var result = await TeamsApiClient.GetAsync(null, page, pageSize, ct);
+            if (result.Items.Count == 0)
+            {
+                break;
+            }
+
+            allTeams.AddRange(result.Items);
+
+            if (allTeams.Count >= result.Total)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        teams.Clear();
+        teams.AddRange(allTeams.OrderBy(t => t.TeamName));
+    }
+
+    private async Task LoadLineupsAsync(CancellationToken ct)
+    {
+        var filter = selectedTeamId == Guid.Empty ? (Guid?)null : selectedTeamId;
+        var fetched = await AdminLineupsApiClient.GetLineupsAsync(filter, ct);
+
+        lineups.Clear();
+        lineups.AddRange(fetched
+            .OrderBy(l => l.TeamName)
+            .ThenByDescending(l => l.IsActive)
+            .ThenBy(l => l.LineupName));
+    }
+
+    private async Task OnTeamFilterChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        selectedTeamId = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        await ReloadAsync();
+    }
+
+    private async Task OnReloadRequested()
+    {
+        await ReloadAsync();
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            if (!AdminAuth.IsAuthenticated)
+            {
+                loadCts?.Cancel();
+                lineups.Clear();
+                teams.Clear();
+                teamsLoaded = false;
+                isLoading = false;
+                errorMessage = null;
+                StateHasChanged();
+                return;
+            }
+
+            await ReloadAsync();
+        });
+    }
+
+    private static string FormatPlayer(TeamLineupSlotPlayerDto? player)
+        => player is null ? "Não definido" : $"{player.Name} ({player.PositionName})";
+
+    public void Dispose()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

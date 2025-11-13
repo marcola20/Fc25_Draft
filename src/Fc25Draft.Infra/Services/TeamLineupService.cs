@@ -39,11 +39,63 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.Slots)
                 .ThenInclude(s => s.Player)
                     .ThenInclude(p => p!.Position)
+            .Include(l => l.CaptainPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickRightPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer)
+                .ThenInclude(p => p!.Position)
             .OrderByDescending(l => l.IsActive)
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
 
         return entities.Select(MapToDto).ToList();
+    }
+
+    public async Task<IReadOnlyList<AdminLineupOverviewDto>> GetAdminLineupsAsync(Guid? teamId, CancellationToken ct)
+    {
+        IQueryable<TeamLineup> query = _dbContext.TeamLineups
+            .AsNoTracking()
+            .Include(l => l.Team)
+            .Include(l => l.Slots)
+                .ThenInclude(s => s.Player)
+                    .ThenInclude(p => p!.Position)
+            .Include(l => l.CaptainPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickRightPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer)
+                .ThenInclude(p => p!.Position);
+
+        if (teamId.HasValue && teamId.Value != Guid.Empty)
+        {
+            await EnsureTeamExistsAsync(teamId.Value, ct);
+            query = query.Where(l => l.TeamId == teamId.Value);
+        }
+
+        var entities = await query
+            .OrderBy(l => l.Team.TeamName)
+            .ThenByDescending(l => l.IsActive)
+            .ThenBy(l => l.CreatedAt)
+            .ToListAsync(ct);
+
+        return entities.Select(MapToAdminDto).ToList();
     }
 
     public async Task<TeamLineupDto> CreateLineupAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -64,6 +116,7 @@ public class TeamLineupService : ITeamLineupService
         var template = LineupTemplateCatalog.GetTemplateOrDefault(request.Formation);
         var assignments = BuildAssignments(template, request);
         await ValidatePlayersAsync(teamId, template, assignments, ct);
+        var normalizedRoles = NormalizeRoles(template, assignments, request.Roles);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
@@ -88,6 +141,8 @@ public class TeamLineupService : ITeamLineupService
                     CreatedAt = now,
                     UpdatedAt = now,
                 };
+
+                ApplyRoles(lineup, normalizedRoles);
 
                 foreach (var slotTemplate in template.AllSlots)
                 {
@@ -190,6 +245,8 @@ public class TeamLineupService : ITeamLineupService
                 lineup.UpdatedAt = now;
 
                 ApplyTemplateSlots(lineup, template, assignments);
+                var normalizedRoles = NormalizeRoles(template, assignments, request.Roles);
+                ApplyRoles(lineup, normalizedRoles);
 
                 var otherLineups = await _dbContext.TeamLineups
                     .Where(l => l.TeamId == teamId && l.LineupId != lineupId)
@@ -412,6 +469,58 @@ public class TeamLineupService : ITeamLineupService
         return trimmed;
     }
 
+    private static TeamLineupRoleAssignmentsDto NormalizeRoles(
+        LineupTemplate template,
+        IReadOnlyDictionary<string, int?> assignments,
+        TeamLineupRoleAssignmentsDto? roles)
+    {
+        var starterPlayerIds = template.Starters
+            .Select(s => assignments.TryGetValue(s.SlotCode, out var playerId) ? playerId : null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToHashSet();
+
+        int? Normalize(int? playerId)
+        {
+            if (!playerId.HasValue)
+            {
+                return null;
+            }
+
+            return starterPlayerIds.Contains(playerId.Value) ? playerId : null;
+        }
+
+        roles ??= new TeamLineupRoleAssignmentsDto(null, null, null, null, null, null, null);
+
+        return new TeamLineupRoleAssignmentsDto(
+            Normalize(roles.CaptainPlayerId),
+            Normalize(roles.ShortFreeKickLeftPlayerId),
+            Normalize(roles.ShortFreeKickRightPlayerId),
+            Normalize(roles.LongFreeKickPlayerId),
+            Normalize(roles.PenaltiesPlayerId),
+            Normalize(roles.CornerLeftPlayerId),
+            Normalize(roles.CornerRightPlayerId));
+    }
+
+    private static void ApplyRoles(TeamLineup lineup, TeamLineupRoleAssignmentsDto roles)
+    {
+        lineup.CaptainPlayerId = roles.CaptainPlayerId;
+        lineup.ShortFreeKickLeftPlayerId = roles.ShortFreeKickLeftPlayerId;
+        lineup.ShortFreeKickRightPlayerId = roles.ShortFreeKickRightPlayerId;
+        lineup.LongFreeKickPlayerId = roles.LongFreeKickPlayerId;
+        lineup.PenaltiesPlayerId = roles.PenaltiesPlayerId;
+        lineup.CornerLeftPlayerId = roles.CornerLeftPlayerId;
+        lineup.CornerRightPlayerId = roles.CornerRightPlayerId;
+
+        lineup.CaptainPlayer = null;
+        lineup.ShortFreeKickLeftPlayer = null;
+        lineup.ShortFreeKickRightPlayer = null;
+        lineup.LongFreeKickPlayer = null;
+        lineup.PenaltiesPlayer = null;
+        lineup.CornerLeftPlayer = null;
+        lineup.CornerRightPlayer = null;
+    }
+
     private static Dictionary<string, int?> BuildAssignments(LineupTemplate template, TeamLineupSaveRequestDto request)
     {
         var assignments = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
@@ -558,6 +667,20 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.Slots)
                 .ThenInclude(s => s.Player)
                     .ThenInclude(p => p!.Position)
+            .Include(l => l.CaptainPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKickRightPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer)
+                .ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer)
+                .ThenInclude(p => p!.Position)
             .FirstOrDefaultAsync(l => l.LineupId == lineupId, ct)
             ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
@@ -601,6 +724,7 @@ public class TeamLineupService : ITeamLineupService
 
         var starters = orderedSlots.Where(s => !s.IsBench).ToList();
         var bench = orderedSlots.Where(s => s.IsBench).ToList();
+        var roles = MapRoles(entity);
 
         return new TeamLineupDto(
             entity.LineupId,
@@ -611,6 +735,62 @@ public class TeamLineupService : ITeamLineupService
             starters,
             bench,
             entity.CreatedAt,
-            entity.UpdatedAt);
+            entity.UpdatedAt,
+            roles);
+    }
+
+    private static TeamLineupRolesDto MapRoles(TeamLineup entity)
+    {
+        return new TeamLineupRolesDto(
+            MapRolePlayer(entity, entity.CaptainPlayerId, entity.CaptainPlayer),
+            MapRolePlayer(entity, entity.ShortFreeKickLeftPlayerId, entity.ShortFreeKickLeftPlayer),
+            MapRolePlayer(entity, entity.ShortFreeKickRightPlayerId, entity.ShortFreeKickRightPlayer),
+            MapRolePlayer(entity, entity.LongFreeKickPlayerId, entity.LongFreeKickPlayer),
+            MapRolePlayer(entity, entity.PenaltiesPlayerId, entity.PenaltiesPlayer),
+            MapRolePlayer(entity, entity.CornerLeftPlayerId, entity.CornerLeftPlayer),
+            MapRolePlayer(entity, entity.CornerRightPlayerId, entity.CornerRightPlayer));
+    }
+
+    private static TeamLineupSlotPlayerDto? MapRolePlayer(TeamLineup entity, int? playerId, Player? navigation)
+    {
+        if (!playerId.HasValue)
+        {
+            return null;
+        }
+
+        var player = navigation;
+        if (player is null)
+        {
+            player = entity.Slots.FirstOrDefault(s => s.PlayerId == playerId)?.Player;
+        }
+
+        if (player is null)
+        {
+            return null;
+        }
+
+        return new TeamLineupSlotPlayerDto(
+            player.PlayerId,
+            player.PlayerGuid,
+            player.Name,
+            player.Position.Name,
+            player.PositionId);
+    }
+
+    private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity)
+    {
+        var dto = MapToDto(entity);
+        return new AdminLineupOverviewDto(
+            dto.LineupId,
+            dto.TeamId,
+            entity.Team.TeamName,
+            dto.Name,
+            dto.Formation,
+            dto.IsActive,
+            dto.Starters,
+            dto.Bench,
+            dto.Roles,
+            dto.CreatedAtUtc,
+            dto.UpdatedAtUtc);
     }
 }

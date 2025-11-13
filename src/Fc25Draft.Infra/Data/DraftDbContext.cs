@@ -115,6 +115,34 @@ public class DraftDbContext : DbContext
              .WithMany(t => t.Lineups)
              .HasForeignKey(x => x.TeamId)
              .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CaptainPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.CaptainPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ShortFreeKickLeftPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.ShortFreeKickLeftPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ShortFreeKickRightPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.ShortFreeKickRightPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.LongFreeKickPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.LongFreeKickPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PenaltiesPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.PenaltiesPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CornerLeftPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.CornerLeftPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CornerRightPlayer)
+             .WithMany()
+             .HasForeignKey(x => x.CornerRightPlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<TeamLineupSlot>(e =>
