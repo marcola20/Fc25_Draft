@@ -1,0 +1,1250 @@
+@page "/admin/competicoes"
+@using System.ComponentModel.DataAnnotations
+@using Fc25Draft.Core.DTOs.Competitions
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Web.Models.Competitions
+@using Fc25Draft.Web.Services
+@inject AdminAuthService AdminAuth
+@inject CompetitionApiClient CompetitionClient
+@inject SeasonApiClient SeasonClient
+@inject TeamsApiClient TeamsClient
+@inject IToastService Toasts
+@inject ILogger<Fc25Draft.Web.Pages.Admin.Competicoes> Logger
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject IJSRuntime JS
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Administração de Competições</PageTitle>
+
+<h1 class="h3 mb-3">Administração de Competições</h1>
+
+@if (!AdminAuth.IsAuthenticated)
+{
+    <div class="alert alert-warning" role="alert">Entre como administrador para gerenciar as competições.</div>
+}
+else
+{
+    <div class="mb-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-primary btn-sm" @onclick="BeginCreate">Nova competição</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="async () => await LoadCompetitionsAsync()" disabled="@_isLoading">Recarregar</button>
+        </div>
+        <div class="nav nav-tabs">
+            <button type="button" class="nav-link @(_activeTab == ListTab ? "active" : string.Empty)" @onclick="() => SwitchTab(ListTab)">Listagem</button>
+            <button type="button" class="nav-link @(_activeTab == DetailsTab ? "active" : string.Empty)" @onclick="() => SwitchTab(DetailsTab)" disabled="@(!_selectedCompetitionId.HasValue)">Detalhes</button>
+            <button type="button" class="nav-link @(_activeTab == TeamsTab ? "active" : string.Empty)" @onclick="() => SwitchTab(TeamsTab)" disabled="@(!_selectedCompetitionId.HasValue)">Times</button>
+            <button type="button" class="nav-link @(_activeTab == RoundsTab ? "active" : string.Empty)" @onclick="() => SwitchTab(RoundsTab)" disabled="@(!_selectedCompetitionId.HasValue)">Rodadas</button>
+            <button type="button" class="nav-link @(_activeTab == StandingsTab ? "active" : string.Empty)" @onclick="() => SwitchTab(StandingsTab)" disabled="@(!_selectedCompetitionId.HasValue)">Classificação</button>
+            <button type="button" class="nav-link @(_activeTab == StatsTab ? "active" : string.Empty)" @onclick="() => SwitchTab(StatsTab)" disabled="@(!_selectedCompetitionId.HasValue)">Estatísticas</button>
+        </div>
+    </div>
+
+    @if (_activeTab == ListTab)
+    {
+        <section>
+            @if (!string.IsNullOrEmpty(_listError))
+            {
+                <div class="alert alert-danger" role="alert">@_listError</div>
+            }
+            else if (_isLoading && _competitions is null)
+            {
+                <div class="alert alert-info" role="status">Carregando competições...</div>
+            }
+            else if (_competitions is null || !_competitions.Any())
+            {
+                <div class="alert alert-warning" role="alert">Nenhuma competição encontrada.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Competição</th>
+                                <th>Temporada</th>
+                                <th>Times</th>
+                                <th>Rodadas</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _competitions.OrderBy(c => c.SeasonName).ThenBy(c => c.Order).ThenBy(c => c.Name))
+                            {
+                                <tr>
+                                    <td>@item.Name</td>
+                                    <td>@item.SeasonName</td>
+                                    <td>@item.TotalTeams</td>
+                                    <td>@item.TotalRounds</td>
+                                    <td>
+                                        <span class="badge @(item.IsActive ? "bg-success" : "bg-secondary")">
+                                            @(item.IsActive ? "Ativa" : "Inativa")
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="() => SelectCompetitionAsync(item.CompetitionId)">Gerenciar</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_activeTab == DetailsTab)
+    {
+        <section>
+            @if (!_selectedCompetitionId.HasValue)
+            {
+                <EditForm Model="_createModel" OnValidSubmit="CreateCompetitionAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Temporada</label>
+                            <InputSelect @bind-Value="_createModel.SeasonId" class="form-select">
+                                @if (_seasons is not null)
+                                {
+                                    @foreach (var season in _seasons)
+                                    {
+                                        <option value="@season.SeasonId">@season.Name</option>
+                                    }
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nome</label>
+                            <InputText @bind-Value="_createModel.Name" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Ordem</label>
+                            <InputNumber @bind-Value="_createModel.Order" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Tipo</label>
+                            <InputSelect @bind-Value="_createModel.Type" class="form-select">
+                                @foreach (CompetitionType type in Enum.GetValues(typeof(CompetitionType)))
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_createModel.IsActive" class="form-check-input" />
+                                <label class="form-check-label">Competição ativa</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@_isSaving">Criar competição</button>
+                    </div>
+                </EditForm>
+            }
+            else if (_selectedCompetition is not null)
+            {
+                <EditForm Model="_editModel" OnValidSubmit="UpdateCompetitionAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome</label>
+                            <InputText @bind-Value="_editModel.Name" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Ordem</label>
+                            <InputNumber @bind-Value="_editModel.Order" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Tipo</label>
+                            <InputSelect @bind-Value="_editModel.Type" class="form-select">
+                                @foreach (CompetitionType type in Enum.GetValues(typeof(CompetitionType)))
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Status</label>
+                            <div class="form-check mt-2">
+                                <InputCheckbox @bind-Value="_editModel.IsActive" class="form-check-input" />
+                                <label class="form-check-label">Ativa</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@_isSaving">Salvar alterações</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ToggleCompetitionAsync">
+                            @(_editModel.IsActive ? "Desativar" : "Ativar")
+                        </button>
+                    </div>
+                </EditForm>
+
+                <div class="mt-4">
+                    <h5>Resumo</h5>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="fw-semibold">Times</div>
+                                    <div class="display-6">@_selectedCompetition.Teams.Count</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="fw-semibold">Rodadas</div>
+                                    <div class="display-6">@_selectedCompetition.Rounds.Count</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="fw-semibold">Partidas</div>
+                                    <div class="display-6">@_selectedCompetition.Rounds.Sum(r => r.Matches.Count)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="fw-semibold">Atualizada</div>
+                                    <div>@_selectedCompetition.Competition.UpdatedAtUtc.ToLocalTime():g</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">Selecione uma competição para visualizar os detalhes.</div>
+            }
+        </section>
+    }
+    else if (_activeTab == TeamsTab)
+    {
+        <section>
+            @if (!_selectedCompetitionId.HasValue)
+            {
+                <div class="alert alert-info" role="alert">Selecione uma competição para gerenciar os times.</div>
+            }
+            else
+            {
+                <EditForm Model="_teamForm" OnValidSubmit="AddTeamAsync">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label">Time</label>
+                            <InputSelect @bind-Value="_teamForm.TeamId" class="form-select">
+                                <option value="@Guid.Empty">Selecione um time</option>
+                                @if (_availableTeams is not null)
+                                {
+                                    @foreach (var team in _availableTeams)
+                                    {
+                                        <option value="@team.TeamId">@team.TeamName</option>
+                                    }
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Orçamento inicial</label>
+                            <InputNumber @bind-Value="_teamForm.InitialBudget" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Observações</label>
+                            <InputText @bind-Value="_teamForm.Notes" class="form-control" />
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Adicionar time</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="LoadAvailableTeamsAsync">Atualizar lista</button>
+                        </div>
+                    </div>
+                </EditForm>
+
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Observações</th>
+                                <th>Criado em</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_teams is null || !_teams.Any())
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Nenhum time cadastrado.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var team in _teams.OrderBy(t => t.TeamName))
+                                {
+                                    <tr>
+                                        <td>@team.TeamName</td>
+                                        <td>@team.Notes</td>
+                                        <td>@team.CreatedAtUtc.ToLocalTime():g</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="() => RemoveTeamAsync(team.CompetitionTeamId)">Remover</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_activeTab == RoundsTab)
+    {
+        <section>
+            @if (!_selectedCompetitionId.HasValue)
+            {
+                <div class="alert alert-info" role="alert">Selecione uma competição para visualizar as rodadas.</div>
+            }
+            else
+            {
+                <EditForm Model="_roundGeneration" OnValidSubmit="GenerateRoundsAsync">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Data inicial</label>
+                            <InputDate @bind-Value="_roundGenerationLocalDate" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Dias entre rodadas</label>
+                            <InputNumber @bind-Value="_roundGeneration.DaysBetweenRounds" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <InputCheckbox @bind-Value="_roundGeneration.IncludeReturnLeg" class="form-check-input" />
+                                <label class="form-check-label">Incluir jogos de volta</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">Gerar rodadas</button>
+                        </div>
+                    </div>
+                </EditForm>
+
+                @if (_rounds is null || !_rounds.Any())
+                {
+                    <div class="alert alert-warning mt-3">Nenhuma rodada cadastrada.</div>
+                }
+                else
+                {
+                    <div class="accordion mt-3" id="roundsAccordion">
+                        @foreach (var round in _rounds.OrderBy(r => r.RoundNumber))
+                        {
+                            var collapseId = $"round-{round.RoundId}";
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-@round.RoundId">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                                        @round.RoundNumber. @round.Name
+                                    </button>
+                                </h2>
+                                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#roundsAccordion">
+                                    <div class="accordion-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Partida</th>
+                                                        <th>Data</th>
+                                                        <th>Status</th>
+                                                        <th class="text-end">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @if (!round.Matches.Any())
+                                                    {
+                                                        <tr>
+                                                            <td colspan="4" class="text-center text-muted">Nenhuma partida cadastrada.</td>
+                                                        </tr>
+                                                    }
+                                                    else
+                                                    {
+                                                        @foreach (var match in round.Matches.OrderBy(m => m.MatchDateUtc ?? DateTime.MaxValue))
+                                                        {
+                                                            <tr>
+                                                                <td>@($"{match.HomeTeamName} {match.HomeGoals ?? 0} x {match.AwayGoals ?? 0} {match.AwayTeamName}")</td>
+                                                                <td>@(match.MatchDateUtc?.ToLocalTime().ToString("g") ?? "—")</td>
+                                                                <td>@match.Status</td>
+                                                                <td class="text-end">
+                                                                    <div class="btn-group btn-group-sm">
+                                                                        <button class="btn btn-outline-primary" @onclick="() => LoadMatchAsync(match.CompetitionMatchId)">Editar</button>
+                                                                        <button class="btn btn-outline-danger" @onclick="() => DeleteMatchAsync(match.CompetitionMatchId)">Excluir</button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_matchForm is not null)
+                {
+                    <div class="card mt-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span>Edição de partida: @_matchForm.HomeTeamName x @_matchForm.AwayTeamName</span>
+                            <button class="btn-close" type="button" @onclick="CancelMatchEdit"></button>
+                        </div>
+                        <div class="card-body">
+                            <EditForm Model="_matchForm" OnValidSubmit="SaveMatchAsync">
+                                <DataAnnotationsValidator />
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Data da partida</label>
+                                        <InputDate @bind-Value="_matchForm.MatchDateLocal" class="form-control" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Gols mandante</label>
+                                        <InputNumber @bind-Value="_matchForm.HomeGoals" class="form-control" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Gols visitante</label>
+                                        <InputNumber @bind-Value="_matchForm.AwayGoals" class="form-control" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Status</label>
+                                        <InputSelect @bind-Value="_matchForm.Status" class="form-select">
+                                            @foreach (CompetitionMatchStatus status in Enum.GetValues(typeof(CompetitionMatchStatus)))
+                                            {
+                                                <option value="@status">@status</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Estádio</label>
+                                        <InputText @bind-Value="_matchForm.Stadium" class="form-control" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Observações</label>
+                                        <InputTextArea @bind-Value="_matchForm.Observations" class="form-control" rows="2" />
+                                    </div>
+                                </div>
+                                <div class="mt-3 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">Salvar partida</button>
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="SaveEventsAsync">Salvar eventos</button>
+                                    <button type="button" class="btn btn-outline-info" @onclick="AddEventRow">Adicionar evento</button>
+                                </div>
+                            </EditForm>
+
+                            <div class="table-responsive mt-3">
+                                <table class="table table-sm table-striped align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Jogador (ID)</th>
+                                            <th>Relacionado (ID)</th>
+                                            <th>Evento</th>
+                                            <th>Minuto</th>
+                                            <th>Observações</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!_matchForm.Events.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted">Nenhum evento cadastrado.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var evt in _matchForm.Events)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <InputSelect @bind-Value="evt.CompetitionTeamId" class="form-select form-select-sm">
+                                                            <option value="@Guid.Empty">Selecione</option>
+                                                            @foreach (var team in _teams ?? Array.Empty<CompetitionTeamDto>())
+                                                            {
+                                                                <option value="@team.CompetitionTeamId">@team.TeamName</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </td>
+                                                    <td><InputNumber @bind-Value="evt.PlayerId" class="form-control form-control-sm" /></td>
+                                                    <td><InputNumber @bind-Value="evt.RelatedPlayerId" class="form-control form-control-sm" /></td>
+                                                    <td>
+                                                        <InputSelect @bind-Value="evt.EventType" class="form-select form-select-sm">
+                                                            @foreach (CompetitionMatchEventType type in Enum.GetValues(typeof(CompetitionMatchEventType)))
+                                                            {
+                                                                <option value="@type">@type</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </td>
+                                                    <td><InputNumber @bind-Value="evt.Minute" class="form-control form-control-sm" /></td>
+                                                    <td><InputText @bind-Value="evt.Observations" class="form-control form-control-sm" /></td>
+                                                    <td class="text-end">
+                                                        <button class="btn btn-outline-danger btn-sm" type="button" @onclick="() => RemoveEventRow(evt)">Remover</button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+    }
+    else if (_activeTab == StandingsTab)
+    {
+        <section>
+            @if (_selectedCompetitionId is null)
+            {
+                <div class="alert alert-info">Selecione uma competição para visualizar a classificação.</div>
+            }
+            else if (_standings is null || !_standings.Any())
+            {
+                <div class="alert alert-warning">Nenhuma classificação disponível. Gere as rodadas e resultados.</div>
+            }
+            else
+            {
+                <div class="mb-2 text-end">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="async () => await RebuildStandingsAsync()">Recalcular classificação</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Time</th>
+                                <th>J</th>
+                                <th>V</th>
+                                <th>E</th>
+                                <th>D</th>
+                                <th>GP</th>
+                                <th>GC</th>
+                                <th>SG</th>
+                                <th>P</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in _standings.OrderBy(s => s.Position))
+                            {
+                                <tr>
+                                    <td>@row.Position</td>
+                                    <td>@row.TeamName</td>
+                                    <td>@row.MatchesPlayed</td>
+                                    <td>@row.Wins</td>
+                                    <td>@row.Draws</td>
+                                    <td>@row.Losses</td>
+                                    <td>@row.GoalsFor</td>
+                                    <td>@row.GoalsAgainst</td>
+                                    <td>@row.GoalDifference</td>
+                                    <td>@row.Points</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+    else if (_activeTab == StatsTab)
+    {
+        <section class="row g-3">
+            <div class="col-12 col-lg-6">
+                <h5>Artilharia</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Jogador</th>
+                                <th>Time</th>
+                                <th>Gols</th>
+                                <th>Assistências</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_playerStats is null || !_playerStats.Any())
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Nenhum dado disponível.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var player in _playerStats.OrderByDescending(p => p.Goals).ThenByDescending(p => p.Assists).Take(20))
+                                {
+                                    <tr>
+                                        <td>@player.PlayerName (@player.PlayerId)</td>
+                                        <td>@player.TeamName</td>
+                                        <td>@player.Goals</td>
+                                        <td>@player.Assists</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <h5>Estatísticas por time</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>J</th>
+                                <th>V</th>
+                                <th>E</th>
+                                <th>D</th>
+                                <th>GP</th>
+                                <th>GC</th>
+                                <th>SG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_teamStats is null || !_teamStats.Any())
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">Nenhum dado disponível.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var team in _teamStats.OrderByDescending(t => t.GoalsFor))
+                                {
+                                    <tr>
+                                        <td>@team.TeamName</td>
+                                        <td>@team.MatchesPlayed</td>
+                                        <td>@team.Wins</td>
+                                        <td>@team.Draws</td>
+                                        <td>@team.Losses</td>
+                                        <td>@team.GoalsFor</td>
+                                        <td>@team.GoalsAgainst</td>
+                                        <td>@team.GoalDifference</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private const string ListTab = "list";
+    private const string DetailsTab = "details";
+    private const string TeamsTab = "teams";
+    private const string RoundsTab = "rounds";
+    private const string StandingsTab = "standings";
+    private const string StatsTab = "stats";
+
+    private string _activeTab = ListTab;
+    private bool _isLoading;
+    private bool _isSaving;
+    private string? _listError;
+    private IReadOnlyList<CompetitionSummaryDto>? _competitions;
+    private IReadOnlyList<SeasonDto>? _seasons;
+    private Guid? _selectedCompetitionId;
+    private CompetitionDetailsDto? _selectedCompetition;
+    private CompetitionEditModel _editModel = new();
+    private CompetitionCreateModel _createModel = new();
+    private IReadOnlyList<CompetitionTeamDto>? _teams;
+    private IReadOnlyList<TeamListItemDto>? _availableTeams;
+    private CompetitionTeamFormModel _teamForm = new();
+    private IReadOnlyList<CompetitionRoundDto>? _rounds;
+    private CompetitionRoundGenerationRequest _roundGeneration = new();
+    private CompetitionMatchFormModel? _matchForm;
+    private IReadOnlyList<CompetitionStandingDto>? _standings;
+    private IReadOnlyList<CompetitionPlayerStatDto>? _playerStats;
+    private IReadOnlyList<CompetitionTeamStatDto>? _teamStats;
+
+    private DateTime? _roundGenerationLocalDate
+    {
+        get => _roundGeneration.FirstRoundDateUtc?.ToLocalTime().Date;
+        set => _roundGeneration.FirstRoundDateUtc = value.HasValue
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Local).ToUniversalTime()
+            : null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutState.SetPageTitle("Administração de Competições");
+        NavigationService.SetActivePage("competicoes");
+
+        await LoadSeasonsAsync();
+        await LoadCompetitionsAsync();
+    }
+
+    private void SwitchTab(string tab)
+    {
+        _activeTab = tab;
+    }
+
+    private async Task LoadSeasonsAsync()
+    {
+        try
+        {
+            _seasons = await SeasonClient.GetSeasonsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar temporadas");
+            Toasts.ShowError("Falha ao carregar as temporadas.");
+        }
+    }
+
+    private async Task LoadCompetitionsAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _listError = null;
+            _competitions = await CompetitionClient.GetCompetitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar competições");
+            _listError = "Falha ao carregar as competições.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void BeginCreate()
+    {
+        _createModel = new CompetitionCreateModel
+        {
+            SeasonId = _seasons?.FirstOrDefault(s => s.IsActive)?.SeasonId ?? _seasons?.FirstOrDefault()?.SeasonId ?? Guid.Empty,
+            Name = string.Empty,
+            Order = 0,
+            Type = CompetitionType.League,
+            IsActive = true
+        };
+        _activeTab = DetailsTab;
+        _selectedCompetitionId = null;
+        _selectedCompetition = null;
+        _editModel = new CompetitionEditModel();
+    }
+
+    private async Task SelectCompetitionAsync(Guid competitionId)
+    {
+        try
+        {
+            _isLoading = true;
+            _selectedCompetitionId = competitionId;
+            _selectedCompetition = await CompetitionClient.GetCompetitionDetailsAsync(competitionId);
+            _editModel = new CompetitionEditModel
+            {
+                Name = _selectedCompetition.Competition.Name,
+                Order = _selectedCompetition.Competition.Order,
+                Type = _selectedCompetition.Competition.Type,
+                IsActive = _selectedCompetition.Competition.IsActive
+            };
+            _teams = _selectedCompetition.Teams;
+            _rounds = _selectedCompetition.Rounds;
+            _standings = _selectedCompetition.Standings;
+            _playerStats = _selectedCompetition.PlayerStats;
+            _teamStats = _selectedCompetition.TeamStats;
+            await LoadAvailableTeamsAsync();
+            _activeTab = DetailsTab;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar detalhes da competição {CompetitionId}", competitionId);
+            Toasts.ShowError("Falha ao carregar os detalhes da competição.");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadAvailableTeamsAsync()
+    {
+        try
+        {
+            var result = await TeamsClient.GetAsync(null, 1, 200);
+            var existing = _teams?.Select(t => t.TeamId).ToHashSet() ?? new HashSet<Guid>();
+            _availableTeams = result.Items.Where(t => !existing.Contains(t.TeamId)).OrderBy(t => t.TeamName).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar times disponíveis");
+            Toasts.ShowError("Falha ao carregar a lista de times.");
+            _availableTeams = Array.Empty<TeamListItemDto>();
+        }
+    }
+
+    private async Task CreateCompetitionAsync()
+    {
+        if (_createModel.SeasonId == Guid.Empty)
+        {
+            Toasts.ShowWarning("Selecione uma temporada válida.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_createModel.Name))
+        {
+            Toasts.ShowWarning("Informe o nome da competição.");
+            return;
+        }
+
+        try
+        {
+            _isSaving = true;
+            var request = new CompetitionCreateRequest
+            {
+                SeasonId = _createModel.SeasonId,
+                Name = _createModel.Name,
+                Order = _createModel.Order,
+                Type = _createModel.Type,
+                IsActive = _createModel.IsActive
+            };
+
+            var created = await CompetitionClient.CreateCompetitionAsync(request);
+            Toasts.ShowSuccess("Competição criada com sucesso.");
+            await LoadCompetitionsAsync();
+            await SelectCompetitionAsync(created.CompetitionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar competição");
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task UpdateCompetitionAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            await CreateCompetitionAsync();
+            return;
+        }
+
+        try
+        {
+            _isSaving = true;
+            var request = new CompetitionUpdateRequest
+            {
+                Name = _editModel.Name,
+                Order = _editModel.Order,
+                Type = _editModel.Type,
+                IsActive = _editModel.IsActive
+            };
+
+            var updated = await CompetitionClient.UpdateCompetitionAsync(_selectedCompetitionId.Value, request);
+            if (updated is null)
+            {
+                Toasts.ShowError("Competição não encontrada.");
+                return;
+            }
+
+            Toasts.ShowSuccess("Competição atualizada.");
+            await LoadCompetitionsAsync();
+            await SelectCompetitionAsync(updated.CompetitionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar competição");
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ToggleCompetitionAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var newValue = !_editModel.IsActive;
+            await CompetitionClient.ToggleCompetitionAsync(_selectedCompetitionId.Value, newValue);
+            _editModel.IsActive = newValue;
+            Toasts.ShowSuccess(newValue ? "Competição ativada." : "Competição desativada.");
+            await LoadCompetitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao alterar status da competição");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task AddTeamAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            Toasts.ShowWarning("Selecione uma competição.");
+            return;
+        }
+
+        if (_teamForm.TeamId == Guid.Empty)
+        {
+            Toasts.ShowWarning("Selecione um time válido.");
+            return;
+        }
+
+        try
+        {
+            var request = new CompetitionTeamRequest
+            {
+                TeamId = _teamForm.TeamId,
+                InitialBudget = _teamForm.InitialBudget,
+                Notes = _teamForm.Notes
+            };
+
+            await CompetitionClient.AddTeamAsync(_selectedCompetitionId.Value, request);
+            Toasts.ShowSuccess("Time adicionado à competição.");
+            await RefreshCompetitionDetailsAsync();
+            _teamForm = new CompetitionTeamFormModel();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao adicionar time");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task RemoveTeamAsync(Guid competitionTeamId)
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await CompetitionClient.RemoveTeamAsync(_selectedCompetitionId.Value, competitionTeamId);
+            Toasts.ShowSuccess("Time removido da competição.");
+            await RefreshCompetitionDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao remover time");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task GenerateRoundsAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            Toasts.ShowWarning("Selecione uma competição.");
+            return;
+        }
+
+        try
+        {
+            await CompetitionClient.GenerateRoundsAsync(_selectedCompetitionId.Value, _roundGeneration);
+            Toasts.ShowSuccess("Rodadas geradas com sucesso.");
+            await RefreshCompetitionDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao gerar rodadas");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task RefreshCompetitionDetailsAsync()
+    {
+        if (_selectedCompetitionId.HasValue)
+        {
+            await SelectCompetitionAsync(_selectedCompetitionId.Value);
+        }
+    }
+
+    private async Task LoadMatchAsync(Guid matchId)
+    {
+        try
+        {
+            var match = await CompetitionClient.GetMatchAsync(matchId);
+            if (match is null)
+            {
+                Toasts.ShowError("Partida não encontrada.");
+                return;
+            }
+
+            _matchForm = new CompetitionMatchFormModel(match, _teams ?? Array.Empty<CompetitionTeamDto>());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar partida {MatchId}", matchId);
+            Toasts.ShowError("Falha ao carregar os dados da partida.");
+        }
+    }
+
+    private void CancelMatchEdit()
+    {
+        _matchForm = null;
+    }
+
+    private async Task SaveMatchAsync()
+    {
+        if (_matchForm is null || !_selectedCompetitionId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var request = new CompetitionMatchUpsertRequest
+            {
+                CompetitionMatchId = _matchForm.CompetitionMatchId,
+                CompetitionId = _selectedCompetitionId,
+                RoundId = _matchForm.RoundId,
+                HomeCompetitionTeamId = _matchForm.HomeCompetitionTeamId,
+                AwayCompetitionTeamId = _matchForm.AwayCompetitionTeamId,
+                MatchDateUtc = _matchForm.MatchDateLocal.HasValue ? DateTime.SpecifyKind(_matchForm.MatchDateLocal.Value, DateTimeKind.Local).ToUniversalTime() : null,
+                HomeGoals = _matchForm.HomeGoals,
+                AwayGoals = _matchForm.AwayGoals,
+                Status = _matchForm.Status,
+                Stadium = _matchForm.Stadium,
+                Observations = _matchForm.Observations
+            };
+
+            var updated = await CompetitionClient.UpsertMatchAsync(request);
+            _matchForm = new CompetitionMatchFormModel(updated, _teams ?? Array.Empty<CompetitionTeamDto>());
+            Toasts.ShowSuccess("Partida salva com sucesso.");
+            await RefreshCompetitionDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar partida");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private void AddEventRow()
+    {
+        if (_matchForm is null)
+        {
+            return;
+        }
+
+        _matchForm.Events.Add(new MatchEventEditModel(_teams ?? Array.Empty<CompetitionTeamDto>()));
+    }
+
+    private void RemoveEventRow(MatchEventEditModel model)
+    {
+        _matchForm?.Events.Remove(model);
+    }
+
+    private async Task SaveEventsAsync()
+    {
+        if (_matchForm is null)
+        {
+            return;
+        }
+
+        if (_matchForm.Events.Any(e => e.CompetitionTeamId == Guid.Empty || e.EventType is null))
+        {
+            Toasts.ShowWarning("Preencha os dados obrigatórios dos eventos.");
+            return;
+        }
+
+        var request = new CompetitionMatchEventsRequest
+        {
+            Events = _matchForm.Events.Select(e => new CompetitionMatchEventRequest
+            {
+                CompetitionMatchEventId = e.CompetitionMatchEventId,
+                CompetitionTeamId = e.CompetitionTeamId,
+                PlayerId = e.PlayerId,
+                RelatedPlayerId = e.RelatedPlayerId,
+                EventType = e.EventType,
+                Minute = e.Minute,
+                Observations = e.Observations
+            }).ToList()
+        };
+
+        try
+        {
+            var updated = await CompetitionClient.ReplaceMatchEventsAsync(_matchForm.CompetitionMatchId, request);
+            _matchForm = new CompetitionMatchFormModel(updated, _teams ?? Array.Empty<CompetitionTeamDto>());
+            Toasts.ShowSuccess("Eventos atualizados com sucesso.");
+            await RefreshCompetitionDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar eventos");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task DeleteMatchAsync(Guid matchId)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Deseja realmente excluir a partida selecionada?"))
+        {
+            return;
+        }
+
+        try
+        {
+            await CompetitionClient.DeleteMatchAsync(matchId);
+            Toasts.ShowSuccess("Partida excluída.");
+            _matchForm = null;
+            await RefreshCompetitionDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao excluir partida");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private async Task RebuildStandingsAsync()
+    {
+        if (!_selectedCompetitionId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            _standings = await CompetitionClient.RebuildStandingsAsync(_selectedCompetitionId.Value);
+            _playerStats = await CompetitionClient.GetPlayerStatsAsync(_selectedCompetitionId.Value);
+            _teamStats = await CompetitionClient.GetTeamStatsAsync(_selectedCompetitionId.Value);
+            Toasts.ShowSuccess("Classificação recalculada.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao recalcular classificação");
+            Toasts.ShowError(ex.Message);
+        }
+    }
+
+    private sealed class CompetitionEditModel
+    {
+        [Required]
+        [StringLength(100, MinimumLength = 3)]
+        public string Name { get; set; } = string.Empty;
+
+        [Range(0, 999)]
+        public int Order { get; set; }
+
+        public CompetitionType Type { get; set; } = CompetitionType.League;
+
+        public bool IsActive { get; set; }
+    }
+
+    private sealed class CompetitionCreateModel
+    {
+        [Required]
+        public Guid SeasonId { get; set; }
+
+        [Required]
+        [StringLength(100, MinimumLength = 3)]
+        public string Name { get; set; } = string.Empty;
+
+        [Range(0, 999)]
+        public int Order { get; set; }
+
+        public CompetitionType Type { get; set; } = CompetitionType.League;
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    private sealed class CompetitionTeamFormModel
+    {
+        public Guid TeamId { get; set; }
+        public decimal? InitialBudget { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private sealed class CompetitionMatchFormModel
+    {
+        public CompetitionMatchFormModel(CompetitionMatchDetailsDto dto, IReadOnlyList<CompetitionTeamDto> teams)
+        {
+            CompetitionMatchId = dto.CompetitionMatchId;
+            CompetitionId = dto.CompetitionId;
+            RoundId = dto.RoundId;
+            HomeCompetitionTeamId = dto.HomeCompetitionTeamId;
+            AwayCompetitionTeamId = dto.AwayCompetitionTeamId;
+            HomeTeamName = dto.HomeTeamName;
+            AwayTeamName = dto.AwayTeamName;
+            MatchDateLocal = dto.MatchDateUtc?.ToLocalTime();
+            HomeGoals = dto.HomeGoals;
+            AwayGoals = dto.AwayGoals;
+            Status = dto.Status;
+            Stadium = dto.Stadium;
+            Observations = dto.Observations;
+            Events = dto.Events.Select(e => new MatchEventEditModel(teams)
+            {
+                CompetitionMatchEventId = e.CompetitionMatchEventId,
+                CompetitionTeamId = e.CompetitionTeamId,
+                PlayerId = e.PlayerId,
+                RelatedPlayerId = e.RelatedPlayerId,
+                EventType = e.EventType,
+                Minute = e.Minute,
+                Observations = e.Observations
+            }).ToList();
+        }
+
+        public CompetitionMatchFormModel()
+        {
+        }
+
+        public Guid CompetitionMatchId { get; set; }
+        public Guid CompetitionId { get; set; }
+        public Guid RoundId { get; set; }
+        public Guid HomeCompetitionTeamId { get; set; }
+        public Guid AwayCompetitionTeamId { get; set; }
+        public string HomeTeamName { get; set; } = string.Empty;
+        public string AwayTeamName { get; set; } = string.Empty;
+        public DateTime? MatchDateLocal { get; set; }
+        public int? HomeGoals { get; set; }
+        public int? AwayGoals { get; set; }
+        public CompetitionMatchStatus Status { get; set; } = CompetitionMatchStatus.Scheduled;
+        public string? Stadium { get; set; }
+        public string? Observations { get; set; }
+        public List<MatchEventEditModel> Events { get; set; } = new();
+    }
+
+    private sealed class MatchEventEditModel
+    {
+        public MatchEventEditModel(IReadOnlyList<CompetitionTeamDto> teams)
+        {
+            if (teams.Any())
+            {
+                CompetitionTeamId = teams.First().CompetitionTeamId;
+            }
+        }
+
+        public Guid? CompetitionMatchEventId { get; set; }
+        public Guid CompetitionTeamId { get; set; }
+        public int? PlayerId { get; set; }
+        public int? RelatedPlayerId { get; set; }
+        public CompetitionMatchEventType? EventType { get; set; }
+        public int? Minute { get; set; }
+        public string? Observations { get; set; }
+    }
+}

@@ -76,6 +76,7 @@ api.MapDraftEndpoints()
    .MapPricingEndpoints()
    .MapTransfersEndpoints()
    .MapSeasonEndpoints()
+   .MapCompetitionModuleEndpoints()
    .MapMarketEndpoints()
    .MapMarketHistoryEndpoints()
    .MapAdminEndpoints();

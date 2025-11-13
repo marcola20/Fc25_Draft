@@ -162,13 +162,17 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
             throw new KeyNotFoundException("Temporada não encontrada.");
         }
 
+        var now = DateTime.UtcNow;
+
         var competition = new Competition
         {
             CompetitionId = Guid.NewGuid(),
             SeasonId = seasonId,
             Name = command.Name.Trim(),
             Order = command.Order,
-            IsActive = command.IsActive
+            IsActive = command.IsActive,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
         };
 
         _db.Competitions.Add(competition);
@@ -188,6 +192,7 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
         competition.Name = command.Name.Trim();
         competition.Order = command.Order;
         competition.IsActive = command.IsActive;
+        competition.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new CompetitionDto(competition.CompetitionId, competition.SeasonId, competition.Name, competition.Order, competition.IsActive);
@@ -218,6 +223,14 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
             throw new KeyNotFoundException("Competição não encontrada.");
         }
 
+        var now = DateTime.UtcNow;
+        var nextNumber = await _db.Rounds
+            .AsNoTracking()
+            .Where(r => r.CompetitionId == competitionId)
+            .Select(r => (int?)r.RoundNumber)
+            .MaxAsync(ct)
+            .ConfigureAwait(false) ?? 0;
+
         var round = new Round
         {
             RoundId = Guid.NewGuid(),
@@ -225,7 +238,10 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
             Name = command.Name.Trim(),
             IsCompleted = command.IsCompleted,
             PlayedAtUtc = command.PlayedAtUtc,
-            Notes = string.IsNullOrWhiteSpace(command.Notes) ? null : command.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(command.Notes) ? null : command.Notes.Trim(),
+            RoundNumber = nextNumber + 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
         };
 
         _db.Rounds.Add(round);
@@ -246,6 +262,7 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
         round.IsCompleted = command.IsCompleted;
         round.PlayedAtUtc = command.PlayedAtUtc;
         round.Notes = string.IsNullOrWhiteSpace(command.Notes) ? null : command.Notes.Trim();
+        round.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new RoundDto(round.RoundId, round.CompetitionId, round.Name, round.IsCompleted, round.PlayedAtUtc, round.Notes);
@@ -261,6 +278,7 @@ public sealed class SeasonService : ISeasonQueryService, ISeasonAdminService
 
         round.IsCompleted = command.IsCompleted;
         round.PlayedAtUtc = command.PlayedAtUtc;
+        round.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new RoundDto(round.RoundId, round.CompetitionId, round.Name, round.IsCompleted, round.PlayedAtUtc, round.Notes);

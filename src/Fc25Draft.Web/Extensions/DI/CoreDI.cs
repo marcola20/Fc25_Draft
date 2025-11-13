@@ -47,6 +47,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<IRoundSeedService, RoundSeedService>();
             services.AddScoped<IRoundSelectionService, RoundSelectionService>();
             services.AddScoped<ITeamLineupService, TeamLineupService>();
+            services.AddScoped<ICompetitionService, CompetitionService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();
@@ -72,6 +73,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ToastService>();
             services.AddScoped<LayoutNavigationService>();
             services.AddScoped<LayoutState>();
+            services.AddScoped<CompetitionApiClient>();
 
             services.AddHttpClient();
             services.AddSignalR();

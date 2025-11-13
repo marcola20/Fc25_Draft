@@ -110,6 +110,9 @@ namespace Fc25Draft.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -120,6 +123,12 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("Order")
                         .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("SeasonId")
                         .HasColumnType("uuid");
@@ -143,6 +152,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
@@ -151,11 +163,20 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");
 
                     b.Property<DateTime?>("PlayedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ScheduledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("RoundId");
@@ -206,6 +227,337 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("RoundSelectionId");
 
                     b.ToTable("RoundSelectionPlayers");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionLog", b =>
+                {
+                    b.Property<Guid>("CompetitionLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompetitionMatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PerformedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("CompetitionLogId");
+
+                    b.HasIndex("CompetitionId");
+
+                    b.HasIndex("CompetitionMatchId");
+
+                    b.ToTable("CompetitionLogs");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionMatch", b =>
+                {
+                    b.Property<Guid>("CompetitionMatchId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AwayGoals")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("AwayCompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("HomeGoals")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("HomeCompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("MatchDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Observations")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Stadium")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CompetitionMatchId");
+
+                    b.HasIndex("AwayCompetitionTeamId");
+
+                    b.HasIndex("CompetitionId");
+
+                    b.HasIndex("HomeCompetitionTeamId");
+
+                    b.HasIndex("RoundId", "HomeCompetitionTeamId", "AwayCompetitionTeamId")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionMatches");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionMatchEvent", b =>
+                {
+                    b.Property<Guid>("CompetitionMatchEventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Minute")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CompetitionMatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Observations")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<int?>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RelatedPlayerId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CompetitionMatchEventId");
+
+                    b.HasIndex("CompetitionMatchId");
+
+                    b.HasIndex("CompetitionTeamId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("RelatedPlayerId");
+
+                    b.ToTable("CompetitionMatchEvents");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionPlayerStat", b =>
+                {
+                    b.Property<Guid>("CompetitionPlayerStatId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Assists")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Goals")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MatchesPlayed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RedCards")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("YellowCards")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CompetitionPlayerStatId");
+
+                    b.HasIndex("CompetitionId", "PlayerId", "CompetitionTeamId")
+                        .IsUnique();
+
+                    b.HasIndex("CompetitionTeamId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("CompetitionPlayerStats");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionStanding", b =>
+                {
+                    b.Property<Guid>("CompetitionStandingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Draws")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalDifference")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalsAgainst")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalsFor")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Losses")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MatchesPlayed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RedCards")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Wins")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("YellowCards")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CompetitionStandingId");
+
+                    b.HasIndex("CompetitionId");
+
+                    b.HasIndex("CompetitionTeamId");
+
+                    b.HasIndex("CompetitionId", "Position");
+
+                    b.HasIndex("CompetitionId", "CompetitionTeamId")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionStandings");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionTeam", b =>
+                {
+                    b.Property<Guid>("CompetitionTeamId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("InitialBudget")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CompetitionTeamId");
+
+                    b.HasIndex("CompetitionId", "TeamId")
+                        .IsUnique();
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("CompetitionTeams");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionTeamStat", b =>
+                {
+                    b.Property<Guid>("CompetitionTeamStatId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Draws")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalDifference")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalsAgainst")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoalsFor")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Losses")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MatchesPlayed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RedCards")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Wins")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("YellowCards")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CompetitionTeamStatId");
+
+                    b.HasIndex("CompetitionId", "CompetitionTeamId")
+                        .IsUnique();
+
+                    b.HasIndex("CompetitionTeamId");
+
+                    b.HasIndex("CompetitionId");
+
+                    b.ToTable("CompetitionTeamStats");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Season", b =>
@@ -959,7 +1311,200 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Logs");
+
+                    b.Navigation("Matches");
+
+                    b.Navigation("Rounds");
+
                     b.Navigation("Season");
+
+                    b.Navigation("Standings");
+
+                    b.Navigation("Teams");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionLog", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany("Logs")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionMatch", "Match")
+                        .WithMany()
+                        .HasForeignKey("CompetitionMatchId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("Match");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionMatch", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "AwayTeam")
+                        .WithMany("AwayMatches")
+                        .HasForeignKey("AwayCompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany("Matches")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "HomeTeam")
+                        .WithMany("HomeMatches")
+                        .HasForeignKey("HomeCompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Round", "Round")
+                        .WithMany("Matches")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AwayTeam");
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("HomeTeam");
+
+                    b.Navigation("Events");
+
+                    b.Navigation("Round");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionMatchEvent", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionMatch", "Match")
+                        .WithMany("Events")
+                        .HasForeignKey("CompetitionMatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany("MatchEvents")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "RelatedPlayer")
+                        .WithMany()
+                        .HasForeignKey("RelatedPlayerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "Team")
+                        .WithMany("Events")
+                        .HasForeignKey("CompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Match");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("RelatedPlayer");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionPlayerStat", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "CompetitionTeam")
+                        .WithMany("PlayerStats")
+                        .HasForeignKey("CompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany("CompetitionStats")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("CompetitionTeam");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionStanding", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany("Standings")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "CompetitionTeam")
+                        .WithMany("Standings")
+                        .HasForeignKey("CompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("CompetitionTeam");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionTeam", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany("Teams")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany("Competitions")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("AwayMatches");
+
+                    b.Navigation("Events");
+
+                    b.Navigation("HomeMatches");
+
+                    b.Navigation("PlayerStats");
+
+                    b.Navigation("Standings");
+
+                    b.Navigation("TeamStats");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionTeamStat", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Competition", "Competition")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.CompetitionTeam", "CompetitionTeam")
+                        .WithMany("TeamStats")
+                        .HasForeignKey("CompetitionTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("CompetitionTeam");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.MarketItem", b =>
@@ -1008,7 +1553,11 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("CompetitionStats");
+
                     b.Navigation("CurrentTeam");
+
+                    b.Navigation("MatchEvents");
 
                     b.Navigation("Position");
                     b.Navigation("RoundSelections");
@@ -1023,6 +1572,10 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Competition");
+
+                    b.Navigation("Matches");
+
+                    b.Navigation("Selection");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.RoundSelection", b =>
@@ -1223,9 +1776,15 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
+                    b.Navigation("CompetitionStats");
+
                     b.Navigation("DraftPicks");
 
                     b.Navigation("MarketItems");
+
+                    b.Navigation("MatchEvents");
+
+                    b.Navigation("RoundSelections");
 
                     b.Navigation("TeamRosters");
                 });
@@ -1237,6 +1796,8 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Team", b =>
                 {
+                    b.Navigation("Competitions");
+
                     b.Navigation("DraftPicks");
 
                     b.Navigation("LeadingMarketItems");
@@ -1252,7 +1813,35 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Competition", b =>
                 {
+                    b.Navigation("Logs");
+
+                    b.Navigation("Matches");
+
                     b.Navigation("Rounds");
+
+                    b.Navigation("Standings");
+
+                    b.Navigation("Teams");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionMatch", b =>
+                {
+                    b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CompetitionTeam", b =>
+                {
+                    b.Navigation("AwayMatches");
+
+                    b.Navigation("Events");
+
+                    b.Navigation("HomeMatches");
+
+                    b.Navigation("PlayerStats");
+
+                    b.Navigation("Standings");
+
+                    b.Navigation("TeamStats");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Season", b =>

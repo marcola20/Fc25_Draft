@@ -27,6 +27,13 @@ public class DraftDbContext : DbContext
     public DbSet<Season> Seasons => Set<Season>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<Round> Rounds => Set<Round>();
+    public DbSet<CompetitionTeam> CompetitionTeams => Set<CompetitionTeam>();
+    public DbSet<CompetitionMatch> CompetitionMatches => Set<CompetitionMatch>();
+    public DbSet<CompetitionMatchEvent> CompetitionMatchEvents => Set<CompetitionMatchEvent>();
+    public DbSet<CompetitionStanding> CompetitionStandings => Set<CompetitionStanding>();
+    public DbSet<CompetitionPlayerStat> CompetitionPlayerStats => Set<CompetitionPlayerStat>();
+    public DbSet<CompetitionTeamStat> CompetitionTeamStats => Set<CompetitionTeamStat>();
+    public DbSet<CompetitionLog> CompetitionLogs => Set<CompetitionLog>();
     public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
     public DbSet<RoundSelection> RoundSelections => Set<RoundSelection>();
     public DbSet<RoundSelectionPlayer> RoundSelectionPlayers => Set<RoundSelectionPlayer>();
@@ -497,7 +504,32 @@ public class DraftDbContext : DbContext
             e.ToTable("Competitions");
             e.HasKey(x => x.CompetitionId);
             e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            e.Property(x => x.Order).IsRequired();
+            e.Property(x => x.Type).HasConversion<int>().IsRequired();
+            e.Property(x => x.IsActive).IsRequired();
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
             e.HasIndex(x => new { x.SeasonId, x.Name }).IsUnique();
+
+            e.HasMany(x => x.Teams)
+                .WithOne(x => x.Competition)
+                .HasForeignKey(x => x.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(x => x.Matches)
+                .WithOne(x => x.Competition)
+                .HasForeignKey(x => x.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(x => x.Standings)
+                .WithOne(x => x.Competition)
+                .HasForeignKey(x => x.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(x => x.Logs)
+                .WithOne(x => x.Competition)
+                .HasForeignKey(x => x.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<Round>(e =>
@@ -506,6 +538,10 @@ public class DraftDbContext : DbContext
             e.HasKey(x => x.RoundId);
             e.Property(x => x.Name).IsRequired().HasMaxLength(100);
             e.Property(x => x.Notes).HasMaxLength(400);
+            e.Property(x => x.RoundNumber).IsRequired();
+            e.Property(x => x.ScheduledAtUtc);
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
 
             e.HasOne(x => x.Competition)
                 .WithMany(x => x.Rounds)
@@ -513,6 +549,147 @@ public class DraftDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => new { x.CompetitionId, x.Name }).IsUnique();
+        });
+
+        mb.Entity<CompetitionTeam>(e =>
+        {
+            e.ToTable("CompetitionTeams");
+            e.HasKey(x => x.CompetitionTeamId);
+            e.Property(x => x.IsActive).IsRequired();
+            e.Property(x => x.InitialBudget).HasColumnType("numeric(18,2)");
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(500);
+
+            e.HasIndex(x => new { x.CompetitionId, x.TeamId }).IsUnique();
+
+            e.HasOne(x => x.Team)
+                .WithMany(t => t.Competitions)
+                .HasForeignKey(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<CompetitionMatch>(e =>
+        {
+            e.ToTable("CompetitionMatches");
+            e.HasKey(x => x.CompetitionMatchId);
+            e.Property(x => x.Status).HasConversion<int>().IsRequired();
+            e.Property(x => x.MatchDateUtc);
+            e.Property(x => x.HomeGoals);
+            e.Property(x => x.AwayGoals);
+            e.Property(x => x.Stadium).HasMaxLength(150);
+            e.Property(x => x.Observations).HasMaxLength(400);
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            e.HasOne(x => x.Round)
+                .WithMany(r => r.Matches)
+                .HasForeignKey(x => x.RoundId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.HomeTeam)
+                .WithMany(t => t.HomeMatches)
+                .HasForeignKey(x => x.HomeCompetitionTeamId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.AwayTeam)
+                .WithMany(t => t.AwayMatches)
+                .HasForeignKey(x => x.AwayCompetitionTeamId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => new { x.RoundId, x.HomeCompetitionTeamId, x.AwayCompetitionTeamId }).IsUnique();
+        });
+
+        mb.Entity<CompetitionMatchEvent>(e =>
+        {
+            e.ToTable("CompetitionMatchEvents");
+            e.HasKey(x => x.CompetitionMatchEventId);
+            e.Property(x => x.EventType).HasConversion<int>().IsRequired();
+            e.Property(x => x.Minute);
+            e.Property(x => x.Observations).HasMaxLength(400);
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+
+            e.HasOne(x => x.Match)
+                .WithMany(m => m.Events)
+                .HasForeignKey(x => x.CompetitionMatchId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Team)
+                .WithMany(t => t.Events)
+                .HasForeignKey(x => x.CompetitionTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Player)
+                .WithMany(p => p.MatchEvents)
+                .HasForeignKey(x => x.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.RelatedPlayer)
+                .WithMany()
+                .HasForeignKey(x => x.RelatedPlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<CompetitionStanding>(e =>
+        {
+            e.ToTable("CompetitionStandings");
+            e.HasKey(x => x.CompetitionStandingId);
+            e.Property(x => x.Position).IsRequired();
+            e.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            e.HasOne(x => x.CompetitionTeam)
+                .WithMany(t => t.Standings)
+                .HasForeignKey(x => x.CompetitionTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.CompetitionId, x.Position });
+            e.HasIndex(x => new { x.CompetitionId, x.CompetitionTeamId }).IsUnique();
+        });
+
+        mb.Entity<CompetitionPlayerStat>(e =>
+        {
+            e.ToTable("CompetitionPlayerStats");
+            e.HasKey(x => x.CompetitionPlayerStatId);
+
+            e.HasOne(x => x.Player)
+                .WithMany(p => p.CompetitionStats)
+                .HasForeignKey(x => x.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.CompetitionTeam)
+                .WithMany(t => t.PlayerStats)
+                .HasForeignKey(x => x.CompetitionTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.CompetitionId, x.PlayerId, x.CompetitionTeamId }).IsUnique();
+        });
+
+        mb.Entity<CompetitionTeamStat>(e =>
+        {
+            e.ToTable("CompetitionTeamStats");
+            e.HasKey(x => x.CompetitionTeamStatId);
+
+            e.HasOne(x => x.CompetitionTeam)
+                .WithMany(t => t.TeamStats)
+                .HasForeignKey(x => x.CompetitionTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.CompetitionId, x.CompetitionTeamId }).IsUnique();
+        });
+
+        mb.Entity<CompetitionLog>(e =>
+        {
+            e.ToTable("CompetitionLogs");
+            e.HasKey(x => x.CompetitionLogId);
+            e.Property(x => x.Action).IsRequired().HasMaxLength(120);
+            e.Property(x => x.PerformedBy).HasMaxLength(120);
+            e.Property(x => x.CreatedAtUtc).IsRequired();
+            e.Property(x => x.Details);
+
+            e.HasOne(x => x.Match)
+                .WithMany()
+                .HasForeignKey(x => x.CompetitionMatchId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<SeasonScheduleItem>(e =>

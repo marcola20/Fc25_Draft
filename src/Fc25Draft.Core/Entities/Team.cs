@@ -15,4 +15,5 @@ public class Team
     public ICollection<MarketItem> LeadingMarketItems { get; set; } = new List<MarketItem>();
     public ICollection<MarketItem> WonMarketItems { get; set; } = new List<MarketItem>();
     public ICollection<TeamLineup> Lineups { get; set; } = new List<TeamLineup>();
+    public ICollection<CompetitionTeam> Competitions { get; set; } = new List<CompetitionTeam>();
 }
