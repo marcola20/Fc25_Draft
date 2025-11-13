@@ -1,0 +1,691 @@
+@page "/teams/{TeamId:guid}/lineups"
+@page "/times/{TeamId:guid}/escalacoes"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Models.Navigation
+@inject LineupsApiClient LineupsApiClient
+@inject TeamsApiClient TeamsApiClient
+@inject ToastService Toasts
+@inject LayoutState LayoutState
+@inject NavigationManager Navigation
+@inject ILogger<Fc25Draft.Web.Pages.Teams.Lineups> Logger
+@inject IJSRuntime JSRuntime
+
+@implements IDisposable
+
+<PageHeader Title="Escalações"
+            Subtitle="@pageSubtitle" />
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <div class="d-flex align-items-center gap-2" role="status">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>Carregando escalações...</span>
+    </div>
+}
+else if (currentEditor is null)
+{
+    <div class="alert alert-info" role="status">
+        Nenhuma escalação criada ainda para este time. Crie uma nova escalação para começar.
+    </div>
+    <button class="btn btn-primary"
+            @onclick="CreateNewLineup"
+            disabled="@(isSaving || isDeleting || lineups.Count >= MaxLineupsPerTeam)">
+        Criar escalação
+    </button>
+}
+else
+{
+    if (lineups.Count >= MaxLineupsPerTeam && !currentEditor.IsActive)
+    {
+        <div class="alert alert-warning" role="status">
+            Este time já possui @MaxLineupsPerTeam escalações salvas. Exclua uma escalação antes de criar outra.
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label" for="lineup-selector">Escalação</label>
+                    <select id="lineup-selector"
+                            class="form-select"
+                            value="@CurrentSelectionValue"
+                            @onchange="OnLineupChanged"
+                            disabled="@(isSaving || isDeleting)">
+                        @if (isNewLineup)
+                        {
+                            <option value="@NewLineupValue">Nova escalação</option>
+                        }
+                        @foreach (var lineup in lineups)
+                        {
+                            <option value="@lineup.LineupId">@GetLineupLabel(lineup)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-8 text-md-end d-flex flex-wrap justify-content-md-end gap-2">
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="CreateNewLineup"
+                            disabled="@(isSaving || isDeleting || lineups.Count >= MaxLineupsPerTeam)">
+                        Nova escalação
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="ResetSelection"
+                            disabled="@(isSaving || isDeleting)">
+                        Recarregar escalação
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="DeleteCurrentAsync"
+                            disabled="@(isSaving || isDeleting)">
+                        Excluir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Informações da escalação</div>
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-5 col-lg-4">
+                    <label class="form-label" for="lineup-name">Nome</label>
+                    <input id="lineup-name"
+                           class="form-control"
+                           value="@currentEditor.Name"
+                           @oninput="OnNameChanged"
+                           maxlength="80"
+                           disabled="@isSaving" />
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label" for="lineup-formation">Formação</label>
+                    <input id="lineup-formation"
+                           class="form-control"
+                           value="@currentEditor.Formation"
+                           disabled />
+                </div>
+                <div class="col-md-3 col-lg-2">
+                    <div class="form-check mt-4 pt-1">
+                        <input id="lineup-active"
+                               class="form-check-input"
+                               type="checkbox"
+                               checked="@currentEditor.IsActive"
+                               @onchange="OnActiveChanged"
+                               disabled="@isSaving" />
+                        <label class="form-check-label" for="lineup-active">Definir como ativa</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Titulares</div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach (var slot in currentEditor.Slots.Where(s => !s.IsBench).OrderBy(s => s.Order))
+                {
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
+                        <select id="slot-@slot.SlotId"
+                                class="form-select"
+                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="">- Nenhum -</option>
+                            @foreach (var option in slot.AvailablePlayers)
+                            {
+                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
+                                    @FormatPlayerOption(option)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Reservas</div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
+                {
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
+                        <select id="slot-@slot.SlotId"
+                                class="form-select"
+                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="">- Nenhum -</option>
+                            @foreach (var option in slot.AvailablePlayers)
+                            {
+                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
+                                    @FormatPlayerOption(option)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-primary"
+                @onclick="SaveAsync"
+                disabled="@(!CanSave || isSaving || isDeleting)">
+            @(isSaving ? "Salvando..." : "Salvar escalação")
+        </button>
+        @if (isSaving)
+        {
+            <span class="text-muted">Processando alterações...</span>
+        }
+        @if (isDeleting)
+        {
+            <span class="text-muted">Excluindo escalação...</span>
+        }
+    </div>
+}
+
+@code {
+    private const int MaxLineupsPerTeam = 3;
+    private const string NewLineupValue = "__new__";
+
+    [Parameter]
+    public Guid TeamId { get; set; }
+
+    private readonly PageDefinition pageDefinition = new()
+    {
+        Title = "Escalações",
+        Breadcrumbs = new List<BreadcrumbSegment>
+        {
+            new("Início", "/home"),
+            new("Times", "/times/elencos"),
+            new("Escalações")
+        }
+    };
+
+    private readonly List<PlayerOption> rosterPlayers = new();
+    private List<TeamLineupDto> lineups = new();
+    private LineupEditorState? currentEditor;
+    private Guid? selectedLineupId;
+    private bool isNewLineup;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isDeleting;
+    private string? errorMessage;
+    private string? pageSubtitle;
+    private CancellationTokenSource? loadCts;
+    private CancellationTokenSource? saveCts;
+    private CancellationTokenSource? deleteCts;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(pageDefinition);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loadCts?.Cancel();
+        loadCts = new CancellationTokenSource();
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var rosterTask = TeamsApiClient.GetRosterByIdAsync(TeamId, loadCts.Token);
+            var lineupsTask = LineupsApiClient.GetLineupsAsync(TeamId, loadCts.Token);
+
+            await Task.WhenAll(rosterTask, lineupsTask);
+
+            var roster = rosterTask.Result;
+            if (roster is null)
+            {
+                errorMessage = "Time não encontrado.";
+                return;
+            }
+
+            rosterPlayers.Clear();
+            rosterPlayers.AddRange(roster.Jogadores
+                .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall))
+                .OrderByDescending(p => p.Overall)
+                .ThenBy(p => p.Name));
+
+            lineups = lineupsTask.Result
+                .OrderByDescending(l => l.IsActive)
+                .ThenBy(l => l.CreatedAtUtc)
+                .ToList();
+
+            pageSubtitle = $"Gerencie as escalações do {roster.TeamName}.";
+            LayoutState.SetPage(pageDefinition, subtitle: pageSubtitle);
+
+            if (lineups.Count > 0)
+            {
+                var active = lineups.FirstOrDefault(l => l.IsActive) ?? lineups[0];
+                SelectExistingLineup(active.LineupId);
+            }
+            else
+            {
+                currentEditor = null;
+                selectedLineupId = null;
+                isNewLineup = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Lineups:Error loading data for team {TeamId}", TeamId);
+            errorMessage = "Não foi possível carregar as escalações. Tente novamente em instantes.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string CurrentSelectionValue => isNewLineup ? NewLineupValue : selectedLineupId?.ToString() ?? string.Empty;
+
+    private bool CanSave => currentEditor is not null && !string.IsNullOrWhiteSpace(currentEditor.Name);
+
+    private async Task OnLineupChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (value == NewLineupValue)
+        {
+            CreateNewLineup();
+            return;
+        }
+
+        if (Guid.TryParse(value, out var lineupId))
+        {
+            SelectExistingLineup(lineupId);
+        }
+    }
+
+    private void SelectExistingLineup(Guid lineupId)
+    {
+        var lineup = lineups.FirstOrDefault(l => l.LineupId == lineupId)
+                     ?? lineups.FirstOrDefault();
+
+        if (lineup is null)
+        {
+            currentEditor = null;
+            selectedLineupId = null;
+            isNewLineup = false;
+            return;
+        }
+
+        selectedLineupId = lineup.LineupId;
+        isNewLineup = false;
+        currentEditor = BuildEditorState(lineup);
+    }
+
+    private void CreateNewLineup()
+    {
+        if (lineups.Count >= MaxLineupsPerTeam)
+        {
+            Toasts.ShowError($"Este time já possui {MaxLineupsPerTeam} escalações salvas. Exclua uma antes de criar outra.");
+            return;
+        }
+
+        var template = LineupTemplateCatalog.GetTemplateOrDefault(LineupTemplateCatalog.DefaultFormation);
+        var slots = template.AllSlots
+            .OrderBy(s => s.IsBench)
+            .ThenBy(s => s.Order)
+            .Select(s => new LineupSlotState(
+                Guid.NewGuid(),
+                s.SlotCode,
+                s.DisplayName,
+                s.IsBench,
+                s.Order,
+                s.AllowedPositionIds.ToArray(),
+                null,
+                Array.Empty<PlayerOption>()))
+            .ToList();
+
+        var recalculated = RecalculateAvailability(slots);
+        var suggestedName = $"Escalação {lineups.Count + 1}";
+
+        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, lineups.Count == 0, recalculated);
+        selectedLineupId = null;
+        isNewLineup = true;
+    }
+
+    private void ResetSelection()
+    {
+        if (isNewLineup)
+        {
+            CreateNewLineup();
+            return;
+        }
+
+        if (selectedLineupId.HasValue)
+        {
+            SelectExistingLineup(selectedLineupId.Value);
+        }
+    }
+
+    private void OnNameChanged(ChangeEventArgs args)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString() ?? string.Empty;
+        currentEditor = currentEditor with { Name = value };
+    }
+
+    private void OnActiveChanged(ChangeEventArgs args)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString();
+        if (bool.TryParse(value, out var isActive))
+        {
+            currentEditor = currentEditor with { IsActive = isActive };
+        }
+    }
+
+    private void OnSlotChanged(Guid slotId, string? value)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        var slots = currentEditor.Slots.ToList();
+        var index = slots.FindIndex(s => s.SlotId == slotId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        PlayerOption? selectedPlayer = null;
+        if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var playerId))
+        {
+            selectedPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == playerId)
+                ?? slots[index].SelectedPlayer;
+
+            if (selectedPlayer is null)
+            {
+                Toasts.ShowError("Jogador não encontrado no elenco.");
+            }
+        }
+
+        slots[index] = slots[index] with { SelectedPlayer = selectedPlayer };
+        var recalculated = RecalculateAvailability(slots);
+        currentEditor = currentEditor with { Slots = recalculated };
+    }
+
+    private async Task SaveAsync()
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        saveCts?.Cancel();
+        saveCts = new CancellationTokenSource();
+        isSaving = true;
+
+        try
+        {
+            var request = BuildSaveRequest(currentEditor);
+            TeamLineupDto result;
+
+            if (isNewLineup || currentEditor.LineupId == Guid.Empty)
+            {
+                result = await LineupsApiClient.CreateAsync(TeamId, request, saveCts.Token);
+                Toasts.ShowSuccess("Escalação criada com sucesso.");
+            }
+            else
+            {
+                result = await LineupsApiClient.UpdateAsync(TeamId, currentEditor.LineupId, request, saveCts.Token);
+                Toasts.ShowSuccess("Escalação atualizada com sucesso.");
+            }
+
+            await RefreshLineupsAsync(result.LineupId, saveCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Lineups:Error saving lineup for team {TeamId}", TeamId);
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteCurrentAsync()
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        if (isNewLineup || currentEditor.LineupId == Guid.Empty)
+        {
+            currentEditor = null;
+            selectedLineupId = null;
+            isNewLineup = false;
+            if (lineups.Count > 0)
+            {
+                var target = lineups.FirstOrDefault(l => l.IsActive) ?? lineups[0];
+                SelectExistingLineup(target.LineupId);
+            }
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Confirma a exclusão desta escalação?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        deleteCts?.Cancel();
+        deleteCts = new CancellationTokenSource();
+        isDeleting = true;
+
+        try
+        {
+            await LineupsApiClient.DeleteAsync(TeamId, currentEditor.LineupId, deleteCts.Token);
+            Toasts.ShowSuccess("Escalação excluída com sucesso.");
+            await RefreshLineupsAsync(null, deleteCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Lineups:Error deleting lineup {LineupId} for team {TeamId}", currentEditor.LineupId, TeamId);
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private async Task RefreshLineupsAsync(Guid? preferredLineupId, CancellationToken ct)
+    {
+        var fetched = await LineupsApiClient.GetLineupsAsync(TeamId, ct);
+        lineups = fetched
+            .OrderByDescending(l => l.IsActive)
+            .ThenBy(l => l.CreatedAtUtc)
+            .ToList();
+
+        if (lineups.Count == 0)
+        {
+            currentEditor = null;
+            selectedLineupId = null;
+            isNewLineup = false;
+            return;
+        }
+
+        Guid targetId;
+        if (preferredLineupId.HasValue && lineups.Any(l => l.LineupId == preferredLineupId.Value))
+        {
+            targetId = preferredLineupId.Value;
+        }
+        else
+        {
+            targetId = lineups.FirstOrDefault(l => l.IsActive)?.LineupId ?? lineups[0].LineupId;
+        }
+
+        SelectExistingLineup(targetId);
+    }
+
+    private LineupEditorState BuildEditorState(TeamLineupDto lineup)
+    {
+        var slots = lineup.Starters.Concat(lineup.Bench)
+            .OrderBy(s => s.IsBench)
+            .ThenBy(s => s.Order)
+            .Select(slot =>
+            {
+                PlayerOption? selected = null;
+                if (slot.Player is not null)
+                {
+                    selected = rosterPlayers.FirstOrDefault(p => p.PlayerId == slot.Player.PlayerId)
+                        ?? new PlayerOption(slot.Player.PlayerId, slot.Player.PlayerGuid, slot.Player.Name, slot.Player.PositionName, slot.Player.PositionId, 0);
+                }
+
+                return new LineupSlotState(
+                    slot.SlotId,
+                    slot.SlotCode,
+                    slot.DisplayName,
+                    slot.IsBench,
+                    slot.Order,
+                    slot.AllowedPositionIds?.ToArray() ?? Array.Empty<short>(),
+                    selected,
+                    Array.Empty<PlayerOption>());
+            })
+            .ToList();
+
+        var recalculated = RecalculateAvailability(slots);
+        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.IsActive, recalculated);
+    }
+
+    private IReadOnlyList<LineupSlotState> RecalculateAvailability(IReadOnlyList<LineupSlotState> slots)
+    {
+        var result = new List<LineupSlotState>(slots.Count);
+        foreach (var slot in slots)
+        {
+            var available = BuildAvailability(slot, slots);
+            result.Add(slot with { AvailablePlayers = available });
+        }
+        return result;
+    }
+
+    private IReadOnlyList<PlayerOption> BuildAvailability(LineupSlotState slot, IReadOnlyList<LineupSlotState> slots)
+    {
+        var used = slots
+            .Where(s => s.SlotId != slot.SlotId && s.SelectedPlayer is not null)
+            .Select(s => s.SelectedPlayer!.PlayerId)
+            .ToHashSet();
+
+        IEnumerable<PlayerOption> candidates = rosterPlayers.Where(p => !used.Contains(p.PlayerId));
+
+        if (!slot.IsBench && slot.AllowedPositionIds.Count > 0)
+        {
+            candidates = candidates.Where(p => slot.AllowedPositionIds.Contains(p.PositionId));
+        }
+
+        var ordered = candidates
+            .OrderByDescending(p => p.Overall)
+            .ThenBy(p => p.Name)
+            .ToList();
+
+        if (slot.SelectedPlayer is not null && ordered.All(p => p.PlayerId != slot.SelectedPlayer.PlayerId))
+        {
+            ordered.Insert(0, slot.SelectedPlayer);
+        }
+
+        return ordered;
+    }
+
+    private static string FormatPlayerOption(PlayerOption option)
+        => option.Overall > 0
+            ? $"{option.Name} ({option.PositionName}, {option.Overall})"
+            : $"{option.Name} ({option.PositionName})";
+
+    private static string GetLineupLabel(TeamLineupDto lineup)
+        => lineup.IsActive ? $"{lineup.Name} (Ativa)" : lineup.Name;
+
+    private static TeamLineupSaveRequestDto BuildSaveRequest(LineupEditorState editor)
+    {
+        var starters = editor.Slots
+            .Where(s => !s.IsBench)
+            .OrderBy(s => s.Order)
+            .Select(s => new TeamLineupSlotAssignmentDto(s.SlotCode, s.SelectedPlayer?.PlayerId))
+            .ToList();
+
+        var bench = editor.Slots
+            .Where(s => s.IsBench)
+            .OrderBy(s => s.Order)
+            .Select(s => new TeamLineupSlotAssignmentDto(s.SlotCode, s.SelectedPlayer?.PlayerId))
+            .ToList();
+
+        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.IsActive, starters, bench);
+    }
+
+    public void Dispose()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        saveCts?.Cancel();
+        saveCts?.Dispose();
+        deleteCts?.Cancel();
+        deleteCts?.Dispose();
+    }
+
+    private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall);
+
+    private sealed record LineupSlotState(
+        Guid SlotId,
+        string SlotCode,
+        string DisplayName,
+        bool IsBench,
+        int Order,
+        IReadOnlyList<short> AllowedPositionIds,
+        PlayerOption? SelectedPlayer,
+        IReadOnlyList<PlayerOption> AvailablePlayers);
+
+    private sealed record LineupEditorState(
+        Guid LineupId,
+        string Name,
+        string Formation,
+        bool IsActive,
+        IReadOnlyList<LineupSlotState> Slots);
+}

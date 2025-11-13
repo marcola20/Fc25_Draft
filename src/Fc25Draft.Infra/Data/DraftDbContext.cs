@@ -30,6 +30,8 @@ public class DraftDbContext : DbContext
     public DbSet<SeasonScheduleItem> SeasonSchedule => Set<SeasonScheduleItem>();
     public DbSet<RoundSelection> RoundSelections => Set<RoundSelection>();
     public DbSet<RoundSelectionPlayer> RoundSelectionPlayers => Set<RoundSelectionPlayer>();
+    public DbSet<TeamLineup> TeamLineups => Set<TeamLineup>();
+    public DbSet<TeamLineupSlot> TeamLineupSlots => Set<TeamLineupSlot>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -92,6 +94,52 @@ public class DraftDbContext : DbContext
             e.Property(x => x.BudgetBlocked).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
             e.HasIndex(x => x.TeamName).IsUnique();
             e.HasIndex(x => x.Token).IsUnique();
+        });
+
+        mb.Entity<TeamLineup>(e =>
+        {
+            e.HasKey(x => x.LineupId);
+            e.Property(x => x.Name)
+             .IsRequired()
+             .HasMaxLength(80);
+            e.Property(x => x.Formation)
+             .IsRequired()
+             .HasMaxLength(20);
+            e.Property(x => x.CreatedAt)
+             .IsRequired();
+            e.Property(x => x.UpdatedAt)
+             .IsRequired();
+            e.HasIndex(x => new { x.TeamId, x.IsActive })
+             .HasDatabaseName("IX_Lineup_Team_Active");
+            e.HasOne(x => x.Team)
+             .WithMany(t => t.Lineups)
+             .HasForeignKey(x => x.TeamId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<TeamLineupSlot>(e =>
+        {
+            e.HasKey(x => x.LineupSlotId);
+            e.Property(x => x.SlotCode)
+             .IsRequired()
+             .HasMaxLength(20);
+            e.Property(x => x.DisplayName)
+             .IsRequired()
+             .HasMaxLength(80);
+            e.Property(x => x.IsBench)
+             .IsRequired();
+            e.Property(x => x.Order)
+             .IsRequired();
+            e.HasIndex(x => new { x.LineupId, x.SlotCode })
+             .IsUnique();
+            e.HasOne(x => x.Lineup)
+             .WithMany(l => l.Slots)
+             .HasForeignKey(x => x.LineupId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Player)
+             .WithMany()
+             .HasForeignKey(x => x.PlayerId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<Draft>(e =>

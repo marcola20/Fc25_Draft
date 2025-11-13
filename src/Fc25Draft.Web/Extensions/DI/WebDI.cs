@@ -1,4 +1,6 @@
-﻿using Fc25Draft.Web.Hubs;
+using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Infra.Services;
+using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Services;
 
 namespace Fc25Draft.Web.Extensions.DI
@@ -12,6 +14,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<PlayersApiClient>();
             services.AddScoped<DraftAdminApiClient>();
             services.AddScoped<TeamsApiClient>();
+            services.AddScoped<LineupsApiClient>();
             services.AddScoped<AdminTransfersApiClient>();
             services.AddScoped<BudgetsApiClient>();
             services.AddScoped<MarketApiClient>();
@@ -19,6 +22,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketClient>();
             services.AddScoped<TransfersClient>();
             services.AddScoped<MarketHubClient>();
+            services.AddScoped<ITeamLineupService, TeamLineupService>();
             return services;
         }
     }

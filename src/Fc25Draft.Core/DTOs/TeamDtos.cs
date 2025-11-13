@@ -34,6 +34,7 @@ public record TeamRosterDto(
 public record TeamRosterPlayerDto(
     Guid PlayerGuid,
     int PlayerId,
+    short PositionId,
     string Nome,
     string Posicao,
     int Overall,

@@ -46,6 +46,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ISeasonAdminService, SeasonService>();
             services.AddScoped<IRoundSeedService, RoundSeedService>();
             services.AddScoped<IRoundSelectionService, RoundSelectionService>();
+            services.AddScoped<ITeamLineupService, TeamLineupService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();
@@ -53,6 +54,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<PlayersApiClient>();
             services.AddScoped<DraftAdminApiClient>();
             services.AddScoped<TeamsApiClient>();
+            services.AddScoped<LineupsApiClient>();
             services.AddScoped<AdminTransfersApiClient>();
             services.AddScoped<BudgetsApiClient>();
             services.AddScoped<MarketApiClient>();

@@ -113,6 +113,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                             .Select(r => new TeamRosterPlayerDto(
                                 r.Player.PlayerGuid,
                                 r.PlayerId,
+                                r.Player.PositionId,
                                 r.Player.Name,
                                 r.Player.Position.Name,
                                 r.Player.Overall,
@@ -140,6 +141,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                             .Select(r => new TeamRosterPlayerDto(
                                 r.Player.PlayerGuid,
                                 r.PlayerId,
+                                r.Player.PositionId,
                                 r.Player.Name,
                                 r.Player.Position.Name,
                                 r.Player.Overall,
@@ -151,6 +153,163 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     .FirstOrDefaultAsync(ct);
 
                 return roster is null ? Results.NotFound() : Results.Ok(roster);
+            });
+
+            var lineupsApi = teamsApi.MapGroup("/{teamId:guid}/lineups");
+
+            lineupsApi.MapGet(string.Empty, async (
+                Guid teamId,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                try
+                {
+                    var lineups = await lineupService.GetLineupsAsync(teamId, ct);
+                    return Results.Ok(lineups);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Get not found {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Get invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Get unexpected error for team {TeamId}", teamId);
+                    return Results.Json(new { message = "Não foi possível carregar as escalações." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            lineupsApi.MapPost(string.Empty, async (
+                Guid teamId,
+                TeamLineupSaveRequestDto request,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                try
+                {
+                    var result = await lineupService.CreateLineupAsync(teamId, request, ct);
+                    return Results.Ok(result);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Create team not found {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Create invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Create unexpected error for team {TeamId}", teamId);
+                    return Results.Json(new { message = "Não foi possível salvar a escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            lineupsApi.MapPut("/{lineupId:guid}", async (
+                Guid teamId,
+                Guid lineupId,
+                TeamLineupSaveRequestDto request,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                try
+                {
+                    var result = await lineupService.UpdateLineupAsync(teamId, lineupId, request, ct);
+                    return Results.Ok(result);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Update not found {TeamId}/{LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Update invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Update unexpected error for team {TeamId} lineup {LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = "Não foi possível salvar a escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            lineupsApi.MapDelete("/{lineupId:guid}", async (
+                Guid teamId,
+                Guid lineupId,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                try
+                {
+                    await lineupService.DeleteLineupAsync(teamId, lineupId, ct);
+                    return Results.Ok(new OperationResultDto(true, "Escalação excluída com sucesso."));
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Delete not found {TeamId}/{LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Delete invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Delete unexpected error for team {TeamId} lineup {LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = "Não foi possível excluir a escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
+            lineupsApi.MapPost("/{lineupId:guid}/activate", async (
+                Guid teamId,
+                Guid lineupId,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                try
+                {
+                    await lineupService.SetActiveLineupAsync(teamId, lineupId, ct);
+                    return Results.Ok(new OperationResultDto(true, "Escalação definida como ativa."));
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Activate not found {TeamId}/{LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Activate invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Activate unexpected error for team {TeamId} lineup {LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = "Não foi possível ativar a escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
             });
 
             teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:guid}", async (
