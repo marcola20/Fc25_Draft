@@ -2,6 +2,7 @@
 @page "/times/{TeamId:guid}/escalacoes"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Utilities
+@using System.Globalization
 @using Fc25Draft.Web.Models.Navigation
 @inject LineupsApiClient LineupsApiClient
 @inject TeamsApiClient TeamsApiClient
@@ -166,6 +167,7 @@ else
                         <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
                         <select id="slot-@slot.SlotId"
                                 class="form-select"
+                                value="@GetSlotSelectedValue(slot)"
                                 @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
                                 disabled="@isSaving">
                             <option value="">- Nenhum -</option>
@@ -192,6 +194,7 @@ else
                         <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
                         <select id="slot-@slot.SlotId"
                                 class="form-select"
+                                value="@GetSlotSelectedValue(slot)"
                                 @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
                                 disabled="@isSaving">
                             <option value="">- Nenhum -</option>
@@ -727,6 +730,13 @@ else
         var recalculated = RecalculateAvailability(slots);
         var sanitizedRoles = SanitizeRoles(roles, recalculated);
         currentEditor = currentEditor with { Slots = recalculated, Roles = sanitizedRoles };
+    }
+
+    private static string GetSlotSelectedValue(LineupSlotState slot)
+    {
+        return slot.SelectedPlayer is null
+            ? string.Empty
+            : slot.SelectedPlayer.PlayerId.ToString(CultureInfo.InvariantCulture);
     }
 
     private async Task SaveAsync()
