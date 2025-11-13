@@ -430,7 +430,7 @@ namespace Fc25Draft.Infra.Migrations
             migrationBuilder.Sql(@"UPDATE ""Competitions"" SET ""UpdatedAtUtc"" = NOW() WHERE ""UpdatedAtUtc"" = '1970-01-01 00:00:00+00';");
             migrationBuilder.Sql(@"UPDATE ""Rounds"" SET ""CreatedAtUtc"" = NOW() WHERE ""CreatedAtUtc"" = '1970-01-01 00:00:00+00';");
             migrationBuilder.Sql(@"UPDATE ""Rounds"" SET ""UpdatedAtUtc"" = NOW() WHERE ""UpdatedAtUtc"" = '1970-01-01 00:00:00+00';");
-            migrationBuilder.Sql(@"WITH ranked AS (SELECT ""RoundId", ROW_NUMBER() OVER(PARTITION BY ""CompetitionId"" ORDER BY ""RoundId"") AS rn FROM ""Rounds"") UPDATE ""Rounds"" r SET ""RoundNumber"" = ranked.rn FROM ranked WHERE ranked.""RoundId"" = r.""RoundId"";");
+            migrationBuilder.Sql(@"WITH ranked AS (SELECT ""RoundId"", ROW_NUMBER() OVER(PARTITION BY ""CompetitionId"" ORDER BY ""RoundId"") AS rn FROM ""Rounds"") UPDATE ""Rounds"" r SET ""RoundNumber"" = ranked.rn FROM ranked WHERE ranked.""RoundId"" = r.""RoundId"";");
         }
 
         /// <inheritdoc />

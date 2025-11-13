@@ -29,9 +29,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync();
         using var response = await client.GetAsync($"api/competition-module/competitions/{competitionId}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             throw new InvalidOperationException("Competição não encontrada.");
-        }
 
         await EnsureSuccessAsync(response);
         return (await ReadAsync<CompetitionDetailsDto>(response, ct))!;
@@ -50,9 +48,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         using var response = await client.PutAsJsonAsync($"api/competition-module/competitions/{competitionId}", request, ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             return null;
-        }
 
         await EnsureSuccessAsync(response);
         return await ReadAsync<CompetitionSummaryDto>(response, ct);
@@ -63,9 +59,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         using var response = await client.PostAsJsonAsync($"api/competition-module/competitions/{competitionId}/activate", new CompetitionToggleRequest { IsActive = isActive }, ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             throw new InvalidOperationException("Competição não encontrada.");
-        }
 
         await EnsureSuccessAsync(response);
     }
@@ -91,9 +85,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         using var response = await client.DeleteAsync($"api/competition-module/competitions/{competitionId}/teams/{competitionTeamId}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             throw new InvalidOperationException("Time não encontrado na competição.");
-        }
 
         await EnsureSuccessAsync(response);
     }
@@ -151,9 +143,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync();
         using var response = await client.GetAsync($"api/competition-module/matches/{competitionMatchId}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             return null;
-        }
 
         await EnsureSuccessAsync(response);
         return await ReadAsync<CompetitionMatchDetailsDto>(response, ct);
@@ -165,13 +155,9 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         HttpResponseMessage response;
         if (matchId == Guid.Empty)
-        {
             response = await client.PostAsJsonAsync("api/competition-module/matches", request, ct);
-        }
         else
-        {
             response = await client.PutAsJsonAsync($"api/competition-module/matches/{matchId}", request, ct);
-        }
 
         await EnsureSuccessAsync(response);
         return (await ReadAsync<CompetitionMatchDetailsDto>(response, ct))!;
@@ -182,9 +168,7 @@ public sealed class CompetitionApiClient
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         using var response = await client.DeleteAsync($"api/competition-module/matches/{competitionMatchId}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
             throw new InvalidOperationException("Partida não encontrada.");
-        }
 
         await EnsureSuccessAsync(response);
     }
@@ -200,16 +184,12 @@ public sealed class CompetitionApiClient
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
-        {
             return;
-        }
 
         string message = await ExtractErrorMessageAsync(response);
 
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        {
             message = "Operação permitida somente para administradores.";
-        }
 
         throw new InvalidOperationException(message);
     }
@@ -221,20 +201,18 @@ public sealed class CompetitionApiClient
     {
         try
         {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>().ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(problem?.Detail))
-            {
-                return problem.Detail;
-            }
+            var problem = await response.Content
+                .ReadFromJsonAsync<ValidationProblemDetails>()
+                .ConfigureAwait(false);
 
-            if (problem?.Errors is not null && problem.Errors.Count > 0)
-            {
+            if (!string.IsNullOrWhiteSpace(problem?.Detail))
+                return problem.Detail;
+
+            if (problem?.Errors is { Count: > 0 })
                 return string.Join("; ", problem.Errors.SelectMany(kvp => kvp.Value ?? Array.Empty<string>()));
-            }
         }
         catch
         {
-            // ignored
         }
 
         return $"Falha ao executar operação: {(int)response.StatusCode} {response.ReasonPhrase}";

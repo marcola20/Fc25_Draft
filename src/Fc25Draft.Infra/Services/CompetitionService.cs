@@ -4,6 +4,7 @@ using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Fc25Draft.Infra.Services;
 

@@ -1,7 +1,9 @@
 @page "/admin/competicoes"
 @using System.ComponentModel.DataAnnotations
+@using Blazored.Toast.Services
 @using Fc25Draft.Core.DTOs.Competitions
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.DTOs.Seasons
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Web.Models.Competitions
 @using Fc25Draft.Web.Services
@@ -685,9 +687,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        LayoutState.SetPageTitle("Administração de Competições");
-        NavigationService.SetActivePage("competicoes");
-
         await LoadSeasonsAsync();
         await LoadCompetitionsAsync();
     }
