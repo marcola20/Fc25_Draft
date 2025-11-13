@@ -1,4 +1,6 @@
+using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Fc25Draft.Core.Utilities;
 
@@ -23,6 +25,17 @@ public static class LineupTemplateCatalog
         }
 
         throw new InvalidOperationException($"Formação '{formation}' não é suportada.");
+    }
+
+    public static IReadOnlyList<string> GetSupportedFormations()
+    {
+        var formations = Templates.Values
+            .Select(t => t.Formation)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return Array.AsReadOnly(formations);
     }
 
     private static IReadOnlyDictionary<string, LineupTemplate> BuildTemplates()

@@ -107,10 +107,16 @@ else
                 </div>
                 <div class="col-md-4 col-lg-3">
                     <label class="form-label" for="lineup-formation">Formação</label>
-                    <input id="lineup-formation"
-                           class="form-control"
-                           value="@currentEditor.Formation"
-                           disabled />
+                    <select id="lineup-formation"
+                            class="form-select"
+                            value="@currentEditor.Formation"
+                            @onchange="OnFormationChanged"
+                            disabled="@isSaving">
+                        @foreach (var formation in FormationOptions)
+                        {
+                            <option value="@formation">@formation</option>
+                        }
+                    </select>
                 </div>
                 <div class="col-md-3 col-lg-2">
                     <div class="form-check mt-4 pt-1">
@@ -199,6 +205,7 @@ else
 @code {
     private const int MaxLineupsPerTeam = 3;
     private const string NewLineupValue = "__new__";
+    private static readonly IReadOnlyList<string> FormationOptions = LineupTemplateCatalog.GetSupportedFormations();
 
     [Parameter]
     public Guid TeamId { get; set; }
@@ -351,19 +358,7 @@ else
         }
 
         var template = LineupTemplateCatalog.GetTemplateOrDefault(LineupTemplateCatalog.DefaultFormation);
-        var slots = template.AllSlots
-            .OrderBy(s => s.IsBench)
-            .ThenBy(s => s.Order)
-            .Select(s => new LineupSlotState(
-                Guid.NewGuid(),
-                s.SlotCode,
-                s.DisplayName,
-                s.IsBench,
-                s.Order,
-                s.AllowedPositionIds.ToArray(),
-                null,
-                Array.Empty<PlayerOption>()))
-            .ToList();
+        var slots = BuildSlotsFromTemplate(template, null);
 
         var recalculated = RecalculateAvailability(slots);
         var suggestedName = $"Escalação {lineups.Count + 1}";
@@ -410,6 +405,40 @@ else
         {
             currentEditor = currentEditor with { IsActive = isActive };
         }
+    }
+
+    private void OnFormationChanged(ChangeEventArgs args)
+    {
+        if (currentEditor is null)
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value) || value.Equals(currentEditor.Formation, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        LineupTemplate template;
+        try
+        {
+            template = LineupTemplateCatalog.GetTemplateOrDefault(value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Lineups:Unsupported formation selected: {Formation}", value);
+            Toasts.ShowError($"Formação '{value}' não é suportada.");
+            return;
+        }
+
+        var previousAssignments = currentEditor.Slots
+            .Where(s => s.SelectedPlayer is not null)
+            .ToDictionary(s => s.SlotCode, s => s.SelectedPlayer, StringComparer.OrdinalIgnoreCase);
+
+        var slots = BuildSlotsFromTemplate(template, previousAssignments);
+        var recalculated = RecalculateAvailability(slots);
+        currentEditor = currentEditor with { Formation = template.Formation, Slots = recalculated };
     }
 
     private void OnSlotChanged(Guid slotId, string? value)
@@ -661,6 +690,29 @@ else
 
     private static string GetLineupLabel(TeamLineupDto lineup)
         => lineup.IsActive ? $"{lineup.Name} (Ativa)" : lineup.Name;
+
+    private static List<LineupSlotState> BuildSlotsFromTemplate(LineupTemplate template, IDictionary<string, PlayerOption?>? assignments)
+    {
+        assignments ??= new Dictionary<string, PlayerOption?>(StringComparer.OrdinalIgnoreCase);
+
+        return template.AllSlots
+            .OrderBy(s => s.IsBench)
+            .ThenBy(s => s.Order)
+            .Select(s =>
+            {
+                assignments.TryGetValue(s.SlotCode, out var selected);
+                return new LineupSlotState(
+                    Guid.NewGuid(),
+                    s.SlotCode,
+                    s.DisplayName,
+                    s.IsBench,
+                    s.Order,
+                    s.AllowedPositionIds.ToArray(),
+                    selected,
+                    Array.Empty<PlayerOption>());
+            })
+            .ToList();
+    }
 
     private static TeamLineupSaveRequestDto BuildSaveRequest(LineupEditorState editor)
     {
