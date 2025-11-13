@@ -1,6 +1,7 @@
 ﻿// Extensions/Endpoints/AdminEndpoints.cs
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Http;

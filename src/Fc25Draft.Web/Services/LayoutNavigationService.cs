@@ -37,7 +37,8 @@ public class LayoutNavigationService
         {
             new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
             new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard", RequiredRole: "Admin"),
-            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin")
+            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
+            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
 

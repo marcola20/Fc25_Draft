@@ -160,7 +160,33 @@ else
     </div>
 
     <div class="card mb-3">
-        <div class="card-header">Funções especiais</div>
+        <div class="card-header">Reservas</div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
+                {
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
+                        <select id="slot-@slot.SlotId"
+                                class="form-select"
+                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="">- Nenhum -</option>
+                            @foreach (var option in slot.AvailablePlayers)
+                            {
+                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
+                                    @FormatPlayerOption(option)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Funções</div>
         <div class="card-body">
             @{ var starterOptions = GetStarterPlayerOptions(); }
             @if (starterOptions.Count == 0)
@@ -239,32 +265,6 @@ else
                         </select>
                     </div>
                 </div>
-        </div>
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-header">Reservas</div>
-        <div class="card-body">
-            <div class="row g-3">
-                @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
-                {
-                    <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
-                        <select id="slot-@slot.SlotId"
-                                class="form-select"
-                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
-                                disabled="@isSaving">
-                            <option value="">- Nenhum -</option>
-                            @foreach (var option in slot.AvailablePlayers)
-                            {
-                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
-                                    @FormatPlayerOption(option)
-                                </option>
-                            }
-                        </select>
-                    </div>
-                }
-            </div>
         </div>
     </div>
 
@@ -377,7 +377,6 @@ else
         }
         catch (OperationCanceledException)
         {
-            // ignore
         }
         catch (Exception ex)
         {
@@ -394,24 +393,24 @@ else
 
     private bool CanSave => currentEditor is not null && !string.IsNullOrWhiteSpace(currentEditor.Name);
 
-    private async Task OnLineupChanged(ChangeEventArgs args)
+    private Task OnLineupChanged(ChangeEventArgs args)
     {
         var value = args.Value?.ToString();
         if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
+            return Task.CompletedTask;
 
         if (value == NewLineupValue)
         {
             CreateNewLineup();
-            return;
+            return Task.CompletedTask;
         }
 
         if (Guid.TryParse(value, out var lineupId))
         {
             SelectExistingLineup(lineupId);
         }
+
+        return Task.CompletedTask;
     }
 
     private void SelectExistingLineup(Guid lineupId)
