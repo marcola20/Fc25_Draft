@@ -97,7 +97,7 @@ else
                                 <span class="badge bg-secondary">Inativa</span>
                             }
                             <div class="text-muted small mt-1">
-                                Atualizada em @lineup.UpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                Atualizada em @lineup.UpdatedAtUtc.AddHours(-3).ToString("dd/MM/yyyy HH:mm")
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-outline-secondary mt-2"
