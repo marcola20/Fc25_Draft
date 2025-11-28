@@ -285,7 +285,7 @@ else
 
         lineups.Clear();
         lineups.AddRange(fetched
-            .OrderBy(l => l.TeamName)
+            .OrderByDescending(l => l.UpdatedAtUtc)
             .ThenByDescending(l => l.IsActive)
             .ThenBy(l => l.LineupName));
 
