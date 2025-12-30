@@ -73,6 +73,33 @@ public class DraftAdminApiClient
         await EnsureSuccessAsync(response);
     }
 
+    public async Task UpdatePickOwnerAsync(Guid draftId, int draftPickId, Guid ownerTeamId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var payload = new DraftPickOwnerUpdateDto(ownerTeamId);
+        var response = await client.PatchAsJsonAsync($"api/admin/draft/{draftId}/picks/{draftPickId}/owner", payload, ct);
+
+        await EnsureSuccessAsync(response);
+    }
+
+    public async Task SwapPicksAsync(Guid draftId, int draftPickIdA, int draftPickIdB, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var payload = new DraftPickSwapRequestDto(draftPickIdA, draftPickIdB);
+        var response = await client.PostAsJsonAsync($"api/admin/draft/{draftId}/picks/swap", payload, ct);
+
+        await EnsureSuccessAsync(response);
+    }
+
+    public async Task MovePickAsync(Guid draftId, int draftPickId, int targetOverall, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var payload = new DraftPickMoveRequestDto(draftPickId, targetOverall);
+        var response = await client.PostAsJsonAsync($"api/admin/draft/{draftId}/picks/move", payload, ct);
+
+        await EnsureSuccessAsync(response);
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)

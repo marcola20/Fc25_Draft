@@ -136,3 +136,9 @@ public record DraftDetailsDto(
     IReadOnlyList<DraftRoundDetailsDto> Rounds);
 
 public record DraftRoundCreateDto(int? OverallMin, int? OverallMax);
+
+public record DraftPickOwnerUpdateDto(Guid OwnerTeamId);
+
+public record DraftPickSwapRequestDto(int DraftPickIdA, int DraftPickIdB);
+
+public record DraftPickMoveRequestDto(int DraftPickId, int TargetOverall);

@@ -24,6 +24,7 @@ namespace Fc25Draft.Web.Extensions.DI
             // Core/Infra
             services.AddScoped<DraftService>();
             services.AddScoped<DraftStateService>();
+            services.AddScoped<DraftAdminService>();
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPositionService, PositionService>();

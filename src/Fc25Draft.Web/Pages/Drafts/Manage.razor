@@ -4,6 +4,7 @@
 @using System.Globalization;
 @using System.Runtime.InteropServices;
 @inject DraftAdminApiClient DraftAdminApiClient
+@inject TeamsApiClient TeamsApiClient
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JSRuntime
 @inject LayoutState LayoutState
@@ -179,6 +180,116 @@ else
                 </ul>
             </nav>
         }
+
+        <div class="card mb-4">
+            <div class="card-header">Ordem de escolhas</div>
+            <div class="card-body">
+                @if (!AdminAuth.IsAuthenticated)
+                {
+                    <div class="alert alert-secondary mb-0" role="alert">Somente administradores podem ajustar as escolhas.</div>
+                }
+                else if (PickOrderRows.Count == 0)
+                {
+                    <p class="mb-0">Nenhuma escolha disponível para ajuste.</p>
+                }
+                else
+                {
+                    <div class="row g-3 mb-3">
+                        <div class="col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <h6 class="mb-2">Trocar duas escolhas</h6>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-5">
+                                        <label class="form-label" for="swapPickA">Escolha A</label>
+                                        <select id="swapPickA" class="form-select form-select-sm" @bind="swapPickA" disabled="@isProcessing">
+                                            <option value="">Selecione</option>
+                                            @foreach (var pick in UnusedPicks)
+                                            {
+                                                <option value="@pick.OverallPick">@pick.OverallPick (@pick.TeamName)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label" for="swapPickB">Escolha B</label>
+                                        <select id="swapPickB" class="form-select form-select-sm" @bind="swapPickB" disabled="@isProcessing">
+                                            <option value="">Selecione</option>
+                                            @foreach (var pick in UnusedPicks)
+                                            {
+                                                <option value="@pick.OverallPick">@pick.OverallPick (@pick.TeamName)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="SwapPicksAsync" disabled="@isProcessing">Trocar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <h6 class="mb-2">Mover escolha para overall</h6>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-5">
+                                        <label class="form-label" for="movePick">Escolha</label>
+                                        <select id="movePick" class="form-select form-select-sm" @bind="movePickId" disabled="@isProcessing">
+                                            <option value="">Selecione</option>
+                                            @foreach (var pick in UnusedPicks)
+                                            {
+                                                <option value="@pick.OverallPick">@pick.OverallPick (@pick.TeamName)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label" for="moveTarget">Overall alvo</label>
+                                        <InputNumber TValue="int?" id="moveTarget" class="form-control form-control-sm" @bind-Value="moveTargetOverall" Min="1" disabled="@isProcessing" />
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="MovePickAsync" disabled="@isProcessing">Mover</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Overall</th>
+                                    <th>Rodada</th>
+                                    <th>Escolha</th>
+                                    <th>Responsável</th>
+                                    <th>Jogador</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var pick in PickOrderRows)
+                                {
+                                    <tr class="@(pick.IsUsed ? "table-secondary" : string.Empty)">
+                                        <td>@pick.OverallPick</td>
+                                        <td>@pick.RoundNumber</td>
+                                        <td>@pick.PickInRound</td>
+                                        <td>
+                                            <select class="form-select form-select-sm"
+                                                    value="@pick.TeamId"
+                                                    @onchange="e => UpdateOwnerAsync(pick, e)"
+                                                    disabled="@(!AdminAuth.IsAuthenticated || isProcessing || pick.IsUsed)">
+                                                @foreach (var team in teams)
+                                                {
+                                                    <option value="@team.TeamId">@team.TeamName (@(string.IsNullOrWhiteSpace(team.OwnerName) ? "Sem responsável" : team.OwnerName))</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <small class="text-muted d-block mt-2">Escolhas já usadas ficam bloqueadas para edição.</small>
+                }
+            </div>
+        </div>
     }
 }
 
@@ -198,6 +309,12 @@ else
 
     private List<DraftRoundDetailsDto> OrderedRounds = new();
     private DraftRoundDetailsDto? RoundToDisplay;
+    private readonly List<TeamListItemDto> teams = new();
+    private List<DraftPickOrderRow> PickOrderRows = new();
+    private int? swapPickA;
+    private int? swapPickB;
+    private int? movePickId;
+    private int? moveTargetOverall;
 
     protected override void OnInitialized()
     {
@@ -238,6 +355,7 @@ else
         authInitialized = true;
 
         await LoadDraftsAndDetailsAsync();
+        await LoadTeamsAsync();
 
         StateHasChanged();
     }
@@ -331,6 +449,7 @@ else
             }
 
             RecomputeRounds();
+            RecomputePickOrder();
         }
         catch (Exception ex)
         {
@@ -353,6 +472,26 @@ else
             .FirstOrDefault(r => selectedRoundNumber.HasValue &&
                                  r.RoundNumber == selectedRoundNumber.Value)
             ?? OrderedRounds.FirstOrDefault();
+
+        RecomputePickOrder();
+    }
+
+    private void RecomputePickOrder()
+    {
+        PickOrderRows = selectedDraft?.Rounds?
+            .SelectMany(round => round.Picks.Select(pick => new DraftPickOrderRow
+            {
+                OverallPick = pick.OverallPick,
+                RoundNumber = round.RoundNumber,
+                PickInRound = pick.PickInRound,
+                TeamId = pick.TeamId,
+                TeamName = pick.TeamName,
+                TeamOwner = pick.TeamOwner,
+                PlayerId = pick.PlayerId,
+                PlayerName = pick.PlayerName
+            }))
+            .OrderBy(p => p.OverallPick)
+            .ToList() ?? new();
     }
 
     private async Task OnDraftChanged(ChangeEventArgs args)
@@ -364,6 +503,21 @@ else
             successMessage = null;
             await LoadDraftDetailsAsync(draftId);
             StateHasChanged();
+        }
+    }
+
+    private async Task LoadTeamsAsync()
+    {
+        try
+        {
+            teams.Clear();
+            var result = await TeamsApiClient.GetAsync(null, 1, 200);
+            teams.AddRange(result.Items.OrderBy(t => t.TeamName));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Erro ao carregar times");
         }
     }
 
@@ -397,6 +551,112 @@ else
         {
             errorMessage = ex.Message;
             Logger.LogError(ex, "LayoutNav:Error ao adicionar rodada ao draft {DraftId}", selectedDraftId);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task UpdateOwnerAsync(DraftPickOrderRow pick, ChangeEventArgs args)
+    {
+        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+
+        if (!Guid.TryParse(args.Value?.ToString(), out var teamId))
+        {
+            return;
+        }
+
+        if (teamId == pick.TeamId)
+        {
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.UpdatePickOwnerAsync(selectedDraftId.Value, pick.OverallPick, teamId);
+            successMessage = $"Escolha {pick.OverallPick} atualizada.";
+
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Erro ao atualizar responsável da escolha {Pick}", pick.OverallPick);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task SwapPicksAsync()
+    {
+        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+
+        if (!swapPickA.HasValue || !swapPickB.HasValue)
+        {
+            errorMessage = "Selecione duas escolhas para trocar.";
+            successMessage = null;
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.SwapPicksAsync(selectedDraftId.Value, swapPickA.Value, swapPickB.Value);
+            successMessage = "Troca concluída com sucesso.";
+
+            swapPickA = null;
+            swapPickB = null;
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Erro ao trocar escolhas");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task MovePickAsync()
+    {
+        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+
+        if (!movePickId.HasValue || !moveTargetOverall.HasValue)
+        {
+            errorMessage = "Selecione a escolha e o overall de destino.";
+            successMessage = null;
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.MovePickAsync(selectedDraftId.Value, movePickId.Value, moveTargetOverall.Value);
+            successMessage = "Ordem atualizada com sucesso.";
+
+            movePickId = null;
+            moveTargetOverall = null;
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Erro ao mover escolha");
         }
         finally
         {
@@ -474,6 +734,7 @@ else
         _ = InvokeAsync(async () =>
         {
             await LoadDraftsAndDetailsAsync();
+            await LoadTeamsAsync();
             StateHasChanged();
         });
     }
@@ -481,5 +742,20 @@ else
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+
+    private IEnumerable<DraftPickOrderRow> UnusedPicks => PickOrderRows.Where(p => !p.IsUsed);
+
+    private sealed class DraftPickOrderRow
+    {
+        public int OverallPick { get; init; }
+        public int RoundNumber { get; init; }
+        public int PickInRound { get; init; }
+        public Guid TeamId { get; init; }
+        public string TeamName { get; init; } = string.Empty;
+        public string? TeamOwner { get; init; }
+        public int? PlayerId { get; init; }
+        public string? PlayerName { get; init; }
+        public bool IsUsed => PlayerId.HasValue;
     }
 }

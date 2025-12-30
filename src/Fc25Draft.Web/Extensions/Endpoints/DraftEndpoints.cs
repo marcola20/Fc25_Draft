@@ -243,6 +243,129 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            adminDraftProtectedApi.MapPatch("/{draftId:guid}/picks/{draftPickId:int}/owner", async (
+                DraftAdminService draftAdminService,
+                DraftStateService draftStateService,
+                IHubContext<DraftHub> hubContext,
+                Guid draftId,
+                int draftPickId,
+                DraftPickOwnerUpdateDto request,
+                CancellationToken ct) =>
+            {
+                if (request is null)
+                {
+                    return Results.BadRequest(new { message = "Payload inválido." });
+                }
+
+                if (request.OwnerTeamId == Guid.Empty)
+                {
+                    return Results.BadRequest(new { message = "Time inválido." });
+                }
+
+                try
+                {
+                    await draftAdminService.UpdatePickOwnerAsync(draftId, draftPickId, request.OwnerTeamId, ct);
+                    await draftStateService.GetStateAsync(ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.Ok(new { message = "Responsável atualizado." });
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return Results.NotFound(new { message = ex.Message });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
+            adminDraftProtectedApi.MapPost("/{draftId:guid}/picks/swap", async (
+                DraftAdminService draftAdminService,
+                DraftStateService draftStateService,
+                IHubContext<DraftHub> hubContext,
+                Guid draftId,
+                DraftPickSwapRequestDto request,
+                CancellationToken ct) =>
+            {
+                if (request is null)
+                {
+                    return Results.BadRequest(new { message = "Payload inválido." });
+                }
+
+                if (request.DraftPickIdA <= 0 || request.DraftPickIdB <= 0)
+                {
+                    return Results.BadRequest(new { message = "Escolhas inválidas para troca." });
+                }
+
+                if (request.DraftPickIdA == request.DraftPickIdB)
+                {
+                    return Results.BadRequest(new { message = "Selecione escolhas diferentes para trocar." });
+                }
+
+                try
+                {
+                    await draftAdminService.SwapPickOrderAsync(draftId, request.DraftPickIdA, request.DraftPickIdB, ct);
+                    await draftStateService.GetStateAsync(ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.Ok(new { message = "Troca concluída." });
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return Results.NotFound(new { message = ex.Message });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
+            adminDraftProtectedApi.MapPost("/{draftId:guid}/picks/move", async (
+                DraftAdminService draftAdminService,
+                DraftStateService draftStateService,
+                IHubContext<DraftHub> hubContext,
+                Guid draftId,
+                DraftPickMoveRequestDto request,
+                CancellationToken ct) =>
+            {
+                if (request is null)
+                {
+                    return Results.BadRequest(new { message = "Payload inválido." });
+                }
+
+                if (request.DraftPickId <= 0 || request.TargetOverall <= 0)
+                {
+                    return Results.BadRequest(new { message = "Escolha alvo inválida." });
+                }
+
+                try
+                {
+                    await draftAdminService.MovePickAsync(draftId, request.DraftPickId, request.TargetOverall, ct);
+                    await draftStateService.GetStateAsync(ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.Ok(new { message = "Ordem atualizada." });
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return Results.NotFound(new { message = ex.Message });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
             adminDraftProtectedApi.MapDelete("/{id:guid}/rounds/{roundNumber:int}", async (
                 DraftService draftService,
                 DraftStateService draftStateService,
