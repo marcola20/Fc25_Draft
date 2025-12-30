@@ -60,6 +60,11 @@
         {
             <p class="mb-0">Nenhum draft configurado no momento.</p>
         }
+        else if (state.Status == DraftStatus.Setup)
+        {
+            <h4 class="mb-2">Draft aguardando início</h4>
+            <p class="mb-0">O administrador precisa iniciar o draft para liberar as escolhas.</p>
+        }
         else if (state.DraftCompleted)
         {
             <h4 class="mb-2">Draft concluído</h4>
@@ -256,7 +261,7 @@ else
     private int? overallMin;
     private int? overallMax;
 
-    private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
+    private bool DisableSelection => state is null || !state.HasDraft || state.Status != DraftStatus.Active || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
     private bool CanGenerateDraft =>
         AdminAuth.IsAuthenticated &&
@@ -487,6 +492,45 @@ else
             return;
         }
 
+        string? setupModeInput;
+        try
+        {
+            setupModeInput = await JSRuntime.InvokeAsync<string?>(
+                "prompt",
+                "Modo de configuração do draft (automatic/manual):",
+                "automatic");
+        }
+        catch (JSException ex)
+        {
+            statusCss = "alert-danger";
+            statusMessage = $"Não foi possível solicitar o modo de configuração: {ex.Message}";
+            Logger.LogError(ex, "LayoutNav:Error ao solicitar modo de configuração do draft");
+            return;
+        }
+
+        if (setupModeInput is null)
+        {
+            return;
+        }
+
+        var normalizedSetupMode = setupModeInput.Trim().ToLowerInvariant();
+        DraftSetupMode setupMode;
+
+        if (string.IsNullOrWhiteSpace(normalizedSetupMode) || normalizedSetupMode is "automatic" or "auto" or "a")
+        {
+            setupMode = DraftSetupMode.Automatic;
+        }
+        else if (normalizedSetupMode is "manual" or "m")
+        {
+            setupMode = DraftSetupMode.Manual;
+        }
+        else
+        {
+            statusCss = "alert-warning";
+            statusMessage = "Modo de configuração inválido. Use 'automatic' ou 'manual'.";
+            return;
+        }
+
         var roundRules = new List<DraftRoundRuleDto>(totalRounds);
 
         for (var round = 1; round <= totalRounds; round++)
@@ -559,7 +603,7 @@ else
         {
             var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
             var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, false, roundRules, draftName));
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, false, roundRules, draftName, setupMode));
 
             if (response.IsSuccessStatusCode)
             {

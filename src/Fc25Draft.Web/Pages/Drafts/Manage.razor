@@ -4,6 +4,7 @@
 @using System.Globalization;
 @using System.Runtime.InteropServices;
 @inject DraftAdminApiClient DraftAdminApiClient
+@inject TeamsApiClient TeamsApiClient
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JSRuntime
 @inject LayoutState LayoutState
@@ -79,9 +80,105 @@ else
                     <dd class="col-sm-9">@selectedDraft.TotalTeams</dd>
                     <dt class="col-sm-3">Total de rodadas</dt>
                     <dd class="col-sm-9">@selectedDraft.TotalRounds</dd>
+                    <dt class="col-sm-3">Modo de configuração</dt>
+                    <dd class="col-sm-9">@FormatSetupMode(selectedDraft.SetupMode)</dd>
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@FormatStatus(selectedDraft.Status)</dd>
                 </dl>
             </div>
         </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Iniciar draft</div>
+            <div class="card-body d-flex flex-column flex-lg-row gap-3 align-items-lg-center justify-content-lg-between">
+                <div>
+                    <p class="mb-1">O draft só pode iniciar quando todas as escolhas estiverem atribuídas.</p>
+                    @if (HasUnassignedPicks)
+                    {
+                        <small class="text-warning">Ainda existem escolhas sem time atribuído.</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">Todas as escolhas estão atribuídas.</small>
+                    }
+                </div>
+                <div>
+                    <button class="btn btn-success"
+                            @onclick="StartDraftAsync"
+                            disabled="@(!CanStartDraft)">
+                        Iniciar draft
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (selectedDraft.SetupMode == DraftSetupMode.Manual)
+        {
+            <div class="card mb-4">
+                <div class="card-header">Configuração manual das escolhas</div>
+                <div class="card-body">
+                    @if (!AdminAuth.IsAuthenticated)
+                    {
+                        <div class="alert alert-secondary mb-0" role="alert">
+                            Somente administradores podem atribuir os donos das escolhas.
+                        </div>
+                    }
+                    else if (isLoadingTeams)
+                    {
+                        <p><em>Carregando times participantes...</em></p>
+                    }
+                    else if (draftTeams.Count == 0)
+                    {
+                        <div class="alert alert-warning mb-0" role="alert">
+                            Nenhum time encontrado para atribuir às escolhas.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rodada</th>
+                                        <th>Escolha</th>
+                                        <th>Overall</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var round in OrderedRounds)
+                                    {
+                                        foreach (var pick in round.Picks.OrderBy(p => p.PickInRound))
+                                        {
+                                            var isUnassigned = pick.Status == DraftPickStatus.Unassigned || pick.TeamId is null;
+                                            <tr class="@(isUnassigned ? "table-warning" : string.Empty)">
+                                                <td>@round.RoundNumber</td>
+                                                <td>@pick.PickInRound</td>
+                                                <td>@pick.OverallPick</td>
+                                                <td>
+                                                    <select class="form-select form-select-sm"
+                                                            value="@FormatTeamId(pick.TeamId)"
+                                                            @onchange="args => AssignPickOwnerAsync(pick, args)"
+                                                            disabled="@(!CanEditAssignments)">
+                                                        <option value="">Selecione um time</option>
+                                                        @foreach (var team in draftTeams)
+                                                        {
+                                                            <option value="@team.TeamId">@team.TeamName</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td>@FormatPickStatus(pick.Status)</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
 
         @if (AdminAuth.IsAuthenticated)
         {
@@ -151,7 +248,7 @@ else
                                     {
                                         <tr>
                                             <td>@pick.PickInRound (@pick.OverallPick)</td>
-                                            <td>@pick.TeamName</td>
+                                            <td>@(string.IsNullOrWhiteSpace(pick.TeamName) ? "A definir" : pick.TeamName)</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
                                             <td>@FormatDateTimePtBr(pick.PickedAtUtc)</td>
@@ -189,6 +286,7 @@ else
     private bool authInitialized;
     private bool isLoadingDrafts = true;
     private bool isLoadingDetails;
+    private bool isLoadingTeams;
     private bool isProcessing;
     private string? errorMessage;
     private string? successMessage;
@@ -198,6 +296,24 @@ else
 
     private List<DraftRoundDetailsDto> OrderedRounds = new();
     private DraftRoundDetailsDto? RoundToDisplay;
+    private readonly List<TeamListItemDto> draftTeams = new();
+    private bool isAssigningPick;
+
+    private bool HasUnassignedPicks => selectedDraft?.Rounds
+        .SelectMany(r => r.Picks)
+        .Any(p => p.Status == DraftPickStatus.Unassigned || p.TeamId is null) == true;
+
+    private bool CanStartDraft => AdminAuth.IsAuthenticated
+        && selectedDraft is not null
+        && selectedDraft.Status == DraftStatus.Setup
+        && !HasUnassignedPicks
+        && !isProcessing;
+
+    private bool CanEditAssignments => AdminAuth.IsAuthenticated
+        && selectedDraft is not null
+        && selectedDraft.Status == DraftStatus.Setup
+        && !isProcessing
+        && !isAssigningPick;
 
     protected override void OnInitialized()
     {
@@ -271,6 +387,7 @@ else
             selectedRoundNumber = null;
             OrderedRounds = new();
             RoundToDisplay = null;
+            draftTeams.Clear();
         }
     }
 
@@ -317,6 +434,15 @@ else
             selectedDraft = draft;
             selectedDraftId = draft.DraftId;
 
+            if (draft.SetupMode == DraftSetupMode.Manual && AdminAuth.IsAuthenticated)
+            {
+                await LoadDraftTeamsAsync();
+            }
+            else
+            {
+                draftTeams.Clear();
+            }
+
             if (draft.Rounds.Count == 0)
             {
                 selectedRoundNumber = null;
@@ -340,6 +466,26 @@ else
         finally
         {
             isLoadingDetails = false;
+        }
+    }
+
+    private async Task LoadDraftTeamsAsync()
+    {
+        try
+        {
+            isLoadingTeams = true;
+            draftTeams.Clear();
+            var result = await TeamsApiClient.GetAsync(null, 1, 200);
+            draftTeams.AddRange(result.Items);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao carregar times do draft");
+        }
+        finally
+        {
+            isLoadingTeams = false;
         }
     }
 
@@ -404,6 +550,41 @@ else
         }
     }
 
+    private async Task StartDraftAsync()
+    {
+        if (!selectedDraftId.HasValue || isProcessing)
+        {
+            return;
+        }
+
+        if (!AdminAuth.IsAuthenticated)
+        {
+            errorMessage = "Somente administradores podem iniciar o draft.";
+            successMessage = null;
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.StartDraftAsync(selectedDraftId.Value);
+            successMessage = "Draft iniciado com sucesso.";
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao iniciar o draft {DraftId}", selectedDraftId);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
     private async Task ConfirmRemoveRoundAsync(int roundNumber)
     {
         if (!selectedDraftId.HasValue || isProcessing) return;
@@ -450,6 +631,54 @@ else
         RecomputeRounds();
     }
 
+    private async Task AssignPickOwnerAsync(DraftRoundPickDto pick, ChangeEventArgs args)
+    {
+        if (!selectedDraftId.HasValue || !CanEditAssignments)
+        {
+            return;
+        }
+
+        if (args.Value is null || string.IsNullOrWhiteSpace(args.Value.ToString()))
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(args.Value.ToString(), out var teamId))
+        {
+            errorMessage = "Time inválido para atribuição.";
+            return;
+        }
+
+        if (pick.TeamId == teamId)
+        {
+            return;
+        }
+
+        try
+        {
+            isAssigningPick = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.AssignDraftPickOwnerAsync(
+                pick.DraftPickId,
+                teamId,
+                pick.RowVersion.ToString(CultureInfo.InvariantCulture));
+
+            successMessage = "Escolha atualizada com sucesso.";
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "LayoutNav:Error ao atribuir time à escolha {PickId}", pick.DraftPickId);
+        }
+        finally
+        {
+            isAssigningPick = false;
+        }
+    }
+
     private bool CanRemoveRound(DraftRoundDetailsDto round)
     {
         if (!AdminAuth.IsAuthenticated || selectedDraft is null) return false;
@@ -468,6 +697,31 @@ else
         if (round.OverallMax is int maxValue) return $"Overall máximo {maxValue}";
         return string.Empty;
     }
+
+    private static string FormatSetupMode(DraftSetupMode setupMode)
+        => setupMode switch
+        {
+            DraftSetupMode.Manual => "Manual",
+            _ => "Automático"
+        };
+
+    private static string FormatStatus(DraftStatus status)
+        => status switch
+        {
+            DraftStatus.Active => "Em andamento",
+            _ => "Em configuração"
+        };
+
+    private static string FormatPickStatus(DraftPickStatus status)
+        => status switch
+        {
+            DraftPickStatus.Assigned => "Atribuída",
+            DraftPickStatus.Used => "Utilizada",
+            _ => "Não atribuída"
+        };
+
+    private static string FormatTeamId(Guid? teamId)
+        => teamId?.ToString("D") ?? string.Empty;
 
     private void OnAuthenticationChanged()
     {

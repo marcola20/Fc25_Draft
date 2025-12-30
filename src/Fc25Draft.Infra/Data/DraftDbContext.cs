@@ -175,6 +175,12 @@ public class DraftDbContext : DbContext
         mb.Entity<Draft>(e =>
         {
             e.HasKey(x => x.DraftId);
+            e.Property(x => x.SetupMode)
+             .HasConversion<int>()
+             .IsRequired();
+            e.Property(x => x.Status)
+             .HasConversion<int>()
+             .IsRequired();
         });
 
         mb.Entity<DraftRound>(e =>
@@ -189,11 +195,25 @@ public class DraftDbContext : DbContext
         mb.Entity<DraftPick>(e =>
         {
             e.HasKey(x => new { x.DraftId, x.OverallPick });
+            e.HasIndex(x => x.DraftPickId)
+             .IsUnique();
             e.HasIndex(x => new { x.DraftId, x.RoundNumber, x.PickInRound }).IsUnique();
-            e.HasIndex(x => new { x.DraftId, x.TeamId, x.RoundNumber });
+            e.HasIndex(x => new { x.DraftId, x.OwnerTeamId, x.RoundNumber });
             e.HasIndex(x => x.PlayerId)
              .IsUnique()
              .HasFilter("\"PlayerId\" IS NOT NULL");
+            e.Property(x => x.DraftPickId)
+             .ValueGeneratedOnAdd();
+            e.Property(x => x.OwnerTeamId)
+             .HasColumnName("TeamId");
+            e.Property(x => x.Status)
+             .HasConversion<int>()
+             .IsRequired();
+            e.Property(x => x.RowVersion)
+             .HasColumnName("xmin")
+             .HasColumnType("xid")
+             .IsConcurrencyToken()
+             .ValueGeneratedOnAddOrUpdate();
             e.HasOne(x => x.Draft)
              .WithMany(d => d.Picks)
              .HasForeignKey(x => x.DraftId)
@@ -204,7 +224,7 @@ public class DraftDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Team)
              .WithMany(t => t.DraftPicks)
-             .HasForeignKey(x => x.TeamId)
+             .HasForeignKey(x => x.OwnerTeamId)
              .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Player)
              .WithMany(pl => pl.DraftPicks)

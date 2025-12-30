@@ -23,6 +23,7 @@ public class DraftService
         int totalRounds = 19,
         bool snake = false,
         IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null,
+        DraftSetupMode setupMode = DraftSetupMode.Automatic,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
@@ -100,7 +101,9 @@ public class DraftService
                 Name = name,
                 TotalTeams = teamOrder.Count,
                 TotalRounds = totalRounds,
-                CreatedAtUtc = utcNow
+                CreatedAtUtc = utcNow,
+                SetupMode = setupMode,
+                Status = DraftStatus.Setup
             };
 
             var rounds = new List<DraftRound>(totalRounds);
@@ -145,16 +148,24 @@ public class DraftService
                 for (var pickIndex = 0; pickIndex < baseOrder.Length; pickIndex++)
                 {
                     var pickInRound = pickIndex + 1;
+                    var pickOwnerId = setupMode == DraftSetupMode.Automatic
+                        ? orderForRound[pickIndex]
+                        : null;
+                    var pickStatus = setupMode == DraftSetupMode.Automatic
+                        ? DraftPickStatus.Assigned
+                        : DraftPickStatus.Unassigned;
 
                     picks.Add(new DraftPick
                     {
+                        DraftPickId = Guid.NewGuid(),
                         DraftId = draftId,
                         RoundNumber = roundNumber,
                         PickInRound = pickInRound,
                         OverallPick = ((roundNumber - 1) * baseOrder.Length) + pickInRound,
-                        TeamId = orderForRound[pickIndex],
+                        OwnerTeamId = pickOwnerId,
                         PlayerId = null,
-                        PickedAtUtc = null
+                        PickedAtUtc = null,
+                        Status = pickStatus
                     });
                 }
             }
@@ -178,6 +189,7 @@ public class DraftService
         bool snake = false,
         IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null,
         string? name = null,
+        DraftSetupMode setupMode = DraftSetupMode.Automatic,
         CancellationToken ct = default)
     {
         if (totalRounds <= 0)
@@ -224,7 +236,7 @@ public class DraftService
             ? $"DRAFT - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
 
-        return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct);
+        return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, setupMode, ct);
     }
 
     public async Task<DraftRoundDetailsDto> AddRoundAsync(
@@ -272,50 +284,68 @@ public class DraftService
                 throw new InvalidOperationException("O draft não pode conter mais de 50 rodadas.");
             }
 
-            var teamsInDraft = await _db.DraftPicks
-                .Where(p => p.DraftId == draftId && p.RoundNumber == 1)
-                .OrderBy(p => p.PickInRound)
-                .Select(p => p.TeamId)
-                .ToArrayAsync(ct);
+            Guid[] orderForRound;
+            var isSnakeDraft = false;
 
-            if (teamsInDraft.Length == 0)
+            if (draft.SetupMode == DraftSetupMode.Manual)
             {
-                throw new InvalidOperationException("Não foi possível determinar a ordem das equipes do draft.");
+                orderForRound = await _db.Teams
+                    .OrderBy(t => t.TeamName)
+                    .Select(t => t.TeamId)
+                    .ToArrayAsync(ct);
+
+                if (orderForRound.Length != draft.TotalTeams)
+                {
+                    throw new InvalidOperationException("Não foi possível determinar o total de equipes do draft.");
+                }
+            }
+            else
+            {
+                var teamsInDraft = await _db.DraftPicks
+                    .Where(p => p.DraftId == draftId && p.RoundNumber == 1)
+                    .OrderBy(p => p.PickInRound)
+                    .Select(p => p.OwnerTeamId)
+                    .ToArrayAsync(ct);
+
+                if (teamsInDraft.Length == 0 || teamsInDraft.Any(teamId => teamId is null))
+                {
+                    throw new InvalidOperationException("Não foi possível determinar a ordem das equipes do draft.");
+                }
+
+                if (maxExistingRound >= 2)
+                {
+                    var secondRoundOrder = await _db.DraftPicks
+                        .Where(p => p.DraftId == draftId && p.RoundNumber == 2)
+                        .OrderBy(p => p.PickInRound)
+                        .Select(p => p.OwnerTeamId)
+                        .ToArrayAsync(ct);
+
+                    if (secondRoundOrder.Length == teamsInDraft.Length &&
+                        secondRoundOrder.SequenceEqual(teamsInDraft.Reverse()))
+                    {
+                        isSnakeDraft = true;
+                    }
+                }
+
+                if (isSnakeDraft)
+                {
+                    orderForRound = DraftService.GetRoundOrder(teamsInDraft.Select(t => t!.Value).ToArray(), maxExistingRound + 1, true).ToArray();
+                }
+                else
+                {
+                    orderForRound = teamsInDraft.Select(t => t!.Value).ToArray();
+                    Shuffle(orderForRound, Random.Shared);
+                }
             }
 
             var nextRoundNumber = maxExistingRound + 1;
 
-            var isSnakeDraft = false;
-            if (maxExistingRound >= 2)
-            {
-                var secondRoundOrder = await _db.DraftPicks
-                    .Where(p => p.DraftId == draftId && p.RoundNumber == 2)
-                    .OrderBy(p => p.PickInRound)
-                    .Select(p => p.TeamId)
-                    .ToArrayAsync(ct);
-
-                if (secondRoundOrder.Length == teamsInDraft.Length &&
-                    secondRoundOrder.SequenceEqual(teamsInDraft.Reverse()))
-                {
-                    isSnakeDraft = true;
-                }
-            }
-
-            Guid[] orderForRound;
-            if (isSnakeDraft)
-            {
-                orderForRound = DraftService.GetRoundOrder(teamsInDraft, nextRoundNumber, true).ToArray();
-            }
-            else
-            {
-                orderForRound = teamsInDraft.ToArray();
-                Shuffle(orderForRound, Random.Shared);
-            }
-
-            var teamDetails = await _db.Teams
-                .Where(t => orderForRound.Contains(t.TeamId))
-                .Select(t => new { t.TeamId, t.TeamName, t.OwnerName })
-                .ToDictionaryAsync(t => t.TeamId, ct);
+            var teamDetails = draft.SetupMode == DraftSetupMode.Manual
+                ? new Dictionary<Guid, (string TeamName, string? OwnerName)>()
+                : await _db.Teams
+                    .Where(t => orderForRound.Contains(t.TeamId))
+                    .Select(t => new { t.TeamId, t.TeamName, t.OwnerName })
+                    .ToDictionaryAsync(t => t.TeamId, t => (t.TeamName, t.OwnerName), ct);
 
             var maxOverallPick = await _db.DraftPicks
                 .Where(p => p.DraftId == draftId)
@@ -336,13 +366,17 @@ public class DraftService
                 var pickInRound = index + 1;
                 picks.Add(new DraftPick
                 {
+                    DraftPickId = Guid.NewGuid(),
                     DraftId = draftId,
                     RoundNumber = nextRoundNumber,
                     PickInRound = pickInRound,
                     OverallPick = maxOverallPick + index + 1,
-                    TeamId = orderForRound[index],
+                    OwnerTeamId = draft.SetupMode == DraftSetupMode.Automatic ? orderForRound[index] : null,
                     PlayerId = null,
-                    PickedAtUtc = null
+                    PickedAtUtc = null,
+                    Status = draft.SetupMode == DraftSetupMode.Automatic
+                        ? DraftPickStatus.Assigned
+                        : DraftPickStatus.Unassigned
                 });
             }
 
@@ -358,19 +392,26 @@ public class DraftService
                 .OrderBy(p => p.PickInRound)
                 .Select(p =>
                 {
-                    teamDetails.TryGetValue(p.TeamId, out var team);
-                    var teamName = team?.TeamName ?? string.Empty;
-                    var ownerName = team?.OwnerName;
+                    string? teamName = null;
+                    string? ownerName = null;
+                    if (p.OwnerTeamId.HasValue && teamDetails.TryGetValue(p.OwnerTeamId.Value, out var team))
+                    {
+                        teamName = string.IsNullOrWhiteSpace(team.TeamName) ? null : team.TeamName;
+                        ownerName = team.OwnerName;
+                    }
 
                     return new DraftRoundPickDto(
+                        p.DraftPickId,
                         p.PickInRound,
                         p.OverallPick,
-                        p.TeamId,
+                        p.OwnerTeamId,
                         teamName,
                         ownerName,
                         null,
                         null,
-                        null);
+                        null,
+                        p.Status,
+                        p.RowVersion);
                 })
                 .ToList();
 
@@ -442,6 +483,97 @@ public class DraftService
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         });
+    }
+
+    public async Task StartDraftAsync(Guid draftId, CancellationToken ct = default)
+    {
+        var draft = await _db.Drafts
+            .FirstOrDefaultAsync(d => d.DraftId == draftId, ct);
+
+        if (draft is null)
+        {
+            throw new KeyNotFoundException("Draft não encontrado.");
+        }
+
+        if (draft.Status != DraftStatus.Setup)
+        {
+            throw new InvalidOperationException("O draft já foi iniciado.");
+        }
+
+        var hasUnassigned = await _db.DraftPicks
+            .AnyAsync(p => p.DraftId == draftId && p.OwnerTeamId == null, ct);
+
+        if (hasUnassigned)
+        {
+            throw new InvalidOperationException("Draft cannot start. There are unassigned picks.");
+        }
+
+        draft.Status = DraftStatus.Active;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<DraftPick> AssignDraftPickOwnerAsync(
+        Guid draftPickId,
+        Guid teamId,
+        uint expectedRowVersion,
+        CancellationToken ct = default)
+    {
+        if (draftPickId == Guid.Empty)
+        {
+            throw new ArgumentException("DraftPickId inválido.", nameof(draftPickId));
+        }
+
+        if (teamId == Guid.Empty)
+        {
+            throw new ArgumentException("TeamId inválido.", nameof(teamId));
+        }
+
+        if (expectedRowVersion == 0)
+        {
+            throw new ArgumentException("RowVersion inválido.", nameof(expectedRowVersion));
+        }
+
+        var pick = await _db.DraftPicks
+            .Include(p => p.Draft)
+            .Include(p => p.Team)
+            .FirstOrDefaultAsync(p => p.DraftPickId == draftPickId, ct);
+
+        if (pick is null)
+        {
+            throw new KeyNotFoundException("Escolha não encontrada.");
+        }
+
+        if (pick.Draft.SetupMode != DraftSetupMode.Manual)
+        {
+            throw new InvalidOperationException("A escolha só pode ser atribuída em drafts manuais.");
+        }
+
+        if (pick.Draft.Status != DraftStatus.Setup)
+        {
+            throw new InvalidOperationException("Não é possível alterar a escolha após o início do draft.");
+        }
+
+        if (pick.Status == DraftPickStatus.Used)
+        {
+            throw new InvalidOperationException("Não é possível alterar uma escolha já utilizada.");
+        }
+
+        var teamExists = await _db.Teams.AnyAsync(t => t.TeamId == teamId, ct);
+        if (!teamExists)
+        {
+            throw new KeyNotFoundException("Time não encontrado.");
+        }
+
+        _db.Entry(pick).Property(p => p.RowVersion).OriginalValue = expectedRowVersion;
+
+        pick.OwnerTeamId = teamId;
+        pick.Status = DraftPickStatus.Assigned;
+
+        await _db.SaveChangesAsync(ct);
+
+        pick.Team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct);
+
+        return pick;
     }
 
     public static IReadOnlyList<Guid> GetRoundOrder(IReadOnlyList<Guid> baseOrder, int roundNumber, bool snake)

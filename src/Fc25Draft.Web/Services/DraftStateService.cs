@@ -49,17 +49,40 @@ public class DraftStateService
         var totalPicks = await picksQuery.CountAsync(ct);
         var completedPicks = await picksQuery.Where(p => p.PlayerId != null).CountAsync(ct);
 
+        if (draft.Status != DraftStatus.Active)
+        {
+            return new DraftStateDto(
+                draft.DraftId,
+                draft.Name,
+                draft.SetupMode,
+                draft.Status,
+                draft.TotalTeams,
+                draft.TotalRounds,
+                totalPicks,
+                completedPicks,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                completedPicks == totalPicks && totalPicks > 0);
+        }
+
         var currentPick = await picksQuery
-            .Where(p => p.PlayerId == null)
+            .Where(p => p.PlayerId == null && p.Status != DraftPickStatus.Used)
             .OrderBy(p => p.OverallPick)
             .Select(p => new
             {
                 p.RoundNumber,
                 p.PickInRound,
                 p.OverallPick,
-                TeamId = p.Team.TeamId,
-                TeamName = p.Team.TeamName,
-                TeamOwner = p.Team.OwnerName
+                TeamId = p.OwnerTeamId,
+                TeamName = p.Team != null ? p.Team.TeamName : null,
+                TeamOwner = p.Team != null ? p.Team.OwnerName : null
             })
             .FirstOrDefaultAsync(ct);
 
@@ -70,13 +93,13 @@ public class DraftStateService
         if (currentPick is not null)
         {
             var nextPick = await picksQuery
-                .Where(p => p.PlayerId == null && p.OverallPick > currentPick.OverallPick)
+                .Where(p => p.PlayerId == null && p.Status != DraftPickStatus.Used && p.OverallPick > currentPick.OverallPick)
                 .OrderBy(p => p.OverallPick)
                 .Select(p => new
                 {
-                    TeamId = p.Team.TeamId,
-                    TeamName = p.Team.TeamName,
-                    TeamOwner = p.Team.OwnerName
+                    TeamId = p.OwnerTeamId,
+                    TeamName = p.Team != null ? p.Team.TeamName : null,
+                    TeamOwner = p.Team != null ? p.Team.OwnerName : null
                 })
                 .FirstOrDefaultAsync(ct);
 
@@ -91,6 +114,8 @@ public class DraftStateService
         return new DraftStateDto(
             draft.DraftId,
             draft.Name,
+            draft.SetupMode,
+            draft.Status,
             draft.TotalTeams,
             draft.TotalRounds,
             totalPicks,
@@ -118,7 +143,7 @@ public class DraftStateService
             .OrderByDescending(d => d.CreatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
-        if (draft is null)
+        if (draft is null || draft.Status != DraftStatus.Active)
         {
             return Array.Empty<AvailablePlayerDto>();
         }
@@ -220,12 +245,27 @@ public class DraftStateService
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Nenhum draft ativo foi encontrado.");
 
+            if (draft.Status != DraftStatus.Active)
+            {
+                throw new InvalidOperationException("O draft ainda não foi iniciado.");
+            }
+
             var currentPick = await _db.DraftPicks
                 .Include(p => p.Team)
-                .Where(p => p.DraftId == draft.DraftId && p.PlayerId == null)
+                .Where(p => p.DraftId == draft.DraftId && p.PlayerId == null && p.Status != DraftPickStatus.Used)
                 .OrderBy(p => p.OverallPick)
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Todas as escolhas já foram realizadas.");
+
+            if (currentPick.Status != DraftPickStatus.Assigned)
+            {
+                throw new InvalidOperationException("A escolha atual ainda não foi atribuída a um time.");
+            }
+
+            if (!currentPick.OwnerTeamId.HasValue)
+            {
+                throw new InvalidOperationException("A escolha atual ainda não foi atribuída a um time.");
+            }
 
             var roundLimits = await _db.DraftRounds
                 .AsNoTracking()
@@ -234,7 +274,7 @@ public class DraftStateService
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Não foi possível localizar as regras da rodada atual.");
 
-            if (!string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.OrdinalIgnoreCase))
+            if (currentPick.Team is null || !string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("⚠️ Token inválido para este time.");
             }
@@ -268,10 +308,11 @@ public class DraftStateService
 
             currentPick.PlayerId = player.PlayerId;
             currentPick.PickedAtUtc = DateTime.UtcNow;
+            currentPick.Status = DraftPickStatus.Used;
 
             _db.TeamRosters.Add(new TeamRoster
             {
-                TeamId = currentPick.TeamId,
+                TeamId = currentPick.OwnerTeamId ?? currentPick.Team!.TeamId,
                 PlayerId = player.PlayerId
             });
 
@@ -303,8 +344,9 @@ public class DraftStateService
                 ? "A definir"
                 : state.CurrentTeamName!;
 
-        var message = BuildWhatsappMessage(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
-        var shareUrl = BuildWhatsappUrl(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
+        var teamName = pick.Team?.TeamName ?? "Time";
+        var message = BuildWhatsappMessage(teamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
+        var shareUrl = BuildWhatsappUrl(teamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
 
         var groupLink = string.IsNullOrWhiteSpace(_securityOptions.WhatsappGroupLink)
             ? null
@@ -315,9 +357,9 @@ public class DraftStateService
             pick.RoundNumber,
             pick.PickInRound,
             pick.OverallPick,
-            pick.TeamId,
-            pick.Team.TeamName,
-            pick.Team.OwnerName,
+            pick.OwnerTeamId ?? pick.Team?.TeamId ?? Guid.Empty,
+            pick.Team?.TeamName ?? "Time",
+            pick.Team?.OwnerName,
             player.PlayerId,
             player.Name,
             player.PositionId,

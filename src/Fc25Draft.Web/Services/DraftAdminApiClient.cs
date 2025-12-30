@@ -60,6 +60,51 @@ public class DraftAdminApiClient
         return round;
     }
 
+    public async Task<DraftStateDto> StartDraftAsync(Guid draftId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PostAsync($"api/admin/draft/{draftId}/start", null, ct);
+
+        await EnsureSuccessAsync(response);
+        var state = await response.Content.ReadFromJsonAsync<DraftStateDto>(cancellationToken: ct);
+        if (state is null)
+        {
+            throw new InvalidOperationException("Resposta inválida do servidor ao iniciar o draft.");
+        }
+
+        return state;
+    }
+
+    public async Task<DraftRoundPickDto> AssignDraftPickOwnerAsync(
+        Guid draftPickId,
+        Guid teamId,
+        string rowVersion,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(rowVersion))
+        {
+            throw new ArgumentException("RowVersion é obrigatório.", nameof(rowVersion));
+        }
+
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/admin/draft/picks/assign")
+        {
+            Content = JsonContent.Create(new AssignDraftPickOwnerRequestDto(draftPickId, teamId))
+        };
+        request.Headers.TryAddWithoutValidation("X-RowVersion", rowVersion);
+
+        using var response = await client.SendAsync(request, ct);
+        await EnsureSuccessAsync(response);
+
+        var pick = await response.Content.ReadFromJsonAsync<DraftRoundPickDto>(cancellationToken: ct);
+        if (pick is null)
+        {
+            throw new InvalidOperationException("Resposta inválida do servidor ao atribuir o time.");
+        }
+
+        return pick;
+    }
+
     public async Task DeleteRoundAsync(Guid draftId, int roundNumber, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);

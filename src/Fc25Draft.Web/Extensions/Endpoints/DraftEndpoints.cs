@@ -1,5 +1,6 @@
 ﻿using Fc25Draft.Core.DTOs;
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -44,9 +45,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.RoundNumber,
                         p.PickInRound,
                         p.OverallPick,
-                        p.TeamId,
-                        p.Team.TeamName,
-                        p.Team.OwnerName,
+                        p.OwnerTeamId,
+                        p.Team != null ? p.Team.TeamName : null,
+                        p.Team != null ? p.Team.OwnerName : null,
                         p.PlayerId,
                         p.Player != null ? p.Player.Name : null,
                         p.Player != null ? p.Player.PositionId : null,
@@ -93,8 +94,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     .Select(p => new DraftBoardExportDto(
                         p.RoundNumber,
                         p.PickInRound,
-                        p.Team.TeamName,
-                        p.Team.OwnerName,
+                        p.Team != null ? p.Team.TeamName : string.Empty,
+                        p.Team != null ? p.Team.OwnerName : null,
                         p.Player != null ? p.Player.Name : string.Empty,
                         p.Player != null ? p.Player.Position.Name : string.Empty,
                         p.PickedAtUtc.HasValue ? p.PickedAtUtc.Value.ToString("u") : string.Empty))
@@ -120,7 +121,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         d.Name,
                         d.TotalRounds,
                         d.TotalTeams,
-                        d.CreatedAtUtc))
+                        d.CreatedAtUtc,
+                        d.SetupMode,
+                        d.Status))
                     .ToListAsync(ct);
 
                 return Results.Ok(drafts);
@@ -137,6 +140,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         d.TotalRounds,
                         d.TotalTeams,
                         d.CreatedAtUtc,
+                        d.SetupMode,
+                        d.Status,
                         d.Rounds
                             .OrderBy(r => r.RoundNumber)
                             .Select(r => new DraftRoundDetailsDto(
@@ -146,14 +151,17 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 r.Picks
                                     .OrderBy(p => p.PickInRound)
                                     .Select(p => new DraftRoundPickDto(
+                                        p.DraftPickId,
                                         p.PickInRound,
                                         p.OverallPick,
-                                        p.TeamId,
-                                        p.Team.TeamName,
-                                        p.Team.OwnerName,
+                                        p.OwnerTeamId,
+                                        p.Team != null ? p.Team.TeamName : null,
+                                        p.Team != null ? p.Team.OwnerName : null,
                                         p.PlayerId,
                                         p.Player != null ? p.Player.Name : null,
-                                        p.PickedAtUtc))
+                                        p.PickedAtUtc,
+                                        p.Status,
+                                        p.RowVersion))
                                     .ToList()))
                             .ToList()))
                     .FirstOrDefaultAsync(ct);
@@ -194,7 +202,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         roundRules = rules;
                     }
 
-                    await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct);
+                    await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, request.SetupMode, ct);
                     var state = await draftStateService.GetStateAsync(ct);
                     await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
                     return Results.Ok(state);
@@ -204,6 +212,88 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     return Results.BadRequest(new { message = ex.Message });
                 }
                 catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
+            adminDraftProtectedApi.MapPost("/{id:guid}/start", async (
+                DraftService draftService,
+                DraftStateService draftStateService,
+                IHubContext<DraftHub> hubContext,
+                Guid id,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    await draftService.StartDraftAsync(id, ct);
+                    var state = await draftStateService.GetStateAsync(ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.Ok(state);
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
+            adminDraftProtectedApi.MapPost("/picks/assign", async (
+                DraftService draftService,
+                DraftDbContext db,
+                HttpContext context,
+                AssignDraftPickOwnerRequestDto request,
+                CancellationToken ct) =>
+            {
+                if (request is null)
+                {
+                    return Results.BadRequest(new { message = "Requisição inválida." });
+                }
+
+                if (!EndpointHelpers.TryResolveRowVersion(context.Request, out var rowVersion, out var errorResult, allowFallbackToRowVersionHeader: true))
+                {
+                    return errorResult!;
+                }
+
+                try
+                {
+                    var pick = await draftService.AssignDraftPickOwnerAsync(request.DraftPickId, request.TeamId, rowVersion, ct);
+                    if (pick.Team is null && pick.OwnerTeamId.HasValue)
+                    {
+                        pick.Team = await db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.TeamId == pick.OwnerTeamId.Value, ct);
+                    }
+
+                    var dto = new DraftRoundPickDto(
+                        pick.DraftPickId,
+                        pick.PickInRound,
+                        pick.OverallPick,
+                        pick.OwnerTeamId,
+                        pick.Team?.TeamName,
+                        pick.Team?.OwnerName,
+                        pick.PlayerId,
+                        pick.Player?.Name,
+                        pick.PickedAtUtc,
+                        pick.Status,
+                        pick.RowVersion);
+
+                    return Results.Ok(dto);
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    return Results.Conflict(new { message = "A escolha foi atualizada por outra operação. Recarregue e tente novamente." });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
