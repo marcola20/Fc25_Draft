@@ -13,7 +13,9 @@ create table "Drafts"
     "Name" text not null,
     "TotalTeams" integer not null,
     "TotalRounds" integer not null,
-    "CreatedAtUtc" timestamptz not null
+    "CreatedAtUtc" timestamptz not null,
+    setup_mode integer not null default 1,
+    status integer not null default 1
 );
 
 create table "MarketCycles"

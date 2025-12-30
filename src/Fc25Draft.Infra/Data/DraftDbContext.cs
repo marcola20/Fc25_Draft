@@ -82,6 +82,11 @@ public class DraftDbContext : DbContext
              .WithMany()
              .HasForeignKey(p => p.CurrentTeamId)
              .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(p => p.RoundSelections)
+             .WithOne(rsp => rsp.Player)
+             .HasForeignKey(rsp => rsp.PlayerGuid)
+             .HasPrincipalKey(p => p.PlayerGuid)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<Team>(e =>
@@ -177,9 +182,13 @@ public class DraftDbContext : DbContext
             e.HasKey(x => x.DraftId);
             e.Property(x => x.SetupMode)
              .HasConversion<int>()
+             .HasColumnName("setup_mode")
+             .HasDefaultValue((int)DraftSetupMode.Automatic)
              .IsRequired();
             e.Property(x => x.Status)
              .HasConversion<int>()
+             .HasColumnName("status")
+             .HasDefaultValue((int)DraftStatus.Setup)
              .IsRequired();
         });
 
@@ -275,11 +284,6 @@ public class DraftDbContext : DbContext
              .HasForeignKey(x => x.RoundSelectionId)
              .OnDelete(DeleteBehavior.Cascade);
 
-            e.HasOne(x => x.Player)
-             .WithMany(p => p.RoundSelections)
-             .HasForeignKey(x => x.PlayerGuid)
-             .HasPrincipalKey(p => p.PlayerGuid)
-             .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<AdminToken>(e =>
