@@ -254,12 +254,6 @@ public class DraftStateService
                 throw new InvalidOperationException($"❌ Este jogador excede o overall máximo ({overallMax}) permitido nesta rodada.");
             }
 
-            var alreadyChosen = await _db.DraftPicks.AnyAsync(p => p.PlayerId == playerId, ct);
-            if (alreadyChosen)
-            {
-                throw new InvalidOperationException("❌ Este jogador já foi selecionado.");
-            }
-
             var alreadyInRoster = await _db.TeamRosters.AnyAsync(r => r.PlayerId == playerId, ct);
             if (alreadyInRoster)
             {
