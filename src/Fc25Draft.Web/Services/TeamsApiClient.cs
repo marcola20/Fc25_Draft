@@ -63,6 +63,16 @@ public class TeamsApiClient
         return result ?? Array.Empty<TeamRosterDto>();
     }
 
+    public async Task<IReadOnlyList<TeamBudgetDto>> GetBudgetsAsync(CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        var response = await client.GetAsync("api/teams/budgets", ct);
+        await EnsureSuccessAsync(response);
+
+        var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<TeamBudgetDto>>(cancellationToken: ct);
+        return result ?? Array.Empty<TeamBudgetDto>();
+    }
+
     public async Task<TeamIdentityDto?> ResolveIdentityAsync(string teamToken, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(teamToken))

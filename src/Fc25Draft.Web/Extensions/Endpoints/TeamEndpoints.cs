@@ -55,6 +55,22 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return Results.Ok(new PagedResult<TeamListItemDto>(items, total, currentPage, currentPageSize));
             });
 
+            teamsApi.MapGet("/budgets", async (DraftDbContext db, CancellationToken ct = default) =>
+            {
+                var items = await db.Teams
+                    .AsNoTracking()
+                    .OrderByDescending(t => t.Budget)
+                    .ThenBy(t => t.TeamName)
+                    .Select(t => new TeamBudgetDto(
+                        t.TeamId,
+                        t.TeamName,
+                        t.OwnerName,
+                        t.Budget))
+                    .ToListAsync(ct);
+
+                return Results.Ok(items);
+            });
+
             teamsApi.MapGet("/{id:guid}", async (DraftDbContext db, Guid id, HttpContext httpContext, CancellationToken ct = default) =>
             {
                 var team = await db.Teams

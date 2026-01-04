@@ -48,6 +48,12 @@ public record TeamExportDto(
     string? Responsavel,
     int TotalJogadores);
 
+public record TeamBudgetDto(
+    Guid TeamId,
+    string TeamName,
+    string? OwnerName,
+    decimal Budget);
+
 public record QuickSellResultDto(
     Guid TeamId,
     Guid PlayerId,

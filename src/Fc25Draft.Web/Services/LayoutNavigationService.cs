@@ -31,7 +31,8 @@ public class LayoutNavigationService
         {
             new("Mercado", "/mercado", "oi oi-cart", MatchPrefix: true),
             new("Jogadores", "/players", "oi oi-person"),
-            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true)
+            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
+            new("Caixa dos Times", "/times/caixa", "oi oi-dollar")
         }),
         new("Admin", new List<MenuItem>
         {
@@ -78,6 +79,7 @@ public class LayoutNavigationService
         ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/mercado/historico", true),
         ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/market/historico", true),
         ["/market/transfers"] = CreateDefinition("Histórico de Transferências", "Mercado", "/market/transfers"),
+        ["/times/caixa"] = CreateDefinition("Caixa dos Times", "Times", "/times/caixa"),
         ["/calendario"] = CreateDefinition("Calendário", "Calendário", "/calendario"),
         ["/calendario/gerenciar"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
         ["/calendario/admin"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),

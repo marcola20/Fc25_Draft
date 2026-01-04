@@ -1,0 +1,86 @@
+@page "/times/caixa"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@inject TeamsApiClient TeamsApiClient
+@inject ILogger<Fc25Draft.Web.Pages.Teams.Budget> Logger
+
+<PageTitle>Caixa dos Times</PageTitle>
+
+<PageHeader Title="Caixa dos Times"
+            Subtitle="Saldo atual de cada time, ordenado do maior para o menor." />
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_isLoading)
+{
+    <div class="alert alert-info" role="status">Carregando caixa dos times...</div>
+}
+else if (_teams.Count == 0)
+{
+    <div class="alert alert-warning" role="status">Nenhum time encontrado.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Time</th>
+                    <th scope="col">Responsável</th>
+                    <th scope="col" class="text-end">Caixa</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var index = 0; index < _teams.Count; index++)
+                {
+                    var team = _teams[index];
+                    <tr>
+                        <td>@(index + 1)</td>
+                        <td class="fw-semibold">@team.TeamName</td>
+                        <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
+                        <td class="text-end text-nowrap">@FormatCurrency(team.Budget)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo BrazilCulture = new("pt-BR");
+    private readonly List<TeamBudgetDto> _teams = new();
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBudgetsAsync();
+    }
+
+    private async Task LoadBudgetsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _teams.Clear();
+
+        try
+        {
+            var result = await TeamsApiClient.GetBudgetsAsync();
+            _teams.AddRange(result);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar caixa dos times.");
+            _errorMessage = "Não foi possível carregar o caixa dos times. Tente novamente.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+}
