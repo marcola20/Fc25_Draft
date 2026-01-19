@@ -456,6 +456,109 @@ public class TeamLineupService : ITeamLineupService
         });
     }
 
+    public async Task<TeamLineupDto> DuplicateLineupAsync(Guid teamId, Guid sourceLineupId, CancellationToken ct)
+    {
+        if (teamId == Guid.Empty)
+        {
+            throw new ArgumentException("Time inválido.", nameof(teamId));
+        }
+
+        if (sourceLineupId == Guid.Empty)
+        {
+            throw new ArgumentException("Escalação inválida.", nameof(sourceLineupId));
+        }
+
+        await EnsureTeamExistsAsync(teamId, ct);
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var currentCount = await _dbContext.TeamLineups.CountAsync(l => l.TeamId == teamId, ct);
+                if (currentCount >= 3)
+                {
+                    throw new InvalidOperationException("O time já possui 3 escalações cadastradas.");
+                }
+
+                var sourceLineup = await _dbContext.TeamLineups
+                    .AsNoTracking()
+                    .Include(l => l.Slots)
+                    .FirstOrDefaultAsync(l => l.LineupId == sourceLineupId && l.TeamId == teamId, ct)
+                    ?? throw new KeyNotFoundException("Escalação não encontrada.");
+
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+                var localNow = now.ToLocalTime();
+                var newName = $"{sourceLineup.Name} - {localNow:dd/MM/yyyy HH:mm}";
+
+                if (newName.Length > 80)
+                {
+                    var maxOriginalNameLength = 80 - " - dd/MM/yyyy HH:mm".Length;
+                    var truncatedName = sourceLineup.Name.Length > maxOriginalNameLength
+                        ? sourceLineup.Name[..maxOriginalNameLength]
+                        : sourceLineup.Name;
+                    newName = $"{truncatedName} - {localNow:dd/MM/yyyy HH:mm}";
+                }
+
+                var newLineup = new TeamLineup
+                {
+                    LineupId = Guid.NewGuid(),
+                    TeamId = teamId,
+                    Name = newName,
+                    Formation = sourceLineup.Formation,
+                    TacticCode = sourceLineup.TacticCode,
+                    IsActive = false,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    CaptainPlayerId = sourceLineup.CaptainPlayerId,
+                    ShortFreeKickLeftPlayerId = sourceLineup.ShortFreeKickLeftPlayerId,
+                    ShortFreeKickRightPlayerId = sourceLineup.ShortFreeKickRightPlayerId,
+                    LongFreeKickPlayerId = sourceLineup.LongFreeKickPlayerId,
+                    PenaltiesPlayerId = sourceLineup.PenaltiesPlayerId,
+                    CornerLeftPlayerId = sourceLineup.CornerLeftPlayerId,
+                    CornerRightPlayerId = sourceLineup.CornerRightPlayerId
+                };
+
+                foreach (var sourceSlot in sourceLineup.Slots)
+                {
+                    newLineup.Slots.Add(new TeamLineupSlot
+                    {
+                        LineupSlotId = Guid.NewGuid(),
+                        LineupId = newLineup.LineupId,
+                        SlotCode = sourceSlot.SlotCode,
+                        DisplayName = sourceSlot.DisplayName,
+                        IsBench = sourceSlot.IsBench,
+                        Order = sourceSlot.Order,
+                        PlayerId = sourceSlot.PlayerId
+                    });
+                }
+
+                await _dbContext.TeamLineups.AddAsync(newLineup, ct);
+                await _dbContext.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                return await LoadLineupDtoAsync(newLineup.LineupId, ct);
+            }
+            catch (InvalidOperationException)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+            catch (KeyNotFoundException)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Erro ao duplicar a escalação {LineupId} do time {TeamId}.", sourceLineupId, teamId);
+                throw new InvalidOperationException("Não foi possível duplicar a escalação.", ex);
+            }
+        });
+    }
+
     private async Task EnsureTeamExistsAsync(Guid teamId, CancellationToken ct)
     {
         var exists = await _dbContext.Teams.AnyAsync(t => t.TeamId == teamId, ct);

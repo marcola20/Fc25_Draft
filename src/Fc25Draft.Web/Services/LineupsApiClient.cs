@@ -108,6 +108,26 @@ public class LineupsApiClient
         await EnsureSuccessAsync(response, ct);
     }
 
+    public async Task<TeamLineupDto> DuplicateAsync(Guid teamId, Guid lineupId, string teamToken, CancellationToken ct = default)
+    {
+        if (teamId == Guid.Empty)
+        {
+            throw new ArgumentException("Time inválido.", nameof(teamId));
+        }
+
+        if (lineupId == Guid.Empty)
+        {
+            throw new ArgumentException("Escalação inválida.", nameof(lineupId));
+        }
+
+        var client = await CreateClientWithTokenAsync(teamToken);
+        var response = await client.PostAsync($"api/teams/{teamId}/lineups/{lineupId}/duplicate", null, ct);
+        await EnsureSuccessAsync(response, ct);
+
+        var payload = await response.Content.ReadFromJsonAsync<TeamLineupDto>(cancellationToken: ct);
+        return payload ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)

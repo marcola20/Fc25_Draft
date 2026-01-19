@@ -97,6 +97,12 @@ else
                         Recarregar escalação
                     </button>
                     <button type="button"
+                            class="btn btn-outline-info"
+                            @onclick="DuplicateCurrentAsync"
+                            disabled="@(isSaving || isDeleting || isNewLineup || lineups.Count >= MaxLineupsPerTeam)">
+                        Duplicar
+                    </button>
+                    <button type="button"
                             class="btn btn-danger"
                             @onclick="DeleteCurrentAsync"
                             disabled="@(isSaving || isDeleting)">
@@ -781,6 +787,50 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Error saving lineup for team {TeamId}", TeamId);
+            Toasts.ShowError(ex.Message);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DuplicateCurrentAsync()
+    {
+        if (currentEditor is null || isNewLineup || currentEditor.LineupId == Guid.Empty)
+        {
+            return;
+        }
+
+        if (lineups.Count >= MaxLineupsPerTeam)
+        {
+            Toasts.ShowError($"O time já possui {MaxLineupsPerTeam} escalações cadastradas.");
+            return;
+        }
+
+        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        {
+            Toasts.ShowError("Informe o token do seu time para duplicar a escalação.");
+            return;
+        }
+
+        saveCts?.Cancel();
+        saveCts = new CancellationTokenSource();
+        isSaving = true;
+
+        try
+        {
+            var duplicated = await LineupsApiClient.DuplicateAsync(TeamId, currentEditor.LineupId, currentTeamToken, saveCts.Token);
+            Toasts.ShowSuccess("Escalação duplicada com sucesso.");
+            await RefreshLineupsAsync(duplicated.LineupId, saveCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Lineups:Error duplicating lineup {LineupId} for team {TeamId}", currentEditor.LineupId, TeamId);
             Toasts.ShowError(ex.Message);
         }
         finally

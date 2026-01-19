@@ -9,5 +9,6 @@ public interface ITeamLineupService
     Task<TeamLineupDto> UpdateLineupAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, CancellationToken ct);
     Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct);
     Task SetActiveLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct);
+    Task<TeamLineupDto> DuplicateLineupAsync(Guid teamId, Guid sourceLineupId, CancellationToken ct);
     Task<IReadOnlyList<AdminLineupOverviewDto>> GetAdminLineupsAsync(Guid? teamId, CancellationToken ct);
 }

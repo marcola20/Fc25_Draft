@@ -370,6 +370,45 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            lineupsApi.MapPost("/{lineupId:guid}/duplicate", async (
+                Guid teamId,
+                Guid lineupId,
+                HttpContext httpContext,
+                DraftDbContext db,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("TeamLineupsEndpoints");
+
+                var authorizationResult = await EnsureTeamLineupAccessAsync(db, httpContext, teamId, ct);
+                if (authorizationResult is not null)
+                {
+                    return authorizationResult;
+                }
+
+                try
+                {
+                    var result = await lineupService.DuplicateLineupAsync(teamId, lineupId, ct);
+                    return Results.Ok(result);
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Duplicate not found {TeamId}/{LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, "Lineups:Duplicate invalid request for team {TeamId}", teamId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status400BadRequest);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Lineups:Duplicate unexpected error for team {TeamId} lineup {LineupId}", teamId, lineupId);
+                    return Results.Json(new { message = "Não foi possível duplicar a escalação." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
             teamsApi.MapPost("/{teamId:guid}/quick-sell/{playerId:guid}", async (
                 Guid teamId,
                 Guid playerId,
