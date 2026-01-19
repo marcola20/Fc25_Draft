@@ -721,7 +721,7 @@ public class TeamLineupService : ITeamLineupService
         }
 
         var rosterNames = rosterPlayers.ToDictionary(x => x.PlayerId, x => x.Name);
-        EnsureUniquePlayers(selectedPlayerIds, rosterNames);
+        EnsureUniquePlayers(selectedPlayerIds, rosterNames!);
 
         var rosterPositions = rosterPlayers.ToDictionary(x => x.PlayerId, x => x.PositionId);
 

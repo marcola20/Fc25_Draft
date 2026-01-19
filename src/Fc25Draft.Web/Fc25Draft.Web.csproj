@@ -5,9 +5,6 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
-	    <ItemGroup>
-		    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-	    </ItemGroup>
         <ItemGroup>
           <ProjectReference Include="..\Fc25Draft.Core\Fc25Draft.Core.csproj" />
           <ProjectReference Include="..\Fc25Draft.Infra\Fc25Draft.Infra.csproj" />

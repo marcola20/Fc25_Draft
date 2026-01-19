@@ -295,7 +295,7 @@ public class DraftService
                     .ToArrayAsync(ct);
 
                 if (secondRoundOrder.Length == teamsInDraft.Length &&
-                    secondRoundOrder.SequenceEqual(teamsInDraft.Reverse()))
+                    secondRoundOrder.SequenceEqual(teamsInDraft.AsEnumerable().Reverse()))
                 {
                     isSnakeDraft = true;
                 }

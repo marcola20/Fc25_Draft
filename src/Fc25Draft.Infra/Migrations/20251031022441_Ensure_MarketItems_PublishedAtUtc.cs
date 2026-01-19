@@ -11,18 +11,12 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "PublishedAtUtc",
-                table: "MarketItems",
-                type: "timestamp with time zone", 
-                nullable: true);
+            // Não faz nada - coluna já existe na migration anterior (20251029085220_InitialPostgres1)
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "PublishedAtUtc",
-                table: "MarketItems");
+            // Não faz nada
         }
     }
 }
