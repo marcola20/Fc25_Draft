@@ -642,14 +642,6 @@ public class TeamLineupService : ITeamLineupService
         lineup.PenaltiesPlayerId = roles.PenaltiesPlayerId;
         lineup.CornerLeftPlayerId = roles.CornerLeftPlayerId;
         lineup.CornerRightPlayerId = roles.CornerRightPlayerId;
-
-        lineup.CaptainPlayer = null;
-        lineup.ShortFreeKickLeftPlayer = null;
-        lineup.ShortFreeKickRightPlayer = null;
-        lineup.LongFreeKickPlayer = null;
-        lineup.PenaltiesPlayer = null;
-        lineup.CornerLeftPlayer = null;
-        lineup.CornerRightPlayer = null;
     }
 
     private static Dictionary<string, int?> BuildAssignments(LineupTemplate template, TeamLineupSaveRequestDto request)
