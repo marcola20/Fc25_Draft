@@ -942,8 +942,8 @@ else
                 PlayerOption? selected = null;
                 if (slot.Player is not null)
                 {
-                    selected = rosterPlayers.FirstOrDefault(p => p.PlayerId == slot.Player.PlayerId)
-                        ?? new PlayerOption(slot.Player.PlayerId, slot.Player.PlayerGuid, slot.Player.Name, slot.Player.PositionName, slot.Player.PositionId, 0);
+                    // Apenas seleciona o jogador se ele ainda estiver no roster do time
+                    selected = rosterPlayers.FirstOrDefault(p => p.PlayerId == slot.Player.PlayerId);
                 }
 
                 return new LineupSlotState(
@@ -1041,13 +1041,8 @@ else
             return null;
         }
 
-        var rosterPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == player.PlayerId);
-        if (rosterPlayer is not null)
-        {
-            return rosterPlayer;
-        }
-
-        return new PlayerOption(player.PlayerId, player.PlayerGuid, player.Name, player.PositionName, player.PositionId, 0);
+        // Apenas retorna o jogador se ele ainda estiver no roster do time
+        return rosterPlayers.FirstOrDefault(p => p.PlayerId == player.PlayerId);
     }
 
     private void OnRoleChanged(SpecialRoleType role, string? value)
