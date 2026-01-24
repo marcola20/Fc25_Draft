@@ -170,9 +170,9 @@ public static class LineupTemplateCatalog
                     new("LCB", "Zagueiro (E)", false, 3, new short[] { 2, 3, 4, 5 }),
                     new("RCB", "Zagueiro (D)", false, 4, new short[] { 2, 3, 4, 5 }),
                     new("RB", "Lateral Direito (LD)", false, 5, new short[] { 2, 3, 4, 5, 9 }),
-                    new("CDM", "Volante (VOL)", false, 6, new short[] { 5, 6 }),
-                    new("LCM", "Meia Central Esquerdo (MC)", false, 7, new short[] { 5, 6, 7 }),
-                    new("RCM", "Meia Central Direito (MC)", false, 8, new short[] { 5, 6, 7 }),
+                    new("CDM", "Volante (VOL)", false, 6, new short[] { 5, 6, 7 }),
+                    new("LCM", "Meia Central Esquerdo (MC)", false, 7, new short[] { 5, 6, 7, 8, 9 }),
+                    new("RCM", "Meia Central Direito (MC)", false, 8, new short[] { 5, 6, 7, 8, 9 }),
                     new("CAM", "Meia Atacante (MEI)", false, 9, new short[] { 6, 7, 8, 9, 10 }),
                     new("ST1", "Atacante Esquerdo (ATA)", false, 10, new short[] { 7, 8, 9, 10 }),
                     new("ST2", "Atacante Direito (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
