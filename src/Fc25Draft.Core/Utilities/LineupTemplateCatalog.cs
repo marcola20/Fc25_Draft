@@ -276,7 +276,7 @@ public static class LineupTemplateCatalog
                     new("CM2", "Meia Central Direito (MC)", false, 7, new short[] {5, 6, 7, 8, 9 }),
                     new("CAM", "Meia Atacante (MEI)", false, 8, new short[] { 6, 7, 8, 9, 10 }),
                     new("LM", "Meia Esquerda (ME)", false, 9, new short[] { 7, 8, 9, 10 }),
-                    new("RD", "Meia Direita (MD)", false, 10, new short[] { 7, 8, 9, 10 }),
+                    new("RM", "Meia Direita (MD)", false, 10, new short[] { 7, 8, 9, 10 }),
                     new("ST", "Atacante (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
                 },
                 CreateBenchTemplate()),
@@ -294,6 +294,23 @@ public static class LineupTemplateCatalog
                     new("CM3", "Meia Central Direito (MC)", false, 8, new short[] {5, 6, 7, 8, 9 }),
                     new("CAM1", "Meia Atacante Esquerdo (MEI)", false, 9, new short[] { 6, 7, 8, 9, 10 }),
                     new("CAM2", "Meia Atacante Direito (MEI)", false, 10, new short[] { 6, 7, 8, 9, 10 }),
+                    new("ST", "Atacante (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
+                },
+                CreateBenchTemplate()),
+            ["4-5-1"] = new LineupTemplate(
+                "4-5-1",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK", "Goleiro (GK)", false, 1, new short[] { 1 }),
+                    new("LB", "Lateral Esquerdo (LE)", false, 2, new short[] { 2, 3, 4, 5, 8 }),
+                    new("LCB", "Zagueiro (E)", false, 3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB", "Zagueiro (D)", false, 4, new short[] { 2, 3, 4, 5 }),
+                    new("RB", "Lateral Direito (LD)", false, 5, new short[] { 2, 3, 4, 5, 9 }),
+                    new("CM1", "Meia Central Esquerdo (MC)", false, 6, new short[] {5, 6, 7, 8, 9 }),
+                    new("CM2", "Meia Central (MC)", false, 7, new short[] {5, 6, 7, 8, 9 }),
+                    new("CM3", "Meia Central Direito (MC)", false, 8, new short[] {5, 6, 7, 8, 9 }),
+                    new("LM", "Meia Esquerdo (ME)", false, 9, new short[] { 7, 8, 9, 10 }),
+                    new("RM", "Meia Direito (MD)", false, 10, new short[] { 7, 8, 9, 10 }),
                     new("ST", "Atacante (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
                 },
                 CreateBenchTemplate())
