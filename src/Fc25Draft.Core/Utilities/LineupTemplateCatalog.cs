@@ -161,6 +161,23 @@ public static class LineupTemplateCatalog
                     new("ST2", "Atacante Direito (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
                 },
                 CreateBenchTemplate()),
+            ["4-1-2-1-2 Aberto"] = new LineupTemplate(
+                "4-1-2-1-2 Aberto",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK", "Goleiro (GK)", false, 1, new short[] { 1 }),
+                    new("LB", "Lateral Esquerdo (LE)", false, 2, new short[] { 2, 3, 4, 5, 8 }),
+                    new("LCB", "Zagueiro (E)", false, 3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB", "Zagueiro (D)", false, 4, new short[] { 2, 3, 4, 5 }),
+                    new("RB", "Lateral Direito (LD)", false, 5, new short[] { 2, 3, 4, 5, 9 }),
+                    new("CDM", "Volante (VOL)", false, 6, new short[] { 5, 6, 7 }),
+                    new("LM", "Meia Esquerdo (ME)", false, 7, new short[] { 7, 8, 9, 10 }),
+                    new("RM", "Meia Direito (MD)", false, 8, new short[] { 7, 8, 9, 10 }),
+                    new("CAM", "Meia Atacante (MEI)", false, 9, new short[] { 6, 7, 8, 9, 10 }),
+                    new("ST1", "Atacante Esquerdo (ATA)", false, 10, new short[] { 7, 8, 9, 10 }),
+                    new("ST2", "Atacante Direito (ATA)", false, 11, new short[] { 7, 8, 9, 10 })
+                },
+                CreateBenchTemplate()),
             ["4-1-2-1-2"] = new LineupTemplate(
                 "4-1-2-1-2",
                 new List<LineupSlotTemplate>
