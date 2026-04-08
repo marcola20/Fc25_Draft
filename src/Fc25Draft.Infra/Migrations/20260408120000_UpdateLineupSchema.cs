@@ -11,176 +11,190 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Remove TacticCode
-            migrationBuilder.DropColumn(
-                name: "TacticCode",
-                table: "TeamLineups");
+            // Remove TacticCode (IF EXISTS — safe to re-run)
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" DROP COLUMN IF EXISTS ""TacticCode"";");
 
-            // Add AutoSubstitution
-            migrationBuilder.AddColumn<int>(
-                name: "AutoSubstitution",
-                table: "TeamLineups",
-                type: "integer",
-                nullable: false,
-                defaultValue: 1);
+            // Add AutoSubstitution (IF NOT EXISTS — safe to re-run)
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""TeamLineups""
+                ADD COLUMN IF NOT EXISTS ""AutoSubstitution"" integer NOT NULL DEFAULT 1;
+            ");
 
-            // Rename ShortFreeKickLeft -> ShortFreeKick1
-            migrationBuilder.RenameColumn(
-                name: "ShortFreeKickLeftPlayerId",
-                table: "TeamLineups",
-                newName: "ShortFreeKick1PlayerId");
+            // Rename ShortFreeKickLeft -> ShortFreeKick1 (only if old name still exists)
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'TeamLineups'
+                          AND column_name = 'ShortFreeKickLeftPlayerId'
+                    ) THEN
+                        ALTER TABLE ""TeamLineups""
+                            RENAME COLUMN ""ShortFreeKickLeftPlayerId"" TO ""ShortFreeKick1PlayerId"";
+                        ALTER INDEX IF EXISTS ""IX_TeamLineups_ShortFreeKickLeftPlayerId""
+                            RENAME TO ""IX_TeamLineups_ShortFreeKick1PlayerId"";
+                    END IF;
+                END$$;
+            ");
 
-            migrationBuilder.RenameIndex(
-                name: "IX_TeamLineups_ShortFreeKickLeftPlayerId",
-                table: "TeamLineups",
-                newName: "IX_TeamLineups_ShortFreeKick1PlayerId");
+            // Rename ShortFreeKickRight -> ShortFreeKick2 (only if old name still exists)
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'TeamLineups'
+                          AND column_name = 'ShortFreeKickRightPlayerId'
+                    ) THEN
+                        ALTER TABLE ""TeamLineups""
+                            RENAME COLUMN ""ShortFreeKickRightPlayerId"" TO ""ShortFreeKick2PlayerId"";
+                        ALTER INDEX IF EXISTS ""IX_TeamLineups_ShortFreeKickRightPlayerId""
+                            RENAME TO ""IX_TeamLineups_ShortFreeKick2PlayerId"";
+                    END IF;
+                END$$;
+            ");
 
-            // Rename ShortFreeKickRight -> ShortFreeKick2
-            migrationBuilder.RenameColumn(
-                name: "ShortFreeKickRightPlayerId",
-                table: "TeamLineups",
-                newName: "ShortFreeKick2PlayerId");
+            // Add AttackingPlayer columns (IF NOT EXISTS — safe to re-run)
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""TeamLineups"" ADD COLUMN IF NOT EXISTS ""AttackingPlayer1Id"" integer NULL;
+                ALTER TABLE ""TeamLineups"" ADD COLUMN IF NOT EXISTS ""AttackingPlayer2Id"" integer NULL;
+                ALTER TABLE ""TeamLineups"" ADD COLUMN IF NOT EXISTS ""AttackingPlayer3Id"" integer NULL;
+            ");
 
-            migrationBuilder.RenameIndex(
-                name: "IX_TeamLineups_ShortFreeKickRightPlayerId",
-                table: "TeamLineups",
-                newName: "IX_TeamLineups_ShortFreeKick2PlayerId");
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_TeamLineups_AttackingPlayer1Id"" ON ""TeamLineups"" (""AttackingPlayer1Id"");");
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_TeamLineups_AttackingPlayer2Id"" ON ""TeamLineups"" (""AttackingPlayer2Id"");");
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_TeamLineups_AttackingPlayer3Id"" ON ""TeamLineups"" (""AttackingPlayer3Id"");");
 
-            // Add AttackingPlayer columns
-            migrationBuilder.AddColumn<int>(
-                name: "AttackingPlayer1Id",
-                table: "TeamLineups",
-                type: "integer",
-                nullable: true);
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'FK_TeamLineups_Players_AttackingPlayer1Id'
+                    ) THEN
+                        ALTER TABLE ""TeamLineups""
+                            ADD CONSTRAINT ""FK_TeamLineups_Players_AttackingPlayer1Id""
+                            FOREIGN KEY (""AttackingPlayer1Id"") REFERENCES ""Players""(""PlayerId"")
+                            ON DELETE RESTRICT;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'FK_TeamLineups_Players_AttackingPlayer2Id'
+                    ) THEN
+                        ALTER TABLE ""TeamLineups""
+                            ADD CONSTRAINT ""FK_TeamLineups_Players_AttackingPlayer2Id""
+                            FOREIGN KEY (""AttackingPlayer2Id"") REFERENCES ""Players""(""PlayerId"")
+                            ON DELETE RESTRICT;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'FK_TeamLineups_Players_AttackingPlayer3Id'
+                    ) THEN
+                        ALTER TABLE ""TeamLineups""
+                            ADD CONSTRAINT ""FK_TeamLineups_Players_AttackingPlayer3Id""
+                            FOREIGN KEY (""AttackingPlayer3Id"") REFERENCES ""Players""(""PlayerId"")
+                            ON DELETE RESTRICT;
+                    END IF;
+                END$$;
+            ");
 
-            migrationBuilder.AddColumn<int>(
-                name: "AttackingPlayer2Id",
-                table: "TeamLineups",
-                type: "integer",
-                nullable: true);
+            // Create TeamLineupOffensiveInstructions table (IF NOT EXISTS — safe to re-run)
+            migrationBuilder.Sql(@"
+                CREATE TABLE IF NOT EXISTS ""TeamLineupOffensiveInstructions"" (
+                    ""LineupId""       uuid    NOT NULL,
+                    ""OffensiveStyle"" integer NOT NULL,
+                    ""Playmaker""      integer NOT NULL,
+                    ""AttackArea""     integer NOT NULL,
+                    ""Positioning""    integer NOT NULL,
+                    ""SupportRange""   integer NOT NULL,
+                    CONSTRAINT ""PK_TeamLineupOffensiveInstructions"" PRIMARY KEY (""LineupId""),
+                    CONSTRAINT ""FK_TeamLineupOffensiveInstructions_TeamLineups_LineupId""
+                        FOREIGN KEY (""LineupId"") REFERENCES ""TeamLineups""(""LineupId"") ON DELETE CASCADE
+                );
+            ");
 
-            migrationBuilder.AddColumn<int>(
-                name: "AttackingPlayer3Id",
-                table: "TeamLineups",
-                type: "integer",
-                nullable: true);
+            // Rename old formation names to new naming convention.
+            // Any unmapped formation is set to the new default "4-3-3 (4-2-1-3)".
+            migrationBuilder.Sql(@"
+                UPDATE ""TeamLineups"" SET ""Formation"" = CASE ""Formation""
+                    WHEN '4-3-3'              THEN '4-3-3 (4-2-1-3)'
+                    WHEN '4-3-3 Conservador'  THEN '4-3-3 (4-1-2-3)'
+                    WHEN '4-2-3-1'            THEN '4-5-1 (4-2-3-1)'
+                    WHEN '4-2-3-1 (2)'        THEN '4-5-1 (4-2-3-1)'
+                    WHEN '4-2-3-1 (3)'        THEN '4-5-1 (4-2-3-1)'
+                    WHEN '4-2-2-2'            THEN '4-4-2 (4-2-2-2) Padrão'
+                    WHEN '4-2-2-2 (2)'        THEN '4-4-2 (4-2-2-2) Padrão'
+                    WHEN '4-1-2-1-2 Aberto'   THEN '4-4-2 (4-3-1-2)'
+                    WHEN '4-1-2-1-2'          THEN '4-4-2 (4-3-1-2)'
+                    WHEN '4-2-1-3'            THEN '4-3-3 (4-2-1-3)'
+                    WHEN '4-4-1-1'            THEN '4-5-1 (4-1-4-1)'
+                    WHEN '4-3-2-1'            THEN '4-5-1 (4-3-2-1)'
+                    WHEN '4-3-1-2'            THEN '4-4-2 (4-3-1-2)'
+                    WHEN '4-5-1'              THEN '4-5-1 (4-2-3-1)'
+                    WHEN '3-4-2-1'            THEN '3-4-3 (3-2-2-3)'
+                    WHEN '5-3-2'              THEN '5-3-2 (5-3-2)'
+                    ELSE '4-3-3 (4-2-1-3)'
+                END
+                WHERE ""Formation"" NOT IN (
+                    '4-4-2 (4-2-2-2) Padrão','4-5-1 (4-2-3-1)','4-5-1 (4-1-4-1)',
+                    '4-5-1 (4-3-2-1)','4-4-2 (4-2-2-2)','4-4-2 (4-3-1-2)',
+                    '4-3-3 (4-2-1-3)','4-3-3 (4-1-2-3)','3-6-1 (3-2-4-1)',
+                    '3-5-2 (3-2-3-2)','3-5-2 (3-3-2-2)','3-4-3 (3-2-2-3)',
+                    '5-4-1 (5-2-2-1)','5-3-2 (5-2-1-2)','5-3-2 (5-3-2)'
+                );
+            ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_TeamLineups_AttackingPlayer1Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer1Id");
+            // Also clear slots for lineups that had their formation renamed
+            // (slot codes may be invalid for the new template, safer to clear them).
+            migrationBuilder.Sql(@"
+                UPDATE ""TeamLineupSlots"" s
+                SET ""PlayerId"" = NULL
+                FROM ""TeamLineups"" l
+                WHERE l.""LineupId"" = s.""LineupId"";
+            ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_TeamLineups_AttackingPlayer2Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer2Id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TeamLineups_AttackingPlayer3Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer3Id");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_TeamLineups_Players_AttackingPlayer1Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer1Id",
-                principalTable: "Players",
-                principalColumn: "PlayerId",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_TeamLineups_Players_AttackingPlayer2Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer2Id",
-                principalTable: "Players",
-                principalColumn: "PlayerId",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_TeamLineups_Players_AttackingPlayer3Id",
-                table: "TeamLineups",
-                column: "AttackingPlayer3Id",
-                principalTable: "Players",
-                principalColumn: "PlayerId",
-                onDelete: ReferentialAction.Restrict);
-
-            // Create TeamLineupOffensiveInstructions table
-            migrationBuilder.CreateTable(
-                name: "TeamLineupOffensiveInstructions",
-                columns: table => new
-                {
-                    LineupId = table.Column<Guid>(type: "uuid", nullable: false),
-                    OffensiveStyle = table.Column<int>(type: "integer", nullable: false),
-                    Playmaker = table.Column<int>(type: "integer", nullable: false),
-                    AttackArea = table.Column<int>(type: "integer", nullable: false),
-                    Positioning = table.Column<int>(type: "integer", nullable: false),
-                    SupportRange = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TeamLineupOffensiveInstructions", x => x.LineupId);
-                    table.ForeignKey(
-                        name: "FK_TeamLineupOffensiveInstructions_TeamLineups_LineupId",
-                        column: x => x.LineupId,
-                        principalTable: "TeamLineups",
-                        principalColumn: "LineupId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            // Create TeamLineupDefensiveInstructions table
-            migrationBuilder.CreateTable(
-                name: "TeamLineupDefensiveInstructions",
-                columns: table => new
-                {
-                    LineupId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DefensiveStyle = table.Column<int>(type: "integer", nullable: false),
-                    ContainmentArea = table.Column<int>(type: "integer", nullable: false),
-                    Pressure = table.Column<int>(type: "integer", nullable: false),
-                    DefensiveLine = table.Column<int>(type: "integer", nullable: false),
-                    Density = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TeamLineupDefensiveInstructions", x => x.LineupId);
-                    table.ForeignKey(
-                        name: "FK_TeamLineupDefensiveInstructions_TeamLineups_LineupId",
-                        column: x => x.LineupId,
-                        principalTable: "TeamLineups",
-                        principalColumn: "LineupId",
-                        onDelete: ReferentialAction.Cascade);
-                });
+            // Create TeamLineupDefensiveInstructions table (IF NOT EXISTS — safe to re-run)
+            migrationBuilder.Sql(@"
+                CREATE TABLE IF NOT EXISTS ""TeamLineupDefensiveInstructions"" (
+                    ""LineupId""          uuid    NOT NULL,
+                    ""DefensiveStyle""    integer NOT NULL,
+                    ""ContainmentArea""   integer NOT NULL,
+                    ""Pressure""          integer NOT NULL,
+                    ""DefensiveLine""     integer NOT NULL,
+                    ""Density""           integer NOT NULL,
+                    CONSTRAINT ""PK_TeamLineupDefensiveInstructions"" PRIMARY KEY (""LineupId""),
+                    CONSTRAINT ""FK_TeamLineupDefensiveInstructions_TeamLineups_LineupId""
+                        FOREIGN KEY (""LineupId"") REFERENCES ""TeamLineups""(""LineupId"") ON DELETE CASCADE
+                );
+            ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "TeamLineupOffensiveInstructions");
-            migrationBuilder.DropTable(name: "TeamLineupDefensiveInstructions");
+            migrationBuilder.Sql(@"DROP TABLE IF EXISTS ""TeamLineupOffensiveInstructions"";");
+            migrationBuilder.Sql(@"DROP TABLE IF EXISTS ""TeamLineupDefensiveInstructions"";");
 
-            migrationBuilder.DropForeignKey(name: "FK_TeamLineups_Players_AttackingPlayer1Id", table: "TeamLineups");
-            migrationBuilder.DropForeignKey(name: "FK_TeamLineups_Players_AttackingPlayer2Id", table: "TeamLineups");
-            migrationBuilder.DropForeignKey(name: "FK_TeamLineups_Players_AttackingPlayer3Id", table: "TeamLineups");
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" DROP COLUMN IF EXISTS ""AttackingPlayer1Id"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" DROP COLUMN IF EXISTS ""AttackingPlayer2Id"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" DROP COLUMN IF EXISTS ""AttackingPlayer3Id"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" DROP COLUMN IF EXISTS ""AutoSubstitution"";");
 
-            migrationBuilder.DropIndex(name: "IX_TeamLineups_AttackingPlayer1Id", table: "TeamLineups");
-            migrationBuilder.DropIndex(name: "IX_TeamLineups_AttackingPlayer2Id", table: "TeamLineups");
-            migrationBuilder.DropIndex(name: "IX_TeamLineups_AttackingPlayer3Id", table: "TeamLineups");
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TeamLineups' AND column_name='ShortFreeKick1PlayerId') THEN
+                        ALTER TABLE ""TeamLineups"" RENAME COLUMN ""ShortFreeKick1PlayerId"" TO ""ShortFreeKickLeftPlayerId"";
+                        ALTER INDEX IF EXISTS ""IX_TeamLineups_ShortFreeKick1PlayerId"" RENAME TO ""IX_TeamLineups_ShortFreeKickLeftPlayerId"";
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TeamLineups' AND column_name='ShortFreeKick2PlayerId') THEN
+                        ALTER TABLE ""TeamLineups"" RENAME COLUMN ""ShortFreeKick2PlayerId"" TO ""ShortFreeKickRightPlayerId"";
+                        ALTER INDEX IF EXISTS ""IX_TeamLineups_ShortFreeKick2PlayerId"" RENAME TO ""IX_TeamLineups_ShortFreeKickRightPlayerId"";
+                    END IF;
+                END$$;
+            ");
 
-            migrationBuilder.DropColumn(name: "AttackingPlayer1Id", table: "TeamLineups");
-            migrationBuilder.DropColumn(name: "AttackingPlayer2Id", table: "TeamLineups");
-            migrationBuilder.DropColumn(name: "AttackingPlayer3Id", table: "TeamLineups");
-            migrationBuilder.DropColumn(name: "AutoSubstitution", table: "TeamLineups");
-
-            migrationBuilder.RenameColumn(name: "ShortFreeKick1PlayerId", table: "TeamLineups", newName: "ShortFreeKickLeftPlayerId");
-            migrationBuilder.RenameIndex(name: "IX_TeamLineups_ShortFreeKick1PlayerId", table: "TeamLineups", newName: "IX_TeamLineups_ShortFreeKickLeftPlayerId");
-            migrationBuilder.RenameColumn(name: "ShortFreeKick2PlayerId", table: "TeamLineups", newName: "ShortFreeKickRightPlayerId");
-            migrationBuilder.RenameIndex(name: "IX_TeamLineups_ShortFreeKick2PlayerId", table: "TeamLineups", newName: "IX_TeamLineups_ShortFreeKickRightPlayerId");
-
-            migrationBuilder.AddColumn<string>(
-                name: "TacticCode",
-                table: "TeamLineups",
-                type: "character varying(40)",
-                maxLength: 40,
-                nullable: true);
+            migrationBuilder.Sql(@"ALTER TABLE ""TeamLineups"" ADD COLUMN IF NOT EXISTS ""TacticCode"" character varying(40) NULL;");
         }
     }
 }

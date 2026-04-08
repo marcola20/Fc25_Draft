@@ -34,13 +34,10 @@ builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
-        await db.Database.MigrateAsync();
-    }
+    var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+    await db.Database.MigrateAsync();
 }
 if (!app.Environment.IsEnvironment("Testing"))
 {
