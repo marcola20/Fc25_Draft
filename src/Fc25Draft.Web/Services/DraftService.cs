@@ -28,9 +28,9 @@ public class DraftService
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(teamOrder);
 
-        if (teamOrder.Count != 14)
+        if (teamOrder.Count != 12)
         {
-            throw new ArgumentException("Drafts must contain exactly 14 teams.", nameof(teamOrder));
+            throw new ArgumentException("Drafts must contain exactly 12 teams.", nameof(teamOrder));
         }
 
         if (totalRounds <= 0)
