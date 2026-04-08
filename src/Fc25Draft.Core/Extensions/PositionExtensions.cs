@@ -1,5 +1,4 @@
-﻿using Fc25Draft.Core.Enums;
-using System;
+using Fc25Draft.Core.Enums;
 using System.Collections.Generic;
 
 namespace Fc25Draft.Core.Extensions
@@ -10,14 +9,17 @@ namespace Fc25Draft.Core.Extensions
         {
             ["GOL"] = (short)PositionType.Goleiro,
             ["ZAG"] = (short)PositionType.Zagueiro,
-            ["LE"] = (short)PositionType.LateralAlaEsquerdo,
-            ["LD"] = (short)PositionType.LateralAlaDireito,
+            ["LE"]  = (short)PositionType.LateralEsquerdo,
+            ["LD"]  = (short)PositionType.LateralDireito,
             ["VOL"] = (short)PositionType.Volante,
-            ["MEI"] = (short)PositionType.MeiaCentral,
+            ["MLG"] = (short)PositionType.MeiaLigacao,
             ["MAT"] = (short)PositionType.MeiaAtacante,
-            ["MPE"] = (short)PositionType.MeiaPontaEsquerda,
-            ["MPD"] = (short)PositionType.MeiaPontaDireita,
-            ["ATA"] = (short)PositionType.Atacante
+            ["ME"]  = (short)PositionType.MeiaEsquerda,
+            ["PE"]  = (short)PositionType.PontaEsquerda,
+            ["MD"]  = (short)PositionType.MeiaDireita,
+            ["PD"]  = (short)PositionType.PontaDireita,
+            ["CA"]  = (short)PositionType.Centroavante,
+            ["SA"]  = (short)PositionType.SegundoAtacante
         };
 
         public static int ToPositionId(this string positionName)
@@ -25,20 +27,22 @@ namespace Fc25Draft.Core.Extensions
             if (string.IsNullOrWhiteSpace(positionName))
                 return 0;
 
-            positionName = positionName.Trim().ToLowerInvariant();
-
-            return positionName switch
+            return positionName.Trim().ToLowerInvariant() switch
             {
-                "goleiro" => (int)PositionType.Goleiro,
-                "zagueiro" => (int)PositionType.Zagueiro,
-                "lateral/ala esquerdo" => (int)PositionType.LateralAlaEsquerdo,
-                "lateral/ala direito" => (int)PositionType.LateralAlaDireito,
-                "volante" => (int)PositionType.Volante,
-                "meia central" => (int)PositionType.MeiaCentral,
-                "meia atacante" => (int)PositionType.MeiaAtacante,
-                "meia/ponta esquerda" => (int)PositionType.MeiaPontaEsquerda,
-                "meia/ponta direita" => (int)PositionType.MeiaPontaDireita,
-                "atacante" => (int)PositionType.Atacante,
+                "goleiro"           => (int)PositionType.Goleiro,
+                "zagueiro"          => (int)PositionType.Zagueiro,
+                "lateral esquerdo"  => (int)PositionType.LateralEsquerdo,
+                "lateral direito"   => (int)PositionType.LateralDireito,
+                "volante"           => (int)PositionType.Volante,
+                "meia de ligação"
+                or "meia de ligacao" => (int)PositionType.MeiaLigacao,
+                "meia atacante"     => (int)PositionType.MeiaAtacante,
+                "meia esquerda"     => (int)PositionType.MeiaEsquerda,
+                "ponta esquerda"    => (int)PositionType.PontaEsquerda,
+                "meia direita"      => (int)PositionType.MeiaDireita,
+                "ponta direita"     => (int)PositionType.PontaDireita,
+                "centroavante"      => (int)PositionType.Centroavante,
+                "segundo atacante"  => (int)PositionType.SegundoAtacante,
                 _ => 0
             };
         }
@@ -47,16 +51,19 @@ namespace Fc25Draft.Core.Extensions
         {
             return positionId switch
             {
-                (int)PositionType.Goleiro => "Goleiro",
-                (int)PositionType.Zagueiro => "Zagueiro",
-                (int)PositionType.LateralAlaEsquerdo => "Lateral/Ala Esquerdo",
-                (int)PositionType.LateralAlaDireito => "Lateral/Ala Direito",
-                (int)PositionType.Volante => "Volante",
-                (int)PositionType.MeiaCentral => "Meia Central",
-                (int)PositionType.MeiaAtacante => "Meia Atacante",
-                (int)PositionType.MeiaPontaEsquerda => "Meia/Ponta Esquerda",
-                (int)PositionType.MeiaPontaDireita => "Meia/Ponta Direita",
-                (int)PositionType.Atacante => "Atacante",
+                (int)PositionType.Goleiro         => "Goleiro",
+                (int)PositionType.Zagueiro        => "Zagueiro",
+                (int)PositionType.LateralEsquerdo => "Lateral Esquerdo",
+                (int)PositionType.LateralDireito  => "Lateral Direito",
+                (int)PositionType.Volante         => "Volante",
+                (int)PositionType.MeiaLigacao     => "Meia de Ligação",
+                (int)PositionType.MeiaAtacante    => "Meia Atacante",
+                (int)PositionType.MeiaEsquerda    => "Meia Esquerda",
+                (int)PositionType.PontaEsquerda   => "Ponta Esquerda",
+                (int)PositionType.MeiaDireita     => "Meia Direita",
+                (int)PositionType.PontaDireita    => "Ponta Direita",
+                (int)PositionType.Centroavante    => "Centroavante",
+                (int)PositionType.SegundoAtacante => "Segundo Atacante",
                 _ => "Desconhecida"
             };
         }
@@ -65,16 +72,19 @@ namespace Fc25Draft.Core.Extensions
         {
             return positionId switch
             {
-                (int)PositionType.Goleiro => "GOL",
-                (int)PositionType.Zagueiro => "ZAG",
-                (int)PositionType.LateralAlaEsquerdo => "LE",
-                (int)PositionType.LateralAlaDireito => "LD",
-                (int)PositionType.Volante => "VOL",
-                (int)PositionType.MeiaCentral => "MEI",
-                (int)PositionType.MeiaAtacante => "MAT",
-                (int)PositionType.MeiaPontaEsquerda => "MPE",
-                (int)PositionType.MeiaPontaDireita => "MPD",
-                (int)PositionType.Atacante => "ATA",
+                (int)PositionType.Goleiro         => "GOL",
+                (int)PositionType.Zagueiro        => "ZAG",
+                (int)PositionType.LateralEsquerdo => "LE",
+                (int)PositionType.LateralDireito  => "LD",
+                (int)PositionType.Volante         => "VOL",
+                (int)PositionType.MeiaLigacao     => "MLG",
+                (int)PositionType.MeiaAtacante    => "MAT",
+                (int)PositionType.MeiaEsquerda    => "ME",
+                (int)PositionType.PontaEsquerda   => "PE",
+                (int)PositionType.MeiaDireita     => "MD",
+                (int)PositionType.PontaDireita    => "PD",
+                (int)PositionType.Centroavante    => "CA",
+                (int)PositionType.SegundoAtacante => "SA",
                 _ => positionId.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
         }
@@ -84,9 +94,7 @@ namespace Fc25Draft.Core.Extensions
             positionId = 0;
 
             if (string.IsNullOrWhiteSpace(code))
-            {
                 return false;
-            }
 
             return PositionCodeLookup.TryGetValue(code.Trim(), out positionId);
         }

@@ -30,7 +30,7 @@ builder.Services.AddAuthorization(o => o.AddPolicy("AdminOnly", p => p.RequireRo
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor(o => o.DetailedErrors = true);
 builder.Services.AddBlazoredToast();
-builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 
 var app = builder.Build();
 
@@ -75,7 +75,6 @@ api.MapDraftEndpoints()
    .MapBudgetEndpoints()
    .MapPricingEndpoints()
    .MapTransfersEndpoints()
-   .MapSeasonEndpoints()
    .MapMarketEndpoints()
    .MapMarketHistoryEndpoints()
    .MapAdminEndpoints();

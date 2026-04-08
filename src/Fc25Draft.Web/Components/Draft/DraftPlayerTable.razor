@@ -1,0 +1,47 @@
+@using Fc25Draft.Core.DTOs
+
+@if (IsLoading)
+{
+    <p><em>Carregando jogadores disponíveis...</em></p>
+}
+else if (Players.Count == 0)
+{
+    <p>Nenhum jogador disponível para seleção.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Jogador</th>
+                    <th>Posição</th>
+                    <th>Overall</th>
+                    <th>Idade</th>
+                    <th class="text-end">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var player in Players)
+                {
+                    <tr>
+                        <td>@player.Name</td>
+                        <td>@player.PositionName</td>
+                        <td>@player.Overall</td>
+                        <td>@(player.Age?.ToString() ?? "-")</td>
+                        <td class="text-end">
+                            <button class="btn btn-primary" @onclick="() => OnPlayerSelected.InvokeAsync(player)" disabled="@DisableSelection">Escolher</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter] public List<AvailablePlayerDto> Players { get; set; } = new();
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool DisableSelection { get; set; }
+    [Parameter] public EventCallback<AvailablePlayerDto> OnPlayerSelected { get; set; }
+}

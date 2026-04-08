@@ -17,11 +17,6 @@ public class LayoutNavigationService
         {
             new("Elencos", "/times/elencos", "oi oi-people")
         }),
-        new("Calendário", new List<MenuItem>
-        {
-            new("Calendário", "/calendario", "oi oi-calendar", MatchPrefix: true),
-            new("Gerenciar Calendário", "/calendario/gerenciar", "oi oi-pencil", RequiredRole: "Admin", MatchPrefix: true)
-        }),
         new("Draft", new List<MenuItem>
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
@@ -80,10 +75,6 @@ public class LayoutNavigationService
         ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/market/historico", true),
         ["/market/transfers"] = CreateDefinition("Histórico de Transferências", "Mercado", "/market/transfers"),
         ["/times/caixa"] = CreateDefinition("Caixa dos Times", "Times", "/times/caixa"),
-        ["/calendario"] = CreateDefinition("Calendário", "Calendário", "/calendario"),
-        ["/calendario/gerenciar"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
-        ["/calendario/admin"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
-        ["/admin/calendario"] = CreateDefinition("Gerenciar Calendário", "Calendário", "/calendario/gerenciar", true),
         ["/admin/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/ciclos", true),
         ["/admin/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/mercado/ciclos", true),
         ["/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/mercado/ciclos", true),
@@ -187,7 +178,6 @@ public class LayoutNavigationService
         {
             "Times" => "/times/elencos",
             "Draft" => "/draft/controle",
-            "Calendário" => "/calendario",
             "Mercado" => "/mercado",
             "Admin" when admin => "/admin/ciclos",
             "Admin" => "/home",

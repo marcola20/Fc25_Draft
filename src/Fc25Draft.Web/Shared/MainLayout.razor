@@ -2,17 +2,9 @@
 @using Blazored.Toast
 @using Blazored.Toast.Configuration
 @using Fc25Draft.Web.Components.Layouts
-@inject Microsoft.Extensions.Options.IOptionsSnapshot<Fc25Draft.Web.Options.AppOptions> AppOptions
 
 <PageTitle>CBFV</PageTitle>
 
-@if (AppOptions.Value.EnableNewNavigationLayout)
-{
-    <AppLayout Body="@Body" />
-}
-else
-{
-    <LegacyAppLayout Body="@Body" />
-}
+<AppLayout Body="@Body" />
 
 <BlazoredToasts Position="ToastPosition.TopRight" />

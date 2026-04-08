@@ -1,9 +1,9 @@
 @page "/draft"
 @page "/draft/controle"
-@using System.Collections.Generic
-@using System.Linq
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
 @using Fc25Draft.Web.Components.Common
+@using Fc25Draft.Web.Components.Draft
 @using Fc25Draft.Web.Services
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.JSInterop
@@ -50,184 +50,21 @@
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body">
-        @if (isLoadingState)
-        {
-            <p><em>Carregando estado do draft...</em></p>
-        }
-        else if (state is null || !state.HasDraft)
-        {
-            <p class="mb-0">Nenhum draft configurado no momento.</p>
-        }
-        else if (state.DraftCompleted)
-        {
-            <h4 class="mb-2">Draft concluído</h4>
-            <p class="mb-2">Todas as @state.TotalPicks escolhas foram finalizadas.</p>
-            <div class="progress" style="height: 8px;">
-                <div class="progress-bar bg-success" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-        }
-        else
-        {
-            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-2">
-                <div>
-                    <h4 class="mb-1">Rodada @state.CurrentRound — Escolha @state.CurrentPickInRound</h4>
-                    <p class="mb-0 text-muted">Escolha geral @state.CurrentOverallPick de @state.TotalPicks.</p>
-                </div>
-                <div class="text-lg-end">
-                    <p class="mb-0">É a vez do time <strong>@state.CurrentTeamName</strong>@FormatOwner(state.CurrentTeamOwner).</p>
-                    @if (!string.IsNullOrEmpty(state.NextTeamName))
-                    {
-                        <small class="text-muted">Próximo: @state.NextTeamName@FormatOwner(state.NextTeamOwner).</small>
-                    }
-                </div>
-            </div>
-            <div class="progress mt-3" style="height: 8px;">
-                <div class="progress-bar" role="progressbar" style="width: @GetProgressWidth();" aria-valuenow="@GetProgressValue()" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-        }
-    </div>
-</div>
+<DraftStateCard IsLoading="@isLoadingState" State="@state" />
 
-<div class="row g-3 align-items-end mb-3">
-    <div class="col-lg-4">
-        <label class="form-label" for="playerSearch">Pesquisar</label>
-        <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por nome" @bind="searchTerm" />
-            <button type="submit" class="btn btn-primary" disabled="@isLoadingPlayers">Buscar</button>
-        </form>
-    </div>
-    <div class="col-lg-3">
-        <label class="form-label" for="draftPositionFilter">Posições</label>
-        @if (isPositionDropdownOpen)
-        {
-            <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="ClosePositionDropdown"></div>
-        }
-        <div class="position-relative" style="z-index: 1010;">
-            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start text-wrap d-flex align-items-center justify-content-between"
-                    type="button"
-                    id="draftPositionFilter"
-                    @onclick="TogglePositionDropdown"
-                    @onkeydown="HandlePositionDropdownKeyDown"
-                    aria-expanded="@isPositionDropdownOpen">
-                <span class="me-2 flex-grow-1">@GetSelectedPositionsLabel()</span>
-            </button>
-            <div class="dropdown-menu w-100 p-3 shadow-sm @(isPositionDropdownOpen ? "show" : string.Empty)"
-                 aria-labelledby="draftPositionFilter"
-                 style="@GetPositionDropdownMenuStyles()"
-                 @onclick:stopPropagation>
-                <div class="form-check mb-2">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           id="draftPositionsAll"
-                           checked="@(!selectedPositionIds.Any())"
-                           @onchange="OnSelectAllPositionsChanged" />
-                    <label class="form-check-label" for="draftPositionsAll">Todas</label>
-                </div>
-                <div class="dropdown-divider"></div>
-                @foreach (var position in positions)
-                {
-                    var checkboxId = $"draftPosition{position.PositionId}";
-                    <div class="form-check">
-                        <input class="form-check-input"
-                               type="checkbox"
-                               id="@checkboxId"
-                               checked="@selectedPositionIds.Contains(position.PositionId)"
-                               @onchange="args => OnPositionToggled(position.PositionId, args.Value)" />
-                        <label class="form-check-label" for="@checkboxId">@position.Name</label>
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-3 d-none d-sm-block">
-        <label class="form-label d-block">Atualizar</label>
-        <button class="btn btn-outline-primary w-50" @onclick="LoadPlayersAsync" disabled="@isLoadingPlayers">Atualizar lista</button>
-    </div>
-</div>
+<DraftPlayerFilters Positions="@positions" IsLoading="@isLoadingPlayers" OnFilterChanged="@OnFilterChangedAsync" />
 
-<div class="row g-3 align-items-end mb-4 draft-filter-group">
-    <div class="col-4 col-sm-4 col-md-3 col-lg-2">
-        <label class="form-label" for="overallMin">Overall mínimo</label>
-        <InputNumber TValue="int?" id="overallMin" class="form-control" min="70" max="99" @bind-Value="overallMin" />
-    </div>
-    <div class="col-5 col-sm-4 col-md-3 col-lg-2">
-        <label class="form-label" for="overallMax">Overall máximo</label>
-        <InputNumber TValue="int?" id="overallMax" class="form-control" min="70" max="99" @bind-Value="overallMax" />
-    </div>
-    <div class="col-3 col-sm-4 col-md-3 col-lg-2 d-flex flex-column justify-content-end gap-2">
-        <label class="form-label d-none d-sm-block">&nbsp;</label>
-        <button type="button" class="btn btn-outline-primary filter-apply-btn w-100" @onclick="ApplyFiltersAsync" disabled="@isLoadingPlayers">Filtrar</button>
-    </div>
-</div>
-
-@if (isLoadingPlayers)
-{
-    <p><em>Carregando jogadores disponíveis...</em></p>
-}
-else if (availablePlayers.Count == 0)
-{
-    <p>Nenhum jogador disponível para seleção.</p>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead>
-                <tr>
-                    <th>Jogador</th>
-                    <th>Posição</th>
-                    <th>Overall</th>
-                    <th>Idade</th>
-                    <th class="text-end">Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var player in availablePlayers)
-                {
-                    <tr>
-                        <td>@player.Name</td>
-                        <td>@player.PositionName</td>
-                        <td>@player.Overall</td>
-                        <td>@(player.Age?.ToString() ?? "-")</td>
-                        <td class="text-end">
-                            <button class="btn btn-primary" @onclick="() => OpenModal(player)" disabled="@DisableSelection">Escolher</button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
+<DraftPlayerTable Players="@availablePlayers" IsLoading="@isLoadingPlayers" DisableSelection="@DisableSelection" OnPlayerSelected="@OpenModal" />
 
 @if (isModalOpen && selectedPlayer is not null)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmar escolha</h5>
-                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseModal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Confirme a escolha do jogador <strong>@selectedPlayer.Name</strong> (@selectedPlayer.PositionName, Overall @selectedPlayer.Overall).</p>
-                    <div class="mb-3">
-                        <label for="tokenInput" class="form-label">Token do time</label>
-                        <input id="tokenInput" type="password" class="form-control" @bind="tokenInput" autocomplete="one-time-code" />
-                    </div>
-                    @if (!string.IsNullOrEmpty(modalError))
-                    {
-                        <div class="alert alert-danger" role="alert">@modalError</div>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSubmittingPick">Cancelar</button>
-                    <button class="btn btn-success" @onclick="ConfirmPickAsync" disabled="@isSubmittingPick">Confirmar escolha</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <DraftPickModal Player="@selectedPlayer"
+                    IsSubmitting="@isSubmittingPick"
+                    Error="@modalError"
+                    TokenInput="@tokenInput"
+                    TokenInputChanged="@(v => tokenInput = v)"
+                    OnClose="@CloseModal"
+                    OnConfirm="@ConfirmPickAsync" />
 }
 
 @code {
@@ -235,7 +72,6 @@ else
     private readonly List<AvailablePlayerDto> availablePlayers = new();
     private DraftStateDto? state;
     private HubConnection? hubConnection;
-    private readonly HashSet<short> selectedPositionIds = new();
     private string? statusMessage;
     private string statusCss = "alert-success";
     private string? connectionError;
@@ -244,7 +80,6 @@ else
     private bool isLoadingPlayers = true;
     private bool isGeneratingDraft;
     private bool authInitialized;
-    private bool isPositionDropdownOpen;
     private bool isModalOpen;
     private AvailablePlayerDto? selectedPlayer;
     private string tokenInput = string.Empty;
@@ -252,9 +87,7 @@ else
     private bool isSubmittingPick;
     private DraftPickSelectionDto? lastSelection;
     private string? shareFeedback;
-    private string searchTerm = string.Empty;
-    private int? overallMin;
-    private int? overallMax;
+    private DraftPlayerFilters.PlayerFilterState currentFilter = new(null, new HashSet<short>(), null, null);
 
     private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
@@ -393,6 +226,12 @@ else
     {
         errorMessage = null;
         await LoadStateAsync();
+        await LoadPlayersAsync();
+    }
+
+    private async Task OnFilterChangedAsync(DraftPlayerFilters.PlayerFilterState filter)
+    {
+        currentFilter = filter;
         await LoadPlayersAsync();
     }
 
@@ -638,7 +477,7 @@ else
 
     private async Task LoadPlayersAsync()
     {
-        if (overallMin.HasValue && overallMax.HasValue && overallMin > overallMax)
+        if (currentFilter.OverallMin.HasValue && currentFilter.OverallMax.HasValue && currentFilter.OverallMin > currentFilter.OverallMax)
         {
             errorMessage = "Overall mínimo não pode ser maior que o máximo.";
             return;
@@ -651,10 +490,10 @@ else
             availablePlayers.Clear();
 
             var players = await DraftStateService.GetAvailablePlayersAsync(
-                selectedPositionIds,
-                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
-                overallMin,
-                overallMax);
+                currentFilter.PositionIds,
+                currentFilter.SearchTerm,
+                currentFilter.OverallMin,
+                currentFilter.OverallMax);
             availablePlayers.AddRange(players);
         }
         catch (Exception ex)
@@ -666,16 +505,6 @@ else
         {
             isLoadingPlayers = false;
         }
-    }
-
-    private async Task OnSearchAsync()
-    {
-        await LoadPlayersAsync();
-    }
-
-    private async Task ApplyFiltersAsync()
-    {
-        await LoadPlayersAsync();
     }
 
     private void OpenModal(AvailablePlayerDto player)
@@ -773,105 +602,6 @@ else
             Logger.LogError(ex, "Erro ao compartilhar no WhatsApp.");
         }
     }
-
-    private string FormatOwner(string? owner)
-        => string.IsNullOrWhiteSpace(owner) ? string.Empty : $" (responsável: {owner})";
-
-    private string GetSelectedPositionsLabel()
-    {
-        if (selectedPositionIds.Count == 0 || positions.Count == 0)
-        {
-            return "Todas as posições";
-        }
-
-        var names = positions
-            .Where(p => selectedPositionIds.Contains(p.PositionId))
-            .Select(p => p.Name)
-            .ToList();
-
-        return names.Count == 0 ? "Todas as posições" : string.Join(", ", names);
-    }
-
-    private string GetPositionDropdownMenuStyles()
-    {
-        var visibility = isPositionDropdownOpen ? string.Empty : " display: none;";
-        return $"max-height: 280px; overflow-y: auto; z-index: 1050;{visibility}";
-    }
-
-    private void TogglePositionDropdown()
-    {
-        isPositionDropdownOpen = !isPositionDropdownOpen;
-    }
-
-    private void ClosePositionDropdown()
-    {
-        if (!isPositionDropdownOpen)
-        {
-            return;
-        }
-
-        isPositionDropdownOpen = false;
-    }
-
-    private void HandlePositionDropdownKeyDown(KeyboardEventArgs args)
-    {
-        if (args.Key == "Escape")
-        {
-            ClosePositionDropdown();
-        }
-    }
-
-    private async Task OnPositionToggled(short positionId, object? value)
-    {
-        var isChecked = ParseCheckboxValue(value);
-        var changed = isChecked
-            ? selectedPositionIds.Add(positionId)
-            : selectedPositionIds.Remove(positionId);
-
-        if (changed)
-        {
-            await ApplyFiltersAsync();
-        }
-    }
-
-    private async Task OnSelectAllPositionsChanged(ChangeEventArgs args)
-    {
-        if (!ParseCheckboxValue(args.Value))
-        {
-            return;
-        }
-
-        if (selectedPositionIds.Count == 0)
-        {
-            return;
-        }
-
-        selectedPositionIds.Clear();
-        await ApplyFiltersAsync();
-    }
-
-    private static bool ParseCheckboxValue(object? value)
-    {
-        return value switch
-        {
-            bool boolean => boolean,
-            string text when bool.TryParse(text, out var parsed) => parsed,
-            _ => false
-        };
-    }
-
-    private int GetProgressValue()
-    {
-        if (state is null || state.TotalPicks == 0)
-        {
-            return 0;
-        }
-
-        return (int)Math.Round((double)state.CompletedPicks * 100 / state.TotalPicks);
-    }
-
-    private string GetProgressWidth()
-        => state is null || state.TotalPicks == 0 ? "0%" : $"{GetProgressValue()}%";
 
     private void OnAdminAuthChanged()
     {

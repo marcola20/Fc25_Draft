@@ -1,0 +1,40 @@
+@using Fc25Draft.Core.DTOs
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar escolha</h5>
+                <button type="button" class="btn-close" aria-label="Fechar" @onclick="OnClose"></button>
+            </div>
+            <div class="modal-body">
+                <p>Confirme a escolha do jogador <strong>@Player.Name</strong> (@Player.PositionName, Overall @Player.Overall).</p>
+                <div class="mb-3">
+                    <label for="tokenInput" class="form-label">Token do time</label>
+                    <input id="tokenInput" type="password" class="form-control"
+                           value="@TokenInput"
+                           @oninput="e => TokenInputChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)"
+                           autocomplete="one-time-code" />
+                </div>
+                @if (!string.IsNullOrEmpty(Error))
+                {
+                    <div class="alert alert-danger" role="alert">@Error</div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="OnClose" disabled="@IsSubmitting">Cancelar</button>
+                <button class="btn btn-success" @onclick="OnConfirm" disabled="@IsSubmitting">Confirmar escolha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AvailablePlayerDto Player { get; set; } = null!;
+    [Parameter] public bool IsSubmitting { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string TokenInput { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> TokenInputChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+}

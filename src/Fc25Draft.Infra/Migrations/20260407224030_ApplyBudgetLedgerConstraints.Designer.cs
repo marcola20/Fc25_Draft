@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260407224030_ApplyBudgetLedgerConstraints")]
+    partial class ApplyBudgetLedgerConstraints
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -196,23 +199,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasKey("DraftId", "RoundNumber");
 
                     b.ToTable("DraftRounds");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.IdempotencyKey", b =>
-                {
-                    b.Property<string>("Key")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTimeOffset>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Key");
-
-                    b.HasIndex("ExpiresAtUtc")
-                        .HasDatabaseName("IX_IdempotencyKeys_ExpiresAtUtc");
-
-                    b.ToTable("IdempotencyKeys");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.MarketBid", b =>
@@ -495,12 +481,12 @@ namespace Fc25Draft.Infra.Migrations
                         new
                         {
                             PositionId = (short)3,
-                            Name = "Lateral Esquerdo"
+                            Name = "Lateral/Ala Esquerdo"
                         },
                         new
                         {
                             PositionId = (short)4,
-                            Name = "Lateral Direito"
+                            Name = "Lateral/Ala Direito"
                         },
                         new
                         {
@@ -510,7 +496,7 @@ namespace Fc25Draft.Infra.Migrations
                         new
                         {
                             PositionId = (short)6,
-                            Name = "Meia de Ligação"
+                            Name = "Meia Central"
                         },
                         new
                         {
@@ -520,32 +506,17 @@ namespace Fc25Draft.Infra.Migrations
                         new
                         {
                             PositionId = (short)8,
-                            Name = "Meia Esquerda"
+                            Name = "Meia/Ponta Esquerda"
                         },
                         new
                         {
                             PositionId = (short)9,
-                            Name = "Ponta Esquerda"
+                            Name = "Meia/Ponta Direita"
                         },
                         new
                         {
                             PositionId = (short)10,
-                            Name = "Meia Direita"
-                        },
-                        new
-                        {
-                            PositionId = (short)11,
-                            Name = "Ponta Direita"
-                        },
-                        new
-                        {
-                            PositionId = (short)12,
-                            Name = "Centroavante"
-                        },
-                        new
-                        {
-                            PositionId = (short)13,
-                            Name = "Segundo Atacante"
+                            Name = "Atacante"
                         });
                 });
 
