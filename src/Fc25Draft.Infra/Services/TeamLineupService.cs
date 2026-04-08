@@ -16,7 +16,6 @@ public class TeamLineupService : ITeamLineupService
     private readonly DraftDbContext _dbContext;
     private readonly ILogger<TeamLineupService> _logger;
     private readonly TimeProvider _timeProvider;
-    private const int MaxTacticCodeLength = 40;
 
     public TeamLineupService(
         DraftDbContext dbContext,
@@ -43,20 +42,18 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.Slots)
                 .ThenInclude(s => s.Player)
                     .ThenInclude(p => p!.Position)
-            .Include(l => l.CaptainPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickRightPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.LongFreeKickPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.PenaltiesPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerRightPlayer)
-                .ThenInclude(p => p!.Position)
+            .Include(l => l.CaptainPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick1Player).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick2Player).ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
+            .Include(l => l.OffensiveInstructions)
+            .Include(l => l.DefensiveInstructions)
             .OrderByDescending(l => l.IsActive)
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
@@ -72,20 +69,18 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.Slots)
                 .ThenInclude(s => s.Player)
                     .ThenInclude(p => p!.Position)
-            .Include(l => l.CaptainPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickRightPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.LongFreeKickPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.PenaltiesPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerRightPlayer)
-                .ThenInclude(p => p!.Position);
+            .Include(l => l.CaptainPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick1Player).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick2Player).ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
+            .Include(l => l.OffensiveInstructions)
+            .Include(l => l.DefensiveInstructions);
 
         if (teamId.HasValue && teamId.Value != Guid.Empty)
         {
@@ -108,20 +103,13 @@ public class TeamLineupService : ITeamLineupService
 
     public async Task<TeamLineupDto> CreateLineupAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct)
     {
-        if (teamId == Guid.Empty)
-        {
-            throw new ArgumentException("Time inválido.", nameof(teamId));
-        }
-
-        if (request is null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
+        if (teamId == Guid.Empty) throw new ArgumentException("Time inválido.", nameof(teamId));
+        if (request is null) throw new ArgumentNullException(nameof(request));
 
         await EnsureTeamExistsAsync(teamId, ct);
 
         var name = NormalizeName(request.Name);
-        var tacticCode = NormalizeTacticCode(request.TacticCode);
+        var autoSubstitution = NormalizeAutoSubstitution(request.AutoSubstitution);
         var template = LineupTemplateCatalog.GetTemplateOrDefault(request.Formation);
         var assignments = BuildAssignments(template, request);
         await ValidatePlayersAsync(teamId, template, assignments, ct);
@@ -136,9 +124,7 @@ public class TeamLineupService : ITeamLineupService
             {
                 var currentCount = await _dbContext.TeamLineups.CountAsync(l => l.TeamId == teamId, ct);
                 if (currentCount >= 3)
-                {
                     throw new InvalidOperationException("O time já possui 3 escalações cadastradas.");
-                }
 
                 var lineup = new TeamLineup
                 {
@@ -146,7 +132,7 @@ public class TeamLineupService : ITeamLineupService
                     TeamId = teamId,
                     Name = name,
                     Formation = template.Formation,
-                    TacticCode = tacticCode,
+                    AutoSubstitution = autoSubstitution,
                     IsActive = false,
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -157,7 +143,6 @@ public class TeamLineupService : ITeamLineupService
                 foreach (var slotTemplate in template.AllSlots)
                 {
                     assignments.TryGetValue(slotTemplate.SlotCode, out var playerId);
-
                     lineup.Slots.Add(new TeamLineupSlot
                     {
                         LineupSlotId = Guid.NewGuid(),
@@ -182,12 +167,20 @@ public class TeamLineupService : ITeamLineupService
                     lineup.IsActive = true;
                     foreach (var other in existingActives)
                     {
-                        if (other.IsActive)
-                        {
-                            other.IsActive = false;
-                            other.UpdatedAt = now;
-                        }
+                        if (other.IsActive) { other.IsActive = false; other.UpdatedAt = now; }
                     }
+                }
+
+                if (request.OffensiveInstructions is not null)
+                {
+                    var oi = BuildOffensiveInstructions(lineup.LineupId, request.OffensiveInstructions);
+                    await _dbContext.TeamLineupOffensiveInstructions.AddAsync(oi, ct);
+                }
+
+                if (request.DefensiveInstructions is not null)
+                {
+                    var di = BuildDefensiveInstructions(lineup.LineupId, request.DefensiveInstructions);
+                    await _dbContext.TeamLineupDefensiveInstructions.AddAsync(di, ct);
                 }
 
                 await _dbContext.SaveChangesAsync(ct);
@@ -195,16 +188,8 @@ public class TeamLineupService : ITeamLineupService
 
                 return await LoadLineupDtoAsync(lineup.LineupId, ct);
             }
-            catch (InvalidOperationException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-            catch (KeyNotFoundException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
+            catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
@@ -216,20 +201,9 @@ public class TeamLineupService : ITeamLineupService
 
     public async Task<TeamLineupDto> UpdateLineupAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, CancellationToken ct)
     {
-        if (teamId == Guid.Empty)
-        {
-            throw new ArgumentException("Time inválido.", nameof(teamId));
-        }
-
-        if (lineupId == Guid.Empty)
-        {
-            throw new ArgumentException("Escalação inválida.", nameof(lineupId));
-        }
-
-        if (request is null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
+        if (teamId == Guid.Empty) throw new ArgumentException("Time inválido.", nameof(teamId));
+        if (lineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(lineupId));
+        if (request is null) throw new ArgumentNullException(nameof(request));
 
         await EnsureTeamExistsAsync(teamId, ct);
 
@@ -237,7 +211,7 @@ public class TeamLineupService : ITeamLineupService
         var assignments = BuildAssignments(template, request);
         await ValidatePlayersAsync(teamId, template, assignments, ct);
         var name = NormalizeName(request.Name);
-        var tacticCode = NormalizeTacticCode(request.TacticCode);
+        var autoSubstitution = NormalizeAutoSubstitution(request.AutoSubstitution);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
@@ -253,7 +227,7 @@ public class TeamLineupService : ITeamLineupService
 
                 lineup.Name = name;
                 lineup.Formation = template.Formation;
-                lineup.TacticCode = tacticCode;
+                lineup.AutoSubstitution = autoSubstitution;
                 lineup.UpdatedAt = now;
 
                 ApplyTemplateSlots(lineup, template, assignments);
@@ -266,20 +240,14 @@ public class TeamLineupService : ITeamLineupService
 
                 var shouldActivate = request.IsActive;
                 if (!shouldActivate && !otherLineups.Any(l => l.IsActive))
-                {
                     shouldActivate = true;
-                }
 
                 if (shouldActivate)
                 {
                     lineup.IsActive = true;
                     foreach (var other in otherLineups)
                     {
-                        if (other.IsActive)
-                        {
-                            other.IsActive = false;
-                            other.UpdatedAt = now;
-                        }
+                        if (other.IsActive) { other.IsActive = false; other.UpdatedAt = now; }
                     }
                 }
                 else if (lineup.IsActive && !request.IsActive)
@@ -289,19 +257,34 @@ public class TeamLineupService : ITeamLineupService
                         .ThenByDescending(l => l.UpdatedAt)
                         .FirstOrDefault();
 
-                    if (fallback is null)
-                    {
-                        lineup.IsActive = true;
-                    }
+                    if (fallback is null) { lineup.IsActive = true; }
                     else
                     {
                         lineup.IsActive = false;
-                        if (!fallback.IsActive)
-                        {
-                            fallback.IsActive = true;
-                            fallback.UpdatedAt = now;
-                        }
+                        if (!fallback.IsActive) { fallback.IsActive = true; fallback.UpdatedAt = now; }
                     }
+                }
+
+                // Upsert offensive instructions
+                if (request.OffensiveInstructions is not null)
+                {
+                    var existing = await _dbContext.TeamLineupOffensiveInstructions
+                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                    if (existing is null)
+                        await _dbContext.TeamLineupOffensiveInstructions.AddAsync(BuildOffensiveInstructions(lineupId, request.OffensiveInstructions), ct);
+                    else
+                        ApplyOffensiveInstructions(existing, request.OffensiveInstructions);
+                }
+
+                // Upsert defensive instructions
+                if (request.DefensiveInstructions is not null)
+                {
+                    var existing = await _dbContext.TeamLineupDefensiveInstructions
+                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                    if (existing is null)
+                        await _dbContext.TeamLineupDefensiveInstructions.AddAsync(BuildDefensiveInstructions(lineupId, request.DefensiveInstructions), ct);
+                    else
+                        ApplyDefensiveInstructions(existing, request.DefensiveInstructions);
                 }
 
                 await _dbContext.SaveChangesAsync(ct);
@@ -309,16 +292,8 @@ public class TeamLineupService : ITeamLineupService
 
                 return await LoadLineupDtoAsync(lineup.LineupId, ct);
             }
-            catch (InvalidOperationException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-            catch (KeyNotFoundException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
+            catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
@@ -330,15 +305,8 @@ public class TeamLineupService : ITeamLineupService
 
     public async Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct)
     {
-        if (teamId == Guid.Empty)
-        {
-            throw new ArgumentException("Time inválido.", nameof(teamId));
-        }
-
-        if (lineupId == Guid.Empty)
-        {
-            throw new ArgumentException("Escalação inválida.", nameof(lineupId));
-        }
+        if (teamId == Guid.Empty) throw new ArgumentException("Time inválido.", nameof(teamId));
+        if (lineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(lineupId));
 
         await EnsureTeamExistsAsync(teamId, ct);
 
@@ -376,16 +344,8 @@ public class TeamLineupService : ITeamLineupService
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
-            catch (InvalidOperationException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-            catch (KeyNotFoundException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
+            catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
@@ -397,15 +357,8 @@ public class TeamLineupService : ITeamLineupService
 
     public async Task SetActiveLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct)
     {
-        if (teamId == Guid.Empty)
-        {
-            throw new ArgumentException("Time inválido.", nameof(teamId));
-        }
-
-        if (lineupId == Guid.Empty)
-        {
-            throw new ArgumentException("Escalação inválida.", nameof(lineupId));
-        }
+        if (teamId == Guid.Empty) throw new ArgumentException("Time inválido.", nameof(teamId));
+        if (lineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(lineupId));
 
         await EnsureTeamExistsAsync(teamId, ct);
 
@@ -424,33 +377,21 @@ public class TeamLineupService : ITeamLineupService
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-                foreach (var lineup in lineups)
+                foreach (var l in lineups)
                 {
-                    var shouldBeActive = lineup.LineupId == lineupId;
-                    if (lineup.IsActive != shouldBeActive)
-                    {
-                        lineup.IsActive = shouldBeActive;
-                        lineup.UpdatedAt = now;
-                    }
+                    var shouldBeActive = l.LineupId == lineupId;
+                    if (l.IsActive != shouldBeActive) { l.IsActive = shouldBeActive; l.UpdatedAt = now; }
                 }
 
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
-            catch (InvalidOperationException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-            catch (KeyNotFoundException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
+            catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Erro ao definir a escalação ativa {LineupId} do time {TeamId}.", lineupId, teamId);
+                _logger.LogError(ex, "Erro ao definir escalação ativa {LineupId} do time {TeamId}.", lineupId, teamId);
                 throw new InvalidOperationException("Não foi possível definir a escalação ativa.", ex);
             }
         });
@@ -458,15 +399,8 @@ public class TeamLineupService : ITeamLineupService
 
     public async Task<TeamLineupDto> DuplicateLineupAsync(Guid teamId, Guid sourceLineupId, CancellationToken ct)
     {
-        if (teamId == Guid.Empty)
-        {
-            throw new ArgumentException("Time inválido.", nameof(teamId));
-        }
-
-        if (sourceLineupId == Guid.Empty)
-        {
-            throw new ArgumentException("Escalação inválida.", nameof(sourceLineupId));
-        }
+        if (teamId == Guid.Empty) throw new ArgumentException("Time inválido.", nameof(teamId));
+        if (sourceLineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(sourceLineupId));
 
         await EnsureTeamExistsAsync(teamId, ct);
 
@@ -478,13 +412,13 @@ public class TeamLineupService : ITeamLineupService
             {
                 var currentCount = await _dbContext.TeamLineups.CountAsync(l => l.TeamId == teamId, ct);
                 if (currentCount >= 3)
-                {
                     throw new InvalidOperationException("O time já possui 3 escalações cadastradas.");
-                }
 
                 var sourceLineup = await _dbContext.TeamLineups
                     .AsNoTracking()
                     .Include(l => l.Slots)
+                    .Include(l => l.OffensiveInstructions)
+                    .Include(l => l.DefensiveInstructions)
                     .FirstOrDefaultAsync(l => l.LineupId == sourceLineupId && l.TeamId == teamId, ct)
                     ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
@@ -507,17 +441,20 @@ public class TeamLineupService : ITeamLineupService
                     TeamId = teamId,
                     Name = newName,
                     Formation = sourceLineup.Formation,
-                    TacticCode = sourceLineup.TacticCode,
+                    AutoSubstitution = sourceLineup.AutoSubstitution,
                     IsActive = false,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CaptainPlayerId = sourceLineup.CaptainPlayerId,
-                    ShortFreeKickLeftPlayerId = sourceLineup.ShortFreeKickLeftPlayerId,
-                    ShortFreeKickRightPlayerId = sourceLineup.ShortFreeKickRightPlayerId,
+                    ShortFreeKick1PlayerId = sourceLineup.ShortFreeKick1PlayerId,
+                    ShortFreeKick2PlayerId = sourceLineup.ShortFreeKick2PlayerId,
                     LongFreeKickPlayerId = sourceLineup.LongFreeKickPlayerId,
                     PenaltiesPlayerId = sourceLineup.PenaltiesPlayerId,
                     CornerLeftPlayerId = sourceLineup.CornerLeftPlayerId,
-                    CornerRightPlayerId = sourceLineup.CornerRightPlayerId
+                    CornerRightPlayerId = sourceLineup.CornerRightPlayerId,
+                    AttackingPlayer1Id = sourceLineup.AttackingPlayer1Id,
+                    AttackingPlayer2Id = sourceLineup.AttackingPlayer2Id,
+                    AttackingPlayer3Id = sourceLineup.AttackingPlayer3Id,
                 };
 
                 foreach (var sourceSlot in sourceLineup.Slots)
@@ -535,21 +472,40 @@ public class TeamLineupService : ITeamLineupService
                 }
 
                 await _dbContext.TeamLineups.AddAsync(newLineup, ct);
+
+                if (sourceLineup.OffensiveInstructions is not null)
+                {
+                    await _dbContext.TeamLineupOffensiveInstructions.AddAsync(new TeamLineupOffensiveInstructions
+                    {
+                        LineupId = newLineup.LineupId,
+                        OffensiveStyle = sourceLineup.OffensiveInstructions.OffensiveStyle,
+                        Playmaker = sourceLineup.OffensiveInstructions.Playmaker,
+                        AttackArea = sourceLineup.OffensiveInstructions.AttackArea,
+                        Positioning = sourceLineup.OffensiveInstructions.Positioning,
+                        SupportRange = sourceLineup.OffensiveInstructions.SupportRange,
+                    }, ct);
+                }
+
+                if (sourceLineup.DefensiveInstructions is not null)
+                {
+                    await _dbContext.TeamLineupDefensiveInstructions.AddAsync(new TeamLineupDefensiveInstructions
+                    {
+                        LineupId = newLineup.LineupId,
+                        DefensiveStyle = sourceLineup.DefensiveInstructions.DefensiveStyle,
+                        ContainmentArea = sourceLineup.DefensiveInstructions.ContainmentArea,
+                        Pressure = sourceLineup.DefensiveInstructions.Pressure,
+                        DefensiveLine = sourceLineup.DefensiveInstructions.DefensiveLine,
+                        Density = sourceLineup.DefensiveInstructions.Density,
+                    }, ct);
+                }
+
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
                 return await LoadLineupDtoAsync(newLineup.LineupId, ct);
             }
-            catch (InvalidOperationException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-            catch (KeyNotFoundException)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
+            catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
@@ -562,42 +518,26 @@ public class TeamLineupService : ITeamLineupService
     private async Task EnsureTeamExistsAsync(Guid teamId, CancellationToken ct)
     {
         var exists = await _dbContext.Teams.AnyAsync(t => t.TeamId == teamId, ct);
-        if (!exists)
-        {
-            throw new KeyNotFoundException("Time não encontrado.");
-        }
+        if (!exists) throw new KeyNotFoundException("Time não encontrado.");
     }
 
     private static string NormalizeName(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
-        {
             throw new InvalidOperationException("O nome da escalação é obrigatório.");
-        }
 
         var trimmed = value.Trim();
         if (trimmed.Length is < 3 or > 80)
-        {
             throw new InvalidOperationException("O nome da escalação deve ter entre 3 e 80 caracteres.");
-        }
 
         return trimmed;
     }
 
-    private static string? NormalizeTacticCode(string? value)
+    private static int NormalizeAutoSubstitution(int value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var trimmed = value.Trim();
-        if (trimmed.Length > MaxTacticCodeLength)
-        {
-            trimmed = trimmed[..MaxTacticCodeLength];
-        }
-
-        return trimmed;
+        if (value < 1 || value > 4)
+            throw new InvalidOperationException("Substituição automática inválida.");
+        return value;
     }
 
     private static TeamLineupRoleAssignmentsDto NormalizeRoles(
@@ -612,36 +552,35 @@ public class TeamLineupService : ITeamLineupService
             .ToHashSet();
 
         int? Normalize(int? playerId)
-        {
-            if (!playerId.HasValue)
-            {
-                return null;
-            }
+            => playerId.HasValue && starterPlayerIds.Contains(playerId.Value) ? playerId : null;
 
-            return starterPlayerIds.Contains(playerId.Value) ? playerId : null;
-        }
-
-        roles ??= new TeamLineupRoleAssignmentsDto(null, null, null, null, null, null, null);
+        roles ??= new TeamLineupRoleAssignmentsDto(null, null, null, null, null, null, null, null, null, null);
 
         return new TeamLineupRoleAssignmentsDto(
             Normalize(roles.CaptainPlayerId),
-            Normalize(roles.ShortFreeKickLeftPlayerId),
-            Normalize(roles.ShortFreeKickRightPlayerId),
+            Normalize(roles.ShortFreeKick1PlayerId),
+            Normalize(roles.ShortFreeKick2PlayerId),
             Normalize(roles.LongFreeKickPlayerId),
             Normalize(roles.PenaltiesPlayerId),
             Normalize(roles.CornerLeftPlayerId),
-            Normalize(roles.CornerRightPlayerId));
+            Normalize(roles.CornerRightPlayerId),
+            Normalize(roles.AttackingPlayer1Id),
+            Normalize(roles.AttackingPlayer2Id),
+            Normalize(roles.AttackingPlayer3Id));
     }
 
     private static void ApplyRoles(TeamLineup lineup, TeamLineupRoleAssignmentsDto roles)
     {
         lineup.CaptainPlayerId = roles.CaptainPlayerId;
-        lineup.ShortFreeKickLeftPlayerId = roles.ShortFreeKickLeftPlayerId;
-        lineup.ShortFreeKickRightPlayerId = roles.ShortFreeKickRightPlayerId;
+        lineup.ShortFreeKick1PlayerId = roles.ShortFreeKick1PlayerId;
+        lineup.ShortFreeKick2PlayerId = roles.ShortFreeKick2PlayerId;
         lineup.LongFreeKickPlayerId = roles.LongFreeKickPlayerId;
         lineup.PenaltiesPlayerId = roles.PenaltiesPlayerId;
         lineup.CornerLeftPlayerId = roles.CornerLeftPlayerId;
         lineup.CornerRightPlayerId = roles.CornerRightPlayerId;
+        lineup.AttackingPlayer1Id = roles.AttackingPlayer1Id;
+        lineup.AttackingPlayer2Id = roles.AttackingPlayer2Id;
+        lineup.AttackingPlayer3Id = roles.AttackingPlayer3Id;
     }
 
     private static Dictionary<string, int?> BuildAssignments(LineupTemplate template, TeamLineupSaveRequestDto request)
@@ -650,19 +589,11 @@ public class TeamLineupService : ITeamLineupService
 
         void Apply(IEnumerable<TeamLineupSlotAssignmentDto> slots)
         {
-            if (slots is null)
-            {
-                return;
-            }
-
+            if (slots is null) return;
             foreach (var assignment in slots)
             {
-                if (assignment is null || string.IsNullOrWhiteSpace(assignment.SlotCode))
-                {
-                    continue;
-                }
-
-                template.GetSlot(assignment.SlotCode); // valida existência
+                if (assignment is null || string.IsNullOrWhiteSpace(assignment.SlotCode)) continue;
+                template.GetSlot(assignment.SlotCode);
                 assignments[assignment.SlotCode.Trim()] = assignment.PlayerId;
             }
         }
@@ -673,9 +604,7 @@ public class TeamLineupService : ITeamLineupService
         foreach (var slot in template.AllSlots)
         {
             if (!assignments.ContainsKey(slot.SlotCode))
-            {
                 assignments[slot.SlotCode] = null;
-            }
         }
 
         return assignments;
@@ -692,14 +621,9 @@ public class TeamLineupService : ITeamLineupService
             .Select(v => v!.Value)
             .ToList();
 
-        if (selectedPlayerIds.Count == 0)
-        {
-            return;
-        }
+        if (selectedPlayerIds.Count == 0) return;
 
-        var uniquePlayerIds = selectedPlayerIds
-            .Distinct()
-            .ToList();
+        var uniquePlayerIds = selectedPlayerIds.Distinct().ToList();
 
         var rosterPlayers = await _dbContext.TeamRosters
             .AsNoTracking()
@@ -708,9 +632,7 @@ public class TeamLineupService : ITeamLineupService
             .ToListAsync(ct);
 
         if (rosterPlayers.Count != uniquePlayerIds.Count)
-        {
             throw new InvalidOperationException("Alguns jogadores informados não pertencem ao elenco da equipe.");
-        }
 
         var rosterNames = rosterPlayers.ToDictionary(x => x.PlayerId, x => x.Name);
         EnsureUniquePlayers(selectedPlayerIds, rosterNames!);
@@ -719,28 +641,18 @@ public class TeamLineupService : ITeamLineupService
 
         foreach (var (slotCode, playerId) in assignments)
         {
-            if (!playerId.HasValue)
-            {
-                continue;
-            }
-
+            if (!playerId.HasValue) continue;
             var slot = template.GetSlot(slotCode);
             if (!slot.IsBench && slot.AllowedPositionIds.Count > 0)
             {
                 var positionId = rosterPositions[playerId.Value];
                 if (!slot.AllowedPositionIds.Contains(positionId))
-                {
                     throw new InvalidOperationException($"O jogador selecionado não pode atuar na posição '{slot.DisplayName}'.");
-                }
             }
         }
-
-        return;
     }
 
-    private static void EnsureUniquePlayers(
-        IReadOnlyCollection<int> selectedPlayerIds,
-        IReadOnlyDictionary<int, string?> rosterNames)
+    private static void EnsureUniquePlayers(IReadOnlyCollection<int> selectedPlayerIds, IReadOnlyDictionary<int, string?> rosterNames)
     {
         var duplicates = selectedPlayerIds
             .GroupBy(id => id)
@@ -748,10 +660,7 @@ public class TeamLineupService : ITeamLineupService
             .Select(group => group.Key)
             .ToList();
 
-        if (duplicates.Count == 0)
-        {
-            return;
-        }
+        if (duplicates.Count == 0) return;
 
         var duplicateNames = duplicates
             .Select(id => rosterNames.TryGetValue(id, out var name) ? name : null)
@@ -810,6 +719,50 @@ public class TeamLineupService : ITeamLineupService
         }
     }
 
+    private static TeamLineupOffensiveInstructions BuildOffensiveInstructions(Guid lineupId, TeamLineupOffensiveInstructionsDto dto)
+    {
+        return new TeamLineupOffensiveInstructions
+        {
+            LineupId = lineupId,
+            OffensiveStyle = dto.OffensiveStyle,
+            Playmaker = dto.Playmaker,
+            AttackArea = dto.AttackArea,
+            Positioning = dto.Positioning,
+            SupportRange = dto.SupportRange,
+        };
+    }
+
+    private static void ApplyOffensiveInstructions(TeamLineupOffensiveInstructions entity, TeamLineupOffensiveInstructionsDto dto)
+    {
+        entity.OffensiveStyle = dto.OffensiveStyle;
+        entity.Playmaker = dto.Playmaker;
+        entity.AttackArea = dto.AttackArea;
+        entity.Positioning = dto.Positioning;
+        entity.SupportRange = dto.SupportRange;
+    }
+
+    private static TeamLineupDefensiveInstructions BuildDefensiveInstructions(Guid lineupId, TeamLineupDefensiveInstructionsDto dto)
+    {
+        return new TeamLineupDefensiveInstructions
+        {
+            LineupId = lineupId,
+            DefensiveStyle = dto.DefensiveStyle,
+            ContainmentArea = dto.ContainmentArea,
+            Pressure = dto.Pressure,
+            DefensiveLine = dto.DefensiveLine,
+            Density = dto.Density,
+        };
+    }
+
+    private static void ApplyDefensiveInstructions(TeamLineupDefensiveInstructions entity, TeamLineupDefensiveInstructionsDto dto)
+    {
+        entity.DefensiveStyle = dto.DefensiveStyle;
+        entity.ContainmentArea = dto.ContainmentArea;
+        entity.Pressure = dto.Pressure;
+        entity.DefensiveLine = dto.DefensiveLine;
+        entity.Density = dto.Density;
+    }
+
     private async Task<TeamLineupDto> LoadLineupDtoAsync(Guid lineupId, CancellationToken ct)
     {
         var entity = await _dbContext.TeamLineups
@@ -817,20 +770,18 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.Slots)
                 .ThenInclude(s => s.Player)
                     .ThenInclude(p => p!.Position)
-            .Include(l => l.CaptainPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.ShortFreeKickRightPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.LongFreeKickPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.PenaltiesPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerLeftPlayer)
-                .ThenInclude(p => p!.Position)
-            .Include(l => l.CornerRightPlayer)
-                .ThenInclude(p => p!.Position)
+            .Include(l => l.CaptainPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick1Player).ThenInclude(p => p!.Position)
+            .Include(l => l.ShortFreeKick2Player).ThenInclude(p => p!.Position)
+            .Include(l => l.LongFreeKickPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.PenaltiesPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerLeftPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.CornerRightPlayer).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
+            .Include(l => l.OffensiveInstructions)
+            .Include(l => l.DefensiveInstructions)
             .FirstOrDefaultAsync(l => l.LineupId == lineupId, ct)
             ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
@@ -876,56 +827,62 @@ public class TeamLineupService : ITeamLineupService
         var bench = orderedSlots.Where(s => s.IsBench).ToList();
         var roles = MapRoles(entity);
 
+        TeamLineupOffensiveInstructionsDto? offensiveInstructions = null;
+        if (entity.OffensiveInstructions is not null)
+        {
+            var oi = entity.OffensiveInstructions;
+            offensiveInstructions = new TeamLineupOffensiveInstructionsDto(
+                oi.OffensiveStyle, oi.Playmaker, oi.AttackArea, oi.Positioning, oi.SupportRange);
+        }
+
+        TeamLineupDefensiveInstructionsDto? defensiveInstructions = null;
+        if (entity.DefensiveInstructions is not null)
+        {
+            var di = entity.DefensiveInstructions;
+            defensiveInstructions = new TeamLineupDefensiveInstructionsDto(
+                di.DefensiveStyle, di.ContainmentArea, di.Pressure, di.DefensiveLine, di.Density);
+        }
+
         return new TeamLineupDto(
             entity.LineupId,
             entity.TeamId,
             entity.Name,
             template.Formation,
-            entity.TacticCode,
+            entity.AutoSubstitution,
             entity.IsActive,
             starters,
             bench,
             entity.CreatedAt,
             entity.UpdatedAt,
-            roles);
+            roles,
+            offensiveInstructions,
+            defensiveInstructions);
     }
 
     private static TeamLineupRolesDto MapRoles(TeamLineup entity)
     {
         return new TeamLineupRolesDto(
             MapRolePlayer(entity, entity.CaptainPlayerId, entity.CaptainPlayer),
-            MapRolePlayer(entity, entity.ShortFreeKickLeftPlayerId, entity.ShortFreeKickLeftPlayer),
-            MapRolePlayer(entity, entity.ShortFreeKickRightPlayerId, entity.ShortFreeKickRightPlayer),
+            MapRolePlayer(entity, entity.ShortFreeKick1PlayerId, entity.ShortFreeKick1Player),
+            MapRolePlayer(entity, entity.ShortFreeKick2PlayerId, entity.ShortFreeKick2Player),
             MapRolePlayer(entity, entity.LongFreeKickPlayerId, entity.LongFreeKickPlayer),
             MapRolePlayer(entity, entity.PenaltiesPlayerId, entity.PenaltiesPlayer),
             MapRolePlayer(entity, entity.CornerLeftPlayerId, entity.CornerLeftPlayer),
-            MapRolePlayer(entity, entity.CornerRightPlayerId, entity.CornerRightPlayer));
+            MapRolePlayer(entity, entity.CornerRightPlayerId, entity.CornerRightPlayer),
+            MapRolePlayer(entity, entity.AttackingPlayer1Id, entity.AttackingPlayer1),
+            MapRolePlayer(entity, entity.AttackingPlayer2Id, entity.AttackingPlayer2),
+            MapRolePlayer(entity, entity.AttackingPlayer3Id, entity.AttackingPlayer3));
     }
 
     private static TeamLineupSlotPlayerDto? MapRolePlayer(TeamLineup entity, int? playerId, Player? navigation)
     {
-        if (!playerId.HasValue)
-        {
-            return null;
-        }
+        if (!playerId.HasValue) return null;
 
-        var player = navigation;
-        if (player is null)
-        {
-            player = entity.Slots.FirstOrDefault(s => s.PlayerId == playerId)?.Player;
-        }
-
-        if (player is null)
-        {
-            return null;
-        }
+        var player = navigation ?? entity.Slots.FirstOrDefault(s => s.PlayerId == playerId)?.Player;
+        if (player is null) return null;
 
         return new TeamLineupSlotPlayerDto(
-            player.PlayerId,
-            player.PlayerGuid,
-            player.Name,
-            player.Position.Name,
-            player.PositionId);
+            player.PlayerId, player.PlayerGuid, player.Name, player.Position.Name, player.PositionId);
     }
 
     private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity)
@@ -937,11 +894,13 @@ public class TeamLineupService : ITeamLineupService
             entity.Team.TeamName,
             dto.Name,
             dto.Formation,
-            dto.TacticCode,
+            dto.AutoSubstitution,
             dto.IsActive,
             dto.Starters,
             dto.Bench,
             dto.Roles,
+            dto.OffensiveInstructions,
+            dto.DefensiveInstructions,
             dto.CreatedAtUtc,
             dto.UpdatedAtUtc);
     }

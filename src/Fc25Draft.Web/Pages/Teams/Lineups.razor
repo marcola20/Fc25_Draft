@@ -113,119 +113,162 @@ else
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header">Informações da escalação</div>
-        <div class="card-body">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-4 col-lg-3">
-                    <label class="form-label" for="lineup-name">Nome</label>
-                    <input id="lineup-name"
-                           class="form-control"
-                           value="@currentEditor.Name"
-                           @oninput="OnNameChanged"
-                           maxlength="80"
-                           disabled="@isSaving" />
-                </div>
-                <div class="col-md-3 col-lg-2">
-                    <label class="form-label" for="lineup-formation">Formação</label>
-                    <select id="lineup-formation"
-                            class="form-select"
-                            value="@currentEditor.Formation"
-                            @onchange="OnFormationChanged"
-                            disabled="@isSaving">
-                        @foreach (var formation in FormationOptions)
-                        {
-                            <option value="@formation">@formation</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-3 col-lg-3">
-                    <label class="form-label" for="lineup-tactic-code">Código da tática (FIFA)</label>
-                    <input id="lineup-tactic-code"
-                           class="form-control"
-                           value="@((currentEditor.TacticCode ?? string.Empty))"
-                           @oninput="OnTacticCodeChanged"
-                           maxlength="@MaxTacticCodeLength"
-                           disabled="@isSaving" />
-                </div>
-                <div class="col-md-2 col-lg-2">
-                    <div class="form-check mt-4 pt-1">
-                        <input id="lineup-active"
-                               class="form-check-input"
-                               type="checkbox"
-                               checked="@currentEditor.IsActive"
-                               @onchange="OnActiveChanged"
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == Tab.Lineup ? "active" : "")"
+                    type="button"
+                    @onclick='() => activeTab = Tab.Lineup'>
+                Escalação
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == Tab.Roles ? "active" : "")"
+                    type="button"
+                    @onclick='() => activeTab = Tab.Roles'>
+                Funções
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == Tab.Offensive ? "active" : "")"
+                    type="button"
+                    @onclick='() => activeTab = Tab.Offensive'>
+                Instruções Ofensivas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == Tab.Defensive ? "active" : "")"
+                    type="button"
+                    @onclick='() => activeTab = Tab.Defensive'>
+                Instruções Defensivas
+            </button>
+        </li>
+    </ul>
+
+    <!-- TAB: Escalação -->
+    @if (activeTab == Tab.Lineup)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Informações da escalação</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label" for="lineup-name">Nome</label>
+                        <input id="lineup-name"
+                               class="form-control"
+                               value="@currentEditor.Name"
+                               @oninput="OnNameChanged"
+                               maxlength="80"
                                disabled="@isSaving" />
-                        <label class="form-check-label" for="lineup-active">Definir como ativa</label>
+                    </div>
+                    <div class="col-md-3 col-lg-3">
+                        <label class="form-label" for="lineup-formation">Formação</label>
+                        <select id="lineup-formation"
+                                class="form-select"
+                                value="@currentEditor.Formation"
+                                @onchange="OnFormationChanged"
+                                disabled="@isSaving">
+                            @foreach (var formation in FormationOptions)
+                            {
+                                <option value="@formation">@formation</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-lg-3">
+                        <label class="form-label" for="lineup-autosub">Substituições automáticas</label>
+                        <select id="lineup-autosub"
+                                class="form-select"
+                                value="@currentEditor.AutoSubstitution"
+                                @onchange="OnAutoSubstitutionChanged"
+                                disabled="@isSaving">
+                            <option value="1">Desativado</option>
+                            <option value="2">Muito Tarde</option>
+                            <option value="3">Flexível</option>
+                            <option value="4">Muito Cedo</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-lg-2">
+                        <div class="form-check mt-4 pt-1">
+                            <input id="lineup-active"
+                                   class="form-check-input"
+                                   type="checkbox"
+                                   checked="@currentEditor.IsActive"
+                                   @onchange="OnActiveChanged"
+                                   disabled="@isSaving" />
+                            <label class="form-check-label" for="lineup-active">Definir como ativa</label>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="card mb-3">
-        <div class="card-header">Titulares</div>
-        <div class="card-body">
-            <div class="row g-3">
-                @foreach (var slot in currentEditor.Slots.Where(s => !s.IsBench).OrderBy(s => s.Order))
-                {
-                    <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
-                        <select id="slot-@slot.SlotId"
-                                class="form-select"
-                                value="@GetSlotSelectedValue(slot)"
-                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
-                                disabled="@isSaving">
-                            <option value="">- Nenhum -</option>
-                            @foreach (var option in slot.AvailablePlayers)
-                            {
-                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
-                                    @FormatPlayerOption(option)
-                                </option>
-                            }
-                        </select>
-                    </div>
-                }
+        <div class="card mb-3">
+            <div class="card-header">Titulares</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var slot in currentEditor.Slots.Where(s => !s.IsBench).OrderBy(s => s.Order))
+                    {
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
+                            <select id="slot-@slot.SlotId"
+                                    class="form-select"
+                                    value="@GetSlotSelectedValue(slot)"
+                                    @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
+                                    disabled="@isSaving">
+                                <option value="">- Nenhum -</option>
+                                @foreach (var option in slot.AvailablePlayers)
+                                {
+                                    <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
+                                        @FormatPlayerOption(option)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="card mb-3">
-        <div class="card-header">Reservas</div>
-        <div class="card-body">
-            <div class="row g-3">
-                @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
-                {
-                    <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
-                        <select id="slot-@slot.SlotId"
-                                class="form-select"
-                                value="@GetSlotSelectedValue(slot)"
-                                @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
-                                disabled="@isSaving">
-                            <option value="">- Nenhum -</option>
-                            @foreach (var option in slot.AvailablePlayers)
-                            {
-                                <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
-                                    @FormatPlayerOption(option)
-                                </option>
-                            }
-                        </select>
-                    </div>
-                }
+        <div class="card mb-3">
+            <div class="card-header">Reservas</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
+                    {
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
+                            <select id="slot-@slot.SlotId"
+                                    class="form-select"
+                                    value="@GetSlotSelectedValue(slot)"
+                                    @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
+                                    disabled="@isSaving">
+                                <option value="">- Nenhum -</option>
+                                @foreach (var option in slot.AvailablePlayers)
+                                {
+                                    <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
+                                        @FormatPlayerOption(option)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
-    </div>
+    }
 
-    <div class="card mb-3">
-        <div class="card-header">Funções</div>
-        <div class="card-body">
-            @{ var starterOptions = GetStarterPlayerOptions(); }
-            @if (starterOptions.Count == 0)
-            {
-                <p class="text-muted">Defina os titulares para escolher capitão e cobradores.</p>
-            }
-            <div class="row g-3">
+    <!-- TAB: Funções -->
+    @if (activeTab == Tab.Roles)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Funções especiais</div>
+            <div class="card-body">
+                @{ var starterOptions = GetStarterPlayerOptions(); }
+                @if (starterOptions.Count == 0)
+                {
+                    <p class="text-muted">Defina os titulares para escolher capitão e cobradores.</p>
+                }
+                <div class="row g-3">
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-captain">Capitão</label>
                         <select id="role-captain" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.Captain, e.Value?.ToString())" disabled="@isSaving">
@@ -237,22 +280,22 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="role-shortfk-left">Falta de perto - Esquerda</label>
-                        <select id="role-shortfk-left" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKickLeft, e.Value?.ToString())" disabled="@isSaving">
+                        <label class="form-label" for="role-shortfk1">Falta curta</label>
+                        <select id="role-shortfk1" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKick1, e.Value?.ToString())" disabled="@isSaving">
                             <option value="">Selecione um jogador...</option>
                             @foreach (var option in starterOptions)
                             {
-                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKickLeft?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKick1?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
                             }
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="role-shortfk-right">Falta de perto - Direita</label>
-                        <select id="role-shortfk-right" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKickRight, e.Value?.ToString())" disabled="@isSaving">
+                        <label class="form-label" for="role-shortfk2">Falta curta 2</label>
+                        <select id="role-shortfk2" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKick2, e.Value?.ToString())" disabled="@isSaving">
                             <option value="">Selecione um jogador...</option>
                             @foreach (var option in starterOptions)
                             {
-                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKickRight?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKick2?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
                             }
                         </select>
                     </div>
@@ -297,8 +340,205 @@ else
                         </select>
                     </div>
                 </div>
+            </div>
         </div>
-    </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Jogadores que atacam</div>
+            <div class="card-body">
+                @if (starterOptions.Count == 0)
+                {
+                    <p class="text-muted">Defina os titulares para selecionar os jogadores que atacam.</p>
+                }
+                <div class="row g-3">
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-atk1">Jogador que ataca 1</label>
+                        <select id="role-atk1" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer1, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer1?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-atk2">Jogador que ataca 2</label>
+                        <select id="role-atk2" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer2, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer2?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="role-atk3">Jogador que ataca 3</label>
+                        <select id="role-atk3" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer3, e.Value?.ToString())" disabled="@isSaving">
+                            <option value="">Selecione um jogador...</option>
+                            @foreach (var option in starterOptions)
+                            {
+                                <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer3?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- TAB: Instruções Ofensivas -->
+    @if (activeTab == Tab.Offensive)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                Instruções Ofensivas
+                <span class="text-muted small ms-2">(opcional)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="oi-style">Estilo Ofensivo</label>
+                        <select id="oi-style" class="form-select"
+                                value="@(currentEditor.OffensiveInstructions?.OffensiveStyle ?? 0)"
+                                @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.OffensiveStyle), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Contra-ataque</option>
+                            <option value="2">Posse de Bola no Ataque</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="oi-playmaker">Provocador</label>
+                        <select id="oi-playmaker" class="form-select"
+                                value="@(currentEditor.OffensiveInstructions?.Playmaker ?? 0)"
+                                @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.Playmaker), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Passe Longo</option>
+                            <option value="2">Passe Curto</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="oi-area">Área de Ataque</label>
+                        <select id="oi-area" class="form-select"
+                                value="@(currentEditor.OffensiveInstructions?.AttackArea ?? 0)"
+                                @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.AttackArea), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Centro</option>
+                            <option value="2">Ampla</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="oi-pos">Posicionamento</label>
+                        <select id="oi-pos" class="form-select"
+                                value="@(currentEditor.OffensiveInstructions?.Positioning ?? 0)"
+                                @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.Positioning), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Manter Formação</option>
+                            <option value="2">Flexível</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="oi-support">Alcance de Apoio: @(currentEditor.OffensiveInstructions?.SupportRange ?? 5)</label>
+                        <input id="oi-support" type="range" class="form-range"
+                               min="1" max="10" step="1"
+                               value="@(currentEditor.OffensiveInstructions?.SupportRange ?? 5)"
+                               @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.SupportRange), e.Value?.ToString())"
+                               disabled="@isSaving" />
+                        <div class="d-flex justify-content-between small text-muted"><span>1</span><span>10</span></div>
+                    </div>
+                </div>
+                @if (currentEditor.OffensiveInstructions is not null)
+                {
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @onclick="ClearOffensiveInstructions"
+                                disabled="@isSaving">
+                            Limpar instruções ofensivas
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- TAB: Instruções Defensivas -->
+    @if (activeTab == Tab.Defensive)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                Instruções Defensivas
+                <span class="text-muted small ms-2">(opcional)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="di-style">Estilo Defensivo</label>
+                        <select id="di-style" class="form-select"
+                                value="@(currentEditor.DefensiveInstructions?.DefensiveStyle ?? 0)"
+                                @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.DefensiveStyle), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Retranca</option>
+                            <option value="2">Pressão na Frente</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="di-area">Área de Contenção</label>
+                        <select id="di-area" class="form-select"
+                                value="@(currentEditor.DefensiveInstructions?.ContainmentArea ?? 0)"
+                                @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.ContainmentArea), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Ampla</option>
+                            <option value="2">Centro</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="di-pressure">Pressão</label>
+                        <select id="di-pressure" class="form-select"
+                                value="@(currentEditor.DefensiveInstructions?.Pressure ?? 0)"
+                                @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.Pressure), e.Value?.ToString())"
+                                disabled="@isSaving">
+                            <option value="0">- Não definido -</option>
+                            <option value="1">Tradicional</option>
+                            <option value="2">Agressiva</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="di-line">Linha Defensiva: @(currentEditor.DefensiveInstructions?.DefensiveLine ?? 5)</label>
+                        <input id="di-line" type="range" class="form-range"
+                               min="1" max="10" step="1"
+                               value="@(currentEditor.DefensiveInstructions?.DefensiveLine ?? 5)"
+                               @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.DefensiveLine), e.Value?.ToString())"
+                               disabled="@isSaving" />
+                        <div class="d-flex justify-content-between small text-muted"><span>1</span><span>10</span></div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <label class="form-label" for="di-density">Densidade: @(currentEditor.DefensiveInstructions?.Density ?? 5)</label>
+                        <input id="di-density" type="range" class="form-range"
+                               min="1" max="10" step="1"
+                               value="@(currentEditor.DefensiveInstructions?.Density ?? 5)"
+                               @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.Density), e.Value?.ToString())"
+                               disabled="@isSaving" />
+                        <div class="d-flex justify-content-between small text-muted"><span>1</span><span>10</span></div>
+                    </div>
+                </div>
+                @if (currentEditor.DefensiveInstructions is not null)
+                {
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @onclick="ClearDefensiveInstructions"
+                                disabled="@isSaving">
+                            Limpar instruções defensivas
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 
     <div class="d-flex align-items-center gap-3">
         <button class="btn btn-primary"
@@ -319,9 +559,10 @@ else
 
 @code {
     private const int MaxLineupsPerTeam = 3;
-    private const int MaxTacticCodeLength = 40;
     private const string NewLineupValue = "__new__";
     private static readonly IReadOnlyList<string> FormationOptions = LineupTemplateCatalog.GetSupportedFormations();
+
+    private enum Tab { Lineup, Roles, Offensive, Defensive }
 
     [Parameter]
     public Guid TeamId { get; set; }
@@ -350,6 +591,7 @@ else
     private string? currentTeamToken;
     private string? errorMessage;
     private string? pageSubtitle;
+    private Tab activeTab = Tab.Lineup;
     private CancellationTokenSource? loadCts;
     private CancellationTokenSource? saveCts;
     private CancellationTokenSource? deleteCts;
@@ -386,14 +628,8 @@ else
         try
         {
             string? token;
-            try
-            {
-                token = await TeamAccess.GetTokenAsync();
-            }
-            catch (InvalidOperationException)
-            {
-                return;
-            }
+            try { token = await TeamAccess.GetTokenAsync(); }
+            catch (InvalidOperationException) { return; }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Lineups:Error retrieving team token");
@@ -414,10 +650,7 @@ else
             currentTeamToken = token.Trim();
 
             TeamIdentityDto? identity;
-            try
-            {
-                identity = await TeamsApiClient.ResolveIdentityAsync(currentTeamToken, loadCts.Token);
-            }
+            try { identity = await TeamsApiClient.ResolveIdentityAsync(currentTeamToken, loadCts.Token); }
             catch (InvalidOperationException ex)
             {
                 Logger.LogWarning(ex, "Lineups:Invalid team token");
@@ -440,9 +673,7 @@ else
                 TeamId = identity.TeamId;
                 var destination = $"/teams/{TeamId}/lineups";
                 if (!Navigation.Uri.EndsWith(destination, StringComparison.OrdinalIgnoreCase))
-                {
                     Navigation.NavigateTo(destination, replace: true);
-                }
             }
 
             hasAccess = true;
@@ -492,9 +723,7 @@ else
 
             var pendingInvalid = TeamAccess.ConsumeInvalidTokenMessage();
             if (!string.IsNullOrWhiteSpace(pendingInvalid))
-            {
                 errorMessage = pendingInvalid;
-            }
 
             if (lineups.Count > 0)
             {
@@ -508,9 +737,7 @@ else
                 isNewLineup = false;
             }
         }
-        catch (OperationCanceledException)
-        {
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Error loading data for team {TeamId}", TeamId);
@@ -529,35 +756,20 @@ else
     private Task OnLineupChanged(ChangeEventArgs args)
     {
         var value = args.Value?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(value)) return Task.CompletedTask;
 
-        if (value == NewLineupValue)
-        {
-            CreateNewLineup();
-            return Task.CompletedTask;
-        }
+        if (value == NewLineupValue) { CreateNewLineup(); return Task.CompletedTask; }
 
         if (Guid.TryParse(value, out var lineupId))
-        {
             SelectExistingLineup(lineupId);
-        }
 
         return Task.CompletedTask;
     }
 
     private void SelectExistingLineup(Guid lineupId)
     {
-        var lineup = lineups.FirstOrDefault(l => l.LineupId == lineupId)
-                     ?? lineups.FirstOrDefault();
-
-        if (lineup is null)
-        {
-            currentEditor = null;
-            selectedLineupId = null;
-            isNewLineup = false;
-            return;
-        }
+        var lineup = lineups.FirstOrDefault(l => l.LineupId == lineupId) ?? lineups.FirstOrDefault();
+        if (lineup is null) { currentEditor = null; selectedLineupId = null; isNewLineup = false; return; }
 
         selectedLineupId = lineup.LineupId;
         isNewLineup = false;
@@ -574,28 +786,19 @@ else
 
         var template = LineupTemplateCatalog.GetTemplateOrDefault(LineupTemplateCatalog.DefaultFormation);
         var slots = BuildSlotsFromTemplate(template, null);
-
         var recalculated = RecalculateAvailability(slots);
         var suggestedName = $"Escalação {lineups.Count + 1}";
         var roles = SanitizeRoles(CreateEmptyRoles(), recalculated);
 
-        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, null, lineups.Count == 0, recalculated, roles);
+        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, 1, lineups.Count == 0, recalculated, roles, null, null);
         selectedLineupId = null;
         isNewLineup = true;
     }
 
     private void ResetSelection()
     {
-        if (isNewLineup)
-        {
-            CreateNewLineup();
-            return;
-        }
-
-        if (selectedLineupId.HasValue)
-        {
-            SelectExistingLineup(selectedLineupId.Value);
-        }
+        if (isNewLineup) { CreateNewLineup(); return; }
+        if (selectedLineupId.HasValue) SelectExistingLineup(selectedLineupId.Value);
     }
 
     private void ClearLocalState()
@@ -608,47 +811,33 @@ else
 
     private void OnNameChanged(ChangeEventArgs args)
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
-
-        var value = args.Value?.ToString() ?? string.Empty;
-        currentEditor = currentEditor with { Name = value };
+        if (currentEditor is null) return;
+        currentEditor = currentEditor with { Name = args.Value?.ToString() ?? string.Empty };
     }
 
     private void OnActiveChanged(ChangeEventArgs args)
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
-
-        var value = args.Value?.ToString();
-        if (bool.TryParse(value, out var isActive))
-        {
+        if (currentEditor is null) return;
+        if (bool.TryParse(args.Value?.ToString(), out var isActive))
             currentEditor = currentEditor with { IsActive = isActive };
-        }
+    }
+
+    private void OnAutoSubstitutionChanged(ChangeEventArgs args)
+    {
+        if (currentEditor is null) return;
+        if (int.TryParse(args.Value?.ToString(), out var value) && value >= 1 && value <= 4)
+            currentEditor = currentEditor with { AutoSubstitution = value };
     }
 
     private void OnFormationChanged(ChangeEventArgs args)
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
-
+        if (currentEditor is null) return;
         var value = args.Value?.ToString();
         if (string.IsNullOrWhiteSpace(value) || value.Equals(currentEditor.Formation, StringComparison.OrdinalIgnoreCase))
-        {
             return;
-        }
 
         LineupTemplate template;
-        try
-        {
-            template = LineupTemplateCatalog.GetTemplateOrDefault(value);
-        }
+        try { template = LineupTemplateCatalog.GetTemplateOrDefault(value); }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Unsupported formation selected: {Formation}", value);
@@ -666,35 +855,14 @@ else
         currentEditor = currentEditor with { Formation = template.Formation, Slots = recalculated, Roles = sanitizedRoles };
     }
 
-    private void OnTacticCodeChanged(ChangeEventArgs args)
-    {
-        if (currentEditor is null)
-        {
-            return;
-        }
-
-        var value = args.Value?.ToString() ?? string.Empty;
-        var sanitized = value.Length > MaxTacticCodeLength
-            ? value[..MaxTacticCodeLength]
-            : value;
-
-        currentEditor = currentEditor with { TacticCode = sanitized };
-    }
-
     private void OnSlotChanged(Guid slotId, string? value)
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
+        if (currentEditor is null) return;
 
         var slots = currentEditor.Slots.ToList();
         var roles = currentEditor.Roles;
         var index = slots.FindIndex(s => s.SlotId == slotId);
-        if (index < 0)
-        {
-            return;
-        }
+        if (index < 0) return;
 
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -702,9 +870,7 @@ else
         }
         else if (int.TryParse(value, out var playerId))
         {
-            var selectedPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == playerId)
-                ?? slots[index].SelectedPlayer;
-
+            var selectedPlayer = rosterPlayers.FirstOrDefault(p => p.PlayerId == playerId) ?? slots[index].SelectedPlayer;
             if (selectedPlayer is null)
             {
                 Toasts.ShowError("Jogador não encontrado no elenco.");
@@ -714,17 +880,10 @@ else
             {
                 for (var i = 0; i < slots.Count; i++)
                 {
-                    if (i == index)
-                    {
-                        continue;
-                    }
-
+                    if (i == index) continue;
                     if (slots[i].SelectedPlayer?.PlayerId == selectedPlayer.PlayerId)
-                    {
                         slots[i] = slots[i] with { SelectedPlayer = null };
-                    }
                 }
-
                 slots[index] = slots[index] with { SelectedPlayer = selectedPlayer };
             }
         }
@@ -738,20 +897,67 @@ else
         currentEditor = currentEditor with { Slots = recalculated, Roles = sanitizedRoles };
     }
 
-    private static string GetSlotSelectedValue(LineupSlotState slot)
+    private void OnOffensiveChanged(string field, string? rawValue)
     {
-        return slot.SelectedPlayer is null
-            ? string.Empty
-            : slot.SelectedPlayer.PlayerId.ToString(CultureInfo.InvariantCulture);
+        if (currentEditor is null) return;
+        if (!int.TryParse(rawValue, out var intValue)) return;
+
+        var oi = currentEditor.OffensiveInstructions ?? new OffensiveInstructionsEditor(0, 0, 0, 0, 5);
+
+        oi = field switch
+        {
+            nameof(OffensiveInstructionsEditor.OffensiveStyle) => oi with { OffensiveStyle = intValue },
+            nameof(OffensiveInstructionsEditor.Playmaker) => oi with { Playmaker = intValue },
+            nameof(OffensiveInstructionsEditor.AttackArea) => oi with { AttackArea = intValue },
+            nameof(OffensiveInstructionsEditor.Positioning) => oi with { Positioning = intValue },
+            nameof(OffensiveInstructionsEditor.SupportRange) => oi with { SupportRange = intValue },
+            _ => oi
+        };
+
+        // If all fields are 0/default, treat as null (not set)
+        var isBlank = oi.OffensiveStyle == 0 && oi.Playmaker == 0 && oi.AttackArea == 0 && oi.Positioning == 0;
+        currentEditor = currentEditor with { OffensiveInstructions = isBlank ? null : oi };
     }
+
+    private void OnDefensiveChanged(string field, string? rawValue)
+    {
+        if (currentEditor is null) return;
+        if (!int.TryParse(rawValue, out var intValue)) return;
+
+        var di = currentEditor.DefensiveInstructions ?? new DefensiveInstructionsEditor(0, 0, 0, 5, 5);
+
+        di = field switch
+        {
+            nameof(DefensiveInstructionsEditor.DefensiveStyle) => di with { DefensiveStyle = intValue },
+            nameof(DefensiveInstructionsEditor.ContainmentArea) => di with { ContainmentArea = intValue },
+            nameof(DefensiveInstructionsEditor.Pressure) => di with { Pressure = intValue },
+            nameof(DefensiveInstructionsEditor.DefensiveLine) => di with { DefensiveLine = intValue },
+            nameof(DefensiveInstructionsEditor.Density) => di with { Density = intValue },
+            _ => di
+        };
+
+        var isBlank = di.DefensiveStyle == 0 && di.ContainmentArea == 0 && di.Pressure == 0;
+        currentEditor = currentEditor with { DefensiveInstructions = isBlank ? null : di };
+    }
+
+    private void ClearOffensiveInstructions()
+    {
+        if (currentEditor is null) return;
+        currentEditor = currentEditor with { OffensiveInstructions = null };
+    }
+
+    private void ClearDefensiveInstructions()
+    {
+        if (currentEditor is null) return;
+        currentEditor = currentEditor with { DefensiveInstructions = null };
+    }
+
+    private static string GetSlotSelectedValue(LineupSlotState slot)
+        => slot.SelectedPlayer is null ? string.Empty : slot.SelectedPlayer.PlayerId.ToString(CultureInfo.InvariantCulture);
 
     private async Task SaveAsync()
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
-
+        if (currentEditor is null) return;
         if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
         {
             Toasts.ShowError("Informe o token do seu time para salvar a escalação.");
@@ -780,10 +986,7 @@ else
 
             await RefreshLineupsAsync(result.LineupId, saveCts.Token);
         }
-        catch (OperationCanceledException)
-        {
-            // ignore
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Error saving lineup for team {TeamId}", TeamId);
@@ -797,17 +1000,12 @@ else
 
     private async Task DuplicateCurrentAsync()
     {
-        if (currentEditor is null || isNewLineup || currentEditor.LineupId == Guid.Empty)
-        {
-            return;
-        }
-
+        if (currentEditor is null || isNewLineup || currentEditor.LineupId == Guid.Empty) return;
         if (lineups.Count >= MaxLineupsPerTeam)
         {
             Toasts.ShowError($"O time já possui {MaxLineupsPerTeam} escalações cadastradas.");
             return;
         }
-
         if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
         {
             Toasts.ShowError("Informe o token do seu time para duplicar a escalação.");
@@ -824,10 +1022,7 @@ else
             Toasts.ShowSuccess("Escalação duplicada com sucesso.");
             await RefreshLineupsAsync(duplicated.LineupId, saveCts.Token);
         }
-        catch (OperationCanceledException)
-        {
-            // ignore
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Error duplicating lineup {LineupId} for team {TeamId}", currentEditor.LineupId, TeamId);
@@ -841,10 +1036,7 @@ else
 
     private async Task DeleteCurrentAsync()
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
+        if (currentEditor is null) return;
 
         if (isNewLineup || currentEditor.LineupId == Guid.Empty)
         {
@@ -860,10 +1052,7 @@ else
         }
 
         var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Confirma a exclusão desta escalação?");
-        if (!confirmed)
-        {
-            return;
-        }
+        if (!confirmed) return;
 
         if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
         {
@@ -881,10 +1070,7 @@ else
             Toasts.ShowSuccess("Escalação excluída com sucesso.");
             await RefreshLineupsAsync(null, deleteCts.Token);
         }
-        catch (OperationCanceledException)
-        {
-            // ignore
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Lineups:Error deleting lineup {LineupId} for team {TeamId}", currentEditor.LineupId, TeamId);
@@ -898,36 +1084,18 @@ else
 
     private async Task RefreshLineupsAsync(Guid? preferredLineupId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(currentTeamToken))
-        {
-            hasAccess = false;
-            ClearLocalState();
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(currentTeamToken)) { hasAccess = false; ClearLocalState(); return; }
 
         var fetched = await LineupsApiClient.GetLineupsAsync(TeamId, currentTeamToken, ct);
-        lineups = fetched
-            .OrderByDescending(l => l.IsActive)
-            .ThenBy(l => l.CreatedAtUtc)
-            .ToList();
+        lineups = fetched.OrderByDescending(l => l.IsActive).ThenBy(l => l.CreatedAtUtc).ToList();
 
-        if (lineups.Count == 0)
-        {
-            currentEditor = null;
-            selectedLineupId = null;
-            isNewLineup = false;
-            return;
-        }
+        if (lineups.Count == 0) { currentEditor = null; selectedLineupId = null; isNewLineup = false; return; }
 
         Guid targetId;
         if (preferredLineupId.HasValue && lineups.Any(l => l.LineupId == preferredLineupId.Value))
-        {
             targetId = preferredLineupId.Value;
-        }
         else
-        {
             targetId = lineups.FirstOrDefault(l => l.IsActive)?.LineupId ?? lineups[0].LineupId;
-        }
 
         SelectExistingLineup(targetId);
     }
@@ -935,42 +1103,45 @@ else
     private LineupEditorState BuildEditorState(TeamLineupDto lineup)
     {
         var slots = lineup.Starters.Concat(lineup.Bench)
-            .OrderBy(s => s.IsBench)
-            .ThenBy(s => s.Order)
+            .OrderBy(s => s.IsBench).ThenBy(s => s.Order)
             .Select(slot =>
             {
                 PlayerOption? selected = null;
                 if (slot.Player is not null)
-                {
-                    // Apenas seleciona o jogador se ele ainda estiver no roster do time
                     selected = rosterPlayers.FirstOrDefault(p => p.PlayerId == slot.Player.PlayerId);
-                }
 
                 return new LineupSlotState(
-                    slot.SlotId,
-                    slot.SlotCode,
-                    slot.DisplayName,
-                    slot.IsBench,
-                    slot.Order,
+                    slot.SlotId, slot.SlotCode, slot.DisplayName, slot.IsBench, slot.Order,
                     slot.AllowedPositionIds?.ToArray() ?? Array.Empty<short>(),
-                    selected,
-                    Array.Empty<PlayerOption>());
+                    selected, Array.Empty<PlayerOption>());
             })
             .ToList();
 
         var recalculated = RecalculateAvailability(slots);
         var roles = BuildRolesState(lineup.Roles, recalculated);
-        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.TacticCode, lineup.IsActive, recalculated, roles);
+
+        OffensiveInstructionsEditor? oi = null;
+        if (lineup.OffensiveInstructions is not null)
+        {
+            var src = lineup.OffensiveInstructions;
+            oi = new OffensiveInstructionsEditor(src.OffensiveStyle, src.Playmaker, src.AttackArea, src.Positioning, src.SupportRange);
+        }
+
+        DefensiveInstructionsEditor? di = null;
+        if (lineup.DefensiveInstructions is not null)
+        {
+            var src = lineup.DefensiveInstructions;
+            di = new DefensiveInstructionsEditor(src.DefensiveStyle, src.ContainmentArea, src.Pressure, src.DefensiveLine, src.Density);
+        }
+
+        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.AutoSubstitution, lineup.IsActive, recalculated, roles, oi, di);
     }
 
     private IReadOnlyList<LineupSlotState> RecalculateAvailability(IReadOnlyList<LineupSlotState> slots)
     {
         var result = new List<LineupSlotState>(slots.Count);
         foreach (var slot in slots)
-        {
-            var available = BuildAvailability(slot, slots);
-            result.Add(slot with { AvailablePlayers = available });
-        }
+            result.Add(slot with { AvailablePlayers = BuildAvailability(slot, slots) });
         return result;
     }
 
@@ -979,29 +1150,19 @@ else
         IEnumerable<PlayerOption> candidates = rosterPlayers;
 
         if (!slot.IsBench && slot.AllowedPositionIds.Count > 0)
-        {
             candidates = candidates.Where(p => slot.AllowedPositionIds.Contains(p.PositionId));
-        }
 
-        var ordered = candidates
-            .OrderByDescending(p => p.Overall)
-            .ThenBy(p => p.Name)
-            .ToList();
+        var ordered = candidates.OrderByDescending(p => p.Overall).ThenBy(p => p.Name).ToList();
 
         if (slot.SelectedPlayer is not null && ordered.All(p => p.PlayerId != slot.SelectedPlayer.PlayerId))
-        {
             ordered.Insert(0, slot.SelectedPlayer);
-        }
 
         return ordered;
     }
 
     private IReadOnlyList<PlayerOption> GetStarterPlayerOptions()
     {
-        if (currentEditor is null)
-        {
-            return Array.Empty<PlayerOption>();
-        }
+        if (currentEditor is null) return Array.Empty<PlayerOption>();
 
         return currentEditor.Slots
             .Where(s => !s.IsBench && s.SelectedPlayer is not null)
@@ -1022,12 +1183,15 @@ else
             roles = roles with
             {
                 Captain = ResolvePlayerOption(dto.Captain),
-                ShortFreeKickLeft = ResolvePlayerOption(dto.ShortFreeKickLeft),
-                ShortFreeKickRight = ResolvePlayerOption(dto.ShortFreeKickRight),
+                ShortFreeKick1 = ResolvePlayerOption(dto.ShortFreeKick1),
+                ShortFreeKick2 = ResolvePlayerOption(dto.ShortFreeKick2),
                 LongFreeKick = ResolvePlayerOption(dto.LongFreeKick),
                 Penalties = ResolvePlayerOption(dto.Penalties),
                 CornerLeft = ResolvePlayerOption(dto.CornerLeft),
-                CornerRight = ResolvePlayerOption(dto.CornerRight)
+                CornerRight = ResolvePlayerOption(dto.CornerRight),
+                AttackingPlayer1 = ResolvePlayerOption(dto.AttackingPlayer1),
+                AttackingPlayer2 = ResolvePlayerOption(dto.AttackingPlayer2),
+                AttackingPlayer3 = ResolvePlayerOption(dto.AttackingPlayer3),
             };
         }
 
@@ -1036,37 +1200,30 @@ else
 
     private PlayerOption? ResolvePlayerOption(TeamLineupSlotPlayerDto? player)
     {
-        if (player is null)
-        {
-            return null;
-        }
-
-        // Apenas retorna o jogador se ele ainda estiver no roster do time
+        if (player is null) return null;
         return rosterPlayers.FirstOrDefault(p => p.PlayerId == player.PlayerId);
     }
 
     private void OnRoleChanged(SpecialRoleType role, string? value)
     {
-        if (currentEditor is null)
-        {
-            return;
-        }
+        if (currentEditor is null) return;
 
         PlayerOption? selected = null;
         if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var playerId))
-        {
             selected = GetStarterPlayerOptions().FirstOrDefault(p => p.PlayerId == playerId);
-        }
 
         var updatedRoles = role switch
         {
             SpecialRoleType.Captain => currentEditor.Roles with { Captain = selected },
-            SpecialRoleType.ShortFreeKickLeft => currentEditor.Roles with { ShortFreeKickLeft = selected },
-            SpecialRoleType.ShortFreeKickRight => currentEditor.Roles with { ShortFreeKickRight = selected },
+            SpecialRoleType.ShortFreeKick1 => currentEditor.Roles with { ShortFreeKick1 = selected },
+            SpecialRoleType.ShortFreeKick2 => currentEditor.Roles with { ShortFreeKick2 = selected },
             SpecialRoleType.LongFreeKick => currentEditor.Roles with { LongFreeKick = selected },
             SpecialRoleType.Penalties => currentEditor.Roles with { Penalties = selected },
             SpecialRoleType.CornerLeft => currentEditor.Roles with { CornerLeft = selected },
             SpecialRoleType.CornerRight => currentEditor.Roles with { CornerRight = selected },
+            SpecialRoleType.AttackingPlayer1 => currentEditor.Roles with { AttackingPlayer1 = selected },
+            SpecialRoleType.AttackingPlayer2 => currentEditor.Roles with { AttackingPlayer2 = selected },
+            SpecialRoleType.AttackingPlayer3 => currentEditor.Roles with { AttackingPlayer3 = selected },
             _ => currentEditor.Roles
         };
 
@@ -1075,7 +1232,7 @@ else
     }
 
     private static LineupRolesState CreateEmptyRoles()
-        => new(null, null, null, null, null, null, null);
+        => new(null, null, null, null, null, null, null, null, null, null);
 
     private static LineupRolesState SanitizeRoles(LineupRolesState roles, IReadOnlyList<LineupSlotState> slots)
     {
@@ -1090,12 +1247,15 @@ else
         return roles with
         {
             Captain = Normalize(roles.Captain),
-            ShortFreeKickLeft = Normalize(roles.ShortFreeKickLeft),
-            ShortFreeKickRight = Normalize(roles.ShortFreeKickRight),
+            ShortFreeKick1 = Normalize(roles.ShortFreeKick1),
+            ShortFreeKick2 = Normalize(roles.ShortFreeKick2),
             LongFreeKick = Normalize(roles.LongFreeKick),
             Penalties = Normalize(roles.Penalties),
             CornerLeft = Normalize(roles.CornerLeft),
-            CornerRight = Normalize(roles.CornerRight)
+            CornerRight = Normalize(roles.CornerRight),
+            AttackingPlayer1 = Normalize(roles.AttackingPlayer1),
+            AttackingPlayer2 = Normalize(roles.AttackingPlayer2),
+            AttackingPlayer3 = Normalize(roles.AttackingPlayer3),
         };
     }
 
@@ -1112,20 +1272,13 @@ else
         assignments ??= new Dictionary<string, PlayerOption?>(StringComparer.OrdinalIgnoreCase);
 
         return template.AllSlots
-            .OrderBy(s => s.IsBench)
-            .ThenBy(s => s.Order)
+            .OrderBy(s => s.IsBench).ThenBy(s => s.Order)
             .Select(s =>
             {
                 assignments.TryGetValue(s.SlotCode, out var selected);
                 return new LineupSlotState(
-                    Guid.NewGuid(),
-                    s.SlotCode,
-                    s.DisplayName,
-                    s.IsBench,
-                    s.Order,
-                    s.AllowedPositionIds.ToArray(),
-                    selected,
-                    Array.Empty<PlayerOption>());
+                    Guid.NewGuid(), s.SlotCode, s.DisplayName, s.IsBench, s.Order,
+                    s.AllowedPositionIds.ToArray(), selected, Array.Empty<PlayerOption>());
             })
             .ToList();
     }
@@ -1133,87 +1286,93 @@ else
     private static TeamLineupSaveRequestDto BuildSaveRequest(LineupEditorState editor)
     {
         var starters = editor.Slots
-            .Where(s => !s.IsBench)
-            .OrderBy(s => s.Order)
+            .Where(s => !s.IsBench).OrderBy(s => s.Order)
             .Select(s => new TeamLineupSlotAssignmentDto(s.SlotCode, s.SelectedPlayer?.PlayerId))
             .ToList();
 
         var bench = editor.Slots
-            .Where(s => s.IsBench)
-            .OrderBy(s => s.Order)
+            .Where(s => s.IsBench).OrderBy(s => s.Order)
             .Select(s => new TeamLineupSlotAssignmentDto(s.SlotCode, s.SelectedPlayer?.PlayerId))
             .ToList();
 
         var roles = new TeamLineupRoleAssignmentsDto(
             editor.Roles.Captain?.PlayerId,
-            editor.Roles.ShortFreeKickLeft?.PlayerId,
-            editor.Roles.ShortFreeKickRight?.PlayerId,
+            editor.Roles.ShortFreeKick1?.PlayerId,
+            editor.Roles.ShortFreeKick2?.PlayerId,
             editor.Roles.LongFreeKick?.PlayerId,
             editor.Roles.Penalties?.PlayerId,
             editor.Roles.CornerLeft?.PlayerId,
-            editor.Roles.CornerRight?.PlayerId);
+            editor.Roles.CornerRight?.PlayerId,
+            editor.Roles.AttackingPlayer1?.PlayerId,
+            editor.Roles.AttackingPlayer2?.PlayerId,
+            editor.Roles.AttackingPlayer3?.PlayerId);
 
-        string? tacticCode = string.IsNullOrWhiteSpace(editor.TacticCode)
-            ? null
-            : editor.TacticCode.Trim();
-
-        if (tacticCode is { Length: > MaxTacticCodeLength })
+        TeamLineupOffensiveInstructionsDto? oi = null;
+        if (editor.OffensiveInstructions is { } oiEditor && oiEditor.OffensiveStyle > 0)
         {
-            tacticCode = tacticCode[..MaxTacticCodeLength];
+            oi = new TeamLineupOffensiveInstructionsDto(
+                oiEditor.OffensiveStyle, oiEditor.Playmaker, oiEditor.AttackArea,
+                oiEditor.Positioning, oiEditor.SupportRange);
         }
 
-        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, tacticCode, editor.IsActive, starters, bench, roles);
+        TeamLineupDefensiveInstructionsDto? di = null;
+        if (editor.DefensiveInstructions is { } diEditor && diEditor.DefensiveStyle > 0)
+        {
+            di = new TeamLineupDefensiveInstructionsDto(
+                diEditor.DefensiveStyle, diEditor.ContainmentArea, diEditor.Pressure,
+                diEditor.DefensiveLine, diEditor.Density);
+        }
+
+        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.AutoSubstitution, editor.IsActive, starters, bench, roles, oi, di);
     }
 
     public void Dispose()
     {
         TeamAccess.TokenChanged -= OnTeamTokenChanged;
-        loadCts?.Cancel();
-        loadCts?.Dispose();
-        saveCts?.Cancel();
-        saveCts?.Dispose();
-        deleteCts?.Cancel();
-        deleteCts?.Dispose();
+        loadCts?.Cancel(); loadCts?.Dispose();
+        saveCts?.Cancel(); saveCts?.Dispose();
+        deleteCts?.Cancel(); deleteCts?.Dispose();
     }
 
     private enum SpecialRoleType
     {
-        Captain,
-        ShortFreeKickLeft,
-        ShortFreeKickRight,
-        LongFreeKick,
-        Penalties,
-        CornerLeft,
-        CornerRight
+        Captain, ShortFreeKick1, ShortFreeKick2, LongFreeKick,
+        Penalties, CornerLeft, CornerRight,
+        AttackingPlayer1, AttackingPlayer2, AttackingPlayer3
     }
 
     private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall);
 
     private sealed record LineupSlotState(
-        Guid SlotId,
-        string SlotCode,
-        string DisplayName,
-        bool IsBench,
-        int Order,
-        IReadOnlyList<short> AllowedPositionIds,
-        PlayerOption? SelectedPlayer,
-        IReadOnlyList<PlayerOption> AvailablePlayers);
+        Guid SlotId, string SlotCode, string DisplayName, bool IsBench, int Order,
+        IReadOnlyList<short> AllowedPositionIds, PlayerOption? SelectedPlayer, IReadOnlyList<PlayerOption> AvailablePlayers);
 
     private sealed record LineupRolesState(
         PlayerOption? Captain,
-        PlayerOption? ShortFreeKickLeft,
-        PlayerOption? ShortFreeKickRight,
+        PlayerOption? ShortFreeKick1,
+        PlayerOption? ShortFreeKick2,
         PlayerOption? LongFreeKick,
         PlayerOption? Penalties,
         PlayerOption? CornerLeft,
-        PlayerOption? CornerRight);
+        PlayerOption? CornerRight,
+        PlayerOption? AttackingPlayer1,
+        PlayerOption? AttackingPlayer2,
+        PlayerOption? AttackingPlayer3);
+
+    private sealed record OffensiveInstructionsEditor(
+        int OffensiveStyle, int Playmaker, int AttackArea, int Positioning, int SupportRange);
+
+    private sealed record DefensiveInstructionsEditor(
+        int DefensiveStyle, int ContainmentArea, int Pressure, int DefensiveLine, int Density);
 
     private sealed record LineupEditorState(
         Guid LineupId,
         string Name,
         string Formation,
-        string? TacticCode,
+        int AutoSubstitution,
         bool IsActive,
         IReadOnlyList<LineupSlotState> Slots,
-        LineupRolesState Roles);
+        LineupRolesState Roles,
+        OffensiveInstructionsEditor? OffensiveInstructions,
+        DefensiveInstructionsEditor? DefensiveInstructions);
 }

@@ -11,7 +11,7 @@ public class TeamLineupConfiguration : IEntityTypeConfiguration<TeamLineup>
         e.HasKey(x => x.LineupId);
         e.Property(x => x.Name).IsRequired().HasMaxLength(80);
         e.Property(x => x.Formation).IsRequired().HasMaxLength(20);
-        e.Property(x => x.TacticCode).HasMaxLength(40);
+        e.Property(x => x.AutoSubstitution).IsRequired().HasDefaultValue(1);
         e.Property(x => x.CreatedAt).IsRequired();
         e.Property(x => x.UpdatedAt).IsRequired();
 
@@ -28,14 +28,14 @@ public class TeamLineupConfiguration : IEntityTypeConfiguration<TeamLineup>
          .HasForeignKey(x => x.CaptainPlayerId)
          .OnDelete(DeleteBehavior.Restrict);
 
-        e.HasOne(x => x.ShortFreeKickLeftPlayer)
+        e.HasOne(x => x.ShortFreeKick1Player)
          .WithMany()
-         .HasForeignKey(x => x.ShortFreeKickLeftPlayerId)
+         .HasForeignKey(x => x.ShortFreeKick1PlayerId)
          .OnDelete(DeleteBehavior.Restrict);
 
-        e.HasOne(x => x.ShortFreeKickRightPlayer)
+        e.HasOne(x => x.ShortFreeKick2Player)
          .WithMany()
-         .HasForeignKey(x => x.ShortFreeKickRightPlayerId)
+         .HasForeignKey(x => x.ShortFreeKick2PlayerId)
          .OnDelete(DeleteBehavior.Restrict);
 
         e.HasOne(x => x.LongFreeKickPlayer)
@@ -57,5 +57,30 @@ public class TeamLineupConfiguration : IEntityTypeConfiguration<TeamLineup>
          .WithMany()
          .HasForeignKey(x => x.CornerRightPlayerId)
          .OnDelete(DeleteBehavior.Restrict);
+
+        e.HasOne(x => x.AttackingPlayer1)
+         .WithMany()
+         .HasForeignKey(x => x.AttackingPlayer1Id)
+         .OnDelete(DeleteBehavior.Restrict);
+
+        e.HasOne(x => x.AttackingPlayer2)
+         .WithMany()
+         .HasForeignKey(x => x.AttackingPlayer2Id)
+         .OnDelete(DeleteBehavior.Restrict);
+
+        e.HasOne(x => x.AttackingPlayer3)
+         .WithMany()
+         .HasForeignKey(x => x.AttackingPlayer3Id)
+         .OnDelete(DeleteBehavior.Restrict);
+
+        e.HasOne(x => x.OffensiveInstructions)
+         .WithOne(x => x.Lineup)
+         .HasForeignKey<TeamLineupOffensiveInstructions>(x => x.LineupId)
+         .OnDelete(DeleteBehavior.Cascade);
+
+        e.HasOne(x => x.DefensiveInstructions)
+         .WithOne(x => x.Lineup)
+         .HasForeignKey<TeamLineupDefensiveInstructions>(x => x.LineupId)
+         .OnDelete(DeleteBehavior.Cascade);
     }
 }

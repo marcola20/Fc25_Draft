@@ -18,6 +18,8 @@ public class DraftDbContext : DbContext
     public DbSet<TeamRoster> TeamRosters => Set<TeamRoster>();
     public DbSet<TeamLineup> TeamLineups => Set<TeamLineup>();
     public DbSet<TeamLineupSlot> TeamLineupSlots => Set<TeamLineupSlot>();
+    public DbSet<TeamLineupOffensiveInstructions> TeamLineupOffensiveInstructions => Set<TeamLineupOffensiveInstructions>();
+    public DbSet<TeamLineupDefensiveInstructions> TeamLineupDefensiveInstructions => Set<TeamLineupDefensiveInstructions>();
     public DbSet<AdminToken> AdminTokens => Set<AdminToken>();
     public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
     public DbSet<MarketCycle> MarketCycles => Set<MarketCycle>();

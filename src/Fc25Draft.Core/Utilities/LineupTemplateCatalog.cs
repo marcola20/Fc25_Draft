@@ -10,7 +10,7 @@ namespace Fc25Draft.Core.Utilities;
 
 public static class LineupTemplateCatalog
 {
-    public const string DefaultFormation = "4-3-3";
+    public const string DefaultFormation = "4-3-3 (4-2-1-3)";
 
     private static readonly IReadOnlyDictionary<string, LineupTemplate> Templates = BuildTemplates();
 
@@ -46,11 +46,119 @@ public static class LineupTemplateCatalog
     {
         return new Dictionary<string, LineupTemplate>(StringComparer.OrdinalIgnoreCase)
         {
-            ["4-3-3"] = new LineupTemplate(
-                "4-3-3",
+            ["4-4-2 (4-2-2-2) Padrão"] = new LineupTemplate(
+                "4-4-2 (4-2-2-2) Padrão",
                 new List<LineupSlotTemplate>
                 {
                     new("GK",   "Goleiro (GOL)",               false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                 false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                 false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",         false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",        false,  7, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",           false,  8, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",            false,  9, new short[] { 7, 10, 11 }),
+                    new("ST1",  "Centroavante (CA)",            false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-5-1 (4-2-3-1)"] = new LineupTemplate(
+                "4-5-1 (4-2-3-1)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",               false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                 false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                 false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",         false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",        false,  7, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",           false,  8, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",            false,  9, new short[] { 7, 10, 11 }),
+                    new("CAM",  "Meia Atacante (MAT)",          false, 10, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST",   "Centroavante (CA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-5-1 (4-1-4-1)"] = new LineupTemplate(
+                "4-5-1 (4-1-4-1)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",               false,  7, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",                false,  8, new short[] { 7, 10, 11 }),
+                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-5-1 (4-3-2-1)"] = new LineupTemplate(
+                "4-5-1 (4-3-2-1)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-4-2 (4-2-2-2)"] = new LineupTemplate(
+                "4-4-2 (4-2-2-2)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("LM",   "Meia Esquerda (ME)",               false,  8, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",                false,  9, new short[] { 7, 10, 11 }),
+                    new("ST1",  "Segundo Atacante (SA)",            false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-4-2 (4-3-1-2)"] = new LineupTemplate(
+                "4-4-2 (4-3-1-2)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CAM",  "Meia Atacante (MAT)",              false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST1",  "Segundo Atacante (SA)",            false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-3-3 (4-2-1-3)"] = new LineupTemplate(
+                "4-3-3 (4-2-1-3)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
                     new("LB",   "Lateral Esquerdo (LE)",       false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
                     new("LCB",  "Zagueiro (E)",                false,  3, new short[] { 2, 3, 4, 5 }),
                     new("RCB",  "Zagueiro (D)",                false,  4, new short[] { 2, 3, 4, 5 }),
@@ -64,8 +172,8 @@ public static class LineupTemplateCatalog
                 },
                 CreateBenchTemplate()),
 
-            ["4-3-3 Conservador"] = new LineupTemplate(
-                "4-3-3 Conservador",
+            ["4-3-3 (4-1-2-3)"] = new LineupTemplate(
+                "4-3-3 (4-1-2-3)",
                 new List<LineupSlotTemplate>
                 {
                     new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
@@ -74,263 +182,137 @@ public static class LineupTemplateCatalog
                     new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
                     new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
                     new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  7, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("CAM2", "Meia Atacante Direito (MAT)",      false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
                     new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 }),
                     new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11 }),
                     new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
 
-            ["4-2-3-1"] = new LineupTemplate(
-                "4-2-3-1",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",      false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",               false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",               false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",       false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  6, new short[] { 5, 6, 7 }),
-                    new("CDM2", "Volante Direito (VOL)",      false,  7, new short[] { 5, 6, 7 }),
-                    new("LM",   "Meia Esquerda (ME)",         false,  8, new short[] { 7, 8, 9 }),
-                    new("CAM",  "Meia Atacante (MAT)",        false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("RM",   "Meia Direita (MD)",          false, 10, new short[] { 7, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",          false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-3-1 (2)"] = new LineupTemplate(
-                "4-2-3-1 (2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("LM",   "Meia Esquerda (ME)",               false,  8, new short[] { 7, 8, 9 }),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("RM",   "Meia Direita (MD)",                false, 10, new short[] { 7, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-3-1 (3)"] = new LineupTemplate(
-                "4-2-3-1 (3)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM1", "Volante Esquerdo (VOL)",           false,  6, new short[] { 5, 6, 7 }),
-                    new("CDM2", "Volante Direito (VOL)",            false,  7, new short[] { 5, 6, 7 }),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  8, new short[] { 7, 8, 9, 10, 11 }),
-                    new("CAM2", "Meia Atacante (MAT)",              false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("CAM3", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 7, 8, 9, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-2-2"] = new LineupTemplate(
-                "4-2-2-2",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM1", "Volante Esquerdo (VOL)",           false,  6, new short[] { 5, 6, 7 }),
-                    new("CDM2", "Volante Direito (VOL)",            false,  7, new short[] { 5, 6, 7 }),
-                    new("LAM",  "Meia Atacante Esquerdo (MAT)",     false,  8, new short[] { 6, 7, 8, 9, 10, 11 }),
-                    new("RAM",  "Meia Atacante Direito (MAT)",      false,  9, new short[] { 6, 7, 8, 9, 10, 11 }),
-                    new("ST1",  "Centroavante (CA)",                false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-2-2 (2)"] = new LineupTemplate(
-                "4-2-2-2 (2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",      false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",               false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",               false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",       false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  6, new short[] { 5, 6, 7 }),
-                    new("CDM2", "Volante Direito (VOL)",      false,  7, new short[] { 5, 6, 7 }),
-                    new("LM",   "Meia Esquerda (ME)",         false,  8, new short[] { 7, 8, 9 }),
-                    new("RM",   "Meia Direita (MD)",          false,  9, new short[] { 7, 10, 11 }),
-                    new("ST1",  "Centroavante (CA)",          false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",      false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-1-2-1-2 Aberto"] = new LineupTemplate(
-                "4-1-2-1-2 Aberto",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",      false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",               false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",               false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",       false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM",  "Volante (VOL)",              false,  6, new short[] { 5, 6, 7 }),
-                    new("LM",   "Meia Esquerda (ME)",         false,  7, new short[] { 7, 8, 9 }),
-                    new("RM",   "Meia Direita (MD)",          false,  8, new short[] { 7, 10, 11 }),
-                    new("CAM",  "Meia Atacante (MAT)",        false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("ST1",  "Centroavante (CA)",          false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",      false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-1-2-1-2"] = new LineupTemplate(
-                "4-1-2-1-2",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
-                    new("LCM",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("RCM",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("ST1",  "Centroavante (CA)",                false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["3-4-2-1"] = new LineupTemplate(
-                "3-4-2-1",
+            ["3-6-1 (3-2-4-1)"] = new LineupTemplate(
+                "3-6-1 (3-2-4-1)",
                 new List<LineupSlotTemplate>
                 {
                     new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
                     new("LCB",  "Zagueiro Esquerdo",                false,  2, new short[] { 2, 3, 4, 5 }),
                     new("CCB",  "Zagueiro Central",                 false,  3, new short[] { 2, 3, 4, 5 }),
                     new("RCB",  "Zagueiro Direito",                 false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("LM",   "Meia Esquerda (ME)",               false,  5, new short[] { 3, 4, 7, 8, 9 }),
-                    new("RM",   "Meia Direita (MD)",                false,  6, new short[] { 3, 4, 7, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, new short[] { 6, 7, 8, 9, 10, 11 }),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 6, 7, 8, 9, 10, 11 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",           false,  5, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",            false,  6, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",               false,  7, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",                false,  8, new short[] { 7, 10, 11 }),
+                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
                     new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
 
-            ["5-3-2"] = new LineupTemplate(
-                "5-3-2",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("ADE",  "Ala Esquerdo (LE)",                false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro Esquerdo",                false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("CCB",  "Zagueiro Central",                 false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro Direito",                 false,  5, new short[] { 2, 3, 4, 5 }),
-                    new("ADD",  "Ala Direito (LD)",                 false,  6, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação (MLG)",            false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM3",  "Meia de Ligação Direito (MLG)",    false,  9, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("ST1",  "Centroavante (CA)",                false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-1-2"] = new LineupTemplate(
-                "4-3-1-2",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação (MLG)",            false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM3",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("ST1",  "Centroavante (CA)",                false, 10, new short[] { 7, 9, 11, 12, 13 }),
-                    new("ST2",  "Segundo Atacante (SA)",            false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-1-3"] = new LineupTemplate(
-                "4-2-1-3",
+            ["3-5-2 (3-2-3-2)"] = new LineupTemplate(
+                "3-5-2 (3-2-3-2)",
                 new List<LineupSlotTemplate>
                 {
                     new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",      false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",               false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",               false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",       false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  6, new short[] { 5, 6, 7 }),
-                    new("CDM2", "Volante Direito (VOL)",      false,  7, new short[] { 5, 6, 7 }),
-                    new("CAM",  "Meia Atacante (MAT)",        false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LW",   "Ponta Esquerda (PE)",        false,  9, new short[] { 7, 8, 9 }),
-                    new("RW",   "Ponta Direita (PD)",         false, 10, new short[] { 7, 10, 11 }),
+                    new("LCB",  "Zagueiro Esquerdo",          false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",           false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",           false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",     false,  5, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",      false,  6, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",         false,  7, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",          false,  8, new short[] { 7, 10, 11 }),
+                    new("CAM",  "Meia Atacante (MAT)",        false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST1",  "Segundo Atacante (SA)",      false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",          false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["3-5-2 (3-3-2-2)"] = new LineupTemplate(
+                "3-5-2 (3-3-2-2)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LCB",  "Zagueiro Esquerdo",                false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",                 false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",                 false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("CDM",  "Volante (VOL)",                    false,  5, new short[] { 5, 6, 7 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("LM",   "Meia Esquerda (ME)",               false,  8, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",                false,  9, new short[] { 7, 10, 11 }),
+                    new("ST1",  "Segundo Atacante (SA)",            false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["3-4-3 (3-2-2-3)"] = new LineupTemplate(
+                "3-4-3 (3-2-2-3)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LCB",  "Zagueiro Esquerdo",                false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",                 false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",                 false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  5, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("LM",   "Meia Esquerda (ME)",               false,  7, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",                false,  8, new short[] { 7, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 }),
+                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["5-4-1 (5-2-2-1)"] = new LineupTemplate(
+                "5-4-1 (5-2-2-1)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
+                    new("LCB",  "Zagueiro Esquerdo",          false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",           false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",           false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("ADE",  "Ala Esquerdo (LE)",          false,  5, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("ADD",  "Ala Direito (LD)",           false,  6, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",     false,  7, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",      false,  8, new short[] { 5, 6, 7 }),
+                    new("LM",   "Meia Esquerda (ME)",         false,  9, new short[] { 7, 8, 9 }),
+                    new("RM",   "Meia Direita (MD)",          false, 10, new short[] { 7, 10, 11 }),
                     new("ST",   "Centroavante (CA)",          false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
 
-            ["4-4-1-1"] = new LineupTemplate(
-                "4-4-1-1",
+            ["5-3-2 (5-2-1-2)"] = new LineupTemplate(
+                "5-3-2 (5-2-1-2)",
                 new List<LineupSlotTemplate>
                 {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LM",   "Meia Esquerda (ME)",               false,  9, new short[] { 7, 8, 9 }),
-                    new("RM",   "Meia Direita (MD)",                false, 10, new short[] { 7, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                    new("GK",   "Goleiro (GOL)",              false,  1, new short[] { 1 }),
+                    new("LCB",  "Zagueiro Esquerdo",          false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",           false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",           false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("ADE",  "Ala Esquerdo (LE)",          false,  5, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("ADD",  "Ala Direito (LD)",           false,  6, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM1", "Volante Esquerdo (VOL)",     false,  7, new short[] { 5, 6, 7 }),
+                    new("CDM2", "Volante Direito (VOL)",      false,  8, new short[] { 5, 6, 7 }),
+                    new("CAM",  "Meia Atacante (MAT)",        false,  9, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("ST1",  "Segundo Atacante (SA)",      false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",          false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
 
-            ["4-3-2-1"] = new LineupTemplate(
-                "4-3-2-1",
+            ["5-3-2 (5-3-2)"] = new LineupTemplate(
+                "5-3-2 (5-3-2)",
                 new List<LineupSlotTemplate>
                 {
                     new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação (MLG)",            false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM3",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, new short[] { 6, 7, 8, 9, 10, 11 }),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, new short[] { 6, 7, 8, 9, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
-                },
-                CreateBenchTemplate()),
-
-            ["4-5-1"] = new LineupTemplate(
-                "4-5-1",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM2",  "Meia de Ligação (MLG)",            false,  7, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("CM3",  "Meia de Ligação Direito (MLG)",    false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
-                    new("LM",   "Meia Esquerda (ME)",               false,  9, new short[] { 7, 8, 9 }),
-                    new("RM",   "Meia Direita (MD)",                false, 10, new short[] { 7, 10, 11 }),
-                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                    new("LCB",  "Zagueiro Esquerdo",                false,  2, new short[] { 2, 3, 4, 5 }),
+                    new("CCB",  "Zagueiro Central",                 false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro Direito",                 false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("ADE",  "Ala Esquerdo (LE)",                false,  5, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("ADD",  "Ala Direito (LD)",                 false,  6, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CDM",  "Volante (VOL)",                    false,  7, new short[] { 5, 6, 7 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  8, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  9, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
+                    new("ST1",  "Segundo Atacante (SA)",            false, 10, new short[] { 7, 9, 11, 12, 13 }),
+                    new("ST2",  "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate())
         };

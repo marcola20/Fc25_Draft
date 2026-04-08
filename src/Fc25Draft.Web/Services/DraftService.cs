@@ -195,9 +195,9 @@ public class DraftService
             throw new InvalidOperationException("Nenhuma equipe cadastrada para gerar o draft.");
         }
 
-        if (teamOrder.Count != 14)
+        if (teamOrder.Count != 12)
         {
-            throw new InvalidOperationException("O draft requer exatamente 14 equipes cadastradas.");
+            throw new InvalidOperationException("O draft requer exatamente 12 equipes cadastradas.");
         }
 
         var existingDraft = await _db.Drafts
