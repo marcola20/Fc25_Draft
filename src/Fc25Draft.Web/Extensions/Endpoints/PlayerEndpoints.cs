@@ -47,15 +47,14 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 if (!string.IsNullOrWhiteSpace(q))
                 {
                     var pattern = $"%{q.Trim()}%";
-                    // ILIKE + UNACCENT (extensão PostgreSQL)
                     query = query.Where(p => EF.Functions.ILike(
                         EF.Functions.Unaccent(p.Name),
                         EF.Functions.Unaccent(pattern)));
                 }
 
-                if (pos is { Length: > 0 })
+                if (pos?.Length > 0)
                 {
-                    var positions = pos.Distinct().ToArray();
+                    var positions = pos.Distinct().ToList();
                     query = query.Where(p => positions.Contains(p.PositionId));
                 }
 

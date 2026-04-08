@@ -20,18 +20,17 @@ public class PlayersApiClient
         _clientFactory = clientFactory;
     }
 
-    public async Task<PagedResult<PlayerListItemDto>> GetAsync(
-        string? search,
-        IReadOnlyCollection<short>? positionIds,
-        bool onlyAvailable,
-        int? overallMin,
-        int? overallMax,
-        string? sortBy,
-        string? sortOrder,
-        int page,
-        int pageSize,
-        CancellationToken ct = default)
-    {
+    public async Task<PagedResult<PlayerListItemDto>> GetAsync(string? search,
+                                                               IReadOnlyCollection<short>? positionIds,
+                                                               bool onlyAvailable,
+                                                               int? overallMin,
+                                                               int? overallMax,
+                                                               string? sortBy,
+                                                               string? sortOrder,
+                                                               int page,
+                                                               int pageSize,
+                                                               CancellationToken ct = default)
+    { 
         var client = await _clientFactory.CreateAsync();
 
         var query = new List<KeyValuePair<string, string?>>

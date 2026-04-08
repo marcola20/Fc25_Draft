@@ -38,13 +38,13 @@ public class DraftService
             throw new ArgumentOutOfRangeException(nameof(totalRounds), totalRounds, "Total rounds must be greater than zero.");
         }
 
-        var distinctTeamIds = teamOrder.Distinct().ToArray();
+        var distinctTeamIds = teamOrder.Distinct().ToList();
         var existingTeamIds = await _db.Teams
             .Where(team => distinctTeamIds.Contains(team.TeamId))
             .Select(team => team.TeamId)
             .ToListAsync(ct);
 
-        if (existingTeamIds.Count != distinctTeamIds.Length)
+        if (existingTeamIds.Count != distinctTeamIds.Count)
         {
             var missingIds = distinctTeamIds.Except(existingTeamIds).ToArray();
             throw new ArgumentException($"The following teams do not exist: {string.Join(", ", missingIds)}", nameof(teamOrder));
@@ -54,8 +54,8 @@ public class DraftService
         {
             if (roundRules.Count != totalRounds)
             {
-                var missingRounds = Enumerable.Range(1, totalRounds).Except(roundRules.Keys).ToArray();
-                if (missingRounds.Length > 0)
+                var missingRounds = Enumerable.Range(1, totalRounds).Except(roundRules.Keys).ToList();
+                if (missingRounds.Count > 0)
                 {
                     throw new ArgumentException($"Faltam regras de overall para as rodadas: {string.Join(", ", missingRounds)}.", nameof(roundRules));
                 }
@@ -163,8 +163,6 @@ public class DraftService
             draft.Picks = picks;
 
             _db.Drafts.Add(draft);
-            _db.DraftRounds.AddRange(rounds);
-            _db.DraftPicks.AddRange(picks);
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
@@ -182,7 +180,7 @@ public class DraftService
     {
         if (totalRounds <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(totalRounds), totalRounds, "Total rounds must be greater than zero.");
+            throw new ArgumentOutOfRangeException(nameof(totalRounds), totalRounds, "O total de rounds deve ser maior que zero (0).");
         }
 
         var teamOrder = await _db.Teams

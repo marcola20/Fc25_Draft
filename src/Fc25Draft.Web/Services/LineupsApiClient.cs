@@ -135,7 +135,19 @@ public class LineupsApiClient
             return;
         }
 
+        string rawContent = string.Empty;
+
+        try
+        {
+            rawContent = await response.Content.ReadAsStringAsync(ct);
+        }
+        catch
+        {
+            // ignore
+        }
+
         ApiErrorResponse? error = null;
+
         try
         {
             error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(cancellationToken: ct);
@@ -145,7 +157,9 @@ public class LineupsApiClient
             // ignore
         }
 
-        var message = error?.Message ?? $"Erro ao comunicar com o servidor ({response.StatusCode}).";
+        var message = $@"StatusCode: {(int)response.StatusCode} ({response.StatusCode})
+                         ErrorMessage: {error?.Message}
+                         RawResponse: {rawContent}";
 
         throw response.StatusCode switch
         {

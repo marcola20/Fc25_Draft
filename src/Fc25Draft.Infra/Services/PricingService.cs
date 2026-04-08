@@ -125,24 +125,39 @@ public class PricingService : IPricingService
     {
         if (age <= 22)
         {
+            return 1.18m;
+        }
+
+        if (age <= 24)
+        {
             return 1.15m;
         }
 
         if (age <= 26)
         {
-            return 1.10m;
+            return 1.1m;
         }
 
-        if (age <= 29)
+        if (age <= 28)
         {
-            return 1.00m;
+            return 1m;
+        }
+
+        if (age <= 30)
+        {
+            return 0.98m;
         }
 
         if (age <= 32)
         {
-            return 0.93m;
+            return 0.95m;
         }
 
-        return 0.88m;
+        if (age <= 34)
+        {
+            return 0.90m;
+        }
+
+        return 0.85m;
     }
 }

@@ -6,16 +6,19 @@ public static class MarketWeightResolver
 {
     private static readonly Dictionary<short, decimal> WeightsById = new()
     {
-        { 1, 0.90m },
-        { 2, 1.05m },
+        { 1, 1.00m },
+        { 2, 1.08m },
         { 3, 1.10m },
         { 4, 1.10m },
-        { 5, 1.10m },
-        { 6, 1.10m },
-        { 7, 1.20m },
+        { 5, 1.15m },
+        { 6, 1.15m },
+        { 7, 1.18m },
         { 8, 1.20m },
         { 9, 1.20m },
-        { 10, 1.20m }
+        { 10, 1.20m },
+        { 11, 1.20m },
+        { 12, 1.20m },
+        { 13, 1.20m }
     };
 
     private static readonly Dictionary<string, short> CodeToId = new(StringComparer.OrdinalIgnoreCase)
@@ -27,9 +30,12 @@ public static class MarketWeightResolver
         { "CDM", 5 },
         { "CM", 6 },
         { "CAM", 7 },
-        { "LW", 8 },
-        { "RW", 9 },
-        { "ST", 10 }
+        { "LM", 8 },
+        { "LW", 9 },
+        { "RM", 10 },
+        { "RW", 11 },
+        { "ST", 12 },
+        { "CF", 13 }
     };
 
     public static decimal GetByPositionId(short positionId)

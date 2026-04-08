@@ -692,7 +692,7 @@ else
             }
             catch (InvalidOperationException ex)
             {
-                Logger.LogWarning(ex, "Lineups:Access denied for team {TeamId}", TeamId);
+                Logger.LogWarning(ex, "Escalações: Acesso negado para o time {TeamId}", TeamId);
                 accessMessage = ex.Message;
                 hasAccess = false;
                 ClearLocalState();
