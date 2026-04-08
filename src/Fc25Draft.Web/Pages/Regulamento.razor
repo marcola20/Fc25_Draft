@@ -1,0 +1,727 @@
+@page "/regulamento"
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Regulamento — CBFV Retro 2008/09</PageTitle>
+
+<PageHeader Title="Regulamento Oficial" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/regulamento"));
+    }
+}
+
+<div class="regulamento-page">
+
+   
+    <section class="reg-section">
+        <div class="reg-section-header">
+            <span class="reg-section-icon">📜</span>
+            <h3>Regulamento de Transferências</h3>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">1</span>
+                Tipos de Transferência Permitidos
+                <span class="reg-icon-inline">🔁</span>
+            </h5>
+            <p class="reg-desc">As negociações entre equipes poderão ocorrer nas seguintes modalidades:</p>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> <strong>Troca de jogadores</strong> — negociações 1x1 ou envolvendo múltiplos atletas simultaneamente</li>
+                <li><span class="reg-bullet">•</span> <strong>Troca com ajuste financeiro</strong> — qualquer negociação poderá incluir dinheiro como complemento</li>
+                <li><span class="reg-bullet">•</span> <strong>Troca com picks</strong> — escolhas de draft podem integrar qualquer tipo de negociação</li>
+                <li><span class="reg-bullet">•</span> <strong>Compra e venda direta</strong> — aquisição ou venda de jogadores sem contrapartida de atletas</li>
+            </ul>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">2</span>
+                Sistema Financeiro
+                <span class="reg-icon-inline">💰</span>
+            </h5>
+            <p class="reg-desc">O equilíbrio financeiro é parte fundamental da competição:</p>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> Cada equipe inicia a temporada com <strong>R$ 50 milhões</strong> de orçamento disponível</li>
+                <li><span class="reg-bullet">•</span> <strong>Nenhum time pode encerrar uma transação com saldo negativo</strong></li>
+                <li><span class="reg-bullet">•</span> Todas as transferências devem respeitar o saldo disponível no momento da negociação</li>
+            </ul>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">3</span>
+                Sistema de Picks
+                <span class="reg-icon-inline">🔢</span>
+            </h5>
+            <p class="reg-desc">As escolhas de draft são ativos negociáveis como qualquer outro recurso:</p>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> Picks podem ser <strong>livremente negociadas</strong> entre as equipes participantes</li>
+                <li><span class="reg-bullet">•</span> Não há limite de trocas envolvendo picks dentro da janela de transferências</li>
+            </ul>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">4</span>
+                Aprovação de Transferências
+                <span class="reg-icon-inline">⚖️</span>
+            </h5>
+            <p class="reg-desc">Toda negociação está sujeita à análise do Comissário da Liga:</p>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> <strong>Todas as transferências</strong> serão avaliadas e precisam ser aprovadas pelo Comissário antes de serem efetivadas</li>
+                <li><span class="reg-bullet">•</span> O Comissário possui <strong>autoridade total</strong> para aprovar ou vetar qualquer negociação, sem necessidade de justificativa</li>
+            </ul>
+        </div>
+
+        <div class="reg-card reg-card-warning">
+            <h5 class="reg-card-title">
+                <span class="reg-badge reg-badge-warning">5</span>
+                Regras Anti-Abuso
+                <span class="reg-icon-inline">🚫</span>
+            </h5>
+            <p class="reg-desc">A integridade da competição é inegociável:</p>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> Trocas <strong>claramente desbalanceadas</strong> — que prejudiquem o equilíbrio competitivo da liga — podem ser vetadas pelo Comissário</li>
+                <li><span class="reg-bullet">•</span> É <strong>estritamente proibido</strong> qualquer tipo de favorecimento entre participantes</li>
+                <li><span class="reg-bullet">•</span> O objetivo central é garantir o <strong>equilíbrio competitivo</strong> ao longo de toda a temporada</li>
+            </ul>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">6</span>
+                Janela de Transferências
+                <span class="reg-icon-inline">📅</span>
+            </h5>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> A janela de transferências ficará <strong>aberta até o encerramento da Rodada 5</strong></li>
+                <li><span class="reg-bullet">•</span> Após esse prazo, <strong>nenhuma transferência será permitida</strong>, independentemente de qualquer circunstância</li>
+            </ul>
+        </div>
+
+        <div class="reg-card">
+            <h5 class="reg-card-title">
+                <span class="reg-badge">7</span>
+                Limite de Transferências
+                <span class="reg-icon-inline">🔄</span>
+            </h5>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> Cada equipe poderá realizar <strong>até 5 transferências</strong> durante a janela</li>
+                <li><span class="reg-bullet">•</span> Esse limite contempla apenas as <strong>negociações diretas com outros participantes</strong></li>
+            </ul>
+        </div>
+
+        <div class="reg-card reg-card-muted">
+            <h5 class="reg-card-title">
+                <span class="reg-badge reg-badge-muted">8</span>
+                Time Controlado por IA
+                <span class="reg-icon-inline">🤖</span>
+            </h5>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> O time controlado por IA <strong>não participará do mercado de transferências</strong> em nenhuma modalidade</li>
+            </ul>
+        </div>
+    </section>
+
+    <hr class="reg-divider" />
+
+    <section class="reg-section">
+        <div class="reg-section-header">
+            <span class="reg-section-icon">🧾</span>
+            <h3>Modelos de Contrato</h3>
+        </div>
+        <p class="reg-section-desc">
+            Toda negociação deve seguir um dos formatos abaixo para ser submetida ao Comissário.
+            Use estes modelos como referência ao propor ou formalizar transferências.
+        </p>
+
+        <div class="row g-4">
+            <div class="col-12 col-lg-6">
+                <div class="reg-contract">
+                    <div class="reg-contract-header reg-contract-header-blue">
+                        <span>🔷</span>
+                        <span>Transferência Simples</span>
+                    </div>
+                    <div class="reg-contract-body">
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">ATLETA</span>
+                            <span class="reg-contract-value">Nome do Jogador</span>
+                        </div>
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">SAINDO DE</span>
+                            <span class="reg-contract-value">Time A</span>
+                        </div>
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">INDO PARA</span>
+                            <span class="reg-contract-value">Time B</span>
+                        </div>
+                        <div class="reg-contract-row reg-contract-row-highlight">
+                            <span class="reg-contract-label">VALOR</span>
+                            <span class="reg-contract-value">R$ XX,XX Mi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empréstimo -->
+            <div class="col-12 col-lg-6">
+                <div class="reg-contract">
+                    <div class="reg-contract-header reg-contract-header-orange">
+                        <span>🔷</span>
+                        <span>Empréstimo</span>
+                    </div>
+                    <div class="reg-contract-body">
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">🙋‍♂️ ATLETA</span>
+                            <span class="reg-contract-value">Nome do Jogador</span>
+                        </div>
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">🛫 SAINDO DE</span>
+                            <span class="reg-contract-value">Time A</span>
+                        </div>
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">🛬 INDO PARA</span>
+                            <span class="reg-contract-value">Time B</span>
+                        </div>
+                        <div class="reg-contract-row">
+                            <span class="reg-contract-label">📅 DURAÇÃO</span>
+                            <span class="reg-contract-value">X Temporadas</span>
+                        </div>
+                        <div class="reg-contract-row reg-contract-row-highlight">
+                            <span class="reg-contract-label">💰 VALOR</span>
+                            <span class="reg-contract-value">R$ XX,XX Mi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="reg-contract">
+                    <div class="reg-contract-header reg-contract-header-green">
+                        <span>🔷</span>
+                        <span>Troca</span>
+                    </div>
+                    <div class="reg-contract-body">
+                        <div class="reg-contract-team-block">
+                            <div class="reg-contract-team-label">TIME A RECEBE</div>
+                            <ul class="reg-contract-items">
+                                <li>Jogador X</li>
+                                <li class="text-muted fst-italic">Pick (se houver)</li>
+                            </ul>
+                        </div>
+                        <div class="reg-contract-swap-icon">⇅</div>
+                        <div class="reg-contract-team-block">
+                            <div class="reg-contract-team-label">TIME B RECEBE</div>
+                            <ul class="reg-contract-items">
+                                <li>Jogador Y</li>
+                                <li class="text-muted fst-italic">Pick (se houver)</li>
+                            </ul>
+                        </div>
+                        <div class="reg-contract-row reg-contract-row-highlight mt-3">
+                            <span class="reg-contract-label">AJUSTE FINANCEIRO</span>
+                            <span class="reg-contract-value">R$ XX Mi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="reg-divider" />
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- CLÁUSULAS CONTRATUAIS                               -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section class="reg-section">
+        <div class="reg-section-header">
+            <span class="reg-section-icon">📑</span>
+            <h3>Cláusulas Contratuais</h3>
+        </div>
+        <p class="reg-section-desc">
+            As cláusulas abaixo podem ser anexadas a qualquer transferência, desde que acordadas entre as partes
+            no momento da negociação e aprovadas pelo Comissário.
+        </p>
+
+        <div class="clausulas-grid">
+
+            <!-- Empréstimos -->
+            <div class="clausula-card">
+                <div class="clausula-card-header clausula-header-orange">
+                    <span class="clausula-icon">🔁</span>
+                    <span>Empréstimos</span>
+                </div>
+                <div class="clausula-card-body">
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-orange">Opção</span>
+                        <span class="clausula-text">Opção de compra ao final do empréstimo, com valor previamente definido no contrato</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-orange">Obrigação</span>
+                        <span class="clausula-text">Obrigação de compra — condicional a metas ou automática ao término do período combinado</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transferências Definitivas -->
+            <div class="clausula-card">
+                <div class="clausula-card-header clausula-header-blue">
+                    <span class="clausula-icon">💰</span>
+                    <span>Transferências Definitivas</span>
+                </div>
+                <div class="clausula-card-body">
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-blue">Recompra</span>
+                        <span class="clausula-text">Cláusula de recompra com valor fixado — o time de origem tem prioridade para readquirir o atleta</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-blue">% Venda</span>
+                        <span class="clausula-text">Percentual sobre venda futura — o time vendedor recebe uma fatia definida em eventuais negociações subsequentes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bônus por Performance -->
+            <div class="clausula-card clausula-card-wide">
+                <div class="clausula-card-header clausula-header-green">
+                    <span class="clausula-icon">📊</span>
+                    <span>Bônus por Performance</span>
+                </div>
+                <div class="clausula-card-body clausula-body-grid">
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Gols</span>
+                        <span class="clausula-text">Bônus por número de gols marcados na temporada</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Assistências</span>
+                        <span class="clausula-text">Bônus por número de assistências registradas</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Clean Sheets</span>
+                        <span class="clausula-text">Bônus por jogos sem sofrer gol (aplicável a goleiros e defesas)</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Jogos</span>
+                        <span class="clausula-text">Bônus por número mínimo de jogos disputados na temporada</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Título</span>
+                        <span class="clausula-text">Bônus por conquista de título da liga com o time comprador</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-green">Classificação</span>
+                        <span class="clausula-text">Bônus por classificação (ex: playoffs / top 4 ao fim da temporada)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cláusulas Especiais -->
+            <div class="clausula-card clausula-card-wide">
+                <div class="clausula-card-header clausula-header-gold">
+                    <span class="clausula-icon">🌟</span>
+                    <span>Cláusulas Especiais</span>
+                </div>
+                <div class="clausula-card-body clausula-body-grid">
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-gold">MVP</span>
+                        <span class="clausula-text">Bônus por conquista do MVP da rodada durante a temporada</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-gold">Artilheiro</span>
+                        <span class="clausula-text">Bônus por término da temporada como artilheiro da liga</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-gold">Melhor Defesa</span>
+                        <span class="clausula-text">Bônus por conquista do prêmio de melhor defesa da liga</span>
+                    </div>
+                    <div class="clausula-item">
+                        <span class="clausula-tag tag-gold">Prioridade</span>
+                        <span class="clausula-text">Cláusula de prioridade de recompra — direito de preferência em negociações futuras</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Regras Gerais -->
+        <div class="clausulas-rules">
+            <div class="clausulas-rules-title">⚖️ Regras Gerais sobre Cláusulas</div>
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> Todas as cláusulas devem ser <strong>acordadas no momento da transferência</strong> e registradas no contrato</li>
+                <li><span class="reg-bullet">•</span> As cláusulas são <strong>opcionais</strong>, mas uma vez estabelecidas devem ser <strong>respeitadas integralmente</strong> por ambas as partes</li>
+                <li><span class="reg-bullet">•</span> O Comissário pode <strong>validar ou vetar</strong> cláusulas consideradas abusivas ou que comprometam o equilíbrio da liga</li>
+            </ul>
+        </div>
+    </section>
+
+    <hr class="reg-divider" />
+
+    <section class="reg-section">
+        <div class="reg-section-header">
+            <span class="reg-section-icon">🎯</span>
+            <h3>Observações Finais</h3>
+        </div>
+        <div class="reg-card reg-card-final">
+            <ul class="reg-list">
+                <li><span class="reg-bullet">•</span> O objetivo da liga é garantir <strong>competitividade, diversão e equilíbrio</strong> entre todas as equipes participantes</li>
+                <li><span class="reg-bullet">•</span> O Comissário poderá <strong>intervir em situações não previstas</strong> neste regulamento, sempre priorizando o bem coletivo da liga</li>
+            </ul>
+        </div>
+    </section>
+
+</div>
+
+<style>
+    .regulamento-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding-bottom: 3rem;
+    }
+
+    .reg-section {
+        margin-bottom: 2rem;
+    }
+
+    .reg-section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .reg-section-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+    }
+
+    .reg-section-header h3 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--bs-emphasis-color, #212529);
+        letter-spacing: -0.01em;
+    }
+
+    .reg-section-desc {
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
+
+    .reg-card {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-left: 4px solid var(--bs-primary, #0d6efd);
+        border-radius: 0.5rem;
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .reg-card-warning {
+        border-left-color: var(--bs-warning, #ffc107);
+    }
+
+    .reg-card-muted {
+        border-left-color: var(--bs-secondary, #6c757d);
+    }
+
+    .reg-card-final {
+        border-left-color: var(--bs-success, #198754);
+        background: color-mix(in srgb, var(--bs-success, #198754) 6%, var(--bs-body-bg, #fff));
+    }
+
+    .reg-card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .reg-icon-inline {
+        font-size: 1rem;
+        margin-left: auto;
+    }
+
+    .reg-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        background: var(--bs-primary, #0d6efd);
+        color: #fff;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .reg-badge-warning {
+        background: var(--bs-warning, #ffc107);
+        color: #000;
+    }
+
+    .reg-badge-muted {
+        background: var(--bs-secondary, #6c757d);
+    }
+
+    .reg-desc {
+        font-size: 0.9rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.5rem;
+    }
+
+    .reg-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .reg-list li {
+        font-size: 0.92rem;
+        line-height: 1.55;
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+
+    .reg-bullet {
+        color: var(--bs-primary, #0d6efd);
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+    }
+
+    .reg-divider {
+        border-color: var(--bs-border-color, #dee2e6);
+        margin: 2rem 0;
+        opacity: 0.5;
+    }
+
+    .reg-contract {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    .reg-contract-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.7rem 1rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #fff;
+    }
+
+    .reg-contract-header-blue {
+        background: var(--bs-primary, #0d6efd);
+    }
+
+    .reg-contract-header-green {
+        background: var(--bs-success, #198754);
+    }
+
+    .reg-contract-header-orange {
+        background: #e07b00;
+    }
+
+    .reg-contract-body {
+        padding: 1rem 1.1rem;
+        background: var(--bs-body-bg, #fff);
+    }
+
+    .reg-contract-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+        font-size: 0.88rem;
+    }
+
+    .reg-contract-row:last-child {
+        border-bottom: none;
+    }
+
+    .reg-contract-row-highlight {
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, transparent);
+        border-radius: 0.3rem;
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+        border-bottom: none !important;
+    }
+
+    .reg-contract-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .reg-contract-value {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .reg-contract-team-block {
+        margin-bottom: 0.5rem;
+    }
+
+    .reg-contract-team-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.25rem;
+    }
+
+    .reg-contract-items {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .reg-contract-items li {
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 0.15rem 0;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .reg-contract-swap-icon {
+        text-align: center;
+        font-size: 1.4rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin: 0.4rem 0;
+        line-height: 1;
+    }
+
+    /* ── Cláusulas Contratuais ── */
+    .clausulas-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    @@media (max-width: 768px) {
+        .clausulas-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .clausula-card {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .clausula-card-wide {
+        grid-column: span 2;
+    }
+
+    @@media (max-width: 768px) {
+        .clausula-card-wide {
+            grid-column: span 1;
+        }
+    }
+
+    .clausula-card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.65rem 1rem;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #fff;
+        letter-spacing: 0.01em;
+    }
+
+    .clausula-icon {
+        font-size: 1.1rem;
+    }
+
+    .clausula-header-orange { background: #e07b00; }
+    .clausula-header-blue   { background: var(--bs-primary, #0d6efd); }
+    .clausula-header-green  { background: var(--bs-success, #198754); }
+    .clausula-header-gold   { background: #a07800; }
+
+    .clausula-card-body {
+        padding: 0.75rem 1rem;
+        background: var(--bs-body-bg, #fff);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .clausula-body-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+
+    @@media (max-width: 600px) {
+        .clausula-body-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .clausula-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .clausula-tag {
+        flex-shrink: 0;
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-top: 0.1rem;
+        white-space: nowrap;
+    }
+
+    .tag-orange { background: rgba(224,123,0,0.15);  color: #c06800; }
+    .tag-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
+    .tag-green  { background: rgba(25,135,84,0.12);  color: var(--bs-success, #198754); }
+    .tag-gold   { background: rgba(160,120,0,0.15);  color: #8a6400; }
+
+    .clausula-text {
+        color: var(--bs-body-color, #212529);
+    }
+
+    /* Regras gerais */
+    .clausulas-rules {
+        background: color-mix(in srgb, var(--bs-secondary, #6c757d) 7%, var(--bs-body-bg, #fff));
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .clausulas-rules-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 0.6rem;
+        color: var(--bs-emphasis-color, #212529);
+    }
+</style>

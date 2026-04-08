@@ -136,7 +136,6 @@ public class LineupsApiClient
         }
 
         string rawContent = string.Empty;
-
         try
         {
             rawContent = await response.Content.ReadAsStringAsync(ct);
@@ -146,27 +145,34 @@ public class LineupsApiClient
             // ignore
         }
 
-        ApiErrorResponse? error = null;
-
+        string? friendlyMessage = null;
         try
         {
-            error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(cancellationToken: ct);
+            var error = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(
+                rawContent,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            friendlyMessage = error?.Message;
         }
         catch
         {
             // ignore
         }
 
-        var message = $@"StatusCode: {(int)response.StatusCode} ({response.StatusCode})
-                         ErrorMessage: {error?.Message}
-                         RawResponse: {rawContent}";
+        var userMessage = !string.IsNullOrWhiteSpace(friendlyMessage)
+            ? friendlyMessage
+            : response.StatusCode switch
+            {
+                HttpStatusCode.NotFound => "Escalação não encontrada.",
+                HttpStatusCode.BadRequest => "Dados inválidos. Verifique as informações e tente novamente.",
+                HttpStatusCode.Conflict => "Conflito ao salvar a escalação.",
+                HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "Token inválido ou sem permissão.",
+                _ => $"Erro inesperado ({(int)response.StatusCode})."
+            };
 
         throw response.StatusCode switch
         {
-            HttpStatusCode.NotFound => new KeyNotFoundException(message),
-            HttpStatusCode.BadRequest => new InvalidOperationException(message),
-            HttpStatusCode.Conflict => new InvalidOperationException(message),
-            _ => new InvalidOperationException(message)
+            HttpStatusCode.NotFound => new KeyNotFoundException(userMessage),
+            _ => new InvalidOperationException(userMessage)
         };
     }
 

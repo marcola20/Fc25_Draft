@@ -29,6 +29,10 @@ public class LayoutNavigationService
             new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
             new("Caixa dos Times", "/times/caixa", "oi oi-dollar")
         }),
+        new("Liga", new List<MenuItem>
+        {
+            new("Regulamento", "/regulamento", "oi oi-document")
+        }),
         new("Admin", new List<MenuItem>
         {
             new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
@@ -80,7 +84,18 @@ public class LayoutNavigationService
         ["/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/mercado/ciclos", true),
         ["/admin/itens/gerar"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/itens/gerar", true),
         ["/admin/transferencias/historico"] = CreateDefinition("Histórico de Transferências", "Mercado", "/admin/transferencias/historico"),
-        ["/admin/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/admin/mercado/historico", true)
+        ["/admin/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/admin/mercado/historico", true),
+        ["/regulamento"] = new PageDefinition
+        {
+            Route = "/regulamento",
+            Title = "Regulamento Oficial",
+            Subtitle = "Liga CBFV Retro 2008/09",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Regulamento")
+            }
+        }
     };
 
     public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin)
