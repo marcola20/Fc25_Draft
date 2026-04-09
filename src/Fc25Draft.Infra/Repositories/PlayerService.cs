@@ -125,6 +125,7 @@ public class PlayerService : IPlayerService
         var positionSet = knownPositions.ToHashSet();
 
         var lineNumber = 0;
+        char? detectedSeparator = null;
 
         while (!reader.EndOfStream)
         {
@@ -143,11 +144,19 @@ public class PlayerService : IPlayerService
                 continue;
             }
 
-            var parts = line.Split(';');
+            // Detecta o separador automaticamente na primeira linha não-vazia (cabeçalho ou dados)
+            if (detectedSeparator is null)
+            {
+                var semicolons = line.Count(c => c == ';');
+                var commas = line.Count(c => c == ',');
+                detectedSeparator = commas > semicolons ? ',' : ';';
+            }
+
+            var parts = line.Split(detectedSeparator.Value);
 
             if (parts.Length < 4)
             {
-                errors.Add($"Linha {lineNumber}: formato inválido. Utilize \"Nome;Idade;Overall;PositionId\".");
+                errors.Add($"Linha {lineNumber}: formato inválido. Utilize \"Nome{detectedSeparator}Idade{detectedSeparator}Overall{detectedSeparator}PositionId\".");
                 continue;
             }
 
