@@ -323,7 +323,7 @@ public class DraftStateService
     }
 
     private static string BuildWhatsappMessage(string team, string player, int pick, int round, string nextTeam)
-        => $"O time {team} escolheu {player} com a escolha {pick} da rodada {round}! Próximo a escolher: {nextTeam}.";
+        => $"{team} escolheu {player} com a escolha {pick} da rodada {round}! Próximo a escolher: {nextTeam}.";
 
     public static string BuildWhatsappUrl(string team, string player, int pick, int round, string nextTeam)
     {
