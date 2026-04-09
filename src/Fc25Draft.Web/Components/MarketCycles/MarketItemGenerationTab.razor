@@ -4,7 +4,6 @@
 @using System.Linq
 @using System.Net.Http
 @using System.Threading
-@using Blazored.Toast.Services
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using Fc25Draft.Core.Interfaces
@@ -12,8 +11,7 @@
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Components.Forms
-@using Blazored.Toast;
-@inject IToastService Toasts
+@inject ToastService Toasts
 @inject PlayersApiClient PlayersApiClient
 @inject ILogger<Fc25Draft.Web.Components.MarketCycles.MarketItemGenerationTab> Logger
 
@@ -567,9 +565,7 @@ else
     private async Task HandlePreviewAsync()
     {
         if (_model is null || _editContext is null)
-        {
             return;
-        }
 
         if (!_editContext.Validate())
         {
@@ -618,7 +614,7 @@ else
     {
         if (_preview is null)
         {
-            Toasts.ShowWarning("Pré-visualize a geração antes de criar os itens.");
+            Toasts.ShowInfo("Pré-visualize a geração antes de criar os itens.");
             return;
         }
 
@@ -647,13 +643,14 @@ else
         _cts = new CancellationTokenSource();
 
         MarketItemGenerationRequestDto? request = null;
+        var generated = false;
         try
         {
             request = CreateGenerationRequest(preferPreviewSeed);
             var result = await GenerationClient.GenerateAsync(_model.CycleId!.Value, request, _cts.Token).ConfigureAwait(false);
             _resultSummary = result;
             Toasts.ShowSuccess($"{result.CreatedCount} itens gerados com sucesso.");
-            await RefreshCycleAsync();
+            generated = true;
         }
         catch (OperationCanceledException)
         {
@@ -668,6 +665,13 @@ else
             _isGenerating = false;
             _isGeneratingFromPreview = false;
             await InvokeAsync(StateHasChanged);
+        }
+
+        // Atualiza o ciclo fora do bloco principal para não contaminar o feedback de geração
+        if (generated)
+        {
+            try { await RefreshCycleAsync(); }
+            catch (Exception ex) { Logger.LogWarning(ex, "LayoutNav:Warning ao atualizar ciclo após geração {CycleId}", _model?.CycleId); }
         }
     }
 
@@ -706,6 +710,7 @@ else
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
+        var cleared = false;
         try
         {
             var response = await GenerationClient.DeleteDraftsAsync(Cycle.CycleId, _cts.Token).ConfigureAwait(false);
@@ -713,7 +718,7 @@ else
                 ? $"{response.RemovedCount} itens em rascunho foram removidos."
                 : "Nenhum item em rascunho foi encontrado.");
             ResetGenerationState();
-            await RefreshCycleAsync();
+            cleared = true;
         }
         catch (OperationCanceledException)
         {
@@ -727,6 +732,12 @@ else
         {
             _isClearing = false;
             await InvokeAsync(StateHasChanged);
+        }
+
+        if (cleared)
+        {
+            try { await RefreshCycleAsync(); }
+            catch (Exception ex) { Logger.LogWarning(ex, "LayoutNav:Warning ao atualizar ciclo após limpeza {CycleId}", Cycle?.CycleId); }
         }
     }
 

@@ -37,8 +37,6 @@ public class MarketCycleClient
         using var response = await client.GetAsync(urlBuilder.ToString(), ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
-        await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-
         var contentType = response.Content.Headers.ContentType?.MediaType;
 
         if (contentType is null || !contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
@@ -203,45 +201,49 @@ public class MarketCycleClient
         string raw = string.Empty;
         try { raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false); } catch { /* ignore */ }
 
-        try
+        // Deserialize from the already-read string (stream is consumed after ReadAsStringAsync)
+        if (!string.IsNullOrWhiteSpace(raw))
         {
-            var err = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(SerializerOptions, ct).ConfigureAwait(false);
-            if (err is not null)
+            try
             {
-                var msg = !string.IsNullOrWhiteSpace(err.Message)
-                    ? err.Message
-                    : (err.Errors is { Count: > 0 }
-                        ? string.Join(" ", err.Errors.SelectMany(kv => kv.Value ?? Array.Empty<string>()))
-                        : null);
+                var err = JsonSerializer.Deserialize<ApiErrorResponse>(raw, SerializerOptions);
+                if (err is not null)
+                {
+                    var msg = !string.IsNullOrWhiteSpace(err.Message)
+                        ? err.Message
+                        : (err.Errors is { Count: > 0 }
+                            ? string.Join(" ", err.Errors.SelectMany(kv => kv.Value ?? Array.Empty<string>()))
+                            : null);
 
-                if (!string.IsNullOrWhiteSpace(msg))
-                    return (Decorate(msg), ComposeLog());
+                    if (!string.IsNullOrWhiteSpace(msg))
+                        return (Decorate(msg), ComposeLog());
+                }
             }
-        }
-        catch { /* fallback */ }
+            catch { /* fallback */ }
 
-        try
-        {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct).ConfigureAwait(false);
-            if (problem is not null)
+            try
             {
-                var msg = problem.Title ?? problem.Detail ?? "Unexpected error.";
-                return (Decorate(msg), ComposeLog(problem.Detail ?? raw));
+                var problem = JsonSerializer.Deserialize<ProblemDetails>(raw, SerializerOptions);
+                if (problem is not null)
+                {
+                    var msg = problem.Title ?? problem.Detail ?? "Unexpected error.";
+                    return (Decorate(msg), ComposeLog(problem.Detail ?? raw));
+                }
             }
-        }
-        catch { /* fallback */ }
+            catch { /* fallback */ }
 
-        try
-        {
-            var v = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(ct).ConfigureAwait(false);
-            if (v is not null)
+            try
             {
-                var flat = v.Errors?.Values?.SelectMany(x => x)?.ToArray() ?? Array.Empty<string>();
-                var msg = flat.Length > 0 ? string.Join(" ", flat) : (v.Title ?? "Validation error.");
-                return (Decorate(msg), ComposeLog(string.Join(Environment.NewLine, flat)));
+                var v = JsonSerializer.Deserialize<ValidationProblemDetails>(raw, SerializerOptions);
+                if (v is not null)
+                {
+                    var flat = v.Errors?.Values?.SelectMany(x => x)?.ToArray() ?? Array.Empty<string>();
+                    var msg = flat.Length > 0 ? string.Join(" ", flat) : (v.Title ?? "Validation error.");
+                    return (Decorate(msg), ComposeLog(string.Join(Environment.NewLine, flat)));
+                }
             }
+            catch { /* fallback */ }
         }
-        catch { /* fallback */ }
 
         if (!string.IsNullOrWhiteSpace(raw))
             return (Decorate(raw), ComposeLog());
