@@ -103,3 +103,63 @@ a, .btn-link {
         content: "An error has occurred."
     }
 
+/* Anchor for positioning the floating card */
+.hint-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* (?) button next to form labels */
+.hint-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    height: 1.15em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--bs-secondary-color);
+    background: transparent;
+    border: 1px solid var(--bs-secondary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.hint-toggle:hover,
+.hint-toggle:focus-visible {
+    color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    outline: none;
+}
+
+/* Floating card that appears on click */
+.hint-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1050;
+    min-width: 260px;
+    max-width: 320px;
+    font-size: 0.8rem;
+    background-color: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    padding: 0.7rem 0.85rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+/* Transparent full-screen backdrop — click fora fecha o card */
+.hint-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1049;
+    background: transparent;
+    cursor: default;
+}
+

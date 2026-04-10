@@ -395,9 +395,27 @@ else
                 <span class="text-muted small ms-2">(opcional)</span>
             </div>
             <div class="card-body">
+                @if (_activeHint is not null)
+                {
+                    <div class="hint-backdrop" @onclick="() => _activeHint = null"></div>
+                }
                 <div class="row g-3">
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="oi-style">Estilo Ofensivo</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="oi-style">Estilo Ofensivo</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("oi-style")'>?</button>
+                                @if (_activeHint == "oi-style")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Posse de Bola no Ataque</strong><br /><span class="text-muted">Os jogadores procuram reter a bola quando houver pouco espaço. Então, qualquer companheiro disponível aparece para dar apoio.</span></p>
+                                        <p class="mb-0"><strong>Contra-ataque</strong><br /><span class="text-muted">Quando estiverem com a bola, os jogadores avançaram para ficar em posições de perigo para o adversário.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="oi-style" class="form-select"
                                 value="@(currentEditor.OffensiveInstructions?.OffensiveStyle ?? 0)"
                                 @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.OffensiveStyle), e.Value?.ToString())"
@@ -408,7 +426,21 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="oi-playmaker">Provocador</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="oi-playmaker">Provocador</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("oi-playmaker")'>?</button>
+                                @if (_activeHint == "oi-playmaker")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Passe Curto</strong><br /><span class="text-muted">Desmonta a formação do adversário com muitos passes da defesa ao ataque. Os jogadores ficarão a uma certa distância para criar mais chances de passe.</span></p>
+                                        <p class="mb-0"><strong>Passe Longo</strong><br /><span class="text-muted">Estilo de jogo direto que envolve lançamentos longos para a linha de frente. Os jogadores vão afastar os adversários para criar espaço e, quando o lançamento chegar ao alvo, eles avançaram para apoiar os atacantes à frente.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="oi-playmaker" class="form-select"
                                 value="@(currentEditor.OffensiveInstructions?.Playmaker ?? 0)"
                                 @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.Playmaker), e.Value?.ToString())"
@@ -419,7 +451,21 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="oi-area">Área de Ataque</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="oi-area">Área de Ataque</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("oi-area")'>?</button>
+                                @if (_activeHint == "oi-area")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Ampla</strong><br /><span class="text-muted">O time ataca principalmente pelas laterais. Mais ligações e tabelas são feitas pelas laterais na subida para o ataque.</span></p>
+                                        <p class="mb-0"><strong>Centro</strong><br /><span class="text-muted">O time ataca principalmente pela parte central do campo. Mais ligações e tabelas são feitas pelo meio do campo na subida para o ataque.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="oi-area" class="form-select"
                                 value="@(currentEditor.OffensiveInstructions?.AttackArea ?? 0)"
                                 @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.AttackArea), e.Value?.ToString())"
@@ -430,7 +476,21 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="oi-pos">Posicionamento</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="oi-pos">Posicionamento</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("oi-pos")'>?</button>
+                                @if (_activeHint == "oi-pos")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Flexível</strong><br /><span class="text-muted">Os jogadores jogam livremente alternando posições e fazendo inversões.</span></p>
+                                        <p class="mb-0"><strong>Manter Formação</strong><br /><span class="text-muted">Os jogadores se movem de um jeito que consigam manter a forma geral do time.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="oi-pos" class="form-select"
                                 value="@(currentEditor.OffensiveInstructions?.Positioning ?? 0)"
                                 @onchange="e => OnOffensiveChanged(nameof(OffensiveInstructionsEditor.Positioning), e.Value?.ToString())"
@@ -441,7 +501,20 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="oi-support">Alcance de Apoio: @(currentEditor.OffensiveInstructions?.SupportRange ?? 5)</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="oi-support">Alcance de Apoio: @(currentEditor.OffensiveInstructions?.SupportRange ?? 5)</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("oi-support")'>?</button>
+                                @if (_activeHint == "oi-support")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-0"><span class="text-muted">Quanto maior for o nível, mais os jogadores vão tender a se espalhar quando quiserem receber passes.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <input id="oi-support" type="range" class="form-range"
                                min="1" max="10" step="1"
                                value="@(currentEditor.OffensiveInstructions?.SupportRange ?? 5)"
@@ -473,9 +546,27 @@ else
                 <span class="text-muted small ms-2">(opcional)</span>
             </div>
             <div class="card-body">
+                @if (_activeHint is not null)
+                {
+                    <div class="hint-backdrop" @onclick="() => _activeHint = null"></div>
+                }
                 <div class="row g-3">
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="di-style">Estilo Defensivo</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="di-style">Estilo Defensivo</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("di-style")'>?</button>
+                                @if (_activeHint == "di-style")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Pressão na Frente</strong><br /><span class="text-muted">Quando a posse é perdida, os jogadores fazem pressão na frente e tentam roubar a bola no campo de ataque.</span></p>
+                                        <p class="mb-0"><strong>Retranca</strong><br /><span class="text-muted">Quando a posse é perdida, os jogadores voltam ao campo de defesa e formam um paredão defensivo.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="di-style" class="form-select"
                                 value="@(currentEditor.DefensiveInstructions?.DefensiveStyle ?? 0)"
                                 @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.DefensiveStyle), e.Value?.ToString())"
@@ -486,7 +577,21 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="di-area">Área de Contenção</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="di-area">Área de Contenção</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("di-area")'>?</button>
+                                @if (_activeHint == "di-area")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Centro</strong><br /><span class="text-muted">Forma uma linha defensiva que bloqueia todas as opções de passe para ataque, forçando o adversário a jogar para a parte central do campo, onde o time pode defender em quantidade.</span></p>
+                                        <p class="mb-0"><strong>Ampla</strong><br /><span class="text-muted">Ao defender, direciona jogadores adversários para as laterais e defende em quantidade quando eles tentam passes ofensivos.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="di-area" class="form-select"
                                 value="@(currentEditor.DefensiveInstructions?.ContainmentArea ?? 0)"
                                 @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.ContainmentArea), e.Value?.ToString())"
@@ -497,7 +602,21 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="di-pressure">Pressão</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="di-pressure">Pressão</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("di-pressure")'>?</button>
+                                @if (_activeHint == "di-pressure")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-1"><strong>Tradicional</strong><br /><span class="text-muted">O primeiro defensor atrasa os atacantes adversários ao deixá-los à distância de um braço ao invés de dar o bote e arriscar ser driblado.</span></p>
+                                        <p class="mb-0"><strong>Agressiva</strong><br /><span class="text-muted">O primeiro defensor avança e pressiona os atacantes adversários tentando recuperar a bola.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <select id="di-pressure" class="form-select"
                                 value="@(currentEditor.DefensiveInstructions?.Pressure ?? 0)"
                                 @onchange="e => OnDefensiveChanged(nameof(DefensiveInstructionsEditor.Pressure), e.Value?.ToString())"
@@ -508,7 +627,20 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="di-line">Linha Defensiva: @(currentEditor.DefensiveInstructions?.DefensiveLine ?? 5)</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="di-line">Linha Defensiva: @(currentEditor.DefensiveInstructions?.DefensiveLine ?? 5)</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("di-line")'>?</button>
+                                @if (_activeHint == "di-line")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-0"><span class="text-muted">Quanto maior for o nível, mais adiantada a linha defensiva ficará.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <input id="di-line" type="range" class="form-range"
                                min="1" max="10" step="1"
                                value="@(currentEditor.DefensiveInstructions?.DefensiveLine ?? 5)"
@@ -517,7 +649,20 @@ else
                         <div class="d-flex justify-content-between small text-muted"><span>1</span><span>10</span></div>
                     </div>
                     <div class="col-12 col-md-6 col-xl-4">
-                        <label class="form-label" for="di-density">Densidade: @(currentEditor.DefensiveInstructions?.Density ?? 5)</label>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="form-label mb-0" for="di-density">Densidade: @(currentEditor.DefensiveInstructions?.Density ?? 5)</label>
+                            <span class="hint-anchor">
+                                <button type="button" class="hint-toggle" title="Ver descrição"
+                                        @onclick:stopPropagation="true"
+                                        @onclick='() => ToggleHint("di-density")'>?</button>
+                                @if (_activeHint == "di-density")
+                                {
+                                    <div class="hint-popover" @onclick:stopPropagation="true">
+                                        <p class="mb-0"><span class="text-muted">Quanto maior for o nível, mais compacta será a forma geral do time quando defender.</span></p>
+                                    </div>
+                                }
+                            </span>
+                        </div>
                         <input id="di-density" type="range" class="form-range"
                                min="1" max="10" step="1"
                                value="@(currentEditor.DefensiveInstructions?.Density ?? 5)"
@@ -592,6 +737,8 @@ else
     private string? errorMessage;
     private string? pageSubtitle;
     private Tab activeTab = Tab.Lineup;
+    private string? _activeHint;
+    private void ToggleHint(string id) => _activeHint = _activeHint == id ? null : id;
     private CancellationTokenSource? loadCts;
     private CancellationTokenSource? saveCts;
     private CancellationTokenSource? deleteCts;
