@@ -2,6 +2,10 @@
 @using Microsoft.AspNetCore.Components.Routing
 
 <nav class="app-sidebar" aria-label="Seções do sistema">
+    <div class="sidebar-logo">
+        <img src="/images/logobranca.png" alt="Logo da Liga" class="sidebar-logo-img" />
+    </div>
+
     @if (MenuGroups?.Count > 0)
     {
         foreach (var group in MenuGroups)

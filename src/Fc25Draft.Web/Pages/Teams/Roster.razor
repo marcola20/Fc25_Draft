@@ -9,6 +9,91 @@
 
 @implements IDisposable
 
+<style>
+    .team-card {
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .team-card-bar {
+        height: 6px;
+        width: 100%;
+    }
+
+    .team-card-body {
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+    }
+
+    .team-card-escudo {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+    .team-card-info {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .team-name {
+        font-size: 15px;
+        font-weight: 500;
+        margin: 0 0 4px;
+        color: var(--bs-body-color);
+    }
+
+    .team-owner {
+        font-size: 13px;
+        color: var(--bs-secondary-color);
+        margin: 0 0 4px;
+    }
+
+        .team-owner strong {
+            font-weight: 500;
+            color: var(--bs-body-color);
+        }
+
+    .team-count {
+        font-size: 13px;
+        color: var(--bs-secondary-color);
+        margin: 0 0 0.75rem;
+    }
+
+        .team-count strong {
+            font-weight: 500;
+            color: var(--bs-body-color);
+        }
+
+    .team-btn {
+        display: inline-block;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 5px 14px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-style: solid;
+        background: transparent;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        align-self: flex-start;
+    }
+
+        .team-btn:hover {
+            opacity: 0.75;
+        }
+</style>
+
 <PageHeader Title="Elencos"
             Subtitle="Selecione uma equipe para visualizar a relação completa de jogadores." />
 
@@ -30,22 +115,29 @@ else if (teams.Count == 0)
 }
 else
 {
-    <div class="row g-4">
+    <div class="row g-3">
         @foreach (var team in teams)
         {
-            <div class="col-12 col-lg-6 col-xl-4">
-                <div class="card h-100">
-                    <div class="card-body d-flex flex-column">
-                        <h5 class="card-title">@team.TeamName</h5>
-                        <p class="card-text mb-2">
-                            <span class="text-muted">Responsável:</span>
-                            @(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)
-                        </p>
-                        <p class="card-text mb-4">
-                            <strong>@team.Jogadores</strong> jogador@(team.Jogadores == 1 ? string.Empty : "es") cadastrados.
-                        </p>
-                        <div class="mt-auto">
-                            <button class="btn btn-primary" @onclick="@(() => Navigation.NavigateTo($"/teams/details/{team.TeamId}"))">
+            var color = GetTeamColor(team.TeamName);
+            var escudo = GetTeamEscudo(team.TeamName);
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="team-card h-100">
+                    <div class="team-card-bar" style="background-color: @color"></div>
+                    <div class="team-card-body">
+                        <img class="team-card-escudo"
+                             src="@escudo"
+                             alt="Escudo @team.TeamName" />
+                        <div class="team-card-info">
+                            <p class="team-name">@team.TeamName</p>
+                            <p class="team-owner">
+                                Responsável: <strong>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</strong>
+                            </p>
+                            <p class="team-count">
+                                <strong>@team.Jogadores</strong> jogador@(team.Jogadores == 1 ? "" : "es") cadastrados.
+                            </p>
+                            <button class="team-btn"
+                                    style="border-color: @color; color: @color"
+                                    @onclick="@(() => Navigation.NavigateTo($"/teams/details/{team.TeamId}"))">
                                 Ver elenco completo
                             </button>
                         </div>
@@ -61,6 +153,44 @@ else
     private bool isLoading = true;
     private string? errorMessage;
     private CancellationTokenSource? loadCts;
+
+    private static readonly Dictionary<string, string> TeamColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Botafogo"] = "#1a1a1a",
+        ["Corinthians"] = "#1a1a1a",
+        ["Coritiba"] = "#1a6b2f",
+        ["Cruzeiro"] = "#1a3e8c",
+        ["Flamengo"] = "#c8102e",
+        ["Fluminense"] = "#8b0000",
+        ["Grêmio"] = "#3b6ab5",
+        ["Internacional"] = "#c8102e",
+        ["Palmeiras"] = "#006437",
+        ["Santos"] = "#2b2b2b",
+        ["São Paulo"] = "#c8102e",
+        ["Vasco"] = "#1a1a1a",
+    };
+
+    private static readonly Dictionary<string, string> TeamEscudos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Botafogo"] = "/images/escudos/Botafogo.png",
+        ["Corinthians"] = "/images/escudos/Corinthians.png",
+        ["Coritiba"] = "/images/escudos/Coritiba.png",
+        ["Cruzeiro"] = "/images/escudos/Cruzeiro.png",
+        ["Flamengo"] = "/images/escudos/Flamengo.png",
+        ["Fluminense"] = "/images/escudos/Fluminense.png",
+        ["Grêmio"] = "/images/escudos/Gremio.png",
+        ["Internacional"] = "/images/escudos/Internacional.png",
+        ["Palmeiras"] = "/images/escudos/Palmeiras.png",
+        ["Santos"] = "/images/escudos/Santos.png",
+        ["São Paulo"] = "/images/escudos/Sao Paulo.png",
+        ["Vasco"] = "/images/escudos/Vasco.png",
+    };
+
+    private static string GetTeamColor(string name)
+        => TeamColors.TryGetValue(name, out var c) ? c : "#888780";
+
+    private static string GetTeamEscudo(string name)
+        => TeamEscudos.TryGetValue(name, out var e) ? e : "/images/escudos/default.png";
 
     protected override async Task OnInitializedAsync()
     {
