@@ -18,29 +18,29 @@ internal static class QuickSellOverallCalculator
         if (randomInclusive is null)
             throw new ArgumentNullException(nameof(randomInclusive));
 
-        if (currentOverall  >= 90)
+        if (currentOverall >= 87)
             return 0;
 
-        if (currentOverall is >= 89 and < 90)
-            return randomInclusive(1, 1);
-
-        if (currentOverall is >= 87 and <= 88)
+        if (currentOverall is >= 85 and <= 86)
             return randomInclusive(1, 2);
 
-        if (currentOverall is >= 85 and <= 86)
+        if (currentOverall is >= 83 and <= 84)
             return randomInclusive(2, 3);
 
-        if (currentOverall is >= 83 and <= 84)
-            return randomInclusive(3, 4);
-
         if (currentOverall is >= 81 and <= 82)
-            return randomInclusive(4, 5);
+            return randomInclusive(3, 3);
 
         if (currentOverall is 80)
+            return randomInclusive(4, 4);
+
+        if (currentOverall is 79)
+            return randomInclusive(4, 5);
+
+        if (currentOverall is >= 77 and < 79)
             return randomInclusive(5, 6);
 
-        if (currentOverall is >= 77 and <= 79)
-            return randomInclusive(7, 8);
+        if (currentOverall is >= 75 and <= 76)
+            return randomInclusive(7, 7);
 
         return 0;
     }
