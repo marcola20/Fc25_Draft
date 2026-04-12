@@ -2,6 +2,7 @@
 @page "/admin/escalacoes"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Models.Navigation
+@using Fc25Draft.Web.Utilities
 @using System.Linq
 @using Microsoft.AspNetCore.Authorization
 @inject AdminAuthService AdminAuth
@@ -97,7 +98,7 @@ else
                                 <span class="badge bg-secondary">Inativa</span>
                             }
                             <div class="text-muted small mt-1">
-                                Atualizada em @lineup.UpdatedAtUtc.AddHours(-3).ToString("dd/MM/yyyy HH:mm")
+                                Atualizada em @BrazilTime.FormatDateTime(lineup.UpdatedAtUtc)
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-outline-secondary mt-2"

@@ -1,5 +1,6 @@
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Utilities
 @using Fc25Draft.Core.Entities
 @using Fc25Draft.Web.Services
 @inject TransferOffersApiClient OffersApi
@@ -375,11 +376,11 @@
 
                     <div class="row mb-2">
                         <div class="col-sm-4"><strong>Criada em:</strong></div>
-                        <div class="col-sm-8">@_detailOffer.CreatedAtUtc.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div class="col-sm-8">@BrazilTime.FormatDateTime(_detailOffer.CreatedAtUtc)</div>
                     </div>
                     <div class="row">
                         <div class="col-sm-4"><strong>Atualizada em:</strong></div>
-                        <div class="col-sm-8">@_detailOffer.UpdatedAtUtc.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div class="col-sm-8">@BrazilTime.FormatDateTime(_detailOffer.UpdatedAtUtc)</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -747,7 +748,7 @@
                         <span class="badge @GetStatusBadgeClass(offer.Status)">@TranslateStatus(offer.Status)</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <small class="text-muted">@offer.CreatedAtUtc.ToString("dd/MM/yyyy HH:mm")</small>
+                        <small class="text-muted">@BrazilTime.FormatDateTime(offer.CreatedAtUtc)</small>
                         <button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenDetailModal(offer)" title="Ver detalhes">
                             Detalhes
                         </button>
