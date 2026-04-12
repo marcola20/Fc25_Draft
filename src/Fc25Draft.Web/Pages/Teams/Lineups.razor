@@ -143,6 +143,13 @@ else
                 Instruções Defensivas
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == Tab.Advanced ? "active" : "")"
+                    type="button"
+                    @onclick='() => activeTab = Tab.Advanced'>
+                Instruções Avançadas
+            </button>
+        </li>
     </ul>
 
     <!-- TAB: Escalação -->
@@ -685,6 +692,93 @@ else
         </div>
     }
 
+    <!-- TAB: Instruções Avançadas -->
+    @if (activeTab == Tab.Advanced)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                Instruções Avançadas
+                <span class="text-muted small ms-2">(opcional)</span>
+            </div>
+            <div class="card-body">
+                @{ var outfieldStarters = GetOutfieldStarterOptions(); }
+                <div class="row g-3">
+                    @foreach (var (label, field, playerField, options, isAttack) in new[]
+                    {
+                        ("Ataque 1", "Attack1", "AttackPlayer1Id", AttackOptions, true),
+                        ("Ataque 2", "Attack2", "AttackPlayer2Id", AttackOptions, true),
+                        ("Defesa 1", "Defense1", "DefensePlayer1Id", DefenseOptions, false),
+                        ("Defesa 2", "Defense2", "DefensePlayer2Id", DefenseOptions, false),
+                    })
+                    {
+                        var currentValue = GetAdvancedValue(field);
+                        var requiresPlayer = isAttack
+                            ? (currentValue == 2 || currentValue == 4)
+                            : (currentValue == 5);
+                        var currentPlayerId = GetAdvancedPlayerId(playerField);
+
+                        <div class="col-md-3">
+                            <label class="form-label">@label</label>
+                            <select class="form-select"
+                                    value="@currentValue"
+                                    @onchange="e => OnAdvancedChanged(field, e.Value?.ToString())"
+                                    disabled="@isSaving">
+                                @foreach (var opt in options)
+                                {
+                                    <option value="@opt.Value">@opt.Label</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Jogador (@label)</label>
+                            <select class="form-select"
+                                    value="@(currentPlayerId?.ToString() ?? "")"
+                                    @onchange="e => OnAdvancedPlayerChanged(playerField, e.Value?.ToString())"
+                                    disabled="@(isSaving || !requiresPlayer)">
+                                <option value="">Nome do Jogador</option>
+                                @if (requiresPlayer)
+                                {
+                                    @foreach (var option in outfieldStarters)
+                                    {
+                                        <option value="@option.PlayerId">@FormatPlayerOption(option)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                @if (currentEditor?.AdvancedInstructions is not null)
+                {
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @onclick="ClearAdvancedInstructions"
+                                disabled="@isSaving">
+                            Limpar instruções avançadas
+                        </button>
+                    </div>
+                }
+
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h5 class="fw-bold text-center">ATAQUE</h5>
+                        @foreach (var (num, title, desc) in AttackDescriptions)
+                        {
+                            <p class="mb-2"><strong>@num - @title</strong><br /><span class="text-muted">@desc</span></p>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="fw-bold text-center">DEFESA</h5>
+                        @foreach (var (num, title, desc) in DefenseDescriptions)
+                        {
+                            <p class="mb-2"><strong>@num - @title</strong><br /><span class="text-muted">@desc</span></p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="d-flex align-items-center gap-3">
         <button class="btn btn-primary"
                 @onclick="SaveAsync"
@@ -707,7 +801,7 @@ else
     private const string NewLineupValue = "__new__";
     private static readonly IReadOnlyList<string> FormationOptions = LineupTemplateCatalog.GetSupportedFormations();
 
-    private enum Tab { Lineup, Roles, Offensive, Defensive }
+    private enum Tab { Lineup, Roles, Offensive, Defensive, Advanced }
 
     [Parameter]
     public Guid TeamId { get; set; }
@@ -937,7 +1031,7 @@ else
         var suggestedName = $"Escalação {lineups.Count + 1}";
         var roles = SanitizeRoles(CreateEmptyRoles(), recalculated);
 
-        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, 1, lineups.Count == 0, recalculated, roles, null, null);
+        currentEditor = new LineupEditorState(Guid.Empty, suggestedName, template.Formation, 1, lineups.Count == 0, recalculated, roles, null, null, null);
         selectedLineupId = null;
         isNewLineup = true;
     }
@@ -1281,7 +1375,18 @@ else
             di = new DefensiveInstructionsEditor(src.DefensiveStyle, src.ContainmentArea, src.Pressure, src.DefensiveLine, src.Density);
         }
 
-        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.AutoSubstitution, lineup.IsActive, recalculated, roles, oi, di);
+        AdvancedInstructionsEditor? adv = null;
+        if (lineup.AdvancedInstructions is not null)
+        {
+            var src = lineup.AdvancedInstructions;
+            adv = new AdvancedInstructionsEditor(
+                src.Attack1, src.AttackPlayer1Id,
+                src.Attack2, src.AttackPlayer2Id,
+                src.Defense1, src.DefensePlayer1Id,
+                src.Defense2, src.DefensePlayer2Id);
+        }
+
+        return new LineupEditorState(lineup.LineupId, lineup.Name, lineup.Formation, lineup.AutoSubstitution, lineup.IsActive, recalculated, roles, oi, di, adv);
     }
 
     private IReadOnlyList<LineupSlotState> RecalculateAvailability(IReadOnlyList<LineupSlotState> slots)
@@ -1470,7 +1575,18 @@ else
                 diEditor.DefensiveLine, diEditor.Density);
         }
 
-        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.AutoSubstitution, editor.IsActive, starters, bench, roles, oi, di);
+        TeamLineupAdvancedInstructionsSaveDto? adv = null;
+        if (editor.AdvancedInstructions is { } advEditor
+            && (advEditor.Attack1 > 1 || advEditor.Attack2 > 1 || advEditor.Defense1 > 1 || advEditor.Defense2 > 1))
+        {
+            adv = new TeamLineupAdvancedInstructionsSaveDto(
+                advEditor.Attack1, advEditor.AttackPlayer1Id,
+                advEditor.Attack2, advEditor.AttackPlayer2Id,
+                advEditor.Defense1, advEditor.DefensePlayer1Id,
+                advEditor.Defense2, advEditor.DefensePlayer2Id);
+        }
+
+        return new TeamLineupSaveRequestDto(editor.Name, editor.Formation, editor.AutoSubstitution, editor.IsActive, starters, bench, roles, oi, di, adv);
     }
 
     public void Dispose()
@@ -1512,6 +1628,12 @@ else
     private sealed record DefensiveInstructionsEditor(
         int DefensiveStyle, int ContainmentArea, int Pressure, int DefensiveLine, int Density);
 
+    private sealed record AdvancedInstructionsEditor(
+        int Attack1, int? AttackPlayer1Id,
+        int Attack2, int? AttackPlayer2Id,
+        int Defense1, int? DefensePlayer1Id,
+        int Defense2, int? DefensePlayer2Id);
+
     private sealed record LineupEditorState(
         Guid LineupId,
         string Name,
@@ -1521,5 +1643,132 @@ else
         IReadOnlyList<LineupSlotState> Slots,
         LineupRolesState Roles,
         OffensiveInstructionsEditor? OffensiveInstructions,
-        DefensiveInstructionsEditor? DefensiveInstructions);
+        DefensiveInstructionsEditor? DefensiveInstructions,
+        AdvancedInstructionsEditor? AdvancedInstructions);
+
+    private static readonly (int Value, string Label)[] AttackOptions = new[]
+    {
+        (1, "Desligado"), (2, "Ancoragem"), (3, "Falso Ala"), (4, "Defensivo"),
+        (5, "Preso às Laterais"), (6, "Laterais Ofensivos"), (7, "Rotação de alas"),
+        (8, "Tik-Taka"), (9, "Falso 9"), (10, "Alvos de Cruzamento"), (11, "Falso Lateral"),
+    };
+
+    private static readonly (int Value, string Label)[] DefenseOptions = new[]
+    {
+        (1, "Desligado"), (2, "Lateral Avançado"), (3, "Defesa Recuada"),
+        (4, "Invadir a Área"), (5, "Pivô contra-ataque"), (6, "Pressão Ofensiva"),
+    };
+
+    private static readonly (int Num, string Title, string Desc)[] AttackDescriptions = new[]
+    {
+        (1, "Desligado", "Nenhuma instrução avançada está definida. Mesmo que você tente acioná-las, nada vai acontecer."),
+        (2, "Ancoragem", "O jogador escolhido tem seus movimentos laterais para fora da posição restringidos. Por exemplo, seu centroavante vai manter uma posição mais centralizada, enquanto os alas não cortarão para dentro."),
+        (3, "Falso Ala", "Alas (ou meias abertos, na ausência de alas) que fogem de suas posições abertas tradicionais e jogam mais centralizados. Quando um falso ala vai para o centro, o lateral do mesmo lado vai para uma posição mais avançada."),
+        (4, "Defensivo", "Jogadores designados não avançaram para o ataque."),
+        (5, "Preso às Laterais", "Os jogadores das duas laterais ficam perto da linha lateral. Isso quer dizer que, mesmo se a bola estiver do outro lado do campo, o jogador na lateral continuará aberto."),
+        (6, "Laterais Ofensivos", "Os dois laterais vão avançar enquanto os meias vão voltar para cobrir as posições deles. Quando os laterais avançarem, os alas irão para o centro do campo."),
+        (7, "Rotação de alas", "Quando um jogador tiver a posse na ala, um companheiro irá para a linha lateral para dar mais opções de passe. Depois disso, outros companheiros correrão para o espaço que ficou aberto."),
+        (8, "Tik-Taka", "A prioridade é passar a bola o tempo todo. Os jogadores se movem com frequência para permitir a manutenção da posse. Os jogadores geralmente não tentarão se infiltrar em espaços atrás da defesa adversária."),
+        (9, "Falso 9", "O centroavante vai recuar frequentemente para receber passes. Quando ele voltar para a bola, os companheiros avançarão para preencher o espaço deixado por ele."),
+        (10, "Alvos de Cruzamento", "O objetivo é marcar gols a partir de cruzamentos. Quando um jogador tiver a posse na ala, os atacantes se posicionarão na frente do gol e esperarão o cruzamento."),
+        (11, "Falso Lateral", "Os laterais saem de suas posições naturais e centralizam. Isso dá mais densidade ao time na parte central do campo."),
+    };
+
+    private static readonly (int Num, string Title, string Desc)[] DefenseDescriptions = new[]
+    {
+        (1, "Desligado", "Nenhuma instrução avançada está definida. Mesmo que você tente acioná-las, nada vai acontecer."),
+        (2, "Lateral Avançado", "Meias ou alas abertos voltam para cobrir a defesa quando necessário."),
+        (3, "Defesa Recuada", "Time defensor recua para evitar lançamentos, abrindo espaço entre os jogadores e os adversários marcados. Sem marcação próxima, fica mais fácil de passar a bola diretamente."),
+        (4, "Invadir a Área", "Quando o adversário estiver avançando pelas laterais, os jogadores se reunirão na frente do gol. Quando os jogadores ficam reunidos perto do gol, fica mais fácil para os adversários chutarem de longe."),
+        (5, "Pivô contra-ataque", "Alguns atacantes ficam perto da área do adversário ao invés de voltar para ajudar a defesa. Isso significa que os atacantes não vão gastar muita energia correndo para trás e para frente."),
+        (6, "Pressão Ofensiva", "Quando o time perder a bola, ele tenta roubá-la de volta imediatamente com vários jogadores pressionando quem tiver a posse. Esta ação exige muita resistência."),
+    };
+
+    private int GetAdvancedValue(string field)
+    {
+        var ai = currentEditor?.AdvancedInstructions;
+        if (ai is null) return 1;
+        return field switch
+        {
+            "Attack1" => ai.Attack1,
+            "Attack2" => ai.Attack2,
+            "Defense1" => ai.Defense1,
+            "Defense2" => ai.Defense2,
+            _ => 1
+        };
+    }
+
+    private int? GetAdvancedPlayerId(string field)
+    {
+        var ai = currentEditor?.AdvancedInstructions;
+        if (ai is null) return null;
+        return field switch
+        {
+            "AttackPlayer1Id" => ai.AttackPlayer1Id,
+            "AttackPlayer2Id" => ai.AttackPlayer2Id,
+            "DefensePlayer1Id" => ai.DefensePlayer1Id,
+            "DefensePlayer2Id" => ai.DefensePlayer2Id,
+            _ => null
+        };
+    }
+
+    private void OnAdvancedChanged(string field, string? rawValue)
+    {
+        if (currentEditor is null) return;
+        if (!int.TryParse(rawValue, out var value)) return;
+
+        var ai = currentEditor.AdvancedInstructions ?? new AdvancedInstructionsEditor(1, null, 1, null, 1, null, 1, null);
+
+        ai = field switch
+        {
+            "Attack1" => ai with { Attack1 = value, AttackPlayer1Id = (value == 2 || value == 4) ? ai.AttackPlayer1Id : null },
+            "Attack2" => ai with { Attack2 = value, AttackPlayer2Id = (value == 2 || value == 4) ? ai.AttackPlayer2Id : null },
+            "Defense1" => ai with { Defense1 = value, DefensePlayer1Id = value == 5 ? ai.DefensePlayer1Id : null },
+            "Defense2" => ai with { Defense2 = value, DefensePlayer2Id = value == 5 ? ai.DefensePlayer2Id : null },
+            _ => ai
+        };
+
+        var isBlank = ai.Attack1 <= 1 && ai.Attack2 <= 1 && ai.Defense1 <= 1 && ai.Defense2 <= 1;
+        currentEditor = currentEditor with { AdvancedInstructions = isBlank ? null : ai };
+    }
+
+    private void OnAdvancedPlayerChanged(string field, string? rawValue)
+    {
+        if (currentEditor is null) return;
+        int? playerId = string.IsNullOrWhiteSpace(rawValue) ? null : int.TryParse(rawValue, out var pid) ? pid : null;
+
+        var ai = currentEditor.AdvancedInstructions ?? new AdvancedInstructionsEditor(1, null, 1, null, 1, null, 1, null);
+
+        ai = field switch
+        {
+            "AttackPlayer1Id" => ai with { AttackPlayer1Id = playerId },
+            "AttackPlayer2Id" => ai with { AttackPlayer2Id = playerId },
+            "DefensePlayer1Id" => ai with { DefensePlayer1Id = playerId },
+            "DefensePlayer2Id" => ai with { DefensePlayer2Id = playerId },
+            _ => ai
+        };
+
+        currentEditor = currentEditor with { AdvancedInstructions = ai };
+    }
+
+    private void ClearAdvancedInstructions()
+    {
+        if (currentEditor is null) return;
+        currentEditor = currentEditor with { AdvancedInstructions = null };
+    }
+
+    private IReadOnlyList<PlayerOption> GetOutfieldStarterOptions()
+    {
+        if (currentEditor is null) return Array.Empty<PlayerOption>();
+
+        return currentEditor.Slots
+            .Where(s => !s.IsBench && s.SelectedPlayer is not null
+                && !s.SlotCode.Equals("GK", StringComparison.OrdinalIgnoreCase))
+            .Select(s => s.SelectedPlayer!)
+            .GroupBy(p => p.PlayerId)
+            .Select(g => g.First())
+            .OrderBy(p => p.PositionName)
+            .ThenBy(p => p.Name)
+            .ToList();
+    }
 }

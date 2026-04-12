@@ -13,7 +13,8 @@ public sealed record TeamLineupDto(
     DateTime UpdatedAtUtc,
     TeamLineupRolesDto Roles,
     TeamLineupOffensiveInstructionsDto? OffensiveInstructions,
-    TeamLineupDefensiveInstructionsDto? DefensiveInstructions);
+    TeamLineupDefensiveInstructionsDto? DefensiveInstructions,
+    TeamLineupAdvancedInstructionsDto? AdvancedInstructions);
 
 public sealed record TeamLineupSlotDto(
     Guid SlotId,
@@ -81,6 +82,35 @@ public sealed record TeamLineupDefensiveInstructionsDto(
     int DefensiveLine,
     int Density);
 
+// Attack1/Attack2: 1=Desligado, 2=Ancoragem**, 3=Falso Ala, 4=Defensivo**,
+//   5=Preso às Laterais, 6=Laterais Ofensivos, 7=Rotação de alas,
+//   8=Tik-Taka, 9=Falso 9, 10=Alvos de Cruzamento, 11=Falso Lateral
+// Defense1/Defense2: 1=Desligado, 2=Lateral Avançado, 3=Defesa Recuada,
+//   4=Invadir a Área, 5=Pivô contra-ataque**, 6=Pressão Ofensiva
+public sealed record TeamLineupAdvancedInstructionsDto(
+    int Attack1,
+    int? AttackPlayer1Id,
+    int Attack2,
+    int? AttackPlayer2Id,
+    int Defense1,
+    int? DefensePlayer1Id,
+    int Defense2,
+    int? DefensePlayer2Id,
+    TeamLineupSlotPlayerDto? AttackPlayer1,
+    TeamLineupSlotPlayerDto? AttackPlayer2,
+    TeamLineupSlotPlayerDto? DefensePlayer1,
+    TeamLineupSlotPlayerDto? DefensePlayer2);
+
+public sealed record TeamLineupAdvancedInstructionsSaveDto(
+    int Attack1,
+    int? AttackPlayer1Id,
+    int Attack2,
+    int? AttackPlayer2Id,
+    int Defense1,
+    int? DefensePlayer1Id,
+    int Defense2,
+    int? DefensePlayer2Id);
+
 public sealed record TeamLineupSaveRequestDto(
     string Name,
     string Formation,
@@ -90,7 +120,8 @@ public sealed record TeamLineupSaveRequestDto(
     IReadOnlyList<TeamLineupSlotAssignmentDto> Bench,
     TeamLineupRoleAssignmentsDto? Roles,
     TeamLineupOffensiveInstructionsDto? OffensiveInstructions,
-    TeamLineupDefensiveInstructionsDto? DefensiveInstructions);
+    TeamLineupDefensiveInstructionsDto? DefensiveInstructions,
+    TeamLineupAdvancedInstructionsSaveDto? AdvancedInstructions);
 
 public sealed record AdminLineupOverviewDto(
     Guid LineupId,
@@ -105,5 +136,6 @@ public sealed record AdminLineupOverviewDto(
     TeamLineupRolesDto Roles,
     TeamLineupOffensiveInstructionsDto? OffensiveInstructions,
     TeamLineupDefensiveInstructionsDto? DefensiveInstructions,
+    TeamLineupAdvancedInstructionsDto? AdvancedInstructions,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);

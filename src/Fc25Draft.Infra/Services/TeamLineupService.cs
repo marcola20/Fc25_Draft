@@ -54,6 +54,10 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
             .Include(l => l.OffensiveInstructions)
             .Include(l => l.DefensiveInstructions)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer2).ThenInclude(p => p!.Position)
             .OrderByDescending(l => l.IsActive)
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
@@ -80,7 +84,11 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.AttackingPlayer2).ThenInclude(p => p!.Position)
             .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
             .Include(l => l.OffensiveInstructions)
-            .Include(l => l.DefensiveInstructions);
+            .Include(l => l.DefensiveInstructions)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer2).ThenInclude(p => p!.Position);
 
         if (teamId.HasValue && teamId.Value != Guid.Empty)
         {
@@ -183,6 +191,12 @@ public class TeamLineupService : ITeamLineupService
                     await _dbContext.TeamLineupDefensiveInstructions.AddAsync(di, ct);
                 }
 
+                if (request.AdvancedInstructions is not null)
+                {
+                    var ai = BuildAdvancedInstructions(lineup.LineupId, request.AdvancedInstructions);
+                    await _dbContext.TeamLineupAdvancedInstructions.AddAsync(ai, ct);
+                }
+
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
@@ -265,7 +279,6 @@ public class TeamLineupService : ITeamLineupService
                     }
                 }
 
-                // Upsert offensive instructions
                 if (request.OffensiveInstructions is not null)
                 {
                     var existing = await _dbContext.TeamLineupOffensiveInstructions
@@ -276,7 +289,6 @@ public class TeamLineupService : ITeamLineupService
                         ApplyOffensiveInstructions(existing, request.OffensiveInstructions);
                 }
 
-                // Upsert defensive instructions
                 if (request.DefensiveInstructions is not null)
                 {
                     var existing = await _dbContext.TeamLineupDefensiveInstructions
@@ -285,6 +297,16 @@ public class TeamLineupService : ITeamLineupService
                         await _dbContext.TeamLineupDefensiveInstructions.AddAsync(BuildDefensiveInstructions(lineupId, request.DefensiveInstructions), ct);
                     else
                         ApplyDefensiveInstructions(existing, request.DefensiveInstructions);
+                }
+
+                if (request.AdvancedInstructions is not null)
+                {
+                    var existing = await _dbContext.TeamLineupAdvancedInstructions
+                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                    if (existing is null)
+                        await _dbContext.TeamLineupAdvancedInstructions.AddAsync(BuildAdvancedInstructions(lineupId, request.AdvancedInstructions), ct);
+                    else
+                        ApplyAdvancedInstructions(existing, request.AdvancedInstructions);
                 }
 
                 await _dbContext.SaveChangesAsync(ct);
@@ -496,6 +518,22 @@ public class TeamLineupService : ITeamLineupService
                         Pressure = sourceLineup.DefensiveInstructions.Pressure,
                         DefensiveLine = sourceLineup.DefensiveInstructions.DefensiveLine,
                         Density = sourceLineup.DefensiveInstructions.Density,
+                    }, ct);
+                }
+
+                if (sourceLineup.AdvancedInstructions is not null)
+                {
+                    await _dbContext.TeamLineupAdvancedInstructions.AddAsync(new TeamLineupAdvancedInstructions
+                    {
+                        LineupId = newLineup.LineupId,
+                        Attack1 = sourceLineup.AdvancedInstructions.Attack1,
+                        AttackPlayer1Id = sourceLineup.AdvancedInstructions.AttackPlayer1Id,
+                        Attack2 = sourceLineup.AdvancedInstructions.Attack2,
+                        AttackPlayer2Id = sourceLineup.AdvancedInstructions.AttackPlayer2Id,
+                        Defense1 = sourceLineup.AdvancedInstructions.Defense1,
+                        DefensePlayer1Id = sourceLineup.AdvancedInstructions.DefensePlayer1Id,
+                        Defense2 = sourceLineup.AdvancedInstructions.Defense2,
+                        DefensePlayer2Id = sourceLineup.AdvancedInstructions.DefensePlayer2Id,
                     }, ct);
                 }
 
@@ -763,6 +801,34 @@ public class TeamLineupService : ITeamLineupService
         entity.Density = dto.Density;
     }
 
+    private static TeamLineupAdvancedInstructions BuildAdvancedInstructions(Guid lineupId, TeamLineupAdvancedInstructionsSaveDto dto)
+    {
+        return new TeamLineupAdvancedInstructions
+        {
+            LineupId = lineupId,
+            Attack1 = dto.Attack1,
+            AttackPlayer1Id = dto.AttackPlayer1Id,
+            Attack2 = dto.Attack2,
+            AttackPlayer2Id = dto.AttackPlayer2Id,
+            Defense1 = dto.Defense1,
+            DefensePlayer1Id = dto.DefensePlayer1Id,
+            Defense2 = dto.Defense2,
+            DefensePlayer2Id = dto.DefensePlayer2Id,
+        };
+    }
+
+    private static void ApplyAdvancedInstructions(TeamLineupAdvancedInstructions entity, TeamLineupAdvancedInstructionsSaveDto dto)
+    {
+        entity.Attack1 = dto.Attack1;
+        entity.AttackPlayer1Id = dto.AttackPlayer1Id;
+        entity.Attack2 = dto.Attack2;
+        entity.AttackPlayer2Id = dto.AttackPlayer2Id;
+        entity.Defense1 = dto.Defense1;
+        entity.DefensePlayer1Id = dto.DefensePlayer1Id;
+        entity.Defense2 = dto.Defense2;
+        entity.DefensePlayer2Id = dto.DefensePlayer2Id;
+    }
+
     private async Task<TeamLineupDto> LoadLineupDtoAsync(Guid lineupId, CancellationToken ct)
     {
         var entity = await _dbContext.TeamLineups
@@ -782,6 +848,10 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.AttackingPlayer3).ThenInclude(p => p!.Position)
             .Include(l => l.OffensiveInstructions)
             .Include(l => l.DefensiveInstructions)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.AttackPlayer2).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer1).ThenInclude(p => p!.Position)
+            .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer2).ThenInclude(p => p!.Position)
             .FirstOrDefaultAsync(l => l.LineupId == lineupId, ct)
             ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
@@ -843,6 +913,21 @@ public class TeamLineupService : ITeamLineupService
                 di.DefensiveStyle, di.ContainmentArea, di.Pressure, di.DefensiveLine, di.Density);
         }
 
+        TeamLineupAdvancedInstructionsDto? advancedInstructions = null;
+        if (entity.AdvancedInstructions is not null)
+        {
+            var ai = entity.AdvancedInstructions;
+            advancedInstructions = new TeamLineupAdvancedInstructionsDto(
+                ai.Attack1, ai.AttackPlayer1Id,
+                ai.Attack2, ai.AttackPlayer2Id,
+                ai.Defense1, ai.DefensePlayer1Id,
+                ai.Defense2, ai.DefensePlayer2Id,
+                MapRolePlayer(entity, ai.AttackPlayer1Id, ai.AttackPlayer1),
+                MapRolePlayer(entity, ai.AttackPlayer2Id, ai.AttackPlayer2),
+                MapRolePlayer(entity, ai.DefensePlayer1Id, ai.DefensePlayer1),
+                MapRolePlayer(entity, ai.DefensePlayer2Id, ai.DefensePlayer2));
+        }
+
         return new TeamLineupDto(
             entity.LineupId,
             entity.TeamId,
@@ -856,7 +941,8 @@ public class TeamLineupService : ITeamLineupService
             entity.UpdatedAt,
             roles,
             offensiveInstructions,
-            defensiveInstructions);
+            defensiveInstructions,
+            advancedInstructions);
     }
 
     private static TeamLineupRolesDto MapRoles(TeamLineup entity)
@@ -901,6 +987,7 @@ public class TeamLineupService : ITeamLineupService
             dto.Roles,
             dto.OffensiveInstructions,
             dto.DefensiveInstructions,
+            dto.AdvancedInstructions,
             dto.CreatedAtUtc,
             dto.UpdatedAtUtc);
     }

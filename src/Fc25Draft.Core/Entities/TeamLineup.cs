@@ -36,4 +36,5 @@ public class TeamLineup
     public Player? AttackingPlayer3 { get; set; }
     public TeamLineupOffensiveInstructions? OffensiveInstructions { get; set; }
     public TeamLineupDefensiveInstructions? DefensiveInstructions { get; set; }
+    public TeamLineupAdvancedInstructions? AdvancedInstructions { get; set; }
 }

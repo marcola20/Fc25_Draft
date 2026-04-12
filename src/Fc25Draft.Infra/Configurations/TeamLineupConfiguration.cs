@@ -82,5 +82,10 @@ public class TeamLineupConfiguration : IEntityTypeConfiguration<TeamLineup>
          .WithOne(x => x.Lineup)
          .HasForeignKey<TeamLineupDefensiveInstructions>(x => x.LineupId)
          .OnDelete(DeleteBehavior.Cascade);
+
+        e.HasOne(x => x.AdvancedInstructions)
+         .WithOne(x => x.Lineup)
+         .HasForeignKey<TeamLineupAdvancedInstructions>(x => x.LineupId)
+         .OnDelete(DeleteBehavior.Cascade);
     }
 }
