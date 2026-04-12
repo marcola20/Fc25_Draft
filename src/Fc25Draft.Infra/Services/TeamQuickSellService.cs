@@ -84,19 +84,10 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (rosterCount <= 16)
                     throw new QuickSellException("Você não pode realizar esta ação. O time ficaria com menos de 17 jogadores.", StatusCodes.Status409Conflict);
 
+                if (team.QuickSellCount >= 5)
+                    throw new QuickSellException("Limite de vendas rápidas da janela atingido (5/5).", StatusCodes.Status429TooManyRequests);
+
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
-                var windowStart = now.AddHours(-24);
-
-                var quickSellCount = await _dbContext.TransferHistories
-                    .CountAsync(
-                        h => h.FromTeamId == teamId
-                             && h.Type == TransferType.QuickSell
-                             && h.PerformedAtUtc >= windowStart,
-                        ct)
-                    .ConfigureAwait(false);
-
-                if (quickSellCount >= 3)
-                    throw new QuickSellException("Limite diário de vendas rápidas atingido. Tente novamente mais tarde.", StatusCodes.Status429TooManyRequests);
 
                 PricingResult pricing;
                 try
@@ -166,6 +157,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                 }
 
                 team.Budget = decimal.Round(team.Budget + payout, 2, MidpointRounding.AwayFromZero);
+                team.QuickSellCount++;
 
                 var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout);
                 var historyEntry = new TransferHistory

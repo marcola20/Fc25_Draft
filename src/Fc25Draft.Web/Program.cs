@@ -72,6 +72,7 @@ api.MapDraftEndpoints()
    .MapBudgetEndpoints()
    .MapPricingEndpoints()
    .MapTransfersEndpoints()
+   .MapTransferOffersEndpoints()
    .MapMarketEndpoints()
    .MapMarketHistoryEndpoints()
    .MapAdminEndpoints();

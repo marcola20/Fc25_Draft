@@ -44,6 +44,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransferHistoryService, TransferHistoryService>();
             services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
             services.AddScoped<ITeamLineupService, TeamLineupService>();
+            services.AddScoped<ITransferOfferService, TransferOfferService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();
@@ -58,6 +59,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketApiClient>();
             services.AddScoped<MarketClient>();
             services.AddScoped<TransfersClient>();
+            services.AddScoped<TransferOffersApiClient>();
             services.AddScoped<MarketCycleClient>();
             services.AddScoped<IMarketItemGenerationClient, MarketItemGenerationClient>();
             services.AddScoped<MarketHubClient>();

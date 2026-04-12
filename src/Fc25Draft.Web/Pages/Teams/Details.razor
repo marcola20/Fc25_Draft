@@ -65,6 +65,29 @@ else
         </button>
     </div>
 
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Info ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Info">
+                Informações
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Negotiations ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Negotiations"
+                    disabled="@(!_canQuickSell)">
+                Negociações
+            </button>
+        </li>
+    </ul>
+
+    @if (_activeMainTab == MainTab.Negotiations)
+    {
+        <Negotiations TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)" />
+    }
+    else
+    {
+
     <section class="mt-4" aria-labelledby="team-token-heading">
         <div class="card">
             <div class="card-body">
@@ -182,7 +205,6 @@ else
                                     <td class="text-center pe-0">
                                         <button type="button" 
                                                 class="btn btn-outline-danger btn-sm btn-icon"
-                                                disabled
                                                 style="border-width: 2px;
                                                        border-color: red;
                                                        color: red;
@@ -222,6 +244,8 @@ else
             Voltar
         </button>
     </div>
+
+    } @* end Info tab *@
 }
 
 @if (_teamTokenModalOpen)
@@ -287,6 +311,7 @@ else
                         <li><strong>Overall:</strong> @_quickSellTarget.Overall</li>
                         <li><strong>Preço base:</strong> @FormatCurrency(_quickSellTarget.BasePrice)</li>
                         <li><strong>Pagamento (80%):</strong> @FormatCurrency(_quickSellPayout)</li>
+                        <li><strong>Quick-sells restantes:</strong> @(Math.Max(0, 5 - (team?.QuickSellCount ?? 0))) / 5</li>
                     </ul>
                     @if (!string.IsNullOrEmpty(_quickSellErrorMessage))
                     {
@@ -735,7 +760,7 @@ else
             if (team is not null)
             {
                 var remainingPlayers = Math.Max(0, team.Jogadores - 1);
-                team = team with { Caixa = formattedBudget, Jogadores = remainingPlayers };
+                team = team with { Caixa = formattedBudget, Jogadores = remainingPlayers, QuickSellCount = team.QuickSellCount + 1 };
             }
 
             var newAmount = (teamAmount ?? 0m) - _quickSellTarget.BasePrice;
@@ -811,6 +836,14 @@ else
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
         TeamAccess.TokenChanged -= OnTeamTokenChanged;
+    }
+
+    private MainTab _activeMainTab = MainTab.Info;
+
+    private enum MainTab
+    {
+        Info,
+        Negotiations
     }
 
     private enum RosterSortColumn

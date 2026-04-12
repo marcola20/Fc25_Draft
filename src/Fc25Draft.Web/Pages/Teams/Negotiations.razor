@@ -1,0 +1,893 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Web.Services
+@inject TransferOffersApiClient OffersApi
+@inject TeamsApiClient TeamsApi
+
+<div class="mt-3">
+    <ul class="nav nav-pills mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(ActiveSubTab == SubTab.Received ? "active" : "")"
+                    type="button" @onclick="() => SwitchSubTab(SubTab.Received)">
+                Recebidas
+                @if (_received.Count > 0)
+                {
+                    <span class="badge bg-danger ms-1">@_received.Count</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(ActiveSubTab == SubTab.Sent ? "active" : "")"
+                    type="button" @onclick="() => SwitchSubTab(SubTab.Sent)">
+                Enviadas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(ActiveSubTab == SubTab.Finished ? "active" : "")"
+                    type="button" @onclick="() => SwitchSubTab(SubTab.Finished)">
+                Finalizadas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(ActiveSubTab == SubTab.NewOffer ? "active" : "")"
+                    type="button" @onclick="() => SwitchSubTab(SubTab.NewOffer)">
+                + Nova Proposta
+            </button>
+        </li>
+    </ul>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success" role="alert">@_success</div>
+    }
+
+    @if (_loading)
+    {
+        <p><em>Carregando...</em></p>
+    }
+    else
+    {
+        @* ===== RECEBIDAS ===== *@
+        @if (ActiveSubTab == SubTab.Received)
+        {
+            @if (_received.Count == 0)
+            {
+                <p class="text-muted">Nenhuma proposta recebida.</p>
+            }
+            else
+            {
+                @foreach (var offer in _received)
+                {
+                    @RenderOfferCard(offer, showActions: true, showCancel: false)
+                }
+            }
+        }
+
+        @* ===== ENVIADAS ===== *@
+        @if (ActiveSubTab == SubTab.Sent)
+        {
+            @if (_sent.Count == 0)
+            {
+                <p class="text-muted">Nenhuma proposta enviada pendente.</p>
+            }
+            else
+            {
+                @foreach (var offer in _sent)
+                {
+                    @RenderOfferCard(offer, showActions: false, showCancel: true)
+                }
+            }
+        }
+
+        @* ===== FINALIZADAS ===== *@
+        @if (ActiveSubTab == SubTab.Finished)
+        {
+            @if (_finished.Count == 0)
+            {
+                <p class="text-muted">Nenhuma negociação finalizada.</p>
+            }
+            else
+            {
+                <h6 class="mt-2">Aceitas</h6>
+                @if (AcceptedOffers.Count == 0)
+                {
+                    <p class="text-muted small">Nenhuma.</p>
+                }
+                else
+                {
+                    @foreach (var offer in AcceptedOffers)
+                    {
+                        @RenderOfferCard(offer, showActions: false, showCancel: false)
+                    }
+                }
+
+                <h6 class="mt-3">Recusadas</h6>
+                @if (RejectedOffers.Count == 0)
+                {
+                    <p class="text-muted small">Nenhuma.</p>
+                }
+                else
+                {
+                    @foreach (var offer in RejectedOffers)
+                    {
+                        @RenderOfferCard(offer, showActions: false, showCancel: false)
+                    }
+                }
+
+                @if (CounteredOffers.Count > 0)
+                {
+                    <h6 class="mt-3">Contraofertadas</h6>
+                    @foreach (var offer in CounteredOffers)
+                    {
+                        @RenderOfferCard(offer, showActions: false, showCancel: false)
+                    }
+                }
+
+                @if (CancelledOffers.Count > 0)
+                {
+                    <h6 class="mt-3">Canceladas</h6>
+                    @foreach (var offer in CancelledOffers)
+                    {
+                        @RenderOfferCard(offer, showActions: false, showCancel: false)
+                    }
+                }
+            }
+        }
+
+        @* ===== NOVA PROPOSTA ===== *@
+        @if (ActiveSubTab == SubTab.NewOffer)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">@(_counterOfferParentId.HasValue ? "Contraproposta" : "Nova Proposta")</h5>
+
+                    @if (_counterOfferParentId.HasValue)
+                    {
+                        <div class="alert alert-info">
+                            Contraproposta baseada na proposta original. Todos os campos são editáveis.
+                        </div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Time adversário</label>
+                            <select class="form-select" @onchange="OnTargetTeamChanged" value="@_selectedTargetTeamId">
+                                <option value="">Selecione um time...</option>
+                                @foreach (var t in _allTeams)
+                                {
+                                    @if (t.TeamId != TeamId)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de negociação</label>
+                            <select class="form-select" @bind="_newOfferType">
+                                <option value="@OfferType.Sale">Venda (Dinheiro)</option>
+                                <option value="@OfferType.Loan">Empréstimo</option>
+                                <option value="@OfferType.Swap">Troca</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (_targetRoster.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Jogadores alvo (do time adversário)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var player in _targetRoster)
+                                {
+                                    var isSelected = _selectedTargetPlayerIds.Contains(player.PlayerGuid);
+                                    <button type="button"
+                                            class="btn btn-sm @(isSelected ? "btn-danger" : "btn-outline-secondary")"
+                                            @onclick="() => ToggleTargetPlayer(player.PlayerGuid)">
+                                        @player.Nome (@player.Posicao, @player.Overall)
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if ((_newOfferType == OfferType.Swap || (_selectedOfferedPlayerIds.Count > 0 && !_counterOfferParentId.HasValue)) && _myRoster.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Jogadores oferecidos (do seu time)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var player in _myRoster)
+                                {
+                                    var isSelected = _selectedOfferedPlayerIds.Contains(player.PlayerGuid);
+                                    <button type="button"
+                                            class="btn btn-sm @(isSelected ? "btn-success" : "btn-outline-secondary")"
+                                            @onclick="() => ToggleOfferedPlayer(player.PlayerGuid)">
+                                        @player.Nome (@player.Posicao, @player.Overall)
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-5">
+                            <label class="form-label">Valor em dinheiro</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" class="form-control" inputmode="decimal"
+                                       value="@FormatMoneyInput(_newOfferMoney)"
+                                       @onchange="OnMoneyChanged"
+                                       placeholder="0,00" />
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Quem paga?</label>
+                            <select class="form-select" @bind="_selectedPayerTeamId">
+                                <option value="">Selecione...</option>
+                                <option value="@TeamId">@MyTeamName</option>
+                                @if (Guid.TryParse(_selectedTargetTeamId, out var _tgtId))
+                                {
+                                    <option value="@_selectedTargetTeamId">@TargetTeamName</option>
+                                }
+                            </select>
+                        </div>
+                        @if (_newOfferType != OfferType.Swap)
+                        {
+                            <div class="col-md-3">
+                                <label class="form-label">Revenda futura</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" inputmode="decimal"
+                                           value="@FormatPercentInput(_newOfferSellOn)"
+                                           @onchange="OnSellOnChanged"
+                                           placeholder="0,00" />
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Cláusulas e Bônus</label>
+                        <textarea class="form-control" rows="2" @bind="_newOfferClauses"></textarea>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" rows="2" @bind="_newOfferNotes"></textarea>
+                    </div>
+
+                    <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-primary" disabled="@_processing" @onclick="SubmitOfferAsync">
+                            @if (_processing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            }
+                            @(_counterOfferParentId.HasValue ? "Enviar Contraproposta" : "Enviar Proposta")
+                        </button>
+                        @if (_counterOfferParentId.HasValue)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="CancelCounterOffer">Cancelar</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@* ===== MODAL DE DETALHES ===== *@
+@if (_detailOffer is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalhes da Proposta</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseDetailModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>De:</strong></div>
+                        <div class="col-sm-8">@_detailOffer.FromTeamName</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Para:</strong></div>
+                        <div class="col-sm-8">@_detailOffer.ToTeamName</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Tipo:</strong></div>
+                        <div class="col-sm-8"><span class="badge bg-info">@TranslateType(_detailOffer.Type)</span></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Status:</strong></div>
+                        <div class="col-sm-8"><span class="badge @GetStatusBadgeClass(_detailOffer.Status)">@TranslateStatus(_detailOffer.Status)</span></div>
+                    </div>
+
+                    @if (_detailOffer.TargetPlayers.Count > 0)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Jogadores solicitados:</strong></div>
+                            <div class="col-sm-8">
+                                @foreach (var p in _detailOffer.TargetPlayers)
+                                {
+                                    <span class="badge bg-danger me-1 mb-1">@p.Name (@p.Position, OVR @p.Overall)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_detailOffer.OfferedPlayers.Count > 0)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Jogadores oferecidos:</strong></div>
+                            <div class="col-sm-8">
+                                @foreach (var p in _detailOffer.OfferedPlayers)
+                                {
+                                    <span class="badge bg-success me-1 mb-1">@p.Name (@p.Position, OVR @p.Overall)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_detailOffer.Money > 0)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Valor:</strong></div>
+                            <div class="col-sm-8">
+                                @FormatCurrency(_detailOffer.Money)
+                                @if (!string.IsNullOrEmpty(_detailOffer.MoneyPayerTeamName))
+                                {
+                                    <span class="text-muted ms-1">(pago por @_detailOffer.MoneyPayerTeamName)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_detailOffer.SellOnPercentage > 0)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Revenda futura:</strong></div>
+                            <div class="col-sm-8">@_detailOffer.SellOnPercentage.ToString("N2", BrazilCulture)%</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_detailOffer.Clauses))
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Cláusulas e Bônus:</strong></div>
+                            <div class="col-sm-8">@_detailOffer.Clauses</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_detailOffer.Notes))
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Observações:</strong></div>
+                            <div class="col-sm-8">@_detailOffer.Notes</div>
+                        </div>
+                    }
+
+                    <div class="row mb-2">
+                        <div class="col-sm-4"><strong>Criada em:</strong></div>
+                        <div class="col-sm-8">@_detailOffer.CreatedAtUtc.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Atualizada em:</strong></div>
+                        <div class="col-sm-8">@_detailOffer.UpdatedAtUtc.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDetailModal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@* ===== MODAL DE CONFIRMAÇÃO DE ACEITE ===== *@
+@if (_acceptConfirmOffer is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar aceite</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAcceptConfirmModal" disabled="@_processing"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Deseja aceitar a proposta de <strong>@_acceptConfirmOffer.FromTeamName</strong>?</p>
+                    <p class="mb-0"><strong>Transferências restantes após aceite:</strong> @(Math.Max(0, 5 - TransferCount - 1)) / 5</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseAcceptConfirmModal" disabled="@_processing">Cancelar</button>
+                    <button type="button" class="btn btn-success" @onclick="ConfirmAcceptAsync" disabled="@_processing">
+                        @if (_processing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Confirmar aceite
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter] public Guid TeamId { get; set; }
+    [Parameter] public string? TeamToken { get; set; }
+    [Parameter] public int TransferCount { get; set; }
+
+    private SubTab ActiveSubTab = SubTab.Received;
+    private bool _loading;
+    private bool _processing;
+    private string? _error;
+    private string? _success;
+
+    private List<TransferOfferListItemDto> _received = new();
+    private List<TransferOfferListItemDto> _sent = new();
+    private List<TransferOfferListItemDto> _finished = new();
+
+    private List<TransferOfferListItemDto> AcceptedOffers => _finished.Where(f => f.Status == "Accepted").ToList();
+    private List<TransferOfferListItemDto> RejectedOffers => _finished.Where(f => f.Status == "Rejected").ToList();
+    private List<TransferOfferListItemDto> CounteredOffers => _finished.Where(f => f.Status == "Countered").ToList();
+    private List<TransferOfferListItemDto> CancelledOffers => _finished.Where(f => f.Status == "Cancelled").ToList();
+
+    private List<TeamListItemDto> _allTeams = new();
+    private List<TeamRosterPlayerDto> _targetRoster = new();
+    private List<TeamRosterPlayerDto> _myRoster = new();
+
+    private string _selectedTargetTeamId = string.Empty;
+    private OfferType _newOfferType = OfferType.Sale;
+    private HashSet<Guid> _selectedTargetPlayerIds = new();
+    private HashSet<Guid> _selectedOfferedPlayerIds = new();
+    private decimal _newOfferMoney;
+    private string _selectedPayerTeamId = string.Empty;
+    private decimal _newOfferSellOn;
+    private string? _newOfferClauses;
+    private string? _newOfferNotes;
+    private Guid? _counterOfferParentId;
+
+    private TransferOfferListItemDto? _detailOffer;
+    private TransferOfferListItemDto? _acceptConfirmOffer;
+
+    private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
+
+    private string MyTeamName => _allTeams.FirstOrDefault(t => t.TeamId == TeamId)?.TeamName ?? "Meu time";
+    private string TargetTeamName
+    {
+        get
+        {
+            if (Guid.TryParse(_selectedTargetTeamId, out var id))
+                return _allTeams.FirstOrDefault(t => t.TeamId == id)?.TeamName ?? "Time adversário";
+            return "Time adversário";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        if (string.IsNullOrEmpty(TeamToken)) return;
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var receivedTask = OffersApi.GetReceivedAsync(TeamToken);
+            var sentTask = OffersApi.GetSentAsync(TeamToken);
+            var finishedTask = OffersApi.GetFinishedAsync(TeamToken);
+            var teamsTask = TeamsApi.GetAsync(null, 1, 100);
+
+            await Task.WhenAll(receivedTask, sentTask, finishedTask, teamsTask);
+
+            _received = (await receivedTask).ToList();
+            _sent = (await sentTask).ToList();
+            _finished = (await finishedTask).ToList();
+            _allTeams = (await teamsTask).Items?.ToList() ?? new();
+
+            var myRosterDto = await TeamsApi.GetRosterByIdAsync(TeamId);
+            _myRoster = myRosterDto?.Jogadores?.ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SwitchSubTab(SubTab tab)
+    {
+        ActiveSubTab = tab;
+        _error = null;
+        _success = null;
+    }
+
+    private async Task OnTargetTeamChanged(ChangeEventArgs e)
+    {
+        _selectedTargetTeamId = e.Value?.ToString() ?? string.Empty;
+        _selectedTargetPlayerIds.Clear();
+        _targetRoster.Clear();
+
+        if (Guid.TryParse(_selectedTargetTeamId, out var targetId))
+        {
+            try
+            {
+                var roster = await TeamsApi.GetRosterByIdAsync(targetId);
+                _targetRoster = roster?.Jogadores?.ToList() ?? new();
+            }
+            catch (Exception ex)
+            {
+                _error = $"Erro ao carregar elenco: {ex.Message}";
+            }
+        }
+    }
+
+    private void ToggleTargetPlayer(Guid playerGuid)
+    {
+        if (!_selectedTargetPlayerIds.Remove(playerGuid))
+            _selectedTargetPlayerIds.Add(playerGuid);
+    }
+
+    private void ToggleOfferedPlayer(Guid playerGuid)
+    {
+        if (!_selectedOfferedPlayerIds.Remove(playerGuid))
+            _selectedOfferedPlayerIds.Add(playerGuid);
+    }
+
+    private async Task RespondAsync(Guid offerId, OfferStatus response)
+    {
+        if (string.IsNullOrEmpty(TeamToken)) return;
+
+        _processing = true;
+        _error = null;
+        _success = null;
+
+        try
+        {
+            await OffersApi.RespondToOfferAsync(offerId, response, TeamToken);
+            _success = response == OfferStatus.Accepted
+                ? "Proposta aceita! Jogadores transferidos."
+                : "Proposta recusada.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task CancelOfferAsync(Guid offerId)
+    {
+        if (string.IsNullOrEmpty(TeamToken)) return;
+
+        _processing = true;
+        _error = null;
+        _success = null;
+
+        try
+        {
+            await OffersApi.CancelOfferAsync(offerId, TeamToken);
+            _success = "Proposta cancelada.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void StartCounterOffer(TransferOfferListItemDto offer)
+    {
+        _counterOfferParentId = offer.OfferId;
+        _selectedTargetTeamId = offer.FromTeamId.ToString();
+        _newOfferType = Enum.TryParse<OfferType>(offer.Type, out var t) ? t : OfferType.Sale;
+        _newOfferMoney = offer.Money;
+        _newOfferSellOn = offer.SellOnPercentage;
+        _newOfferClauses = offer.Clauses;
+        _newOfferNotes = offer.Notes;
+        _selectedPayerTeamId = offer.MoneyPayerTeamId?.ToString() ?? string.Empty;
+
+        if (_newOfferType == OfferType.Swap)
+        {
+            // Swap: invert target <-> offered
+            _selectedTargetPlayerIds = new HashSet<Guid>(offer.OfferedPlayers.Select(p => p.PlayerGuid));
+            _selectedOfferedPlayerIds = new HashSet<Guid>(offer.TargetPlayers.Select(p => p.PlayerGuid));
+        }
+        else
+        {
+            // Sale/Loan: original TargetPlayers are MY players being sold -> become OfferedPlayers
+            _selectedTargetPlayerIds = new HashSet<Guid>();
+            _selectedOfferedPlayerIds = new HashSet<Guid>(offer.TargetPlayers.Select(p => p.PlayerGuid));
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var roster = await TeamsApi.GetRosterByIdAsync(offer.FromTeamId);
+                _targetRoster = roster?.Jogadores?.ToList() ?? new();
+                StateHasChanged();
+            }
+            catch { }
+        });
+
+        ActiveSubTab = SubTab.NewOffer;
+    }
+
+    private void CancelCounterOffer()
+    {
+        _counterOfferParentId = null;
+        ResetNewOfferForm();
+        ActiveSubTab = SubTab.Received;
+    }
+
+    private async Task SubmitOfferAsync()
+    {
+        if (string.IsNullOrEmpty(TeamToken)) return;
+
+        _processing = true;
+        _error = null;
+        _success = null;
+
+        try
+        {
+            if (!Guid.TryParse(_selectedTargetTeamId, out var targetTeamId))
+                throw new InvalidOperationException("Selecione um time adversário.");
+
+            if (_selectedTargetPlayerIds.Count == 0 && _selectedOfferedPlayerIds.Count == 0)
+                throw new InvalidOperationException("Selecione ao menos um jogador na negociação.");
+
+            Guid? payerTeamId = null;
+            if (_newOfferMoney > 0)
+            {
+                if (!Guid.TryParse(_selectedPayerTeamId, out var parsedPayer))
+                    throw new InvalidOperationException("Informe qual time paga o valor em dinheiro.");
+                payerTeamId = parsedPayer;
+            }
+
+            var dto = new CreateTransferOfferDto(
+                FromTeamId: TeamId,
+                ToTeamId: targetTeamId,
+                Type: _newOfferType,
+                TargetPlayerIds: _selectedTargetPlayerIds.ToArray(),
+                OfferedPlayerIds: _selectedOfferedPlayerIds.Count > 0 ? _selectedOfferedPlayerIds.ToArray() : null,
+                Money: _newOfferMoney,
+                MoneyPayerTeamId: payerTeamId,
+                SellOnPercentage: _newOfferType == OfferType.Swap ? 0 : _newOfferSellOn,
+                Clauses: _newOfferClauses,
+                Notes: _newOfferNotes,
+                ParentOfferId: _counterOfferParentId);
+
+            await OffersApi.CreateOfferAsync(dto, TeamToken);
+            _success = _counterOfferParentId.HasValue ? "Contraproposta enviada!" : "Proposta enviada!";
+            _counterOfferParentId = null;
+            ResetNewOfferForm();
+            await LoadDataAsync();
+            ActiveSubTab = SubTab.Sent;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void ResetNewOfferForm()
+    {
+        _selectedTargetTeamId = string.Empty;
+        _selectedTargetPlayerIds.Clear();
+        _selectedOfferedPlayerIds.Clear();
+        _targetRoster.Clear();
+        _newOfferType = OfferType.Sale;
+        _newOfferMoney = 0;
+        _selectedPayerTeamId = string.Empty;
+        _newOfferSellOn = 0;
+        _newOfferClauses = null;
+        _newOfferNotes = null;
+    }
+
+    private void OpenDetailModal(TransferOfferListItemDto offer) => _detailOffer = offer;
+    private void CloseDetailModal() => _detailOffer = null;
+
+    private void OpenAcceptConfirmModal(TransferOfferListItemDto offer) => _acceptConfirmOffer = offer;
+    private void CloseAcceptConfirmModal() => _acceptConfirmOffer = null;
+
+    private async Task ConfirmAcceptAsync()
+    {
+        if (_acceptConfirmOffer is null) return;
+        var offerId = _acceptConfirmOffer.OfferId;
+        _acceptConfirmOffer = null;
+        await RespondAsync(offerId, OfferStatus.Accepted);
+    }
+
+    private RenderFragment RenderOfferCard(TransferOfferListItemDto offer, bool showActions, bool showCancel) => __builder =>
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="card-title mb-1">
+                            @if (offer.FromTeamId == TeamId)
+                            {
+                                <span>Proposta para <strong>@offer.ToTeamName</strong></span>
+                            }
+                            else
+                            {
+                                <span>Proposta de <strong>@offer.FromTeamName</strong></span>
+                            }
+                        </h6>
+                        <span class="badge bg-info me-1">@TranslateType(offer.Type)</span>
+                        <span class="badge @GetStatusBadgeClass(offer.Status)">@TranslateStatus(offer.Status)</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">@offer.CreatedAtUtc.ToString("dd/MM/yyyy HH:mm")</small>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenDetailModal(offer)" title="Ver detalhes">
+                            Detalhes
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    <strong>Jogadores solicitados:</strong>
+                    @foreach (var p in offer.TargetPlayers)
+                    {
+                        <span class="badge bg-danger me-1">@p.Name (@p.Position, @p.Overall)</span>
+                    }
+                </div>
+
+                @if (offer.OfferedPlayers.Count > 0)
+                {
+                    <div class="mt-1">
+                        <strong>Jogadores oferecidos:</strong>
+                        @foreach (var p in offer.OfferedPlayers)
+                        {
+                            <span class="badge bg-success me-1">@p.Name (@p.Position, @p.Overall)</span>
+                        }
+                    </div>
+                }
+
+                @if (offer.Money > 0)
+                {
+                    <div class="mt-1">
+                        <strong>Valor:</strong> @FormatCurrency(offer.Money)
+                        @if (!string.IsNullOrEmpty(offer.MoneyPayerTeamName))
+                        {
+                            <span class="text-muted ms-1">(pago por @offer.MoneyPayerTeamName)</span>
+                        }
+                    </div>
+                }
+
+                @if (offer.SellOnPercentage > 0)
+                {
+                    <div class="mt-1"><strong>Revenda futura:</strong> @offer.SellOnPercentage.ToString("F2", BrazilCulture)%</div>
+                }
+
+                @if (!string.IsNullOrEmpty(offer.Clauses))
+                {
+                    <div class="mt-1"><strong>Cláusulas e Bônus:</strong> @offer.Clauses</div>
+                }
+
+                @if (showActions)
+                {
+                    <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-success btn-sm" disabled="@_processing"
+                                @onclick="() => OpenAcceptConfirmModal(offer)">
+                            Aceitar
+                        </button>
+                        <button class="btn btn-danger btn-sm" disabled="@_processing"
+                                @onclick="() => RespondAsync(offer.OfferId, OfferStatus.Rejected)">
+                            Recusar
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm" disabled="@_processing"
+                                @onclick="() => StartCounterOffer(offer)">
+                            Contraofertar
+                        </button>
+                    </div>
+                }
+
+                @if (showCancel)
+                {
+                    <div class="mt-3">
+                        <button class="btn btn-outline-danger btn-sm" disabled="@_processing"
+                                @onclick="() => CancelOfferAsync(offer.OfferId)">
+                            Cancelar Proposta
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    };
+
+    private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+
+    private static string FormatMoneyInput(decimal value)
+        => value == 0m ? string.Empty : value.ToString("N2", BrazilCulture);
+
+    private static string FormatPercentInput(decimal value)
+        => value == 0m ? string.Empty : value.ToString("F2", BrazilCulture);
+
+    private void OnSellOnChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        var cleaned = new string(raw.Where(c => char.IsDigit(c) || c == ',').ToArray());
+
+        if (decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var parsed))
+            _newOfferSellOn = Math.Clamp(decimal.Round(parsed, 2, MidpointRounding.AwayFromZero), 0m, 100m);
+        else
+            _newOfferSellOn = 0m;
+    }
+
+    private void OnMoneyChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        // Strip dots (thousand sep) and keep only digits + comma
+        var cleaned = new string(raw.Where(c => char.IsDigit(c) || c == ',').ToArray());
+
+        if (decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var parsed))
+            _newOfferMoney = Math.Max(0, decimal.Round(parsed, 2, MidpointRounding.AwayFromZero));
+        else
+            _newOfferMoney = 0m;
+    }
+
+    private static string TranslateType(string type) => type switch
+    {
+        "Sale" => "Venda",
+        "Loan" => "Empréstimo",
+        "Swap" => "Troca",
+        _ => type
+    };
+
+    private static string TranslateStatus(string status) => status switch
+    {
+        "Pending" => "Pendente",
+        "Accepted" => "Aceita",
+        "Rejected" => "Recusada",
+        "Countered" => "Contraofertada",
+        "Cancelled" => "Cancelada",
+        _ => status
+    };
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Accepted" => "bg-success",
+        "Rejected" => "bg-danger",
+        "Countered" => "bg-info",
+        "Cancelled" => "bg-secondary",
+        _ => "bg-warning text-dark"
+    };
+
+    private enum SubTab
+    {
+        Received,
+        Sent,
+        Finished,
+        NewOffer
+    }
+}

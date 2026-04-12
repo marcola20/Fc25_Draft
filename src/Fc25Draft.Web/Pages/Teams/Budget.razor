@@ -1,13 +1,15 @@
 @page "/times/caixa"
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
 @inject TeamsApiClient TeamsApiClient
+@inject IPricingService PricingService
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Budget> Logger
 
 <PageTitle>Caixa dos Times</PageTitle>
 
 <PageHeader Title="Caixa dos Times"
-            Subtitle="Saldo atual de cada time, ordenado do maior para o menor." />
+            Subtitle="Saldo e valor de elenco de cada time." />
 
 @if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
@@ -17,7 +19,7 @@ else if (_isLoading)
 {
     <div class="alert alert-info" role="status">Carregando caixa dos times...</div>
 }
-else if (_teams.Count == 0)
+else if (_rows.Count == 0)
 {
     <div class="alert alert-warning" role="status">Nenhum time encontrado.</div>
 }
@@ -30,18 +32,40 @@ else
                     <th scope="col">#</th>
                     <th scope="col">Time</th>
                     <th scope="col">Responsável</th>
-                    <th scope="col" class="text-end">Caixa</th>
+                    <th scope="col" class="text-end">
+                        <button type="button"
+                                class="@SortButtonClass(SortCol.Budget)"
+                                @onclick="() => ToggleSort(SortCol.Budget)">
+                            Caixa
+                            @if (_sortCol == SortCol.Budget)
+                            {
+                                <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
+                            }
+                        </button>
+                    </th>
+                    <th scope="col" class="text-end">
+                        <button type="button"
+                                class="@SortButtonClass(SortCol.SquadValue)"
+                                @onclick="() => ToggleSort(SortCol.SquadValue)">
+                            Valor de Elenco
+                            @if (_sortCol == SortCol.SquadValue)
+                            {
+                                <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
+                            }
+                        </button>
+                    </th>
                 </tr>
             </thead>
             <tbody>
-                @for (var index = 0; index < _teams.Count; index++)
+                @for (var index = 0; index < _sortedRows.Count; index++)
                 {
-                    var team = _teams[index];
+                    var row = _sortedRows[index];
                     <tr>
                         <td>@(index + 1)</td>
-                        <td class="fw-semibold">@team.TeamName</td>
-                        <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
-                        <td class="text-end text-nowrap">@FormatCurrency(team.Budget)</td>
+                        <td class="fw-semibold">@row.TeamName</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.OwnerName) ? "-" : row.OwnerName)</td>
+                        <td class="text-end text-nowrap">@FormatCurrency(row.Budget)</td>
+                        <td class="text-end text-nowrap">@FormatCurrency(row.SquadValue)</td>
                     </tr>
                 }
             </tbody>
@@ -51,25 +75,60 @@ else
 
 @code {
     private static readonly CultureInfo BrazilCulture = new("pt-BR");
-    private readonly List<TeamBudgetDto> _teams = new();
+    private readonly List<BudgetRow> _rows = new();
+    private IReadOnlyList<BudgetRow> _sortedRows = Array.Empty<BudgetRow>();
     private bool _isLoading = true;
     private string? _errorMessage;
+    private SortCol _sortCol = SortCol.Budget;
+    private bool _sortDesc = true;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadBudgetsAsync();
+        await LoadDataAsync();
     }
 
-    private async Task LoadBudgetsAsync()
+    private async Task LoadDataAsync()
     {
         _isLoading = true;
         _errorMessage = null;
-        _teams.Clear();
+        _rows.Clear();
 
         try
         {
-            var result = await TeamsApiClient.GetBudgetsAsync();
-            _teams.AddRange(result);
+            var budgetsTask = TeamsApiClient.GetBudgetsAsync();
+            var rostersTask = TeamsApiClient.GetRostersAsync();
+
+            await Task.WhenAll(budgetsTask, rostersTask);
+
+            var budgets = await budgetsTask;
+            var rosters = await rostersTask;
+
+            var rosterMap = rosters.ToDictionary(r => r.TeamId);
+
+            foreach (var team in budgets)
+            {
+                decimal squadValue = 0m;
+
+                if (rosterMap.TryGetValue(team.TeamId, out var roster))
+                {
+                    foreach (var player in roster.Jogadores)
+                    {
+                        try
+                        {
+                            var pricing = await PricingService.CalculateForPlayerAsync(player.PlayerId, default);
+                            squadValue += pricing.BasePrice;
+                        }
+                        catch
+                        {
+                            // ignore pricing failures
+                        }
+                    }
+                }
+
+                _rows.Add(new BudgetRow(team.TeamId, team.TeamName, team.OwnerName, team.Budget, squadValue));
+            }
+
+            ApplySort();
         }
         catch (Exception ex)
         {
@@ -82,5 +141,49 @@ else
         }
     }
 
+    private void ToggleSort(SortCol col)
+    {
+        if (_sortCol == col)
+        {
+            _sortDesc = !_sortDesc;
+        }
+        else
+        {
+            _sortCol = col;
+            _sortDesc = true;
+        }
+
+        ApplySort();
+    }
+
+    private void ApplySort()
+    {
+        IEnumerable<BudgetRow> query = _rows;
+
+        query = _sortCol switch
+        {
+            SortCol.Budget => _sortDesc
+                ? query.OrderByDescending(r => r.Budget).ThenBy(r => r.TeamName)
+                : query.OrderBy(r => r.Budget).ThenBy(r => r.TeamName),
+            SortCol.SquadValue => _sortDesc
+                ? query.OrderByDescending(r => r.SquadValue).ThenBy(r => r.TeamName)
+                : query.OrderBy(r => r.SquadValue).ThenBy(r => r.TeamName),
+            _ => query
+        };
+
+        _sortedRows = query.ToList();
+    }
+
+    private string SortButtonClass(SortCol col)
+    {
+        var cls = "btn btn-link btn-sm p-0 text-decoration-none text-body";
+        if (_sortCol == col) cls += " fw-semibold";
+        return cls;
+    }
+
     private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+
+    private enum SortCol { Budget, SquadValue }
+
+    private sealed record BudgetRow(Guid TeamId, string TeamName, string? OwnerName, decimal Budget, decimal SquadValue);
 }

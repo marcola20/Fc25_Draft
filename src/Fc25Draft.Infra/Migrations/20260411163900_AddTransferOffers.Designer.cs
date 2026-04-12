@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260411163900_AddTransferOffers")]
+    partial class AddTransferOffers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -569,9 +572,6 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<int>("QuickSellCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("TeamName")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -581,9 +581,6 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
-
-                    b.Property<int>("TransferCount")
-                        .HasColumnType("integer");
 
                     b.HasKey("TeamId");
 
@@ -860,9 +857,6 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<decimal>("Money")
                         .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid?>("MoneyPayerTeamId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)

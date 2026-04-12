@@ -18,8 +18,10 @@ public record TeamDetailsDto(
     string TeamName,
     string? OwnerName,
     string Token,
-    int Jogadores, 
-    string Caixa);
+    int Jogadores,
+    string Caixa,
+    int QuickSellCount,
+    int TransferCount);
 
 public record TeamIdentityDto(
     Guid TeamId,

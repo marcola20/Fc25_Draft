@@ -29,6 +29,8 @@ public class DraftDbContext : DbContext
     public DbSet<TransferHistory> TransferHistories => Set<TransferHistory>();
     public DbSet<BudgetLedger> BudgetLedgers => Set<BudgetLedger>();
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+    public DbSet<TransferOffer> TransferOffers => Set<TransferOffer>();
+    public DbSet<TransferOfferPlayer> TransferOfferPlayers => Set<TransferOfferPlayer>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
