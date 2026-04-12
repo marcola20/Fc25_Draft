@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 # Local dev secrets
 src/Fc25Draft.Web/appsettings.Development.json
+/.claude/settings.local.json
