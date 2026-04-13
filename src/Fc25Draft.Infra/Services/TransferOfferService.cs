@@ -51,11 +51,18 @@ public class TransferOfferService : ITransferOfferService
             .FirstOrDefaultAsync(t => t.TeamId == dto.ToTeamId, ct)
             ?? throw new KeyNotFoundException("Time de destino não encontrado.");
 
-        if (fromTeam.TransferCount >= 5)
-            throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
-
-        if (toTeam.TransferCount >= 5)
-            throw new InvalidOperationException($"O time {toTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+        if (dto.Type == OfferType.Swap)
+        {
+            if (fromTeam.TransferCount >= 5)
+                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            if (toTeam.TransferCount >= 5)
+                throw new InvalidOperationException($"O time {toTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+        }
+        else
+        {
+            if (fromTeam.TransferCount >= 5)
+                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+        }
 
         var targetPlayers = await _db.Players
             .Include(p => p.Position)
@@ -163,10 +170,18 @@ public class TransferOfferService : ITransferOfferService
 
         if (response == OfferStatus.Accepted)
         {
-            if (offer.FromTeam.TransferCount >= 5)
-                throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
-            if (offer.ToTeam.TransferCount >= 5)
-                throw new InvalidOperationException($"O time {offer.ToTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            if (offer.Type == OfferType.Swap)
+            {
+                if (offer.FromTeam.TransferCount >= 5)
+                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+                if (offer.ToTeam.TransferCount >= 5)
+                    throw new InvalidOperationException($"O time {offer.ToTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            }
+            else
+            {
+                if (offer.FromTeam.TransferCount >= 5)
+                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            }
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -298,7 +313,6 @@ public class TransferOfferService : ITransferOfferService
         var toTeam = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == offer.ToTeamId, ct)
             ?? throw new InvalidOperationException("Time de destino não encontrado.");
 
-        // Money direction: MoneyPayerTeamId determines who pays
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {
             var payerTeam = offer.MoneyPayerTeamId.Value == fromTeam.TeamId ? fromTeam : toTeam;
@@ -312,12 +326,10 @@ public class TransferOfferService : ITransferOfferService
             receiverTeam.Budget = decimal.Round(receiverTeam.Budget + offer.Money, 2, MidpointRounding.AwayFromZero);
         }
 
-        // Determine which player carries the amount in TransferHistory (highest OVR)
         var amountCarrierPlayerId = allPlayers.Count > 0
             ? allPlayers.OrderByDescending(p => p.Overall).ThenBy(p => p.PlayerId).First().PlayerId
             : (int?)null;
 
-        // Build descriptive notes
         var noteParts = new List<string>();
         if (offer.Type == OfferType.Swap)
         {
@@ -330,8 +342,16 @@ public class TransferOfferService : ITransferOfferService
         else
         {
             var typeLabel = offer.Type == OfferType.Loan ? "Empréstimo" : "Venda";
-            noteParts.Add($"{typeLabel} de {FormatPlayerList(targetPlayers)}");
-            noteParts.Add($"De {toTeam.TeamName} para {fromTeam.TeamName}");
+            if (targetPlayers.Count > 0)
+            {
+                noteParts.Add($"{typeLabel} de {FormatPlayerList(targetPlayers)}");
+                noteParts.Add($"De {toTeam.TeamName} para {fromTeam.TeamName}");
+            }
+            if (offeredPlayers.Count > 0)
+            {
+                noteParts.Add($"{typeLabel} de {FormatPlayerList(offeredPlayers)}");
+                noteParts.Add($"De {fromTeam.TeamName} para {toTeam.TeamName}");
+            }
         }
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
@@ -350,7 +370,6 @@ public class TransferOfferService : ITransferOfferService
         if (historyNotes.Length > 400)
             historyNotes = historyNotes[..397] + "...";
 
-        // Move target players: ToTeam -> FromTeam
         foreach (var player in targetPlayers)
         {
             var tracked = await _db.Players.FirstAsync(p => p.PlayerId == player.PlayerId, ct);
@@ -381,7 +400,6 @@ public class TransferOfferService : ITransferOfferService
             }, ct);
         }
 
-        // Move offered players: FromTeam -> ToTeam
         foreach (var player in offeredPlayers)
         {
             var tracked = await _db.Players.FirstAsync(p => p.PlayerId == player.PlayerId, ct);
@@ -412,14 +430,13 @@ public class TransferOfferService : ITransferOfferService
             }, ct);
         }
 
-        // Increment transfer count for both teams
         fromTeam.TransferCount++;
-        toTeam.TransferCount++;
+        if (offer.Type == OfferType.Swap)
+            toTeam.TransferCount++;
 
-        // Auto-cancel all pending offers for teams that reached the limit
         var teamsAtLimit = new List<Guid>();
         if (fromTeam.TransferCount >= 5) teamsAtLimit.Add(fromTeam.TeamId);
-        if (toTeam.TransferCount >= 5) teamsAtLimit.Add(toTeam.TeamId);
+        if (offer.Type == OfferType.Swap && toTeam.TransferCount >= 5) teamsAtLimit.Add(toTeam.TeamId);
 
         if (teamsAtLimit.Count > 0)
         {
