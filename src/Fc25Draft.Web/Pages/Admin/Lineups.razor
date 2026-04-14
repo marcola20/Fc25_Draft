@@ -184,6 +184,51 @@ else
                                     </ul>
                                 </div>
                             }
+
+                            @if (lineup.AdvancedInstructions is not null)
+                            {
+                                <div class="col-12">
+                                    <h6 class="text-uppercase text-muted small mb-2">Instruções Avançadas</h6>
+                                    <div class="row g-3">
+                                        <div class="col-12 col-lg-6">
+                                            <ul class="list-unstyled mb-0">
+                                                <li>
+                                                    <strong>Ataque 1:</strong> @GetAdvancedAttackLabel(lineup.AdvancedInstructions.Attack1)
+                                                    @if (lineup.AdvancedInstructions.AttackPlayer1 is not null)
+                                                    {
+                                                        <span class="text-muted"> — @FormatPlayer(lineup.AdvancedInstructions.AttackPlayer1)</span>
+                                                    }
+                                                </li>
+                                                <li>
+                                                    <strong>Ataque 2:</strong> @GetAdvancedAttackLabel(lineup.AdvancedInstructions.Attack2)
+                                                    @if (lineup.AdvancedInstructions.AttackPlayer2 is not null)
+                                                    {
+                                                        <span class="text-muted"> — @FormatPlayer(lineup.AdvancedInstructions.AttackPlayer2)</span>
+                                                    }
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-12 col-lg-6">
+                                            <ul class="list-unstyled mb-0">
+                                                <li>
+                                                    <strong>Defesa 1:</strong> @GetAdvancedDefenseLabel(lineup.AdvancedInstructions.Defense1)
+                                                    @if (lineup.AdvancedInstructions.DefensePlayer1 is not null)
+                                                    {
+                                                        <span class="text-muted"> — @FormatPlayer(lineup.AdvancedInstructions.DefensePlayer1)</span>
+                                                    }
+                                                </li>
+                                                <li>
+                                                    <strong>Defesa 2:</strong> @GetAdvancedDefenseLabel(lineup.AdvancedInstructions.Defense2)
+                                                    @if (lineup.AdvancedInstructions.DefensePlayer2 is not null)
+                                                    {
+                                                        <span class="text-muted"> — @FormatPlayer(lineup.AdvancedInstructions.DefensePlayer2)</span>
+                                                    }
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     </div>
                 }
@@ -362,6 +407,33 @@ else
     private static string GetDefensiveStyleLabel(int v) => v switch { 1 => "Retranca", 2 => "Pressão na Frente", _ => "-" };
     private static string GetContainmentAreaLabel(int v) => v switch { 1 => "Ampla", 2 => "Centro", _ => "-" };
     private static string GetPressureLabel(int v) => v switch { 1 => "Tradicional", 2 => "Agressiva", _ => "-" };
+
+    private static string GetAdvancedAttackLabel(int v) => v switch
+    {
+        1 => "Desligado",
+        2 => "Ancoragem",
+        3 => "Falso Ala",
+        4 => "Defensivo",
+        5 => "Preso às Laterais",
+        6 => "Laterais Ofensivos",
+        7 => "Rotação de Alas",
+        8 => "Tik-Taka",
+        9 => "Falso 9",
+        10 => "Alvos de Cruzamento",
+        11 => "Falso Lateral",
+        _ => v.ToString()
+    };
+
+    private static string GetAdvancedDefenseLabel(int v) => v switch
+    {
+        1 => "Desligado",
+        2 => "Lateral Avançado",
+        3 => "Defesa Recuada",
+        4 => "Invadir a Área",
+        5 => "Pivô Contra-ataque",
+        6 => "Pressão Ofensiva",
+        _ => v.ToString()
+    };
 
     public void Dispose()
     {

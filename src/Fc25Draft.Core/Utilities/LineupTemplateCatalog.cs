@@ -166,8 +166,8 @@ public static class LineupTemplateCatalog
                     new("CDM1", "Volante Esquerdo (VOL)",      false,  6, new short[] { 5, 6, 7 }),
                     new("CDM2", "Volante Direito (VOL)",       false,  7, new short[] { 5, 6, 7 }),
                     new("CAM",  "Meia Atacante (MAT)",         false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LW",   "Ponta Esquerda (PE)",         false,  9, new short[] { 7, 8, 9, 10, 11 }),
-                    new("RW",   "Ponta Direita (PD)",          false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",         false,  9, new short[] { 7, 8, 9, 10, 11 , 13 }),
+                    new("RW",   "Ponta Direita (PD)",          false, 10, new short[] { 7, 8, 9, 10, 11 , 13 }),
                     new("ST",   "Centroavante (CA)",           false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
@@ -184,8 +184,8 @@ public static class LineupTemplateCatalog
                     new("CDM",  "Volante (VOL)",                    false,  6, new short[] { 5, 6, 7 }),
                     new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  7, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
                     new("CAM2", "Meia Atacante Direito (MAT)",      false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 }),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 , 13 }),
+                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11, 13 }),
                     new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
@@ -256,8 +256,8 @@ public static class LineupTemplateCatalog
                     new("CM2",  "Meia de Ligação Direito (MLG)",    false,  6, new short[] { 5, 6, 7, 8, 9, 10, 11 }),
                     new("LM",   "Meia Esquerda (ME)",               false,  7, new short[] { 7, 8, 9 }),
                     new("RM",   "Meia Direita (MD)",                false,  8, new short[] { 7, 10, 11 }),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 }),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11, 13 }),
+                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11, 13 }),
                     new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
@@ -328,8 +328,8 @@ public static class LineupTemplateCatalog
                     new("CDM",  "Volante (VOL)",               false,  6, new short[] { 5, 6, 7 }),
                     new("CM",   "Meia de Ligação (MLG)",       false,  7, new short[] { 5, 6, 7 }),
                     new("CAM",  "Meia Atacante (MAT)",         false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LW",   "Ponta Esquerda (PE)",         false,  9, new short[] { 7, 8, 9, 10, 11 }),
-                    new("RW",   "Ponta Direita (PD)",          false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",         false,  9, new short[] { 7, 8, 9, 10, 11 , 13 }),
+                    new("RW",   "Ponta Direita (PD)",          false, 10, new short[] { 7, 8, 9, 10, 11 , 13 }),
                     new("ST",   "Centroavante (CA)",           false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate()),
@@ -364,8 +364,26 @@ public static class LineupTemplateCatalog
                     new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7 }),
                     new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7 }),
                     new("CAM",  "Meia Atacante (MAT)",              false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11 }),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11 }),
+                    new("LW",   "Ponta Esquerda (PE)",              false,  9, new short[] { 7, 8, 9, 10, 11, 13 }),
+                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11, 13 }),
+                    new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
+                },
+                CreateBenchTemplate()),
+
+            ["4-3-3 (P2)"] = new LineupTemplate(
+                "4-3-3 (P2)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, new short[] { 1 }),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, new short[] { 2, 3, 4, 5, 8, 9 }),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, new short[] { 2, 3, 4, 5 }),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, new short[] { 2, 3, 4, 5 }),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, new short[] { 2, 3, 4, 5, 10, 11 }),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, new short[] { 5, 6, 7 }),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, new short[] { 5, 6, 7 }),
+                    new("CAM",  "Meia Atacante (MAT)",              false,  8, new short[] { 6, 7, 8, 9, 10, 11, 12, 13 }),
+                    new("SA",   "Segundo Atacante (SA)",            false,  9, new short[] { 7, 8, 9, 10, 11, 13 }),
+                    new("RW",   "Ponta Direita (PD)",               false, 10, new short[] { 7, 8, 9, 10, 11, 13 }),
                     new("ST",   "Centroavante (CA)",                false, 11, new short[] { 7, 9, 11, 12, 13 })
                 },
                 CreateBenchTemplate())
