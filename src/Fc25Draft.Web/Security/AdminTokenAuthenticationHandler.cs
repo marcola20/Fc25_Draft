@@ -36,28 +36,31 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
 
         var headerValue = authorizationHeader.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerValue))
-            return AuthenticateResult.NoResult(); 
+            return AuthenticateResult.NoResult();
 
         const string bearerPrefix = "Bearer ";
         if (!headerValue.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-            return AuthenticateResult.NoResult(); 
+            return AuthenticateResult.NoResult();
 
         var providedToken = headerValue[bearerPrefix.Length..].Trim();
-        if (!Guid.TryParse(providedToken, out var tokenGuid))
-            return AuthenticateResult.Fail("Token de administrador inválido.");
+        if (string.IsNullOrWhiteSpace(providedToken))
+            return AuthenticateResult.Fail("Token inválido.");
 
-        var tokenExists = await _db.AdminTokens
+        var team = await _db.Teams
             .AsNoTracking()
-            .AnyAsync(t => t.Token == tokenGuid, Context.RequestAborted);
+            .FirstOrDefaultAsync(t => t.Token == providedToken, Context.RequestAborted);
 
-        if (!tokenExists)
-            return AuthenticateResult.Fail("Token de administrador inválido.");
+        if (team is null)
+            return AuthenticateResult.Fail("Token inválido.");
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-        new Claim(ClaimTypes.Name, "Administrador"),
-        new Claim(ClaimTypes.Role, "Admin"),
-    };
+            new(ClaimTypes.Name, team.TeamName),
+            new("TeamId", team.TeamId.ToString()),
+        };
+
+        if (team.IsAdmin)
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);

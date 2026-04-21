@@ -14,6 +14,7 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
         e.Property(x => x.Token).IsRequired().HasMaxLength(80);
         e.Property(x => x.Budget).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
         e.Property(x => x.BudgetBlocked).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+        e.Property(x => x.IsAdmin).HasDefaultValue(false);
 
         e.HasIndex(x => x.TeamName).IsUnique();
         e.HasIndex(x => x.Token).IsUnique();

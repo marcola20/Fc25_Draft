@@ -9,13 +9,16 @@
             </div>
             <div class="modal-body">
                 <p>Confirme a escolha do jogador <strong>@Player.Name</strong> (@Player.PositionName, Overall @Player.Overall).</p>
-                <div class="mb-3">
-                    <label for="tokenInput" class="form-label">Token do time</label>
-                    <input id="tokenInput" type="password" class="form-control"
-                           value="@TokenInput"
-                           @oninput="e => TokenInputChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)"
-                           autocomplete="one-time-code" />
-                </div>
+                @if (!IsAuthenticated)
+                {
+                    <div class="mb-3">
+                        <label for="tokenInput" class="form-label">Token do time</label>
+                        <input id="tokenInput" type="password" class="form-control"
+                               value="@TokenInput"
+                               @oninput="e => TokenInputChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)"
+                               autocomplete="one-time-code" />
+                    </div>
+                }
                 @if (!string.IsNullOrEmpty(Error))
                 {
                     <div class="alert alert-danger" role="alert">@Error</div>
@@ -32,6 +35,7 @@
 @code {
     [Parameter, EditorRequired] public AvailablePlayerDto Player { get; set; } = null!;
     [Parameter] public bool IsSubmitting { get; set; }
+    [Parameter] public bool IsAuthenticated { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter] public string TokenInput { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> TokenInputChanged { get; set; }

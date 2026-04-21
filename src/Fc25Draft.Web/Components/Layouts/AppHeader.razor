@@ -40,13 +40,13 @@
                 else
                 {
                     <div class="btn-group" role="group" aria-label="Controles de acesso">
-                        @if (IsAdmin)
+                        @if (IsAuthenticated)
                         {
                             <button class="btn btn-sm btn-outline-light" @onclick="SignOut">Sair</button>
                         }
                         else
                         {
-                            <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Entrar como Admin</button>
+                            <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Login</button>
                         }
                     </div>
                 }
@@ -62,6 +62,7 @@
     [Parameter] public string AccessLabel { get; set; } = string.Empty;
     [Parameter] public bool ShowAuthProgress { get; set; }
     [Parameter] public bool IsAdmin { get; set; }
+    [Parameter] public bool IsAuthenticated { get; set; }
     [Parameter] public string? HomeHref { get; set; }
     [Parameter] public EventCallback ToggleSidebar { get; set; }
     [Parameter] public EventCallback SignIn { get; set; }

@@ -17,7 +17,7 @@
 <PageHeader Title="Escalações (Admin)"
             Subtitle="Visualize as escalações salvas por cada equipe." />
 
-@if (!AdminAuth.IsAuthenticated)
+@if (!AdminAuth.IsAdmin)
 {
     <div class="alert alert-warning" role="alert">
         Entre como administrador para consultar as escalações das equipes.
@@ -268,7 +268,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         await AdminAuth.EnsureInitializedAsync();
-        if (AdminAuth.IsAuthenticated) await ReloadAsync();
+        if (AdminAuth.IsAdmin) await ReloadAsync();
         else isLoading = false;
     }
 
@@ -282,7 +282,7 @@ else
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        if (!AdminAuth.IsAuthenticated) { lineups.Clear(); lineupDetailsState.Clear(); isLoading = false; return; }
+        if (!AdminAuth.IsAdmin) { lineups.Clear(); lineupDetailsState.Clear(); isLoading = false; return; }
 
         isLoading = true;
         errorMessage = null;
@@ -376,7 +376,7 @@ else
     {
         InvokeAsync(async () =>
         {
-            if (!AdminAuth.IsAuthenticated)
+            if (!AdminAuth.IsAdmin)
             {
                 loadCts?.Cancel();
                 lineups.Clear(); lineupDetailsState.Clear(); teams.Clear();

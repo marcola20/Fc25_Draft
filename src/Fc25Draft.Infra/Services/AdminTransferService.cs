@@ -500,26 +500,17 @@ public partial class AdminTransferService
     private async Task<Guid> EnsureValidAdminTokenAsync(string adminToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(adminToken))
-        {
             throw new AdminForbiddenException("Token de administrador ausente.");
-        }
 
-        if (!Guid.TryParse(adminToken.Trim(), out var tokenGuid))
-        {
-            throw new AdminForbiddenException("Token de administrador inválido.");
-        }
-
-        var tokenExists = await _dbContext.AdminTokens
+        var team = await _dbContext.Teams
             .AsNoTracking()
-            .AnyAsync(t => t.Token == tokenGuid, ct)
+            .FirstOrDefaultAsync(t => t.Token == adminToken.Trim() && t.IsAdmin, ct)
             .ConfigureAwait(false);
 
-        if (!tokenExists)
-        {
+        if (team is null)
             throw new AdminForbiddenException("Token de administrador inválido.");
-        }
 
-        return tokenGuid;
+        return team.TeamId;
     }
 
     private static bool PlayerBelongsToTeam(Player player, Guid teamId)

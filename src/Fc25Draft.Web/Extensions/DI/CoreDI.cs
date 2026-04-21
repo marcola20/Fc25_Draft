@@ -6,7 +6,6 @@ using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Options;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
-using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 
 namespace Fc25Draft.Web.Extensions.DI
 {
@@ -63,8 +62,6 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketCycleClient>();
             services.AddScoped<IMarketItemGenerationClient, MarketItemGenerationClient>();
             services.AddScoped<MarketHubClient>();
-            services.AddScoped<ProtectedLocalStorage>();
-            services.AddScoped<ITeamTokenStore, ProtectedLocalStorageTeamTokenStore>();
             services.AddScoped<TeamAccessService>();
             services.AddScoped<ToastService>();
             services.AddScoped<LayoutNavigationService>();

@@ -18,6 +18,14 @@ namespace Fc25Draft.Web.Extensions.Endpoints
     {
         public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
         {
+            app.MapGet("/auth/me", (HttpContext ctx) =>
+            {
+                var teamIdClaim = ctx.User.FindFirst("TeamId")?.Value;
+                var teamName = ctx.User.Identity?.Name;
+                var isAdmin = ctx.User.IsInRole("Admin");
+                return Results.Ok(new { status = "ok", teamName, isAdmin, teamId = teamIdClaim });
+            }).RequireAuthorization();
+
             var adminApi = app.MapGroup("/admin").RequireAuthorization("AdminOnly");
 
             adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));

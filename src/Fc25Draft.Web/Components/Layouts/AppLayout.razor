@@ -20,7 +20,8 @@
                    Actions="@LayoutState.Actions"
                    AccessLabel="@GetAccessLabel()"
                    ShowAuthProgress="@(!authReady)"
-                   IsAdmin="@AdminAuth.IsAuthenticated"
+                   IsAdmin="@AdminAuth.IsAdmin"
+                   IsAuthenticated="@AdminAuth.IsAuthenticated"
                    HomeHref="@homeRoute"
                    ToggleSidebar="@ToggleSidebar"
                    SignIn="@OpenAdminModal"
@@ -60,13 +61,13 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Entrar como Admin</h5>
+                    <h5 class="modal-title">Entrar</h5>
                     <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Informe o token de administrador configurado no servidor.</p>
+                    <p>Informe o token do seu time para entrar.</p>
                     <div class="mb-3">
-                        <label class="form-label" for="adminTokenInput">Token</label>
+                        <label class="form-label" for="adminTokenInput">Token do time</label>
                         <input id="adminTokenInput"
                                class="form-control"
                                type="password"
@@ -151,7 +152,7 @@
     {
         try
         {
-            menuGroups = NavigationService.BuildMenu(AdminAuth.IsAuthenticated);
+            menuGroups = NavigationService.BuildMenu(AdminAuth.IsAdmin);
             await LogMenuBuiltAsync();
         }
         catch (Exception ex)
@@ -262,7 +263,7 @@
                          ?? user?.Identity?.Name
                          ?? "anonimo";
 
-            var role = AdminAuth.IsAuthenticated
+            var role = AdminAuth.IsAdmin
                 ? "Admin"
                 : user?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
 
@@ -274,7 +275,11 @@
         }
     }
 
-    private string GetAccessLabel() => AdminAuth.IsAuthenticated ? "Modo administrador" : "Modo somente leitura";
+    private string GetAccessLabel()
+    {
+        if (!AdminAuth.IsAuthenticated) return "Modo somente leitura";
+        return AdminAuth.IsAdmin ? "Administrador" : "Time autenticado";
+    }
 
     private void ToggleSidebar()
     {
@@ -304,7 +309,7 @@
             var success = await AdminAuth.SignInAsync(adminTokenInput);
             if (success)
             {
-                adminBannerMessage = "Modo administrador ativado.";
+                adminBannerMessage = AdminAuth.IsAdmin ? "Modo administrador ativado." : "Time autenticado com sucesso.";
                 adminBannerCss = "alert-success";
                 CloseAdminModal();
                 await RebuildMenuAsync();
@@ -326,7 +331,7 @@
         try
         {
             await AdminAuth.SignOutAsync();
-            adminBannerMessage = "Modo administrador desativado.";
+            adminBannerMessage = "Sessão encerrada.";
             adminBannerCss = "alert-warning";
             await RebuildMenuAsync();
         }

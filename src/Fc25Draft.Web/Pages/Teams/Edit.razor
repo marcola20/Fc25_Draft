@@ -18,7 +18,7 @@
 {
     <p><em>Carregando...</em></p>
 }
-else if (!AdminAuth.IsAuthenticated)
+else if (!AdminAuth.IsAdmin)
 {
     <div class="alert alert-warning" role="alert">Apenas administradores podem cadastrar ou editar equipes.</div>
     <button class="btn btn-secondary" @onclick="Cancel">Voltar</button>
@@ -117,7 +117,7 @@ else
             return;
         }
 
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Entre como administrador para salvar alterações.";
             return;

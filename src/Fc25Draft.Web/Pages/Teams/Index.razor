@@ -18,7 +18,7 @@
         </form>
     </div>
     <div class="col-md-6 text-md-end">
-        @if (AdminAuth.IsAuthenticated)
+        @if (AdminAuth.IsAdmin)
         {
             <button class="btn btn-success ms-2" @onclick="CreateTeam">Nova Equipe</button>
         }
@@ -59,7 +59,7 @@ else
                         <td>@team.Jogadores</td>
                         <td class="text-end">
                             <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Detalhes</button>
-                            @if (AdminAuth.IsAuthenticated)
+                            @if (AdminAuth.IsAdmin)
                             {
                                 <button class="btn btn-link" @onclick="() => EditTeam(team.TeamId)">Editar</button>
                                 <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(team.TeamId)">Excluir</button>
@@ -151,7 +151,7 @@ else
 
     private void CreateTeam()
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Entre como administrador para adicionar equipes.";
             return;
@@ -162,7 +162,7 @@ else
 
     private void EditTeam(Guid id)
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Entre como administrador para editar equipes.";
             return;
@@ -175,7 +175,7 @@ else
 
     private async Task ConfirmDelete(Guid id)
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Entre como administrador para excluir equipes.";
             return;

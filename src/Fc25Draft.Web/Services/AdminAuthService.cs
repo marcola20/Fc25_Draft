@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -31,14 +32,14 @@ public class AdminAuthService
 
     public bool IsAuthenticated => !string.IsNullOrWhiteSpace(_token);
 
+    public bool IsAdmin { get; private set; }
+
     public string? Token => _token;
 
     public async Task EnsureInitializedAsync()
     {
         if (_initialized)
-        {
             return;
-        }
 
         var initializationCompleted = false;
 
@@ -47,11 +48,16 @@ public class AdminAuthService
             _token = await _jsRuntime.InvokeAsync<string?>("fc25Auth.getToken");
             if (!string.IsNullOrWhiteSpace(_token))
             {
-                var valid = await ValidateTokenAsync(_token);
-                if (!valid)
+                var result = await ValidateTokenAsync(_token);
+                if (!result.IsValid)
                 {
                     await ClearStoredTokenAsync();
                     _token = null;
+                    IsAdmin = false;
+                }
+                else
+                {
+                    IsAdmin = result.IsAdmin;
                 }
             }
 
@@ -60,6 +66,7 @@ public class AdminAuthService
         catch (JSException)
         {
             _token = null;
+            IsAdmin = false;
             initializationCompleted = true;
         }
         catch (InvalidOperationException ex) when (IsPrerenderInteropException(ex))
@@ -90,18 +97,15 @@ public class AdminAuthService
     public async Task<bool> SignInAsync(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
-        {
             return false;
-        }
 
         var normalizedToken = token.Trim();
-        var isValid = await ValidateTokenAsync(normalizedToken);
-        if (!isValid)
-        {
+        var result = await ValidateTokenAsync(normalizedToken);
+        if (!result.IsValid)
             return false;
-        }
 
         _token = normalizedToken;
+        IsAdmin = result.IsAdmin;
 
         try
         {
@@ -109,7 +113,7 @@ public class AdminAuthService
         }
         catch (JSException)
         {
-            // Ignored: fallback is to keep token only in memory for current sessão.
+            // Keep token in memory only if storage fails.
         }
 
         _initialized = true;
@@ -120,6 +124,7 @@ public class AdminAuthService
     public async Task SignOutAsync()
     {
         _token = null;
+        IsAdmin = false;
 
         await ClearStoredTokenAsync();
 
@@ -127,7 +132,7 @@ public class AdminAuthService
         AuthenticationChanged?.Invoke();
     }
 
-    private async Task<bool> ValidateTokenAsync(string token)
+    private async Task<(bool IsValid, bool IsAdmin)> ValidateTokenAsync(string token)
     {
         try
         {
@@ -135,12 +140,16 @@ public class AdminAuthService
             client.BaseAddress = new Uri(_navigationManager.BaseUri);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            using var response = await client.GetAsync("api/admin/validate");
-            return response.IsSuccessStatusCode;
+            using var response = await client.GetAsync("api/auth/me");
+            if (!response.IsSuccessStatusCode)
+                return (false, false);
+
+            var data = await response.Content.ReadFromJsonAsync<AuthMeResponse>();
+            return (true, data?.IsAdmin ?? false);
         }
         catch (Exception)
         {
-            return false;
+            return (false, false);
         }
     }
 
@@ -152,7 +161,9 @@ public class AdminAuthService
         }
         catch (Exception)
         {
-            // Ignored: storage may be unavailable.
+            // Storage may be unavailable.
         }
     }
+
+    private sealed record AuthMeResponse(bool IsAdmin);
 }

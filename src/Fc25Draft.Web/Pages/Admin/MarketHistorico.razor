@@ -14,7 +14,7 @@
 
 <h1 class="h3 mb-3">Histórico do Mercado (Admin)</h1>
 
-@if (!AdminAuth.IsAuthenticated)
+@if (!AdminAuth.IsAdmin)
 {
     <div class="alert alert-warning" role="alert">
         Entre como administrador para visualizar o histórico completo do mercado.
@@ -178,7 +178,7 @@ else
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
         await AdminAuth.EnsureInitializedAsync();
-        if (AdminAuth.IsAuthenticated)
+        if (AdminAuth.IsAdmin)
         {
             await LoadAsync();
         }
@@ -189,7 +189,7 @@ else
 
     private async Task LoadAsync(int page)
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             return;
         }

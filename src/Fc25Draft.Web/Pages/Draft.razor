@@ -60,6 +60,7 @@
 {
     <DraftPickModal Player="@selectedPlayer"
                     IsSubmitting="@isSubmittingPick"
+                    IsAuthenticated="@AdminAuth.IsAuthenticated"
                     Error="@modalError"
                     TokenInput="@tokenInput"
                     TokenInputChanged="@(v => tokenInput = v)"
@@ -92,14 +93,14 @@
     private bool DisableSelection => state is null || !state.HasDraft || state.DraftCompleted || state.CurrentTeamId is null || isSubmittingPick;
 
     private bool CanGenerateDraft =>
-        AdminAuth.IsAuthenticated &&
+        AdminAuth.IsAdmin &&
         !isGeneratingDraft &&
         !isLoadingState &&
         (state is null || !state.HasDraft || state.DraftCompleted);
 
     private RenderFragment? BuildDraftActions()
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             return null;
         }
@@ -245,7 +246,7 @@
         statusMessage = null;
         statusCss = "alert-success";
 
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             statusCss = "alert-warning";
             statusMessage = "Entre como administrador para gerar o draft.";
@@ -507,10 +508,10 @@
         }
     }
 
-    private void OpenModal(AvailablePlayerDto player)
+    private async Task OpenModal(AvailablePlayerDto player)
     {
         selectedPlayer = player;
-        tokenInput = string.Empty;
+        tokenInput = await AdminAuth.GetTokenAsync() ?? string.Empty;
         modalError = null;
         isModalOpen = true;
         shareFeedback = null;

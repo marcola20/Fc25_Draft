@@ -32,7 +32,7 @@
 
 <h1 class="h3 mb-3">Administração de Ciclos do Mercado</h1>
 
-@if (!AdminAuth.IsAuthenticated)
+@if (!AdminAuth.IsAdmin)
 {
     <div class="alert alert-warning" role="alert">
         Entre como administrador para gerenciar os ciclos do mercado.
@@ -322,7 +322,7 @@ else
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
         _locationRegistration = Navigation.RegisterLocationChangingHandler(OnLocationChanging);
         await AdminAuth.EnsureInitializedAsync();
-        if (AdminAuth.IsAuthenticated)
+        if (AdminAuth.IsAdmin)
         {
             await LoadAsync();
         }
@@ -371,7 +371,7 @@ else
 
     private async Task LoadAsync(int page = 1)
     {
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             return;
         }
@@ -916,7 +916,7 @@ else
     {
         InvokeAsync(async () =>
         {
-            if (!AdminAuth.IsAuthenticated)
+            if (!AdminAuth.IsAdmin)
             {
                 _cycles = null;
                 _listError = null;

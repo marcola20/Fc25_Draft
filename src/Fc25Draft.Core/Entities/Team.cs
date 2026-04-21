@@ -10,6 +10,7 @@ public class Team
     public decimal BudgetBlocked { get; set; }
     public int QuickSellCount { get; set; }
     public int TransferCount { get; set; }
+    public bool IsAdmin { get; set; }
 
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();

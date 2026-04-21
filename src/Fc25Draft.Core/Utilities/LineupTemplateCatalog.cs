@@ -63,7 +63,7 @@ public static class LineupTemplateCatalog
                 "4-4-2 (4-2-2-2) Padrão",
                 new List<LineupSlotTemplate>
                 {
-                    new("GK",   "Goleiro (GOL)",               false,  1, Gol),
+                    new("GK",   "Goleiro (GOL)",                false,  1, Gol),
                     new("LB",   "Lateral Esquerdo (LE)",        false,  2, Le),
                     new("LCB",  "Zagueiro (E)",                 false,  3, Zag),
                     new("RCB",  "Zagueiro (D)",                 false,  4, Zag),
@@ -81,7 +81,7 @@ public static class LineupTemplateCatalog
                 "4-5-1 (4-2-3-1)",
                 new List<LineupSlotTemplate>
                 {
-                    new("GK",   "Goleiro (GOL)",               false,  1, Gol),
+                    new("GK",   "Goleiro (GOL)",                false,  1, Gol),
                     new("LB",   "Lateral Esquerdo (LE)",        false,  2, Le),
                     new("LCB",  "Zagueiro (E)",                 false,  3, Zag),
                     new("RCB",  "Zagueiro (D)",                 false,  4, Zag),
@@ -171,7 +171,7 @@ public static class LineupTemplateCatalog
                 "4-3-3 (4-2-1-3)",
                 new List<LineupSlotTemplate>
                 {
-                    new("GK",   "Goleiro (GOL)",              false,  1, Gol),
+                    new("GK",   "Goleiro (GOL)",               false,  1, Gol),
                     new("LB",   "Lateral Esquerdo (LE)",       false,  2, Le),
                     new("LCB",  "Zagueiro (E)",                false,  3, Zag),
                     new("RCB",  "Zagueiro (D)",                false,  4, Zag),

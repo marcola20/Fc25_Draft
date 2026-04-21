@@ -32,7 +32,7 @@
 }
 else
 {
-    if (!AdminAuth.IsAuthenticated)
+    if (!AdminAuth.IsAdmin)
     {
         <div class="alert alert-info" role="alert">
             Você está visualizando a lista de drafts. Informe o token de administrador na página inicial para adicionar ou remover rodadas.
@@ -84,7 +84,7 @@ else
             </div>
         </div>
 
-        @if (AdminAuth.IsAuthenticated)
+        @if (AdminAuth.IsAdmin)
         {
             <div class="card mb-4">
                 <div class="card-header">Adicionar rodada</div>
@@ -126,7 +126,7 @@ else
                             <strong>Rodada @RoundToDisplay.RoundNumber</strong>
                             <span class="ms-2 text-muted">@FormatOverallRange(RoundToDisplay)</span>
                         </div>
-                        @if (AdminAuth.IsAuthenticated && CanRemoveRound(RoundToDisplay))
+                        @if (AdminAuth.IsAdmin && CanRemoveRound(RoundToDisplay))
                         {
                             <button class="btn btn-outline-danger btn-sm"
                                     @onclick="() => ConfirmRemoveRoundAsync(RoundToDisplay.RoundNumber)"
@@ -184,7 +184,7 @@ else
         <div class="card mb-4">
             <div class="card-header">Ordem de escolhas</div>
             <div class="card-body">
-                @if (!AdminAuth.IsAuthenticated)
+                @if (!AdminAuth.IsAdmin)
                 {
                     <div class="alert alert-secondary mb-0" role="alert">Somente administradores podem ajustar as escolhas.</div>
                 }
@@ -273,7 +273,7 @@ else
                                             <select class="form-select form-select-sm"
                                                     value="@pick.TeamId"
                                                     @onchange="e => UpdateOwnerAsync(pick, e)"
-                                                    disabled="@(!AdminAuth.IsAuthenticated || isProcessing || pick.IsUsed)">
+                                                    disabled="@(!AdminAuth.IsAdmin || isProcessing || pick.IsUsed)">
                                                 @foreach (var team in teams)
                                                 {
                                                     <option value="@team.TeamId">@team.TeamName (@(string.IsNullOrWhiteSpace(team.OwnerName) ? "Sem responsável" : team.OwnerName))</option>
@@ -525,7 +525,7 @@ else
     {
         if (!selectedDraftId.HasValue || isProcessing) return;
 
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Somente administradores podem adicionar rodadas.";
             successMessage = null;
@@ -560,7 +560,7 @@ else
 
     private async Task UpdateOwnerAsync(DraftPickOrderRow pick, ChangeEventArgs args)
     {
-        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+        if (!AdminAuth.IsAdmin || selectedDraftId is null || isProcessing) return;
 
         if (!Guid.TryParse(args.Value?.ToString(), out var teamId))
         {
@@ -596,7 +596,7 @@ else
 
     private async Task SwapPicksAsync()
     {
-        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+        if (!AdminAuth.IsAdmin || selectedDraftId is null || isProcessing) return;
 
         if (!swapPickA.HasValue || !swapPickB.HasValue)
         {
@@ -631,7 +631,7 @@ else
 
     private async Task MovePickAsync()
     {
-        if (!AdminAuth.IsAuthenticated || selectedDraftId is null || isProcessing) return;
+        if (!AdminAuth.IsAdmin || selectedDraftId is null || isProcessing) return;
 
         if (!movePickId.HasValue || !moveTargetOverall.HasValue)
         {
@@ -668,7 +668,7 @@ else
     {
         if (!selectedDraftId.HasValue || isProcessing) return;
 
-        if (!AdminAuth.IsAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             errorMessage = "Somente administradores podem remover rodadas.";
             successMessage = null;
@@ -712,7 +712,7 @@ else
 
     private bool CanRemoveRound(DraftRoundDetailsDto round)
     {
-        if (!AdminAuth.IsAuthenticated || selectedDraft is null) return false;
+        if (!AdminAuth.IsAdmin || selectedDraft is null) return false;
 
         var isLastRound = round.RoundNumber == selectedDraft.Rounds.Max(r => r.RoundNumber);
         var hasSelections = round.Picks.Any(p => p.PlayerId.HasValue);
