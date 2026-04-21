@@ -411,7 +411,7 @@ public static class LineupTemplateCatalog
                     new("RCB",  "Zagueiro (D)",                     false,  4, Zag),
                     new("RB",   "Lateral Direito (LD)",             false,  5, Ld),
                     new("CDM",  "Volante (VOL)",                    false,  6, Vol),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  8, Mat),
+                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  7, Mat),
                     new("CAM2", "Meia Atacante Direito (MAT)",      false,  8, Mat),
                     new("SA",   "Segundo Atacante (SA)",            false,  9, Pe),
                     new("RW",   "Ponta Direita (PD)",               false, 10, Pd),

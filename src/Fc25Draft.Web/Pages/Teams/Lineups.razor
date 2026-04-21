@@ -1528,6 +1528,13 @@ else
             .Select(s =>
             {
                 assignments.TryGetValue(s.SlotCode, out var selected);
+
+                if (selected is not null && !s.IsBench && s.AllowedPositionIds.Count > 0
+                    && !s.AllowedPositionIds.Contains(selected.PositionId))
+                {
+                    selected = null;
+                }
+
                 return new LineupSlotState(
                     Guid.NewGuid(), s.SlotCode, s.DisplayName, s.IsBench, s.Order,
                     s.AllowedPositionIds.ToArray(), selected, Array.Empty<PlayerOption>());

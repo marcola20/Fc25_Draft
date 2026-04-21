@@ -125,8 +125,9 @@ public class TeamLineupService : ITeamLineupService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        var newLineupId = await strategy.ExecuteAsync(async () =>
         {
+            _dbContext.ChangeTracker.Clear();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
@@ -200,7 +201,7 @@ public class TeamLineupService : ITeamLineupService
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                return await LoadLineupDtoAsync(lineup.LineupId, ct);
+                return lineup.LineupId;
             }
             catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
             catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
@@ -211,6 +212,8 @@ public class TeamLineupService : ITeamLineupService
                 throw new InvalidOperationException("Não foi possível salvar a escalação.", ex);
             }
         });
+
+        return await LoadLineupDtoAsync(newLineupId, ct);
     }
 
     public async Task<TeamLineupDto> UpdateLineupAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -229,8 +232,9 @@ public class TeamLineupService : ITeamLineupService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        await strategy.ExecuteAsync(async () =>
         {
+            _dbContext.ChangeTracker.Clear();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
@@ -311,8 +315,6 @@ public class TeamLineupService : ITeamLineupService
 
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
-
-                return await LoadLineupDtoAsync(lineup.LineupId, ct);
             }
             catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
             catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
@@ -323,6 +325,8 @@ public class TeamLineupService : ITeamLineupService
                 throw new InvalidOperationException("Não foi possível salvar a escalação.", ex);
             }
         });
+
+        return await LoadLineupDtoAsync(lineupId, ct);
     }
 
     public async Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct)
@@ -335,6 +339,7 @@ public class TeamLineupService : ITeamLineupService
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
+            _dbContext.ChangeTracker.Clear();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
@@ -387,6 +392,7 @@ public class TeamLineupService : ITeamLineupService
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
+            _dbContext.ChangeTracker.Clear();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
@@ -427,8 +433,10 @@ public class TeamLineupService : ITeamLineupService
         await EnsureTeamExistsAsync(teamId, ct);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        Guid newLineupId = default;
+        await strategy.ExecuteAsync(async () =>
         {
+            _dbContext.ChangeTracker.Clear();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
@@ -441,6 +449,7 @@ public class TeamLineupService : ITeamLineupService
                     .Include(l => l.Slots)
                     .Include(l => l.OffensiveInstructions)
                     .Include(l => l.DefensiveInstructions)
+                    .Include(l => l.AdvancedInstructions)
                     .FirstOrDefaultAsync(l => l.LineupId == sourceLineupId && l.TeamId == teamId, ct)
                     ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
@@ -540,7 +549,7 @@ public class TeamLineupService : ITeamLineupService
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                return await LoadLineupDtoAsync(newLineup.LineupId, ct);
+                newLineupId = newLineup.LineupId;
             }
             catch (InvalidOperationException) { await transaction.RollbackAsync(ct); throw; }
             catch (KeyNotFoundException) { await transaction.RollbackAsync(ct); throw; }
@@ -551,6 +560,8 @@ public class TeamLineupService : ITeamLineupService
                 throw new InvalidOperationException("Não foi possível duplicar a escalação.", ex);
             }
         });
+
+        return await LoadLineupDtoAsync(newLineupId, ct);
     }
 
     private async Task EnsureTeamExistsAsync(Guid teamId, CancellationToken ct)
@@ -719,6 +730,14 @@ public class TeamLineupService : ITeamLineupService
     private void ApplyTemplateSlots(TeamLineup lineup, LineupTemplate template, IReadOnlyDictionary<string, int?> assignments)
     {
         var existingByCode = lineup.Slots.ToDictionary(s => s.SlotCode, StringComparer.OrdinalIgnoreCase);
+        var templateCodes = new HashSet<string>(template.AllSlots.Select(s => s.SlotCode), StringComparer.OrdinalIgnoreCase);
+
+        // Remove slots that no longer belong to the new formation directly via DbSet,
+        // avoiding navigation-collection fixup that can corrupt change-tracker state.
+        foreach (var slot in lineup.Slots.Where(s => !templateCodes.Contains(s.SlotCode)).ToList())
+        {
+            _dbContext.TeamLineupSlots.Remove(slot);
+        }
 
         foreach (var slotTemplate in template.AllSlots)
         {
@@ -726,6 +745,7 @@ public class TeamLineupService : ITeamLineupService
 
             if (existingByCode.TryGetValue(slotTemplate.SlotCode, out var slot))
             {
+                // Update properties that can legitimately change between formations.
                 slot.DisplayName = slotTemplate.DisplayName;
                 slot.IsBench = slotTemplate.IsBench;
                 slot.Order = slotTemplate.Order;
@@ -733,7 +753,8 @@ public class TeamLineupService : ITeamLineupService
             }
             else
             {
-                lineup.Slots.Add(new TeamLineupSlot
+                // Add new slot directly via DbSet to guarantee Added state (not Modified).
+                _dbContext.TeamLineupSlots.Add(new TeamLineupSlot
                 {
                     LineupSlotId = Guid.NewGuid(),
                     LineupId = lineup.LineupId,
@@ -744,16 +765,6 @@ public class TeamLineupService : ITeamLineupService
                     PlayerId = playerId
                 });
             }
-        }
-
-        var slotsToRemove = lineup.Slots
-            .Where(s => !template.AllSlots.Any(t => t.SlotCode.Equals(s.SlotCode, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-
-        foreach (var slot in slotsToRemove)
-        {
-            lineup.Slots.Remove(slot);
-            _dbContext.TeamLineupSlots.Remove(slot);
         }
     }
 
