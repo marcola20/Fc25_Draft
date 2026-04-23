@@ -1,0 +1,870 @@
+@page "/formato"
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Formato da Competição — CBFV Retro 2008/09</PageTitle>
+
+<PageHeader Title="Formato da Competição" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/formato"));
+    }
+}
+
+<div class="formato-page">
+
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🏆</span>
+            <h3>Visão Geral</h3>
+        </div>
+
+        <div class="fmt-overview-grid">
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">12</div>
+                <div class="fmt-stat-label">Times</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">8</div>
+                <div class="fmt-stat-label">Rodadas na Fase de Liga</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">3</div>
+                <div class="fmt-stat-label">Jogos no Play-In</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">4</div>
+                <div class="fmt-stat-label">Confrontos nos Offs</div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">📋</span>
+            <h3>Fase de Liga</h3>
+        </div>
+
+        <div class="fmt-card">
+            <p class="fmt-desc">Todos os 12 times se enfrentam ao longo de <strong>8 rodadas</strong>. A classificação final define o caminho de cada equipe para os playoffs.</p>
+            <div class="fmt-league-table">
+                <div class="fmt-league-row fmt-league-row-header">
+                    <span class="fmt-league-pos">Pos.</span>
+                    <span class="fmt-league-destiny">Destino</span>
+                </div>
+                <div class="fmt-league-row fmt-league-row-bye">
+                    <span class="fmt-league-pos"><span class="fmt-pos-badge fmt-pos-gold">1°</span> – <span class="fmt-pos-badge fmt-pos-gold">2°</span></span>
+                    <span class="fmt-league-destiny"><span class="fmt-tag fmt-tag-gold">⚡ Bye</span> Aguardam direto nos ffs</span>
+                </div>
+                <div class="fmt-league-row fmt-league-row-offs">
+                    <span class="fmt-league-pos"><span class="fmt-pos-badge fmt-pos-blue">3°</span> – <span class="fmt-pos-badge fmt-pos-blue">6°</span></span>
+                    <span class="fmt-league-destiny"><span class="fmt-tag fmt-tag-blue">🏟️ Offs</span> Classificados direto para os Offs</span>
+                </div>
+                <div class="fmt-league-row fmt-league-row-playin">
+                    <span class="fmt-league-pos"><span class="fmt-pos-badge fmt-pos-orange">7°</span> – <span class="fmt-pos-badge fmt-pos-orange">10°</span></span>
+                    <span class="fmt-league-destiny"><span class="fmt-tag fmt-tag-orange">🎯 Play-In</span> Disputam o Play-In por mais 2 vagas</span>
+                </div>
+                <div class="fmt-league-row fmt-league-row-elim">
+                    <span class="fmt-league-pos"><span class="fmt-pos-badge fmt-pos-red">11°</span> – <span class="fmt-pos-badge fmt-pos-red">12°</span></span>
+                    <span class="fmt-league-destiny"><span class="fmt-tag fmt-tag-red">❌ Eliminados</span> Encerram a participação na liga</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🎯</span>
+            <h3>Play-In</h3>
+        </div>
+        <p class="fmt-section-desc">Os times do 7° ao 10° lugar disputam o Play-In para conquistar as 2 últimas vagas nos Offs. <strong>Dois classificados</strong>, sem segunda chance para todos.</p>
+
+        <div class="fmt-playin-bracket">
+
+            <div class="fmt-bracket-col">
+                <div class="fmt-bracket-match fmt-match-orange">
+                    <div class="fmt-match-label">Jogo 1</div>
+                    <div class="fmt-matchup">
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">9°</span>
+                                <span class="fmt-team-name">9º Colocado</span>
+                            </div>
+                        </div>
+                        <div class="fmt-vs">VS</div>
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">10°</span>
+                                <span class="fmt-team-name">10º Colocado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fmt-match-result">
+                        <span class="fmt-result-win">Vencedor → Jogo 3</span>
+                        <span class="fmt-result-lose">Perdedor → Eliminado</span>
+                    </div>
+                </div>
+
+                <div class="fmt-bracket-match fmt-match-orange">
+                    <div class="fmt-match-label">Jogo 2</div>
+                    <div class="fmt-matchup">
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">7°</span>
+                                <span class="fmt-team-name">7º Colocado</span>
+                            </div>
+                        </div>
+                        <div class="fmt-vs">VS</div>
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">8°</span>
+                                <span class="fmt-team-name">8º Colocado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fmt-match-result">
+                        <span class="fmt-result-win">Vencedor → Classificado para os Offs</span>
+                        <span class="fmt-result-lose">Perdedor → Jogo 3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fmt-bracket-arrow">
+                <div class="fmt-arrow-line"></div>
+                <div class="fmt-arrow-tip">→</div>
+            </div>
+
+            <div class="fmt-bracket-col fmt-bracket-col-center">
+                <div class="fmt-bracket-match fmt-match-purple fmt-match-final">
+                    <div class="fmt-match-label">Jogo 3 — Decisivo</div>
+                    <div class="fmt-matchup">
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">W</span>
+                                <span class="fmt-team-name">Vencedor J1</span>
+                            </div>
+                        </div>
+                        <div class="fmt-vs">VS</div>
+                        <div class="fmt-team-slot">
+                            <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-shield" />
+                            <div class="fmt-team-info">
+                                <span class="fmt-team-seed">L</span>
+                                <span class="fmt-team-name">Perdedor J2</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fmt-match-result">
+                        <span class="fmt-result-win fmt-result-win-gold">Vencedor → Classificado para os Offs</span>
+                        <span class="fmt-result-lose">Perdedor → Eliminado</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="fmt-playin-summary">
+            <div class="fmt-summary-item fmt-summary-classified">
+                <span class="fmt-summary-icon">✅</span>
+                <div>
+                    <strong>2 classificados</strong> do Play-In avançam para os Offs
+                    <div class="fmt-summary-detail">Vencedor do J2 + Vencedor do J3</div>
+                </div>
+            </div>
+            <div class="fmt-summary-item fmt-summary-eliminated">
+                <span class="fmt-summary-icon">❌</span>
+                <div>
+                    <strong>2 eliminados</strong> encerram sua participação
+                    <div class="fmt-summary-detail">Perdedor do J1 + Perdedor do J3</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🏅</span>
+            <h3>Offs (Playoffs)</h3>
+        </div>
+        <p class="fmt-section-desc">Os 8 classificados disputam os Offs em confrontos eliminatórios. Os dois melhores da fase de liga entram diretamente, com <strong>vantagem de mando</strong>.</p>
+
+        <div class="fmt-offs-grid">
+
+            <div class="fmt-offs-match">
+                <div class="fmt-offs-badge fmt-offs-badge-gold">⚡ Bye</div>
+                <div class="fmt-offs-matchup">
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-gold">1°</span>
+                            <span class="fmt-offs-name">1º Colocado</span>
+                        </div>
+                    </div>
+                    <div class="fmt-offs-vs">VS</div>
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-orange">W</span>
+                            <span class="fmt-offs-name">Vencedor J3</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fmt-offs-match">
+                <div class="fmt-offs-badge fmt-offs-badge-gold">⚡ Bye</div>
+                <div class="fmt-offs-matchup">
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-gold">2°</span>
+                            <span class="fmt-offs-name">2º Colocado</span>
+                        </div>
+                    </div>
+                    <div class="fmt-offs-vs">VS</div>
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-orange">W</span>
+                            <span class="fmt-offs-name">Vencedor J2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fmt-offs-match">
+                <div class="fmt-offs-badge fmt-offs-badge-blue">Liga</div>
+                <div class="fmt-offs-matchup">
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-blue">3°</span>
+                            <span class="fmt-offs-name">3º Colocado</span>
+                        </div>
+                    </div>
+                    <div class="fmt-offs-vs">VS</div>
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-blue">6°</span>
+                            <span class="fmt-offs-name">6º Colocado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fmt-offs-match">
+                <div class="fmt-offs-badge fmt-offs-badge-blue">Liga</div>
+                <div class="fmt-offs-matchup">
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-blue">4°</span>
+                            <span class="fmt-offs-name">4º Colocado</span>
+                        </div>
+                    </div>
+                    <div class="fmt-offs-vs">VS</div>
+                    <div class="fmt-offs-team">
+                        <img src="/images/escudos/escudo.png" alt="Escudo" class="fmt-offs-shield" />
+                        <div class="fmt-offs-team-info">
+                            <span class="fmt-offs-seed fmt-seed-blue">5°</span>
+                            <span class="fmt-offs-name">5º Colocado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🗺️</span>
+            <h3>Fluxo Completo da Competição</h3>
+        </div>
+
+        <div class="fmt-flow">
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon fmt-flow-icon-primary">📋</div>
+                <div class="fmt-flow-content">
+                    <strong>Fase de Liga</strong>
+                    <span>8 rodadas · 12 times</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector">→</div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon fmt-flow-icon-orange">🎯</div>
+                <div class="fmt-flow-content">
+                    <strong>Play-In</strong>
+                    <span>7° a 10° · 3 jogos · 2 vagas</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector">→</div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon fmt-flow-icon-gold">🏅</div>
+                <div class="fmt-flow-content">
+                    <strong>Offs</strong>
+                    <span>8 times · 4 confrontos</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector">→</div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon fmt-flow-icon-champion">🏆</div>
+                <div class="fmt-flow-content">
+                    <strong>Campeão</strong>
+                    <span>Melhor dos Offs</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<style>
+    .formato-page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding-bottom: 3rem;
+    }
+
+    .fmt-section {
+        margin-bottom: 2rem;
+    }
+
+    .fmt-section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 1.1rem;
+    }
+
+    .fmt-section-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+    }
+
+    .fmt-section-header h3 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--bs-emphasis-color, #212529);
+        letter-spacing: -0.01em;
+    }
+
+    .fmt-section-desc {
+        font-size: 0.92rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 1.25rem;
+        line-height: 1.6;
+    }
+
+    .fmt-divider {
+        border-color: var(--bs-border-color, #dee2e6);
+        margin: 2rem 0;
+        opacity: 0.4;
+    }
+
+    .fmt-card {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-left: 4px solid var(--bs-primary, #0d6efd);
+        border-radius: 0.5rem;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .fmt-desc {
+        font-size: 0.92rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 1rem;
+        line-height: 1.6;
+    }
+
+    .fmt-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    @@media (max-width: 768px) {
+        .fmt-overview-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .fmt-stat-card {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        padding: 1.25rem 1rem;
+        text-align: center;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .fmt-stat-number {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: var(--bs-primary, #0d6efd);
+        line-height: 1.1;
+    }
+
+    .fmt-stat-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--bs-secondary-color, #6c757d);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-top: 0.3rem;
+    }
+
+    .fmt-league-table {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .fmt-league-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+        font-size: 0.9rem;
+    }
+
+    .fmt-league-row:last-child {
+        border-bottom: none;
+    }
+
+    .fmt-league-row-header {
+        background: var(--bs-secondary-bg, #f8f9fa);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bs-secondary-color, #6c757d);
+        padding: 0.5rem 1rem;
+    }
+
+    .fmt-league-row-bye       { background: color-mix(in srgb, #a07800 8%, var(--bs-body-bg, #fff)); }
+    .fmt-league-row-offs      { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 6%, var(--bs-body-bg, #fff)); }
+    .fmt-league-row-playin    { background: color-mix(in srgb, #e07b00 7%, var(--bs-body-bg, #fff)); }
+    .fmt-league-row-elim      { background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg, #fff)); }
+
+    .fmt-league-pos {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        min-width: 120px;
+        flex-shrink: 0;
+    }
+
+    .fmt-league-destiny {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .fmt-pos-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2rem;
+        height: 1.6rem;
+        padding: 0 0.4rem;
+        border-radius: 0.3rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .fmt-pos-gold   { background: rgba(160,120,0,0.18); color: #8a6400; }
+    .fmt-pos-blue   { background: rgba(13,110,253,0.15); color: var(--bs-primary, #0d6efd); }
+    .fmt-pos-orange { background: rgba(224,123,0,0.18); color: #c06800; }
+    .fmt-pos-red    { background: rgba(220,53,69,0.15); color: var(--bs-danger, #dc3545); }
+
+    .fmt-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .fmt-tag-gold   { background: rgba(160,120,0,0.18); color: #8a6400; }
+    .fmt-tag-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
+    .fmt-tag-orange { background: rgba(224,123,0,0.15); color: #c06800; }
+    .fmt-tag-red    { background: rgba(220,53,69,0.12); color: var(--bs-danger, #dc3545); }
+
+    .fmt-playin-bracket {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    @@media (max-width: 768px) {
+        .fmt-playin-bracket {
+            flex-direction: column;
+        }
+
+        .fmt-bracket-arrow {
+            transform: rotate(90deg);
+        }
+    }
+
+    .fmt-bracket-col {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        flex: 1;
+    }
+
+    .fmt-bracket-col-center {
+        flex: 1.1;
+    }
+
+    .fmt-bracket-match {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        padding: 1rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        position: relative;
+    }
+
+    .fmt-match-orange { border-top: 3px solid #e07b00; }
+    .fmt-match-purple { border-top: 3px solid #7c3aed; }
+
+    .fmt-match-final {
+        box-shadow: 0 4px 16px rgba(124,58,237,0.18);
+    }
+
+    .fmt-match-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.75rem;
+    }
+
+    .fmt-matchup {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .fmt-team-slot {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.4rem;
+        background: var(--bs-secondary-bg, #f8f9fa);
+    }
+
+    .fmt-shield {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+    .fmt-team-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+    }
+
+    .fmt-team-seed {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--bs-secondary-color, #6c757d);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .fmt-team-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .fmt-vs {
+        text-align: center;
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: var(--bs-secondary-color, #6c757d);
+        letter-spacing: 0.08em;
+        padding: 0.1rem 0;
+    }
+
+    .fmt-match-result {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding-top: 0.6rem;
+        border-top: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .fmt-result-win {
+        font-size: 0.78rem;
+        color: var(--bs-success, #198754);
+        font-weight: 600;
+    }
+
+    .fmt-result-win-gold {
+        color: #a07800;
+    }
+
+    .fmt-result-lose {
+        font-size: 0.78rem;
+        color: var(--bs-danger, #dc3545);
+        font-weight: 500;
+    }
+
+    .fmt-bracket-arrow {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .fmt-arrow-line {
+        width: 2px;
+        height: 40px;
+        background: var(--bs-border-color, #dee2e6);
+    }
+
+    .fmt-arrow-tip {
+        font-size: 1.4rem;
+        line-height: 1;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-top: -4px;
+    }
+
+    @@media (min-width: 769px) {
+        .fmt-bracket-arrow {
+            flex-direction: row;
+        }
+
+        .fmt-arrow-line {
+            width: 30px;
+            height: 2px;
+        }
+    }
+
+    .fmt-playin-summary {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .fmt-summary-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.88rem;
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .fmt-summary-classified {
+        background: color-mix(in srgb, var(--bs-success, #198754) 8%, var(--bs-body-bg, #fff));
+        border: 1px solid color-mix(in srgb, var(--bs-success, #198754) 30%, transparent);
+    }
+
+    .fmt-summary-eliminated {
+        background: color-mix(in srgb, var(--bs-danger, #dc3545) 7%, var(--bs-body-bg, #fff));
+        border: 1px solid color-mix(in srgb, var(--bs-danger, #dc3545) 25%, transparent);
+    }
+
+    .fmt-summary-icon {
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+    }
+
+    .fmt-summary-detail {
+        font-size: 0.78rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-top: 0.15rem;
+    }
+
+    .fmt-offs-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    @@media (max-width: 700px) {
+        .fmt-offs-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .fmt-offs-match {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    .fmt-offs-badge {
+        padding: 0.35rem 0.9rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #fff;
+    }
+
+    .fmt-offs-badge-gold { background: linear-gradient(90deg, #a07800, #c89a00); }
+    .fmt-offs-badge-blue { background: linear-gradient(90deg, #0d6efd, #4d9bff); }
+
+    .fmt-offs-matchup {
+        padding: 0.9rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .fmt-offs-team {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.45rem 0.6rem;
+        border-radius: 0.4rem;
+        background: var(--bs-secondary-bg, #f8f9fa);
+    }
+
+    .fmt-offs-shield {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+    .fmt-offs-team-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+    }
+
+    .fmt-offs-seed {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .fmt-seed-gold   { color: #a07800; }
+    .fmt-seed-blue   { color: var(--bs-primary, #0d6efd); }
+    .fmt-seed-orange { color: #c06800; }
+
+    .fmt-offs-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .fmt-offs-vs {
+        text-align: center;
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: var(--bs-secondary-color, #6c757d);
+        letter-spacing: 0.08em;
+    }
+
+    .fmt-flow {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 1.25rem 1rem;
+        background: var(--bs-secondary-bg, #f8f9fa);
+        border-radius: 0.6rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .fmt-flow-step {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.5rem 0.8rem;
+        background: var(--bs-body-bg, #fff);
+        border-radius: 0.5rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        flex: 1;
+        min-width: 140px;
+    }
+
+    .fmt-flow-icon {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .fmt-flow-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+    }
+
+    .fmt-flow-content strong {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .fmt-flow-content span {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .fmt-flow-connector {
+        font-size: 1.1rem;
+        color: var(--bs-secondary-color, #6c757d);
+        flex-shrink: 0;
+        font-weight: 700;
+    }
+
+    @@media (max-width: 600px) {
+        .fmt-flow {
+            flex-direction: column;
+        }
+
+        .fmt-flow-step {
+            width: 100%;
+        }
+
+        .fmt-flow-connector {
+            transform: rotate(90deg);
+        }
+    }
+</style>

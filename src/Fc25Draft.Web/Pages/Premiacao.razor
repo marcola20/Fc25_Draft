@@ -1,0 +1,444 @@
+@page "/premiacao"
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Premiação — CBFV Retro 2008/09</PageTitle>
+
+<PageHeader Title="Premiação" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/premiacao"));
+    }
+}
+
+<div class="prem-page">
+
+    <section class="prem-section">
+        <div class="prem-totals">
+            <div class="prem-total-card prem-total-league">
+                <div class="prem-total-label">Premiação da Fase de Liga</div>
+                <div class="prem-total-value">R$ 146 Mi</div>
+                <div class="prem-total-sub">distribuídos entre os 12 times</div>
+            </div>
+            <div class="prem-total-card prem-total-playoff">
+                <div class="prem-total-label">Premiação do Mata-Mata</div>
+                <div class="prem-total-value">R$ 82 Mi</div>
+                <div class="prem-total-sub">distribuídos conforme eliminação</div>
+            </div>
+            <div class="prem-total-card prem-total-grand">
+                <div class="prem-total-label">Total do Torneio</div>
+                <div class="prem-total-value">R$ 228 Mi</div>
+                <div class="prem-total-sub">em premiação total</div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="prem-divider" />
+
+    <section class="prem-section">
+        <div class="prem-section-header">
+            <span class="prem-section-icon">📋</span>
+            <h3>Fase de Liga</h3>
+        </div>
+        <p class="prem-section-desc">Todo time recebe premiação pela sua colocação ao final das 8 rodadas, independente do que acontecer no mata-mata.</p>
+
+        <div class="prem-league-grid">
+            @foreach (var item in LeaguePrizes)
+            {
+                <div class="prem-prize-row @item.RowClass">
+                    <div class="prem-prize-pos">
+                        <span class="prem-pos-badge @item.BadgeClass">@item.Position</span>
+                    </div>
+                    <div class="prem-prize-bar-wrap">
+                        <div class="prem-prize-bar @item.BarClass" style="width: @item.BarWidth%"></div>
+                    </div>
+                    <div class="prem-prize-value">R$ @item.Prize Mi</div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <hr class="prem-divider" />
+
+    <section class="prem-section">
+        <div class="prem-section-header">
+            <span class="prem-section-icon">🏆</span>
+            <h3>Mata-Mata</h3>
+        </div>
+        <p class="prem-section-desc">Prêmio adicional recebido conforme a fase em que o time é eliminado. Quanto mais longe chegar, maior a premiação.</p>
+
+        <div class="prem-playoff-ladder">
+
+            <div class="prem-playoff-step prem-step-champion">
+                <div class="prem-step-icon">🏆</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Campeão</div>
+                    <div class="prem-step-teams">1 time</div>
+                </div>
+                <div class="prem-step-prize">R$ 25 Mi</div>
+            </div>
+
+            <div class="prem-playoff-step prem-step-vice">
+                <div class="prem-step-icon">🥈</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Vice-Campeão</div>
+                    <div class="prem-step-teams">1 time</div>
+                </div>
+                <div class="prem-step-prize">R$ 15 Mi</div>
+            </div>
+
+            <div class="prem-playoff-step prem-step-semi">
+                <div class="prem-step-icon">🎖️</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Eliminado nas Semis</div>
+                    <div class="prem-step-teams">2 times</div>
+                </div>
+                <div class="prem-step-prize">R$ 8 Mi</div>
+            </div>
+
+            <div class="prem-playoff-step prem-step-quarters">
+                <div class="prem-step-icon">⚔️</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Eliminado nas Quartas</div>
+                    <div class="prem-step-teams">4 times</div>
+                </div>
+                <div class="prem-step-prize">R$ 5 Mi</div>
+            </div>
+
+            <div class="prem-playoff-step prem-step-playin">
+                <div class="prem-step-icon">🎯</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Eliminado no Play-In</div>
+                    <div class="prem-step-teams">2 times</div>
+                </div>
+                <div class="prem-step-prize">R$ 3 Mi</div>
+            </div>
+
+        </div>
+    </section>
+
+    <hr class="prem-divider" />
+
+    <section class="prem-section">
+        <div class="prem-section-header">
+            <span class="prem-section-icon">💰</span>
+            <h3>Premiação Máxima por Posição</h3>
+        </div>
+        <p class="prem-section-desc">Combinando liga + mata-mata, o campeão que terminou em 1° lugar pode faturar até <strong>R$ 43 Mi</strong> na temporada.</p>
+
+        <div class="prem-max-grid">
+            <div class="prem-max-card prem-max-champion">
+                <div class="prem-max-title">🏆 Campeão (1°)</div>
+                <div class="prem-max-breakdown">
+                    <span>Liga (1°): R$ 18 Mi</span>
+                    <span>+</span>
+                    <span>Campeão: R$ 25 Mi</span>
+                </div>
+                <div class="prem-max-total">R$ 43 Mi</div>
+            </div>
+            <div class="prem-max-card prem-max-last">
+                <div class="prem-max-title">❌ 12° colocado</div>
+                <div class="prem-max-breakdown">
+                    <span>Liga (12°): R$ 5 Mi</span>
+                </div>
+                <div class="prem-max-total prem-max-total-low">R$ 5 Mi</div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+@code {
+    private sealed record LeaguePrize(
+        string Position,
+        int Prize,
+        string RowClass,
+        string BadgeClass,
+        string BarClass,
+        int BarWidth);
+
+    private static readonly IReadOnlyList<LeaguePrize> LeaguePrizes = new List<LeaguePrize>
+    {
+        new("1°",  18, "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",   100),
+        new("2°",  18, "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",   100),
+        new("3°",  16, "prem-row-silver", "prem-badge-silver", "prem-bar-silver",  89),
+        new("4°",  16, "prem-row-silver", "prem-badge-silver", "prem-bar-silver",  89),
+        new("5°",  14, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    78),
+        new("6°",  14, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    78),
+        new("7°",  12, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    67),
+        new("8°",  12, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    67),
+        new("9°",   8, "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  44),
+        new("10°",  8, "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  44),
+        new("11°",  5, "prem-row-red",    "prem-badge-red",    "prem-bar-red",     28),
+        new("12°",  5, "prem-row-red",    "prem-badge-red",    "prem-bar-red",     28),
+    };
+}
+
+<style>
+    .prem-page {
+        max-width: 860px;
+        margin: 0 auto;
+        padding-bottom: 3rem;
+    }
+
+    .prem-divider {
+        border-color: var(--bs-border-color, #dee2e6);
+        margin: 2rem 0;
+        opacity: 0.4;
+    }
+
+    .prem-section {
+        margin-bottom: 0.5rem;
+    }
+
+    .prem-section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .prem-section-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+    }
+
+    .prem-section-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--bs-emphasis-color, #212529);
+        letter-spacing: -0.01em;
+    }
+
+    .prem-section-desc {
+        font-size: 0.9rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 1.1rem;
+        line-height: 1.6;
+    }
+
+    .prem-totals {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1rem;
+    }
+
+    @@media (max-width: 680px) {
+        .prem-totals { grid-template-columns: 1fr; }
+    }
+
+    .prem-total-card {
+        border-radius: 0.65rem;
+        padding: 1.25rem 1.1rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .prem-total-league  { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
+    .prem-total-playoff { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
+    .prem-total-grand   { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
+
+    .prem-total-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        opacity: 0.85;
+        margin-bottom: 0.4rem;
+    }
+
+    .prem-total-value {
+        font-size: 1.9rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 0.25rem;
+    }
+
+    .prem-total-sub {
+        font-size: 0.72rem;
+        opacity: 0.8;
+    }
+
+    .prem-league-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .prem-prize-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.55rem 0.85rem;
+        border-radius: 0.45rem;
+        border: 1px solid transparent;
+    }
+
+    .prem-row-gold   { background: color-mix(in srgb, #a07800 9%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, #a07800 20%, transparent); }
+    .prem-row-silver { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 7%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 18%, transparent); }
+    .prem-row-blue   { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 5%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 13%, transparent); }
+    .prem-row-orange { background: color-mix(in srgb, #e07b00 7%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, #e07b00 18%, transparent); }
+    .prem-row-red    { background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-danger, #dc3545) 15%, transparent); }
+
+    .prem-prize-pos {
+        flex-shrink: 0;
+        width: 40px;
+    }
+
+    .prem-pos-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        height: 1.6rem;
+        padding: 0 0.4rem;
+        border-radius: 0.3rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    .prem-badge-gold   { background: rgba(160,120,0,0.2);  color: #8a6400; }
+    .prem-badge-silver { background: rgba(13,110,253,0.15); color: var(--bs-primary, #0d6efd); }
+    .prem-badge-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
+    .prem-badge-orange { background: rgba(224,123,0,0.18); color: #c06800; }
+    .prem-badge-red    { background: rgba(220,53,69,0.15); color: var(--bs-danger, #dc3545); }
+
+    .prem-prize-bar-wrap {
+        flex: 1;
+        height: 8px;
+        background: var(--bs-border-color, #dee2e6);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .prem-prize-bar {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+    }
+
+    .prem-bar-gold   { background: linear-gradient(90deg, #c89a00, #f0c040); }
+    .prem-bar-silver { background: linear-gradient(90deg, #1a5fb4, #4d9bff); }
+    .prem-bar-blue   { background: linear-gradient(90deg, #3584e4, #72b3ff); }
+    .prem-bar-orange { background: linear-gradient(90deg, #c06800, #e8a400); }
+    .prem-bar-red    { background: linear-gradient(90deg, #a01020, #dc3545); }
+
+    .prem-prize-value {
+        flex-shrink: 0;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+        min-width: 70px;
+        text-align: right;
+    }
+
+    .prem-playoff-ladder {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        overflow: hidden;
+    }
+
+    .prem-playoff-step {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.9rem 1.1rem;
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+        position: relative;
+    }
+
+    .prem-playoff-step:last-child {
+        border-bottom: none;
+    }
+
+    .prem-step-champion  { background: linear-gradient(90deg, color-mix(in srgb, #a07800 14%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+    .prem-step-vice      { background: linear-gradient(90deg, color-mix(in srgb, #6c757d 10%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+    .prem-step-semi      { background: linear-gradient(90deg, color-mix(in srgb, #198754 9%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+    .prem-step-quarters  { background: linear-gradient(90deg, color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+    .prem-step-playin    { background: linear-gradient(90deg, color-mix(in srgb, #e07b00 8%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+
+    .prem-step-icon {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+        width: 2rem;
+        text-align: center;
+    }
+
+    .prem-step-info {
+        flex: 1;
+    }
+
+    .prem-step-stage {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .prem-step-teams {
+        font-size: 0.78rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-top: 0.1rem;
+    }
+
+    .prem-step-prize {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--bs-emphasis-color, #212529);
+        flex-shrink: 0;
+    }
+
+    .prem-step-champion .prem-step-prize { color: #a07800; }
+    .prem-step-vice     .prem-step-prize { color: var(--bs-secondary, #6c757d); }
+
+    .prem-max-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    @@media (max-width: 600px) {
+        .prem-max-grid { grid-template-columns: 1fr; }
+    }
+
+    .prem-max-card {
+        border-radius: 0.6rem;
+        padding: 1.1rem 1.15rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .prem-max-champion { border-left: 4px solid #a07800; background: color-mix(in srgb, #a07800 7%, var(--bs-body-bg, #fff)); }
+    .prem-max-last     { border-left: 4px solid var(--bs-danger, #dc3545); background: color-mix(in srgb, var(--bs-danger, #dc3545) 5%, var(--bs-body-bg, #fff)); }
+
+    .prem-max-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .prem-max-breakdown {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.6rem;
+        flex-wrap: wrap;
+    }
+
+    .prem-max-total {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #a07800;
+    }
+
+    .prem-max-total-low {
+        color: var(--bs-danger, #dc3545);
+    }
+</style>

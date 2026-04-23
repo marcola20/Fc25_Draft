@@ -20,7 +20,8 @@ public class LayoutNavigationService
         new("Draft", new List<MenuItem>
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
-            new("Informações do Draft", "/draft/info", "oi oi-document")
+            new("Informações do Draft", "/draft/info", "oi oi-document"),
+            new("Picks do Draft", "/picks", "oi oi-tag")
         }),
         new("Mercado de Transferências", new List<MenuItem>
         {
@@ -31,6 +32,8 @@ public class LayoutNavigationService
         }),
         new("Liga", new List<MenuItem>
         {
+            new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
+            new("Premiação", "/premiacao", "oi oi-dollar"),
             new("Regulamento", "/regulamento", "oi oi-document")
         }),
         new("Admin", new List<MenuItem>
@@ -85,6 +88,40 @@ public class LayoutNavigationService
         ["/admin/itens/gerar"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/itens/gerar", true),
         ["/admin/transferencias/historico"] = CreateDefinition("Histórico de Transferências", "Mercado", "/admin/transferencias/historico"),
         ["/admin/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/admin/mercado/historico", true),
+        ["/premiacao"] = new PageDefinition
+        {
+            Route = "/premiacao",
+            Title = "Premiação",
+            Subtitle = "Liga CBFV Retro 2008/09",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Premiação")
+            }
+        },
+        ["/picks"] = new PageDefinition
+        {
+            Route = "/picks",
+            Title = "Picks do Draft",
+            Subtitle = "Liga CBFV Retro 2008/09",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Draft", "/draft/controle"),
+                new("Picks")
+            }
+        },
+        ["/formato"] = new PageDefinition
+        {
+            Route = "/formato",
+            Title = "Formato da Competição",
+            Subtitle = "Liga CBFV Retro 2008/09",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Formato")
+            }
+        },
         ["/regulamento"] = new PageDefinition
         {
             Route = "/regulamento",
