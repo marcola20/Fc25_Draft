@@ -454,6 +454,42 @@ public static class LineupTemplateCatalog
                     new("CAM3", "Meia Atacante Direito (MAT)",      false, 10, MAT),
                     new("ST",   "Centroavante (CA)",                false, 11, CA)
                 },
+                CreateBenchTemplate()),
+
+            ["4-3-3 (P4)"] = new LineupTemplate(
+                "4-3-3 (P4)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
+                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
+                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
+                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
+                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
+                    new("SA2",  "Segundo Atacante (SA)",            false,  10, SA),
+                    new("ST",   "Centroavante (CA)",                false, 11, CA)
+                },
+                CreateBenchTemplate()),
+
+            ["4-3-3 (P5)"] = new LineupTemplate(
+                "4-3-3 (P5)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
+                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
+                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
+                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
+                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
+                    new("CDM1", "Volante Esquerdo (VOL)",           false,  6, VOL),
+                    new("CDM2", "Volante Direito (VOL)",            false,  7, VOL),
+                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
+                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
+                    new("SA2",  "Segundo Atacante (SA)",            false,  10, SA),
+                    new("ST",   "Centroavante (CA)",                false, 11, CA)
+                },
                 CreateBenchTemplate())
         };
     }
