@@ -1,0 +1,93 @@
+@page "/liga/mata-mata"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+<PageTitle>Mata-Mata</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-3">Mata-Mata</h1>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (!_jogos.Any())
+    {
+        <div class="alert alert-info">Fase de mata-mata ainda não gerada.</div>
+    }
+    else
+    {
+        <!-- Play-In -->
+        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
+        <div class="row g-3 mb-4">
+            @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
+            {
+                var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                if (jogo is not null)
+                {
+                    <div class="col-12 col-md-4">
+                        <KnockoutCard Jogo="jogo" />
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Quartas -->
+        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
+        <div class="row g-3 mb-4">
+            @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
+            {
+                var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                if (jogo is not null)
+                {
+                    <div class="col-12 col-md-3">
+                        <KnockoutCard Jogo="jogo" />
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Semis -->
+        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Semifinais</h5>
+        <div class="row g-3 mb-4">
+            @foreach (var fase in new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 })
+            {
+                var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                if (jogo is not null)
+                {
+                    <div class="col-12 col-md-6">
+                        <KnockoutCard Jogo="jogo" />
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Final -->
+        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Final</h5>
+        @if (_jogos.FirstOrDefault(j => j.Fase == FaseKnockout.Final) is { } jogoFinal)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-6 offset-md-3">
+                    <KnockoutCard Jogo="jogoFinal" Destaque="true" />
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@* Componente inline do card *@
+@code {
+    private LigaDto? _liga;
+    private IReadOnlyList<LigaKnockoutJogoDto> _jogos = Array.Empty<LigaKnockoutJogoDto>();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        if (_liga is not null)
+            _jogos = await LigaService.GetKnockoutAsync(_liga.LigaId, CancellationToken.None);
+        _loading = false;
+    }
+}

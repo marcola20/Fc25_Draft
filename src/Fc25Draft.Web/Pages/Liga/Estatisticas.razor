@@ -1,0 +1,158 @@
+@page "/liga/estatisticas"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+<PageTitle>Estatísticas</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-3">Estatísticas</h1>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_liga is null)
+    {
+        <div class="alert alert-info">Nenhuma liga encontrada.</div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "artilheiros" ? "active" : "")" @onclick='() => _tab = "artilheiros"'>Artilheiros</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "assistencias" ? "active" : "")" @onclick='() => _tab = "assistencias"'>Assistências</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "cartoes" ? "active" : "")" @onclick='() => _tab = "cartoes"'>Cartões</button>
+            </li>
+        </ul>
+
+        @if (_tab == "artilheiros")
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Jogador</th>
+                            <th>Time</th>
+                            <th class="text-center">Gols</th>
+                            <th class="text-center">Assist.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rankArt = 0; }
+                        @foreach (var a in _artilheiros ?? Array.Empty<LigaArtilheiroDto>())
+                        {
+                            rankArt++;
+                            <tr>
+                                <td class="text-muted">@rankArt</td>
+                                <td class="fw-semibold">@a.JogadorNome</td>
+                                <td>@a.TimeNome</td>
+                                <td class="text-center fw-bold">@a.Gols</td>
+                                <td class="text-center">@a.Assistencias</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (!_artilheiros?.Any() ?? true)
+                {
+                    <div class="text-center text-muted py-3">Sem gols registrados.</div>
+                }
+            </div>
+        }
+
+        @if (_tab == "assistencias")
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Jogador</th>
+                            <th>Time</th>
+                            <th class="text-center">Assist.</th>
+                            <th class="text-center">Gols</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rankAss = 0; }
+                        @foreach (var a in (_artilheiros ?? Array.Empty<LigaArtilheiroDto>()).OrderByDescending(x => x.Assistencias).ThenByDescending(x => x.Gols))
+                        {
+                            if (a.Assistencias == 0) continue;
+                            rankAss++;
+                            <tr>
+                                <td class="text-muted">@rankAss</td>
+                                <td class="fw-semibold">@a.JogadorNome</td>
+                                <td>@a.TimeNome</td>
+                                <td class="text-center fw-bold">@a.Assistencias</td>
+                                <td class="text-center">@a.Gols</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (rankAss == 0)
+                {
+                    <div class="text-center text-muted py-3">Sem assistências registradas.</div>
+                }
+            </div>
+        }
+
+        @if (_tab == "cartoes")
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Jogador</th>
+                            <th>Time</th>
+                            <th class="text-center">🟨 Amarelos</th>
+                            <th class="text-center">🟥 Vermelhos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rankCart = 0; }
+                        @foreach (var c in _cartoes ?? Array.Empty<LigaCartaoEstatDto>())
+                        {
+                            rankCart++;
+                            <tr>
+                                <td class="text-muted">@rankCart</td>
+                                <td class="fw-semibold">@c.JogadorNome</td>
+                                <td>@c.TimeNome</td>
+                                <td class="text-center text-warning fw-bold">@c.CartoesAmarelos</td>
+                                <td class="text-center text-danger fw-bold">@c.CartoesVermelhos</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (!_cartoes?.Any() ?? true)
+                {
+                    <div class="text-center text-muted py-3">Sem cartões registrados.</div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private LigaDto? _liga;
+    private IReadOnlyList<LigaArtilheiroDto>? _artilheiros;
+    private IReadOnlyList<LigaCartaoEstatDto>? _cartoes;
+    private bool _loading = true;
+    private string _tab = "artilheiros";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        if (_liga is not null)
+        {
+            _artilheiros = await LigaService.GetArtilheirosAsync(_liga.LigaId, CancellationToken.None);
+            _cartoes = await LigaService.GetCartoesEstatAsync(_liga.LigaId, CancellationToken.None);
+        }
+        _loading = false;
+    }
+}

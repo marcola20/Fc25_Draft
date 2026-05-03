@@ -1,0 +1,414 @@
+@page "/liga"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+<PageTitle>Liga</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar a liga:</strong> @_erro</div>
+    }
+    else if (_liga is null)
+    {
+        <div class="alert alert-info">Nenhuma liga ativa no momento.</div>
+    }
+    else
+    {
+        <h1 class="h3 mb-1">@_liga.Nome</h1>
+        <p class="text-muted small mb-3">Status: <strong>@_liga.Status</strong></p>
+
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "fase" ? "active" : "")" @onclick='() => _tab = "fase"'>Primeira Fase</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "knockout" ? "active" : "")" @onclick='() => _tab = "knockout"'>Mata-Mata</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "stats" ? "active" : "")" @onclick='() => _tab = "stats"'>Estatísticas</button>
+            </li>
+        </ul>
+
+        <!-- ── Primeira Fase ── -->
+        @if (_tab == "fase")
+        {
+            @if (_classif.Any())
+            {
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th>Time</th>
+                                <th class="text-center">Pts</th>
+                                <th class="text-center">J</th>
+                                <th class="text-center">V</th>
+                                <th class="text-center">E</th>
+                                <th class="text-center">D</th>
+                                <th class="text-center">GP</th>
+                                <th class="text-center">GC</th>
+                                <th class="text-center">SG</th>
+                                @if (_classif.Any(c => c.PontosDescontados > 0))
+                                {
+                                    <th class="text-center text-danger" title="Pontos deduzidos por punição">-Pts</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in _classif)
+                            {
+                                <tr class="@RowClass(c.Posicao)">
+                                    <td class="text-center fw-bold">@c.Posicao</td>
+                                    <td class="fw-semibold">
+                                        <img src="@EscudoUrl(c.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                        @c.TimeNome
+                                    </td>
+                                    <td class="text-center fw-bold">@c.Pontos</td>
+                                    <td class="text-center">@c.Jogos</td>
+                                    <td class="text-center">@c.Vitorias</td>
+                                    <td class="text-center">@c.Empates</td>
+                                    <td class="text-center">@c.Derrotas</td>
+                                    <td class="text-center">@c.GolsPro</td>
+                                    <td class="text-center">@c.GolsContra</td>
+                                    <td class="text-center @(c.SaldoGols > 0 ? "text-success fw-semibold" : c.SaldoGols < 0 ? "text-danger" : "")">
+                                        @(c.SaldoGols > 0 ? "+" : "")@c.SaldoGols
+                                    </td>
+                                    @if (_classif.Any(x => x.PontosDescontados > 0))
+                                    {
+                                        <td class="text-center text-danger small">
+                                            @(c.PontosDescontados > 0 ? $"-{c.PontosDescontados}" : "")
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex gap-3 flex-wrap mb-4 small">
+                    <span><span class="badge bg-success px-2">&nbsp;</span> Playoffs (1º–6º)</span>
+                    <span><span class="badge bg-info px-2">&nbsp;</span> Play-In (7º–8º)</span>
+                    <span><span class="badge bg-warning text-dark px-2">&nbsp;</span> Play-In decisivo (9º–10º)</span>
+                    <span><span class="badge bg-danger px-2">&nbsp;</span> Eliminado (11º–12º)</span>
+                </div>
+            }
+
+            @if (_rodadas.Any())
+            {
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
+                    <span class="fw-bold px-2">Rodada @(_rodadaAtual?.Numero)</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                </div>
+                @if (_rodadaAtual is not null)
+                {
+                    <div class="list-group">
+                        @foreach (var p in _rodadaAtual.Partidas)
+                        {
+                            <div class="list-group-item py-2 d-flex align-items-center gap-2">
+                                <div class="flex-grow-1 row g-0 align-items-center">
+                                    <div class="col-5 d-flex align-items-center justify-content-end gap-1">
+                                        <span class="fw-semibold text-end">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                    </div>
+                                    <div class="col-2 text-center fw-bold">
+                                        @if (p.Status == PartidaStatus.Agendada)
+                                        {
+                                            <span class="text-muted small fw-normal">vs</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
+                                        }
+                                    </div>
+                                    <div class="col-5 d-flex align-items-center gap-1">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold">@p.TimeForaNome</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:90px;justify-content:flex-end">
+                                    <span class="badge @StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark">Pênaltis</span> }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="text-muted small">Nenhuma rodada registrada.</div>
+            }
+        }
+
+        <!-- ── Mata-Mata ── -->
+        @if (_tab == "knockout")
+        {
+            @if (!_knockoutJogos.Any())
+            {
+                <div class="alert alert-info">Fase de mata-mata ainda não iniciada.</div>
+            }
+            else
+            {
+                <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
+                <div class="row g-3 mb-4">
+                    @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
+                    {
+                        var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
+                        if (jogo is not null)
+                        {
+                            <div class="col-12 col-md-4"><KnockoutCard Jogo="jogo" /></div>
+                        }
+                    }
+                </div>
+
+                <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
+                <div class="row g-3 mb-4">
+                    @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
+                    {
+                        var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
+                        if (jogo is not null)
+                        {
+                            <div class="col-12 col-md-3"><KnockoutCard Jogo="jogo" /></div>
+                        }
+                    }
+                </div>
+
+                <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Semifinais</h5>
+                <div class="row g-3 mb-4">
+                    @foreach (var fase in new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 })
+                    {
+                        var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
+                        if (jogo is not null)
+                        {
+                            <div class="col-12 col-md-6"><KnockoutCard Jogo="jogo" /></div>
+                        }
+                    }
+                </div>
+
+                @if (_knockoutJogos.FirstOrDefault(j => j.Fase == FaseKnockout.Final) is { } jogoFinal)
+                {
+                    <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Final</h5>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6 offset-md-3">
+                            <KnockoutCard Jogo="jogoFinal" Destaque="true" />
+                        </div>
+                    </div>
+                }
+            }
+        }
+
+        <!-- ── Estatísticas ── -->
+        @if (_tab == "stats")
+        {
+            <ul class="nav nav-pills mb-3">
+                <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "artilheiros" ? "active" : "")" @onclick='() => _statsTab = "artilheiros"'>Artilheiros</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "assistencias" ? "active" : "")" @onclick='() => _statsTab = "assistencias"'>Assistências</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "cartoes" ? "active" : "")" @onclick='() => _statsTab = "cartoes"'>Cartões</button>
+                </li>
+            </ul>
+
+            @if (_statsTab == "artilheiros")
+            {
+                @if (!_artilheiros.Any())
+                {
+                    <div class="text-muted">Nenhum gol registrado.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-dark">
+                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">⚽ Gols</th><th class="text-center">Assist.</th></tr>
+                            </thead>
+                            <tbody>
+                                @{ int r = 0; }
+                                @foreach (var a in _artilheiros)
+                                {
+                                    r++;
+                                    <tr>
+                                        <td class="fw-bold text-muted">@r</td>
+                                        <td>@a.JogadorNome</td>
+                                        <td class="text-muted small">
+                                            <img src="@EscudoUrl(a.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            @a.TimeNome
+                                        </td>
+                                        <td class="text-center fw-bold">@a.Gols</td>
+                                        <td class="text-center text-muted">@(a.Assistencias > 0 ? a.Assistencias.ToString() : "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+
+            @if (_statsTab == "assistencias")
+            {
+                @if (!_assistencias.Any())
+                {
+                    <div class="text-muted">Nenhuma assistência registrada.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-dark">
+                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">Assistências</th></tr>
+                            </thead>
+                            <tbody>
+                                @{ int ra = 0; }
+                                @foreach (var a in _assistencias)
+                                {
+                                    ra++;
+                                    <tr>
+                                        <td class="fw-bold text-muted">@ra</td>
+                                        <td>@a.JogadorNome</td>
+                                        <td class="text-muted small">
+                                            <img src="@EscudoUrl(a.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            @a.TimeNome
+                                        </td>
+                                        <td class="text-center fw-bold">@a.Assistencias</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+
+            @if (_statsTab == "cartoes")
+            {
+                @if (!_cartoes.Any())
+                {
+                    <div class="text-muted">Nenhum cartão registrado.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-dark">
+                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">🟨</th><th class="text-center">🟥</th></tr>
+                            </thead>
+                            <tbody>
+                                @{ int rc = 0; }
+                                @foreach (var c in _cartoes)
+                                {
+                                    rc++;
+                                    <tr>
+                                        <td class="fw-bold text-muted">@rc</td>
+                                        <td>@c.JogadorNome</td>
+                                        <td class="text-muted small">@c.TimeNome</td>
+                                        <td class="text-center">@c.CartoesAmarelos</td>
+                                        <td class="text-center">@(c.CartoesVermelhos > 0 ? c.CartoesVermelhos.ToString() : "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        }
+    }
+</div>
+
+@code {
+    private string _tab = "fase";
+    private string _statsTab = "artilheiros";
+    private int _rodadaIdx;
+    private bool _loading = true;
+
+    private LigaDto? _liga;
+    private IReadOnlyList<LigaClassificacaoItemDto> _classif = Array.Empty<LigaClassificacaoItemDto>();
+    private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
+    private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
+    private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
+    private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
+    private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
+
+    private string? _erro;
+
+    private LigaRodadaComPartidasDto? _rodadaAtual =>
+        _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+            if (_liga is not null)
+            {
+                _classif = await LigaService.GetClassificacaoAsync(_liga.LigaId, CancellationToken.None);
+                var rodadas = await LigaService.GetRodadasComPartidasAsync(_liga.LigaId, CancellationToken.None);
+                _rodadas = rodadas.Where(r => r.Numero > 0).ToArray();
+                _knockoutJogos = await LigaService.GetKnockoutAsync(_liga.LigaId, CancellationToken.None);
+                _artilheiros = await LigaService.GetArtilheirosAsync(_liga.LigaId, CancellationToken.None);
+                _assistencias = await LigaService.GetAssistenciasAsync(_liga.LigaId, CancellationToken.None);
+                _cartoes = await LigaService.GetCartoesEstatAsync(_liga.LigaId, CancellationToken.None);
+
+                for (int i = _rodadas.Count - 1; i >= 0; i--)
+                {
+                    if (_rodadas[i].Partidas.Any(p => p.Status != PartidaStatus.Agendada))
+                    {
+                        _rodadaIdx = i;
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void RodadaAnterior() { if (_rodadaIdx > 0) _rodadaIdx--; }
+    private void RodadaProxima() { if (_rodadaIdx < _rodadas.Count - 1) _rodadaIdx++; }
+
+    private static string RowClass(int pos) => pos switch
+    {
+        <= 6 => "table-success",
+        7 or 8 => "table-info",
+        9 or 10 => "table-warning",
+        _ => "table-danger"
+    };
+
+    private static string StatusBadge(PartidaStatus s) => s switch
+    {
+        PartidaStatus.EmAndamento => "bg-warning text-dark",
+        PartidaStatus.Encerrada => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private static string StatusLabel(PartidaStatus s) => s switch
+    {
+        PartidaStatus.EmAndamento => "Ao vivo",
+        PartidaStatus.Encerrada => "Encerrada",
+        _ => "Agendada"
+    };
+
+    private static string EscudoUrl(string? teamName)
+    {
+        if (string.IsNullOrWhiteSpace(teamName)) return "/images/escudos/escudo.png";
+        var normalized = teamName.Normalize(System.Text.NormalizationForm.FormD);
+        var clean = new string(normalized.Where(c =>
+            System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) !=
+            System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        return $"/images/escudos/{clean}.png";
+    }
+}

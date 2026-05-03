@@ -1,0 +1,71 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+
+<div class="card @(Destaque ? "border-warning border-2" : "") h-100">
+    <div class="card-header d-flex justify-content-between align-items-center py-1 px-2 @(Destaque ? "bg-warning text-dark" : "bg-dark text-white")">
+        <small class="fw-bold">@Jogo.FaseLabel</small>
+        @if (Jogo.PartidaStatus.HasValue)
+        {
+            <span class="badge @StatusBadge(Jogo.PartidaStatus.Value) ms-1">@StatusLabel(Jogo.PartidaStatus.Value)</span>
+        }
+    </div>
+    <div class="card-body py-2 px-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-semibold @(IsVencedor(Jogo.TimeCasaId) ? "text-success" : "") d-flex align-items-center gap-1">
+                <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                @(Jogo.TimeCasaNome ?? "A definir")
+            </span>
+            <span class="badge bg-secondary fs-6 mx-2">@(Jogo.GolsCasa?.ToString() ?? "—")</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-semibold @(IsVencedor(Jogo.TimeForaId) ? "text-success" : "") d-flex align-items-center gap-1">
+                <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                @(Jogo.TimeForaNome ?? "A definir")
+            </span>
+            <span class="badge bg-secondary fs-6 mx-2">@(Jogo.GolsFora?.ToString() ?? "—")</span>
+        </div>
+        @if (Jogo.TemPenaltis && Jogo.VencedorNome is not null)
+        {
+            <div class="mt-1 text-center">
+                <small class="text-muted">Nos pênaltis: <strong>@Jogo.VencedorNome</strong></small>
+            </div>
+        }
+        @if (Jogo.VencedorId.HasValue && !Jogo.TemPenaltis)
+        {
+            <div class="mt-1 text-center">
+                <small class="text-success fw-bold">✓ @Jogo.VencedorNome</small>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public LigaKnockoutJogoDto Jogo { get; set; } = null!;
+    [Parameter] public bool Destaque { get; set; }
+
+    private bool IsVencedor(Guid? timeId) => timeId.HasValue && timeId == Jogo.VencedorId;
+
+    private static string EscudoUrl(string? teamName)
+    {
+        if (string.IsNullOrWhiteSpace(teamName)) return "/images/escudos/escudo.png";
+        var normalized = teamName.Normalize(System.Text.NormalizationForm.FormD);
+        var clean = new string(normalized.Where(c =>
+            System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) !=
+            System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        return $"/images/escudos/{clean}.png";
+    }
+
+    private static string StatusBadge(PartidaStatus s) => s switch
+    {
+        PartidaStatus.EmAndamento => "bg-warning text-dark",
+        PartidaStatus.Encerrada => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private static string StatusLabel(PartidaStatus s) => s switch
+    {
+        PartidaStatus.EmAndamento => "Ao vivo",
+        PartidaStatus.Encerrada => "Encerrado",
+        _ => "Agendado"
+    };
+}

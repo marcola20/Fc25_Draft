@@ -44,6 +44,8 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
             services.AddScoped<ITeamLineupService, TeamLineupService>();
             services.AddScoped<ITransferOfferService, TransferOfferService>();
+            services.AddScoped<ILigaAdminService, LigaAdminService>();
+            services.AddScoped<ILigaPublicService, LigaPublicService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();

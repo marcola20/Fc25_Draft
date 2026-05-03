@@ -1,0 +1,123 @@
+@page "/liga/classificacao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+@inject NavigationManager Navigation
+
+<PageTitle>Classificação</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-1">Classificação</h1>
+
+    @if (_liga is not null)
+    {
+        <p class="text-muted mb-3">@_liga.Nome — @StatusLabel(_liga.Status)</p>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_classif is null || _classif.Count == 0)
+    {
+        <div class="alert alert-info">Classificação ainda não disponível.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Time</th>
+                        <th class="text-center" title="Pontos">Pts</th>
+                        <th class="text-center" title="Jogos">J</th>
+                        <th class="text-center" title="Vitórias">V</th>
+                        <th class="text-center" title="Empates">E</th>
+                        <th class="text-center" title="Derrotas">D</th>
+                        <th class="text-center" title="Gols Pró">GP</th>
+                        <th class="text-center" title="Gols Contra">GC</th>
+                        <th class="text-center" title="Saldo de Gols">SG</th>
+                        <th class="text-center d-none d-md-table-cell" title="Cartões Amarelos">CA</th>
+                        <th class="text-center d-none d-md-table-cell" title="Cartões Vermelhos">CV</th>
+                        <th class="text-center d-none d-md-table-cell" title="Pontos descontados por punição">Pun.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _classif)
+                    {
+                        <tr class="@RowClass(item.Posicao)">
+                            <td>
+                                <span class="badge @BadgeClass(item.Posicao)">@item.Posicao</span>
+                            </td>
+                            <td class="fw-semibold">@item.TimeNome</td>
+                            <td class="text-center fw-bold">@item.Pontos</td>
+                            <td class="text-center">@item.Jogos</td>
+                            <td class="text-center">@item.Vitorias</td>
+                            <td class="text-center">@item.Empates</td>
+                            <td class="text-center">@item.Derrotas</td>
+                            <td class="text-center">@item.GolsPro</td>
+                            <td class="text-center">@item.GolsContra</td>
+                            <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")">
+                                @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
+                            </td>
+                            <td class="text-center d-none d-md-table-cell">@item.CartoesAmarelos</td>
+                            <td class="text-center d-none d-md-table-cell text-danger">@item.CartoesVermelhos</td>
+                            <td class="text-center d-none d-md-table-cell @(item.PontosDescontados > 0 ? "text-danger fw-bold" : "text-muted")">
+                                @(item.PontosDescontados > 0 ? $"-{item.PontosDescontados}" : "—")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
+            <span><span class="badge bg-warning text-dark me-1">●</span> Bye (1º-2º)</span>
+            <span><span class="badge bg-success me-1">●</span> Playoffs direto (3º-6º)</span>
+            <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
+            <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
+        </div>
+    }
+</div>
+
+@code {
+    private LigaDto? _liga;
+    private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        if (_liga is not null)
+            _classif = await LigaService.GetClassificacaoAsync(_liga.LigaId, CancellationToken.None);
+        _loading = false;
+    }
+
+    private static string RowClass(int pos) => pos switch
+    {
+        1 or 2 => "table-warning",
+        3 or 4 or 5 or 6 => "table-success",
+        7 or 8 or 9 or 10 => "table-info",
+        _ => "table-danger"
+    };
+
+    private static string BadgeClass(int pos) => pos switch
+    {
+        1 or 2 => "bg-warning text-dark",
+        3 or 4 or 5 or 6 => "bg-success",
+        7 or 8 or 9 or 10 => "bg-info text-dark",
+        _ => "bg-danger"
+    };
+
+    private static string StatusLabel(LigaStatus s) => s switch
+    {
+        LigaStatus.Criada => "Não iniciada",
+        LigaStatus.PrimeiraFase => "Fase de Liga em andamento",
+        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.Encerrada => "Encerrada",
+        _ => s.ToString()
+    };
+}

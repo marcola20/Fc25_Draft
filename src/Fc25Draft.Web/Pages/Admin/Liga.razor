@@ -1,0 +1,628 @@
+@page "/admin/liga"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ILigaAdminService AdminSvc
+@inject ILigaPublicService PublicSvc
+@inject ITeamService TeamSvc
+@inject NavigationManager Nav
+
+<PageTitle>Administração da Liga</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-3">Administração da Liga</h1>
+
+    @if (!string.IsNullOrEmpty(_erro))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_erro
+            <button type="button" class="btn-close" @onclick='() => _erro = null'></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_ok))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_ok
+            <button type="button" class="btn-close" @onclick='() => _ok = null'></button>
+        </div>
+    }
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>_tab="liga"'>Liga</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>_tab="rodadas"' disabled="@(_ligaAtual == null)">Rodadas</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>_tab="partidas"' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="punicoes"?"active":"")" @onclick='()=>_tab="punicoes"' disabled="@(_ligaAtual == null)">Punições</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="knockout"?"active":"")" @onclick='()=>_tab="knockout"' disabled="@(_ligaAtual == null)">Mata-Mata</button></li>
+    </ul>
+
+    <!-- ─ Tab: Liga ─ -->
+    @if (_tab == "liga")
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-5">
+                <div class="card">
+                    <div class="card-header fw-bold">@(_editandoLigaId.HasValue ? "Editar Liga" : "Nova Liga")</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label">Nome</label>
+                            <input class="form-control" @bind="_formNome" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Início</label>
+                            <input type="date" class="form-control" @bind="_formInicio" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Fim</label>
+                            <input type="date" class="form-control" @bind="_formFim" />
+                        </div>
+                        <button class="btn btn-primary" @onclick="SalvarLiga" disabled="@_saving">
+                            @(_saving ? "Salvando..." : (_editandoLigaId.HasValue ? "Salvar" : "Criar Liga"))
+                        </button>
+                        @if (_editandoLigaId.HasValue)
+                        {
+                            <button class="btn btn-outline-secondary ms-2" @onclick="CancelarEdicao">Cancelar</button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-7">
+                <div class="card">
+                    <div class="card-header fw-bold">Ligas</div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var liga in _ligas)
+                        {
+                            <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    <span class="fw-semibold">@liga.Nome</span>
+                                    <span class="badge ms-2 @StatusBadge(liga.Status)">@StatusLabel(liga.Status)</span>
+                                    <div class="small text-muted">@liga.DataInicio.ToLocalTime().ToString("dd/MM/yyyy") – @liga.DataFim.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                </div>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditarLiga(liga)">Editar</button>
+                                    @if (liga.Status == LigaStatus.Criada)
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => IniciarFase(liga.LigaId)">Iniciar Fase</button>
+                                    }
+                                    @if (liga.Status == LigaStatus.PrimeiraFase)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => EncerrarFase(liga.LigaId)">Encerrar 1ª Fase</button>
+                                    }
+                                    <button class="btn btn-sm btn-primary" @onclick="() => SelecionarLiga(liga)">Gerenciar</button>
+                                </div>
+                            </div>
+                        }
+                        @if (!_ligas.Any())
+                        {
+                            <div class="list-group-item text-muted">Nenhuma liga criada.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ─ Tab: Rodadas ─ -->
+    @if (_tab == "rodadas" && _ligaAtual is not null)
+    {
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-primary btn-sm" @onclick="CriarRodada" disabled="@_saving">+ Criar Rodada</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="GerarRodadasAuto" disabled="@_saving">Gerar Automático (todas)</button>
+        </div>
+
+        <div class="row g-2">
+            @foreach (var r in _rodadas)
+            {
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="card @(_rodadaSelecionada?.RodadaId == r.RodadaId ? "border-primary border-2" : "")">
+                        <div class="card-body py-2 text-center">
+                            <div class="fw-bold">Rodada @r.Numero</div>
+                            <div class="small text-muted">@r.TotalPartidas partidas</div>
+                            <div class="d-flex gap-1 justify-content-center mt-1">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SelecionarRodada(r)">Gerenciar</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeletarRodada(r.RodadaId)">X</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            @if (!_rodadas.Any())
+            {
+                <div class="col-12"><div class="alert alert-info">Nenhuma rodada criada.</div></div>
+            }
+        </div>
+    }
+
+    <!-- ─ Tab: Partidas ─ -->
+    @if (_tab == "partidas" && _rodadaSelecionada is not null)
+    {
+        <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+            <span class="fw-semibold">Rodada @_rodadaSelecionada.Numero</span>
+            <button class="btn btn-primary btn-sm" @onclick="() => _showCriarPartida = !_showCriarPartida">+ Nova Partida</button>
+        </div>
+
+        @if (_showCriarPartida)
+        {
+            <div class="card mb-3" style="max-width:420px">
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label small">Mandante</label>
+                        <select class="form-select" @bind="_novaCasa">
+                            <option value="">Selecione...</option>
+                            @foreach (var t in _times)
+                            {
+                                <option value="@t.TeamId">@t.TeamName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Visitante</label>
+                        <select class="form-select" @bind="_novaFora">
+                            <option value="">Selecione...</option>
+                            @foreach (var t in _times)
+                            {
+                                <option value="@t.TeamId">@t.TeamName</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="btn btn-sm btn-primary" @onclick="CriarPartida" disabled="@_saving">Criar</button>
+                    <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => _showCriarPartida = false">Cancelar</button>
+                </div>
+            </div>
+        }
+
+        @foreach (var p in _partidas)
+        {
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-semibold">@p.TimeCasaNome</span>
+                        <span class="fw-bold fs-5">@p.GolsCasa – @p.GolsFora</span>
+                        <span class="fw-semibold">@p.TimeForaNome</span>
+                        <span class="badge @PartidaBadge(p.Status)">@p.Status</span>
+                        @if (p.IsWO) { <span class="badge bg-danger">W.O.</span> }
+
+                        <div class="ms-auto d-flex gap-1 flex-wrap">
+                            @if (p.Status == PartidaStatus.Agendada)
+                            {
+                                <button class="btn btn-sm btn-success" @onclick="() => IniciarPartida(p.PartidaId)">Iniciar</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => MostrarWO(p)">W.O.</button>
+                            }
+                            @if (p.Status == PartidaStatus.EmAndamento)
+                            {
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Stats</button>
+                                <button class="btn btn-sm btn-warning" @onclick="() => EncerrarPartida(p.PartidaId)">Encerrar</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => MostrarWO(p)">W.O.</button>
+                            }
+                            @if (p.Status == PartidaStatus.Encerrada)
+                            {
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Ver Stats</button>
+                            }
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeletarPartida(p.PartidaId)">Del</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (!_partidas.Any())
+        {
+            <div class="alert alert-info">Nenhuma partida nesta rodada.</div>
+        }
+
+        @if (_woPartida is not null)
+        {
+            <div class="modal show d-block" style="background:rgba(0,0,0,0.5)">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header"><h5 class="modal-title">Aplicar W.O.</h5></div>
+                        <div class="modal-body">
+                            <p>Selecione o time que fez W.O. (ele perderá 2x0):</p>
+                            <select class="form-select" @bind="_woTimeId">
+                                <option value="">Selecione...</option>
+                                <option value="@_woPartida.TimeCasaId">@_woPartida.TimeCasaNome</option>
+                                <option value="@_woPartida.TimeForaId">@_woPartida.TimeForaNome</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-danger" @onclick="ConfirmarWO" disabled="@_saving">Confirmar W.O.</button>
+                            <button class="btn btn-secondary" @onclick="() => { _woPartida = null; _woTimeId = null; }">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- ─ Tab: Punições ─ -->
+    @if (_tab == "punicoes" && _ligaAtual is not null)
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-4">
+                <div class="card">
+                    <div class="card-header fw-bold">Nova Punição</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small">Time</label>
+                            <select class="form-select" @bind="_punTimeId">
+                                <option value="">Selecione...</option>
+                                @foreach (var t in _times)
+                                {
+                                    <option value="@t.TeamId">@t.TeamName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Pontos a descontar</label>
+                            <input type="number" class="form-control" min="1" @bind="_punPontos" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Motivo</label>
+                            <input class="form-control" @bind="_punMotivo" />
+                        </div>
+                        <button class="btn btn-danger btn-sm" @onclick="AplicarPunicao" disabled="@_saving">Aplicar Punição</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-8">
+                <div class="card">
+                    <div class="card-header fw-bold">Punições Aplicadas</div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var p in _punicoes)
+                        {
+                            <div class="list-group-item d-flex align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    <span class="fw-semibold">@p.TimeNome</span>
+                                    <span class="badge bg-danger ms-1">-@p.PontosSubtraidos pts</span>
+                                    <div class="small text-muted">@p.Motivo</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoverPunicao(p.PunicaoId)">Remover</button>
+                            </div>
+                        }
+                        @if (!_punicoes.Any())
+                        {
+                            <div class="list-group-item text-muted">Nenhuma punição.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ─ Tab: Mata-Mata ─ -->
+    @if (_tab == "knockout" && _ligaAtual is not null)
+    {
+        @if (!_knockoutJogos.Any())
+        {
+            <div class="alert alert-info">
+                Mata-mata não gerado.
+                @if (_ligaAtual.Status == LigaStatus.PlayIn || _ligaAtual.Status == LigaStatus.Playoffs)
+                {
+                    <button class="btn btn-sm btn-primary ms-3" @onclick="GerarKnockout" disabled="@_saving">Gerar Bracket</button>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var jogo in _knockoutJogos)
+                {
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card">
+                            <div class="card-header small fw-bold bg-dark text-white py-1">@jogo.FaseLabel</div>
+                            <div class="card-body py-2">
+                                <div class="fw-semibold">@(jogo.TimeCasaNome ?? "A definir") @(jogo.GolsCasa?.ToString() ?? "—") × @(jogo.GolsFora?.ToString() ?? "—") @(jogo.TimeForaNome ?? "A definir")</div>
+                                @if (jogo.VencedorNome is not null)
+                                {
+                                    <div class="small text-success mt-1">✓ @jogo.VencedorNome</div>
+                                }
+                                @if (jogo.VencedorId is null && jogo.TimeCasaId.HasValue && jogo.TimeForaId.HasValue)
+                                {
+                                    <div class="mt-1 d-flex gap-1 flex-wrap">
+                                        @if (!jogo.PartidaId.HasValue)
+                                        {
+                                            <button class="btn btn-sm btn-primary" @onclick="() => CriarPartidaKnockout(jogo)" disabled="@_saving">Criar Partida</button>
+                                        }
+                                        else
+                                        {
+                                            <a href="/admin/liga/stats/@jogo.PartidaId" class="btn btn-sm btn-outline-primary">Stats</a>
+                                            <button class="btn btn-sm btn-warning" @onclick="() => MostrarEncerrarKnockout(jogo)" disabled="@_saving">Encerrar</button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (_knockoutJogoParaEncerrar is not null)
+            {
+                <div class="modal show d-block" style="background:rgba(0,0,0,0.5)">
+                    <div class="modal-dialog modal-sm">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title">Encerrar: @_knockoutJogoParaEncerrar.FaseLabel</h5></div>
+                            <div class="modal-body">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="temPen" @bind="_knockoutTemPenaltis" />
+                                    <label class="form-check-label" for="temPen">Foi para pênaltis?</label>
+                                </div>
+                                @if (_knockoutTemPenaltis)
+                                {
+                                    <label class="form-label small">Vencedor nos pênaltis</label>
+                                    <select class="form-select" @bind="_knockoutPenaltisVencedor">
+                                        <option value="">Selecione...</option>
+                                        <option value="@_knockoutJogoParaEncerrar.TimeCasaId">@_knockoutJogoParaEncerrar.TimeCasaNome</option>
+                                        <option value="@_knockoutJogoParaEncerrar.TimeForaId">@_knockoutJogoParaEncerrar.TimeForaNome</option>
+                                    </select>
+                                }
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-primary" @onclick="ConfirmarEncerrarKnockout" disabled="@_saving">Confirmar</button>
+                                <button class="btn btn-secondary" @onclick="() => _knockoutJogoParaEncerrar = null">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private string _tab = "liga";
+    private string? _erro, _ok;
+    private bool _saving;
+
+    // Liga
+    private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
+    private LigaDto? _ligaAtual;
+    private Guid? _editandoLigaId;
+    private string _formNome = "";
+    private DateTime _formInicio = DateTime.Today;
+    private DateTime _formFim = DateTime.Today.AddMonths(2);
+
+    // Times
+    private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
+
+    // Rodadas
+    private IReadOnlyList<LigaRodadaDto> _rodadas = Array.Empty<LigaRodadaDto>();
+    private LigaRodadaDto? _rodadaSelecionada;
+
+    // Partidas
+    private IReadOnlyList<LigaPartidaDto> _partidas = Array.Empty<LigaPartidaDto>();
+    private bool _showCriarPartida;
+    private string? _novaCasa, _novaFora;
+    private LigaPartidaDto? _woPartida;
+    private string? _woTimeId;
+
+    // Punições
+    private IReadOnlyList<LigaPunicaoDto> _punicoes = Array.Empty<LigaPunicaoDto>();
+    private string? _punTimeId;
+    private int _punPontos = 3;
+    private string _punMotivo = "";
+
+    // Knockout
+    private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
+    private LigaKnockoutJogoDto? _knockoutJogoParaEncerrar;
+    private bool _knockoutTemPenaltis;
+    private string? _knockoutPenaltisVencedor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        _ligas = await AdminSvc.ListAsync(CancellationToken.None);
+        var (teams, _) = await TeamSvc.SearchAsync(null, 1, 100);
+        _times = teams.Select(t => new TeamListItemDto(t.TeamId, t.TeamName, t.OwnerName, 0)).ToList();
+
+        if (_ligaAtual is null && _ligas.Any())
+            _ligaAtual = _ligas[0];
+
+        if (_ligaAtual is not null)
+        {
+            _ligaAtual = _ligas.FirstOrDefault(l => l.LigaId == _ligaAtual.LigaId) ?? _ligaAtual;
+            _rodadas = await AdminSvc.ListRodadasAsync(_ligaAtual.LigaId, CancellationToken.None);
+            _punicoes = await AdminSvc.ListPunicoesAsync(_ligaAtual.LigaId, CancellationToken.None);
+            _knockoutJogos = await PublicSvc.GetKnockoutAsync(_ligaAtual.LigaId, CancellationToken.None);
+            if (_rodadaSelecionada is not null)
+                _partidas = await AdminSvc.ListPartidasAsync(_rodadaSelecionada.RodadaId, CancellationToken.None);
+        }
+    }
+
+    private async Task SalvarLiga()
+    {
+        _erro = null; _saving = true;
+        try
+        {
+            if (_editandoLigaId.HasValue)
+            {
+                await AdminSvc.UpdateAsync(_editandoLigaId.Value, new LigaUpdateRequest(_formNome, _formInicio, _formFim), CancellationToken.None);
+                _ok = "Liga atualizada.";
+            }
+            else
+            {
+                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim), CancellationToken.None);
+                _ok = "Liga criada.";
+            }
+            CancelarEdicao();
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
+    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
+
+    private void SelecionarLiga(LigaDto liga)
+    {
+        _ligaAtual = liga;
+        _rodadaSelecionada = null;
+        _partidas = Array.Empty<LigaPartidaDto>();
+        _tab = "rodadas";
+        InvokeAsync(CarregarDados);
+    }
+
+    private async Task IniciarFase(Guid ligaId)
+    {
+        try { await AdminSvc.IniciarPrimeiraFaseAsync(ligaId, CancellationToken.None); _ok = "Fase iniciada."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task EncerrarFase(Guid ligaId)
+    {
+        try { await AdminSvc.EncerrarPrimeiraFaseAsync(ligaId, CancellationToken.None); _ok = "Primeira fase encerrada. Play-In ativo."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task CriarRodada()
+    {
+        _erro = null; _saving = true;
+        try { await AdminSvc.CreateRodadaAsync(_ligaAtual!.LigaId, CancellationToken.None); await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task GerarRodadasAuto()
+    {
+        _erro = null; _saving = true;
+        try { await AdminSvc.GerarRodadasAutoAsync(_ligaAtual!.LigaId, CancellationToken.None); _ok = "Rodadas geradas automaticamente."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task DeletarRodada(Guid id)
+    {
+        try { await AdminSvc.DeleteRodadaAsync(id, CancellationToken.None); await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task SelecionarRodada(LigaRodadaDto r)
+    {
+        _rodadaSelecionada = r;
+        _partidas = await AdminSvc.ListPartidasAsync(r.RodadaId, CancellationToken.None);
+        _tab = "partidas";
+    }
+
+    private async Task CriarPartida()
+    {
+        if (!Guid.TryParse(_novaCasa, out var casa) || !Guid.TryParse(_novaFora, out var fora)) { _erro = "Selecione os dois times."; return; }
+        _saving = true;
+        try { await AdminSvc.CreatePartidaAsync(_rodadaSelecionada!.RodadaId, new LigaPartidaCreateRequest(casa, fora), CancellationToken.None); _showCriarPartida = false; _novaCasa = null; _novaFora = null; await SelecionarRodada(_rodadaSelecionada); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task IniciarPartida(Guid id)
+    {
+        try { await AdminSvc.IniciarPartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task EncerrarPartida(Guid id)
+    {
+        try { await AdminSvc.EncerrarPartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task DeletarPartida(Guid id)
+    {
+        try { await AdminSvc.DeletePartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void IrParaStats(Guid partidaId) => Nav.NavigateTo($"/admin/liga/stats/{partidaId}");
+
+    private void MostrarWO(LigaPartidaDto p) { _woPartida = p; _woTimeId = null; }
+
+    private async Task ConfirmarWO()
+    {
+        if (!Guid.TryParse(_woTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
+        _saving = true;
+        try { await AdminSvc.AplicarWOAsync(_woPartida!.PartidaId, timeId, CancellationToken.None); _woPartida = null; _woTimeId = null; _ok = "W.O. aplicado."; await SelecionarRodada(_rodadaSelecionada!); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task AplicarPunicao()
+    {
+        if (!Guid.TryParse(_punTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
+        if (_punPontos < 1) { _erro = "Pontos devem ser >= 1."; return; }
+        if (string.IsNullOrWhiteSpace(_punMotivo)) { _erro = "Informe o motivo."; return; }
+        _saving = true;
+        try { await AdminSvc.AplicarPunicaoAsync(_ligaAtual!.LigaId, new LigaPunicaoRequest(timeId, _punPontos, _punMotivo), CancellationToken.None); _punTimeId = null; _punPontos = 3; _punMotivo = ""; _ok = "Punição aplicada."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task RemoverPunicao(Guid id)
+    {
+        try { await AdminSvc.RemoverPunicaoAsync(id, CancellationToken.None); _ok = "Punição removida."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task GerarKnockout()
+    {
+        _saving = true;
+        try { await AdminSvc.GerarFaseKnockoutAsync(_ligaAtual!.LigaId, CancellationToken.None); _ok = "Bracket gerado."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task CriarPartidaKnockout(LigaKnockoutJogoDto jogo)
+    {
+        _saving = true; _erro = null;
+        try
+        {
+            var partida = await AdminSvc.CriarPartidaKnockoutAsync(jogo.KnockoutJogoId, CancellationToken.None);
+            await CarregarDados();
+            Nav.NavigateTo($"/admin/liga/stats/{partida.PartidaId}");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void MostrarEncerrarKnockout(LigaKnockoutJogoDto jogo) { _knockoutJogoParaEncerrar = jogo; _knockoutTemPenaltis = false; _knockoutPenaltisVencedor = null; }
+
+    private async Task ConfirmarEncerrarKnockout()
+    {
+        Guid? penId = _knockoutTemPenaltis && Guid.TryParse(_knockoutPenaltisVencedor, out var g) ? g : null;
+        if (_knockoutTemPenaltis && penId is null) { _erro = "Selecione o vencedor nos pênaltis."; return; }
+        _saving = true;
+        try { await AdminSvc.EncerrarKnockoutJogoAsync(_knockoutJogoParaEncerrar!.KnockoutJogoId, new LigaEncerrarKnockoutRequest(_knockoutTemPenaltis, penId), CancellationToken.None); _knockoutJogoParaEncerrar = null; _ok = "Jogo encerrado. Bracket atualizado."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private static string StatusBadge(LigaStatus s) => s switch
+    {
+        LigaStatus.PrimeiraFase => "bg-success",
+        LigaStatus.PlayIn => "bg-info text-dark",
+        LigaStatus.Playoffs => "bg-warning text-dark",
+        LigaStatus.Encerrada => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+
+    private static string StatusLabel(LigaStatus s) => s switch
+    {
+        LigaStatus.Criada => "Não iniciada",
+        LigaStatus.PrimeiraFase => "1ª Fase",
+        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.Encerrada => "Encerrada",
+        _ => s.ToString()
+    };
+
+    private static string PartidaBadge(PartidaStatus s) => s switch
+    {
+        PartidaStatus.EmAndamento => "bg-warning text-dark",
+        PartidaStatus.Encerrada => "bg-success",
+        _ => "bg-secondary"
+    };
+}

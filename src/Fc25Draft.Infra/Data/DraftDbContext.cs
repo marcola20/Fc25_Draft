@@ -32,6 +32,14 @@ public class DraftDbContext : DbContext
     public DbSet<TransferOffer> TransferOffers => Set<TransferOffer>();
     public DbSet<TransferOfferPlayer> TransferOfferPlayers => Set<TransferOfferPlayer>();
 
+    public DbSet<Liga> Ligas => Set<Liga>();
+    public DbSet<LigaRodada> LigaRodadas => Set<LigaRodada>();
+    public DbSet<LigaPartida> LigaPartidas => Set<LigaPartida>();
+    public DbSet<LigaEventoPartida> LigaEventos => Set<LigaEventoPartida>();
+    public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
+    public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();
+    public DbSet<LigaKnockoutJogo> LigaKnockoutJogos => Set<LigaKnockoutJogo>();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.HasPostgresExtension("unaccent");

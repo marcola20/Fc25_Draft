@@ -1,8 +1,8 @@
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Endpoints.Market;
+using Fc25Draft.Web.Extensions.Endpoints;
 using Fc25Draft.Web.Extensions;
 using Fc25Draft.Web.Extensions.DI;
-using Fc25Draft.Web.Extensions.Endpoints;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
@@ -75,7 +75,8 @@ api.MapDraftEndpoints()
    .MapTransferOffersEndpoints()
    .MapMarketEndpoints()
    .MapMarketHistoryEndpoints()
-   .MapAdminEndpoints();
+   .MapAdminEndpoints()
+   .MapLigaEndpoints();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");

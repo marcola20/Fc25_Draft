@@ -32,6 +32,7 @@ public class LayoutNavigationService
         }),
         new("Liga", new List<MenuItem>
         {
+            new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
             new("Regulamento", "/regulamento", "oi oi-document")
@@ -41,7 +42,8 @@ public class LayoutNavigationService
             new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
             new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard", RequiredRole: "Admin"),
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
-            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin")
+            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
+            new("Gerenciar Liga", "/admin/liga", "oi oi-trophy", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
 
@@ -131,6 +133,65 @@ public class LayoutNavigationService
             {
                 new("Início", "/home"),
                 new("Regulamento")
+            }
+        },
+        ["/liga"] = new PageDefinition
+        {
+            Route = "/liga",
+            Title = "Liga",
+            Subtitle = "Classificação, Mata-Mata e Estatísticas",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga")
+            }
+        },
+        ["/liga/classificacao"] = new PageDefinition
+        {
+            Route = "/liga/classificacao",
+            Title = "Classificação",
+            Subtitle = "Tabela de Classificação",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Classificação")
+            }
+        },
+        ["/liga/estatisticas"] = new PageDefinition
+        {
+            Route = "/liga/estatisticas",
+            Title = "Estatísticas",
+            Subtitle = "Artilheiros, Assistências e Cartões",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Estatísticas")
+            }
+        },
+        ["/liga/mata-mata"] = new PageDefinition
+        {
+            Route = "/liga/mata-mata",
+            Title = "Mata-Mata",
+            Subtitle = "Chaveamento da Fase Final",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Mata-Mata")
+            }
+        },
+        ["/admin/liga"] = new PageDefinition
+        {
+            Route = "/admin/liga",
+            Title = "Gerenciar Liga",
+            Subtitle = "Administração da Liga",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Liga")
             }
         }
     };
