@@ -1205,6 +1205,22 @@ else
             return;
         }
 
+        if (currentEditor.DefensiveInstructions is { } diCheck &&
+            (diCheck.DefensiveStyle == 0 || diCheck.ContainmentArea == 0 || diCheck.Pressure == 0))
+        {
+            Toasts.ShowError("Instruções defensivas incompletas: selecione Estilo Defensivo, Área de Contenção e Pressão antes de salvar.");
+            activeTab = Tab.Defensive;
+            return;
+        }
+
+        if (currentEditor.OffensiveInstructions is { } oiCheck &&
+            (oiCheck.OffensiveStyle == 0 || oiCheck.Playmaker == 0 || oiCheck.AttackArea == 0 || oiCheck.Positioning == 0))
+        {
+            Toasts.ShowError("Instruções ofensivas incompletas: selecione Estilo Ofensivo, Provocador, Área de Ataque e Posicionamento antes de salvar.");
+            activeTab = Tab.Offensive;
+            return;
+        }
+
         saveCts?.Cancel();
         saveCts = new CancellationTokenSource();
         isSaving = true;
@@ -1567,7 +1583,8 @@ else
             editor.Roles.AttackingPlayer3?.PlayerId);
 
         TeamLineupOffensiveInstructionsDto? oi = null;
-        if (editor.OffensiveInstructions is { } oiEditor && oiEditor.OffensiveStyle > 0)
+        if (editor.OffensiveInstructions is { } oiEditor &&
+            oiEditor.OffensiveStyle > 0 && oiEditor.Playmaker > 0 && oiEditor.AttackArea > 0 && oiEditor.Positioning > 0)
         {
             oi = new TeamLineupOffensiveInstructionsDto(
                 oiEditor.OffensiveStyle, oiEditor.Playmaker, oiEditor.AttackArea,
@@ -1575,7 +1592,8 @@ else
         }
 
         TeamLineupDefensiveInstructionsDto? di = null;
-        if (editor.DefensiveInstructions is { } diEditor && diEditor.DefensiveStyle > 0)
+        if (editor.DefensiveInstructions is { } diEditor &&
+            diEditor.DefensiveStyle > 0 && diEditor.ContainmentArea > 0 && diEditor.Pressure > 0)
         {
             di = new TeamLineupDefensiveInstructionsDto(
                 diEditor.DefensiveStyle, diEditor.ContainmentArea, diEditor.Pressure,
