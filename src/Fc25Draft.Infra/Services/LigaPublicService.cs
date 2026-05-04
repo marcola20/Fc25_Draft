@@ -95,7 +95,9 @@ public class LigaPublicService : ILigaPublicService
             .AsNoTracking()
             .Where(x => x.Tipo == TipoEvento.Gol && x.AssistenteId != null
                         && x.Partida.Rodada.LigaId == ligaId)
-            .Include(x => x.Assistente).ThenInclude(a => a!.CurrentTeam)
+            .Include(x => x.Assistente)
+                .ThenInclude(a => a!.TeamRosters)
+                    .ThenInclude(r => r.Team)
             .ToListAsync(ct);
 
         return eventos
@@ -103,11 +105,12 @@ public class LigaPublicService : ILigaPublicService
             .Select(g =>
             {
                 var player = g.First().Assistente!;
+                var roster = player.TeamRosters.FirstOrDefault();
                 return new LigaArtilheiroDto(
                     player.PlayerId,
                     player.Name,
-                    player.CurrentTeamId ?? Guid.Empty,
-                    player.CurrentTeam?.TeamName ?? "—",
+                    roster?.TeamId ?? Guid.Empty,
+                    roster?.Team?.TeamName ?? "—",
                     0,
                     g.Count());
             })

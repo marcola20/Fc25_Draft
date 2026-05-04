@@ -9,11 +9,12 @@
 @inject ILigaAdminService AdminSvc
 @inject DraftDbContext Db
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Stats da Partida</PageTitle>
 
 <div class="container-fluid py-3">
-    <button class="btn btn-sm btn-outline-secondary mb-3" @onclick='() => Nav.NavigateTo("/admin/liga")'>← Voltar</button>
+    <button class="btn btn-sm btn-outline-secondary mb-3" @onclick='async () => await JS.InvokeVoidAsync("history.back")'>← Voltar</button>
 
     @if (_partida is null)
     {

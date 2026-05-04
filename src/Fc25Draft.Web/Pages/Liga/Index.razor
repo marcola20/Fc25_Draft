@@ -309,7 +309,10 @@
                                     <tr>
                                         <td class="fw-bold text-muted">@rc</td>
                                         <td>@c.JogadorNome</td>
-                                        <td class="text-muted small">@c.TimeNome</td>
+                                        <td class="text-muted small">
+                                            <img src="@EscudoUrl(c.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            @c.TimeNome
+                                        </td>
                                         <td class="text-center">@c.CartoesAmarelos</td>
                                         <td class="text-center">@(c.CartoesVermelhos > 0 ? c.CartoesVermelhos.ToString() : "—")</td>
                                     </tr>
