@@ -207,12 +207,12 @@
         if (_jogadoresPorTime.TryGetValue(teamId, out var cached)) return cached;
         var jogadores = await Db.TeamRosters
             .Where(r => r.TeamId == teamId)
+            .OrderBy(r => r.Player.Position.Name).ThenBy(r => r.Player.Name)
             .Select(r => new PlayerListItemDto(
                 r.Player.PlayerId, r.Player.Name,
                 r.Player.PositionId, r.Player.Position.Name,
                 r.Player.Overall, r.Player.Age,
                 "Normal", null))
-            .OrderBy(p => p.PositionName).ThenBy(p => p.Name)
             .ToListAsync();
         _jogadoresPorTime[teamId] = jogadores;
         return jogadores;
