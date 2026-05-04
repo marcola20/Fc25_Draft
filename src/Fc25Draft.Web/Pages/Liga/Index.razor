@@ -22,7 +22,7 @@
     else
     {
         <h1 class="h3 mb-1">@_liga.Nome</h1>
-        <p class="text-muted small mb-3">Status: <strong>@_liga.Status</strong></p>
+        <p class="text-muted small mb-3">Status: <strong>@LigaStatusLabel(_liga.Status)</strong></p>
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
@@ -403,6 +403,16 @@
         PartidaStatus.EmAndamento => "Ao vivo",
         PartidaStatus.Encerrada => "Encerrada",
         _ => "Agendada"
+    };
+
+    private static string LigaStatusLabel(LigaStatus s) => s switch
+    {
+        LigaStatus.Criada => "Criada",
+        LigaStatus.PrimeiraFase => "Primeira Fase",
+        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.Encerrada => "Encerrada",
+        _ => s.ToString()
     };
 
     private static string EscudoUrl(string? teamName)

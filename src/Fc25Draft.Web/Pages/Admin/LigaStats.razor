@@ -9,12 +9,11 @@
 @inject ILigaAdminService AdminSvc
 @inject DraftDbContext Db
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <PageTitle>Stats da Partida</PageTitle>
 
 <div class="container-fluid py-3">
-    <button class="btn btn-sm btn-outline-secondary mb-3" @onclick='async () => await JS.InvokeVoidAsync("history.back")'>← Voltar</button>
+    <button class="btn btn-sm btn-outline-secondary mb-3" @onclick='() => Nav.NavigateTo(ReturnUrl ?? "/admin/liga")'>← Voltar</button>
 
     @if (_partida is null)
     {
@@ -151,6 +150,7 @@
 
 @code {
     [Parameter] public Guid PartidaId { get; set; }
+    [SupplyParameterFromQuery(Name = "return")] [Parameter] public string? ReturnUrl { get; set; }
 
     private LigaPartidaDto? _partida;
     private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();
@@ -208,7 +208,7 @@
         if (_jogadoresPorTime.TryGetValue(teamId, out var cached)) return cached;
         var jogadores = await Db.TeamRosters
             .Where(r => r.TeamId == teamId)
-            .OrderBy(r => r.Player.Position.Name).ThenBy(r => r.Player.Name)
+            .OrderBy(r => r.Player.Name)
             .Select(r => new PlayerListItemDto(
                 r.Player.PlayerId, r.Player.Name,
                 r.Player.PositionId, r.Player.Position.Name,

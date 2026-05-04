@@ -327,7 +327,7 @@
                                         }
                                         else
                                         {
-                                            <a href="/admin/liga/stats/@jogo.PartidaId" class="btn btn-sm btn-outline-primary">Stats</a>
+                                            <a href="/admin/liga/stats/@jogo.PartidaId?return=/admin/liga" class="btn btn-sm btn-outline-primary">Stats</a>
                                             <button class="btn btn-sm btn-warning" @onclick="() => MostrarEncerrarKnockout(jogo)" disabled="@_saving">Encerrar</button>
                                         }
                                     </div>
@@ -537,7 +537,7 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
-    private void IrParaStats(Guid partidaId) => Nav.NavigateTo($"/admin/liga/stats/{partidaId}");
+    private void IrParaStats(Guid partidaId) => Nav.NavigateTo($"/admin/liga/stats/{partidaId}?return=/admin/liga");
 
     private void MostrarWO(LigaPartidaDto p) { _woPartida = p; _woTimeId = null; }
 
@@ -582,7 +582,7 @@
         {
             var partida = await AdminSvc.CriarPartidaKnockoutAsync(jogo.KnockoutJogoId, CancellationToken.None);
             await CarregarDados();
-            Nav.NavigateTo($"/admin/liga/stats/{partida.PartidaId}");
+            Nav.NavigateTo($"/admin/liga/stats/{partida.PartidaId}?return=/admin/liga");
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
