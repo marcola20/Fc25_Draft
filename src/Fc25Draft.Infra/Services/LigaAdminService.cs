@@ -442,7 +442,7 @@ public class LigaAdminService : ILigaAdminService
         var classif = await _db.LigaClassificacoes.FirstOrDefaultAsync(x => x.LigaId == ligaId && x.TimeId == request.TimeId, ct);
         if (classif is not null)
         {
-            classif.Pontos = Math.Max(0, classif.Pontos - request.PontosSubtraidos);
+            classif.Pontos = classif.Pontos - request.PontosSubtraidos;
             await _db.SaveChangesAsync(ct);
             await RecalcularPosicoesAsync(ligaId, ct);
         }
@@ -779,7 +779,7 @@ public class LigaAdminService : ILigaAdminService
             if (stats.TryGetValue(cls.TimeId, out var s))
             {
                 var desconto = punicoes.GetValueOrDefault(cls.TimeId, 0);
-                cls.Pontos = Math.Max(0, s.Pts - desconto);
+                cls.Pontos = s.Pts - desconto;
                 cls.Jogos = s.J;
                 cls.Vitorias = s.V;
                 cls.Empates = s.E;
@@ -809,7 +809,7 @@ public class LigaAdminService : ILigaAdminService
                     ClassificacaoId = Guid.NewGuid(),
                     LigaId = ligaId,
                     TimeId = timeId,
-                    Pontos = Math.Max(0, s.Pts - desconto),
+                    Pontos = s.Pts - desconto,
                     Jogos = s.J,
                     Vitorias = s.V,
                     Empates = s.E,
