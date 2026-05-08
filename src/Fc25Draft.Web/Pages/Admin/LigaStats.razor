@@ -75,7 +75,7 @@
                             <label class="form-label small">Minuto (opcional)</label>
                             <input type="number" class="form-control" min="1" max="120" @bind="_golMinuto" />
                         </div>
-                        <button class="btn btn-primary btn-sm" @onclick="RegistrarGol" disabled="@(_partida.Status == PartidaStatus.Encerrada || _saving)">Registrar Gol</button>
+                        <button class="btn btn-primary btn-sm" @onclick="RegistrarGol" disabled="@_saving">Registrar Gol</button>
                     </div>
                 </div>
             </div>
@@ -114,7 +114,7 @@
                             <label class="form-label small">Minuto (opcional)</label>
                             <input type="number" class="form-control" min="1" max="120" @bind="_cartaoMinuto" />
                         </div>
-                        <button class="btn btn-warning btn-sm" @onclick="RegistrarCartao" disabled="@(_partida.Status == PartidaStatus.Encerrada || _saving)">Registrar Cartão</button>
+                        <button class="btn btn-warning btn-sm" @onclick="RegistrarCartao" disabled="@_saving">Registrar Cartão</button>
                     </div>
                 </div>
             </div>
