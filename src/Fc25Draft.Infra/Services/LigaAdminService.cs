@@ -708,10 +708,10 @@ public class LigaAdminService : ILigaAdminService
 
         var ligaId = rodada.LigaId;
 
-        // Busca todas as partidas contáveis da liga
+        // Busca apenas partidas da fase regular (Rodada.Numero > 0 exclui rodada knockout = 0)
         var partidas = await _db.LigaPartidas
             .AsNoTracking()
-            .Where(x => x.Rodada.LigaId == ligaId && x.Status != PartidaStatus.Agendada)
+            .Where(x => x.Rodada.LigaId == ligaId && x.Rodada.Numero > 0 && x.Status != PartidaStatus.Agendada)
             .Include(x => x.Eventos)
             .ToListAsync(ct);
 

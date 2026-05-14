@@ -21,7 +21,8 @@ public class LayoutNavigationService
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document"),
-            new("Picks do Draft", "/picks", "oi oi-tag")
+            new("Picks do Draft", "/picks", "oi oi-tag"),
+            new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
         new("Mercado de Transferências", new List<MenuItem>
         {
@@ -43,7 +44,8 @@ public class LayoutNavigationService
             new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard", RequiredRole: "Admin"),
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
-            new("Gerenciar Liga", "/admin/liga", "oi oi-trophy", RequiredRole: "Admin")
+            new("Gerenciar Liga", "/admin/liga", "oi oi-trophy", RequiredRole: "Admin"),
+            new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
 
@@ -111,6 +113,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Draft", "/draft/controle"),
                 new("Picks")
+            }
+        },
+        ["/loteria"] = new PageDefinition
+        {
+            Route = "/loteria",
+            Title = "Loteria do Draft",
+            Subtitle = "Sorteio ao vivo das picks",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Draft", "/draft/controle"),
+                new("Loteria")
+            }
+        },
+        ["/admin/loteria"] = new PageDefinition
+        {
+            Route = "/admin/loteria",
+            Title = "Loteria do Draft",
+            Subtitle = "Controle do sorteio — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Loteria")
             }
         },
         ["/formato"] = new PageDefinition

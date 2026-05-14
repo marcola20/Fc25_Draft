@@ -1,0 +1,521 @@
+@page "/loteria"
+@implements IDisposable
+@inject LotteryStateService LotteryService
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Loteria do Draft</PageTitle>
+
+<div class="lottery-page">
+
+    @if (LotteryService.State is null)
+    {
+        <div class="lottery-waiting">
+            <div class="lottery-waiting-icon">🎰</div>
+            <h2>Aguardando a Loteria</h2>
+            <p>A loteria ainda não foi iniciada. Acompanhe quando o administrador começar o sorteio.</p>
+        </div>
+    }
+    else
+    {
+        var s = LotteryService.State;
+
+        <div class="lottery-header">
+            <div class="lottery-header-meta">
+                <span class="lottery-liga-badge">@s.LigaNome</span>
+                <span class="lottery-round-badge @(s.Rodada == 2 ? "lottery-round-2" : "")">
+                    @(s.Rodada == 1 ? "🏆 Round 1" : "🎲 Round 2")
+                </span>
+            </div>
+            <h1 class="lottery-title">Loteria do Draft</h1>
+            <p class="lottery-subtitle">
+                @if (s.IsFinished)
+                {
+                    <span class="lottery-finished-label">✅ Sorteio encerrado</span>
+                }
+                else if (s.HasPending)
+                {
+                    <span>Revelando picks...</span>
+                }
+                else if (s.Round1Done)
+                {
+                    <span>Round 1 concluído — aguardando Round 2</span>
+                }
+                else if (s.Round2Done)
+                {
+                    <span>Aguardando encerramento</span>
+                }
+            </p>
+        </div>
+
+        @if (s.IsFinished)
+        {
+            <div class="lottery-final-board">
+                <div class="lottery-final-header">
+                    <span class="lottery-final-icon">🎉</span>
+                    <span>Resultado Final — Round @s.Rodada</span>
+                </div>
+                @foreach (var pick in s.Revealed)
+                {
+                    <div class="lottery-final-row">
+                        <span class="lottery-final-pick">#@pick.PickNumero</span>
+                        <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
+                        <span class="lottery-final-name">@pick.TimeNome</span>
+                        @if (s.Rodada == 1)
+                        {
+                            <span class="lottery-final-pos">@pick.Posicao°</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="lottery-stage">
+                <!-- Revealed picks -->
+                @if (s.Revealed.Count > 0)
+                {
+                    <div class="lottery-revealed-list">
+                        @for (int i = s.Revealed.Count - 1; i >= 0; i--)
+                        {
+                            var pick = s.Revealed[i];
+                            bool isLatest    = i == s.Revealed.Count - 1;
+                            bool isPick1     = pick.PickNumero == 1 && s.Rodada == 1;
+                            bool isZone      = pick.PickNumero <= 4 && s.Rodada == 1 && !isPick1;
+
+                            string cardClass = isLatest
+                                ? (isPick1 ? "lottery-card-latest lottery-card-pick1"
+                                           : isZone ? "lottery-card-latest lottery-card-zone"
+                                           : "lottery-card-latest")
+                                : (isPick1 ? "lottery-card-done lottery-card-done-pick1"
+                                           : isZone ? "lottery-card-done lottery-card-done-zone"
+                                           : "lottery-card-done");
+
+                            <div class="lottery-card @cardClass">
+                                <div class="lottery-card-pick @(isPick1 && isLatest ? "lottery-pick-gold" : isZone && isLatest ? "lottery-pick-purple" : "")">
+                                    @if (isPick1 && isLatest) { <span>🏆</span> }
+                                    @if (isZone  && isLatest) { <span>🎰</span> }
+                                    #@pick.PickNumero
+                                </div>
+                                <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-card-escudo" onerror="this.style.display='none'" />
+                                <div class="lottery-card-info">
+                                    <div class="lottery-card-name">@pick.TimeNome</div>
+                                    @if (isZone && isLatest)
+                                    {
+                                        <div class="lottery-card-zone-label">🎲 Concorreu ao Pick #1</div>
+                                    }
+                                </div>
+                                @if (s.Rodada == 1)
+                                {
+                                    <div class="lottery-card-pos">@pick.Posicao° colocado</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Pending count -->
+                @if (s.HasPending)
+                {
+                    <div class="lottery-pending-info">
+                        <span class="lottery-pending-badge">@s.Pending.Count restante@(s.Pending.Count != 1 ? "s" : "")</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/loteria"));
+        LotteryService.OnChange += HandleChange;
+    }
+
+    private async void HandleChange() => await InvokeAsync(StateHasChanged);
+
+    public void Dispose() => LotteryService.OnChange -= HandleChange;
+
+    private static string EscudoUrl(string teamName)
+    {
+        var normalized = string.Concat(
+            teamName.Normalize(System.Text.NormalizationForm.FormD)
+                    .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                                != System.Globalization.UnicodeCategory.NonSpacingMark));
+        return $"/img/escudos/{normalized}.png";
+    }
+}
+
+<style>
+    .lottery-page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 4rem;
+    }
+
+    /* ─ Waiting ─ */
+    .lottery-waiting {
+        text-align: center;
+        padding: 5rem 1rem;
+    }
+
+    .lottery-waiting-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .lottery-waiting h2 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+        margin-bottom: 0.6rem;
+    }
+
+    .lottery-waiting p {
+        color: var(--bs-secondary-color, #6c757d);
+        font-size: 1rem;
+    }
+
+    /* ─ Header ─ */
+    .lottery-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .lottery-header-meta {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.7rem;
+    }
+
+    .lottery-liga-badge {
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 12%, var(--bs-body-bg, #fff));
+        color: var(--bs-primary, #0d6efd);
+        border: 1px solid color-mix(in srgb, var(--bs-primary, #0d6efd) 30%, transparent);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.2rem 0.75rem;
+        letter-spacing: 0.03em;
+    }
+
+    .lottery-round-badge {
+        background: color-mix(in srgb, #198754 12%, var(--bs-body-bg, #fff));
+        color: #198754;
+        border: 1px solid color-mix(in srgb, #198754 30%, transparent);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.2rem 0.75rem;
+    }
+
+    .lottery-round-2 {
+        background: color-mix(in srgb, #a07800 12%, var(--bs-body-bg, #fff));
+        color: #8a6400;
+        border-color: color-mix(in srgb, #a07800 30%, transparent);
+    }
+
+    .lottery-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--bs-emphasis-color, #212529);
+        letter-spacing: -0.02em;
+        margin: 0 0 0.4rem;
+    }
+
+    .lottery-subtitle {
+        color: var(--bs-secondary-color, #6c757d);
+        font-size: 0.92rem;
+        margin: 0;
+    }
+
+    .lottery-finished-label {
+        font-weight: 600;
+        color: #198754;
+    }
+
+    /* ─ Stage ─ */
+    .lottery-stage {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .lottery-revealed-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    /* ─ Cards ─ */
+    .lottery-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-radius: 0.75rem;
+        padding: 0.8rem 1.1rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        transition: all 0.3s ease;
+    }
+
+    .lottery-card-latest {
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 10%, var(--bs-body-bg, #fff));
+        border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 50%, transparent);
+        border-left: 4px solid var(--bs-primary, #0d6efd);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--bs-primary, #0d6efd) 40%, transparent);
+        animation: lotteryReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) both,
+                   lotteryPulse 0.9s 0.55s ease-out both;
+    }
+
+    .lottery-card-done {
+        background: var(--bs-secondary-bg, #f8f9fa);
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    /* ─ Lottery zone done (picks 2-4, already revealed, not latest) ─ */
+    .lottery-card-done-zone {
+        background: color-mix(in srgb, #8b5cf6 6%, var(--bs-secondary-bg, #f8f9fa)) !important;
+        border-left: 2px solid color-mix(in srgb, #8b5cf6 35%, transparent) !important;
+        opacity: 0.75;
+    }
+
+    /* ─ Pick #1 done ─ */
+    .lottery-card-done-pick1 {
+        background: color-mix(in srgb, #e5a000 8%, var(--bs-secondary-bg, #f8f9fa)) !important;
+        border-left: 2px solid color-mix(in srgb, #e5a000 40%, transparent) !important;
+        opacity: 0.85;
+    }
+
+    /* ─ Lottery zone latest (picks 2-4) ─ */
+    .lottery-card-zone {
+        background: linear-gradient(135deg,
+            color-mix(in srgb, #8b5cf6 13%, var(--bs-body-bg, #fff)),
+            color-mix(in srgb, #7c3aed 9%, var(--bs-body-bg, #fff))) !important;
+        border-color: color-mix(in srgb, #8b5cf6 50%, transparent) !important;
+        border-left: 4px solid #8b5cf6 !important;
+        animation: lotteryReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both,
+                   lotteryShake  0.55s 0.5s ease-in-out both,
+                   lotteryPulseZone 1s 1.05s ease-out both !important;
+    }
+
+    /* Card flip / zoom-in from center */
+    @@keyframes lotteryReveal {
+        0% {
+            opacity: 0;
+            transform: scale(0.7) rotateX(25deg);
+            filter: blur(4px);
+        }
+        60% {
+            opacity: 1;
+            transform: scale(1.04) rotateX(-3deg);
+            filter: blur(0);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1) rotateX(0);
+        }
+    }
+
+    /* Shake for zone cards */
+    @@keyframes lotteryShake {
+        0%   { transform: translateX(0); }
+        12%  { transform: translateX(-7px); }
+        25%  { transform: translateX(7px); }
+        37%  { transform: translateX(-5px); }
+        50%  { transform: translateX(5px); }
+        62%  { transform: translateX(-3px); }
+        75%  { transform: translateX(3px); }
+        88%  { transform: translateX(-1px); }
+        100% { transform: translateX(0); }
+    }
+
+    /* Purple glow pulse (zone) */
+    @@keyframes lotteryPulseZone {
+        0%   { box-shadow: 0 0 0 0    rgba(139,92,246,0.65); }
+        50%  { box-shadow: 0 0 0 16px rgba(139,92,246,0); }
+        100% { box-shadow: 0 5px 22px rgba(109,40,217,0.2); }
+    }
+
+    /* Glow pulse after reveal (regular) */
+    @@keyframes lotteryPulse {
+        0%   { box-shadow: 0 0 0 0   color-mix(in srgb, var(--bs-primary, #0d6efd) 50%, transparent); }
+        50%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--bs-primary, #0d6efd) 0%, transparent); }
+        100% { box-shadow: 0 4px 18px color-mix(in srgb, var(--bs-primary, #0d6efd) 14%, transparent); }
+    }
+
+    /* ─ Pick #1 — grand reveal ─ */
+    .lottery-card-pick1 {
+        background: linear-gradient(135deg,
+            color-mix(in srgb, #a07800 14%, var(--bs-body-bg, #fff)),
+            color-mix(in srgb, #e5a000 11%, var(--bs-body-bg, #fff))) !important;
+        border-color: color-mix(in srgb, #a07800 50%, transparent) !important;
+        border-left: 4px solid #e5a000 !important;
+        animation: lotteryRevealGrand 0.85s cubic-bezier(0.16, 1, 0.3, 1) both,
+                   lotteryPulseGold  1.4s 0.85s ease-out both !important;
+    }
+
+    @@keyframes lotteryRevealGrand {
+        0%  { opacity: 0; transform: scale(0.45) rotateX(40deg) rotateZ(-3deg); filter: blur(10px); }
+        55% { opacity: 1; transform: scale(1.1)  rotateX(-6deg) rotateZ(1deg);  filter: blur(0); }
+        75% { transform: scale(0.97) rotateX(2deg) rotateZ(0); }
+        100%{ opacity: 1; transform: scale(1) rotateX(0) rotateZ(0); }
+    }
+
+    @@keyframes lotteryPulseGold {
+        0%   { box-shadow: 0 0 0 0    rgba(229,160,0,0.7); }
+        40%  { box-shadow: 0 0 0 22px rgba(229,160,0,0); }
+        100% { box-shadow: 0 8px 30px rgba(160,120,0,0.3); }
+    }
+
+    .lottery-card-pick {
+        font-size: 1.4rem;
+        font-weight: 900;
+        color: var(--bs-primary, #0d6efd);
+        min-width: 3rem;
+        text-align: center;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .lottery-pick-gold {
+        color: #a07800 !important;
+        font-size: 1.5rem !important;
+    }
+
+    .lottery-pick-purple {
+        color: #7c3aed !important;
+        font-size: 1.45rem !important;
+    }
+
+    .lottery-card-done .lottery-card-pick {
+        color: var(--bs-secondary-color, #6c757d);
+        font-size: 1rem;
+    }
+
+    .lottery-card-escudo {
+        width: 42px;
+        height: 42px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+    .lottery-card-done .lottery-card-escudo {
+        width: 28px;
+        height: 28px;
+    }
+
+    /* ─ Name + zone label wrapper ─ */
+    .lottery-card-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.18rem;
+        min-width: 0;
+    }
+
+    .lottery-card-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .lottery-card-done .lottery-card-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .lottery-card-zone-label {
+        font-size: 0.69rem;
+        font-weight: 700;
+        color: #7c3aed;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .lottery-card-pos {
+        font-size: 0.78rem;
+        color: var(--bs-secondary-color, #6c757d);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* ─ Pending info ─ */
+    .lottery-pending-info {
+        text-align: center;
+        padding: 0.5rem;
+    }
+
+    .lottery-pending-badge {
+        display: inline-block;
+        background: var(--bs-secondary-bg, #f8f9fa);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--bs-secondary-color, #6c757d);
+        padding: 0.25rem 0.85rem;
+    }
+
+    /* ─ Final board ─ */
+    .lottery-final-board {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    .lottery-final-header {
+        background: var(--bs-secondary-bg, #f8f9fa);
+        padding: 0.65rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bs-secondary-color, #6c757d);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .lottery-final-row {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .lottery-final-row:last-child { border-bottom: none; }
+
+    .lottery-final-pick {
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--bs-primary, #0d6efd);
+        min-width: 2.5rem;
+        text-align: center;
+    }
+
+    .lottery-final-escudo {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .lottery-final-name {
+        flex: 1;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--bs-emphasis-color, #212529);
+    }
+
+    .lottery-final-pos {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+</style>

@@ -46,6 +46,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransferOfferService, TransferOfferService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
             services.AddScoped<ILigaPublicService, LigaPublicService>();
+            services.AddSingleton<LotteryStateService>();
 
             // Web layer
             services.AddScoped<AdminAuthService>();
