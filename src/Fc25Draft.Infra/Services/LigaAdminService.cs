@@ -831,7 +831,6 @@ public class LigaAdminService : ILigaAdminService
     {
         var classifs = await _db.LigaClassificacoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
 
-        // Ordenação: Pts → V → SG → GP → Nome
         var ordenados = classifs
             .OrderByDescending(c => c.Pontos)
             .ThenByDescending(c => c.Vitorias)
@@ -839,10 +838,71 @@ public class LigaAdminService : ILigaAdminService
             .ThenByDescending(c => c.GolsPro)
             .ToList();
 
-        for (int i = 0; i < ordenados.Count; i++)
-            ordenados[i].Posicao = i + 1;
+        var partidas = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => p.Rodada.LigaId == ligaId && p.Status == PartidaStatus.Encerrada && !p.IsWO)
+            .ToListAsync(ct);
+
+        var resultado = new List<LigaClassificacao>();
+        int i = 0;
+        while (i < ordenados.Count)
+        {
+            var c = ordenados[i];
+            var grupo = ordenados
+                .Skip(i)
+                .TakeWhile(x => x.Pontos == c.Pontos && x.Vitorias == c.Vitorias &&
+                                x.SaldoGols == c.SaldoGols && x.GolsPro == c.GolsPro)
+                .ToList();
+
+            resultado.AddRange(grupo.Count > 1 ? AplicarConfrontoDireto(grupo, partidas) : grupo);
+            i += grupo.Count;
+        }
+
+        for (int j = 0; j < resultado.Count; j++)
+            resultado[j].Posicao = j + 1;
 
         await _db.SaveChangesAsync(ct);
+    }
+
+    private static List<LigaClassificacao> AplicarConfrontoDireto(
+        List<LigaClassificacao> grupo,
+        List<LigaPartida> todasPartidas)
+    {
+        var ids = grupo.Select(g => g.TimeId).ToHashSet();
+        var h2h = todasPartidas
+            .Where(p => ids.Contains(p.TimeCasaId) && ids.Contains(p.TimeForaId))
+            .ToList();
+
+        if (h2h.Count == 0)
+            return grupo;
+
+        var stats = grupo.ToDictionary(g => g.TimeId, _ => (Pts: 0, V: 0, SG: 0, GP: 0));
+
+        foreach (var p in h2h)
+        {
+            var (cpCasa, vCasa, sgCasa, gpCasa) = stats[p.TimeCasaId];
+            var (cpFora, vFora, sgFora, gpFora) = stats[p.TimeForaId];
+
+            gpCasa += p.GolsCasa;
+            gpFora += p.GolsFora;
+            sgCasa += p.GolsCasa - p.GolsFora;
+            sgFora += p.GolsFora - p.GolsCasa;
+
+            if (p.GolsCasa > p.GolsFora)      { cpCasa += 3; vCasa += 1; }
+            else if (p.GolsCasa == p.GolsFora) { cpCasa += 1; cpFora += 1; }
+            else                               { cpFora += 3; vFora += 1; }
+
+            stats[p.TimeCasaId] = (cpCasa, vCasa, sgCasa, gpCasa);
+            stats[p.TimeForaId] = (cpFora, vFora, sgFora, gpFora);
+        }
+
+        return grupo
+            .OrderByDescending(g => stats[g.TimeId].Pts)
+            .ThenByDescending(g => stats[g.TimeId].V)
+            .ThenByDescending(g => stats[g.TimeId].SG)
+            .ThenByDescending(g => stats[g.TimeId].GP)
+            .ThenBy(g => g.TimeId) 
+            .ToList();
     }
 
     private static void EnsureEntry(Dictionary<Guid, (int, int, int, int, int, int, int, int, int)> d, Guid id)
@@ -850,12 +910,9 @@ public class LigaAdminService : ILigaAdminService
         if (!d.ContainsKey(id)) d[id] = (0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static List<List<(Guid, Guid)>> GerarRoundRobinParcial(List<Guid> times, int totalRodadas)
     {
-        // Algoritmo círculo: n times → n-1 rodadas completas
-        // Se n impar, adiciona "bye". Aqui selecionamos as primeiras `totalRodadas` rodadas.
         var n = times.Count;
         if (n % 2 != 0)
         {
