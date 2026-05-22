@@ -201,30 +201,30 @@
                     <div class="list-group">
                         @foreach (var p in _rodadaAtual.Partidas)
                         {
-                            <div class="list-group-item py-2 d-flex align-items-center gap-2" style="cursor:pointer" @onclick="() => AbrirDetalhesPartida(p)">
-                                <div class="flex-grow-1 row g-0 align-items-center">
-                                    <div class="col-5 d-flex align-items-center justify-content-end gap-1">
-                                        <span class="fw-semibold text-end d-none d-md-inline">@p.TimeCasaNome</span>
-                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                            <div class="list-group-item py-2 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;flex-wrap:wrap;" @onclick="() => AbrirDetalhesPartida(p)">
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-between gap-1 gap-md-3">
+                                    <div class="d-flex align-items-center justify-content-end gap-1" style="flex:1;min-width:0;">
+                                        <span class="fw-semibold text-end d-none d-md-inline small">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
                                     </div>
-                                    <div class="col-2 text-center fw-bold">
+                                    <div class="text-center fw-bold" style="flex:0 0 auto;min-width:45px;">
                                         @if (p.Status == PartidaStatus.Agendada)
                                         {
                                             <span class="text-muted small fw-normal">vs</span>
                                         }
                                         else
                                         {
-                                            <span>@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
+                                            <span class="small">@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
                                         }
                                     </div>
-                                    <div class="col-5 d-flex align-items-center gap-1 justify-content-start">
-                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="fw-semibold d-none d-md-inline">@p.TimeForaNome</span>
+                                    <div class="d-flex align-items-center gap-1 justify-content-start" style="flex:1;min-width:0;justify-content:flex-end;">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold d-none d-md-inline small">@p.TimeForaNome</span>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:90px;justify-content:flex-end">
-                                    <span class="badge @StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
-                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark">Pênaltis</span> }
+                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
+                                    <span class="badge @StatusBadge(p.Status)" style="font-size:0.7rem;">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="font-size:0.7rem;">Pen</span> }
                                 </div>
                             </div>
                         }
