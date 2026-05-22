@@ -43,7 +43,7 @@ public class LayoutNavigationService
             new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
-            new("Gerenciar Liga", "/admin/liga", "oi oi-sliders", RequiredRole: "Admin"),
+            new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
