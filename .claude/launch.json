@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Fc25Draft.Web"],
+      "port": 5001
+    }
+  ]
+}

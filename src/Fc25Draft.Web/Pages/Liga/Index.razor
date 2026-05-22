@@ -585,37 +585,15 @@
 
     private string GetRowClass(LigaClassificacaoItemDto item)
     {
-        // During Primeira Fase, all teams same color (no qualifications yet)
-        if (_liga?.Status == LigaStatus.PrimeiraFase || _liga?.Status == LigaStatus.Criada)
-            return "table-success";
-
-        if (_classif.Count == 0) return RowClass(item.Posicao);
-
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
-            return "table-success";
-
-        return RowClass(item.Posicao);
+        // Only highlight 1st place in green
+        return item.Posicao == 1 ? "table-success" : "";
     }
 
     private string GetBadgeClass(LigaClassificacaoItemDto item)
     {
-        if (_classif.Count == 0) return BadgeClass(item.Posicao);
-
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
-            return "bg-success";
-
-        return BadgeClass(item.Posicao);
+        // Only highlight 1st place in green
+        return item.Posicao == 1 ? "bg-success" : "bg-secondary";
     }
-
-    private static string RowClass(int pos) => pos == 1 ? "table-success" : "";
-
-    private static string BadgeClass(int pos) => pos == 1 ? "bg-success" : "bg-secondary";
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {
