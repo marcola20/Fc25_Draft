@@ -34,6 +34,17 @@ public class LigaPublicService : ILigaPublicService
         return liga is null ? null : ToDto(liga);
     }
 
+    public async Task<IReadOnlyList<LigaDto>> ListAtivasAsync(CancellationToken ct)
+    {
+        var ligas = await _db.Ligas
+            .AsNoTracking()
+            .Where(x => x.Status != LigaStatus.Criada && x.Status != LigaStatus.Encerrada)
+            .OrderByDescending(x => x.CriadoEm)
+            .ToListAsync(ct);
+
+        return ligas.Select(ToDto).ToArray();
+    }
+
     public async Task<IReadOnlyList<LigaClassificacaoItemDto>> GetClassificacaoAsync(Guid ligaId, CancellationToken ct)
     {
         var classifs = await _db.LigaClassificacoes
@@ -55,7 +66,8 @@ public class LigaPublicService : ILigaPublicService
             c.Pontos, c.Jogos, c.Vitorias, c.Empates, c.Derrotas,
             c.GolsPro, c.GolsContra, c.SaldoGols,
             c.CartoesAmarelos, c.CartoesVermelhos,
-            punicoes.GetValueOrDefault(c.TimeId, 0))).ToArray();
+            punicoes.GetValueOrDefault(c.TimeId, 0),
+            c.Grupo)).ToArray();
     }
 
     public async Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct)
@@ -162,11 +174,24 @@ public class LigaPublicService : ILigaPublicService
         return jogos.Select(ToKnockoutJogoDto).ToArray();
     }
 
+    public async Task<IReadOnlyList<LigaGrupoTimeDto>> GetGruposAsync(Guid ligaId, CancellationToken ct)
+    {
+        var grupos = await _db.LigaGruposTimes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .Include(x => x.Time)
+            .OrderBy(x => x.Grupo)
+            .ThenBy(x => x.Time.TeamName)
+            .ToListAsync(ct);
+
+        return grupos.Select(g => new LigaGrupoTimeDto(g.LigaId, g.TimeId, g.Time.TeamName, g.Grupo)).ToArray();
+    }
+
     public async Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetRodadasComPartidasAsync(Guid ligaId, CancellationToken ct)
     {
         var rodadas = await _db.LigaRodadas
             .AsNoTracking()
-            .Where(x => x.LigaId == ligaId)
+            .Where(x => x.LigaId == ligaId && x.Numero > 0)
             .Include(x => x.Partidas).ThenInclude(p => p.TimeCasa)
             .Include(x => x.Partidas).ThenInclude(p => p.TimeFora)
             .OrderBy(x => x.Numero)
@@ -184,7 +209,7 @@ public class LigaPublicService : ILigaPublicService
     }
 
     private static LigaDto ToDto(Liga l) =>
-        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.CriadoEm, l.AtualizadoEm);
+        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase],

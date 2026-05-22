@@ -17,6 +17,9 @@ public static class LigaEndpoints
             return liga is null ? Results.NotFound(new { message = "Nenhuma liga encontrada." }) : Results.Ok(liga);
         });
 
+        pub.MapGet("/ativas", async (ILigaPublicService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListAtivasAsync(ct)));
+
         pub.MapGet("/{ligaId:guid}/classificacao", async (Guid ligaId, ILigaPublicService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetClassificacaoAsync(ligaId, ct)));
 
@@ -31,6 +34,9 @@ public static class LigaEndpoints
 
         pub.MapGet("/{ligaId:guid}/rodadas", async (Guid ligaId, ILigaPublicService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetRodadasComPartidasAsync(ligaId, ct)));
+
+        pub.MapGet("/{ligaId:guid}/grupos", async (Guid ligaId, ILigaPublicService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetGruposAsync(ligaId, ct)));
 
         // ── Admin ─────────────────────────────────────────────────────────────
         var admin = app.MapGroup("/admin/liga").RequireAuthorization("AdminOnly");
@@ -151,6 +157,27 @@ public static class LigaEndpoints
         punicoes.MapDelete("/{punicaoId:guid}", async (Guid ligaId, Guid punicaoId, ILigaAdminService svc, CancellationToken ct) =>
         {
             try { await svc.RemoverPunicaoAsync(punicaoId, ct); return Results.NoContent(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+
+        // Copa grupos
+        admin.MapGet("/{ligaId:guid}/grupos", async (Guid ligaId, ILigaAdminService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListGruposAsync(ligaId, ct)));
+        admin.MapPost("/{ligaId:guid}/grupos", async (Guid ligaId, LigaConfigurarGruposRequest request, ILigaAdminService svc, CancellationToken ct) =>
+        {
+            try { await svc.ConfigurarGruposCopaAsync(ligaId, request, ct); return Results.NoContent(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+
+        // Tiebreaker
+        admin.MapPost("/{ligaId:guid}:iniciar-decisao", async (Guid ligaId, ILigaAdminService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.IniciarDecisaoCampeaoAsync(ligaId, ct)); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+        admin.MapPost("/{ligaId:guid}:iniciar-mini-liga", async (Guid ligaId, ILigaAdminService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.IniciarMiniLigaAsync(ligaId, ct)); }
             catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
         });
 

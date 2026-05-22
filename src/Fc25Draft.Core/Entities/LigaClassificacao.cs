@@ -1,3 +1,5 @@
+using Fc25Draft.Core.Enums;
+
 namespace Fc25Draft.Core.Entities;
 
 public class LigaClassificacao
@@ -16,6 +18,7 @@ public class LigaClassificacao
     public int SaldoGols { get; set; }
     public int CartoesAmarelos { get; set; }
     public int CartoesVermelhos { get; set; }
+    public GrupoCopa? Grupo { get; set; }
 
     public Liga Liga { get; set; } = null!;
     public Team Time { get; set; } = null!;

@@ -41,6 +41,7 @@ public class DraftDbContext : DbContext
     public DbSet<LigaKnockoutJogo> LigaKnockoutJogos => Set<LigaKnockoutJogo>();
     public DbSet<LigaLoteria> LigaLoterias => Set<LigaLoteria>();
     public DbSet<LigaLoteriaPick> LigaLoteriaPicks => Set<LigaLoteriaPick>();
+    public DbSet<LigaGrupoTime> LigaGruposTimes => Set<LigaGrupoTime>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

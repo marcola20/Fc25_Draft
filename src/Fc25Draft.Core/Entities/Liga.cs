@@ -10,6 +10,7 @@ public class Liga
     public DateTime DataInicio { get; set; }
     public DateTime DataFim { get; set; }
     public LigaStatus Status { get; set; } = LigaStatus.Criada;
+    public TipoCompetition Tipo { get; set; } = TipoCompetition.Liga;
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 
@@ -17,4 +18,5 @@ public class Liga
     public ICollection<LigaClassificacao> Classificacoes { get; set; } = new List<LigaClassificacao>();
     public ICollection<LigaPunicao> Punicoes { get; set; } = new List<LigaPunicao>();
     public ICollection<LigaKnockoutJogo> KnockoutJogos { get; set; } = new List<LigaKnockoutJogo>();
+    public ICollection<LigaGrupoTime> Grupos { get; set; } = new List<LigaGrupoTime>();
 }

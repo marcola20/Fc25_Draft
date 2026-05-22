@@ -27,10 +27,11 @@ public class LigaAdminService : ILigaAdminService
         {
             LigaId = Guid.NewGuid(),
             Nome = request.Nome.Trim(),
-            TotalRodadas = 8,
+            TotalRodadas = request.Tipo == TipoCompetition.Copa ? 6 : 8,
             DataInicio = request.DataInicio,
             DataFim = request.DataFim,
             Status = LigaStatus.Criada,
+            Tipo = request.Tipo,
             CriadoEm = now,
             AtualizadoEm = now
         };
@@ -77,23 +78,115 @@ public class LigaAdminService : ILigaAdminService
         liga.Status = LigaStatus.PrimeiraFase;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
-        // Inicializa classificação para todos os times
+        if (liga.Tipo == TipoCompetition.Copa)
+            await IniciarPrimeiraFaseCopaAsync(liga, ct);
+        else
+            await IniciarPrimeiraFaseLigaAsync(liga, ct);
+
+        await _db.SaveChangesAsync(ct);
+        return ToDto(liga);
+    }
+
+    private async Task IniciarPrimeiraFaseLigaAsync(Liga liga, CancellationToken ct)
+    {
         var times = await _db.Teams.AsNoTracking().ToListAsync(ct);
         foreach (var time in times)
         {
-            if (!await _db.LigaClassificacoes.AnyAsync(x => x.LigaId == ligaId && x.TimeId == time.TeamId, ct))
+            if (!await _db.LigaClassificacoes.AnyAsync(x => x.LigaId == liga.LigaId && x.TimeId == time.TeamId, ct))
             {
                 _db.LigaClassificacoes.Add(new LigaClassificacao
                 {
                     ClassificacaoId = Guid.NewGuid(),
-                    LigaId = ligaId,
+                    LigaId = liga.LigaId,
                     TimeId = time.TeamId
                 });
             }
         }
+    }
 
-        await _db.SaveChangesAsync(ct);
-        return ToDto(liga);
+    private async Task IniciarPrimeiraFaseCopaAsync(Liga liga, CancellationToken ct)
+    {
+        var grupos = await _db.LigaGruposTimes
+            .AsNoTracking()
+            .Where(x => x.LigaId == liga.LigaId)
+            .Include(x => x.Time)
+            .ToListAsync(ct);
+
+        var grupoA = grupos.Where(x => x.Grupo == GrupoCopa.A).Select(x => x.TimeId).ToList();
+        var grupoB = grupos.Where(x => x.Grupo == GrupoCopa.B).Select(x => x.TimeId).ToList();
+
+        if (grupoA.Count != 6 || grupoB.Count != 6)
+            throw new InvalidOperationException("Copa requer exatamente 6 times em cada grupo.");
+
+        // Classificação com grupo definido
+        foreach (var g in grupos)
+        {
+            if (!await _db.LigaClassificacoes.AnyAsync(x => x.LigaId == liga.LigaId && x.TimeId == g.TimeId, ct))
+            {
+                _db.LigaClassificacoes.Add(new LigaClassificacao
+                {
+                    ClassificacaoId = Guid.NewGuid(),
+                    LigaId = liga.LigaId,
+                    TimeId = g.TimeId,
+                    Grupo = g.Grupo
+                });
+            }
+        }
+
+        // Rodadas existentes?
+        var jaTemRodadas = await _db.LigaRodadas.AnyAsync(x => x.LigaId == liga.LigaId, ct);
+        if (jaTemRodadas) return;
+
+        // Gera 6 rodadas com jogos cross-group (A vs B)
+        var jogos = GerarCrossGroup(grupoA, grupoB);
+        for (int r = 0; r < liga.TotalRodadas; r++)
+        {
+            var rodada = new LigaRodada
+            {
+                RodadaId = Guid.NewGuid(),
+                LigaId = liga.LigaId,
+                Numero = r + 1
+            };
+            foreach (var (casa, fora) in jogos[r])
+            {
+                rodada.Partidas.Add(new LigaPartida
+                {
+                    PartidaId = Guid.NewGuid(),
+                    TimeCasaId = casa,
+                    TimeForaId = fora,
+                    Status = PartidaStatus.Agendada
+                });
+            }
+            _db.LigaRodadas.Add(rodada);
+        }
+    }
+
+    /// <summary>
+    /// Gera schedule cross-group: cada time de A joga contra cada time de B (36 jogos, 6 rodadas).
+    /// </summary>
+    private static List<List<(Guid, Guid)>> GerarCrossGroup(List<Guid> a, List<Guid> b)
+    {
+        // Round-robin across two groups: 6 rodadas × 6 jogos
+        // Usamos rotação do grupo B mantendo A fixo para distribuir os confrontos
+        var resultado = new List<List<(Guid, Guid)>>();
+        var bRot = new List<Guid>(b);
+
+        for (int r = 0; r < a.Count; r++)
+        {
+            var rodada = new List<(Guid, Guid)>();
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (r % 2 == 0)
+                    rodada.Add((a[i], bRot[i]));
+                else
+                    rodada.Add((bRot[i], a[i]));
+            }
+            resultado.Add(rodada);
+            // Rotaciona B
+            bRot = new List<Guid> { bRot[^1] }.Concat(bRot.Take(bRot.Count - 1)).ToList();
+        }
+
+        return resultado;
     }
 
     public async Task<LigaDto> EncerrarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
@@ -104,10 +197,84 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.PrimeiraFase)
             throw new InvalidOperationException("Liga não está na primeira fase.");
 
-        liga.Status = LigaStatus.PlayIn;
+        if (liga.Tipo == TipoCompetition.Copa)
+        {
+            // Copa vai direto para PlayIn (knockout 4 times)
+            liga.Status = LigaStatus.PlayIn;
+        }
+        else
+        {
+            // Liga: detecta empate no topo
+            var classif = await _db.LigaClassificacoes
+                .AsNoTracking()
+                .Where(x => x.LigaId == ligaId)
+                .OrderByDescending(x => x.Pontos)
+                .ThenByDescending(x => x.Vitorias)
+                .ThenByDescending(x => x.SaldoGols)
+                .ThenByDescending(x => x.GolsPro)
+                .ToListAsync(ct);
+
+            if (classif.Count >= 2)
+            {
+                var lider = classif[0];
+                var empatados = classif
+                    .Where(c => c.Pontos == lider.Pontos &&
+                                c.Vitorias == lider.Vitorias &&
+                                c.SaldoGols == lider.SaldoGols &&
+                                c.GolsPro == lider.GolsPro)
+                    .ToList();
+
+                liga.Status = empatados.Count switch
+                {
+                    >= 3 => LigaStatus.MiniLiga,
+                    2    => LigaStatus.DecisaoCampeao,
+                    _    => LigaStatus.PlayIn
+                };
+            }
+            else
+            {
+                liga.Status = LigaStatus.PlayIn;
+            }
+        }
+
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
+
+        // Auto-gen knockout for Liga when status = PlayIn (not DecisaoCampeao or MiniLiga)
+        if (liga.Status == LigaStatus.PlayIn)
+        {
+            var jaExiste = await _db.LigaKnockoutJogos.AnyAsync(x => x.LigaId == ligaId, ct);
+            if (!jaExiste)
+                await GerarFaseKnockoutAsync(ligaId, ct);
+        }
+
         return ToDto(liga);
+    }
+
+    public async Task DeleteLigaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        // Delete all related entities (cascade)
+        var rodadas = await _db.LigaRodadas.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var partidas = await _db.LigaPartidas.Where(x => x.Rodada.LigaId == ligaId).ToListAsync(ct);
+        var eventos = await _db.LigaEventos.Where(x => x.Partida.Rodada.LigaId == ligaId).ToListAsync(ct);
+        var knockouts = await _db.LigaKnockoutJogos.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var classif = await _db.LigaClassificacoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var punicoes = await _db.LigaPunicoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var grupos = await _db.LigaGruposTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+
+        _db.LigaEventos.RemoveRange(eventos);
+        _db.LigaPartidas.RemoveRange(partidas);
+        _db.LigaRodadas.RemoveRange(rodadas);
+        _db.LigaKnockoutJogos.RemoveRange(knockouts);
+        _db.LigaClassificacoes.RemoveRange(classif);
+        _db.LigaPunicoes.RemoveRange(punicoes);
+        _db.LigaGruposTimes.RemoveRange(grupos);
+        _db.Ligas.Remove(liga);
+
+        await _db.SaveChangesAsync(ct);
     }
 
     // ── Rodadas ───────────────────────────────────────────────────────────────
@@ -158,10 +325,12 @@ public class LigaAdminService : ILigaAdminService
         if (times.Count < 2)
             throw new InvalidOperationException("Precisa de ao menos 2 times para gerar rodadas.");
 
-        var jogos = GerarRoundRobinParcial(times, liga.TotalRodadas);
+        // Liga: full round-robin (n-1 rodadas). Copa: use TotalRodadas (6)
+        var totalRodadas = liga.Tipo == TipoCompetition.Liga ? times.Count - 1 : liga.TotalRodadas;
+        var jogos = GerarRoundRobinParcial(times, totalRodadas);
 
         var rodadasCriadas = new List<LigaRodada>();
-        for (int r = 0; r < liga.TotalRodadas; r++)
+        for (int r = 0; r < totalRodadas; r++)
         {
             var rodada = new LigaRodada
             {
@@ -498,6 +667,9 @@ public class LigaAdminService : ILigaAdminService
         if (jaExiste)
             throw new InvalidOperationException("Bracket já foi gerado.");
 
+        if (liga.Tipo == TipoCompetition.Copa)
+            return await GerarFaseKnockoutCopaAsync(ligaId, ct);
+
         // Pega classificação ordenada
         var classif = await _db.LigaClassificacoes
             .AsNoTracking()
@@ -625,6 +797,186 @@ public class LigaAdminService : ILigaAdminService
         await AvancarBracketAsync(jogo, vencedorId, ct);
 
         return await GetKnockoutJogoDtoAsync(knockoutJogoId, ct);
+    }
+
+    // ── Copa grupos ───────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<LigaGrupoTimeDto>> ListGruposAsync(Guid ligaId, CancellationToken ct)
+    {
+        var grupos = await _db.LigaGruposTimes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .Include(x => x.Time)
+            .OrderBy(x => x.Grupo)
+            .ThenBy(x => x.Time.TeamName)
+            .ToListAsync(ct);
+
+        return grupos.Select(g => new LigaGrupoTimeDto(g.LigaId, g.TimeId, g.Time.TeamName, g.Grupo)).ToArray();
+    }
+
+    public async Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Tipo != TipoCompetition.Copa)
+            throw new InvalidOperationException("Esta liga não é uma Copa.");
+
+        if (liga.Status != LigaStatus.Criada)
+            throw new InvalidOperationException("Grupos só podem ser configurados antes de iniciar a copa.");
+
+        if (request.TimesGrupoA.Count != 6 || request.TimesGrupoB.Count != 6)
+            throw new InvalidOperationException("Cada grupo deve ter exatamente 6 times.");
+
+        var todos = request.TimesGrupoA.Concat(request.TimesGrupoB).ToList();
+        if (todos.Distinct().Count() != 12)
+            throw new InvalidOperationException("Times repetidos entre os grupos.");
+
+        // Remove grupos anteriores
+        var existentes = await _db.LigaGruposTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        _db.LigaGruposTimes.RemoveRange(existentes);
+
+        foreach (var timeId in request.TimesGrupoA)
+            _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.A });
+
+        foreach (var timeId in request.TimesGrupoB)
+            _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.B });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<IReadOnlyList<LigaKnockoutJogoDto>> GerarFaseKnockoutCopaAsync(Guid ligaId, CancellationToken ct)
+    {
+        // Top 2 de cada grupo pela classificação
+        var classifA = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId && x.Grupo == GrupoCopa.A)
+            .OrderBy(x => x.Posicao)
+            .Take(2)
+            .ToListAsync(ct);
+
+        var classifB = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId && x.Grupo == GrupoCopa.B)
+            .OrderBy(x => x.Posicao)
+            .Take(2)
+            .ToListAsync(ct);
+
+        if (classifA.Count < 2 || classifB.Count < 2)
+            throw new InvalidOperationException("Precisa de ao menos 2 classificados por grupo.");
+
+        // Semi1: 1A vs 2B, Semi2: 1B vs 2A
+        var jogos = new[]
+        {
+            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi1, TimeCasaId = classifA[0].TimeId, TimeForaId = classifB[1].TimeId },
+            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi2, TimeCasaId = classifB[0].TimeId, TimeForaId = classifA[1].TimeId },
+            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Final }
+        };
+
+        _db.LigaKnockoutJogos.AddRange(jogos);
+        await _db.SaveChangesAsync(ct);
+
+        return await GetKnockoutDtosAsync(ligaId, ct);
+    }
+
+    // ── Tiebreaker (Liga) ─────────────────────────────────────────────────────
+
+    public async Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Status != LigaStatus.DecisaoCampeao)
+            throw new InvalidOperationException("Liga não está em DecisaoCampeao.");
+
+        // Pega os 2 times empatados no topo
+        var classif = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .OrderBy(x => x.Posicao)
+            .Take(2)
+            .ToListAsync(ct);
+
+        if (classif.Count < 2)
+            throw new InvalidOperationException("Times não encontrados para decisão.");
+
+        // Cria rodada regular para decisão (Numero = próximo regular, não knockout)
+        var maxRodadaRegular = await _db.LigaRodadas
+            .Where(x => x.LigaId == ligaId && x.Numero > 0)
+            .MaxAsync(x => (int?)x.Numero, ct) ?? 0;
+
+        var rodadaDecisao = new LigaRodada
+        {
+            RodadaId = Guid.NewGuid(),
+            LigaId = ligaId,
+            Numero = maxRodadaRegular + 1
+        };
+
+        var partidaDecisao = new LigaPartida
+        {
+            PartidaId = Guid.NewGuid(),
+            TimeCasaId = classif[0].TimeId,
+            TimeForaId = classif[1].TimeId,
+            Status = PartidaStatus.Agendada
+        };
+
+        rodadaDecisao.Partidas.Add(partidaDecisao);
+        _db.LigaRodadas.Add(rodadaDecisao);
+
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+        return ToDto(liga);
+    }
+
+    public async Task<LigaDto> IniciarMiniLigaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Status != LigaStatus.MiniLiga)
+            throw new InvalidOperationException("Liga não está em MiniLiga.");
+
+        // Busca os times empatados no topo
+        var classif = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .OrderBy(x => x.Posicao)
+            .ToListAsync(ct);
+
+        var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
+        var empatados = classif
+            .Where(c => c.Pontos == lider.Pontos &&
+                        c.Vitorias == lider.Vitorias &&
+                        c.SaldoGols == lider.SaldoGols &&
+                        c.GolsPro == lider.GolsPro)
+            .Select(c => c.TimeId)
+            .ToList();
+
+        if (empatados.Count < 3)
+            throw new InvalidOperationException("Mini liga requer 3 ou mais times empatados.");
+
+        // Gera rodadas de round-robin entre os empatados
+        var rodadasExistentes = await _db.LigaRodadas.CountAsync(x => x.LigaId == ligaId && x.Numero == 0, ct);
+        if (rodadasExistentes == 0)
+        {
+            var jogos = GerarRoundRobinParcial(empatados, empatados.Count - 1);
+            foreach (var (r, rodadaJogos) in jogos.Select((j, i) => (i, j)))
+            {
+                var rodada = new LigaRodada
+                {
+                    RodadaId = Guid.NewGuid(),
+                    LigaId = ligaId,
+                    Numero = 0 // Usa Numero=0 para mini liga (exclui da classificação principal)
+                };
+                foreach (var (casa, fora) in rodadaJogos)
+                    rodada.Partidas.Add(new LigaPartida { PartidaId = Guid.NewGuid(), TimeCasaId = casa, TimeForaId = fora, Status = PartidaStatus.Agendada });
+                _db.LigaRodadas.Add(rodada);
+            }
+        }
+
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+        return ToDto(liga);
     }
 
     // ── Bracket advancement ───────────────────────────────────────────────────
@@ -997,7 +1349,7 @@ public class LigaAdminService : ILigaAdminService
     }
 
     private static LigaDto ToDto(Liga l) =>
-        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.CriadoEm, l.AtualizadoEm);
+        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada.Numero, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,

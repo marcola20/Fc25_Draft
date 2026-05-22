@@ -7,7 +7,20 @@
 <PageTitle>Mata-Mata</PageTitle>
 
 <div class="container-fluid py-3">
-    <h1 class="h3 mb-3">Mata-Mata</h1>
+    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <h1 class="h3 mb-0">Mata-Mata</h1>
+        @if (_ligas is not null && _ligas.Count > 1)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                @foreach (var l in _ligas)
+                {
+                    <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
+                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                    </option>
+                }
+            </select>
+        }
+    </div>
 
     @if (_loading)
     {
@@ -19,35 +32,39 @@
     }
     else
     {
-        <!-- Play-In -->
-        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
-        <div class="row g-3 mb-4">
-            @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
-            {
-                var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
-                if (jogo is not null)
+        <!-- Copa: sem Play-In nem Quartas -->
+        @if (_liga?.Tipo != TipoCompetition.Copa)
+        {
+            <!-- Play-In (Liga apenas) -->
+            <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
+            <div class="row g-3 mb-4">
+                @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
                 {
-                    <div class="col-12 col-md-4">
-                        <KnockoutCard Jogo="jogo" />
-                    </div>
+                    var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                    if (jogo is not null)
+                    {
+                        <div class="col-12 col-md-4">
+                            <KnockoutCard Jogo="jogo" />
+                        </div>
+                    }
                 }
-            }
-        </div>
+            </div>
 
-        <!-- Quartas -->
-        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
-        <div class="row g-3 mb-4">
-            @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
-            {
-                var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
-                if (jogo is not null)
+            <!-- Quartas (Liga apenas) -->
+            <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
+            <div class="row g-3 mb-4">
+                @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
                 {
-                    <div class="col-12 col-md-3">
-                        <KnockoutCard Jogo="jogo" />
-                    </div>
+                    var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                    if (jogo is not null)
+                    {
+                        <div class="col-12 col-md-3">
+                            <KnockoutCard Jogo="jogo" />
+                        </div>
+                    }
                 }
-            }
-        </div>
+            </div>
+        }
 
         <!-- Semis -->
         <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Semifinais</h5>
@@ -80,14 +97,34 @@
 @* Componente inline do card *@
 @code {
     private LigaDto? _liga;
+    private IReadOnlyList<LigaDto>? _ligas;
+    private Guid _ligaId;
     private IReadOnlyList<LigaKnockoutJogoDto> _jogos = Array.Empty<LigaKnockoutJogoDto>();
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
+        _liga = _ligas.Count > 0 ? _ligas[0] : await LigaService.GetAtualAsync(CancellationToken.None);
+
         if (_liga is not null)
-            _jogos = await LigaService.GetKnockoutAsync(_liga.LigaId, CancellationToken.None);
+        {
+            _ligaId = _liga.LigaId;
+            _jogos = await LigaService.GetKnockoutAsync(_ligaId, CancellationToken.None);
+        }
         _loading = false;
+    }
+
+    private async Task OnLigaChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _ligaId = id;
+            _liga = _ligas?.FirstOrDefault(l => l.LigaId == id);
+            _loading = true;
+            StateHasChanged();
+            _jogos = await LigaService.GetKnockoutAsync(_ligaId, CancellationToken.None);
+            _loading = false;
+        }
     }
 }

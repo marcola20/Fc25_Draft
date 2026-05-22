@@ -11,6 +11,7 @@ public interface ILigaAdminService
     Task<LigaDto> UpdateAsync(Guid ligaId, LigaUpdateRequest request, CancellationToken ct);
     Task<LigaDto> IniciarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct);
     Task<LigaDto> EncerrarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct);
+    Task DeleteLigaAsync(Guid ligaId, CancellationToken ct);
 
     // Rodadas
     Task<LigaRodadaDto> CreateRodadaAsync(Guid ligaId, CancellationToken ct);
@@ -42,4 +43,12 @@ public interface ILigaAdminService
     Task<IReadOnlyList<LigaKnockoutJogoDto>> GerarFaseKnockoutAsync(Guid ligaId, CancellationToken ct);
     Task<LigaPartidaDto> CriarPartidaKnockoutAsync(Guid knockoutJogoId, CancellationToken ct);
     Task<LigaKnockoutJogoDto> EncerrarKnockoutJogoAsync(Guid knockoutJogoId, LigaEncerrarKnockoutRequest request, CancellationToken ct);
+
+    // Copa grupos
+    Task<IReadOnlyList<LigaGrupoTimeDto>> ListGruposAsync(Guid ligaId, CancellationToken ct);
+    Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
+
+    // Tiebreaker (Liga)
+    Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct);
+    Task<LigaDto> IniciarMiniLigaAsync(Guid ligaId, CancellationToken ct);
 }

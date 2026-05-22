@@ -20,6 +20,8 @@ public class LigaClassificacaoConfiguration : IEntityTypeConfiguration<LigaClass
             .HasForeignKey(x => x.TimeId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        e.Property(x => x.Grupo).HasConversion<int?>().IsRequired(false);
+
         e.HasIndex(x => new { x.LigaId, x.TimeId }).IsUnique();
     }
 }

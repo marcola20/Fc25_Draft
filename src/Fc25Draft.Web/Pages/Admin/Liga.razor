@@ -32,6 +32,10 @@
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>_tab="liga"'>Liga</button></li>
+        @if (_ligaAtual?.Tipo == TipoCompetition.Copa)
+        {
+            <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
+        }
         <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>_tab="rodadas"' disabled="@(_ligaAtual == null)">Rodadas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>_tab="partidas"' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="punicoes"?"active":"")" @onclick='()=>_tab="punicoes"' disabled="@(_ligaAtual == null)">Punições</button></li>
@@ -49,6 +53,13 @@
                         <div class="mb-2">
                             <label class="form-label">Nome</label>
                             <input class="form-control" @bind="_formNome" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Tipo</label>
+                            <select class="form-select" @bind="_formTipo" disabled="@_editandoLigaId.HasValue">
+                                <option value="@TipoCompetition.Liga">Liga (pontos corridos)</option>
+                                <option value="@TipoCompetition.Copa">Copa (grupos A e B)</option>
+                            </select>
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Início</label>
@@ -78,7 +89,8 @@
                             <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
                                 <div class="flex-grow-1">
                                     <span class="fw-semibold">@liga.Nome</span>
-                                    <span class="badge ms-2 @StatusBadge(liga.Status)">@StatusLabel(liga.Status)</span>
+                                    <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@(liga.Tipo == TipoCompetition.Copa ? "Copa" : "Liga")</span>
+                                    <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status)</span>
                                     <div class="small text-muted">@liga.DataInicio.ToLocalTime().ToString("dd/MM/yyyy") – @liga.DataFim.ToLocalTime().ToString("dd/MM/yyyy")</div>
                                 </div>
                                 <div class="d-flex gap-1 flex-wrap">
@@ -91,7 +103,16 @@
                                     {
                                         <button class="btn btn-sm btn-warning" @onclick="() => EncerrarFase(liga.LigaId)">Encerrar 1ª Fase</button>
                                     }
+                                    @if (liga.Status == LigaStatus.DecisaoCampeao)
+                                    {
+                                        <button class="btn btn-sm btn-danger" @onclick="() => IniciarDecisao(liga.LigaId)">Decisão Campeão</button>
+                                    }
+                                    @if (liga.Status == LigaStatus.MiniLiga)
+                                    {
+                                        <button class="btn btn-sm btn-danger" @onclick="() => IniciarMiniLiga(liga.LigaId)">Gerar Mini Liga</button>
+                                    }
                                     <button class="btn btn-sm btn-primary" @onclick="() => SelecionarLiga(liga)">Gerenciar</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => ConfirmarDelete(liga)">Apagar</button>
                                 </div>
                             </div>
                         }
@@ -103,6 +124,102 @@
                 </div>
             </div>
         </div>
+
+        <!-- ── Delete Liga Modal ── -->
+        @if (_ligaParaDeleter is not null)
+        {
+            <div class="modal fade show d-block" style="background-color:rgba(0,0,0,0.5)">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Apagar Liga</h5>
+                            <button type="button" class="btn-close" @onclick="CancelarDelete"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p><strong>⚠️ Confirmar exclusão</strong></p>
+                            <p>Você tem certeza que deseja apagar a liga "<strong>@_ligaParaDeleter.Nome</strong>"?</p>
+                            <p class="text-danger">Todos os dados serão deletados permanentemente (rodadas, partidas, classificação, etc).</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CancelarDelete">Cancelar</button>
+                            <button type="button" class="btn btn-danger" @onclick="ApagarLiga" disabled="@_saving">
+                                @(_saving ? "Apagando..." : "Apagar Liga")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- ─ Tab: Grupos Copa ─ -->
+    @if (_tab == "grupos" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card">
+                    <div class="card-header fw-bold">Grupo A</div>
+                    <div class="card-body">
+                        @for (int i = 0; i < 6; i++)
+                        {
+                            var idx = i;
+                            <div class="mb-2">
+                                <select class="form-select form-select-sm" @bind="_grupoA[idx]">
+                                    <option value="">Selecione...</option>
+                                    @foreach (var t in _times)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card">
+                    <div class="card-header fw-bold">Grupo B</div>
+                    <div class="card-body">
+                        @for (int i = 0; i < 6; i++)
+                        {
+                            var idx = i;
+                            <div class="mb-2">
+                                <select class="form-select form-select-sm" @bind="_grupoB[idx]">
+                                    <option value="">Selecione...</option>
+                                    @foreach (var t in _times)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" @onclick="SalvarGrupos" disabled="@_saving">Salvar Grupos</button>
+            </div>
+        </div>
+
+        @if (_grupos.Any())
+        {
+            <div class="row g-3 mt-3">
+                @foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+                {
+                    <div class="col-12 col-md-6">
+                        <div class="card">
+                            <div class="card-header fw-bold">Grupo @grupo configurado</div>
+                            <ul class="list-group list-group-flush">
+                                @foreach (var g in _grupos.Where(x => x.Grupo == grupo))
+                                {
+                                    <li class="list-group-item">@g.TimeNome</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     }
 
     <!-- ─ Tab: Rodadas ─ -->
@@ -379,10 +496,17 @@
     // Liga
     private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
     private LigaDto? _ligaAtual;
+    private LigaDto? _ligaParaDeleter;
     private Guid? _editandoLigaId;
     private string _formNome = "";
     private DateTime _formInicio = DateTime.Today;
     private DateTime _formFim = DateTime.Today.AddMonths(2);
+    private TipoCompetition _formTipo = TipoCompetition.Liga;
+
+    // Grupos Copa
+    private IReadOnlyList<LigaGrupoTimeDto> _grupos = Array.Empty<LigaGrupoTimeDto>();
+    private readonly string[] _grupoA = new string[6];
+    private readonly string[] _grupoB = new string[6];
 
     // Times
     private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
@@ -432,8 +556,22 @@
             _knockoutJogos = await PublicSvc.GetKnockoutAsync(_ligaAtual.LigaId, CancellationToken.None);
             if (_rodadaSelecionada is not null)
                 _partidas = await AdminSvc.ListPartidasAsync(_rodadaSelecionada.RodadaId, CancellationToken.None);
+            if (_ligaAtual.Tipo == TipoCompetition.Copa)
+            {
+                _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
+                PreencherSelects();
+            }
         }
     }
+
+    private void PreencherSelects()
+    {
+        var a = _grupos.Where(g => g.Grupo == GrupoCopa.A).Select(g => g.TimeId.ToString()).ToArray();
+        var b = _grupos.Where(g => g.Grupo == GrupoCopa.B).Select(g => g.TimeId.ToString()).ToArray();
+        for (int i = 0; i < 6; i++) { _grupoA[i] = i < a.Length ? a[i] : ""; _grupoB[i] = i < b.Length ? b[i] : ""; }
+    }
+
+    private void SetTab(string tab) { _tab = tab; }
 
     private async Task SalvarLiga()
     {
@@ -447,7 +585,7 @@
             }
             else
             {
-                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim), CancellationToken.None);
+                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo), CancellationToken.None);
                 _ok = "Liga criada.";
             }
             CancelarEdicao();
@@ -457,8 +595,8 @@
         finally { _saving = false; }
     }
 
-    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
-    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
+    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
+    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
 
     private void SelecionarLiga(LigaDto liga)
     {
@@ -479,6 +617,31 @@
     {
         try { await AdminSvc.EncerrarPrimeiraFaseAsync(ligaId, CancellationToken.None); _ok = "Primeira fase encerrada. Play-In ativo."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void ConfirmarDelete(LigaDto liga)
+    {
+        _ligaParaDeleter = liga;
+    }
+
+    private async Task ApagarLiga()
+    {
+        if (_ligaParaDeleter is null) return;
+        _saving = true;
+        try
+        {
+            await AdminSvc.DeleteLigaAsync(_ligaParaDeleter.LigaId, CancellationToken.None);
+            _ok = $"Liga '{_ligaParaDeleter.Nome}' apagada.";
+            _ligaParaDeleter = null;
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void CancelarDelete()
+    {
+        _ligaParaDeleter = null;
     }
 
     private async Task CriarRodada()
@@ -567,6 +730,34 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
+    private async Task SalvarGrupos()
+    {
+        var a = _grupoA.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
+        var b = _grupoB.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
+        if (a.Count != 6 || b.Count != 6) { _erro = "Selecione exatamente 6 times em cada grupo."; return; }
+        _saving = true;
+        try
+        {
+            await AdminSvc.ConfigurarGruposCopaAsync(_ligaAtual!.LigaId, new LigaConfigurarGruposRequest(a, b), CancellationToken.None);
+            _ok = "Grupos configurados.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task IniciarDecisao(Guid ligaId)
+    {
+        try { await AdminSvc.IniciarDecisaoCampeaoAsync(ligaId, CancellationToken.None); _ok = "Decisão de campeão iniciada."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task IniciarMiniLiga(Guid ligaId)
+    {
+        try { await AdminSvc.IniciarMiniLigaAsync(ligaId, CancellationToken.None); _ok = "Mini Liga gerada."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
     private async Task GerarKnockout()
     {
         _saving = true;
@@ -605,6 +796,8 @@
         LigaStatus.PrimeiraFase => "bg-success",
         LigaStatus.PlayIn => "bg-info text-dark",
         LigaStatus.Playoffs => "bg-warning text-dark",
+        LigaStatus.DecisaoCampeao => "bg-danger",
+        LigaStatus.MiniLiga => "bg-danger",
         LigaStatus.Encerrada => "bg-secondary",
         _ => "bg-light text-dark"
     };
@@ -615,6 +808,8 @@
         LigaStatus.PrimeiraFase => "1ª Fase",
         LigaStatus.PlayIn => "Play-In",
         LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.DecisaoCampeao => "Decisão Campeão",
+        LigaStatus.MiniLiga => "Mini Liga",
         LigaStatus.Encerrada => "Encerrada",
         _ => s.ToString()
     };

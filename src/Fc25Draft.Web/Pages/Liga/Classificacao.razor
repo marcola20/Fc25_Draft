@@ -8,7 +8,20 @@
 <PageTitle>Classificação</PageTitle>
 
 <div class="container-fluid py-3">
-    <h1 class="h3 mb-1">Classificação</h1>
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <h1 class="h3 mb-0">Classificação</h1>
+        @if (_ligas is not null && _ligas.Count > 1)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                @foreach (var l in _ligas)
+                {
+                    <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
+                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                    </option>
+                }
+            </select>
+        }
+    </div>
 
     @if (_liga is not null)
     {
@@ -23,8 +36,64 @@
     {
         <div class="alert alert-info">Classificação ainda não disponível.</div>
     }
+    else if (_liga?.Tipo == TipoCompetition.Copa)
+    {
+        <!-- Copa: tabelas separadas por grupo -->
+        @foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        {
+            var itensGrupo = _classif.Where(c => c.Grupo == grupo).ToList();
+            if (itensGrupo.Count == 0) continue;
+
+            <h5 class="mt-3 mb-2">Grupo @grupo</h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Time</th>
+                            <th class="text-center" title="Pontos">Pts</th>
+                            <th class="text-center" title="Jogos">J</th>
+                            <th class="text-center" title="Vitórias">V</th>
+                            <th class="text-center" title="Empates">E</th>
+                            <th class="text-center" title="Derrotas">D</th>
+                            <th class="text-center" title="Gols Pró">GP</th>
+                            <th class="text-center" title="Gols Contra">GC</th>
+                            <th class="text-center" title="Saldo de Gols">SG</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int grupoPos = 0; }
+                        @foreach (var item in itensGrupo.OrderBy(x => x.Posicao))
+                        {
+                            grupoPos++;
+                            <tr class="@CopaRowClass(grupoPos)">
+                                <td><span class="badge @CopaBadgeClass(grupoPos)">@grupoPos</span></td>
+                                <td class="fw-semibold">@item.TimeNome</td>
+                                <td class="text-center fw-bold">@item.Pontos</td>
+                                <td class="text-center">@item.Jogos</td>
+                                <td class="text-center">@item.Vitorias</td>
+                                <td class="text-center">@item.Empates</td>
+                                <td class="text-center">@item.Derrotas</td>
+                                <td class="text-center">@item.GolsPro</td>
+                                <td class="text-center">@item.GolsContra</td>
+                                <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")">
+                                    @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
+            <span><span class="badge bg-success me-1">●</span> Avança (1º-2º do grupo)</span>
+            <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
+        </div>
+    }
     else
     {
+        <!-- Liga: tabela única -->
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
@@ -47,9 +116,9 @@
                 <tbody>
                     @foreach (var item in _classif)
                     {
-                        <tr class="@RowClass(item.Posicao)">
+                        <tr class="@GetRowClass(item)">
                             <td>
-                                <span class="badge @BadgeClass(item.Posicao)">@item.Posicao</span>
+                                <span class="badge @GetBadgeClass(item)">@item.Posicao</span>
                             </td>
                             <td class="fw-semibold">@item.TimeNome</td>
                             <td class="text-center fw-bold">@item.Pontos</td>
@@ -73,26 +142,89 @@
             </table>
         </div>
 
-        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
-            <span><span class="badge bg-warning text-dark me-1">●</span> Bye (1º-2º)</span>
-            <span><span class="badge bg-success me-1">●</span> Playoffs direto (3º-6º)</span>
-            <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
-            <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
-        </div>
+        @if (_liga?.Status != LigaStatus.PrimeiraFase && _liga?.Status != LigaStatus.Criada)
+        {
+            <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
+                <span><span class="badge bg-success me-1">●</span> Bye (1º-2º)</span>
+                <span><span class="badge bg-success me-1">●</span> QF direto (3º-6º)</span>
+                <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
+                <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
+            </div>
+        }
     }
 </div>
 
 @code {
     private LigaDto? _liga;
+    private IReadOnlyList<LigaDto>? _ligas;
+    private Guid _ligaId;
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
+
+        if (_ligas.Count == 0)
+        {
+            // Fallback: pega última liga (mesmo encerrada)
+            _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+        }
+        else
+        {
+            _liga = _ligas[0];
+        }
+
         if (_liga is not null)
-            _classif = await LigaService.GetClassificacaoAsync(_liga.LigaId, CancellationToken.None);
+        {
+            _ligaId = _liga.LigaId;
+            _classif = await LigaService.GetClassificacaoAsync(_ligaId, CancellationToken.None);
+        }
+
         _loading = false;
+    }
+
+    private async Task OnLigaChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _ligaId = id;
+            _liga = _ligas?.FirstOrDefault(l => l.LigaId == id);
+            _loading = true;
+            StateHasChanged();
+            _classif = await LigaService.GetClassificacaoAsync(_ligaId, CancellationToken.None);
+            _loading = false;
+        }
+    }
+
+    private string GetRowClass(LigaClassificacaoItemDto item)
+    {
+        // During Primeira Fase, all teams same color (no qualifications yet)
+        if (_liga?.Status == LigaStatus.PrimeiraFase || _liga?.Status == LigaStatus.Criada)
+            return "table-success";
+
+        if (_classif is null || _classif.Count == 0) return RowClass(item.Posicao);
+
+        var topTeam = _classif[0];
+        // Highlight all teams tied with the leader in green
+        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
+            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
+            return "table-success";
+
+        return RowClass(item.Posicao);
+    }
+
+    private string GetBadgeClass(LigaClassificacaoItemDto item)
+    {
+        if (_classif is null || _classif.Count == 0) return BadgeClass(item.Posicao);
+
+        var topTeam = _classif[0];
+        // Highlight all teams tied with the leader in green
+        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
+            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
+            return "bg-success";
+
+        return BadgeClass(item.Posicao);
     }
 
     private static string RowClass(int pos) => pos switch
@@ -111,12 +243,17 @@
         _ => "bg-danger"
     };
 
+    private static string CopaRowClass(int pos) => pos <= 2 ? "table-success" : "table-danger";
+    private static string CopaBadgeClass(int pos) => pos <= 2 ? "bg-success" : "bg-danger";
+
     private static string StatusLabel(LigaStatus s) => s switch
     {
         LigaStatus.Criada => "Não iniciada",
-        LigaStatus.PrimeiraFase => "Fase de Liga em andamento",
-        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.PrimeiraFase => "Fase regular em andamento",
+        LigaStatus.PlayIn => "Play-In / Knockout",
         LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.DecisaoCampeao => "Decisão de Campeão",
+        LigaStatus.MiniLiga => "Mini Liga (desempate)",
         LigaStatus.Encerrada => "Encerrada",
         _ => s.ToString()
     };

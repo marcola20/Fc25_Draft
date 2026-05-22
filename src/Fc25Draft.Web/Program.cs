@@ -61,6 +61,25 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT "FK_LigaLoteriaPicks_LigaLoterias"
                 FOREIGN KEY ("LoteraiaId") REFERENCES "LigaLoterias"("LoteraiaId") ON DELETE CASCADE
         );
+
+        ALTER TABLE "Ligas" ADD COLUMN IF NOT EXISTS "Tipo" integer NOT NULL DEFAULT 0;
+        ALTER TABLE "LigaClassificacoes" ADD COLUMN IF NOT EXISTS "Grupo" integer NULL;
+
+        CREATE TABLE IF NOT EXISTS "LigaGruposTimes" (
+            "Id"      uuid    NOT NULL,
+            "LigaId"  uuid    NOT NULL,
+            "TimeId"  uuid    NOT NULL,
+            "Grupo"   integer NOT NULL,
+            CONSTRAINT "PK_LigaGruposTimes" PRIMARY KEY ("Id"),
+            CONSTRAINT "FK_LigaGruposTimes_Ligas"
+                FOREIGN KEY ("LigaId") REFERENCES "Ligas"("LigaId") ON DELETE CASCADE,
+            CONSTRAINT "FK_LigaGruposTimes_Teams"
+                FOREIGN KEY ("TimeId") REFERENCES "Teams"("TeamId") ON DELETE CASCADE
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_LigaGruposTimes_LigaId_TimeId"
+            ON "LigaGruposTimes"("LigaId", "TimeId");
+        CREATE INDEX IF NOT EXISTS "IX_LigaGruposTimes_LigaId_Grupo"
+            ON "LigaGruposTimes"("LigaId", "Grupo");
         """);
 
     // Restaura última loteria finalizada no serviço singleton

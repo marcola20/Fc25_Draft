@@ -10,13 +10,15 @@ public record LigaDto(
     DateTime DataInicio,
     DateTime DataFim,
     LigaStatus Status,
+    TipoCompetition Tipo,
     DateTime CriadoEm,
     DateTime AtualizadoEm);
 
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,
     DateTime DataInicio,
-    DateTime DataFim);
+    DateTime DataFim,
+    TipoCompetition Tipo = TipoCompetition.Liga);
 
 public record LigaUpdateRequest(
     [MaxLength(120)] string? Nome,
@@ -95,7 +97,18 @@ public record LigaClassificacaoItemDto(
     int SaldoGols,
     int CartoesAmarelos,
     int CartoesVermelhos,
-    int PontosDescontados);
+    int PontosDescontados,
+    GrupoCopa? Grupo = null);
+
+public record LigaGrupoTimeDto(
+    Guid LigaId,
+    Guid TimeId,
+    string TimeNome,
+    GrupoCopa Grupo);
+
+public record LigaConfigurarGruposRequest(
+    IReadOnlyList<Guid> TimesGrupoA,
+    IReadOnlyList<Guid> TimesGrupoB);
 
 public record LigaPunicaoDto(
     Guid PunicaoId,
