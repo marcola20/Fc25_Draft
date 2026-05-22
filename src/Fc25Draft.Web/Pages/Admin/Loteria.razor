@@ -76,15 +76,59 @@
             <span class="badge @(s.Rodada == 1 ? "bg-success" : "bg-warning text-dark") fs-6">Round @s.Rodada</span>
             @if (s.IsFinished) { <span class="badge bg-secondary fs-6">Encerrado</span> }
             <div class="ms-auto d-flex gap-2">
-                @if (s.IsFinished)
-                {
-                    <button class="btn btn-sm btn-success fw-semibold" @onclick="CriarDraft" disabled="@_carregando">
-                        🏈 Gerar Draft
-                    </button>
-                }
                 <button class="btn btn-sm btn-outline-danger" @onclick="Reset">✖ Resetar</button>
             </div>
         </div>
+
+        @if (s.IsFinished)
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-bold">⚙️ Configurar Draft</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="fw-semibold mb-2 small text-muted text-uppercase">Round 1 — Overall dos Jogadores</div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="flex-fill">
+                                    <label class="form-label small mb-1">Mínimo</label>
+                                    <input type="number" class="form-control form-control-sm" placeholder="ex: 75"
+                                           @bind="_r1OverallMin" min="1" max="99" />
+                                </div>
+                                <div class="flex-fill">
+                                    <label class="form-label small mb-1">Máximo</label>
+                                    <input type="number" class="form-control form-control-sm" placeholder="ex: 99"
+                                           @bind="_r1OverallMax" min="1" max="99" />
+                                </div>
+                            </div>
+                        </div>
+                        @if (s.Round1Results.Count > 0)
+                        {
+                            <div class="col-12 col-md-6">
+                                <div class="fw-semibold mb-2 small text-muted text-uppercase">Round 2 — Overall dos Jogadores</div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <div class="flex-fill">
+                                        <label class="form-label small mb-1">Mínimo</label>
+                                        <input type="number" class="form-control form-control-sm" placeholder="ex: 75"
+                                               @bind="_r2OverallMin" min="1" max="99" />
+                                    </div>
+                                    <div class="flex-fill">
+                                        <label class="form-label small mb-1">Máximo</label>
+                                        <input type="number" class="form-control form-control-sm" placeholder="ex: 99"
+                                               @bind="_r2OverallMax" min="1" max="99" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-success fw-semibold" @onclick="CriarDraft" disabled="@_carregando">
+                            🏈 Gerar Draft
+                        </button>
+                        <span class="text-muted small ms-2">Min/Máx opcionais — deixe vazio para sem restrição</span>
+                    </div>
+                </div>
+            </div>
+        }
 
         @if (!s.IsFinished)
         {
@@ -220,6 +264,10 @@
     private string? _erro;
     private string? _ok;
     private bool _carregando;
+    private int? _r1OverallMin;
+    private int? _r1OverallMax;
+    private int? _r2OverallMin;
+    private int? _r2OverallMax;
 
     protected override async Task OnInitializedAsync()
     {
@@ -416,13 +464,18 @@
     {
         var s = LotteryService.State;
         if (s is null || !s.IsFinished) { _erro = "Finalize a loteria antes de gerar o draft."; return; }
-        if (s.Round1Results.Count == 0) { _erro = "Resultados do Round 1 não encontrados."; return; }
+
+        // R1: Round1Results (se teve round 2) ou Revealed (se encerrou no round 1)
+        var r1 = s.Round1Results.Count > 0
+            ? s.Round1Results.OrderBy(p => p.PickNumero).ToList()
+            : s.Revealed.OrderBy(p => p.PickNumero).ToList();
+        var r2 = s.Rodada == 2 ? s.Revealed.OrderBy(p => p.PickNumero).ToList() : new List<LotteryPickItem>();
+
+        if (r1.Count == 0) { _erro = "Nenhuma pick do Round 1 encontrada."; return; }
 
         _carregando = true; _erro = null; _ok = null;
         try
         {
-            var r1 = s.Round1Results.OrderBy(p => p.PickNumero).ToList();
-            var r2 = s.Revealed.OrderBy(p => p.PickNumero).ToList();
             int totalTeams = r1.Count;
             int totalRounds = r2.Count > 0 ? 2 : 1;
 
@@ -435,10 +488,21 @@
                 CreatedAtUtc = DateTime.UtcNow
             };
 
-            // DraftRounds (sem restrição de overall)
-            draft.Rounds.Add(new DraftRound { DraftId = draft.DraftId, RoundNumber = 1 });
+            draft.Rounds.Add(new DraftRound
+            {
+                DraftId     = draft.DraftId,
+                RoundNumber = 1,
+                OverallMin  = _r1OverallMin,
+                OverallMax  = _r1OverallMax
+            });
             if (totalRounds == 2)
-                draft.Rounds.Add(new DraftRound { DraftId = draft.DraftId, RoundNumber = 2 });
+                draft.Rounds.Add(new DraftRound
+                {
+                    DraftId     = draft.DraftId,
+                    RoundNumber = 2,
+                    OverallMin  = _r2OverallMin,
+                    OverallMax  = _r2OverallMax
+                });
 
             // Round 1 picks
             foreach (var p in r1)

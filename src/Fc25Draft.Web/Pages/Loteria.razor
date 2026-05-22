@@ -50,20 +50,44 @@
 
         @if (s.IsFinished)
         {
-            <div class="lottery-final-board">
-                <div class="lottery-final-header">
-                    <span class="lottery-final-icon">🎉</span>
-                    <span>Resultado Final — Round @s.Rodada</span>
-                </div>
-                @foreach (var pick in s.Revealed)
-                {
-                    <div class="lottery-final-row">
-                        <span class="lottery-final-pick">#@pick.PickNumero</span>
-                        <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
-                        <span class="lottery-final-name">@pick.TimeNome</span>
-                        @if (s.Rodada == 1)
-                        {
+            var r1Final = s.Round1Results.Count > 0
+                ? s.Round1Results.OrderBy(p => p.PickNumero).ToList()
+                : (s.Rodada == 1 ? s.Revealed.OrderBy(p => p.PickNumero).ToList() : new());
+            var r2Final = s.Rodada == 2 ? s.Revealed.OrderBy(p => p.PickNumero).ToList() : new();
+
+            <div class="lottery-final-wrap">
+                <!-- Round 1 -->
+                <div class="lottery-final-board">
+                    <div class="lottery-final-header">
+                        <span class="lottery-final-icon">🏆</span>
+                        <span>Round 1 — Ordem do Draft</span>
+                    </div>
+                    @foreach (var pick in r1Final)
+                    {
+                        <div class="lottery-final-row">
+                            <span class="lottery-final-pick @(pick.PickNumero == 1 ? "lottery-final-pick-gold" : "")">#@pick.PickNumero</span>
+                            <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
+                            <span class="lottery-final-name">@pick.TimeNome</span>
                             <span class="lottery-final-pos">@pick.Posicao°</span>
+                        </div>
+                    }
+                </div>
+
+                <!-- Round 2 (só se existir) -->
+                @if (r2Final.Count > 0)
+                {
+                    <div class="lottery-final-board">
+                        <div class="lottery-final-header">
+                            <span class="lottery-final-icon">🎲</span>
+                            <span>Round 2 — Ordem do Draft</span>
+                        </div>
+                        @foreach (var pick in r2Final)
+                        {
+                            <div class="lottery-final-row">
+                                <span class="lottery-final-pick">#@pick.PickNumero</span>
+                                <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
+                                <span class="lottery-final-name">@pick.TimeNome</span>
+                            </div>
                         }
                     </div>
                 }
@@ -462,6 +486,13 @@
         padding: 0.25rem 0.85rem;
     }
 
+    /* ─ Final boards wrapper ─ */
+    .lottery-final-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
     /* ─ Final board ─ */
     .lottery-final-board {
         border: 1px solid var(--bs-border-color, #dee2e6);
@@ -517,5 +548,10 @@
     .lottery-final-pos {
         font-size: 0.75rem;
         color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .lottery-final-pick-gold {
+        color: #a07800 !important;
+        font-weight: 900;
     }
 </style>
