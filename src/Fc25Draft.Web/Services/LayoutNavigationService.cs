@@ -36,7 +36,8 @@ public class LayoutNavigationService
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
-            new("Regulamento", "/regulamento", "oi oi-document")
+            new("Regulamento", "/regulamento", "oi oi-document"),
+            new("Gerenciar Liga", "/admin/liga", "oi oi-sliders", RequiredRole: "Admin")
         }),
         new("Admin", new List<MenuItem>
         {
@@ -44,7 +45,6 @@ public class LayoutNavigationService
             new("Histórico de Mercado", "/mercado/historico", "oi oi-clipboard", RequiredRole: "Admin"),
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
-            new("Gerenciar Liga", "/admin/liga", "oi oi-trophy", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
