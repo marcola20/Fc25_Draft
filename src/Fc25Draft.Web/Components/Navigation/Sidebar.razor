@@ -8,24 +8,44 @@
 
     @if (MenuGroups?.Count > 0)
     {
-        foreach (var group in MenuGroups)
-        {
-            <div class="sidebar-group">
-                <div class="sidebar-group-title">@group.Title</div>
-                <ul class="sidebar-group-list">
-                    @foreach (var item in group.Items)
-                    {
-                        var match = item.MatchPrefix ? NavLinkMatch.Prefix : NavLinkMatch.All;
-                        <li class="sidebar-item">
-                            <NavLink class="sidebar-link" href="@item.Href" Match="@match">
-                                <span class="@item.Icon" aria-hidden="true"></span>
-                                <span class="sidebar-link-text">@item.Title</span>
-                            </NavLink>
-                        </li>
-                    }
-                </ul>
-            </div>
-        }
+        <div class="accordion" id="sidebarAccordion">
+            @foreach (var group in MenuGroups)
+            {
+                var groupId = $"group-{System.Web.HttpUtility.UrlEncode(group.Title)}";
+                var isExpanded = expandedGroups.Contains(group.Title);
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="@($"heading-{groupId}")">
+                        <button class="accordion-button @(!isExpanded ? "collapsed" : "")"
+                                type="button"
+                                @onclick="@(() => ToggleGroup(group.Title))"
+                                aria-expanded="@isExpanded.ToString().ToLower()"
+                                aria-controls="@groupId">
+                            <span class="sidebar-group-title-text">@group.Title</span>
+                        </button>
+                    </h2>
+                    <div id="@groupId"
+                         class="accordion-collapse collapse @(isExpanded ? "show" : "")"
+                         aria-labelledby="@($"heading-{groupId}")"
+                         data-bs-parent="#sidebarAccordion">
+                        <div class="accordion-body p-0">
+                            <ul class="sidebar-group-list">
+                                @foreach (var item in group.Items)
+                                {
+                                    var match = item.MatchPrefix ? NavLinkMatch.Prefix : NavLinkMatch.All;
+                                    <li class="sidebar-item">
+                                        <NavLink class="sidebar-link" href="@item.Href" Match="@match">
+                                            <span class="@item.Icon" aria-hidden="true"></span>
+                                            <span class="sidebar-link-text">@item.Title</span>
+                                        </NavLink>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     }
     else
     {
@@ -35,4 +55,27 @@
 
 @code {
     [Parameter] public IReadOnlyList<MenuGroup> MenuGroups { get; set; } = Array.Empty<MenuGroup>();
+
+    private HashSet<string> expandedGroups = new();
+
+    protected override void OnInitialized()
+    {
+        // Expandir primeiro grupo por padrão
+        if (MenuGroups?.Count > 0)
+        {
+            expandedGroups.Add(MenuGroups[0].Title);
+        }
+    }
+
+    private void ToggleGroup(string groupTitle)
+    {
+        if (expandedGroups.Contains(groupTitle))
+        {
+            expandedGroups.Remove(groupTitle);
+        }
+        else
+        {
+            expandedGroups.Add(groupTitle);
+        }
+    }
 }
