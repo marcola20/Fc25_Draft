@@ -38,7 +38,7 @@ public class LigaPublicService : ILigaPublicService
     {
         var ligas = await _db.Ligas
             .AsNoTracking()
-            .Where(x => x.Status != LigaStatus.Criada && x.Status != LigaStatus.Encerrada)
+            .Where(x => x.Status != LigaStatus.Encerrada)
             .OrderByDescending(x => x.CriadoEm)
             .ToListAsync(ct);
 
