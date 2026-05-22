@@ -313,6 +313,18 @@ public class TransferOfferService : ITransferOfferService
         var toTeam = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == offer.ToTeamId, ct)
             ?? throw new InvalidOperationException("Time de destino não encontrado.");
 
+        // Validate roster counts to ensure teams stay with at least 15 players
+        var fromTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == fromTeam.TeamId, ct);
+        var toTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == toTeam.TeamId, ct);
+
+        // If toTeam is losing players (targetPlayers), it must have at least 16 to stay with 15
+        if (targetPlayers.Count > 0 && toTeamRosterCount < 16)
+            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de 15 jogadores.");
+
+        // If fromTeam is losing players (offeredPlayers in a swap), it must have at least 16 to stay with 15
+        if (offeredPlayers.Count > 0 && offer.Type == OfferType.Swap && fromTeamRosterCount < 16)
+            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de 15 jogadores.");
+
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {
             var payerTeam = offer.MoneyPayerTeamId.Value == fromTeam.TeamId ? fromTeam : toTeam;
