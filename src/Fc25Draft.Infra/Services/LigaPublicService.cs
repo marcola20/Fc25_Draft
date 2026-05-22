@@ -208,6 +208,31 @@ public class LigaPublicService : ILigaPublicService
         )).ToArray();
     }
 
+    public async Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct)
+    {
+        var eventos = await _db.LigaEventos
+            .AsNoTracking()
+            .Where(x => x.PartidaId == partidaId)
+            .Include(x => x.Jogador)
+            .Include(x => x.Time)
+            .Include(x => x.Assistente)
+            .OrderBy(x => x.Minuto)
+            .ToListAsync(ct);
+
+        return eventos.Select(e => new LigaEventoDto(
+            e.EventoId,
+            e.PartidaId,
+            e.Tipo,
+            e.TimeId,
+            e.Time?.TeamName ?? "?",
+            e.JogadorId,
+            e.Jogador?.Name ?? "?",
+            e.AssistenteId,
+            e.Assistente?.Name,
+            e.Minuto,
+            e.CriadoEm)).ToArray();
+    }
+
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
 

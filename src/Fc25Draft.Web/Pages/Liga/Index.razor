@@ -183,6 +183,58 @@
                     </div>
                 }
             }
+
+            <!-- Matches/Rounds -->
+            @if (_rodadas.Any())
+            {
+                <hr class="my-4" />
+                <h5 class="text-uppercase text-muted small fw-bold mb-3">Partidas</h5>
+
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
+                    <span class="fw-bold px-2">Rodada @(_rodadaAtual?.Numero)</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                </div>
+
+                @if (_rodadaAtual is not null)
+                {
+                    <div class="list-group">
+                        @foreach (var p in _rodadaAtual.Partidas)
+                        {
+                            <div class="list-group-item py-2 d-flex align-items-center gap-2" style="cursor:pointer" @onclick="() => AbrirDetalhesPartida(p)">
+                                <div class="flex-grow-1 row g-0 align-items-center">
+                                    <div class="col-5 d-flex align-items-center justify-content-end gap-1">
+                                        <span class="fw-semibold text-end d-none d-md-inline">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                    </div>
+                                    <div class="col-2 text-center fw-bold">
+                                        @if (p.Status == PartidaStatus.Agendada)
+                                        {
+                                            <span class="text-muted small fw-normal">vs</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
+                                        }
+                                    </div>
+                                    <div class="col-5 d-flex align-items-center gap-1 justify-content-start">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold d-none d-md-inline">@p.TimeForaNome</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:90px;justify-content:flex-end">
+                                    <span class="badge @StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark">Pênaltis</span> }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="text-muted small mt-4">Nenhuma rodada registrada.</div>
+            }
         }
 
         <!-- ── Mata-Mata ── -->
@@ -364,6 +416,74 @@
     }
 </div>
 
+<!-- Match Details Modal -->
+@if (_mostraDetalhesPartida && _partidaDetalhes is not null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <img src="@EscudoUrl(_partidaDetalhes.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
+                        @_partidaDetalhes.TimeCasaNome
+                        <span class="text-muted mx-2">@_partidaDetalhes.GolsCasa – @_partidaDetalhes.GolsFora</span>
+                        @_partidaDetalhes.TimeForaNome
+                        <img src="@EscudoUrl(_partidaDetalhes.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="FecharDetalhesPartida"></button>
+                </div>
+                <div class="modal-body">
+                    @if (_eventoPartida.Any())
+                    {
+                        var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol).ToList();
+                        if (gols.Any())
+                        {
+                            <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
+                            <ul class="list-unstyled">
+                                @foreach (var gol in gols)
+                                {
+                                    <li class="mb-2">
+                                        <span class="badge bg-primary me-2">@gol.Minuto'</span>
+                                        <strong>@gol.JogadorNome</strong> (@gol.TimeNome)
+                                        @if (!string.IsNullOrEmpty(gol.AssistenteNome))
+                                        {
+                                            <span class="text-muted small">- Assistência: @gol.AssistenteNome</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            <hr />
+                        }
+
+                        var cartoes = _eventoPartida.Where(e => e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho).ToList();
+                        if (cartoes.Any())
+                        {
+                            <h6 class="mb-3"><strong>🟨 Cartões</strong></h6>
+                            <ul class="list-unstyled">
+                                @foreach (var cartao in cartoes)
+                                {
+                                    <li class="mb-2">
+                                        <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger") me-2">@cartao.Minuto'</span>
+                                        <strong>@cartao.JogadorNome</strong> (@cartao.TimeNome)
+                                        <span class="ms-2">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-muted">Nenhum evento registrado.</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="FecharDetalhesPartida">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string _tab = "classif";
     private string _statsTab = "artilheiros";
@@ -379,6 +499,10 @@
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
+
+    private bool _mostraDetalhesPartida = false;
+    private LigaPartidaDto? _partidaDetalhes;
+    private IReadOnlyList<LigaEventoDto> _eventoPartida = Array.Empty<LigaEventoDto>();
 
     private string? _erro;
 
@@ -444,6 +568,21 @@
     private void RodadaAnterior() { if (_rodadaIdx > 0) _rodadaIdx--; }
     private void RodadaProxima() { if (_rodadaIdx < _rodadas.Count - 1) _rodadaIdx++; }
 
+    private async Task AbrirDetalhesPartida(LigaPartidaDto partida)
+    {
+        _partidaDetalhes = partida;
+        _mostraDetalhesPartida = true;
+        _eventoPartida = await LigaService.GetEventosPartidaAsync(partida.PartidaId, CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void FecharDetalhesPartida()
+    {
+        _mostraDetalhesPartida = false;
+        _partidaDetalhes = null;
+        _eventoPartida = Array.Empty<LigaEventoDto>();
+    }
+
     private string GetRowClass(LigaClassificacaoItemDto item)
     {
         // During Primeira Fase, all teams same color (no qualifications yet)
@@ -474,19 +613,9 @@
         return BadgeClass(item.Posicao);
     }
 
-    private static string RowClass(int pos) => pos switch
-    {
-        <= 6 => "table-success",
-        >= 7 and <= 10 => "table-info",
-        _ => "table-danger"
-    };
+    private static string RowClass(int pos) => pos == 1 ? "table-success" : "";
 
-    private static string BadgeClass(int pos) => pos switch
-    {
-        <= 6 => "bg-success",
-        >= 7 and <= 10 => "bg-info text-dark",
-        _ => "bg-danger"
-    };
+    private static string BadgeClass(int pos) => pos == 1 ? "bg-success" : "bg-secondary";
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {
