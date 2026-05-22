@@ -46,6 +46,45 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         if (string.IsNullOrWhiteSpace(providedToken))
             return AuthenticateResult.Fail("Token inválido.");
 
+        // Check AdminTokens first (dedicated admin tokens without team requirement)
+        var adminToken = await _db.AdminTokens
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Token == providedToken && t.IsActive, Context.RequestAborted);
+
+        if (adminToken is not null)
+        {
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.Name, "Admin"),
+                new(ClaimTypes.Role, "Admin"),
+            };
+
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
+            var principal = new ClaimsPrincipal(identity);
+            var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+            // Update LastUsedAtUtc in background (fire and forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var tokenToUpdate = await _db.AdminTokens.FirstOrDefaultAsync(t => t.AdminTokenId == adminToken.AdminTokenId);
+                    if (tokenToUpdate is not null)
+                    {
+                        tokenToUpdate.LastUsedAtUtc = DateTime.UtcNow;
+                        await _db.SaveChangesAsync();
+                    }
+                }
+                catch
+                {
+                    // Silent fail - don't break authentication if update fails
+                }
+            });
+
+            return AuthenticateResult.Success(ticket);
+        }
+
+        // Fallback to Teams with IsAdmin flag (for backward compatibility)
         var team = await _db.Teams
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Token == providedToken, Context.RequestAborted);
@@ -53,20 +92,20 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         if (team is null)
             return AuthenticateResult.Fail("Token inválido.");
 
-        var claims = new List<Claim>
+        var teamClaims = new List<Claim>
         {
             new(ClaimTypes.Name, team.TeamName),
             new("TeamId", team.TeamId.ToString()),
         };
 
         if (team.IsAdmin)
-            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            teamClaims.Add(new Claim(ClaimTypes.Role, "Admin"));
 
-        var identity = new ClaimsIdentity(claims, Scheme.Name);
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        var teamIdentity = new ClaimsIdentity(teamClaims, Scheme.Name);
+        var teamPrincipal = new ClaimsPrincipal(teamIdentity);
+        var teamTicket = new AuthenticationTicket(teamPrincipal, Scheme.Name);
 
-        return AuthenticateResult.Success(ticket);
+        return AuthenticateResult.Success(teamTicket);
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)

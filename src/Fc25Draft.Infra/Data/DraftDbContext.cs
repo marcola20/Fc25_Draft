@@ -31,6 +31,7 @@ public class DraftDbContext : DbContext
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
     public DbSet<TransferOffer> TransferOffers => Set<TransferOffer>();
     public DbSet<TransferOfferPlayer> TransferOfferPlayers => Set<TransferOfferPlayer>();
+    public DbSet<AdminToken> AdminTokens => Set<AdminToken>();
 
     public DbSet<Liga> Ligas => Set<Liga>();
     public DbSet<LigaRodada> LigaRodadas => Set<LigaRodada>();
