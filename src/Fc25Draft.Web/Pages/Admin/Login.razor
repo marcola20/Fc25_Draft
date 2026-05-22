@@ -1,0 +1,90 @@
+@page "/admin/login"
+@using Fc25Draft.Web.Services
+@inject AdminAuthService AdminAuth
+@inject NavigationManager Navigation
+
+<PageTitle>Admin - Entrar</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center min-vh-100" style="background: linear-gradient(135deg, #0d1b2a 0%, #1a2f4a 100%);">
+    <div class="card shadow-lg" style="width: 100%; max-width: 400px; border: none; border-radius: 12px;">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <h1 class="h4 fw-bold text-white mb-2">Acesso Admin</h1>
+                <p class="text-muted small">Informe seu token para continuar</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_erro))
+            {
+                <div class="alert alert-danger alert-dismissible" role="alert">
+                    @_erro
+                    <button type="button" class="btn-close btn-sm" @onclick='() => _erro = null'></button>
+                </div>
+            }
+
+            <div class="mb-3">
+                <label for="tokenInput" class="form-label fw-semibold">Token</label>
+                <input
+                    id="tokenInput"
+                    type="password"
+                    class="form-control form-control-lg"
+                    placeholder="Cole seu token de admin aqui"
+                    @bind="_token"
+                    @bind:event="oninput"
+                    @onkeyup="@((KeyboardEventArgs e) => { if (e.Key == "Enter") SubmeterAsync().GetAwaiter().GetResult(); })"
+                    autocomplete="one-time-code"
+                    disabled="@_carregando" />
+            </div>
+
+            <button
+                class="btn btn-primary btn-lg w-100 fw-semibold"
+                @onclick="SubmeterAsync"
+                disabled="@(_carregando || string.IsNullOrWhiteSpace(_token))">
+                @(_carregando ? "Autenticando..." : "Entrar como Admin")
+            </button>
+
+            <div class="text-center mt-3">
+                <a href="/" class="text-muted text-decoration-none small">
+                    ← Voltar ao início
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _token = string.Empty;
+    private string? _erro;
+    private bool _carregando;
+
+    private async Task SubmeterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_token))
+            return;
+
+        _erro = null;
+        _carregando = true;
+
+        try
+        {
+            var sucesso = await AdminAuth.SignInAsync(_token);
+            if (sucesso)
+            {
+                Navigation.NavigateTo("/admin/liga", forceLoad: false);
+            }
+            else
+            {
+                _erro = "Token inválido. Tente novamente.";
+                _token = string.Empty;
+            }
+        }
+        catch
+        {
+            _erro = "Erro ao validar token. Tente novamente.";
+            _token = string.Empty;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+}
