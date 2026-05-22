@@ -201,13 +201,13 @@
                     <div class="list-group">
                         @foreach (var p in _rodadaAtual.Partidas)
                         {
-                            <div class="list-group-item py-3 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;white-space:nowrap;overflow-x:auto;" @onclick="() => AbrirDetalhesPartida(p)">
-                                <div class="flex-grow-1 d-flex align-items-center justify-content-between gap-2 gap-md-3" style="min-width:0;">
-                                    <div class="d-flex align-items-center justify-content-end gap-1" style="flex:0 0 auto;">
-                                        <span class="fw-semibold text-end d-none d-md-inline small" style="white-space:normal;word-break:break-word;">@p.TimeCasaNome</span>
-                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                            <div class="list-group-item py-2 d-flex align-items-center gap-2" style="cursor:pointer" @onclick="() => AbrirDetalhesPartida(p)">
+                                <div class="flex-grow-1 row g-0 align-items-center">
+                                    <div class="col-5 d-flex align-items-center justify-content-end gap-1">
+                                        <span class="fw-semibold text-end d-none d-md-inline">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
                                     </div>
-                                    <div class="text-center fw-bold" style="flex:0 0 auto;min-width:50px;">
+                                    <div class="col-2 text-center fw-bold">
                                         @if (p.Status == PartidaStatus.Agendada)
                                         {
                                             <span class="text-muted small fw-normal">vs</span>
@@ -217,14 +217,14 @@
                                             <span>@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
                                         }
                                     </div>
-                                    <div class="d-flex align-items-center gap-1 justify-content-start" style="flex:0 0 auto;">
-                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="fw-semibold d-none d-md-inline small" style="white-space:normal;word-break:break-word;">@p.TimeForaNome</span>
+                                    <div class="col-5 d-flex align-items-center gap-1 justify-content-start">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold d-none d-md-inline">@p.TimeForaNome</span>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
-                                    <span class="badge @StatusBadge(p.Status)" style="white-space:nowrap;font-size:0.75rem;">@StatusLabel(p.Status)</span>
-                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="white-space:nowrap;font-size:0.75rem;">Pen</span> }
+                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:90px;justify-content:flex-end">
+                                    <span class="badge @StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark">Pênaltis</span> }
                                 </div>
                             </div>
                         }
