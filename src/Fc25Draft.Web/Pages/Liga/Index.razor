@@ -81,38 +81,38 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle">
+                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>#</th>
+                                    <th style="width:40px;">#</th>
                                     <th>Time</th>
-                                    <th class="text-center" title="Pontos">Pts</th>
-                                    <th class="text-center" title="Jogos">J</th>
-                                    <th class="text-center" title="Vitórias">V</th>
-                                    <th class="text-center" title="Empates">E</th>
-                                    <th class="text-center" title="Derrotas">D</th>
-                                    <th class="text-center" title="Gols Pró">GP</th>
-                                    <th class="text-center" title="Gols Contra">GC</th>
-                                    <th class="text-center" title="Saldo de Gols">SG</th>
+                                    <th class="text-center" title="Pontos" style="width:40px;">Pts</th>
+                                    <th class="text-center" title="Jogos" style="width:35px;">J</th>
+                                    <th class="text-center" title="Vitórias" style="width:35px;">V</th>
+                                    <th class="text-center" title="Empates" style="width:35px;">E</th>
+                                    <th class="text-center" title="Derrotas" style="width:35px;">D</th>
+                                    <th class="text-center" title="Gols Pró" style="width:35px;">GP</th>
+                                    <th class="text-center" title="Gols Contra" style="width:35px;">GC</th>
+                                    <th class="text-center" title="Saldo de Gols" style="width:35px;">SG</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = i + 1 }))
                                 {
-                                    <tr class="@(item.Position <= 2 ? "table-success" : "table-danger")">
-                                        <td><span class="badge @(item.Position <= 2 ? "bg-success" : "bg-danger")">@item.Position</span></td>
-                                        <td class="fw-semibold">
+                                    <tr class="@(item.Position <= 2 ? "table-success" : "table-danger")" style="height:44px;">
+                                        <td style="width:40px;"><span class="badge @(item.Position <= 2 ? "bg-success" : "bg-danger")">@item.Position</span></td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(item.Item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                                            @item.Item.TimeNome
+                                            <span class="fw-semibold">@item.Item.TimeNome</span>
                                         </td>
-                                        <td class="text-center fw-bold">@item.Item.Pontos</td>
-                                        <td class="text-center">@item.Item.Jogos</td>
-                                        <td class="text-center">@item.Item.Vitorias</td>
-                                        <td class="text-center">@item.Item.Empates</td>
-                                        <td class="text-center">@item.Item.Derrotas</td>
-                                        <td class="text-center">@item.Item.GolsPro</td>
-                                        <td class="text-center">@item.Item.GolsContra</td>
-                                        <td class="text-center @(item.Item.SaldoGols > 0 ? "text-success" : item.Item.SaldoGols < 0 ? "text-danger" : "")">
+                                        <td class="text-center fw-bold" style="width:40px;">@item.Item.Pontos</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.Jogos</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.Vitorias</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.Empates</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.Derrotas</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.GolsPro</td>
+                                        <td class="text-center" style="width:35px;">@item.Item.GolsContra</td>
+                                        <td class="text-center @(item.Item.SaldoGols > 0 ? "text-success" : item.Item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
                                             @(item.Item.SaldoGols > 0 ? "+" : "")@item.Item.SaldoGols
                                         </td>
                                     </tr>
@@ -131,40 +131,40 @@
             {
                 <!-- Liga: tabela única -->
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle">
+                    <table class="table table-hover align-middle" style="font-size:0.875rem;">
                         <thead class="table-dark">
                             <tr>
-                                <th>#</th>
+                                <th style="width:40px;">#</th>
                                 <th>Time</th>
-                                <th class="text-center" title="Pontos">Pts</th>
-                                <th class="text-center" title="Jogos">J</th>
-                                <th class="text-center" title="Vitórias">V</th>
-                                <th class="text-center" title="Empates">E</th>
-                                <th class="text-center" title="Derrotas">D</th>
-                                <th class="text-center" title="Gols Pró">GP</th>
-                                <th class="text-center" title="Gols Contra">GC</th>
-                                <th class="text-center" title="Saldo de Gols">SG</th>
+                                <th class="text-center" title="Pontos" style="width:40px;">Pts</th>
+                                <th class="text-center" title="Jogos" style="width:35px;">J</th>
+                                <th class="text-center" title="Vitórias" style="width:35px;">V</th>
+                                <th class="text-center" title="Empates" style="width:35px;">E</th>
+                                <th class="text-center" title="Derrotas" style="width:35px;">D</th>
+                                <th class="text-center" title="Gols Pró" style="width:35px;">GP</th>
+                                <th class="text-center" title="Gols Contra" style="width:35px;">GC</th>
+                                <th class="text-center" title="Saldo de Gols" style="width:35px;">SG</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var item in _classif)
                             {
-                                <tr class="@GetRowClass(item)">
-                                    <td>
+                                <tr class="@GetRowClass(item)" style="height:44px;">
+                                    <td style="width:40px;">
                                         <span class="badge @GetBadgeClass(item)">@item.Posicao</span>
                                     </td>
-                                    <td class="fw-semibold">
+                                    <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                         <img src="@EscudoUrl(item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                                        @item.TimeNome
+                                        <span class="fw-semibold">@item.TimeNome</span>
                                     </td>
-                                    <td class="text-center fw-bold">@item.Pontos</td>
-                                    <td class="text-center">@item.Jogos</td>
-                                    <td class="text-center">@item.Vitorias</td>
-                                    <td class="text-center">@item.Empates</td>
-                                    <td class="text-center">@item.Derrotas</td>
-                                    <td class="text-center">@item.GolsPro</td>
-                                    <td class="text-center">@item.GolsContra</td>
-                                    <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")">
+                                    <td class="text-center fw-bold" style="width:40px;">@item.Pontos</td>
+                                    <td class="text-center" style="width:35px;">@item.Jogos</td>
+                                    <td class="text-center" style="width:35px;">@item.Vitorias</td>
+                                    <td class="text-center" style="width:35px;">@item.Empates</td>
+                                    <td class="text-center" style="width:35px;">@item.Derrotas</td>
+                                    <td class="text-center" style="width:35px;">@item.GolsPro</td>
+                                    <td class="text-center" style="width:35px;">@item.GolsContra</td>
+                                    <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
                                         @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                                     </td>
                                 </tr>
@@ -201,13 +201,13 @@
                     <div class="list-group">
                         @foreach (var p in _rodadaAtual.Partidas)
                         {
-                            <div class="list-group-item py-2 d-flex align-items-center gap-2" style="cursor:pointer" @onclick="() => AbrirDetalhesPartida(p)">
-                                <div class="flex-grow-1 row g-0 align-items-center">
-                                    <div class="col-5 d-flex align-items-center justify-content-end gap-1">
-                                        <span class="fw-semibold text-end d-none d-md-inline">@p.TimeCasaNome</span>
-                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                            <div class="list-group-item py-3 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;white-space:nowrap;overflow-x:auto;" @onclick="() => AbrirDetalhesPartida(p)">
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-between gap-2 gap-md-3" style="min-width:0;">
+                                    <div class="d-flex align-items-center justify-content-end gap-1" style="flex:0 0 auto;">
+                                        <span class="fw-semibold text-end d-none d-md-inline small" style="white-space:normal;word-break:break-word;">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
                                     </div>
-                                    <div class="col-2 text-center fw-bold">
+                                    <div class="text-center fw-bold" style="flex:0 0 auto;min-width:50px;">
                                         @if (p.Status == PartidaStatus.Agendada)
                                         {
                                             <span class="text-muted small fw-normal">vs</span>
@@ -217,14 +217,14 @@
                                             <span>@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
                                         }
                                     </div>
-                                    <div class="col-5 d-flex align-items-center gap-1 justify-content-start">
-                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="22" height="22" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="fw-semibold d-none d-md-inline">@p.TimeForaNome</span>
+                                    <div class="d-flex align-items-center gap-1 justify-content-start" style="flex:0 0 auto;">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold d-none d-md-inline small" style="white-space:normal;word-break:break-word;">@p.TimeForaNome</span>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:90px;justify-content:flex-end">
-                                    <span class="badge @StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
-                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark">Pênaltis</span> }
+                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
+                                    <span class="badge @StatusBadge(p.Status)" style="white-space:nowrap;font-size:0.75rem;">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="white-space:nowrap;font-size:0.75rem;">Pen</span> }
                                 </div>
                             </div>
                         }
@@ -318,24 +318,30 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover">
+                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
-                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">⚽ Gols</th><th class="text-center">Assist.</th></tr>
+                                <tr>
+                                    <th style="width:35px;">#</th>
+                                    <th>Jogador</th>
+                                    <th class="d-none d-md-table-cell">Time</th>
+                                    <th class="text-center" style="width:50px;">⚽</th>
+                                    <th class="text-center" style="width:45px;">A</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @{ int r = 0; }
                                 @foreach (var a in _artilheiros)
                                 {
                                     r++;
-                                    <tr>
-                                        <td class="fw-bold text-muted">@r</td>
-                                        <td>@a.JogadorNome</td>
-                                        <td class="text-muted small">
+                                    <tr style="height:40px;">
+                                        <td style="width:35px;" class="fw-bold text-muted">@r</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@a.JogadorNome</td>
+                                        <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(a.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
                                             @a.TimeNome
                                         </td>
-                                        <td class="text-center fw-bold">@a.Gols</td>
-                                        <td class="text-center text-muted">@(a.Assistencias > 0 ? a.Assistencias.ToString() : "—")</td>
+                                        <td class="text-center fw-bold" style="width:50px;">@a.Gols</td>
+                                        <td class="text-center text-muted" style="width:45px;">@(a.Assistencias > 0 ? a.Assistencias.ToString() : "—")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -353,23 +359,28 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover">
+                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
-                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">Assistências</th></tr>
+                                <tr>
+                                    <th style="width:35px;">#</th>
+                                    <th>Jogador</th>
+                                    <th class="d-none d-md-table-cell">Time</th>
+                                    <th class="text-center" style="width:60px;">Assist.</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @{ int ra = 0; }
                                 @foreach (var a in _assistencias)
                                 {
                                     ra++;
-                                    <tr>
-                                        <td class="fw-bold text-muted">@ra</td>
-                                        <td>@a.JogadorNome</td>
-                                        <td class="text-muted small">
+                                    <tr style="height:40px;">
+                                        <td style="width:35px;" class="fw-bold text-muted">@ra</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@a.JogadorNome</td>
+                                        <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(a.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
                                             @a.TimeNome
                                         </td>
-                                        <td class="text-center fw-bold">@a.Assistencias</td>
+                                        <td class="text-center fw-bold" style="width:60px;">@a.Assistencias</td>
                                     </tr>
                                 }
                             </tbody>
@@ -387,24 +398,30 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover">
+                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
-                                <tr><th>#</th><th>Jogador</th><th>Time</th><th class="text-center">🟨</th><th class="text-center">🟥</th></tr>
+                                <tr>
+                                    <th style="width:35px;">#</th>
+                                    <th>Jogador</th>
+                                    <th class="d-none d-md-table-cell">Time</th>
+                                    <th class="text-center" style="width:45px;">🟨</th>
+                                    <th class="text-center" style="width:45px;">🟥</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @{ int rc = 0; }
                                 @foreach (var c in _cartoes)
                                 {
                                     rc++;
-                                    <tr>
-                                        <td class="fw-bold text-muted">@rc</td>
-                                        <td>@c.JogadorNome</td>
-                                        <td class="text-muted small">
+                                    <tr style="height:40px;">
+                                        <td style="width:35px;" class="fw-bold text-muted">@rc</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@c.JogadorNome</td>
+                                        <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(c.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
                                             @c.TimeNome
                                         </td>
-                                        <td class="text-center">@c.CartoesAmarelos</td>
-                                        <td class="text-center">@(c.CartoesVermelhos > 0 ? c.CartoesVermelhos.ToString() : "—")</td>
+                                        <td class="text-center" style="width:45px;">@c.CartoesAmarelos</td>
+                                        <td class="text-center" style="width:45px;">@(c.CartoesVermelhos > 0 ? c.CartoesVermelhos.ToString() : "—")</td>
                                     </tr>
                                 }
                             </tbody>
