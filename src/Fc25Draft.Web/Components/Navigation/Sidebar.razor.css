@@ -110,14 +110,15 @@
 
 /* Accordion Styles */
 .accordion {
-    --bs-accordion-bg: transparent;
-    --bs-accordion-active-bg: transparent;
-    --bs-accordion-border-color: transparent;
+    --bs-accordion-bg: transparent !important;
+    --bs-accordion-active-bg: transparent !important;
+    --bs-accordion-border-color: transparent !important;
+    --bs-accordion-btn-active-bg: transparent !important;
 }
 
 .accordion-item {
-    background-color: transparent;
-    border: none;
+    background-color: transparent !important;
+    border: none !important;
     margin-bottom: 0.75rem;
 }
 
@@ -182,4 +183,13 @@
 .sidebar-group-title-text {
     display: inline-block;
     flex: 1;
+}
+
+/* Ensure sidebar items stay white in accordion */
+.accordion-body .sidebar-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.accordion-body .sidebar-link:hover {
+    color: #fff !important;
 }
