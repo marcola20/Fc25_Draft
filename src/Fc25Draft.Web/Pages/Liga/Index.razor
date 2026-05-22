@@ -25,10 +25,10 @@
             <h1 class="h3 mb-0">@_liga.Nome</h1>
             @if (_ligas is not null && _ligas.Count > 1)
             {
-                <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                <select class="form-select form-select-sm w-auto" @bind="_ligaId" @bind:event="onchange">
                     @foreach (var l in _ligas)
                     {
-                        <option value="@l.LigaId" selected="@(l.LigaId == _liga.LigaId)">
+                        <option value="@l.LigaId">
                             @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
                         </option>
                     }
@@ -507,6 +507,7 @@
     private int _rodadaIdx;
     private bool _loading = true;
     private GrupoCopa _grupoSelecionado = GrupoCopa.A;
+    private Guid _ligaId = Guid.Empty;
 
     private LigaDto? _liga;
     private IReadOnlyList<LigaDto>? _ligas;
@@ -535,6 +536,7 @@
 
             if (_liga is not null)
             {
+                _ligaId = _liga.LigaId;
                 await LoadLigaDataAsync(_liga.LigaId);
             }
         }
@@ -573,7 +575,9 @@
     {
         if (Guid.TryParse(e.Value?.ToString(), out var ligaId))
         {
+            _ligaId = ligaId;
             _liga = _ligas?.FirstOrDefault(l => l.LigaId == ligaId);
+            _tab = "classif";
             _loading = true;
             StateHasChanged();
             await LoadLigaDataAsync(ligaId);
