@@ -38,6 +38,9 @@ public static class LigaEndpoints
         pub.MapGet("/{ligaId:guid}/grupos", async (Guid ligaId, ILigaPublicService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetGruposAsync(ligaId, ct)));
 
+        pub.MapGet("/eventos-partida/{partidaId:guid}", async (Guid partidaId, ILigaPublicService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetEventosPartidaAsync(partidaId, ct)));
+
         // ── Admin ─────────────────────────────────────────────────────────────
         var admin = app.MapGroup("/admin/liga").RequireAuthorization("AdminOnly");
 
