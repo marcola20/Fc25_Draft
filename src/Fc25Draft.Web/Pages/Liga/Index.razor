@@ -25,10 +25,10 @@
             <h1 class="h3 mb-0">@_liga.Nome</h1>
             @if (_ligas is not null && _ligas.Count > 1)
             {
-                <select class="form-select form-select-sm w-auto" @bind="_ligaId" @bind:event="onchange">
+                <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
                     @foreach (var l in _ligas)
                     {
-                        <option value="@l.LigaId">
+                        <option value="@l.LigaId" selected="@(_ligaId == l.LigaId)">
                             @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
                         </option>
                     }
