@@ -233,6 +233,65 @@ public class LigaPublicService : ILigaPublicService
             e.CriadoEm)).ToArray();
     }
 
+    public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct)
+    {
+        var ligas = await _db.Ligas.AsNoTracking().ToListAsync(ct);
+        var eventos = await _db.LigaEventos
+            .AsNoTracking()
+            .Include(x => x.Jogador)
+            .Include(x => x.Partida)
+            .ThenInclude(x => x.Rodada)
+            .ThenInclude(x => x.Liga)
+            .ToListAsync(ct);
+
+        var golsPorJogador = eventos
+            .Where(e => e.Tipo == TipoEvento.Gol)
+            .GroupBy(e => e.JogadorId)
+            .Select(g =>
+            {
+                var primeiro = g.First();
+                var totalGols = g.Count();
+                var totalAssistencias = eventos.Count(e => e.Tipo == TipoEvento.Gol && e.AssistenteId == primeiro.JogadorId);
+
+                var competicoes = g
+                    .GroupBy(e => new { e.Partida.Rodada.LigaId, e.Partida.Rodada.Liga.Nome, e.Partida.Rodada.Liga.Tipo })
+                    .Select(cg =>
+                    {
+                        var assistenciasNaCompetition = eventos.Count(e =>
+                            e.Tipo == TipoEvento.Gol &&
+                            e.AssistenteId == primeiro.JogadorId &&
+                            e.Partida.Rodada.LigaId == cg.Key.LigaId);
+
+                        return new ArtilheiroCompetitionDetalheDto(
+                            cg.Key.LigaId,
+                            cg.Key.Nome,
+                            cg.Key.Tipo,
+                            cg.Count(),
+                            assistenciasNaCompetition);
+                    })
+                    .OrderByDescending(x => x.Gols)
+                    .ToArray();
+
+                return new HistoricoArtilheiroDto(
+                    primeiro.JogadorId,
+                    primeiro.Jogador.Name,
+                    totalGols,
+                    totalAssistencias,
+                    competicoes);
+            })
+            .OrderByDescending(x => x.TotalGols)
+            .ThenByDescending(x => x.TotalAssistencias)
+            .ToArray();
+
+        return golsPorJogador;
+    }
+
+    public async Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct)
+    {
+        var historico = await GetHistoricoArtilheirosAsync(ct);
+        return historico.FirstOrDefault(h => h.JogadorId == jogadorId);
+    }
+
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
 

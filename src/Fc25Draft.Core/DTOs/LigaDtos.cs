@@ -159,3 +159,29 @@ public record LigaCartaoEstatDto(
     string TimeNome,
     int CartoesAmarelos,
     int CartoesVermelhos);
+
+public record HistoricoArtilheiroDto(
+    int JogadorId,
+    string JogadorNome,
+    int TotalGols,
+    int TotalAssistencias,
+    IReadOnlyList<ArtilheiroCompetitionDetalheDto> Competicoes);
+
+public record ArtilheiroCompetitionDetalheDto(
+    Guid LigaId,
+    string NomeCompeticion,
+    TipoCompetition TipoCompeticion,
+    int Gols,
+    int Assistencias);
+
+public record HistoricoAssistenciaDto(
+    int JogadorId,
+    string JogadorNome,
+    int TotalAssistencias,
+    IReadOnlyList<AssistenciaCompetitionDetalheDto> Competicoes);
+
+public record AssistenciaCompetitionDetalheDto(
+    Guid LigaId,
+    string NomeCompeticion,
+    TipoCompetition TipoCompeticion,
+    int Assistencias);

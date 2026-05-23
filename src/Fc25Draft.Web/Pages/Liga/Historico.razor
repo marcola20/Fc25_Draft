@@ -1,0 +1,141 @@
+@page "/liga/historico"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+<PageTitle>Histórico - Artilheiros</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar histórico:</strong> @_erro</div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <h1 class="h3">Histórico de Gols</h1>
+            <p class="text-muted">Artilheiros de todas as competições</p>
+        </div>
+
+        @if (!_artilheiros.Any())
+        {
+            <div class="alert alert-info">Nenhum gol registrado no histórico.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width:40px;">#</th>
+                            <th>Jogador</th>
+                            <th class="text-center" style="width:60px;">⚽</th>
+                            <th class="text-center" style="width:60px;">Assist.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (item, idx) in _artilheiros.Select((x, i) => (x, i + 1)))
+                        {
+                            <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
+                                <td style="width:40px;" class="fw-bold text-muted">@idx</td>
+                                <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.JogadorNome</td>
+                                <td class="text-center fw-bold" style="width:60px;">@item.TotalGols</td>
+                                <td class="text-center text-muted" style="width:60px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <!-- Detalhe do Jogador -->
+        @if (_jogadorSelecionado is not null)
+        {
+            <div class="mt-4 p-3 border rounded bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">@_jogadorSelecionado.JogadorNome</h5>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _jogadorSelecionado = null">Fechar</button>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-body">
+                                <h6 class="card-title">Total de Gols</h6>
+                                <h2 class="mb-0">@_jogadorSelecionado.TotalGols</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">Assistências</h6>
+                                <h2 class="mb-0">@_jogadorSelecionado.TotalAssistencias</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="text-uppercase text-muted small fw-bold mb-2">Gols por Competição</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Competição</th>
+                                <th class="text-center" style="width:70px;">⚽</th>
+                                <th class="text-center" style="width:70px;">Assist.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var comp in _jogadorSelecionado.Competicoes)
+                            {
+                                <tr>
+                                    <td>
+                                        <span>@comp.NomeCompeticion</span>
+                                        <br />
+                                        <small class="text-muted">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
+                                    </td>
+                                    <td class="text-center fw-bold">@comp.Gols</td>
+                                    <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _erro;
+    private IReadOnlyList<HistoricoArtilheiroDto> _artilheiros = Array.Empty<HistoricoArtilheiroDto>();
+    private HistoricoArtilheiroDto? _jogadorSelecionado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _artilheiros = await LigaService.GetHistoricoArtilheirosAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SelecionarJogador(HistoricoArtilheiroDto jogador)
+    {
+        _jogadorSelecionado = jogador;
+    }
+}

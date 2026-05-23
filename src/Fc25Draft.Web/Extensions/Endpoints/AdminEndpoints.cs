@@ -23,7 +23,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 var teamIdClaim = ctx.User.FindFirst("TeamId")?.Value;
                 var teamName = ctx.User.Identity?.Name;
                 var isAdmin = ctx.User.IsInRole("Admin");
-                return Results.Ok(new { status = "ok", teamName, isAdmin, teamId = teamIdClaim });
+                return Results.Ok(new { status = "ok", teamName, IsAdmin = isAdmin, teamId = teamIdClaim });
             }).RequireAuthorization();
 
             var adminApi = app.MapGroup("/admin").RequireAuthorization("AdminOnly");
