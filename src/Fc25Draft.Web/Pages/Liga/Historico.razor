@@ -34,23 +34,49 @@
                         <tr>
                             <th style="width:40px;">#</th>
                             <th>Jogador</th>
-                            <th class="text-center" style="width:60px;">⚽</th>
-                            <th class="text-center" style="width:60px;">Assist.</th>
+                            <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
+                                Gols @SortIcon("gols")
+                            </th>
+                            <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
+                                Assist. @SortIcon("assistencias")
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var (item, idx) in _artilheiros.Select((x, i) => (x, i + 1)))
+                        @foreach (var (item, idx) in PagedItems.Select((x, i) => (x, (_page - 1) * _pageSize + i + 1)))
                         {
                             <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
                                 <td style="width:40px;" class="fw-bold text-muted">@idx</td>
                                 <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.JogadorNome</td>
-                                <td class="text-center fw-bold" style="width:60px;">@item.TotalGols</td>
-                                <td class="text-center text-muted" style="width:60px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
+                                <td class="text-center fw-bold" style="width:70px;">@item.TotalGols</td>
+                                <td class="text-center text-muted" style="width:70px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+
+            @if (_totalPages > 1)
+            {
+                <nav class="d-flex justify-content-center mt-2">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item @(_page == 1 ? "disabled" : "")">
+                            <button class="page-link" @onclick="() => GoToPage(_page - 1)" disabled="@(_page == 1)">‹</button>
+                        </li>
+                        @for (int p = 1; p <= _totalPages; p++)
+                        {
+                            var pg = p;
+                            <li class="page-item @(_page == pg ? "active" : "")">
+                                <button class="page-link" @onclick="() => GoToPage(pg)">@pg</button>
+                            </li>
+                        }
+                        <li class="page-item @(_page == _totalPages ? "disabled" : "")">
+                            <button class="page-link" @onclick="() => GoToPage(_page + 1)" disabled="@(_page == _totalPages)">›</button>
+                        </li>
+                    </ul>
+                </nav>
+                <p class="text-center text-muted small mt-1">@_artilheiros.Count jogadores · página @_page de @_totalPages</p>
+            }
         }
 
         <!-- Detalhe do Jogador -->
@@ -117,6 +143,51 @@
     private string? _erro;
     private IReadOnlyList<HistoricoArtilheiroDto> _artilheiros = Array.Empty<HistoricoArtilheiroDto>();
     private HistoricoArtilheiroDto? _jogadorSelecionado;
+
+    // Sort
+    private string _sortBy = "gols";
+    private bool _sortAsc = false;
+
+    // Pagination
+    private int _page = 1;
+    private const int _pageSize = 20;
+    private int _totalPages => (int)Math.Ceiling(_artilheiros.Count / (double)_pageSize);
+
+    private IEnumerable<HistoricoArtilheiroDto> SortedItems => _sortBy == "assistencias"
+        ? (_sortAsc
+            ? _artilheiros.OrderBy(x => x.TotalAssistencias).ThenBy(x => x.TotalGols)
+            : _artilheiros.OrderByDescending(x => x.TotalAssistencias).ThenByDescending(x => x.TotalGols))
+        : (_sortAsc
+            ? _artilheiros.OrderBy(x => x.TotalGols).ThenBy(x => x.TotalAssistencias)
+            : _artilheiros.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias));
+
+    private IEnumerable<HistoricoArtilheiroDto> PagedItems =>
+        SortedItems.Skip((_page - 1) * _pageSize).Take(_pageSize);
+
+    private void SetSort(string col)
+    {
+        if (_sortBy == col)
+            _sortAsc = !_sortAsc;
+        else
+        {
+            _sortBy = col;
+            _sortAsc = false;
+        }
+        _page = 1;
+    }
+
+    private void GoToPage(int p)
+    {
+        if (p < 1 || p > _totalPages) return;
+        _page = p;
+        _jogadorSelecionado = null;
+    }
+
+    private string SortIcon(string col)
+    {
+        if (_sortBy != col) return "⇅";
+        return _sortAsc ? "↑" : "↓";
+    }
 
     protected override async Task OnInitializedAsync()
     {
