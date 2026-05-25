@@ -18,8 +18,8 @@
     else
     {
         <div class="mb-3">
-            <h1 class="h3">Histórico de Gols</h1>
-            <p class="text-muted">Artilheiros de todas as competições</p>
+            <h1 class="h3">Histórico de Estatísticas</h1>
+            <p class="text-muted">Estatísticas de todas as competições</p>
         </div>
 
         @if (!_artilheiros.Any())
@@ -34,11 +34,11 @@
                         <tr>
                             <th style="width:40px;">#</th>
                             <th>Jogador</th>
-                            <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
-                                Gols @SortIcon("gols")
+                            <th class="text-center" style="width:90px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
+                                ⚽ Gols @SortIcon("gols")
                             </th>
-                            <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
-                                Assist. @SortIcon("assistencias")
+                            <th class="text-center" style="width:130px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
+                                🅰️ Assistências @SortIcon("assistencias")
                             </th>
                         </tr>
                     </thead>
@@ -48,8 +48,8 @@
                             <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
                                 <td style="width:40px;" class="fw-bold text-muted">@idx</td>
                                 <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.JogadorNome</td>
-                                <td class="text-center fw-bold" style="width:70px;">@item.TotalGols</td>
-                                <td class="text-center text-muted" style="width:70px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
+                                <td class="text-center fw-bold" style="width:90px;">@item.TotalGols</td>
+                                <td class="text-center text-muted" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
                             </tr>
                         }
                     </tbody>
