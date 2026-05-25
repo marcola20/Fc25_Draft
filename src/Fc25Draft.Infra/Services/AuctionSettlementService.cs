@@ -224,6 +224,7 @@ public class AuctionSettlementService : IAuctionSettlementService
             await _dbContext.TransferHistories.AddAsync(new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
+                CycleId = item.CycleId,
                 PlayerId = item.PlayerId,
                 FromTeamId = null,
                 ToTeamId = team.TeamId,

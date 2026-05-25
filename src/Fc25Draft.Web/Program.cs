@@ -62,6 +62,18 @@ using (var scope = app.Services.CreateScope())
                 FOREIGN KEY ("LoteraiaId") REFERENCES "LigaLoterias"("LoteraiaId") ON DELETE CASCADE
         );
 
+        ALTER TABLE "TransferHistories" ADD COLUMN IF NOT EXISTS "CycleId" uuid NULL;
+
+        -- Backfill CycleId para contratações via mercado (MarketAuction = 1) existentes
+        UPDATE "TransferHistories" th
+        SET "CycleId" = mi."CycleId"
+        FROM "MarketTransactions" mt
+        JOIN "MarketItems" mi ON mt."ItemId" = mi."ItemId"
+        WHERE th."CycleId" IS NULL
+          AND th."Type" = 1
+          AND th."PlayerId" = mi."PlayerId"
+          AND mt."Type" IN (3, 5);
+
         ALTER TABLE "Ligas" ADD COLUMN IF NOT EXISTS "Tipo" integer NOT NULL DEFAULT 0;
         ALTER TABLE "LigaClassificacoes" ADD COLUMN IF NOT EXISTS "Grupo" integer NULL;
 

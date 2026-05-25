@@ -45,6 +45,11 @@ public class TransfersClient
             query["playerId"] = request.PlayerId.Value.ToString("D");
         }
 
+        if (request.CycleId.HasValue)
+        {
+            query["cycleId"] = request.CycleId.Value.ToString("D");
+        }
+
         if (request.DateFromUtc.HasValue)
         {
             query["dateFromUtc"] = request.DateFromUtc.Value.ToString("O");

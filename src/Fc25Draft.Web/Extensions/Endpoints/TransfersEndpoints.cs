@@ -59,6 +59,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
         {
             [FromQuery(Name = "teamId")] public string? TeamIdRaw { get; init; }
             [FromQuery(Name = "playerId")] public string? PlayerIdRaw { get; init; }
+            [FromQuery(Name = "cycleId")] public string? CycleIdRaw { get; init; }
             [FromQuery(Name = "type")] public string? TypeRaw { get; init; }
             [FromQuery(Name = "dateFromUtc")] public string? FromUtcRaw { get; init; }
             [FromQuery(Name = "dateToUtc")] public string? ToUtcRaw { get; init; }
@@ -72,7 +73,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 errorResult = null;
 
                 if (!TryParseGuid(TeamIdRaw, "teamId", out var teamId, out errorResult) ||
-                    !TryParseGuid(PlayerIdRaw, "playerId", out var playerId, out errorResult))
+                    !TryParseGuid(PlayerIdRaw, "playerId", out var playerId, out errorResult) ||
+                    !TryParseGuid(CycleIdRaw, "cycleId", out var cycleId, out errorResult))
                 {
                     return false;
                 }
@@ -107,6 +109,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 {
                     TeamId = NormalizeGuid(teamId),
                     PlayerId = NormalizeGuid(playerId),
+                    CycleId = NormalizeGuid(cycleId),
                     Type = type,
                     FromUtc = fromUtc,
                     ToUtc = toUtc,

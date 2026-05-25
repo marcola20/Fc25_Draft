@@ -48,6 +48,12 @@ public class TransfersQueryService : ITransfersQueryService
             query = query.Where(h => h.FromTeamId == teamId || h.ToTeamId == teamId);
         }
 
+        if (filter.CycleId.HasValue)
+        {
+            var cycleId = filter.CycleId.Value;
+            query = query.Where(h => h.CycleId == cycleId);
+        }
+
         if (filter.PlayerId.HasValue)
         {
             var playerId = filter.PlayerId.Value;

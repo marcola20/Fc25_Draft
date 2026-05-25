@@ -360,6 +360,7 @@ public class MarketService : IMarketService
             await _dbContext.TransferHistories.AddAsync(new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
+                CycleId = item.CycleId,
                 PlayerId = player.PlayerId,
                 FromTeamId = null,
                 ToTeamId = team.TeamId,

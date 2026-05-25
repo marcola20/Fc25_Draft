@@ -3,6 +3,7 @@ namespace Fc25Draft.Core.Entities;
 public class TransferHistory
 {
     public Guid TransferId { get; set; }
+    public Guid? CycleId { get; set; }
     public TransferType Type { get; set; }
     public int PlayerId { get; set; }
     public Guid? FromTeamId { get; set; }

@@ -393,25 +393,15 @@ else
         TransferHistoryQueryRequest? request = null;
         try
         {
-            DateTime? dateFrom = Model.PeriodStartUtc;
-            DateTime? dateTo = Model.PeriodEndUtc;
-
-            if (_isAdmin && Guid.TryParse(_selectedCycleId, out var cycleGuid))
-            {
-                var cycle = _cycleOptions.FirstOrDefault(c => c.CycleId == cycleGuid);
-                if (cycle is not null)
-                {
-                    dateFrom = cycle.StartsAtUtc;
-                    dateTo = cycle.EndsAtUtc;
-                }
-            }
+            Guid? selectedCycleGuid = _isAdmin && Guid.TryParse(_selectedCycleId, out var cg) ? cg : null;
 
             request = new TransferHistoryQueryRequest
             {
                 TeamId = Model.TeamId,
                 PlayerId = Model.PlayerId,
-                DateFromUtc = dateFrom,
-                DateToUtc = dateTo,
+                CycleId = selectedCycleGuid,
+                DateFromUtc = selectedCycleGuid.HasValue ? null : Model.PeriodStartUtc,
+                DateToUtc = selectedCycleGuid.HasValue ? null : Model.PeriodEndUtc,
                 NotesQuery = Model.NotesQuery,
                 OnlyAcquisitions = Model.OnlyAcquisitions,
                 Page = Model.Page,

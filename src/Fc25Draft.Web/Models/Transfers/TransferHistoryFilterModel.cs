@@ -61,6 +61,7 @@ public class TransferHistoryQueryRequest
 {
     public Guid? TeamId { get; init; }
     public Guid? PlayerId { get; init; }
+    public Guid? CycleId { get; init; }
     public DateTime? DateFromUtc { get; init; }
     public DateTime? DateToUtc { get; init; }
     public string? NotesQuery { get; init; }

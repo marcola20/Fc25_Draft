@@ -7,6 +7,7 @@ public record class TransfersFilter
 {
     public Guid? TeamId { get; init; }
     public Guid? PlayerId { get; init; }
+    public Guid? CycleId { get; init; }
     public TransferType? Type { get; init; }
     public DateTime? FromUtc { get; init; }
     public DateTime? ToUtc { get; init; }
