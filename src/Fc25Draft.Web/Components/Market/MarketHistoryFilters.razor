@@ -82,6 +82,15 @@
                 }
             </div>
 
+            <div class="col-12 col-sm-auto d-flex align-items-end pb-1">
+                <div class="form-check mb-0">
+                    <InputCheckbox id="history-only-acquisitions"
+                                   class="form-check-input"
+                                   @bind-Value="Model.OnlyAcquisitions" />
+                    <label class="form-check-label" for="history-only-acquisitions">Somente contratações</label>
+                </div>
+            </div>
+
             @if (ShowAdminFields)
             {
                 <div class="col-12 col-sm-6 col-lg-3">
@@ -266,6 +275,7 @@
         Model.TeamName = null;
         Model.TargetTeamName = null;
         Model.Type = null;
+        Model.OnlyAcquisitions = false;
         Model.PerformedBy = null;
         Model.FromUtc = null;
         Model.ToUtc = null;

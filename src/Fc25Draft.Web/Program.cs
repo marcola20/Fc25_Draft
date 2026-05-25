@@ -28,7 +28,7 @@ builder.Services
 
 builder.Services.AddAuthorization(o => o.AddPolicy("AdminOnly", p => p.RequireRole("Admin")));
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor(o => o.DetailedErrors = true);
+builder.Services.AddServerSideBlazor(o => o.DetailedErrors = builder.Environment.IsDevelopment());
 builder.Services.AddBlazoredToast();
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 

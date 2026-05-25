@@ -13,6 +13,7 @@ public class MarketHistoryQueryOptions
     public string? TeamName { get; set; }
     public string? TargetTeamName { get; set; }
     public MarketTransactionType? Type { get; set; }
+    public bool OnlyAcquisitions { get; set; }
     public string? PerformedBy { get; set; }
     public DateTime? FromUtc { get; set; }
     public DateTime? ToUtc { get; set; }
@@ -36,6 +37,11 @@ public class MarketHistoryQueryOptions
         if (Type.HasValue)
         {
             builder.AddInvariant("type", (int)Type.Value);
+        }
+
+        if (OnlyAcquisitions)
+        {
+            builder.Add("onlyAcquisitions", "true");
         }
 
         if (includePaging)

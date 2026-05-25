@@ -11,6 +11,8 @@
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Market.Transfers> Logger
+@inject AdminAuthService AdminAuth
+@inject MarketCycleClient CycleClient
 
 
 @implements IDisposable
@@ -50,6 +52,27 @@
         <div class="col-12 col-md-6">
             <label class="form-label" for="filter-notes">Observações</label>
             <InputText id="filter-notes" class="form-control" @bind-Value="Model.NotesQuery" placeholder="Palavras-chave nas observações" />
+        </div>
+        @if (_isAdmin)
+        {
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="filter-cycle">Ciclo</label>
+                <InputSelect id="filter-cycle" class="form-select" @bind-Value="_selectedCycleId" disabled="@(_cycleOptions.Count == 0)">
+                    <option value="">Todos os ciclos</option>
+                    @foreach (var c in _cycleOptions)
+                    {
+                        <option value="@c.CycleId">@c.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        }
+        <div class="col-12 col-sm-auto d-flex align-items-end pb-1">
+            <div class="form-check mb-0">
+                <InputCheckbox id="filter-only-acquisitions"
+                               class="form-check-input"
+                               @bind-Value="Model.OnlyAcquisitions" />
+                <label class="form-check-label" for="filter-only-acquisitions">Apenas mercado externo</label>
+            </div>
         </div>
         <div class="col-12 col-md-6 d-flex gap-2 flex-wrap justify-content-end">
             <button type="submit" class="btn btn-primary" disabled="@_isLoading">
@@ -213,6 +236,10 @@ else
     private TransferDetailsDto? _selectedTransfer;
     private CancellationTokenSource? _detailsCts;
 
+    private bool _isAdmin;
+    private string? _selectedCycleId;
+    private List<MarketCycleDto> _cycleOptions = new();
+
     private int TotalPages => _page is null || _page.PageSize <= 0
         ? 1
         : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
@@ -248,7 +275,13 @@ else
     protected override async Task OnInitializedAsync()
     {
         _editContext = new EditContext(Model);
-        await LoadTeamsAsync();
+        await AdminAuth.EnsureInitializedAsync();
+        _isAdmin = AdminAuth.IsAdmin;
+
+        await Task.WhenAll(
+            LoadTeamsAsync(),
+            _isAdmin ? LoadCyclesAsync() : Task.CompletedTask
+        );
         await LoadAsync(Model.Page, CancellationToken.None);
     }
 
@@ -272,6 +305,24 @@ else
         finally
         {
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadCyclesAsync()
+    {
+        try
+        {
+            var result = await CycleClient.QueryAsync(new Fc25Draft.Web.Models.MarketCycles.MarketCycleQueryRequest
+            {
+                Page = 1,
+                PageSize = 100
+            });
+            _cycleOptions = result.Items.OrderByDescending(c => c.StartsAtUtc).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar ciclos para filtro de transferências");
+            _cycleOptions = new List<MarketCycleDto>();
         }
     }
 
@@ -342,13 +393,27 @@ else
         TransferHistoryQueryRequest? request = null;
         try
         {
+            DateTime? dateFrom = Model.PeriodStartUtc;
+            DateTime? dateTo = Model.PeriodEndUtc;
+
+            if (_isAdmin && Guid.TryParse(_selectedCycleId, out var cycleGuid))
+            {
+                var cycle = _cycleOptions.FirstOrDefault(c => c.CycleId == cycleGuid);
+                if (cycle is not null)
+                {
+                    dateFrom = cycle.StartsAtUtc;
+                    dateTo = cycle.EndsAtUtc;
+                }
+            }
+
             request = new TransferHistoryQueryRequest
             {
                 TeamId = Model.TeamId,
                 PlayerId = Model.PlayerId,
-                DateFromUtc = Model.PeriodStartUtc,
-                DateToUtc = Model.PeriodEndUtc,
+                DateFromUtc = dateFrom,
+                DateToUtc = dateTo,
                 NotesQuery = Model.NotesQuery,
+                OnlyAcquisitions = Model.OnlyAcquisitions,
                 Page = Model.Page,
                 PageSize = Model.PageSize
             };
@@ -386,6 +451,7 @@ else
         Model.Reset();
         _selectedTeamId = null;
         _playerIdText = null;
+        _selectedCycleId = null;
         await LoadAsync(1, CancellationToken.None);
     }
 

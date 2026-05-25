@@ -180,6 +180,7 @@ public static class MarketHistoryEndpoints
         [FromQuery(Name = "fromUtc")] public string? LegacyFromUtcRaw { get; init; }
         [FromQuery(Name = "to")] public string? ToUtcRaw { get; init; }
         [FromQuery(Name = "toUtc")] public string? LegacyToUtcRaw { get; init; }
+        public bool OnlyAcquisitions { get; init; }
         public int Page { get; init; } = 1;
         public int PageSize { get; init; } = 50;
 
@@ -272,6 +273,7 @@ public static class MarketHistoryEndpoints
                 TeamName = string.IsNullOrWhiteSpace(TeamName) ? null : TeamName.Trim(),
                 TargetTeamName = string.IsNullOrWhiteSpace(TargetTeamName) ? null : TargetTeamName.Trim(),
                 Type = type,
+                OnlyAcquisitions = OnlyAcquisitions,
                 PerformedBy = string.IsNullOrWhiteSpace(PerformedBy) ? null : PerformedBy.Trim(),
                 FromUtc = effectiveFromUtc,
                 ToUtc = effectiveToUtc,

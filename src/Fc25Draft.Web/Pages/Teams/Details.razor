@@ -436,6 +436,10 @@ else
         if (string.IsNullOrWhiteSpace(token))
             return;
 
+        await AdminAuth.EnsureInitializedAsync();
+        if (AdminAuth.IsAdmin)
+            return;
+
         _currentTeamToken = token.Trim();
 
         try
@@ -448,20 +452,24 @@ else
             }
             else if (identity is not null)
             {
-                _teamTokenErrorMessage = "O token configurado pertence a outro time.";
+                if (!AdminAuth.IsAdmin)
+                    _teamTokenErrorMessage = "O token configurado pertence a outro time.";
             }
             else
             {
-                _teamTokenErrorMessage = "Token do time inválido.";
+                if (!AdminAuth.IsAdmin)
+                    _teamTokenErrorMessage = "Token do time inválido.";
             }
         }
         catch (InvalidOperationException ex)
         {
-            _teamTokenErrorMessage = ex.Message;
+            if (!AdminAuth.IsAdmin)
+                _teamTokenErrorMessage = ex.Message;
         }
         catch
         {
-            _teamTokenErrorMessage = "Não foi possível validar o token do time.";
+            if (!AdminAuth.IsAdmin)
+                _teamTokenErrorMessage = "Não foi possível validar o token do time.";
         }
 
         var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();

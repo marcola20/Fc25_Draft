@@ -1,5 +1,6 @@
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -79,6 +80,10 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
         {
             var type = filter.Type.Value;
             q = q.Where(x => x.m.Type == type);
+        }
+        else if (filter.OnlyAcquisitions)
+        {
+            q = q.Where(x => x.m.Type == MarketTransactionType.BuyNow || x.m.Type == MarketTransactionType.AuctionSettled);
         }
 
         if (filter.FromUtc.HasValue)
@@ -185,6 +190,10 @@ public class MarketHistoryQueryService : IMarketHistoryQueryService
         {
             var type = filter.Type.Value;
             q = q.Where(x => x.m.Type == type);
+        }
+        else if (filter.OnlyAcquisitions)
+        {
+            q = q.Where(x => x.m.Type == MarketTransactionType.BuyNow || x.m.Type == MarketTransactionType.AuctionSettled);
         }
 
         if (filter.FromUtc.HasValue)

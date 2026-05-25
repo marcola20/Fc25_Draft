@@ -23,6 +23,8 @@ public class TransferHistoryFilterModel : IValidatableObject
     [StringLength(200, ErrorMessage = "Informe no máximo 200 caracteres.")]
     public string? NotesQuery { get; set; }
 
+    public bool OnlyAcquisitions { get; set; }
+
     [Range(1, 100, ErrorMessage = "Informe um tamanho de página válido.")]
     public int PageSize { get; set; } = 20;
 
@@ -50,6 +52,7 @@ public class TransferHistoryFilterModel : IValidatableObject
         PeriodStartLocal = null;
         PeriodEndLocal = null;
         NotesQuery = null;
+        OnlyAcquisitions = false;
         Page = 1;
     }
 }
@@ -61,6 +64,7 @@ public class TransferHistoryQueryRequest
     public DateTime? DateFromUtc { get; init; }
     public DateTime? DateToUtc { get; init; }
     public string? NotesQuery { get; init; }
+    public bool OnlyAcquisitions { get; init; }
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 20;
 }

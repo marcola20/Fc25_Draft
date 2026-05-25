@@ -60,6 +60,11 @@ public class TransfersClient
             query["q"] = request.NotesQuery;
         }
 
+        if (request.OnlyAcquisitions)
+        {
+            query["type"] = "1"; // TransferType.MarketAuction
+        }
+
         var url = QueryHelpers.AddQueryString("/api/transfers/history", query);
         var client = await _clientFactory.CreateAsync().ConfigureAwait(false);
 

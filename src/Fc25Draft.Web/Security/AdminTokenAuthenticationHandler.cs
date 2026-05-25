@@ -12,15 +12,18 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
     public const string SchemeName = "AdminToken";
 
     private readonly DraftDbContext _db;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public AdminTokenAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        DraftDbContext db)
+        DraftDbContext db,
+        IServiceScopeFactory scopeFactory)
         : base(options, logger, encoder)
     {
         _db = db;
+        _scopeFactory = scopeFactory;
     }
 
     protected override async Task InitializeHandlerAsync()
@@ -63,21 +66,24 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-            // Update LastUsedAtUtc in background (fire and forget)
+            // Update LastUsedAtUtc in background — uses its own scope to avoid concurrent DbContext access
+            var adminTokenId = adminToken.AdminTokenId;
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var tokenToUpdate = await _db.AdminTokens.FirstOrDefaultAsync(t => t.AdminTokenId == adminToken.AdminTokenId);
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+                    var tokenToUpdate = await db.AdminTokens.FirstOrDefaultAsync(t => t.AdminTokenId == adminTokenId);
                     if (tokenToUpdate is not null)
                     {
                         tokenToUpdate.LastUsedAtUtc = DateTime.UtcNow;
-                        await _db.SaveChangesAsync();
+                        await db.SaveChangesAsync();
                     }
                 }
                 catch
                 {
-                    // Silent fail - don't break authentication if update fails
+                    // Silent fail — don't break authentication if update fails
                 }
             });
 

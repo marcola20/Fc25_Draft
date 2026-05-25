@@ -12,6 +12,7 @@ public sealed record MarketHistoryFilter
     public string? TeamName { get; init; }
     public string? TargetTeamName { get; init; }
     public MarketTransactionType? Type { get; init; }
+    public bool OnlyAcquisitions { get; init; }
     public string? PerformedBy { get; init; }
     public DateTime? FromUtc { get; init; }
     public DateTime? ToUtc { get; init; }

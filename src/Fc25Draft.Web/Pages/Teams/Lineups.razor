@@ -12,6 +12,7 @@
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Lineups> Logger
 @inject IJSRuntime JSRuntime
 @inject TeamAccessService TeamAccess
+@inject AdminAuthService AdminAuth
 
 @implements IDisposable
 
@@ -866,8 +867,73 @@ else
         accessMessage = null;
         hasAccess = false;
 
+
         try
         {
+            await AdminAuth.EnsureInitializedAsync();
+            if (AdminAuth.IsAdmin)
+            {
+                hasAccess = true;
+                currentTeamToken = null;
+
+                var adminRosterTask = TeamsApiClient.GetRosterByIdAsync(TeamId, loadCts.Token);
+                var adminLineupsTask = LineupsApiClient.GetLineupsAsync(TeamId, null, loadCts.Token);
+
+                TeamRosterDto? adminRoster;
+                IReadOnlyList<TeamLineupDto> adminLineups;
+
+                try
+                {
+                    await Task.WhenAll(adminRosterTask, adminLineupsTask);
+                    adminRoster = adminRosterTask.Result;
+                    adminLineups = adminLineupsTask.Result;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Logger.LogWarning(ex, "Escalações: Acesso negado para o time {TeamId}", TeamId);
+                    accessMessage = ex.Message;
+                    hasAccess = false;
+                    ClearLocalState();
+                    return;
+                }
+
+                if (adminRoster is null)
+                {
+                    accessMessage = "Time não encontrado.";
+                    hasAccess = false;
+                    ClearLocalState();
+                    return;
+                }
+
+                rosterPlayers.Clear();
+                rosterPlayers.AddRange(adminRoster.Jogadores
+                    .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall))
+                    .OrderByDescending(p => p.Overall)
+                    .ThenBy(p => p.Name));
+
+                lineups = adminLineups
+                    .OrderByDescending(l => l.IsActive)
+                    .ThenBy(l => l.CreatedAtUtc)
+                    .ToList();
+
+                pageSubtitle = $"Gerencie as escalações do {adminRoster.TeamName}.";
+                LayoutState.SetPage(pageDefinition, subtitle: pageSubtitle);
+
+                if (lineups.Count > 0)
+                {
+                    var active = lineups.FirstOrDefault(l => l.IsActive) ?? lineups[0];
+                    SelectExistingLineup(active.LineupId);
+                }
+                else
+                {
+                    currentEditor = null;
+                    selectedLineupId = null;
+                    isNewLineup = false;
+                }
+
+                return;
+            }
+
             string? token;
             try { token = await TeamAccess.GetTokenAsync(); }
             catch (InvalidOperationException) { return; }
@@ -1199,7 +1265,7 @@ else
     private async Task SaveAsync()
     {
         if (currentEditor is null) return;
-        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        if (!hasAccess)
         {
             Toasts.ShowError("Informe o token do seu time para salvar a escalação.");
             return;
@@ -1263,7 +1329,7 @@ else
             Toasts.ShowError($"O time já possui {MaxLineupsPerTeam} escalações cadastradas.");
             return;
         }
-        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        if (!hasAccess)
         {
             Toasts.ShowError("Informe o token do seu time para duplicar a escalação.");
             return;
@@ -1311,7 +1377,7 @@ else
         var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Confirma a exclusão desta escalação?");
         if (!confirmed) return;
 
-        if (!hasAccess || string.IsNullOrWhiteSpace(currentTeamToken))
+        if (!hasAccess)
         {
             Toasts.ShowError("Informe o token do seu time para excluir a escalação.");
             return;
@@ -1341,7 +1407,7 @@ else
 
     private async Task RefreshLineupsAsync(Guid? preferredLineupId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(currentTeamToken)) { hasAccess = false; ClearLocalState(); return; }
+        if (!hasAccess) { ClearLocalState(); return; }
 
         var fetched = await LineupsApiClient.GetLineupsAsync(TeamId, currentTeamToken, ct);
         lineups = fetched.OrderByDescending(l => l.IsActive).ThenBy(l => l.CreatedAtUtc).ToList();
