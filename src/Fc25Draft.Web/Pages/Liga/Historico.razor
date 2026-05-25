@@ -38,7 +38,7 @@
                                 ⚽ Gols @SortIcon("gols")
                             </th>
                             <th class="text-center" style="width:130px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
-                                🅰️ Assistências @SortIcon("assistencias")
+                                🅰️ Assist. @SortIcon("assistencias")
                             </th>
                         </tr>
                     </thead>
@@ -79,7 +79,6 @@
             }
         }
 
-        <!-- Detalhe do Jogador -->
         @if (_jogadorSelecionado is not null)
         {
             <div class="mt-4 p-3 border rounded bg-light">
@@ -144,7 +143,6 @@
     private IReadOnlyList<HistoricoArtilheiroDto> _artilheiros = Array.Empty<HistoricoArtilheiroDto>();
     private HistoricoArtilheiroDto? _jogadorSelecionado;
 
-    // Sort
     private string _sortBy = "gols";
     private bool _sortAsc = false;
 
