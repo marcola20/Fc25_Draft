@@ -22,7 +22,7 @@
             <h3>Liga</h3>
         </div>
 
-        <div class="fmt-overview-grid fmt-overview-grid-liga">
+        <div class="fmt-overview-grid fmt-overview-grid-3">
             <div class="fmt-stat-card">
                 <div class="fmt-stat-number">12</div>
                 <div class="fmt-stat-label">Times</div>
@@ -48,7 +48,6 @@
                     <span class="fmt-tiebreak-icon">⚖️</span>
                     <span>Critérios de Desempate</span>
                 </div>
-
                 <div class="fmt-tiebreak-cards">
                     <div class="fmt-tiebreak-card">
                         <div class="fmt-tiebreak-badge fmt-badge-blue">2 times</div>
@@ -104,7 +103,7 @@
             <h3>Copa</h3>
         </div>
 
-        <div class="fmt-overview-grid fmt-overview-grid-copa">
+        <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
                 <div class="fmt-stat-number">2</div>
                 <div class="fmt-stat-label">Grupos</div>
@@ -123,7 +122,6 @@
             </div>
         </div>
 
-        <!-- Fase de Grupos -->
         <div class="fmt-copa-phase">
             <div class="fmt-phase-label">
                 <span class="fmt-phase-icon">📋</span>
@@ -174,7 +172,6 @@
             </div>
         </div>
 
-        <!-- Fases Finais -->
         <div class="fmt-copa-phase">
             <div class="fmt-phase-label">
                 <span class="fmt-phase-icon">⚔️</span>
@@ -182,8 +179,6 @@
             </div>
 
             <div class="fmt-knockout-bracket">
-
-                <!-- Semifinal A -->
                 <div class="fmt-knockout-col">
                     <div class="fmt-ko-match fmt-ko-match-a">
                         <div class="fmt-ko-label">Semifinal — Grupo A</div>
@@ -207,7 +202,6 @@
 
                 <div class="fmt-knockout-arrow">→</div>
 
-                <!-- Final -->
                 <div class="fmt-knockout-col fmt-knockout-col-final">
                     <div class="fmt-ko-match fmt-ko-match-final">
                         <div class="fmt-ko-label">🏆 Final</div>
@@ -230,7 +224,6 @@
 
                 <div class="fmt-knockout-arrow">←</div>
 
-                <!-- Semifinal B -->
                 <div class="fmt-knockout-col">
                     <div class="fmt-ko-match fmt-ko-match-b">
                         <div class="fmt-ko-label">Semifinal — Grupo B</div>
@@ -251,11 +244,9 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
-        <!-- Fluxo Copa -->
         <div class="fmt-flow">
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon">📋</div>
@@ -300,9 +291,7 @@
         padding-bottom: 3rem;
     }
 
-    .fmt-section {
-        margin-bottom: 2rem;
-    }
+    .fmt-section { margin-bottom: 2rem; }
 
     .fmt-section-header {
         display: flex;
@@ -311,10 +300,7 @@
         margin-bottom: 1.1rem;
     }
 
-    .fmt-section-icon {
-        font-size: 1.4rem;
-        line-height: 1;
-    }
+    .fmt-section-icon { font-size: 1.4rem; line-height: 1; }
 
     .fmt-section-header h3 {
         font-size: 1.3rem;
@@ -338,9 +324,7 @@
         margin-bottom: 1rem;
     }
 
-    .fmt-card-liga {
-        border-left: 4px solid var(--bs-primary, #0d6efd);
-    }
+    .fmt-card-liga { border-left: 4px solid var(--bs-primary, #0d6efd); }
 
     .fmt-desc {
         font-size: 0.92rem;
@@ -349,26 +333,13 @@
         line-height: 1.6;
     }
 
-    /* Overview grids */
-    .fmt-overview-grid {
-        display: grid;
-        gap: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .fmt-overview-grid-liga {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .fmt-overview-grid-copa {
-        grid-template-columns: repeat(4, 1fr);
-    }
+    .fmt-overview-grid { display: grid; gap: 1rem; margin-bottom: 1rem; }
+    .fmt-overview-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .fmt-overview-grid-4 { grid-template-columns: repeat(4, 1fr); }
 
     @@media (max-width: 768px) {
-        .fmt-overview-grid-liga,
-        .fmt-overview-grid-copa {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        .fmt-overview-grid-3,
+        .fmt-overview-grid-4 { grid-template-columns: repeat(2, 1fr); }
     }
 
     .fmt-stat-card {
@@ -396,10 +367,7 @@
         margin-top: 0.3rem;
     }
 
-    /* Tiebreak */
-    .fmt-tiebreak-section {
-        margin-top: 0.5rem;
-    }
+    .fmt-tiebreak-section { margin-top: 0.5rem; }
 
     .fmt-tiebreak-header {
         display: flex;
@@ -413,15 +381,9 @@
         margin-bottom: 0.75rem;
     }
 
-    .fmt-tiebreak-icon {
-        font-size: 1rem;
-    }
+    .fmt-tiebreak-icon { font-size: 1rem; }
 
-    .fmt-tiebreak-cards {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-    }
+    .fmt-tiebreak-cards { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
     .fmt-tiebreak-card {
         display: flex;
@@ -448,28 +410,11 @@
     .fmt-badge-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
     .fmt-badge-purple { background: rgba(124,58,237,0.12); color: #7c3aed; }
 
-    .fmt-tiebreak-content {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        font-size: 0.85rem;
-    }
+    .fmt-tiebreak-content { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+    .fmt-tiebreak-content strong { font-weight: 700; color: var(--bs-emphasis-color, #212529); }
+    .fmt-tiebreak-content span   { font-size: 0.8rem; color: var(--bs-secondary-color, #6c757d); line-height: 1.5; }
 
-    .fmt-tiebreak-content strong {
-        font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
-    }
-
-    .fmt-tiebreak-content span {
-        font-size: 0.8rem;
-        color: var(--bs-secondary-color, #6c757d);
-        line-height: 1.5;
-    }
-
-    /* Copa phase */
-    .fmt-copa-phase {
-        margin-bottom: 1.25rem;
-    }
+    .fmt-copa-phase { margin-bottom: 1.25rem; }
 
     .fmt-phase-label {
         display: flex;
@@ -483,11 +428,8 @@
         margin-bottom: 0.75rem;
     }
 
-    .fmt-phase-icon {
-        font-size: 1rem;
-    }
+    .fmt-phase-icon { font-size: 1rem; }
 
-    /* Groups */
     .fmt-groups-grid {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
@@ -496,13 +438,8 @@
     }
 
     @@media (max-width: 700px) {
-        .fmt-groups-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .fmt-groups-vs {
-            justify-content: center;
-        }
+        .fmt-groups-grid      { grid-template-columns: 1fr; }
+        .fmt-groups-vs        { justify-content: center; }
     }
 
     .fmt-group-card {
@@ -525,16 +462,9 @@
     .fmt-group-a { background: linear-gradient(90deg, #0d6efd, #4d9bff); }
     .fmt-group-b { background: linear-gradient(90deg, #7c3aed, #a855f7); }
 
-    .fmt-group-body {
-        padding: 0.75rem 1rem;
-    }
+    .fmt-group-body { padding: 0.75rem 1rem; }
 
-    .fmt-group-teams {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin-bottom: 0.75rem;
-    }
+    .fmt-group-teams { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; }
 
     .fmt-group-team {
         display: flex;
@@ -544,26 +474,12 @@
         color: var(--bs-secondary-color, #6c757d);
     }
 
-    .fmt-team-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
+    .fmt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fmt-dot-a    { background: #0d6efd; }
+    .fmt-dot-b    { background: #7c3aed; }
 
-    .fmt-dot-a { background: #0d6efd; }
-    .fmt-dot-b { background: #7c3aed; }
-
-    .fmt-group-desc {
-        font-size: 0.78rem;
-        color: var(--bs-secondary-color, #6c757d);
-        margin-bottom: 0.5rem;
-        line-height: 1.5;
-    }
-
-    .fmt-group-advance {
-        display: flex;
-    }
+    .fmt-group-desc { font-size: 0.78rem; color: var(--bs-secondary-color, #6c757d); margin-bottom: 0.5rem; line-height: 1.5; }
+    .fmt-group-advance { display: flex; }
 
     .fmt-advance-badge {
         background: color-mix(in srgb, var(--bs-success, #198754) 10%, var(--bs-body-bg, #fff));
@@ -591,13 +507,8 @@
         color: var(--bs-secondary-color, #6c757d);
     }
 
-    .fmt-groups-vs-arrow {
-        font-size: 1.5rem;
-        color: var(--bs-secondary-color, #6c757d);
-        font-weight: 700;
-    }
+    .fmt-groups-vs-arrow { font-size: 1.5rem; color: var(--bs-secondary-color, #6c757d); font-weight: 700; }
 
-    /* Knockout bracket */
     .fmt-knockout-bracket {
         display: grid;
         grid-template-columns: 1fr auto 1.1fr auto 1fr;
@@ -606,24 +517,12 @@
     }
 
     @@media (max-width: 768px) {
-        .fmt-knockout-bracket {
-            grid-template-columns: 1fr;
-        }
-
-        .fmt-knockout-arrow {
-            text-align: center;
-            transform: rotate(90deg);
-        }
+        .fmt-knockout-bracket { grid-template-columns: 1fr; }
+        .fmt-knockout-arrow   { text-align: center; }
     }
 
-    .fmt-knockout-col {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .fmt-knockout-col-final {
-        flex: 1.1;
-    }
+    .fmt-knockout-col       { display: flex; flex-direction: column; }
+    .fmt-knockout-col-final { flex: 1.1; }
 
     .fmt-knockout-arrow {
         font-size: 1.3rem;
@@ -641,12 +540,9 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
 
-    .fmt-ko-match-a    { border-top: 3px solid #0d6efd; }
-    .fmt-ko-match-b    { border-top: 3px solid #7c3aed; }
-    .fmt-ko-match-final {
-        border-top: 3px solid #a07800;
-        box-shadow: 0 4px 16px rgba(160,120,0,0.18);
-    }
+    .fmt-ko-match-a     { border-top: 3px solid #0d6efd; }
+    .fmt-ko-match-b     { border-top: 3px solid #7c3aed; }
+    .fmt-ko-match-final { border-top: 3px solid #a07800; box-shadow: 0 4px 16px rgba(160,120,0,0.18); }
 
     .fmt-ko-label {
         font-size: 0.7rem;
@@ -657,11 +553,7 @@
         margin-bottom: 0.65rem;
     }
 
-    .fmt-ko-matchup {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-    }
+    .fmt-ko-matchup { display: flex; flex-direction: column; gap: 0.4rem; }
 
     .fmt-ko-team {
         display: flex;
@@ -672,30 +564,12 @@
         background: var(--bs-secondary-bg, #f8f9fa);
     }
 
-    .fmt-ko-seed {
-        font-size: 0.68rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        flex-shrink: 0;
-    }
+    .fmt-ko-seed { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
+    .fmt-seed-a  { color: #0d6efd; }
+    .fmt-seed-b  { color: #7c3aed; }
 
-    .fmt-seed-a { color: #0d6efd; }
-    .fmt-seed-b { color: #7c3aed; }
-
-    .fmt-ko-name {
-        font-size: 0.83rem;
-        font-weight: 600;
-        color: var(--bs-emphasis-color, #212529);
-    }
-
-    .fmt-ko-vs {
-        text-align: center;
-        font-size: 0.65rem;
-        font-weight: 800;
-        color: var(--bs-secondary-color, #6c757d);
-        letter-spacing: 0.08em;
-    }
+    .fmt-ko-name { font-size: 0.83rem; font-weight: 600; color: var(--bs-emphasis-color, #212529); }
+    .fmt-ko-vs   { text-align: center; font-size: 0.65rem; font-weight: 800; color: var(--bs-secondary-color, #6c757d); letter-spacing: 0.08em; }
 
     .fmt-ko-result {
         margin-top: 0.6rem;
@@ -706,25 +580,10 @@
         border-top: 1px solid var(--bs-border-color, #dee2e6);
     }
 
-    .fmt-result-win {
-        font-size: 0.76rem;
-        color: var(--bs-success, #198754);
-        font-weight: 600;
-    }
+    .fmt-result-win      { font-size: 0.76rem; color: var(--bs-success, #198754); font-weight: 600; }
+    .fmt-result-champion { color: #a07800; font-weight: 700; font-size: 0.82rem; }
+    .fmt-result-lose     { font-size: 0.76rem; color: var(--bs-danger, #dc3545); font-weight: 500; }
 
-    .fmt-result-champion {
-        color: #a07800;
-        font-weight: 700;
-        font-size: 0.82rem;
-    }
-
-    .fmt-result-lose {
-        font-size: 0.76rem;
-        color: var(--bs-danger, #dc3545);
-        font-weight: 500;
-    }
-
-    /* Flow */
     .fmt-flow {
         display: flex;
         align-items: center;
@@ -749,46 +608,16 @@
         min-width: 130px;
     }
 
-    .fmt-flow-icon {
-        font-size: 1.4rem;
-        flex-shrink: 0;
-    }
+    .fmt-flow-icon           { font-size: 1.4rem; flex-shrink: 0; }
+    .fmt-flow-content        { display: flex; flex-direction: column; gap: 0.05rem; }
+    .fmt-flow-content strong { font-size: 0.88rem; font-weight: 700; color: var(--bs-emphasis-color, #212529); }
+    .fmt-flow-content span   { font-size: 0.73rem; color: var(--bs-secondary-color, #6c757d); }
 
-    .fmt-flow-content {
-        display: flex;
-        flex-direction: column;
-        gap: 0.05rem;
-    }
-
-    .fmt-flow-content strong {
-        font-size: 0.88rem;
-        font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
-    }
-
-    .fmt-flow-content span {
-        font-size: 0.73rem;
-        color: var(--bs-secondary-color, #6c757d);
-    }
-
-    .fmt-flow-connector {
-        font-size: 1.1rem;
-        color: var(--bs-secondary-color, #6c757d);
-        flex-shrink: 0;
-        font-weight: 700;
-    }
+    .fmt-flow-connector { font-size: 1.1rem; color: var(--bs-secondary-color, #6c757d); flex-shrink: 0; font-weight: 700; }
 
     @@media (max-width: 600px) {
-        .fmt-flow {
-            flex-direction: column;
-        }
-
-        .fmt-flow-step {
-            width: 100%;
-        }
-
-        .fmt-flow-connector {
-            transform: rotate(90deg);
-        }
+        .fmt-flow           { flex-direction: column; }
+        .fmt-flow-step      { width: 100%; }
+        .fmt-flow-connector { transform: rotate(90deg); }
     }
 </style>

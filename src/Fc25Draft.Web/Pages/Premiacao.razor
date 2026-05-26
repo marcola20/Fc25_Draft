@@ -11,38 +11,38 @@
     {
         LayoutState.SetPage(NavigationService.GetPageDefinition("/premiacao"));
     }
+
+    private sealed record LeaguePrize(string Position, string Prize, string RowClass, string BadgeClass, string BarClass, int BarWidth);
+
+    private static readonly IReadOnlyList<LeaguePrize> LeaguePrizes = new List<LeaguePrize>
+    {
+        new("12°", "50 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",    100),
+        new("11°", "44 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",     88),
+        new("10°", "38 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  76),
+        new("9°",  "32 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  64),
+        new("8°",  "26 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  52),
+        new("7°",  "21 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  42),
+        new("6°",  "16 Mi", "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    32),
+        new("5°",  "12 Mi", "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    24),
+        new("4°",   "9 Mi", "prem-row-green",  "prem-badge-green",  "prem-bar-green",   18),
+        new("3°",   "6 Mi", "prem-row-green",  "prem-badge-green",  "prem-bar-green",   12),
+        new("2°",   "4 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",     8),
+        new("1° 🏆","2 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",     4),
+    };
 }
 
 <div class="prem-page">
 
-    <section class="prem-section">
-        <div class="prem-totals">
-            <div class="prem-total-card prem-total-league">
-                <div class="prem-total-label">Premiação da Fase de Liga</div>
-                <div class="prem-total-value">R$ 146 Mi</div>
-                <div class="prem-total-sub">distribuídos entre os 12 times</div>
-            </div>
-            <div class="prem-total-card prem-total-playoff">
-                <div class="prem-total-label">Premiação do Mata-Mata</div>
-                <div class="prem-total-value">R$ 82 Mi</div>
-                <div class="prem-total-sub">distribuídos conforme eliminação</div>
-            </div>
-            <div class="prem-total-card prem-total-grand">
-                <div class="prem-total-label">Total do Torneio</div>
-                <div class="prem-total-value">R$ 228 Mi</div>
-                <div class="prem-total-sub">em premiação total</div>
-            </div>
-        </div>
-    </section>
-
-    <hr class="prem-divider" />
-
+    <!-- LIGA -->
     <section class="prem-section">
         <div class="prem-section-header">
-            <span class="prem-section-icon">📋</span>
-            <h3>Fase de Liga</h3>
+            <span class="prem-section-icon">🏆</span>
+            <h3>Liga — Prêmio por Classificação</h3>
         </div>
-        <p class="prem-section-desc">Todo time recebe premiação pela sua colocação ao final das 8 rodadas, independente do que acontecer no mata-mata.</p>
+        <p class="prem-section-desc">
+            Quanto <strong>pior a posição</strong>, maior o prêmio — mecanismo de equilíbrio para próxima temporada.
+            O campeão leva o título; os últimos levam mais grana para reconstruir.
+        </p>
 
         <div class="prem-league-grid">
             @foreach (var item in LeaguePrizes)
@@ -54,7 +54,7 @@
                     <div class="prem-prize-bar-wrap">
                         <div class="prem-prize-bar @item.BarClass" style="width: @item.BarWidth%"></div>
                     </div>
-                    <div class="prem-prize-value">R$ @item.Prize Mi</div>
+                    <div class="prem-prize-value">@item.Prize</div>
                 </div>
             }
         </div>
@@ -62,119 +62,219 @@
 
     <hr class="prem-divider" />
 
+    <!-- COPA -->
     <section class="prem-section">
         <div class="prem-section-header">
-            <span class="prem-section-icon">🏆</span>
-            <h3>Mata-Mata</h3>
+            <span class="prem-section-icon">🥇</span>
+            <h3>Copa — Prêmio por Fase</h3>
         </div>
-        <p class="prem-section-desc">Prêmio adicional recebido conforme a fase em que o time é eliminado. Quanto mais longe chegar, maior a premiação.</p>
+        <p class="prem-section-desc">Quanto mais longe chegar, maior o prêmio. O campeão leva o maior bônus.</p>
 
-        <div class="prem-playoff-ladder">
-
-            <div class="prem-playoff-step prem-step-champion">
+        <div class="prem-copa-ladder">
+            <div class="prem-copa-step prem-step-champ">
                 <div class="prem-step-icon">🏆</div>
                 <div class="prem-step-info">
-                    <div class="prem-step-stage">Campeão</div>
+                    <div class="prem-step-stage">Campeão da Copa</div>
                     <div class="prem-step-teams">1 time</div>
                 </div>
-                <div class="prem-step-prize">R$ 25 Mi</div>
+                <div class="prem-step-prize prem-prize-gold">35 Mi</div>
             </div>
-
-            <div class="prem-playoff-step prem-step-vice">
+            <div class="prem-copa-step prem-step-vice">
                 <div class="prem-step-icon">🥈</div>
                 <div class="prem-step-info">
-                    <div class="prem-step-stage">Vice-Campeão</div>
+                    <div class="prem-step-stage">Vice-campeão</div>
                     <div class="prem-step-teams">1 time</div>
                 </div>
-                <div class="prem-step-prize">R$ 15 Mi</div>
+                <div class="prem-step-prize">20 Mi</div>
             </div>
-
-            <div class="prem-playoff-step prem-step-semi">
-                <div class="prem-step-icon">🎖️</div>
-                <div class="prem-step-info">
-                    <div class="prem-step-stage">Eliminado nas Semis</div>
-                    <div class="prem-step-teams">2 times</div>
-                </div>
-                <div class="prem-step-prize">R$ 8 Mi</div>
-            </div>
-
-            <div class="prem-playoff-step prem-step-quarters">
+            <div class="prem-copa-step prem-step-semi">
                 <div class="prem-step-icon">⚔️</div>
                 <div class="prem-step-info">
-                    <div class="prem-step-stage">Eliminado nas Quartas</div>
-                    <div class="prem-step-teams">4 times</div>
-                </div>
-                <div class="prem-step-prize">R$ 5 Mi</div>
-            </div>
-
-            <div class="prem-playoff-step prem-step-playin">
-                <div class="prem-step-icon">🎯</div>
-                <div class="prem-step-info">
-                    <div class="prem-step-stage">Eliminado no Play-In</div>
+                    <div class="prem-step-stage">Eliminado nas Semifinais</div>
                     <div class="prem-step-teams">2 times</div>
                 </div>
-                <div class="prem-step-prize">R$ 3 Mi</div>
+                <div class="prem-step-prize">10 Mi</div>
             </div>
-
+            <div class="prem-copa-step prem-step-grupos">
+                <div class="prem-step-icon">📋</div>
+                <div class="prem-step-info">
+                    <div class="prem-step-stage">Eliminado na Fase de Grupos</div>
+                    <div class="prem-step-teams">8 times</div>
+                </div>
+                <div class="prem-step-prize">4 Mi</div>
+            </div>
         </div>
     </section>
 
     <hr class="prem-divider" />
 
+    <!-- ESTATÍSTICAS INDIVIDUAIS -->
     <section class="prem-section">
         <div class="prem-section-header">
-            <span class="prem-section-icon">💰</span>
-            <h3>Premiação Máxima por Posição</h3>
+            <span class="prem-section-icon">📊</span>
+            <h3>Premiações Individuais de Estatística</h3>
         </div>
-        <p class="prem-section-desc">Combinando liga + mata-mata, o campeão que terminou em 1° lugar pode faturar até <strong>R$ 43 Mi</strong> na temporada.</p>
+        <p class="prem-section-desc">Top 3 de cada categoria recebem prêmio em dinheiro e +1 over.</p>
 
-        <div class="prem-max-grid">
-            <div class="prem-max-card prem-max-champion">
-                <div class="prem-max-title">🏆 Campeão (1°)</div>
-                <div class="prem-max-breakdown">
-                    <span>Liga (1°): R$ 18 Mi</span>
-                    <span>+</span>
-                    <span>Campeão: R$ 25 Mi</span>
+        <div class="prem-stats-grid">
+
+            <div class="prem-stat-card">
+                <div class="prem-stat-title">⚽ Artilharia</div>
+                <div class="prem-stat-rows">
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥇</span>
+                        <span class="prem-stat-money">8 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥈</span>
+                        <span class="prem-stat-money">6 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥉</span>
+                        <span class="prem-stat-money">4 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
                 </div>
-                <div class="prem-max-total">R$ 43 Mi</div>
             </div>
-            <div class="prem-max-card prem-max-last">
-                <div class="prem-max-title">❌ 12° colocado</div>
-                <div class="prem-max-breakdown">
-                    <span>Liga (12°): R$ 5 Mi</span>
+
+            <div class="prem-stat-card">
+                <div class="prem-stat-title">🅰️ Assistências</div>
+                <div class="prem-stat-rows">
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥇</span>
+                        <span class="prem-stat-money">6 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥈</span>
+                        <span class="prem-stat-money">4 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥉</span>
+                        <span class="prem-stat-money">2 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
                 </div>
-                <div class="prem-max-total prem-max-total-low">R$ 5 Mi</div>
             </div>
+
+            <div class="prem-stat-card">
+                <div class="prem-stat-title">🧤 Clean Sheets</div>
+                <div class="prem-stat-rows">
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥇</span>
+                        <span class="prem-stat-money">6 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥈</span>
+                        <span class="prem-stat-money">4 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                    <div class="prem-stat-row">
+                        <span class="prem-medal">🥉</span>
+                        <span class="prem-stat-money">2 Mi</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="prem-note-box">
+            ⚠️ Se um jogador receber <strong>2 overs</strong> por premiação individual, <strong>1 é repassado a um companheiro</strong> (escolha do treinador).
+        </div>
+    </section>
+
+    <hr class="prem-divider" />
+
+    <!-- PRÊMIOS DE DESTAQUE -->
+    <section class="prem-section">
+        <div class="prem-section-header">
+            <span class="prem-section-icon">🏅</span>
+            <h3>Prêmios de Destaque</h3>
+        </div>
+        <p class="prem-section-desc">Votação ao final da temporada. Prêmio em over para os vencedores.</p>
+
+        <div class="prem-awards-grid">
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">⭐</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">MVP</div>
+                    <div class="prem-award-sub">Melhor Jogador da Temporada</div>
+                    <div class="prem-award-prize">
+                        <span class="prem-winner-label">Vencedor</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">🌟</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">ROY</div>
+                    <div class="prem-award-sub">Melhor Jogador Novo <em>(sub-85, entrou na temporada atual)</em></div>
+                    <div class="prem-award-prize">
+                        <span class="prem-winner-label">Top 3</span>
+                        <span class="prem-over-badge">+1 over cada</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">📈</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">MIP</div>
+                    <div class="prem-award-sub">Jogador que Mais Evoluiu</div>
+                    <div class="prem-award-prize">
+                        <span class="prem-winner-label">Top 3</span>
+                        <span class="prem-over-badge">+1 over cada</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">🛡️</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">DPOY</div>
+                    <div class="prem-award-sub">Melhor Defensor</div>
+                    <div class="prem-award-prize">
+                        <span class="prem-winner-label">Vencedor</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">🧤</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">GKOY</div>
+                    <div class="prem-award-sub">Melhor Goleiro</div>
+                    <div class="prem-award-prize">
+                        <span class="prem-winner-label">Vencedor</span>
+                        <span class="prem-over-badge">+1 over</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prem-award-card">
+                <div class="prem-award-icon">🧠</div>
+                <div class="prem-award-body">
+                    <div class="prem-award-title">COTY</div>
+                    <div class="prem-award-sub">Melhor Treinador</div>
+                    <div class="prem-award-prize">
+                        <span class="prem-honor-badge">Honra</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </section>
 
 </div>
-
-@code {
-    private sealed record LeaguePrize(
-        string Position,
-        int Prize,
-        string RowClass,
-        string BadgeClass,
-        string BarClass,
-        int BarWidth);
-
-    private static readonly IReadOnlyList<LeaguePrize> LeaguePrizes = new List<LeaguePrize>
-    {
-        new("1°",  18, "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",   100),
-        new("2°",  18, "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",   100),
-        new("3°",  16, "prem-row-silver", "prem-badge-silver", "prem-bar-silver",  89),
-        new("4°",  16, "prem-row-silver", "prem-badge-silver", "prem-bar-silver",  89),
-        new("5°",  14, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    78),
-        new("6°",  14, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    78),
-        new("7°",  12, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    67),
-        new("8°",  12, "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    67),
-        new("9°",   8, "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  44),
-        new("10°",  8, "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  44),
-        new("11°",  5, "prem-row-red",    "prem-badge-red",    "prem-bar-red",     28),
-        new("12°",  5, "prem-row-red",    "prem-badge-red",    "prem-bar-red",     28),
-    };
-}
 
 <style>
     .prem-page {
@@ -183,15 +283,8 @@
         padding-bottom: 3rem;
     }
 
-    .prem-divider {
-        border-color: var(--bs-border-color, #dee2e6);
-        margin: 2rem 0;
-        opacity: 0.4;
-    }
-
-    .prem-section {
-        margin-bottom: 0.5rem;
-    }
+    .prem-divider { border-color: var(--bs-border-color, #dee2e6); margin: 2rem 0; opacity: 0.4; }
+    .prem-section { margin-bottom: 0.5rem; }
 
     .prem-section-header {
         display: flex;
@@ -200,10 +293,7 @@
         margin-bottom: 0.9rem;
     }
 
-    .prem-section-icon {
-        font-size: 1.4rem;
-        line-height: 1;
-    }
+    .prem-section-icon { font-size: 1.4rem; line-height: 1; }
 
     .prem-section-header h3 {
         font-size: 1.25rem;
@@ -220,73 +310,26 @@
         line-height: 1.6;
     }
 
-    .prem-totals {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 1rem;
-    }
-
-    @@media (max-width: 680px) {
-        .prem-totals { grid-template-columns: 1fr; }
-    }
-
-    .prem-total-card {
-        border-radius: 0.65rem;
-        padding: 1.25rem 1.1rem;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    }
-
-    .prem-total-league  { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
-    .prem-total-playoff { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
-    .prem-total-grand   { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
-
-    .prem-total-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        opacity: 0.85;
-        margin-bottom: 0.4rem;
-    }
-
-    .prem-total-value {
-        font-size: 1.9rem;
-        font-weight: 800;
-        line-height: 1.1;
-        margin-bottom: 0.25rem;
-    }
-
-    .prem-total-sub {
-        font-size: 0.72rem;
-        opacity: 0.8;
-    }
-
-    .prem-league-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-    }
+    /* Liga table */
+    .prem-league-grid { display: flex; flex-direction: column; gap: 0.3rem; }
 
     .prem-prize-row {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        padding: 0.55rem 0.85rem;
+        padding: 0.5rem 0.85rem;
         border-radius: 0.45rem;
         border: 1px solid transparent;
     }
 
-    .prem-row-gold   { background: color-mix(in srgb, #a07800 9%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, #a07800 20%, transparent); }
-    .prem-row-silver { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 7%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 18%, transparent); }
-    .prem-row-blue   { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 5%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 13%, transparent); }
-    .prem-row-orange { background: color-mix(in srgb, #e07b00 7%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, #e07b00 18%, transparent); }
-    .prem-row-red    { background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-danger, #dc3545) 15%, transparent); }
+    .prem-row-red    { background: color-mix(in srgb, var(--bs-danger, #dc3545) 8%, var(--bs-body-bg, #fff));  border-color: color-mix(in srgb, var(--bs-danger, #dc3545) 20%, transparent); }
+    .prem-row-orange { background: color-mix(in srgb, #e07b00 7%, var(--bs-body-bg, #fff));                   border-color: color-mix(in srgb, #e07b00 18%, transparent); }
+    .prem-row-yellow { background: color-mix(in srgb, #e5a000 7%, var(--bs-body-bg, #fff));                   border-color: color-mix(in srgb, #e5a000 18%, transparent); }
+    .prem-row-blue   { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 6%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 15%, transparent); }
+    .prem-row-green  { background: color-mix(in srgb, var(--bs-success, #198754) 6%, var(--bs-body-bg, #fff)); border-color: color-mix(in srgb, var(--bs-success, #198754) 15%, transparent); }
+    .prem-row-gold   { background: color-mix(in srgb, #a07800 6%, var(--bs-body-bg, #fff));                   border-color: color-mix(in srgb, #a07800 15%, transparent); }
 
-    .prem-prize-pos {
-        flex-shrink: 0;
-        width: 40px;
-    }
+    .prem-prize-pos  { flex-shrink: 0; min-width: 70px; }
 
     .prem-pos-badge {
         display: inline-flex;
@@ -296,15 +339,16 @@
         height: 1.6rem;
         padding: 0 0.4rem;
         border-radius: 0.3rem;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 700;
     }
 
-    .prem-badge-gold   { background: rgba(160,120,0,0.2);  color: #8a6400; }
-    .prem-badge-silver { background: rgba(13,110,253,0.15); color: var(--bs-primary, #0d6efd); }
+    .prem-badge-red    { background: rgba(220,53,69,0.15);  color: var(--bs-danger, #dc3545); }
+    .prem-badge-orange { background: rgba(224,123,0,0.18);  color: #c06800; }
+    .prem-badge-yellow { background: rgba(229,160,0,0.2);   color: #9a7200; }
     .prem-badge-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
-    .prem-badge-orange { background: rgba(224,123,0,0.18); color: #c06800; }
-    .prem-badge-red    { background: rgba(220,53,69,0.15); color: var(--bs-danger, #dc3545); }
+    .prem-badge-green  { background: rgba(25,135,84,0.12);  color: var(--bs-success, #198754); }
+    .prem-badge-gold   { background: rgba(160,120,0,0.18);  color: #8a6400; }
 
     .prem-prize-bar-wrap {
         flex: 1;
@@ -314,131 +358,176 @@
         overflow: hidden;
     }
 
-    .prem-prize-bar {
-        height: 100%;
-        border-radius: 999px;
-        transition: width 0.4s ease;
-    }
+    .prem-prize-bar { height: 100%; border-radius: 999px; }
 
-    .prem-bar-gold   { background: linear-gradient(90deg, #c89a00, #f0c040); }
-    .prem-bar-silver { background: linear-gradient(90deg, #1a5fb4, #4d9bff); }
-    .prem-bar-blue   { background: linear-gradient(90deg, #3584e4, #72b3ff); }
-    .prem-bar-orange { background: linear-gradient(90deg, #c06800, #e8a400); }
     .prem-bar-red    { background: linear-gradient(90deg, #a01020, #dc3545); }
+    .prem-bar-orange { background: linear-gradient(90deg, #c06800, #e8a400); }
+    .prem-bar-yellow { background: linear-gradient(90deg, #9a7200, #e5a000); }
+    .prem-bar-blue   { background: linear-gradient(90deg, #3584e4, #72b3ff); }
+    .prem-bar-green  { background: linear-gradient(90deg, #198754, #2ec27e); }
+    .prem-bar-gold   { background: linear-gradient(90deg, #8a6400, #c89a00); }
 
-    .prem-prize-value {
-        flex-shrink: 0;
-        font-size: 0.92rem;
-        font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
-        min-width: 70px;
-        text-align: right;
-    }
+    .prem-prize-value { flex-shrink: 0; font-size: 0.92rem; font-weight: 700; color: var(--bs-emphasis-color, #212529); min-width: 55px; text-align: right; }
 
-    .prem-playoff-ladder {
+    /* Copa ladder */
+    .prem-copa-ladder {
         display: flex;
         flex-direction: column;
-        gap: 0;
         border: 1px solid var(--bs-border-color, #dee2e6);
         border-radius: 0.6rem;
         overflow: hidden;
     }
 
-    .prem-playoff-step {
+    .prem-copa-step {
         display: flex;
         align-items: center;
         gap: 1rem;
-        padding: 0.9rem 1.1rem;
+        padding: 0.85rem 1.1rem;
         border-bottom: 1px solid var(--bs-border-color, #dee2e6);
-        position: relative;
     }
 
-    .prem-playoff-step:last-child {
-        border-bottom: none;
-    }
+    .prem-copa-step:last-child { border-bottom: none; }
 
-    .prem-step-champion  { background: linear-gradient(90deg, color-mix(in srgb, #a07800 14%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
-    .prem-step-vice      { background: linear-gradient(90deg, color-mix(in srgb, #6c757d 10%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
-    .prem-step-semi      { background: linear-gradient(90deg, color-mix(in srgb, #198754 9%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
-    .prem-step-quarters  { background: linear-gradient(90deg, color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
-    .prem-step-playin    { background: linear-gradient(90deg, color-mix(in srgb, #e07b00 8%, var(--bs-body-bg, #fff)), var(--bs-body-bg, #fff)); }
+    .prem-step-champ  { background: color-mix(in srgb, #a07800 12%, var(--bs-body-bg, #fff)); }
+    .prem-step-vice   { background: color-mix(in srgb, #6c757d 8%, var(--bs-body-bg, #fff)); }
+    .prem-step-semi   { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 6%, var(--bs-body-bg, #fff)); }
+    .prem-step-grupos { background: color-mix(in srgb, var(--bs-danger, #dc3545) 5%, var(--bs-body-bg, #fff)); }
 
-    .prem-step-icon {
-        font-size: 1.5rem;
-        flex-shrink: 0;
-        width: 2rem;
-        text-align: center;
-    }
+    .prem-step-icon  { font-size: 1.5rem; flex-shrink: 0; width: 2rem; text-align: center; }
+    .prem-step-info  { flex: 1; }
+    .prem-step-stage { font-size: 0.95rem; font-weight: 600; color: var(--bs-emphasis-color, #212529); }
+    .prem-step-teams { font-size: 0.78rem; color: var(--bs-secondary-color, #6c757d); margin-top: 0.1rem; }
+    .prem-step-prize { font-size: 1.15rem; font-weight: 800; color: var(--bs-emphasis-color, #212529); flex-shrink: 0; }
+    .prem-prize-gold { color: #a07800; }
 
-    .prem-step-info {
-        flex: 1;
-    }
-
-    .prem-step-stage {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: var(--bs-emphasis-color, #212529);
-    }
-
-    .prem-step-teams {
-        font-size: 0.78rem;
-        color: var(--bs-secondary-color, #6c757d);
-        margin-top: 0.1rem;
-    }
-
-    .prem-step-prize {
-        font-size: 1.15rem;
-        font-weight: 800;
-        color: var(--bs-emphasis-color, #212529);
-        flex-shrink: 0;
-    }
-
-    .prem-step-champion .prem-step-prize { color: #a07800; }
-    .prem-step-vice     .prem-step-prize { color: var(--bs-secondary, #6c757d); }
-
-    .prem-max-grid {
+    /* Stats */
+    .prem-stats-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-
-    @@media (max-width: 600px) {
-        .prem-max-grid { grid-template-columns: 1fr; }
-    }
-
-    .prem-max-card {
-        border-radius: 0.6rem;
-        padding: 1.1rem 1.15rem;
+        grid-template-columns: repeat(3, 1fr);
         border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
     }
 
-    .prem-max-champion { border-left: 4px solid #a07800; background: color-mix(in srgb, #a07800 7%, var(--bs-body-bg, #fff)); }
-    .prem-max-last     { border-left: 4px solid var(--bs-danger, #dc3545); background: color-mix(in srgb, var(--bs-danger, #dc3545) 5%, var(--bs-body-bg, #fff)); }
+    @@media (max-width: 640px) {
+        .prem-stats-grid { grid-template-columns: 1fr; }
+    }
 
-    .prem-max-title {
-        font-size: 0.88rem;
+    .prem-stat-card {
+        padding: 0.9rem 1rem;
+        border-right: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .prem-stat-card:last-child { border-right: none; }
+
+    .prem-stat-title {
+        font-size: 0.8rem;
         font-weight: 700;
-        margin-bottom: 0.5rem;
-        color: var(--bs-emphasis-color, #212529);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.65rem;
     }
 
-    .prem-max-breakdown {
+    .prem-stat-rows { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .prem-stat-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.84rem;
+    }
+
+    .prem-medal      { font-size: 1rem; flex-shrink: 0; }
+    .prem-stat-money { font-weight: 700; flex: 1; }
+
+    .prem-over-badge {
+        background: rgba(124,58,237,0.12);
+        color: #7c3aed;
+        border-radius: 999px;
+        padding: 0.1rem 0.45rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .prem-note-box {
+        padding: 0.7rem 1rem;
+        font-size: 0.82rem;
+        background: color-mix(in srgb, #e07b00 7%, var(--bs-body-bg, #fff));
+        border: 1px solid color-mix(in srgb, #e07b00 25%, transparent);
+        border-radius: 0.5rem;
+        color: var(--bs-secondary-color, #6c757d);
+        line-height: 1.5;
+    }
+
+    /* Awards */
+    .prem-awards-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.6rem;
+        overflow: hidden;
+    }
+
+    @@media (max-width: 640px) {
+        .prem-awards-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @@media (max-width: 400px) {
+        .prem-awards-grid { grid-template-columns: 1fr; }
+    }
+
+    .prem-award-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        padding: 0.9rem 1rem;
+        border-right: 1px solid var(--bs-border-color, #dee2e6);
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    }
+
+    .prem-award-card:nth-child(3n) { border-right: none; }
+
+    @@media (max-width: 640px) {
+        .prem-award-card:nth-child(3n) { border-right: 1px solid var(--bs-border-color, #dee2e6); }
+        .prem-award-card:nth-child(2n) { border-right: none; }
+    }
+
+    .prem-award-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 0.1rem; }
+
+    .prem-award-body { display: flex; flex-direction: column; gap: 0.15rem; }
+
+    .prem-award-title { font-size: 1rem; font-weight: 800; color: var(--bs-emphasis-color, #212529); }
+
+    .prem-award-sub {
+        font-size: 0.76rem;
+        color: var(--bs-secondary-color, #6c757d);
+        line-height: 1.4;
+    }
+
+    .prem-award-sub em { font-style: normal; display: block; font-size: 0.7rem; margin-top: 0.05rem; }
+
+    .prem-award-prize {
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        font-size: 0.8rem;
+        margin-top: 0.35rem;
+    }
+
+    .prem-winner-label {
+        font-size: 0.7rem;
+        font-weight: 600;
         color: var(--bs-secondary-color, #6c757d);
-        margin-bottom: 0.6rem;
-        flex-wrap: wrap;
     }
 
-    .prem-max-total {
-        font-size: 1.6rem;
-        font-weight: 800;
-        color: #a07800;
-    }
-
-    .prem-max-total-low {
-        color: var(--bs-danger, #dc3545);
+    .prem-honor-badge {
+        background: rgba(13,110,253,0.1);
+        color: var(--bs-primary, #0d6efd);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 700;
     }
 </style>
