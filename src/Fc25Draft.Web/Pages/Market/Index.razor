@@ -19,6 +19,7 @@
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 @inject MarketClient Client
 @inject MarketHubClient Hub
+@inject MarketUpdateService MarketUpdates
 @inject IPositionService PositionService
 @inject ILogger<Index> Logger
 @inject TeamAccessService TeamAccess
@@ -380,6 +381,16 @@ else
     protected override void OnInitialized()
     {
         RefreshLayoutHeader();
+        MarketUpdates.OnBidUpdated += HandleMarketUpdateEvent;
+        MarketUpdates.OnItemBought += HandleMarketUpdateEvent;
+        MarketUpdates.OnItemClosed += HandleMarketUpdateEvent;
+    }
+
+    private async void HandleMarketUpdateEvent(Guid cycleId, CoreItemVm vm)
+    {
+        if (ActiveCycleId != Guid.Empty && cycleId != ActiveCycleId)
+            return;
+        await InvokeAsync(() => HandleRealtimeUpdateAsync(vm));
     }
 
     protected override async Task OnInitializedAsync()
@@ -500,6 +511,17 @@ else
             var total = result?.Total ?? 0;
             PageData = new PagedResult<CoreItemVm>(items, total, Query.Page, Query.PageSize);
             ComputeServerOffsetFromClient();
+
+            // Se não tinha ciclo na URL, descobre pelo primeiro item e entra no grupo SignalR
+            if (ActiveCycleId == Guid.Empty)
+            {
+                var detectedCycle = items.FirstOrDefault(i => i.CycleId != Guid.Empty)?.CycleId;
+                if (detectedCycle.HasValue && detectedCycle.Value != Guid.Empty)
+                {
+                    ActiveCycleId = detectedCycle.Value;
+                    _ = InvokeAsync(JoinCycleAsync);
+                }
+            }
         }
         catch (MarketCycleUnavailableException ex)
         {
@@ -1469,6 +1491,9 @@ else
     public async ValueTask DisposeAsync()
     {
         TeamAccess.TokenChanged -= OnTeamTokenChanged;
+        MarketUpdates.OnBidUpdated -= HandleMarketUpdateEvent;
+        MarketUpdates.OnItemBought -= HandleMarketUpdateEvent;
+        MarketUpdates.OnItemClosed -= HandleMarketUpdateEvent;
 
         _loadCts?.Cancel();
         _loadCts?.Dispose();

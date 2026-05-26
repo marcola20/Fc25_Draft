@@ -15,6 +15,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -28,7 +29,7 @@ public class MarketService : IMarketService
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
     private readonly IBudgetService _budgetService;
-
+    private readonly IMarketBroadcaster? _broadcaster;
 
     public MarketService(
         DraftDbContext dbContext,
@@ -36,7 +37,8 @@ public class MarketService : IMarketService
         IOptions<MarketOptions> options,
         ITransactionLogService transactionLogService,
         IBudgetService budgetService,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IMarketBroadcaster? broadcaster = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cycleGenerator = cycleGenerator ?? throw new ArgumentNullException(nameof(cycleGenerator));
@@ -44,6 +46,7 @@ public class MarketService : IMarketService
         _transactionLogService = transactionLogService ?? throw new ArgumentNullException(nameof(transactionLogService));
         _budgetService = budgetService ?? throw new ArgumentNullException(nameof(budgetService));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _broadcaster = broadcaster;
     }
 
     public async Task<MarketCycleDto> EnsureCycleAsync(CancellationToken ct)
@@ -261,7 +264,15 @@ public class MarketService : IMarketService
                 await _dbContext.Entry(item.Player).Reference(p => p.Position).LoadAsync(ct2);
             await _dbContext.Entry(item).Reference(i => i.CurrentLeaderTeam).LoadAsync(ct2);
 
-            return ToDto(item);
+            var dto = ToDto(item);
+
+            if (_broadcaster is not null)
+            {
+                var vm = ToVm(dto);
+                await _broadcaster.BidUpdatedAsync(item.CycleId, vm, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            return dto;
         }, ct);
     }
 
@@ -381,6 +392,13 @@ public class MarketService : IMarketService
             {
                 throw new MarketPreconditionFailedException(
                     "O item foi atualizado por outro time. Atualize a página e tente novamente.", ex);
+            }
+
+            if (_broadcaster is not null)
+            {
+                var soldDto = ToDto(item);
+                var vm = ToVm(soldDto);
+                await _broadcaster.ItemBoughtAsync(item.CycleId, vm, CancellationToken.None).ConfigureAwait(false);
             }
 
             return new BuyNowResultDto(true, "Compra realizada com sucesso.");
@@ -533,6 +551,26 @@ public class MarketService : IMarketService
             cycle.UpdatedAtUtc,
             cycle.Notes);
     }
+
+    private static MarketItemVm ToVm(MarketItemDto dto) => new MarketItemVm
+    {
+        ItemId = dto.ItemId,
+        CycleId = dto.CycleId,
+        PlayerId = dto.PlayerId,
+        PlayerName = dto.PlayerName,
+        Overall = dto.Ovr,
+        BasePrice = dto.BasePrice,
+        BuyNowPrice = dto.BuyNowPrice,
+        MinIncrement = dto.MinIncrement,
+        RequiredMinBid = dto.RequiredMinBid,
+        CurrentLeaderAmount = dto.CurrentLeaderAmount,
+        CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
+        CurrentLeaderTeamName = dto.CurrentLeaderTeamName,
+        ExpiresAtUtc = dto.ExpiresAtUtc,
+        Status = dto.Status,
+        IsActive = dto.Status == "Active",
+        RowVersion = dto.RowVersion.ToString()
+    };
 
     private static void EnsureExpectedRowVersion(uint expectedRowVersion)
     {

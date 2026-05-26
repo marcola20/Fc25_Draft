@@ -411,6 +411,7 @@ namespace Fc25Draft.Web.Services
             return new CoreItemVm
             {
                 ItemId = dto.ItemId,
+                CycleId = dto.CycleId,
                 PlayerId = dto.PlayerId,
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
@@ -436,6 +437,7 @@ namespace Fc25Draft.Web.Services
             return new CoreItemVm
             {
                 ItemId = dto.ItemId,
+                CycleId = dto.CycleId,
                 PlayerId = dto.PlayerId,
                 PlayerName = dto.PlayerName,
                 PositionId = dto.Position.ToPositionId(),
