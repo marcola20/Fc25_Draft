@@ -38,26 +38,45 @@
         <div class="card mb-3">
             <div class="card-header fw-bold">Configurar Loteria</div>
             <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Liga</label>
-                    @if (_ligas is null)
-                    {
-                        <div class="text-muted">Carregando...</div>
-                    }
-                    else if (_ligas.Count == 0)
-                    {
-                        <div class="alert alert-info">Nenhuma liga cadastrada.</div>
-                    }
-                    else
-                    {
-                        <select class="form-select" @bind="_ligaIdSelecionada">
-                            <option value="">— Selecione uma liga —</option>
-                            @foreach (var l in _ligas)
-                            {
-                                <option value="@l.LigaId">@l.Nome</option>
-                            }
-                        </select>
-                    }
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">🏆 Liga <span class="text-muted fw-normal">(Round 1)</span></label>
+                        @if (_ligas is null)
+                        {
+                            <div class="text-muted">Carregando...</div>
+                        }
+                        else if (_ligas.Count == 0)
+                        {
+                            <div class="alert alert-info mb-0">Nenhuma liga cadastrada.</div>
+                        }
+                        else
+                        {
+                            <select class="form-select" @bind="_ligaIdSelecionada">
+                                <option value="">— Selecione a Liga —</option>
+                                @foreach (var l in _ligas)
+                                {
+                                    <option value="@l.LigaId">@l.Nome</option>
+                                }
+                            </select>
+                        }
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">🥇 Copa <span class="text-muted fw-normal">(Round 2 — opcional)</span></label>
+                        @if (_ligas is null)
+                        {
+                            <div class="text-muted">Carregando...</div>
+                        }
+                        else
+                        {
+                            <select class="form-select" @bind="_copaIdSelecionada">
+                                <option value="">— Selecione a Copa —</option>
+                                @foreach (var l in _ligas)
+                                {
+                                    <option value="@l.LigaId">@l.Nome</option>
+                                }
+                            </select>
+                        }
+                    </div>
                 </div>
                 <button class="btn btn-success fw-semibold"
                         disabled="@(_ligaIdSelecionada == Guid.Empty || _carregando)"
@@ -72,7 +91,11 @@
         var s = LotteryService.State;
 
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-            <span class="badge bg-primary fs-6">@s.LigaNome</span>
+            <span class="badge bg-primary fs-6">🏆 @s.LigaNome</span>
+            @if (!string.IsNullOrEmpty(s.CopaLigaNome))
+            {
+                <span class="badge bg-info text-dark fs-6">🥇 @s.CopaLigaNome</span>
+            }
             <span class="badge @(s.Rodada == 1 ? "bg-success" : "bg-warning text-dark") fs-6">Round @s.Rodada</span>
             @if (s.IsFinished) { <span class="badge bg-secondary fs-6">Encerrado</span> }
             <div class="ms-auto d-flex gap-2">
@@ -261,6 +284,7 @@
 @code {
     private IReadOnlyList<LigaDto>? _ligas;
     private Guid _ligaIdSelecionada;
+    private Guid _copaIdSelecionada;
     private string? _erro;
     private string? _ok;
     private bool _carregando;
@@ -289,24 +313,104 @@
             var liga = _ligas?.FirstOrDefault(l => l.LigaId == _ligaIdSelecionada);
             if (liga is null) { _erro = "Liga não encontrada."; return; }
 
-            var classif = await PublicSvc.GetClassificacaoAsync(_ligaIdSelecionada, CancellationToken.None);
-            if (classif.Count == 0) { _erro = "Nenhuma classificação disponível."; return; }
+            LigaDto? copaLiga = _copaIdSelecionada != Guid.Empty
+                ? _ligas?.FirstOrDefault(l => l.LigaId == _copaIdSelecionada)
+                : null;
 
-            var knockout = await PublicSvc.GetKnockoutAsync(_ligaIdSelecionada, CancellationToken.None);
+            var classif = await PublicSvc.GetClassificacaoAsync(_ligaIdSelecionada, CancellationToken.None);
+            if (classif.Count < 12) { _erro = "Classificação incompleta (mínimo 12 times)."; return; }
+
+            // sorted[0]=1°(melhor)  sorted[11]=12°(pior)
+            var sorted = classif.OrderBy(c => c.Posicao).ToList();
+
+            var allPicks = new List<LotteryPickItem>();
+            var rng = new Random();
+
+            // ── Picks 1-4: loteria ponderada entre 12°/11°/10°/9° (pesos 35/35/15/15) ──
+            var pool = new List<(Guid Id, string Nome, int Pos, int Peso)>
+            {
+                (sorted[11].TimeId, sorted[11].TimeNome, sorted[11].Posicao, 35), // 12°
+                (sorted[10].TimeId, sorted[10].TimeNome, sorted[10].Posicao, 35), // 11°
+                (sorted[9].TimeId,  sorted[9].TimeNome,  sorted[9].Posicao,  15), // 10°
+                (sorted[8].TimeId,  sorted[8].TimeNome,  sorted[8].Posicao,  15), //  9°
+            };
+            for (int pick = 1; pick <= 4; pick++)
+            {
+                if (pool.Count == 1)
+                {
+                    allPicks.Add(new LotteryPickItem(pick, pool[0].Id, pool[0].Nome, pool[0].Pos));
+                    pool.RemoveAt(0); break;
+                }
+                int total = pool.Sum(e => e.Peso), acum = 0, idx = 0;
+                int rollW = rng.Next(total);
+                for (int i = 0; i < pool.Count; i++) { acum += pool[i].Peso; if (rollW < acum) { idx = i; break; } }
+                allPicks.Add(new LotteryPickItem(pick, pool[idx].Id, pool[idx].Nome, pool[idx].Pos));
+                pool.RemoveAt(idx);
+            }
+
+            // ── Picks 5-6: 50/50 entre 8° e 7° ──
+            var p56 = new[] { sorted[7], sorted[6] };
+            if (rng.Next(2) == 1) (p56[0], p56[1]) = (p56[1], p56[0]);
+            allPicks.Add(new LotteryPickItem(5, p56[0].TimeId, p56[0].TimeNome, p56[0].Posicao));
+            allPicks.Add(new LotteryPickItem(6, p56[1].TimeId, p56[1].TimeNome, p56[1].Posicao));
+
+            // ── Picks 7-8: 50/50 entre 6° e 5° ──
+            var p78 = new[] { sorted[5], sorted[4] };
+            if (rng.Next(2) == 1) (p78[0], p78[1]) = (p78[1], p78[0]);
+            allPicks.Add(new LotteryPickItem(7, p78[0].TimeId, p78[0].TimeNome, p78[0].Posicao));
+            allPicks.Add(new LotteryPickItem(8, p78[1].TimeId, p78[1].TimeNome, p78[1].Posicao));
+
+            // ── Picks 9-10: 50/50 entre 4° e 3° ──
+            var p910 = new[] { sorted[3], sorted[2] };
+            if (rng.Next(2) == 1) (p910[0], p910[1]) = (p910[1], p910[0]);
+            allPicks.Add(new LotteryPickItem(9,  p910[0].TimeId, p910[0].TimeNome, p910[0].Posicao));
+            allPicks.Add(new LotteryPickItem(10, p910[1].TimeId, p910[1].TimeNome, p910[1].Posicao));
+
+            // ── Picks 11-12: 50/50 entre 2° e 1° ──
+            var p1112 = new[] { sorted[1], sorted[0] };
+            if (rng.Next(2) == 1) (p1112[0], p1112[1]) = (p1112[1], p1112[0]);
+            allPicks.Add(new LotteryPickItem(11, p1112[0].TimeId, p1112[0].TimeNome, p1112[0].Posicao));
+            allPicks.Add(new LotteryPickItem(12, p1112[1].TimeId, p1112[1].TimeNome, p1112[1].Posicao));
+
+            // Revelação: pick #12 primeiro → pick #1 por último (máximo drama)
+            allPicks = allPicks.OrderByDescending(p => p.PickNumero).ToList();
+
+            LotteryService.Start(new LotteryState
+            {
+                LigaId       = _ligaIdSelecionada,
+                LigaNome     = liga.Nome,
+                CopaLigaId   = copaLiga?.LigaId,
+                CopaLigaNome = copaLiga?.Nome ?? "",
+                Rodada       = 1,
+                Pending      = allPicks
+            });
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private void RevealNext() => LotteryService.RevealNext();
+
+    private async Task AdvanceRound2()
+    {
+        var s = LotteryService.State;
+        if (s is null) return;
+        if (s.CopaLigaId is null)
+        {
+            _erro = "Nenhuma Copa configurada. Reinicie a loteria selecionando a Copa.";
+            return;
+        }
+
+        _carregando = true; _erro = null;
+        try
+        {
+            var copaId   = s.CopaLigaId.Value;
+            var classif  = await PublicSvc.GetClassificacaoAsync(copaId, CancellationToken.None);
+            var knockout = await PublicSvc.GetKnockoutAsync(copaId, CancellationToken.None);
 
             var classifByTeam = classif.ToDictionary(c => c.TimeId);
             string GetNome(Guid id) => classifByTeam.TryGetValue(id, out var c) ? c.TimeNome : "?";
-            int GetPos(Guid id)     => classifByTeam.TryGetValue(id, out var c) ? c.Posicao : 0;
-
-            var bracketTeams = new HashSet<Guid>(
-                knockout.SelectMany(j => new[] { j.TimeCasaId, j.TimeForaId })
-                        .Where(id => id.HasValue).Select(id => id!.Value));
-
-            // 12° e 11° = times fora do bracket, pior classificação primeiro
-            var nonBracket = classif
-                .Where(c => !bracketTeams.Contains(c.TimeId))
-                .OrderByDescending(c => c.Posicao)
-                .ToList();
+            int    GetPos(Guid id)  => classifByTeam.TryGetValue(id, out var c) ? c.Posicao  : 0;
 
             Guid? Loser(FaseKnockout fase)
             {
@@ -316,98 +420,87 @@
             }
             Guid? Winner(FaseKnockout fase) => knockout.FirstOrDefault(x => x.Fase == fase)?.VencedorId;
 
-            // ── Grupo loteria (picks 1-4): pesos 35/35/15/15 ──
-            var lotteryGroup = new List<(Guid Id, string Nome, int Pos, int Peso)>();
-            if (nonBracket.Count >= 1) lotteryGroup.Add((nonBracket[0].TimeId, nonBracket[0].TimeNome, nonBracket[0].Posicao, 35));
-            if (nonBracket.Count >= 2) lotteryGroup.Add((nonBracket[1].TimeId, nonBracket[1].TimeNome, nonBracket[1].Posicao, 35));
-            var pi1 = Loser(FaseKnockout.PlayIn_A);
-            var pi2 = Loser(FaseKnockout.PlayIn_C);
-            if (pi1.HasValue) lotteryGroup.Add((pi1.Value, GetNome(pi1.Value), GetPos(pi1.Value), 15));
-            if (pi2.HasValue) lotteryGroup.Add((pi2.Value, GetNome(pi2.Value), GetPos(pi2.Value), 15));
+            // Times no bracket = participantes das semis (4 times)
+            var bracketTeams = new HashSet<Guid>(
+                new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 }
+                    .SelectMany(f =>
+                    {
+                        var j = knockout.FirstOrDefault(x => x.Fase == f);
+                        if (j is null) return Enumerable.Empty<Guid>();
+                        return new[] { j.TimeCasaId, j.TimeForaId }
+                            .Where(id => id.HasValue).Select(id => id!.Value);
+                    }));
 
-            if (lotteryGroup.Count == 0) { _erro = "Nenhum time elegível para a loteria."; return; }
+            // Eliminados na fase de grupos = todos exceto bracket, pior campanha primeiro
+            var groupElims = classif
+                .Where(c => !bracketTeams.Contains(c.TimeId))
+                .OrderByDescending(c => c.Posicao)
+                .ToList();
 
-            // Sorteia pick #1 ponderado
+            if (groupElims.Count < 8) { _erro = "Menos de 8 times eliminados na fase de grupos da Copa."; return; }
+
+            var allPicks = new List<LotteryPickItem>();
             var rng = new Random();
-            int totalPeso = lotteryGroup.Sum(e => e.Peso);
-            int roll = rng.Next(totalPeso), acum = 0, pick1Idx = 0;
-            for (int i = 0; i < lotteryGroup.Count; i++)
+
+            // ── Picks 1-4: loteria ponderada entre os 4 piores eliminados (35/35/15/15) ──
+            var pool14 = groupElims.Take(4)
+                .Select((c, i) => (c.TimeId, c.TimeNome, c.Posicao, Peso: i < 2 ? 35 : 15))
+                .ToList();
+            for (int pick = 1; pick <= 4; pick++)
             {
-                acum += lotteryGroup[i].Peso;
-                if (roll < acum) { pick1Idx = i; break; }
+                if (pool14.Count == 1)
+                {
+                    allPicks.Add(new LotteryPickItem(pick, pool14[0].TimeId, pool14[0].TimeNome, pool14[0].Posicao));
+                    pool14.Clear(); break;
+                }
+                int total = pool14.Sum(e => e.Peso), acum = 0, idx = 0;
+                int rollA = rng.Next(total);
+                for (int i = 0; i < pool14.Count; i++) { acum += pool14[i].Peso; if (rollA < acum) { idx = i; break; } }
+                allPicks.Add(new LotteryPickItem(pick, pool14[idx].TimeId, pool14[idx].TimeNome, pool14[idx].Posicao));
+                pool14.RemoveAt(idx);
             }
 
-            // Atribui picks 1..N: vencedor → #1, restantes em ordem de prioridade
-            var pickMap = new Dictionary<Guid, int> { [lotteryGroup[pick1Idx].Id] = 1 };
-            int nextPick = 2;
-            for (int i = 0; i < lotteryGroup.Count; i++)
-                if (i != pick1Idx) pickMap[lotteryGroup[i].Id] = nextPick++;
-
-            // ── Quartas (picks 5-8): pior classificação → pick mais baixo ──
-            var qfLosers = new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 }
-                .Select(f => Loser(f)).Where(x => x.HasValue).Select(x => x!.Value)
-                .OrderByDescending(id => GetPos(id)).ToList();
-            int qfStart = nextPick;
-            foreach (var (id, i) in qfLosers.Select((id, i) => (id, i)))
-                pickMap[id] = qfStart + i;
-            nextPick = qfStart + qfLosers.Count;
-
-            // ── Semis (picks 9-10) ──
-            var semiLosers = new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 }
-                .Select(f => Loser(f)).Where(x => x.HasValue).Select(x => x!.Value)
-                .OrderByDescending(id => GetPos(id)).ToList();
-            int semiStart = nextPick;
-            foreach (var (id, i) in semiLosers.Select((id, i) => (id, i)))
-                pickMap[id] = semiStart + i;
-            nextPick = semiStart + semiLosers.Count;
-
-            // ── Vice e Campeão ──
-            var allPicks = new List<LotteryPickItem>();
-            foreach (var e in lotteryGroup)
-                allPicks.Add(new LotteryPickItem(pickMap[e.Id], e.Id, e.Nome, e.Pos));
-            foreach (var id in qfLosers)
-                allPicks.Add(new LotteryPickItem(pickMap[id], id, GetNome(id), GetPos(id)));
-            foreach (var id in semiLosers)
-                allPicks.Add(new LotteryPickItem(pickMap[id], id, GetNome(id), GetPos(id)));
-
-            var vice = Loser(FaseKnockout.Final);
-            if (vice.HasValue)  allPicks.Add(new LotteryPickItem(nextPick++, vice.Value,  GetNome(vice.Value),  GetPos(vice.Value)));
-            var champ = Winner(FaseKnockout.Final);
-            if (champ.HasValue) allPicks.Add(new LotteryPickItem(nextPick,   champ.Value, GetNome(champ.Value), GetPos(champ.Value)));
-
-            // Ordem de revelação: pick #12 primeiro → pick #1 por último (máximo drama)
-            allPicks = allPicks.OrderByDescending(p => p.PickNumero).ToList();
-
-            LotteryService.Start(new LotteryState
+            // ── Picks 5-8: loteria ponderada entre os 4 seguintes (35/35/15/15) ──
+            var pool58 = groupElims.Skip(4).Take(4)
+                .Select((c, i) => (c.TimeId, c.TimeNome, c.Posicao, Peso: i < 2 ? 35 : 15))
+                .ToList();
+            for (int pick = 5; pick <= 8; pick++)
             {
-                LigaId   = _ligaIdSelecionada,
-                LigaNome = liga.Nome,
-                Rodada   = 1,
-                Pending  = allPicks
-            });
+                if (pool58.Count == 1)
+                {
+                    allPicks.Add(new LotteryPickItem(pick, pool58[0].TimeId, pool58[0].TimeNome, pool58[0].Posicao));
+                    pool58.Clear(); break;
+                }
+                int total = pool58.Sum(e => e.Peso), acum = 0, idx = 0;
+                int rollB = rng.Next(total);
+                for (int i = 0; i < pool58.Count; i++) { acum += pool58[i].Peso; if (rollB < acum) { idx = i; break; } }
+                allPicks.Add(new LotteryPickItem(pick, pool58[idx].TimeId, pool58[idx].TimeNome, pool58[idx].Posicao));
+                pool58.RemoveAt(idx);
+            }
+
+            // ── Picks 9-10: perdedores das semis (pior campanha Copa → pick 9) ──
+            var semiLosers = new[] { Loser(FaseKnockout.Semi1), Loser(FaseKnockout.Semi2) }
+                .Where(x => x.HasValue).Select(x => x!.Value)
+                .OrderByDescending(id => GetPos(id)).ToList();
+            for (int i = 0; i < semiLosers.Count; i++)
+                allPicks.Add(new LotteryPickItem(9 + i, semiLosers[i], GetNome(semiLosers[i]), GetPos(semiLosers[i])));
+
+            // ── Pick 11: vice-campeão Copa ──
+            var vice = Loser(FaseKnockout.Final);
+            if (vice.HasValue)
+                allPicks.Add(new LotteryPickItem(11, vice.Value, GetNome(vice.Value), GetPos(vice.Value)));
+
+            // ── Pick 12: campeão Copa ──
+            var champ = Winner(FaseKnockout.Final);
+            if (champ.HasValue)
+                allPicks.Add(new LotteryPickItem(12, champ.Value, GetNome(champ.Value), GetPos(champ.Value)));
+
+            // Revelação: pick #12 primeiro → pick #1 por último
+            var round2 = allPicks.OrderByDescending(p => p.PickNumero).ToList();
+            LotteryService.AdvanceToRound2(round2);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
-    }
-
-    private void RevealNext() => LotteryService.RevealNext();
-
-    private void AdvanceRound2()
-    {
-        var s = LotteryService.State;
-        if (s is null) return;
-        var teams = s.Revealed.ToList();
-        var rng = new Random();
-        for (int i = teams.Count - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            (teams[i], teams[j]) = (teams[j], teams[i]);
-        }
-        // Round 2: revelado do pick# maior para o menor (pick#1 por último)
-        var round2 = teams.Select((t, idx) => new LotteryPickItem(idx + 1, t.TimeId, t.TimeNome, t.Posicao))
-                          .OrderByDescending(p => p.PickNumero)
-                          .ToList();
-        LotteryService.AdvanceToRound2(round2);
     }
 
     private async Task Finish()

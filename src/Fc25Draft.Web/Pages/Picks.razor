@@ -2,7 +2,7 @@
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 
-<PageTitle>Picks do Draft — CBFV Retro 2008/09</PageTitle>
+<PageTitle>Picks do Draft — CBFV</PageTitle>
 
 <PageHeader Title="Picks do Draft" />
 
@@ -17,30 +17,32 @@
 
     <section class="picks-section">
         <div class="picks-card picks-card-info">
-            <p>Os times que terminarem em posições mais baixas têm acesso a escolhas mais cedo no draft. Times eliminados nas fases iniciais do mata-mata também ganham picks antecipadas, premiando reconstruções para o futuro.</p>
+            <p>O draft tem <strong>dois rounds</strong>: o Round 1 é baseado na classificação final da <strong>Liga</strong>, e o Round 2 é baseado no desempenho na <strong>Copa</strong>. Em ambos, times com pior desempenho têm acesso a picks mais cedo.</p>
         </div>
     </section>
 
     <hr class="picks-divider" />
 
+    <!-- ═══ ROUND 1 ═══ -->
     <section class="picks-section">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🎯</span>
-            <h3>Picks por Resultado</h3>
+            <span class="picks-section-icon">🏆</span>
+            <h3>Round 1 — Liga</h3>
         </div>
+        <p class="picks-section-desc">Baseado na classificação final da fase de Liga (pontos corridos). Pior time da Liga tem maior chance de conseguir a pick #1.</p>
 
         <div class="picks-table-wrap">
             <table class="picks-table">
                 <thead>
                     <tr>
-                        <th>Resultado</th>
+                        <th>Resultado na Liga</th>
                         <th>Times</th>
                         <th>Picks Disponíveis</th>
                         <th class="picks-th-range">Faixa</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var row in PicksData)
+                    @foreach (var row in R1Data)
                     {
                         <tr class="picks-row @row.RowClass">
                             <td>
@@ -70,17 +72,15 @@
         </div>
     </section>
 
-    <hr class="picks-divider" />
-
-    <section class="picks-section">
+    <section class="picks-section picks-section-sub">
         <div class="picks-section-header">
             <span class="picks-section-icon">🎰</span>
-            <h3>Loteria — Pick #1</h3>
+            <h3>Loteria R1 — Pick #1</h3>
         </div>
-        <p class="picks-section-desc">A pick #1 não é garantida. Os 4 times elegíveis participam de uma loteria com as probabilidades abaixo.</p>
+        <p class="picks-section-desc">Os 4 piores times da Liga (9° ao 12°) disputam a pick #1 por loteria ponderada.</p>
 
         <div class="picks-lottery-grid">
-            @foreach (var entry in LotteryOdds)
+            @foreach (var entry in R1LotteryOdds)
             {
                 <div class="picks-lottery-card @entry.CardClass">
                     <div class="picks-lottery-team">
@@ -93,7 +93,7 @@
                     <div class="picks-lottery-odds-wrap">
                         <div class="picks-lottery-pct">@entry.Pct%</div>
                         <div class="picks-lottery-bar-bg">
-                            <div class="picks-lottery-bar @entry.BarClass" style="width: @entry.Pct%"></div>
+                            <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
                         </div>
                     </div>
                 </div>
@@ -102,26 +102,157 @@
 
         <div class="picks-lottery-note">
             <span class="picks-lottery-note-icon">ℹ️</span>
-            <span>O 11° e o 12° colocado têm juntos <strong>70%</strong> de chance de conquistar a pick #1. Os dois times eliminados no Play-In dividem os <strong>30%</strong> restantes.</span>
+            <span>O 11° e 12° têm juntos <strong>70%</strong> de chance de pegar a pick #1. Os picks 2, 3 e 4 são sorteados sequencialmente do mesmo pool (sem reposição). O 9° e o 10° ficam com os <strong>30%</strong> restantes.</span>
         </div>
     </section>
 
     <hr class="picks-divider" />
 
+    <!-- ═══ ROUND 2 ═══ -->
+    <section class="picks-section">
+        <div class="picks-section-header">
+            <span class="picks-section-icon">🥇</span>
+            <h3>Round 2 — Copa</h3>
+        </div>
+        <p class="picks-section-desc">Baseado no desempenho na Copa. Times eliminados na fase de grupos têm mais chances nas melhores picks. Campeão da Copa recebe a pick #12.</p>
+
+        <div class="picks-table-wrap">
+            <table class="picks-table">
+                <thead>
+                    <tr>
+                        <th>Resultado na Copa</th>
+                        <th>Times</th>
+                        <th>Picks Disponíveis</th>
+                        <th class="picks-th-range">Faixa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in R2Data)
+                    {
+                        <tr class="picks-row @row.RowClass">
+                            <td>
+                                <div class="picks-stage-cell">
+                                    <span class="picks-stage-icon">@row.Icon</span>
+                                    <span class="picks-stage-name">@row.Stage</span>
+                                </div>
+                            </td>
+                            <td class="picks-td-count">
+                                <span class="picks-count-badge @row.CountBadgeClass">@row.TeamCount</span>
+                            </td>
+                            <td>
+                                <div class="picks-chips">
+                                    @foreach (var pick in row.Picks)
+                                    {
+                                        <span class="picks-chip @GetPickClass(pick)">@pick</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="picks-td-range">
+                                <span class="picks-range-badge @row.RangeBadgeClass">@row.RangeLabel</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="picks-section picks-section-sub">
+        <div class="picks-section-header">
+            <span class="picks-section-icon">🎰</span>
+            <h3>Loteria R2 — Picks #1–8</h3>
+        </div>
+        <p class="picks-section-desc">Os 8 eliminados na fase de grupos disputam picks 1–8 em dois blocos: o pior quarteto briga pelas picks 1–4, o melhor quarteto pelas picks 5–8.</p>
+
+        <div class="picks-r2-blocks">
+            <div class="picks-r2-block">
+                <div class="picks-r2-block-title">Bloco A — Picks 1–4</div>
+                <div class="picks-r2-block-sub">4 piores eliminados (Copa posição 9°–12°)</div>
+                <div class="picks-lottery-grid picks-lottery-grid-2">
+                    @foreach (var entry in R2LotteryBlock1)
+                    {
+                        <div class="picks-lottery-card @entry.CardClass">
+                            <div class="picks-lottery-team">
+                                <span class="picks-lottery-icon">@entry.Icon</span>
+                                <div>
+                                    <div class="picks-lottery-stage">@entry.Stage</div>
+                                    <div class="picks-lottery-detail">@entry.Detail</div>
+                                </div>
+                            </div>
+                            <div class="picks-lottery-odds-wrap">
+                                <div class="picks-lottery-pct">@entry.Pct%</div>
+                                <div class="picks-lottery-bar-bg">
+                                    <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="picks-r2-block">
+                <div class="picks-r2-block-title">Bloco B — Picks 5–8</div>
+                <div class="picks-r2-block-sub">4 próximos eliminados (Copa posição 5°–8°)</div>
+                <div class="picks-lottery-grid picks-lottery-grid-2">
+                    @foreach (var entry in R2LotteryBlock2)
+                    {
+                        <div class="picks-lottery-card @entry.CardClass">
+                            <div class="picks-lottery-team">
+                                <span class="picks-lottery-icon">@entry.Icon</span>
+                                <div>
+                                    <div class="picks-lottery-stage">@entry.Stage</div>
+                                    <div class="picks-lottery-detail">@entry.Detail</div>
+                                </div>
+                            </div>
+                            <div class="picks-lottery-odds-wrap">
+                                <div class="picks-lottery-pct">@entry.Pct%</div>
+                                <div class="picks-lottery-bar-bg">
+                                    <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="picks-lottery-note">
+            <span class="picks-lottery-note-icon">ℹ️</span>
+            <span>Dentro de cada bloco, os picks são sorteados sequencialmente sem reposição. Pior posição Copa = maior chance de pick antecipada.</span>
+        </div>
+    </section>
+
+    <hr class="picks-divider" />
+
+    <!-- Mapa de picks R1 -->
     <section class="picks-section">
         <div class="picks-section-header">
             <span class="picks-section-icon">🗺️</span>
-            <h3>Mapa de Picks</h3>
+            <h3>Mapa de Picks — Round 1</h3>
         </div>
-        <p class="picks-section-desc">Visualização de quais posições do draft estão disponíveis para cada grupo de times.</p>
-
         <div class="picks-map">
             @for (int pick = 1; pick <= 12; pick++)
             {
                 var p = pick;
                 <div class="picks-map-col">
-                    <div class="picks-map-num @GetPickMapClass(p)">#@p</div>
-                    <div class="picks-map-label">@GetPickMapLabel(p)</div>
+                    <div class="picks-map-num @GetR1MapClass(p)">#@p</div>
+                    <div class="picks-map-label">@GetR1MapLabel(p)</div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="picks-section picks-section-sub">
+        <div class="picks-section-header">
+            <span class="picks-section-icon">🗺️</span>
+            <h3>Mapa de Picks — Round 2</h3>
+        </div>
+        <div class="picks-map">
+            @for (int pick = 1; pick <= 12; pick++)
+            {
+                var p = pick;
+                <div class="picks-map-col">
+                    <div class="picks-map-num @GetR2MapClass(p)">#@p</div>
+                    <div class="picks-map-label">@GetR2MapLabel(p)</div>
                 </div>
             }
         </div>
@@ -148,23 +279,48 @@
         string CardClass,
         string BarClass);
 
-    private static readonly IReadOnlyList<PickRow> PicksData = new List<PickRow>
+    // ── Round 1 ──────────────────────────────────────────────────────────────
+    private static readonly IReadOnlyList<PickRow> R1Data = new List<PickRow>
     {
-        new("❌", "11° Colocado",             "1",   new[] {1, 2, 3, 4}, "1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
-        new("❌", "12° Colocado",             "1",   new[] {1, 2, 3, 4}, "1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
-        new("🎯", "Eliminado no Play-In",     "2",   new[] {1, 2, 3, 4}, "1–4",  "picks-row-orange", "picks-cnt-orange", "picks-rng-lottery"),
-        new("⚔️", "Eliminado nas Quartas",    "4",   new[] {5, 6, 7, 8}, "5–8",  "picks-row-blue",   "picks-cnt-blue",   "picks-rng-mid"),
-        new("🎖️", "Eliminado nas Semis",      "2",   new[] {9, 10},      "9–10", "picks-row-green",  "picks-cnt-green",  "picks-rng-late"),
-        new("🥈", "Vice-Campeão",             "1",   new[] {11},          "11",   "picks-row-silver", "picks-cnt-silver", "picks-rng-late"),
-        new("🏆", "Campeão",                  "1",   new[] {12},          "12",   "picks-row-gold",   "picks-cnt-gold",   "picks-rng-last"),
+        new("🎰", "9° ao 12° da Liga",  "4", new[] {1,2,3,4},      "Loteria 1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
+        new("⚖️", "7° e 8° da Liga",    "2", new[] {5,6},           "50/50  5–6",   "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
+        new("⚖️", "5° e 6° da Liga",    "2", new[] {7,8},           "50/50  7–8",   "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
+        new("⚖️", "3° e 4° da Liga",    "2", new[] {9,10},          "50/50  9–10",  "picks-row-blue",   "picks-cnt-blue",   "picks-rng-mid"),
+        new("⚖️", "1° e 2° da Liga",    "2", new[] {11,12},         "50/50  11–12", "picks-row-green",  "picks-cnt-green",  "picks-rng-late"),
     };
 
-    private static readonly IReadOnlyList<LotteryEntry> LotteryOdds = new List<LotteryEntry>
+    private static readonly IReadOnlyList<LotteryEntry> R1LotteryOdds = new List<LotteryEntry>
     {
-        new("❌", "11° Colocado",         "Eliminado na Liga",  35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("❌", "12° Colocado",         "Eliminado na Liga",  35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("🎯", "Eliminado Play-In #1", "1° a ser eliminado", 15, "picks-lot-orange", "picks-lot-bar-orange"),
-        new("🎯", "Eliminado Play-In #2", "2° a ser eliminado", 15, "picks-lot-orange", "picks-lot-bar-orange"),
+        new("🔴", "12° da Liga", "Pior classificado",     35, "picks-lot-red",    "picks-lot-bar-red"),
+        new("🔴", "11° da Liga", "2° pior classificado",  35, "picks-lot-red",    "picks-lot-bar-red"),
+        new("🟠", "10° da Liga", "3° pior classificado",  15, "picks-lot-orange", "picks-lot-bar-orange"),
+        new("🟠",  "9° da Liga", "4° pior classificado",  15, "picks-lot-orange", "picks-lot-bar-orange"),
+    };
+
+    // ── Round 2 ──────────────────────────────────────────────────────────────
+    private static readonly IReadOnlyList<PickRow> R2Data = new List<PickRow>
+    {
+        new("🎰", "Elim. Grupos — 4 piores (Copa)",   "4", new[] {1,2,3,4},   "Loteria 1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
+        new("🎰", "Elim. Grupos — 4 seguintes (Copa)","4", new[] {5,6,7,8},   "Loteria 5–8",  "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
+        new("🎖️", "Eliminados nas Semis",             "2", new[] {9,10},       "9–10",         "picks-row-blue",   "picks-cnt-blue",   "picks-rng-mid"),
+        new("🥈", "Vice-Campeão Copa",                "1", new[] {11},          "11",           "picks-row-silver", "picks-cnt-silver", "picks-rng-late"),
+        new("🏆", "Campeão Copa",                     "1", new[] {12},          "12",           "picks-row-gold",   "picks-cnt-gold",   "picks-rng-last"),
+    };
+
+    private static readonly IReadOnlyList<LotteryEntry> R2LotteryBlock1 = new List<LotteryEntry>
+    {
+        new("🔴", "Pior eliminado", "12° Copa",              35, "picks-lot-red",    "picks-lot-bar-red"),
+        new("🔴", "2° eliminado",   "11° Copa",              35, "picks-lot-red",    "picks-lot-bar-red"),
+        new("🟠", "3° eliminado",   "10° Copa",              15, "picks-lot-orange", "picks-lot-bar-orange"),
+        new("🟠", "4° eliminado",    "9° Copa",              15, "picks-lot-orange", "picks-lot-bar-orange"),
+    };
+
+    private static readonly IReadOnlyList<LotteryEntry> R2LotteryBlock2 = new List<LotteryEntry>
+    {
+        new("🔵", "5° eliminado",   "8° Copa",              35, "picks-lot-blue",   "picks-lot-bar-blue"),
+        new("🔵", "6° eliminado",   "7° Copa",              35, "picks-lot-blue",   "picks-lot-bar-blue"),
+        new("🟣", "7° eliminado",   "6° Copa",              15, "picks-lot-purple", "picks-lot-bar-purple"),
+        new("🟣", "8° eliminado",   "5° Copa",              15, "picks-lot-purple", "picks-lot-bar-purple"),
     };
 
     private static string GetPickClass(int pick) => pick switch
@@ -172,32 +328,45 @@
         <= 4  => "picks-chip-lottery",
         <= 8  => "picks-chip-mid",
         <= 10 => "picks-chip-late",
+        11    => "picks-chip-silver",
         _     => "picks-chip-last"
     };
 
-    private static string GetPickMapClass(int pick) => pick switch
+    private static string GetR1MapClass(int pick) => pick switch
     {
         <= 4  => "picks-map-lottery",
-        <= 8  => "picks-map-mid",
-        <= 10 => "picks-map-late",
+        <= 8  => "picks-map-half",
+        <= 10 => "picks-map-mid",
+        11    => "picks-map-late",
+        _     => "picks-map-top"
+    };
+
+    private static string GetR1MapLabel(int pick) => pick switch
+    {
+        1 or 2 or 3 or 4 => "Loteria",
+        5 or 6           => "50/50 7°/8°",
+        7 or 8           => "50/50 5°/6°",
+        9 or 10          => "50/50 3°/4°",
+        11               => "50/50 1°/2°",
+        _                => "50/50 1°/2°"
+    };
+
+    private static string GetR2MapClass(int pick) => pick switch
+    {
+        <= 4  => "picks-map-lottery",
+        <= 8  => "picks-map-half",
+        <= 10 => "picks-map-mid",
         11    => "picks-map-silver",
         _     => "picks-map-gold"
     };
 
-    private static string GetPickMapLabel(int pick) => pick switch
+    private static string GetR2MapLabel(int pick) => pick switch
     {
-        1  => "Loteria",
-        2  => "Loteria",
-        3  => "Loteria",
-        4  => "Loteria",
-        5  => "Quartas",
-        6  => "Quartas",
-        7  => "Quartas",
-        8  => "Quartas",
-        9  => "Semis",
-        10 => "Semis",
-        11 => "Vice",
-        _  => "Campeão"
+        1 or 2 or 3 or 4 => "Lot. Grupos A",
+        5 or 6 or 7 or 8 => "Lot. Grupos B",
+        9 or 10          => "Semis",
+        11               => "Vice Copa",
+        _                => "Campeão Copa"
     };
 }
 
@@ -214,9 +383,8 @@
         opacity: 0.4;
     }
 
-    .picks-section {
-        margin-bottom: 0.5rem;
-    }
+    .picks-section { margin-bottom: 0.5rem; }
+    .picks-section-sub { margin-top: 1.5rem; }
 
     .picks-section-header {
         display: flex;
@@ -255,7 +423,6 @@
         border-left: 4px solid var(--bs-primary, #0d6efd);
         color: var(--bs-body-color, #212529);
     }
-
     .picks-card-info p { margin: 0; }
 
     .picks-table-wrap {
@@ -270,9 +437,7 @@
         font-size: 0.88rem;
     }
 
-    .picks-table thead tr {
-        background: var(--bs-secondary-bg, #f8f9fa);
-    }
+    .picks-table thead tr { background: var(--bs-secondary-bg, #f8f9fa); }
 
     .picks-table th {
         padding: 0.6rem 0.9rem;
@@ -302,18 +467,9 @@
     .picks-row-silver { background: color-mix(in srgb, #6c757d 4%, var(--bs-body-bg, #fff)); }
     .picks-row-gold   { background: color-mix(in srgb, #a07800 6%, var(--bs-body-bg, #fff)); }
 
-    .picks-stage-cell {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
+    .picks-stage-cell { display: flex; align-items: center; gap: 0.5rem; }
     .picks-stage-icon { font-size: 1.1rem; flex-shrink: 0; }
-
-    .picks-stage-name {
-        font-weight: 600;
-        color: var(--bs-emphasis-color, #212529);
-    }
+    .picks-stage-name { font-weight: 600; color: var(--bs-emphasis-color, #212529); }
 
     .picks-td-count { text-align: center; }
 
@@ -329,18 +485,14 @@
         padding: 0 0.35rem;
     }
 
-    .picks-cnt-red    { background: rgba(220,53,69,0.14);  color: var(--bs-danger, #dc3545); }
-    .picks-cnt-orange { background: rgba(224,123,0,0.16);  color: #c06800; }
-    .picks-cnt-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
-    .picks-cnt-green  { background: rgba(25,135,84,0.12);  color: #198754; }
+    .picks-cnt-red    { background: rgba(220,53,69,0.14);   color: var(--bs-danger, #dc3545); }
+    .picks-cnt-orange { background: rgba(224,123,0,0.16);   color: #c06800; }
+    .picks-cnt-blue   { background: rgba(13,110,253,0.12);  color: var(--bs-primary, #0d6efd); }
+    .picks-cnt-green  { background: rgba(25,135,84,0.12);   color: #198754; }
     .picks-cnt-silver { background: rgba(108,117,125,0.14); color: #6c757d; }
-    .picks-cnt-gold   { background: rgba(160,120,0,0.18);  color: #8a6400; }
+    .picks-cnt-gold   { background: rgba(160,120,0,0.18);   color: #8a6400; }
 
-    .picks-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.3rem;
-    }
+    .picks-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 
     .picks-chip {
         display: inline-flex;
@@ -356,6 +508,7 @@
     .picks-chip-lottery { background: linear-gradient(135deg, #a01020, #dc3545); color: #fff; }
     .picks-chip-mid     { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
     .picks-chip-late    { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
+    .picks-chip-silver  { background: linear-gradient(135deg, #5a6370, #8d959e); color: #fff; }
     .picks-chip-last    { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
 
     .picks-td-range { text-align: right; }
@@ -372,16 +525,20 @@
     }
 
     .picks-rng-lottery { background: rgba(220,53,69,0.14);  color: var(--bs-danger, #dc3545); }
+    .picks-rng-half    { background: rgba(224,123,0,0.14);  color: #c06800; }
     .picks-rng-mid     { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
     .picks-rng-late    { background: rgba(25,135,84,0.12);  color: #198754; }
     .picks-rng-last    { background: rgba(160,120,0,0.18);  color: #8a6400; }
 
+    /* Lottery cards */
     .picks-lottery-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.85rem;
         margin-bottom: 1rem;
     }
+
+    .picks-lottery-grid-2 { margin-bottom: 0; }
 
     @@media (max-width: 600px) {
         .picks-lottery-grid { grid-template-columns: 1fr; }
@@ -396,34 +553,18 @@
         gap: 0.7rem;
     }
 
-    .picks-lot-red    { border-left: 4px solid var(--bs-danger, #dc3545);  background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg, #fff)); }
+    .picks-lot-red    { border-left: 4px solid var(--bs-danger, #dc3545); background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg, #fff)); }
     .picks-lot-orange { border-left: 4px solid #e07b00; background: color-mix(in srgb, #e07b00 6%, var(--bs-body-bg, #fff)); }
+    .picks-lot-blue   { border-left: 4px solid #1a5fb4; background: color-mix(in srgb, #1a5fb4 6%, var(--bs-body-bg, #fff)); }
+    .picks-lot-purple { border-left: 4px solid #6741d9; background: color-mix(in srgb, #6741d9 6%, var(--bs-body-bg, #fff)); }
 
-    .picks-lottery-team {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.6rem;
-    }
-
+    .picks-lottery-team { display: flex; align-items: flex-start; gap: 0.6rem; }
     .picks-lottery-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 0.05rem; }
 
-    .picks-lottery-stage {
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
-    }
+    .picks-lottery-stage  { font-size: 0.9rem; font-weight: 700; color: var(--bs-emphasis-color, #212529); }
+    .picks-lottery-detail { font-size: 0.75rem; color: var(--bs-secondary-color, #6c757d); margin-top: 0.1rem; }
 
-    .picks-lottery-detail {
-        font-size: 0.75rem;
-        color: var(--bs-secondary-color, #6c757d);
-        margin-top: 0.1rem;
-    }
-
-    .picks-lottery-odds-wrap {
-        display: flex;
-        flex-direction: column;
-        gap: 0.3rem;
-    }
+    .picks-lottery-odds-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
 
     .picks-lottery-pct {
         font-size: 1.5rem;
@@ -439,13 +580,12 @@
         overflow: hidden;
     }
 
-    .picks-lottery-bar {
-        height: 100%;
-        border-radius: 999px;
-    }
+    .picks-lottery-bar { height: 100%; border-radius: 999px; }
 
     .picks-lot-bar-red    { background: linear-gradient(90deg, #a01020, #dc3545); }
     .picks-lot-bar-orange { background: linear-gradient(90deg, #c06800, #e8a400); }
+    .picks-lot-bar-blue   { background: linear-gradient(90deg, #1a3f80, #3584e4); }
+    .picks-lot-bar-purple { background: linear-gradient(90deg, #4a2da0, #9b6dff); }
 
     .picks-lottery-note {
         display: flex;
@@ -462,11 +602,39 @@
 
     .picks-lottery-note-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
 
-    .picks-map {
-        display: flex;
-        gap: 0.4rem;
-        flex-wrap: wrap;
+    /* R2 two-block layout */
+    .picks-r2-blocks {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
     }
+
+    @@media (max-width: 700px) {
+        .picks-r2-blocks { grid-template-columns: 1fr; }
+    }
+
+    .picks-r2-block {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.65rem;
+        padding: 1rem 1rem 1.1rem;
+    }
+
+    .picks-r2-block-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+        margin-bottom: 0.2rem;
+    }
+
+    .picks-r2-block-sub {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color, #6c757d);
+        margin-bottom: 0.85rem;
+    }
+
+    /* Pick map */
+    .picks-map { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
     .picks-map-col {
         display: flex;
@@ -488,16 +656,18 @@
     }
 
     .picks-map-lottery { background: linear-gradient(135deg, #a01020, #dc3545); }
+    .picks-map-half    { background: linear-gradient(135deg, #a05000, #e07b00); }
     .picks-map-mid     { background: linear-gradient(135deg, #1a5fb4, #3584e4); }
     .picks-map-late    { background: linear-gradient(135deg, #1c5829, #2ec27e); }
+    .picks-map-top     { background: linear-gradient(135deg, #1c5829, #2ec27e); }
     .picks-map-silver  { background: linear-gradient(135deg, #5a6370, #8d959e); }
     .picks-map-gold    { background: linear-gradient(135deg, #a07800, #e5a000); }
 
     .picks-map-label {
-        font-size: 0.65rem;
+        font-size: 0.62rem;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.03em;
         color: var(--bs-secondary-color, #6c757d);
         text-align: center;
         line-height: 1.2;

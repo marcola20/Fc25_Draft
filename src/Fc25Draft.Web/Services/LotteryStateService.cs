@@ -6,6 +6,8 @@ public sealed class LotteryState
 {
     public Guid LigaId { get; init; }
     public string LigaNome { get; init; } = "";
+    public Guid? CopaLigaId { get; init; }
+    public string CopaLigaNome { get; init; } = "";
     public int Rodada { get; set; }
     public bool IsFinished { get; set; }
     public List<LotteryPickItem> Revealed { get; } = [];
