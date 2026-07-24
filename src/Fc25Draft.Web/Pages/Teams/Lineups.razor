@@ -280,7 +280,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-captain">Capitão</label>
                         <select id="role-captain" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.Captain, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.Captain?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -290,7 +290,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-shortfk1">Falta curta</label>
                         <select id="role-shortfk1" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKick1, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKick1?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -300,7 +300,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-shortfk2">Falta curta 2</label>
                         <select id="role-shortfk2" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.ShortFreeKick2, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.ShortFreeKick2?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -310,7 +310,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-longfk">Falta de longa distância</label>
                         <select id="role-longfk" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.LongFreeKick, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.LongFreeKick?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -320,7 +320,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-penalties">Pênaltis</label>
                         <select id="role-penalties" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.Penalties, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.Penalties?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -330,7 +330,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-corner-left">Escanteios - Esquerda</label>
                         <select id="role-corner-left" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.CornerLeft, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.CornerLeft?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -340,7 +340,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-corner-right">Escanteios - Direita</label>
                         <select id="role-corner-right" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.CornerRight, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.CornerRight?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -362,7 +362,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-atk1">Jogador que ataca 1</label>
                         <select id="role-atk1" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer1, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer1?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -372,7 +372,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-atk2">Jogador que ataca 2</label>
                         <select id="role-atk2" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer2, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer2?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>
@@ -382,7 +382,7 @@ else
                     <div class="col-12 col-md-6 col-xl-4">
                         <label class="form-label" for="role-atk3">Jogador que ataca 3</label>
                         <select id="role-atk3" class="form-select" @onchange="e => OnRoleChanged(SpecialRoleType.AttackingPlayer3, e.Value?.ToString())" disabled="@isSaving">
-                            <option value="">Selecione um jogador...</option>
+                            <option value="">Melhor na função</option>
                             @foreach (var option in starterOptions)
                             {
                                 <option value="@option.PlayerId" selected="@(currentEditor.Roles.AttackingPlayer3?.PlayerId == option.PlayerId)">@FormatPlayerOption(option)</option>

@@ -140,20 +140,20 @@ else
                             <div class="col-12 col-lg-4">
                                 <h6 class="text-uppercase text-muted small mb-2">Funções especiais</h6>
                                 <ul class="list-unstyled mb-0">
-                                    <li><strong>Capitão:</strong> @FormatPlayer(lineup.Roles.Captain)</li>
-                                    <li><strong>Falta curta:</strong> @FormatPlayer(lineup.Roles.ShortFreeKick1)</li>
-                                    <li><strong>Falta curta 2:</strong> @FormatPlayer(lineup.Roles.ShortFreeKick2)</li>
-                                    <li><strong>Falta longa:</strong> @FormatPlayer(lineup.Roles.LongFreeKick)</li>
-                                    <li><strong>Pênaltis:</strong> @FormatPlayer(lineup.Roles.Penalties)</li>
-                                    <li><strong>Escanteio esq.:</strong> @FormatPlayer(lineup.Roles.CornerLeft)</li>
-                                    <li><strong>Escanteio dir.:</strong> @FormatPlayer(lineup.Roles.CornerRight)</li>
+                                    <li><strong>Capitão:</strong> @FormatRolePlayer(lineup.Roles.Captain)</li>
+                                    <li><strong>Falta curta:</strong> @FormatRolePlayer(lineup.Roles.ShortFreeKick1)</li>
+                                    <li><strong>Falta curta 2:</strong> @FormatRolePlayer(lineup.Roles.ShortFreeKick2)</li>
+                                    <li><strong>Falta longa:</strong> @FormatRolePlayer(lineup.Roles.LongFreeKick)</li>
+                                    <li><strong>Pênaltis:</strong> @FormatRolePlayer(lineup.Roles.Penalties)</li>
+                                    <li><strong>Escanteio esq.:</strong> @FormatRolePlayer(lineup.Roles.CornerLeft)</li>
+                                    <li><strong>Escanteio dir.:</strong> @FormatRolePlayer(lineup.Roles.CornerRight)</li>
                                 </ul>
 
                                 <h6 class="text-uppercase text-muted small mt-3 mb-2">Jogadores que atacam</h6>
                                 <ul class="list-unstyled mb-0">
-                                    <li><strong>Ataque 1:</strong> @FormatPlayer(lineup.Roles.AttackingPlayer1)</li>
-                                    <li><strong>Ataque 2:</strong> @FormatPlayer(lineup.Roles.AttackingPlayer2)</li>
-                                    <li><strong>Ataque 3:</strong> @FormatPlayer(lineup.Roles.AttackingPlayer3)</li>
+                                    <li><strong>Ataque 1:</strong> @FormatRolePlayer(lineup.Roles.AttackingPlayer1)</li>
+                                    <li><strong>Ataque 2:</strong> @FormatRolePlayer(lineup.Roles.AttackingPlayer2)</li>
+                                    <li><strong>Ataque 3:</strong> @FormatRolePlayer(lineup.Roles.AttackingPlayer3)</li>
                                 </ul>
                             </div>
 
@@ -390,6 +390,9 @@ else
 
     private static string FormatPlayer(TeamLineupSlotPlayerDto? player)
         => player is null ? "Não definido" : $"{player.Name} ({player.PositionName})";
+
+    private static string FormatRolePlayer(TeamLineupSlotPlayerDto? player)
+        => player is null ? "Melhor na função" : $"{player.Name} ({player.PositionName})";
 
     private static string GetAutoSubLabel(int value) => value switch
     {
