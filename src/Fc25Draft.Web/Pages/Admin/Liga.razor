@@ -598,13 +598,13 @@
     private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
     private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
 
-    private void SelecionarLiga(LigaDto liga)
+    private async Task SelecionarLiga(LigaDto liga)
     {
         _ligaAtual = liga;
         _rodadaSelecionada = null;
         _partidas = Array.Empty<LigaPartidaDto>();
         _tab = "rodadas";
-        InvokeAsync(CarregarDados);
+        await CarregarDados();
     }
 
     private async Task IniciarFase(Guid ligaId)
