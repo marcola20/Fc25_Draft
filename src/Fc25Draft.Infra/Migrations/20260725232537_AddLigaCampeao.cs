@@ -11,6 +11,11 @@ namespace Fc25Draft.Infra.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Reconcilia uma divergência pré-existente: a propriedade TransferHistory.CycleId
+            // existe no modelo mas nunca teve migração. Idempotente — só cria se faltar.
+            migrationBuilder.Sql(
+                "ALTER TABLE \"TransferHistories\" ADD COLUMN IF NOT EXISTS \"CycleId\" uuid NULL;");
+
             migrationBuilder.AddColumn<Guid>(
                 name: "CampeaoTimeId",
                 table: "Ligas",

@@ -346,11 +346,19 @@
                             {
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Stats</button>
                                 <button class="btn btn-sm btn-warning" @onclick="() => EncerrarPartida(p.PartidaId)">Encerrar</button>
+                                @if (_rodadaSelecionada?.Numero == -1)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => MostrarPenaltis(p)">Pênaltis</button>
+                                }
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => MostrarWO(p)">W.O.</button>
                             }
                             @if (p.Status == PartidaStatus.Encerrada)
                             {
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Ver Stats</button>
+                                @if (p.TemPenaltis && p.PenaltisVencedorId is Guid pv)
+                                {
+                                    <span class="badge bg-warning text-dark align-self-center">Pên.: @(pv == p.TimeCasaId ? p.TimeCasaNome : p.TimeForaNome)</span>
+                                }
                             }
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeletarPartida(p.PartidaId)">Del</button>
                         </div>
@@ -380,6 +388,29 @@
                         <div class="modal-footer">
                             <button class="btn btn-danger" @onclick="ConfirmarWO" disabled="@_saving">Confirmar W.O.</button>
                             <button class="btn btn-secondary" @onclick="() => { _woPartida = null; _woTimeId = null; }">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_penPartida is not null)
+        {
+            <div class="modal show d-block" style="background:rgba(0,0,0,0.5)">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header"><h5 class="modal-title">Vencedor nos pênaltis</h5></div>
+                        <div class="modal-body">
+                            <p class="small text-muted">Jogo empatado em @_penPartida.GolsCasa × @_penPartida.GolsFora. Selecione o vencedor da disputa de pênaltis:</p>
+                            <select class="form-select" @bind="_penTimeId">
+                                <option value="">Selecione...</option>
+                                <option value="@_penPartida.TimeCasaId">@_penPartida.TimeCasaNome</option>
+                                <option value="@_penPartida.TimeForaId">@_penPartida.TimeForaNome</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-warning" @onclick="ConfirmarPenaltis" disabled="@_saving">Encerrar nos pênaltis</button>
+                            <button class="btn btn-secondary" @onclick="() => { _penPartida = null; _penTimeId = null; }">Cancelar</button>
                         </div>
                     </div>
                 </div>
@@ -559,6 +590,8 @@
     private string? _novaCasa, _novaFora;
     private LigaPartidaDto? _woPartida;
     private string? _woTimeId;
+    private LigaPartidaDto? _penPartida;
+    private string? _penTimeId;
 
     // Punições
     private IReadOnlyList<LigaPunicaoDto> _punicoes = Array.Empty<LigaPunicaoDto>();
@@ -806,6 +839,17 @@
         if (!Guid.TryParse(_woTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
         _saving = true;
         try { await AdminSvc.AplicarWOAsync(_woPartida!.PartidaId, timeId, CancellationToken.None); _woPartida = null; _woTimeId = null; _ok = "W.O. aplicado."; await SelecionarRodada(_rodadaSelecionada!); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void MostrarPenaltis(LigaPartidaDto p) { _penPartida = p; _penTimeId = null; }
+
+    private async Task ConfirmarPenaltis()
+    {
+        if (!Guid.TryParse(_penTimeId, out var timeId)) { _erro = "Selecione o vencedor dos pênaltis."; return; }
+        _saving = true;
+        try { await AdminSvc.EncerrarPartidaComPenaltisAsync(_penPartida!.PartidaId, timeId, CancellationToken.None); _penPartida = null; _penTimeId = null; _ok = "Jogo encerrado nos pênaltis."; await SelecionarRodada(_rodadaSelecionada!); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }

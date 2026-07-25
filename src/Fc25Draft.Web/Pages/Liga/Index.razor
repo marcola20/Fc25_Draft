@@ -3,6 +3,9 @@
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @inject ILigaPublicService LigaService
+@inject NavigationManager Navigation
+@inject AdminAuthService AdminAuth
+@implements IDisposable
 
 <PageTitle>Liga</PageTitle>
 
@@ -495,6 +498,10 @@
                     }
                 </div>
                 <div class="modal-footer">
+                    @if (AdminAuth.IsAdmin)
+                    {
+                        <button type="button" class="btn btn-primary me-auto" @onclick="EditarStats">✏️ Editar stats</button>
+                    }
                     <button type="button" class="btn btn-secondary" @onclick="FecharDetalhesPartida">Fechar</button>
                 </div>
             </div>
@@ -525,8 +532,40 @@
 
     private string? _erro;
 
+    private bool _authInitialized;
+
     private LigaRodadaComPartidasDto? _rodadaAtual =>
         _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await AdminAuth.EnsureInitializedAsync();
+        _authInitialized = true;
+        StateHasChanged();
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!_authInitialized) return;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void EditarStats()
+    {
+        if (_partidaDetalhes is null) return;
+        Navigation.NavigateTo($"/admin/liga/stats/{_partidaDetalhes.PartidaId}?return=/liga");
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {

@@ -485,6 +485,30 @@ public class LigaAdminService : ILigaAdminService
         return await GetPartidaDtoAsync(partidaId, ct);
     }
 
+    public async Task<LigaPartidaDto> EncerrarPartidaComPenaltisAsync(Guid partidaId, Guid vencedorId, CancellationToken ct)
+    {
+        var partida = await _db.LigaPartidas.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)
+            ?? throw new InvalidOperationException("Partida não encontrada.");
+
+        if (partida.Status != PartidaStatus.EmAndamento)
+            throw new InvalidOperationException("Partida não está em andamento.");
+
+        if (partida.GolsCasa != partida.GolsFora)
+            throw new InvalidOperationException("Pênaltis só se aplicam a jogos empatados no tempo normal.");
+
+        if (vencedorId != partida.TimeCasaId && vencedorId != partida.TimeForaId)
+            throw new InvalidOperationException("O vencedor dos pênaltis deve ser um dos times da partida.");
+
+        partida.TemPenaltis = true;
+        partida.PenaltisVencedorId = vencedorId;
+        partida.Status = PartidaStatus.Encerrada;
+        partida.EncerradaEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+
+        await RecalcularClassificacaoAsync(partida.RodadaId, ct);
+        return await GetPartidaDtoAsync(partidaId, ct);
+    }
+
     public async Task<LigaPartidaDto> AplicarWOAsync(Guid partidaId, Guid timeWOId, CancellationToken ct)
     {
         var partida = await _db.LigaPartidas.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)

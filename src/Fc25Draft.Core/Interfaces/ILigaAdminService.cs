@@ -28,6 +28,7 @@ public interface ILigaAdminService
     Task<IReadOnlyList<LigaPartidaDto>> ListPartidasAsync(Guid rodadaId, CancellationToken ct);
     Task<LigaPartidaDto> IniciarPartidaAsync(Guid partidaId, CancellationToken ct);
     Task<LigaPartidaDto> EncerrarPartidaAsync(Guid partidaId, CancellationToken ct);
+    Task<LigaPartidaDto> EncerrarPartidaComPenaltisAsync(Guid partidaId, Guid vencedorId, CancellationToken ct);
     Task<LigaPartidaDto> AplicarWOAsync(Guid partidaId, Guid timeWOId, CancellationToken ct);
     Task DeletePartidaAsync(Guid partidaId, CancellationToken ct);
 
