@@ -282,6 +282,126 @@
         </div>
     </section>
 
+    <hr class="fmt-divider" />
+
+    <!-- CALENDÁRIO -->
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">📅</span>
+            <h3>Calendário da Temporada</h3>
+        </div>
+
+        <div class="fmt-overview-grid fmt-overview-grid-4">
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">20</div>
+                <div class="fmt-stat-label">Datas</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">11</div>
+                <div class="fmt-stat-label">Rodadas de Liga</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">6</div>
+                <div class="fmt-stat-label">Grupos da Copa</div>
+            </div>
+            <div class="fmt-stat-card">
+                <div class="fmt-stat-number">3</div>
+                <div class="fmt-stat-label">Datas Especiais</div>
+            </div>
+        </div>
+
+        <div class="fmt-cal-legend">
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-liga"></span>Liga</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Mercado / All-Star</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Semifinais</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Final</span>
+        </div>
+
+        <div class="fmt-cal-grid">
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">1</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">2</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 1</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">3</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">4</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">5</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 2</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">6</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">7</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 3</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">8</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">9</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">10</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 4</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-special">
+                <span class="fmt-cal-num">11</span>
+                <span class="fmt-cal-comp">Mercado / All-Star</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">12</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">13</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 5</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">14</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">15</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-copa">
+                <span class="fmt-cal-num">16</span>
+                <span class="fmt-cal-comp">Copa<small>Grupo 6</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">17</span>
+                <span class="fmt-cal-comp">Liga</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-semi">
+                <span class="fmt-cal-num">18</span>
+                <span class="fmt-cal-comp">Semifinais da Copa</span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-liga">
+                <span class="fmt-cal-num">19</span>
+                <span class="fmt-cal-comp">Liga<small>11ª e última rodada</small></span>
+            </div>
+            <div class="fmt-cal-card fmt-cal-final">
+                <span class="fmt-cal-num">20</span>
+                <span class="fmt-cal-comp">Final da Copa</span>
+            </div>
+        </div>
+    </section>
+
 </div>
 
 <style>
@@ -620,4 +740,89 @@
         .fmt-flow-step      { width: 100%; }
         .fmt-flow-connector { transform: rotate(90deg); }
     }
+
+    /* Calendário */
+    .fmt-cal-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        margin-bottom: 1rem;
+    }
+
+    .fmt-cal-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .fmt-cal-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .fmt-dot-liga    { background: #0d6efd; }
+    .fmt-dot-copa    { background: #7c3aed; }
+    .fmt-dot-special { background: #0d9488; }
+    .fmt-dot-semi    { background: #d63384; }
+    .fmt-dot-final   { background: #a07800; }
+
+    .fmt-cal-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 0.6rem;
+    }
+
+    .fmt-cal-card {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.65rem 0.85rem;
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-left: 4px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.55rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .fmt-cal-num {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 50%;
+        font-size: 0.85rem;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+
+    .fmt-cal-comp {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+        font-size: 0.86rem;
+        font-weight: 700;
+        color: var(--bs-emphasis-color, #212529);
+        line-height: 1.25;
+    }
+
+    .fmt-cal-comp small {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+
+    .fmt-cal-liga    { border-left-color: #0d6efd; }
+    .fmt-cal-liga    .fmt-cal-num { background: rgba(13,110,253,0.12); color: #0d6efd; }
+
+    .fmt-cal-copa    { border-left-color: #7c3aed; }
+    .fmt-cal-copa    .fmt-cal-num { background: rgba(124,58,237,0.12); color: #7c3aed; }
+
+    .fmt-cal-special { border-left-color: #0d9488; }
+    .fmt-cal-special .fmt-cal-num { background: rgba(13,148,136,0.14); color: #0d9488; }
+
+    .fmt-cal-semi    { border-left-color: #d63384; }
+    .fmt-cal-semi    .fmt-cal-num { background: rgba(214,51,132,0.14); color: #d63384; }
+
+    .fmt-cal-final   { border-left-color: #a07800; box-shadow: 0 2px 10px rgba(160,120,0,0.16); }
+    .fmt-cal-final   .fmt-cal-num { background: rgba(160,120,0,0.15); color: #a07800; }
 </style>
