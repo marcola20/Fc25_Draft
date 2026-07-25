@@ -16,5 +16,10 @@ public class LigaConfiguration : IEntityTypeConfiguration<Liga>
         e.Property(x => x.Tipo).HasConversion<int>().HasDefaultValue(TipoCompetition.Liga);
         e.Property(x => x.CriadoEm).IsRequired();
         e.Property(x => x.AtualizadoEm).IsRequired();
+
+        e.HasOne(x => x.Campeao)
+            .WithMany()
+            .HasForeignKey(x => x.CampeaoTimeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

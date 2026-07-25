@@ -14,6 +14,10 @@ public class Liga
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 
+    /// <summary>Time campeão, definido quando a competição é encerrada.</summary>
+    public Guid? CampeaoTimeId { get; set; }
+    public Team? Campeao { get; set; }
+
     public ICollection<LigaRodada> Rodadas { get; set; } = new List<LigaRodada>();
     public ICollection<LigaClassificacao> Classificacoes { get; set; } = new List<LigaClassificacao>();
     public ICollection<LigaPunicao> Punicoes { get; set; } = new List<LigaPunicao>();

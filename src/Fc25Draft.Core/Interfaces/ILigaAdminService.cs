@@ -11,6 +11,9 @@ public interface ILigaAdminService
     Task<LigaDto> UpdateAsync(Guid ligaId, LigaUpdateRequest request, CancellationToken ct);
     Task<LigaDto> IniciarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct);
     Task<LigaDto> EncerrarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct);
+    Task<LigaDto> ReverterParaPrimeiraFaseAsync(Guid ligaId, CancellationToken ct);
+    Task<LigaDto> ConcluirMiniLigaAsync(Guid ligaId, CancellationToken ct);
+    Task<LigaDto> ConcluirDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct);
     Task DeleteLigaAsync(Guid ligaId, CancellationToken ct);
 
     // Rodadas

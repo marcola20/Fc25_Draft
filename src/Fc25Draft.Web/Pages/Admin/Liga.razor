@@ -90,26 +90,36 @@
                                 <div class="flex-grow-1">
                                     <span class="fw-semibold">@liga.Nome</span>
                                     <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@(liga.Tipo == TipoCompetition.Copa ? "Copa" : "Liga")</span>
-                                    <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status)</span>
+                                    <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
+                                    @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
+                                    {
+                                        <span class="badge ms-1 bg-warning text-dark">🏆 Campeão: @liga.CampeaoNome</span>
+                                    }
                                     <div class="small text-muted">@liga.DataInicio.ToLocalTime().ToString("dd/MM/yyyy") – @liga.DataFim.ToLocalTime().ToString("dd/MM/yyyy")</div>
                                 </div>
                                 <div class="d-flex gap-1 flex-wrap">
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditarLiga(liga)">Editar</button>
                                     @if (liga.Status == LigaStatus.Criada)
                                     {
-                                        <button class="btn btn-sm btn-success" @onclick="() => IniciarFase(liga.LigaId)">Iniciar Fase</button>
+                                        <button class="btn btn-sm btn-success" @onclick="() => IniciarFase(liga.LigaId)">@(liga.Tipo == TipoCompetition.Liga ? "Iniciar Temporada" : "Iniciar Fase de Grupos")</button>
                                     }
                                     @if (liga.Status == LigaStatus.PrimeiraFase)
                                     {
-                                        <button class="btn btn-sm btn-warning" @onclick="() => EncerrarFase(liga.LigaId)">Encerrar 1ª Fase</button>
-                                    }
-                                    @if (liga.Status == LigaStatus.DecisaoCampeao)
-                                    {
-                                        <button class="btn btn-sm btn-danger" @onclick="() => IniciarDecisao(liga.LigaId)">Decisão Campeão</button>
+                                        <button class="btn btn-sm btn-warning" @onclick="() => ConfirmarEncerrarFase(liga)">@(liga.Tipo == TipoCompetition.Liga ? "Encerrar Temporada" : "Encerrar Fase de Grupos")</button>
                                     }
                                     @if (liga.Status == LigaStatus.MiniLiga)
                                     {
-                                        <button class="btn btn-sm btn-danger" @onclick="() => IniciarMiniLiga(liga.LigaId)">Gerar Mini Liga</button>
+                                        <button class="btn btn-sm btn-info" @onclick="() => IniciarMiniLiga(liga.LigaId)">Gerar Mini Liga</button>
+                                        <button class="btn btn-sm btn-success" @onclick="() => ConfirmarConcluirMiniLiga(liga)" title="Apurar os 2 melhores da mini liga">Concluir Mini Liga</button>
+                                    }
+                                    @if (liga.Status == LigaStatus.DecisaoCampeao)
+                                    {
+                                        <button class="btn btn-sm btn-info" @onclick="() => IniciarDecisao(liga.LigaId)">Criar Jogo Decisivo</button>
+                                        <button class="btn btn-sm btn-success" @onclick="() => ConfirmarConcluirDecisao(liga)" title="Definir o campeão pelo jogo decisivo">Concluir Decisão</button>
+                                    }
+                                    @if (liga.Status is LigaStatus.PlayIn or LigaStatus.Playoffs or LigaStatus.DecisaoCampeao or LigaStatus.MiniLiga)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => ConfirmarReverterFase(liga)" title="Voltar para a fase anterior">↩ Reverter Fase</button>
                                     }
                                     <button class="btn btn-sm btn-primary" @onclick="() => SelecionarLiga(liga)">Gerenciar</button>
                                     <button class="btn btn-sm btn-danger" @onclick="() => ConfirmarDelete(liga)">Apagar</button>
@@ -144,6 +154,30 @@
                             <button type="button" class="btn btn-secondary" @onclick="CancelarDelete">Cancelar</button>
                             <button type="button" class="btn btn-danger" @onclick="ApagarLiga" disabled="@_saving">
                                 @(_saving ? "Apagando..." : "Apagar Liga")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ── Modal de Confirmação Genérico ── -->
+        @if (_confirmAction is not null)
+        {
+            <div class="modal fade show d-block" style="background-color:rgba(0,0,0,0.5)">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">@_confirmTitulo</h5>
+                            <button type="button" class="btn-close" @onclick="CancelarConfirmacao"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">@_confirmMensagem</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CancelarConfirmacao">Cancelar</button>
+                            <button type="button" class="btn @_confirmBotaoClasse" @onclick="ExecutarConfirmacao" disabled="@_saving">
+                                @(_saving ? "Processando..." : _confirmBotaoTexto)
                             </button>
                         </div>
                     </div>
@@ -236,7 +270,7 @@
                 <div class="col-6 col-md-3 col-lg-2">
                     <div class="card @(_rodadaSelecionada?.RodadaId == r.RodadaId ? "border-primary border-2" : "")">
                         <div class="card-body py-2 text-center">
-                            <div class="fw-bold">Rodada @r.Numero</div>
+                            <div class="fw-bold">@RodadaLabel(r.Numero)</div>
                             <div class="small text-muted">@r.TotalPartidas partidas</div>
                             <div class="d-flex gap-1 justify-content-center mt-1">
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => SelecionarRodada(r)">Gerenciar</button>
@@ -257,7 +291,7 @@
     @if (_tab == "partidas" && _rodadaSelecionada is not null)
     {
         <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-            <span class="fw-semibold">Rodada @_rodadaSelecionada.Numero</span>
+            <span class="fw-semibold">@RodadaLabel(_rodadaSelecionada.Numero)</span>
             <button class="btn btn-primary btn-sm" @onclick="() => _showCriarPartida = !_showCriarPartida">+ Nova Partida</button>
         </div>
 
@@ -498,6 +532,10 @@
     private LigaDto? _ligaAtual;
     private LigaDto? _ligaParaDeleter;
     private Guid? _editandoLigaId;
+
+    // Confirmação genérica
+    private string _confirmTitulo = "", _confirmMensagem = "", _confirmBotaoTexto = "Confirmar", _confirmBotaoClasse = "btn-primary";
+    private Func<Task>? _confirmAction;
     private string _formNome = "";
     private DateTime _formInicio = DateTime.Today;
     private DateTime _formFim = DateTime.Today.AddMonths(2);
@@ -615,8 +653,67 @@
 
     private async Task EncerrarFase(Guid ligaId)
     {
-        try { await AdminSvc.EncerrarPrimeiraFaseAsync(ligaId, CancellationToken.None); _ok = "Primeira fase encerrada. Play-In ativo."; await CarregarDados(); }
+        try
+        {
+            var liga = await AdminSvc.EncerrarPrimeiraFaseAsync(ligaId, CancellationToken.None);
+            _ok = liga.Status switch
+            {
+                LigaStatus.Encerrada => "Temporada encerrada. Campeão definido pelo 1º colocado.",
+                LigaStatus.DecisaoCampeao => "Empate no topo: use \"Decisão Campeão\" para o jogo decisivo.",
+                LigaStatus.MiniLiga => "Empate no topo (3+ times): use \"Gerar Mini Liga\".",
+                LigaStatus.PlayIn => "Fase de grupos encerrada. Mata-mata ativo.",
+                _ => "Fase encerrada."
+            };
+            await CarregarDados();
+        }
         catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task ReverterFase(Guid ligaId)
+    {
+        try { await AdminSvc.ReverterParaPrimeiraFaseAsync(ligaId, CancellationToken.None); _ok = "Fase revertida."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void ConfirmarEncerrarFase(LigaDto liga)
+    {
+        var isLiga = liga.Tipo == TipoCompetition.Liga;
+        PedirConfirmacao(
+            isLiga ? "Encerrar Temporada" : "Encerrar Fase de Grupos",
+            isLiga
+                ? $"Tem certeza que deseja encerrar a temporada de \"{liga.Nome}\"? A classificação atual será usada para definir o campeão (ou o desempate, se houver empate no topo). Você pode reverter depois."
+                : $"Tem certeza que deseja encerrar a fase de grupos de \"{liga.Nome}\"? Os classificados avançarão para o mata-mata. Você pode reverter depois.",
+            isLiga ? "Encerrar Temporada" : "Encerrar Fase de Grupos",
+            "btn-warning",
+            () => EncerrarFase(liga.LigaId));
+    }
+
+    private void ConfirmarReverterFase(LigaDto liga)
+    {
+        PedirConfirmacao(
+            "Reverter Fase",
+            $"Tem certeza que deseja reverter \"{liga.Nome}\" para a fase anterior? Os jogos de mata-mata e de mini liga gerados serão removidos. As rodadas e a classificação regulares são preservadas.",
+            "Reverter Fase",
+            "btn-warning",
+            () => ReverterFase(liga.LigaId));
+    }
+
+    private void PedirConfirmacao(string titulo, string mensagem, string botaoTexto, string botaoClasse, Func<Task> action)
+    {
+        _confirmTitulo = titulo;
+        _confirmMensagem = mensagem;
+        _confirmBotaoTexto = botaoTexto;
+        _confirmBotaoClasse = botaoClasse;
+        _confirmAction = action;
+    }
+
+    private void CancelarConfirmacao() => _confirmAction = null;
+
+    private async Task ExecutarConfirmacao()
+    {
+        var action = _confirmAction;
+        _confirmAction = null;
+        if (action is not null) await action();
     }
 
     private void ConfirmarDelete(LigaDto liga)
@@ -748,13 +845,40 @@
 
     private async Task IniciarDecisao(Guid ligaId)
     {
-        try { await AdminSvc.IniciarDecisaoCampeaoAsync(ligaId, CancellationToken.None); _ok = "Decisão de campeão iniciada."; await CarregarDados(); }
+        try { await AdminSvc.IniciarDecisaoCampeaoAsync(ligaId, CancellationToken.None); _ok = "Jogo decisivo criado. Registre o resultado na aba Partidas e depois clique em \"Concluir Decisão\"."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
     }
 
     private async Task IniciarMiniLiga(Guid ligaId)
     {
-        try { await AdminSvc.IniciarMiniLigaAsync(ligaId, CancellationToken.None); _ok = "Mini Liga gerada."; await CarregarDados(); }
+        try { await AdminSvc.IniciarMiniLigaAsync(ligaId, CancellationToken.None); _ok = "Mini Liga gerada. Registre os resultados na aba Partidas e depois clique em \"Concluir Mini Liga\"."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void ConfirmarConcluirMiniLiga(LigaDto liga) => PedirConfirmacao(
+        "Concluir Mini Liga",
+        $"Apurar os 2 melhores da mini liga de \"{liga.Nome}\"? Eles avançarão para o jogo decisivo. Todos os jogos da mini liga precisam estar encerrados.",
+        "Concluir Mini Liga", "btn-success", () => ConcluirMiniLiga(liga.LigaId));
+
+    private async Task ConcluirMiniLiga(Guid ligaId)
+    {
+        try { await AdminSvc.ConcluirMiniLigaAsync(ligaId, CancellationToken.None); _ok = "Mini liga apurada. Jogo decisivo criado entre os 2 melhores."; await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void ConfirmarConcluirDecisao(LigaDto liga) => PedirConfirmacao(
+        "Concluir Decisão",
+        $"Definir o campeão de \"{liga.Nome}\" pelo jogo decisivo? O jogo precisa estar encerrado (com vencedor nos pênaltis, se empatado). A liga será encerrada.",
+        "Concluir Decisão", "btn-success", () => ConcluirDecisao(liga.LigaId));
+
+    private async Task ConcluirDecisao(Guid ligaId)
+    {
+        try
+        {
+            var liga = await AdminSvc.ConcluirDecisaoCampeaoAsync(ligaId, CancellationToken.None);
+            _ok = liga.CampeaoNome is not null ? $"Liga encerrada. Campeão: {liga.CampeaoNome}." : "Liga encerrada.";
+            await CarregarDados();
+        }
         catch (Exception ex) { _erro = ex.Message; }
     }
 
@@ -802,10 +926,17 @@
         _ => "bg-light text-dark"
     };
 
-    private static string StatusLabel(LigaStatus s) => s switch
+    private static string RodadaLabel(int numero) => numero switch
+    {
+        0  => "Mini Liga",
+        -1 => "Jogo Decisivo",
+        _  => $"Rodada {numero}"
+    };
+
+    private static string StatusLabel(LigaStatus s, TipoCompetition tipo) => s switch
     {
         LigaStatus.Criada => "Não iniciada",
-        LigaStatus.PrimeiraFase => "1ª Fase",
+        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Liga ? "Em andamento" : "Fase de Grupos",
         LigaStatus.PlayIn => "Play-In",
         LigaStatus.Playoffs => "Playoffs",
         LigaStatus.DecisaoCampeao => "Decisão Campeão",

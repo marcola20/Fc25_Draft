@@ -12,7 +12,9 @@ public record LigaDto(
     LigaStatus Status,
     TipoCompetition Tipo,
     DateTime CriadoEm,
-    DateTime AtualizadoEm);
+    DateTime AtualizadoEm,
+    Guid? CampeaoTimeId = null,
+    string? CampeaoNome = null);
 
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,

@@ -43,13 +43,15 @@ public class LigaAdminService : ILigaAdminService
 
     public async Task<LigaDto?> GetByIdAsync(Guid ligaId, CancellationToken ct)
     {
-        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
+        var liga = await _db.Ligas.AsNoTracking().Include(x => x.Campeao)
+            .FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
         return liga is null ? null : ToDto(liga);
     }
 
     public async Task<IReadOnlyList<LigaDto>> ListAsync(CancellationToken ct)
     {
-        var list = await _db.Ligas.AsNoTracking().OrderByDescending(x => x.CriadoEm).ToListAsync(ct);
+        var list = await _db.Ligas.AsNoTracking().Include(x => x.Campeao)
+            .OrderByDescending(x => x.CriadoEm).ToListAsync(ct);
         return list.Select(ToDto).ToArray();
     }
 
@@ -204,7 +206,9 @@ public class LigaAdminService : ILigaAdminService
         }
         else
         {
-            // Liga: detecta empate no topo
+            // Liga (pontos corridos): o campeão é o 1º colocado. Só há fase extra em caso
+            // de empate no topo — jogo decisivo (2 times) ou mini liga (3+). Sem empate,
+            // a competição encerra direto no líder (não há playoffs no formato da Liga).
             var classif = await _db.LigaClassificacoes
                 .AsNoTracking()
                 .Where(x => x.LigaId == ligaId)
@@ -224,23 +228,33 @@ public class LigaAdminService : ILigaAdminService
                                 c.GolsPro == lider.GolsPro)
                     .ToList();
 
-                liga.Status = empatados.Count switch
+                if (empatados.Count >= 3)
                 {
-                    >= 3 => LigaStatus.MiniLiga,
-                    2    => LigaStatus.DecisaoCampeao,
-                    _    => LigaStatus.PlayIn
-                };
+                    liga.Status = LigaStatus.MiniLiga;
+                }
+                else if (empatados.Count == 2)
+                {
+                    liga.Status = LigaStatus.DecisaoCampeao;
+                }
+                else
+                {
+                    // Líder isolado → campeão definido.
+                    liga.Status = LigaStatus.Encerrada;
+                    liga.CampeaoTimeId = lider.TimeId;
+                }
             }
             else
             {
-                liga.Status = LigaStatus.PlayIn;
+                // 0 ou 1 time classificado: não há empate possível, encerra direto.
+                liga.Status = LigaStatus.Encerrada;
+                liga.CampeaoTimeId = classif.FirstOrDefault()?.TimeId;
             }
         }
 
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
 
-        // Auto-gen knockout for Liga when status = PlayIn (not DecisaoCampeao or MiniLiga)
+        // Gera o mata-mata automaticamente quando a fase encerra em PlayIn (Copa → semis/final).
         if (liga.Status == LigaStatus.PlayIn)
         {
             var jaExiste = await _db.LigaKnockoutJogos.AnyAsync(x => x.LigaId == ligaId, ct);
@@ -248,6 +262,36 @@ public class LigaAdminService : ILigaAdminService
                 await GerarFaseKnockoutAsync(ligaId, ct);
         }
 
+        return ToDto(liga);
+    }
+
+    public async Task<LigaDto> ReverterParaPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Status is not (LigaStatus.PlayIn or LigaStatus.Playoffs
+            or LigaStatus.DecisaoCampeao or LigaStatus.MiniLiga))
+            throw new InvalidOperationException(
+                "Só é possível reverter uma liga que esteja em Play-In, Playoffs, Decisão Campeão ou Mini Liga.");
+
+        // Remove apenas o que é gerado DEPOIS da 1ª fase (mata-mata e rodadas de desempate:
+        // mini liga com Numero=0 e jogo decisivo com Numero=-1), preservando as rodadas regulares (Numero > 0).
+        var knockouts = await _db.LigaKnockoutJogos.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var miniRodadas = await _db.LigaRodadas.Where(x => x.LigaId == ligaId && x.Numero <= 0).ToListAsync(ct);
+        var miniRodadaIds = miniRodadas.Select(r => r.RodadaId).ToList();
+        var miniPartidas = await _db.LigaPartidas.Where(x => miniRodadaIds.Contains(x.RodadaId)).ToListAsync(ct);
+        var miniPartidaIds = miniPartidas.Select(p => p.PartidaId).ToList();
+        var miniEventos = await _db.LigaEventos.Where(x => miniPartidaIds.Contains(x.PartidaId)).ToListAsync(ct);
+
+        _db.LigaEventos.RemoveRange(miniEventos);
+        _db.LigaPartidas.RemoveRange(miniPartidas);
+        _db.LigaRodadas.RemoveRange(miniRodadas);
+        _db.LigaKnockoutJogos.RemoveRange(knockouts);
+
+        liga.Status = LigaStatus.PrimeiraFase;
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
         return ToDto(liga);
     }
 
@@ -881,13 +925,17 @@ public class LigaAdminService : ILigaAdminService
 
     // ── Tiebreaker (Liga) ─────────────────────────────────────────────────────
 
+    // Numero sentinela para os jogos de desempate (excluídos da classificação regular, que usa Numero > 0)
+    private const int NumeroMiniLiga = 0;
+    private const int NumeroJogoDecisivo = -1;
+
     public async Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct)
     {
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
         if (liga.Status != LigaStatus.DecisaoCampeao)
-            throw new InvalidOperationException("Liga não está em DecisaoCampeao.");
+            throw new InvalidOperationException("Liga não está em Decisão de Campeão.");
 
         // Pega os 2 times empatados no topo
         var classif = await _db.LigaClassificacoes
@@ -900,29 +948,69 @@ public class LigaAdminService : ILigaAdminService
         if (classif.Count < 2)
             throw new InvalidOperationException("Times não encontrados para decisão.");
 
-        // Cria rodada regular para decisão (Numero = próximo regular, não knockout)
-        var maxRodadaRegular = await _db.LigaRodadas
-            .Where(x => x.LigaId == ligaId && x.Numero > 0)
-            .MaxAsync(x => (int?)x.Numero, ct) ?? 0;
+        await CriarJogoDecisivoAsync(ligaId, classif[0].TimeId, classif[1].TimeId, ct);
 
-        var rodadaDecisao = new LigaRodada
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+        return ToDto(liga);
+    }
+
+    /// <summary>Cria o jogo único de desempate (Numero = -1) entre dois times. Idempotente.</summary>
+    private async Task CriarJogoDecisivoAsync(Guid ligaId, Guid timeCasaId, Guid timeForaId, CancellationToken ct)
+    {
+        var jaExiste = await _db.LigaRodadas.AnyAsync(x => x.LigaId == ligaId && x.Numero == NumeroJogoDecisivo, ct);
+        if (jaExiste) return;
+
+        var rodada = new LigaRodada
         {
             RodadaId = Guid.NewGuid(),
             LigaId = ligaId,
-            Numero = maxRodadaRegular + 1
+            Numero = NumeroJogoDecisivo
         };
-
-        var partidaDecisao = new LigaPartida
+        rodada.Partidas.Add(new LigaPartida
         {
             PartidaId = Guid.NewGuid(),
-            TimeCasaId = classif[0].TimeId,
-            TimeForaId = classif[1].TimeId,
+            TimeCasaId = timeCasaId,
+            TimeForaId = timeForaId,
             Status = PartidaStatus.Agendada
-        };
+        });
+        _db.LigaRodadas.Add(rodada);
+    }
 
-        rodadaDecisao.Partidas.Add(partidaDecisao);
-        _db.LigaRodadas.Add(rodadaDecisao);
+    public async Task<LigaDto> ConcluirDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
 
+        if (liga.Status != LigaStatus.DecisaoCampeao)
+            throw new InvalidOperationException("Liga não está em Decisão de Campeão.");
+
+        var partida = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(x => x.Rodada.LigaId == ligaId && x.Rodada.Numero == NumeroJogoDecisivo)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("Jogo decisivo ainda não foi criado. Use \"Criar Jogo Decisivo\" primeiro.");
+
+        if (partida.Status != PartidaStatus.Encerrada)
+            throw new InvalidOperationException("O jogo decisivo ainda não foi encerrado.");
+
+        Guid campeaoId;
+        if (partida.GolsCasa != partida.GolsFora)
+        {
+            campeaoId = partida.GolsCasa > partida.GolsFora ? partida.TimeCasaId : partida.TimeForaId;
+        }
+        else if (partida.TemPenaltis && partida.PenaltisVencedorId is Guid pen)
+        {
+            campeaoId = pen;
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "O jogo decisivo terminou empatado. Registre o vencedor nos pênaltis (W.O. ou pênaltis) antes de concluir.");
+        }
+
+        liga.Status = LigaStatus.Encerrada;
+        liga.CampeaoTimeId = campeaoId;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
         return ToDto(liga);
@@ -955,8 +1043,8 @@ public class LigaAdminService : ILigaAdminService
         if (empatados.Count < 3)
             throw new InvalidOperationException("Mini liga requer 3 ou mais times empatados.");
 
-        // Gera rodadas de round-robin entre os empatados
-        var rodadasExistentes = await _db.LigaRodadas.CountAsync(x => x.LigaId == ligaId && x.Numero == 0, ct);
+        // Gera rodadas de round-robin entre os empatados (Numero = 0 exclui da classificação principal)
+        var rodadasExistentes = await _db.LigaRodadas.CountAsync(x => x.LigaId == ligaId && x.Numero == NumeroMiniLiga, ct);
         if (rodadasExistentes == 0)
         {
             var jogos = GerarRoundRobinParcial(empatados, empatados.Count - 1);
@@ -966,7 +1054,7 @@ public class LigaAdminService : ILigaAdminService
                 {
                     RodadaId = Guid.NewGuid(),
                     LigaId = ligaId,
-                    Numero = 0 // Usa Numero=0 para mini liga (exclui da classificação principal)
+                    Numero = NumeroMiniLiga
                 };
                 foreach (var (casa, fora) in rodadaJogos)
                     rodada.Partidas.Add(new LigaPartida { PartidaId = Guid.NewGuid(), TimeCasaId = casa, TimeForaId = fora, Status = PartidaStatus.Agendada });
@@ -974,6 +1062,76 @@ public class LigaAdminService : ILigaAdminService
             }
         }
 
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+        return ToDto(liga);
+    }
+
+    public async Task<LigaDto> ConcluirMiniLigaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Status != LigaStatus.MiniLiga)
+            throw new InvalidOperationException("Liga não está em Mini Liga.");
+
+        // Times empatados que disputam a mini liga
+        var classif = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .OrderBy(x => x.Posicao)
+            .ToListAsync(ct);
+
+        var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
+        var empatados = classif
+            .Where(c => c.Pontos == lider.Pontos &&
+                        c.Vitorias == lider.Vitorias &&
+                        c.SaldoGols == lider.SaldoGols &&
+                        c.GolsPro == lider.GolsPro)
+            .Select(c => c.TimeId)
+            .ToHashSet();
+
+        // Jogos da mini liga (Numero = 0)
+        var jogos = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(x => x.Rodada.LigaId == ligaId && x.Rodada.Numero == NumeroMiniLiga)
+            .ToListAsync(ct);
+
+        if (jogos.Count == 0)
+            throw new InvalidOperationException("A mini liga ainda não foi gerada. Use \"Gerar Mini Liga\" primeiro.");
+
+        if (jogos.Any(j => j.Status != PartidaStatus.Encerrada))
+            throw new InvalidOperationException("Todos os jogos da mini liga precisam estar encerrados para apurar os classificados.");
+
+        // Classificação parcial: apenas confrontos diretos entre os empatados
+        var tabela = empatados.ToDictionary(id => id, _ => (Pts: 0, SG: 0, GP: 0));
+        foreach (var j in jogos)
+        {
+            if (!tabela.ContainsKey(j.TimeCasaId) || !tabela.ContainsKey(j.TimeForaId)) continue;
+            var (ptsCasa, ptsFora) = j.GolsCasa > j.GolsFora ? (3, 0)
+                                   : j.GolsCasa < j.GolsFora ? (0, 3) : (1, 1);
+            var c = tabela[j.TimeCasaId];
+            tabela[j.TimeCasaId] = (c.Pts + ptsCasa, c.SG + (j.GolsCasa - j.GolsFora), c.GP + j.GolsCasa);
+            var f = tabela[j.TimeForaId];
+            tabela[j.TimeForaId] = (f.Pts + ptsFora, f.SG + (j.GolsFora - j.GolsCasa), f.GP + j.GolsFora);
+        }
+
+        // 2 melhores avançam para o jogo decisivo (desempate por Pts, SG, GP e, por fim, Id p/ determinismo)
+        var top2 = tabela
+            .OrderByDescending(kv => kv.Value.Pts)
+            .ThenByDescending(kv => kv.Value.SG)
+            .ThenByDescending(kv => kv.Value.GP)
+            .ThenBy(kv => kv.Key)
+            .Take(2)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        if (top2.Count < 2)
+            throw new InvalidOperationException("Não foi possível determinar os 2 classificados da mini liga.");
+
+        await CriarJogoDecisivoAsync(ligaId, top2[0], top2[1], ct);
+
+        liga.Status = LigaStatus.DecisaoCampeao;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
         return ToDto(liga);
@@ -1028,11 +1186,12 @@ public class LigaAdminService : ILigaAdminService
                 break;
 
             case FaseKnockout.Final:
-                // Encerra liga
+                // Encerra liga e registra o campeão (vencedor da final).
                 var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == jogo.LigaId, ct);
                 if (liga is not null)
                 {
                     liga.Status = LigaStatus.Encerrada;
+                    liga.CampeaoTimeId = vencedorId;
                     liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
                     await _db.SaveChangesAsync(ct);
                 }
@@ -1349,7 +1508,8 @@ public class LigaAdminService : ILigaAdminService
     }
 
     private static LigaDto ToDto(Liga l) =>
-        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
+        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
+            l.CampeaoTimeId, l.Campeao?.TeamName);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada.Numero, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
