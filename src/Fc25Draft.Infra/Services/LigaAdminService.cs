@@ -846,6 +846,11 @@ public class LigaAdminService : ILigaAdminService
                 partida.TemPenaltis = true;
                 partida.PenaltisVencedorId = vencedorId;
             }
+            else if (partida.GolsCasa == partida.GolsFora)
+            {
+                throw new InvalidOperationException(
+                    "O jogo terminou empatado. Marque \"Foi para pênaltis?\" e informe o vencedor.");
+            }
             else
             {
                 vencedorId = partida.GolsCasa > partida.GolsFora

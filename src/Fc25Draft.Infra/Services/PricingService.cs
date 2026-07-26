@@ -1,23 +1,26 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
-using Fc25Draft.Core.Options;
 using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Infra.Services;
 
 public class PricingService : IPricingService
 {
     private readonly DraftDbContext _dbContext;
-    private readonly MarketOptions _marketOptions;
+    private PricingConfig? _config;
 
-    public PricingService(DraftDbContext dbContext, IOptions<MarketOptions> options)
+    public PricingService(DraftDbContext dbContext)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _marketOptions = options.Value ?? throw new ArgumentNullException(nameof(options));
     }
+
+    // Config de precificação (editável em /admin/configuracoes). Carregada uma vez por instância;
+    // se ainda não houver linha no banco, usa os padrões (comportamento anterior).
+    private PricingConfig Config => _config ??=
+        _dbContext.PricingConfigs.AsNoTracking().FirstOrDefault() ?? PricingConfig.Default();
 
     public PricingResult Calculate(decimal positionWeight, int overall, int age)
     {
@@ -36,17 +39,18 @@ public class PricingService : IPricingService
             throw new ArgumentOutOfRangeException(nameof(positionWeight));
         }
 
-        var overFactor = Math.Pow(1.08d, overall - 75);
-        var ageFactor = GetAgeFactor(age);
+        var cfg = Config;
+        var overFactor = Math.Pow((double)cfg.OverallBase, overall - cfg.OverallPivot);
+        var ageFactor = cfg.AgeFactor(age);
 
-        var rawBasePrice = positionWeight * (decimal)overFactor * ageFactor * _marketOptions.BaseScale;
-        var normalizedBasePrice = Round(rawBasePrice, _marketOptions.MinIncrementStep);
+        var rawBasePrice = positionWeight * (decimal)overFactor * ageFactor * cfg.BaseScale;
+        var normalizedBasePrice = Round(rawBasePrice, cfg.MinIncrementStep);
 
-        var minIncrementBase = normalizedBasePrice * _marketOptions.MinIncrementRate;
-        var minIncrement = RoundUp(minIncrementBase, _marketOptions.MinIncrementStep);
+        var minIncrementBase = normalizedBasePrice * cfg.MinIncrementRate;
+        var minIncrement = RoundUp(minIncrementBase, cfg.MinIncrementStep);
 
-        var buyNowBase = normalizedBasePrice * _marketOptions.BuyNowFactor;
-        var buyNow = Round(buyNowBase, _marketOptions.MinIncrementStep);
+        var buyNowBase = normalizedBasePrice * cfg.BuyNowFactor;
+        var buyNow = Round(buyNowBase, cfg.MinIncrementStep);
 
         return new PricingResult(normalizedBasePrice, minIncrement, buyNow);
     }
@@ -119,45 +123,5 @@ public class PricingService : IPricingService
         }
 
         return rounded * step;
-    }
-
-    private static decimal GetAgeFactor(int age)
-    {
-        if (age <= 22)
-        {
-            return 1.18m;
-        }
-
-        if (age <= 24)
-        {
-            return 1.15m;
-        }
-
-        if (age <= 26)
-        {
-            return 1.1m;
-        }
-
-        if (age <= 28)
-        {
-            return 1m;
-        }
-
-        if (age <= 30)
-        {
-            return 0.98m;
-        }
-
-        if (age <= 32)
-        {
-            return 0.95m;
-        }
-
-        if (age <= 34)
-        {
-            return 0.90m;
-        }
-
-        return 0.85m;
     }
 }

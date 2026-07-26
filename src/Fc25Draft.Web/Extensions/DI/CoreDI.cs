@@ -16,7 +16,6 @@ namespace Fc25Draft.Web.Extensions.DI
             // Options
             services.Configure<AppOptions>(cfg.GetSection(AppOptions.SectionName));
             services.Configure<SecurityOptions>(cfg.GetSection(SecurityOptions.SectionName));
-            services.Configure<PricingOptions>(cfg.GetSection(PricingOptions.SectionName));
             services.Configure<MarketOptions>(cfg.GetSection(MarketOptions.SectionName));
             services.Configure<EconomiaOptions>(cfg.GetSection(EconomiaOptions.SectionName));
 
@@ -28,6 +27,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPositionService, PositionService>();
             services.AddScoped<IPricingService, PricingService>();
+            services.AddScoped<IPricingConfigService, PricingConfigService>();
             services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
             services.AddScoped<IMarketCycleAdminService, MarketCycleAdminService>();
             services.AddScoped<IMarketCycleService, MarketCycleService>();

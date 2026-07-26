@@ -44,6 +44,8 @@ public class DraftDbContext : DbContext
     public DbSet<LigaLoteriaPick> LigaLoteriaPicks => Set<LigaLoteriaPick>();
     public DbSet<LigaGrupoTime> LigaGruposTimes => Set<LigaGrupoTime>();
 
+    public DbSet<PricingConfig> PricingConfigs => Set<PricingConfig>();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.HasPostgresExtension("unaccent");

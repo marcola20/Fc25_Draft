@@ -44,7 +44,8 @@ public class LayoutNavigationService
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
-            new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin")
+            new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
+            new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
 
@@ -217,6 +218,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Liga")
+            }
+        },
+        ["/admin/configuracoes"] = new PageDefinition
+        {
+            Route = "/admin/configuracoes",
+            Title = "Configurações",
+            Subtitle = "Ajustes do sistema — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Configurações")
             }
         }
     };

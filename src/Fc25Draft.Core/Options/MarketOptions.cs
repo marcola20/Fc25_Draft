@@ -5,9 +5,6 @@ public class  MarketOptions
     public const string SectionName = "Market";
 
     public int CycleDurationHours { get; set; } = 48;
-    public decimal BuyNowFactor { get; set; } = 1.80m;
-    public decimal MinIncrementRate { get; set; } = 0.03m;
-    public decimal MinIncrementStep { get; set; } = 500m;
     public decimal MarketVariancePct { get; set; } = 0.07m;
     public MarketBandsOptions Bands { get; set; } = new();
     public int OvrBandA_Min { get; set; }
@@ -16,7 +13,9 @@ public class  MarketOptions
     public int OvrBandB_Max { get; set; }
     public int OvrBandC_Min { get; set; }
     public int OvrBandC_Max { get; set; }
-    public decimal BaseScale { get; set; } = 10_000_000m;
+
+    // Precificação (BaseScale, BuyNowFactor, MinIncrementRate, MinIncrementStep) migrou para
+    // PricingConfig (tabela editável em /admin/configuracoes).
 }
 
 public class MarketBandsOptions

@@ -1,0 +1,231 @@
+@page "/admin/configuracoes"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IPricingConfigService PricingCfg
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Configurações</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-3">Configurações</h1>
+
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><button class="nav-link @(_tab == "preco" ? "active" : "")" @onclick='() => _tab = "preco"'>Precificação</button></li>
+    </ul>
+
+    @if (_tab == "preco")
+    {
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+        }
+        else
+        {
+            <div class="row g-3">
+                <div class="col-12 col-xl-7">
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">Fórmula base</div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Preço base = <strong>peso da posição</strong> × <strong>fator de overall</strong> × <strong>fator de idade</strong> × <strong>escala base</strong>,
+                                arredondado ao passo. Os pesos por posição são fixos no sistema.
+                            </p>
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label">Escala base (BaseScale)</label>
+                                    <input type="number" step="any" class="form-control" @bind="_baseScale" />
+                                    <div class="form-text">Multiplicador geral. Sobe/desce todos os preços.</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Base overall</label>
+                                    <input type="number" step="any" class="form-control" @bind="_overallBase" />
+                                    <div class="form-text">1.08 = +8% por ponto.</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Pivô overall</label>
+                                    <input type="number" class="form-control" @bind="_overallPivot" />
+                                    <div class="form-text">Overall "neutro" (fator = 1).</div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label">Fator comprar-agora</label>
+                                    <input type="number" step="any" class="form-control" @bind="_buyNow" />
+                                    <div class="form-text">Base × isto = comprar agora.</div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label">Taxa incremento mín.</label>
+                                    <input type="number" step="any" class="form-control" @bind="_minRate" />
+                                    <div class="form-text">Ex.: 0.03 = 3% do lance.</div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label">Passo de arredondamento</label>
+                                    <input type="number" step="any" class="form-control" @bind="_minStep" />
+                                    <div class="form-text">Arredonda preços a múltiplos disto.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">Fatores de idade</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-3"><label class="form-label">Até 22</label><input type="number" step="any" class="form-control" @bind="_f22" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">23–24</label><input type="number" step="any" class="form-control" @bind="_f24" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">25–26</label><input type="number" step="any" class="form-control" @bind="_f26" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">27–28</label><input type="number" step="any" class="form-control" @bind="_f28" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">29–30</label><input type="number" step="any" class="form-control" @bind="_f30" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">31–32</label><input type="number" step="any" class="form-control" @bind="_f32" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">33–34</label><input type="number" step="any" class="form-control" @bind="_f34" /></div>
+                                <div class="col-6 col-md-3"><label class="form-label">35+</label><input type="number" step="any" class="form-control" @bind="_f35" /></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="Salvar" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar")</button>
+                        <button class="btn btn-outline-secondary" @onclick="RestaurarPadroes" disabled="@_saving">Restaurar padrões</button>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card">
+                        <div class="card-header fw-bold">Prévia (com os valores acima, sem salvar)</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr><th>Exemplo</th><th class="text-end">Base</th><th class="text-end">Comprar agora</th><th class="text-end">Incr. mín.</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var ex in _exemplos)
+                                    {
+                                        var r = Preview(ex.PositionId, ex.Overall, ex.Age);
+                                        <tr>
+                                            <td>@ex.Label</td>
+                                            <td class="text-end">@r.Base.ToString("N0")</td>
+                                            <td class="text-end">@r.BuyNow.ToString("N0")</td>
+                                            <td class="text-end">@r.MinInc.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer small text-muted">A prévia usa os pesos de posição fixos do sistema.</div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string _tab = "preco";
+    private bool _loading = true;
+    private bool _saving;
+    private string? _erro, _ok;
+
+    private decimal _baseScale, _overallBase, _buyNow, _minRate, _minStep;
+    private int _overallPivot;
+    private decimal _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35;
+
+    private record Exemplo(string Label, short PositionId, int Overall, int Age);
+    private static readonly Exemplo[] _exemplos =
+    {
+        new("Centroavante · 85 · 24", 12, 85, 24),
+        new("Meia · 80 · 27", 6, 80, 27),
+        new("Zagueiro · 78 · 30", 2, 78, 30),
+        new("Goleiro · 82 · 33", 1, 82, 33),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/configuracoes"));
+        try
+        {
+            var cfg = await PricingCfg.GetAsync(CancellationToken.None);
+            Aplicar(cfg);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void Aplicar(PricingConfigDto c)
+    {
+        _baseScale = c.BaseScale; _overallBase = c.OverallBase; _overallPivot = c.OverallPivot;
+        _buyNow = c.BuyNowFactor; _minRate = c.MinIncrementRate; _minStep = c.MinIncrementStep;
+        _f22 = c.AgeFactorUpTo22; _f24 = c.AgeFactor23To24; _f26 = c.AgeFactor25To26; _f28 = c.AgeFactor27To28;
+        _f30 = c.AgeFactor29To30; _f32 = c.AgeFactor31To32; _f34 = c.AgeFactor33To34; _f35 = c.AgeFactor35Plus;
+    }
+
+    private PricingConfigDto Montar() => new(
+        _baseScale, _overallBase, _overallPivot, _buyNow, _minRate, _minStep,
+        _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35);
+
+    private async Task Salvar()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var salvo = await PricingCfg.UpdateAsync(Montar(), CancellationToken.None);
+            Aplicar(salvo);
+            _ok = "Precificação salva. Vale para os próximos itens gerados no mercado.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void RestaurarPadroes()
+    {
+        var d = PricingConfig.Default();
+        _baseScale = d.BaseScale; _overallBase = d.OverallBase; _overallPivot = d.OverallPivot;
+        _buyNow = d.BuyNowFactor; _minRate = d.MinIncrementRate; _minStep = d.MinIncrementStep;
+        _f22 = d.AgeFactorUpTo22; _f24 = d.AgeFactor23To24; _f26 = d.AgeFactor25To26; _f28 = d.AgeFactor27To28;
+        _f30 = d.AgeFactor29To30; _f32 = d.AgeFactor31To32; _f34 = d.AgeFactor33To34; _f35 = d.AgeFactor35Plus;
+        _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";
+    }
+
+    private decimal AgeFactor(int age) => age switch
+    {
+        <= 22 => _f22, <= 24 => _f24, <= 26 => _f26, <= 28 => _f28,
+        <= 30 => _f30, <= 32 => _f32, <= 34 => _f34, _ => _f35
+    };
+
+    private (decimal Base, decimal BuyNow, decimal MinInc) Preview(short positionId, int overall, int age)
+    {
+        if (_overallBase <= 0 || _baseScale <= 0 || _minStep <= 0) return (0, 0, 0);
+        var weight = MarketWeightResolver.GetByPositionId(positionId);
+        var overFactor = (decimal)Math.Pow((double)_overallBase, overall - _overallPivot);
+        var raw = weight * overFactor * AgeFactor(age) * _baseScale;
+        var base_ = Round(raw, _minStep);
+        var buyNow = Round(base_ * _buyNow, _minStep);
+        var minInc = RoundUp(base_ * _minRate, _minStep);
+        return (base_, buyNow, minInc);
+    }
+
+    private static decimal Round(decimal value, decimal step)
+    {
+        if (value <= 0) return step;
+        var rounded = Math.Round(decimal.Divide(value, step), MidpointRounding.AwayFromZero);
+        if (rounded == 0) rounded = 1;
+        return rounded * step;
+    }
+
+    private static decimal RoundUp(decimal value, decimal step)
+    {
+        if (value <= 0) return step;
+        return Math.Ceiling(decimal.Divide(value, step)) * step;
+    }
+}
