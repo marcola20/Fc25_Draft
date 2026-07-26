@@ -5,6 +5,7 @@
 @using Fc25Draft.Web.Services
 @inject TransferOffersApiClient OffersApi
 @inject TeamsApiClient TeamsApi
+@inject Fc25Draft.Core.Interfaces.ITransferConfigService TransferConfigSvc
 
 <div class="mt-3">
     <ul class="nav nav-pills mb-3" role="tablist">
@@ -404,7 +405,7 @@
                 </div>
                 <div class="modal-body">
                     <p>Deseja aceitar a proposta de <strong>@_acceptConfirmOffer.FromTeamName</strong>?</p>
-                    <p class="mb-0"><strong>Transferências restantes após aceite:</strong> @(Math.Max(0, 5 - TransferCount - 1)) / 5</p>
+                    <p class="mb-0"><strong>Transferências restantes após aceite:</strong> @(Math.Max(0, _maxTransfers - TransferCount - 1)) / @_maxTransfers</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" @onclick="CloseAcceptConfirmModal" disabled="@_processing">Cancelar</button>
@@ -475,8 +476,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try { _maxTransfers = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxTransfers; }
+        catch { /* mantém o padrão se a config não carregar */ }
         await LoadDataAsync();
     }
+
+    private int _maxTransfers = 5;
 
     private async Task LoadDataAsync()
     {

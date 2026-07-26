@@ -51,17 +51,19 @@ public class TransferOfferService : ITransferOfferService
             .FirstOrDefaultAsync(t => t.TeamId == dto.ToTeamId, ct)
             ?? throw new KeyNotFoundException("Time de destino não encontrado.");
 
+        var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+
         if (dto.Type == OfferType.Swap)
         {
-            if (fromTeam.TransferCount >= 5)
-                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
-            if (toTeam.TransferCount >= 5)
-                throw new InvalidOperationException($"O time {toTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            if (fromTeam.TransferCount >= cfg.MaxTransfers)
+                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela ({fromTeam.TransferCount}/{cfg.MaxTransfers}).");
+            if (toTeam.TransferCount >= cfg.MaxTransfers)
+                throw new InvalidOperationException($"O time {toTeam.TeamName} já atingiu o limite de transferências da janela ({toTeam.TransferCount}/{cfg.MaxTransfers}).");
         }
         else
         {
-            if (fromTeam.TransferCount >= 5)
-                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+            if (fromTeam.TransferCount >= cfg.MaxTransfers)
+                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela ({fromTeam.TransferCount}/{cfg.MaxTransfers}).");
         }
 
         var targetPlayers = await _db.Players
@@ -170,17 +172,18 @@ public class TransferOfferService : ITransferOfferService
 
         if (response == OfferStatus.Accepted)
         {
+            var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
             if (offer.Type == OfferType.Swap)
             {
-                if (offer.FromTeam.TransferCount >= 5)
-                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
-                if (offer.ToTeam.TransferCount >= 5)
-                    throw new InvalidOperationException($"O time {offer.ToTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+                if (offer.FromTeam.TransferCount >= cfg.MaxTransfers)
+                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela ({offer.FromTeam.TransferCount}/{cfg.MaxTransfers}).");
+                if (offer.ToTeam.TransferCount >= cfg.MaxTransfers)
+                    throw new InvalidOperationException($"O time {offer.ToTeam.TeamName} já atingiu o limite de transferências da janela ({offer.ToTeam.TransferCount}/{cfg.MaxTransfers}).");
             }
             else
             {
-                if (offer.FromTeam.TransferCount >= 5)
-                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela (5/5).");
+                if (offer.FromTeam.TransferCount >= cfg.MaxTransfers)
+                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela ({offer.FromTeam.TransferCount}/{cfg.MaxTransfers}).");
             }
         }
 
@@ -313,17 +316,19 @@ public class TransferOfferService : ITransferOfferService
         var toTeam = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == offer.ToTeamId, ct)
             ?? throw new InvalidOperationException("Time de destino não encontrado.");
 
-        // Validate roster counts to ensure teams stay with at least 15 players
+        var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+
+        // Valida o tamanho do elenco para os times manterem o mínimo de jogadores
         var fromTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == fromTeam.TeamId, ct);
         var toTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == toTeam.TeamId, ct);
 
-        // If toTeam is losing players (targetPlayers), it must have at least 16 to stay with 15
-        if (targetPlayers.Count > 0 && toTeamRosterCount < 16)
-            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de 15 jogadores.");
+        // Se toTeam perde jogadores (targetPlayers), precisa ter mais que o mínimo para não ficar abaixo
+        if (targetPlayers.Count > 0 && toTeamRosterCount <= cfg.MinRosterSize)
+            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
 
-        // If fromTeam is losing players (offeredPlayers in a swap), it must have at least 16 to stay with 15
-        if (offeredPlayers.Count > 0 && offer.Type == OfferType.Swap && fromTeamRosterCount < 16)
-            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de 15 jogadores.");
+        // Se fromTeam perde jogadores (offeredPlayers numa troca), idem
+        if (offeredPlayers.Count > 0 && offer.Type == OfferType.Swap && fromTeamRosterCount <= cfg.MinRosterSize)
+            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {
@@ -447,8 +452,8 @@ public class TransferOfferService : ITransferOfferService
             toTeam.TransferCount++;
 
         var teamsAtLimit = new List<Guid>();
-        if (fromTeam.TransferCount >= 5) teamsAtLimit.Add(fromTeam.TeamId);
-        if (offer.Type == OfferType.Swap && toTeam.TransferCount >= 5) teamsAtLimit.Add(toTeam.TeamId);
+        if (fromTeam.TransferCount >= cfg.MaxTransfers) teamsAtLimit.Add(fromTeam.TeamId);
+        if (offer.Type == OfferType.Swap && toTeam.TransferCount >= cfg.MaxTransfers) teamsAtLimit.Add(toTeam.TeamId);
 
         if (teamsAtLimit.Count > 0)
         {

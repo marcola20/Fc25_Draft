@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IPricingConfigService PricingCfg
+@inject ITransferConfigService TransferCfg
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 
@@ -25,6 +26,7 @@
 
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item"><button class="nav-link @(_tab == "preco" ? "active" : "")" @onclick='() => _tab = "preco"'>Precificação</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab == "transf" ? "active" : "")" @onclick='() => _tab = "transf"'>Transferências</button></li>
     </ul>
 
     @if (_tab == "preco")
@@ -129,6 +131,47 @@
             </div>
         }
     }
+
+    @if (_tab == "transf")
+    {
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+        }
+        else
+        {
+            <div class="row g-3">
+                <div class="col-12 col-lg-7">
+                    <div class="card">
+                        <div class="card-header fw-bold">Limites de transferências</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">Vendas rápidas por janela</label>
+                                    <input type="number" min="0" class="form-control" @bind="_maxQuickSell" />
+                                    <div class="form-text">Máximo de quick-sells que um time pode fazer.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">Transferências por janela</label>
+                                    <input type="number" min="0" class="form-control" @bind="_maxTransfers" />
+                                    <div class="form-text">Máximo de transferências por time.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">Mínimo de jogadores no elenco</label>
+                                    <input type="number" min="0" class="form-control" @bind="_minRoster" />
+                                    <div class="form-text">Um time não pode ficar abaixo disto.</div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-primary" @onclick="SalvarTransf" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar")</button>
+                                <button class="btn btn-outline-secondary ms-2" @onclick="RestaurarTransf" disabled="@_saving">Restaurar padrões</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
 </div>
 
 @code {
@@ -140,6 +183,9 @@
     private decimal _baseScale, _overallBase, _buyNow, _minRate, _minStep;
     private int _overallPivot;
     private decimal _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35;
+
+    // Transferências
+    private int _maxQuickSell, _maxTransfers, _minRoster;
 
     private record Exemplo(string Label, short PositionId, int Overall, int Age);
     private static readonly Exemplo[] _exemplos =
@@ -157,9 +203,41 @@
         {
             var cfg = await PricingCfg.GetAsync(CancellationToken.None);
             Aplicar(cfg);
+
+            var tcfg = await TransferCfg.GetAsync(CancellationToken.None);
+            AplicarTransf(tcfg);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _loading = false; }
+    }
+
+    private void AplicarTransf(TransferConfigDto t)
+    {
+        _maxQuickSell = t.MaxQuickSellPerWindow;
+        _maxTransfers = t.MaxTransfers;
+        _minRoster = t.MinRosterSize;
+    }
+
+    private async Task SalvarTransf()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster), CancellationToken.None);
+            AplicarTransf(salvo);
+            _ok = "Limites de transferências salvos.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void RestaurarTransf()
+    {
+        var d = TransferConfig.Default();
+        _maxQuickSell = d.MaxQuickSellPerWindow;
+        _maxTransfers = d.MaxTransfers;
+        _minRoster = d.MinRosterSize;
+        _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";
     }
 
     private void Aplicar(PricingConfigDto c)

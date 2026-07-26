@@ -8,6 +8,7 @@
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IPricingService PricingService
+@inject ITransferConfigService TransferConfigSvc
 @inject TeamAccessService TeamAccess
 
 @implements IDisposable
@@ -241,7 +242,7 @@ else
                         <li><strong>Overall:</strong> @_quickSellTarget.Overall</li>
                         <li><strong>Preço base:</strong> @FormatCurrency(_quickSellTarget.BasePrice)</li>
                         <li><strong>Pagamento (80%):</strong> @FormatCurrency(_quickSellPayout)</li>
-                        <li><strong>Quick-sells restantes:</strong> @(Math.Max(0, 5 - (team?.QuickSellCount ?? 0))) / 5</li>
+                        <li><strong>Quick-sells restantes:</strong> @(Math.Max(0, _maxQuickSell - (team?.QuickSellCount ?? 0))) / @_maxQuickSell</li>
                     </ul>
                     @if (!string.IsNullOrEmpty(_quickSellErrorMessage))
                     {
@@ -277,6 +278,7 @@ else
     public Guid Id { get; set; }
 
     private TeamDetailsDto? team;
+    private int _maxQuickSell = 5;
     private decimal? teamAmount;
     private TeamRosterDto? roster;
     private string? errorMessage;
@@ -305,6 +307,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        try { _maxQuickSell = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxQuickSellPerWindow; }
+        catch { /* mantém o padrão se a config não carregar */ }
         await LoadTeamAsync();
         await RefreshTeamTokenStateAsync();
     }

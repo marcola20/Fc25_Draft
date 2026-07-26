@@ -45,6 +45,7 @@ public class DraftDbContext : DbContext
     public DbSet<LigaGrupoTime> LigaGruposTimes => Set<LigaGrupoTime>();
 
     public DbSet<PricingConfig> PricingConfigs => Set<PricingConfig>();
+    public DbSet<TransferConfig> TransferConfigs => Set<TransferConfig>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

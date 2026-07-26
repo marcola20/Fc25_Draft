@@ -77,15 +77,18 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (player.TeamRosters.All(r => r.TeamId != teamId))
                     throw new QuickSellException("Jogador não pertence ao time informado.", StatusCodes.Status404NotFound);
 
+                var cfg = await _dbContext.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                    ?? TransferConfig.Default();
+
                 var rosterCount = await _dbContext.TeamRosters
                     .CountAsync(r => r.TeamId == teamId, ct)
                     .ConfigureAwait(false);
 
-                if (rosterCount < 16)
-                    throw new QuickSellException("Você não pode realizar esta ação. O time ficaria com menos de 15 jogadores.", StatusCodes.Status409Conflict);
+                if (rosterCount <= cfg.MinRosterSize)
+                    throw new QuickSellException($"Você não pode realizar esta ação. O time ficaria com menos de {cfg.MinRosterSize} jogadores.", StatusCodes.Status409Conflict);
 
-                if (team.QuickSellCount >= 5)
-                    throw new QuickSellException("Limite de vendas rápidas da janela atingido (5/5).", StatusCodes.Status429TooManyRequests);
+                if (team.QuickSellCount >= cfg.MaxQuickSellPerWindow)
+                    throw new QuickSellException($"Limite de vendas rápidas da janela atingido ({team.QuickSellCount}/{cfg.MaxQuickSellPerWindow}).", StatusCodes.Status429TooManyRequests);
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 
