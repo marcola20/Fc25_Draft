@@ -234,7 +234,7 @@ public class LigaAdminService : ILigaAdminService
                 .Where(x => x.LigaId == ligaId)
                 .OrderByDescending(x => x.Pontos)
                 .ThenByDescending(x => x.Vitorias)
-                .ThenByDescending(x => x.SaldoGols)
+                .ThenByDescending(x => x.GolsPro - x.GolsContra)
                 .ThenByDescending(x => x.GolsPro)
                 .ToListAsync(ct);
 
@@ -566,6 +566,19 @@ public class LigaAdminService : ILigaAdminService
 
         await _db.SaveChangesAsync(ct);
         await RecalcularClassificacaoAsync(partida.RodadaId, ct);
+
+        // Integração com o mata-mata: se esta partida pertence a um jogo do bracket,
+        // resolve o vencedor (quem não fez W.O.) e avança automaticamente.
+        var jogoKo = await _db.LigaKnockoutJogos
+            .FirstOrDefaultAsync(x => x.PartidaId == partidaId && x.VencedorId == null, ct);
+        if (jogoKo is not null && jogoKo.TimeCasaId.HasValue && jogoKo.TimeForaId.HasValue)
+        {
+            var vencedorId = casaFezWO ? partida.TimeForaId : partida.TimeCasaId;
+            jogoKo.VencedorId = vencedorId;
+            await _db.SaveChangesAsync(ct);
+            await AvancarBracketAsync(jogoKo, vencedorId, ct);
+        }
+
         return await GetPartidaDtoAsync(partidaId, ct);
     }
 
@@ -1422,14 +1435,13 @@ public class LigaAdminService : ILigaAdminService
                 cls.Derrotas = s.D;
                 cls.GolsPro = s.GP;
                 cls.GolsContra = s.GC;
-                cls.SaldoGols = s.GP - s.GC;
                 cls.CartoesAmarelos = s.CA;
                 cls.CartoesVermelhos = s.CV;
             }
             else
             {
                 cls.Pontos = 0; cls.Jogos = 0; cls.Vitorias = 0; cls.Empates = 0;
-                cls.Derrotas = 0; cls.GolsPro = 0; cls.GolsContra = 0; cls.SaldoGols = 0;
+                cls.Derrotas = 0; cls.GolsPro = 0; cls.GolsContra = 0;
                 cls.CartoesAmarelos = 0; cls.CartoesVermelhos = 0;
             }
         }
@@ -1452,7 +1464,6 @@ public class LigaAdminService : ILigaAdminService
                     Derrotas = s.D,
                     GolsPro = s.GP,
                     GolsContra = s.GC,
-                    SaldoGols = s.GP - s.GC,
                     CartoesAmarelos = s.CA,
                     CartoesVermelhos = s.CV
                 });

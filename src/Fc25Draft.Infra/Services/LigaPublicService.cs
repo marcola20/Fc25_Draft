@@ -233,57 +233,64 @@ public class LigaPublicService : ILigaPublicService
             e.CriadoEm)).ToArray();
     }
 
+    private sealed record GolFlat(
+        int JogadorId, string JogadorNome, int? AssistenteId,
+        Guid LigaId, string LigaNome, TipoCompetition LigaTipo);
+
     public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct)
     {
-        var ligas = await _db.Ligas.AsNoTracking().ToListAsync(ct);
-        var eventos = await _db.LigaEventos
+        // Projeta apenas os campos necessários dos gols (evita carregar entidades inteiras).
+        var gols = await _db.LigaEventos
             .AsNoTracking()
-            .Include(x => x.Jogador)
-            .Include(x => x.Partida)
-            .ThenInclude(x => x.Rodada)
-            .ThenInclude(x => x.Liga)
+            .Where(e => e.Tipo == TipoEvento.Gol)
+            .Select(e => new GolFlat(
+                e.JogadorId,
+                e.Jogador.Name,
+                e.AssistenteId,
+                e.Partida.Rodada.LigaId,
+                e.Partida.Rodada.Liga.Nome,
+                e.Partida.Rodada.Liga.Tipo))
             .ToListAsync(ct);
 
-        var golsPorJogador = eventos
-            .Where(e => e.Tipo == TipoEvento.Gol)
-            .GroupBy(e => e.JogadorId)
-            .Select(g =>
+        // Assistências pré-computadas em passos únicos (evita O(jogadores × eventos)).
+        var assistPorJogador = gols
+            .Where(g => g.AssistenteId.HasValue)
+            .GroupBy(g => g.AssistenteId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var assistPorJogadorLiga = gols
+            .Where(g => g.AssistenteId.HasValue)
+            .GroupBy(g => (Jogador: g.AssistenteId!.Value, g.LigaId))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var resultado = gols
+            .GroupBy(g => g.JogadorId)
+            .Select(pg =>
             {
-                var primeiro = g.First();
-                var totalGols = g.Count();
-                var totalAssistencias = eventos.Count(e => e.Tipo == TipoEvento.Gol && e.AssistenteId == primeiro.JogadorId);
-
-                var competicoes = g
-                    .GroupBy(e => new { e.Partida.Rodada.LigaId, e.Partida.Rodada.Liga.Nome, e.Partida.Rodada.Liga.Tipo })
-                    .Select(cg =>
-                    {
-                        var assistenciasNaCompetition = eventos.Count(e =>
-                            e.Tipo == TipoEvento.Gol &&
-                            e.AssistenteId == primeiro.JogadorId &&
-                            e.Partida.Rodada.LigaId == cg.Key.LigaId);
-
-                        return new ArtilheiroCompetitionDetalheDto(
-                            cg.Key.LigaId,
-                            cg.Key.Nome,
-                            cg.Key.Tipo,
-                            cg.Count(),
-                            assistenciasNaCompetition);
-                    })
+                var jogadorId = pg.Key;
+                var competicoes = pg
+                    .GroupBy(g => (g.LigaId, g.LigaNome, g.LigaTipo))
+                    .Select(cg => new ArtilheiroCompetitionDetalheDto(
+                        cg.Key.LigaId,
+                        cg.Key.LigaNome,
+                        cg.Key.LigaTipo,
+                        cg.Count(),
+                        assistPorJogadorLiga.GetValueOrDefault((jogadorId, cg.Key.LigaId), 0)))
                     .OrderByDescending(x => x.Gols)
                     .ToArray();
 
                 return new HistoricoArtilheiroDto(
-                    primeiro.JogadorId,
-                    primeiro.Jogador.Name,
-                    totalGols,
-                    totalAssistencias,
+                    jogadorId,
+                    pg.First().JogadorNome,
+                    pg.Count(),
+                    assistPorJogador.GetValueOrDefault(jogadorId, 0),
                     competicoes);
             })
             .OrderByDescending(x => x.TotalGols)
             .ThenByDescending(x => x.TotalAssistencias)
             .ToArray();
 
-        return golsPorJogador;
+        return resultado;
     }
 
     public async Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct)

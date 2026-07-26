@@ -15,7 +15,8 @@ public class LigaClassificacao
     public int Derrotas { get; set; }
     public int GolsPro { get; set; }
     public int GolsContra { get; set; }
-    public int SaldoGols { get; set; }
+    // Saldo de gols é sempre GolsPro - GolsContra (computado; não persiste, evita desatualizar).
+    public int SaldoGols => GolsPro - GolsContra;
     public int CartoesAmarelos { get; set; }
     public int CartoesVermelhos { get; set; }
     public GrupoCopa? Grupo { get; set; }

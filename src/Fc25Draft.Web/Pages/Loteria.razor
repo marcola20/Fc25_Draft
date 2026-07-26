@@ -167,7 +167,7 @@
             teamName.Normalize(System.Text.NormalizationForm.FormD)
                     .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
                                 != System.Globalization.UnicodeCategory.NonSpacingMark));
-        return $"/img/escudos/{normalized}.png";
+        return $"/images/escudos/{normalized}.png";
     }
 }
 

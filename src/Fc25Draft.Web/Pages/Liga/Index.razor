@@ -572,7 +572,9 @@
         try
         {
             _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
-            _liga = await LigaService.GetAtualAsync(CancellationToken.None);
+            // Padrão: liga atual; se não houver, cai para a primeira ativa.
+            _liga = await LigaService.GetAtualAsync(CancellationToken.None)
+                    ?? (_ligas.Count > 0 ? _ligas[0] : null);
 
             if (_liga is not null)
             {
