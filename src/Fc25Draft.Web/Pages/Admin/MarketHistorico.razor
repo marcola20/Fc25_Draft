@@ -290,9 +290,9 @@ else
         await LoadAsync(page);
     }
 
-    private void OnAuthenticationChanged(object? sender, bool isAuthenticated)
+    private void OnAuthenticationChanged()
     {
-        if (!isAuthenticated)
+        if (!AdminAuth.IsAdmin)
         {
             _page = null;
             _errorMessage = null;
@@ -345,9 +345,5 @@ else
         _loadCts?.Dispose();
         _exportCts?.Cancel();
         _exportCts?.Dispose();
-    }
-
-    private void OnAuthenticationChanged()
-    {
     }
 }

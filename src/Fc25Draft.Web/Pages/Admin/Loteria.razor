@@ -8,7 +8,7 @@
 @inject ILigaAdminService AdminSvc
 @inject ILigaPublicService PublicSvc
 @inject LotteryStateService LotteryService
-@inject DraftDbContext Db
+@inject IDbContextFactory<DraftDbContext> DbFactory
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 
@@ -513,6 +513,8 @@
         _carregando = true;
         try
         {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+
             // Remove loteria anterior da mesma liga (se existir)
             var existing = await Db.LigaLoterias
                 .Where(x => x.LigaId == s.LigaId)
@@ -569,6 +571,8 @@
         _carregando = true; _erro = null; _ok = null;
         try
         {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+
             int totalTeams = r1.Count;
             int totalRounds = r2.Count > 0 ? 2 : 1;
 

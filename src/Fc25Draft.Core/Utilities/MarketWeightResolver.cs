@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Fc25Draft.Core.Extensions;
 
 namespace Fc25Draft.Core.Utilities;
 
@@ -21,23 +22,6 @@ public static class MarketWeightResolver
         { 13, 1.20m }
     };
 
-    private static readonly Dictionary<string, short> CodeToId = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "GK", 1 },
-        { "CB", 2 },
-        { "LB", 3 },
-        { "RB", 4 },
-        { "CDM", 5 },
-        { "CM", 6 },
-        { "CAM", 7 },
-        { "LM", 8 },
-        { "LW", 9 },
-        { "RM", 10 },
-        { "RW", 11 },
-        { "ST", 12 },
-        { "CF", 13 }
-    };
-
     public static decimal GetByPositionId(short positionId)
     {
         if (!WeightsById.TryGetValue(positionId, out var weight))
@@ -55,7 +39,8 @@ public static class MarketWeightResolver
             throw new ArgumentException("Código de posição obrigatório.", nameof(positionCode));
         }
 
-        if (!CodeToId.TryGetValue(positionCode.Trim().ToUpperInvariant(), out var positionId))
+        // Usa o vocabulário único de códigos (PositionExtensions).
+        if (!PositionExtensions.TryParsePositionCode(positionCode, out var positionId))
         {
             throw new ArgumentException($"Código de posição desconhecido: {positionCode}.", nameof(positionCode));
         }

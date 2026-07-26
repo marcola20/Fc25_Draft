@@ -9,6 +9,7 @@ namespace Fc25Draft.Core.Enums;
 /// </summary>
 public enum FaseKnockout
 {
+    None = 0,
     PlayIn_A = 1,
     PlayIn_B = 2,
     PlayIn_C = 3,

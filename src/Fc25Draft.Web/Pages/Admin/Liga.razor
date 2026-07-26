@@ -36,6 +36,10 @@
         {
             <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
         }
+        @if (_ligaAtual?.Tipo == TipoCompetition.Liga)
+        {
+            <li class="nav-item"><button class="nav-link @(_tab=="times"?"active":"")" @onclick='()=>SetTab("times")' disabled="@(_ligaAtual == null)">Times</button></li>
+        }
         <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>_tab="rodadas"' disabled="@(_ligaAtual == null)">Rodadas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>_tab="partidas"' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="punicoes"?"active":"")" @onclick='()=>_tab="punicoes"' disabled="@(_ligaAtual == null)">Punições</button></li>
@@ -254,6 +258,48 @@
                 }
             </div>
         }
+    }
+
+    <!-- ─ Tab: Times (Liga) ─ -->
+    @if (_tab == "times" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
+    {
+        <div class="card">
+            <div class="card-header fw-bold d-flex flex-wrap align-items-center gap-2">
+                Times participantes
+                <span class="badge bg-primary">@_timesLigaSel.Count selecionados</span>
+                @if (_ligaAtual.Status != LigaStatus.Criada)
+                {
+                    <span class="badge bg-secondary">Somente leitura (liga já iniciada)</span>
+                }
+                <span class="ms-auto small text-muted">Rodadas geradas: @(Math.Max(0, _timesLigaSel.Count - 1))</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Selecione os times que disputam esta liga. O total de rodadas é o nº de times − 1 (todos se enfrentam uma vez).</p>
+                <div class="row g-2">
+                    @foreach (var t in _times)
+                    {
+                        var id = t.TeamId;
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tl-@id"
+                                       checked="@_timesLigaSel.Contains(id)"
+                                       disabled="@(_ligaAtual.Status != LigaStatus.Criada || _saving)"
+                                       @onchange="e => ToggleTimeLiga(id, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label" for="tl-@id">@t.TeamName</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+                @if (_ligaAtual.Status == LigaStatus.Criada)
+                {
+                    <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="SalvarTimesLiga" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar times")</button>
+                        <button class="btn btn-outline-secondary" @onclick="() => { _timesLigaSel = _times.Select(t => t.TeamId).ToHashSet(); }" disabled="@_saving">Selecionar todos</button>
+                        <button class="btn btn-outline-secondary" @onclick="() => { _timesLigaSel = new(); }" disabled="@_saving">Limpar</button>
+                    </div>
+                }
+            </div>
+        </div>
     }
 
     <!-- ─ Tab: Rodadas ─ -->
@@ -580,6 +626,9 @@
     // Times
     private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
 
+    // Times inscritos (Liga)
+    private HashSet<Guid> _timesLigaSel = new();
+
     // Rodadas
     private IReadOnlyList<LigaRodadaDto> _rodadas = Array.Empty<LigaRodadaDto>();
     private LigaRodadaDto? _rodadaSelecionada;
@@ -632,7 +681,30 @@
                 _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
                 PreencherSelects();
             }
+            else
+            {
+                _timesLigaSel = (await AdminSvc.ListTimesLigaAsync(_ligaAtual.LigaId, CancellationToken.None)).ToHashSet();
+            }
         }
+    }
+
+    private void ToggleTimeLiga(Guid id, bool on)
+    {
+        if (on) _timesLigaSel.Add(id);
+        else _timesLigaSel.Remove(id);
+    }
+
+    private async Task SalvarTimesLiga()
+    {
+        _erro = null; _saving = true;
+        try
+        {
+            await AdminSvc.ConfigurarTimesLigaAsync(_ligaAtual!.LigaId, _timesLigaSel.ToList(), CancellationToken.None);
+            _ok = $"Times salvos. Total de rodadas: {Math.Max(0, _timesLigaSel.Count - 1)}.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
     }
 
     private void PreencherSelects()

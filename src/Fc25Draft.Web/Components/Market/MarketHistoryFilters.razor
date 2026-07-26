@@ -140,6 +140,7 @@
 
     private static readonly IReadOnlyList<(MarketTransactionType Type, string Label)> TypeOptions = Enum
         .GetValues<MarketTransactionType>()
+        .Where(type => type != MarketTransactionType.None)
         .Select(type => (type, type.ToDisplayName()))
         .ToArray();
 

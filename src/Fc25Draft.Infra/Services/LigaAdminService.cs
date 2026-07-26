@@ -91,16 +91,23 @@ public class LigaAdminService : ILigaAdminService
 
     private async Task IniciarPrimeiraFaseLigaAsync(Liga liga, CancellationToken ct)
     {
-        var times = await _db.Teams.AsNoTracking().ToListAsync(ct);
-        foreach (var time in times)
+        var timeIds = await _db.LigaTimes.AsNoTracking()
+            .Where(x => x.LigaId == liga.LigaId)
+            .Select(x => x.TimeId)
+            .ToListAsync(ct);
+
+        if (timeIds.Count < 2)
+            throw new InvalidOperationException("Configure os times participantes na aba \"Times\" antes de iniciar a liga.");
+
+        foreach (var timeId in timeIds)
         {
-            if (!await _db.LigaClassificacoes.AnyAsync(x => x.LigaId == liga.LigaId && x.TimeId == time.TeamId, ct))
+            if (!await _db.LigaClassificacoes.AnyAsync(x => x.LigaId == liga.LigaId && x.TimeId == timeId, ct))
             {
                 _db.LigaClassificacoes.Add(new LigaClassificacao
                 {
                     ClassificacaoId = Guid.NewGuid(),
                     LigaId = liga.LigaId,
-                    TimeId = time.TeamId
+                    TimeId = timeId
                 });
             }
         }
@@ -193,6 +200,19 @@ public class LigaAdminService : ILigaAdminService
 
     public async Task<LigaDto> EncerrarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
     {
+        Liga liga = null!;
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+            liga = await EncerrarPrimeiraFaseCoreAsync(ligaId, ct);
+            await tx.CommitAsync(ct);
+        });
+        return ToDto(liga);
+    }
+
+    private async Task<Liga> EncerrarPrimeiraFaseCoreAsync(Guid ligaId, CancellationToken ct)
+    {
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
@@ -262,7 +282,7 @@ public class LigaAdminService : ILigaAdminService
                 await GerarFaseKnockoutAsync(ligaId, ct);
         }
 
-        return ToDto(liga);
+        return liga;
     }
 
     public async Task<LigaDto> ReverterParaPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
@@ -308,6 +328,7 @@ public class LigaAdminService : ILigaAdminService
         var classif = await _db.LigaClassificacoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
         var punicoes = await _db.LigaPunicoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
         var grupos = await _db.LigaGruposTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        var timesInscritos = await _db.LigaTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
 
         _db.LigaEventos.RemoveRange(eventos);
         _db.LigaPartidas.RemoveRange(partidas);
@@ -316,6 +337,7 @@ public class LigaAdminService : ILigaAdminService
         _db.LigaClassificacoes.RemoveRange(classif);
         _db.LigaPunicoes.RemoveRange(punicoes);
         _db.LigaGruposTimes.RemoveRange(grupos);
+        _db.LigaTimes.RemoveRange(timesInscritos);
         _db.Ligas.Remove(liga);
 
         await _db.SaveChangesAsync(ct);
@@ -365,11 +387,24 @@ public class LigaAdminService : ILigaAdminService
         if (existentes > 0)
             throw new InvalidOperationException("Liga já possui rodadas. Delete-as antes de gerar automaticamente.");
 
-        var times = await _db.Teams.AsNoTracking().Select(t => t.TeamId).ToListAsync(ct);
-        if (times.Count < 2)
-            throw new InvalidOperationException("Precisa de ao menos 2 times para gerar rodadas.");
+        List<Guid> times;
+        if (liga.Tipo == TipoCompetition.Liga)
+        {
+            times = await _db.LigaTimes.AsNoTracking()
+                .Where(x => x.LigaId == ligaId)
+                .Select(x => x.TimeId)
+                .ToListAsync(ct);
+            if (times.Count < 2)
+                throw new InvalidOperationException("Configure os times participantes na aba \"Times\" antes de gerar as rodadas.");
+        }
+        else
+        {
+            times = await _db.Teams.AsNoTracking().Select(t => t.TeamId).ToListAsync(ct);
+            if (times.Count < 2)
+                throw new InvalidOperationException("Precisa de ao menos 2 times para gerar rodadas.");
+        }
 
-        // Liga: full round-robin (n-1 rodadas). Copa: use TotalRodadas (6)
+        // Liga: round-robin completo (n-1 rodadas). Copa: usa TotalRodadas (6).
         var totalRodadas = liga.Tipo == TipoCompetition.Liga ? times.Count - 1 : liga.TotalRodadas;
         var jogos = GerarRoundRobinParcial(times, totalRodadas);
 
@@ -557,6 +592,13 @@ public class LigaAdminService : ILigaAdminService
         if (partida.TimeCasaId != request.TimeId && partida.TimeForaId != request.TimeId)
             throw new InvalidOperationException("Time não participa desta partida.");
 
+        if (!await _db.Players.AnyAsync(p => p.PlayerId == request.JogadorId, ct))
+            throw new InvalidOperationException("Jogador não encontrado.");
+
+        if (request.AssistenteId.HasValue &&
+            !await _db.Players.AnyAsync(p => p.PlayerId == request.AssistenteId.Value, ct))
+            throw new InvalidOperationException("Assistente não encontrado.");
+
         var evento = new LigaEventoPartida
         {
             EventoId = Guid.NewGuid(),
@@ -596,6 +638,9 @@ public class LigaAdminService : ILigaAdminService
 
         if (partida.TimeCasaId != request.TimeId && partida.TimeForaId != request.TimeId)
             throw new InvalidOperationException("Time não participa desta partida.");
+
+        if (!await _db.Players.AnyAsync(p => p.PlayerId == request.JogadorId, ct))
+            throw new InvalidOperationException("Jogador não encontrado.");
 
         var evento = new LigaEventoPartida
         {
@@ -662,27 +707,36 @@ public class LigaAdminService : ILigaAdminService
         var time = await _db.Teams.AsNoTracking().FirstOrDefaultAsync(x => x.TeamId == request.TimeId, ct)
             ?? throw new InvalidOperationException("Time não encontrado.");
 
-        var punicao = new LigaPunicao
+        LigaPunicao punicao = null!;
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            PunicaoId = Guid.NewGuid(),
-            LigaId = ligaId,
-            TimeId = request.TimeId,
-            PontosSubtraidos = request.PontosSubtraidos,
-            Motivo = request.Motivo.Trim(),
-            CriadaEm = _time.GetUtcNow().UtcDateTime
-        };
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        _db.LigaPunicoes.Add(punicao);
-        await _db.SaveChangesAsync(ct);
+            punicao = new LigaPunicao
+            {
+                PunicaoId = Guid.NewGuid(),
+                LigaId = ligaId,
+                TimeId = request.TimeId,
+                PontosSubtraidos = request.PontosSubtraidos,
+                Motivo = request.Motivo.Trim(),
+                CriadaEm = _time.GetUtcNow().UtcDateTime
+            };
 
-        // Aplica desconto na classificação
-        var classif = await _db.LigaClassificacoes.FirstOrDefaultAsync(x => x.LigaId == ligaId && x.TimeId == request.TimeId, ct);
-        if (classif is not null)
-        {
-            classif.Pontos = classif.Pontos - request.PontosSubtraidos;
+            _db.LigaPunicoes.Add(punicao);
             await _db.SaveChangesAsync(ct);
-            await RecalcularPosicoesAsync(ligaId, ct);
-        }
+
+            // Aplica desconto na classificação (atômico com o registro da punição)
+            var classif = await _db.LigaClassificacoes.FirstOrDefaultAsync(x => x.LigaId == ligaId && x.TimeId == request.TimeId, ct);
+            if (classif is not null)
+            {
+                classif.Pontos = classif.Pontos - request.PontosSubtraidos;
+                await _db.SaveChangesAsync(ct);
+                await RecalcularPosicoesAsync(ligaId, ct);
+            }
+
+            await tx.CommitAsync(ct);
+        });
 
         return new LigaPunicaoDto(punicao.PunicaoId, ligaId, request.TimeId, time.TeamName, request.PontosSubtraidos, punicao.Motivo, punicao.CriadaEm);
     }
@@ -864,6 +918,14 @@ public class LigaAdminService : ILigaAdminService
         }
 
         jogo.VencedorId = vencedorId;
+
+        // Encerra a partida vinculada (evita ficar EmAndamento para sempre).
+        if (jogo.Partida is not null && jogo.Partida.Status != PartidaStatus.Encerrada)
+        {
+            jogo.Partida.Status = PartidaStatus.Encerrada;
+            jogo.Partida.EncerradaEm = _time.GetUtcNow().UtcDateTime;
+        }
+
         await _db.SaveChangesAsync(ct);
 
         // Avança vencedor (e perdedor para PlayIn_C) no bracket
@@ -914,6 +976,40 @@ public class LigaAdminService : ILigaAdminService
 
         foreach (var timeId in request.TimesGrupoB)
             _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.B });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListTimesLigaAsync(Guid ligaId, CancellationToken ct)
+        => await _db.LigaTimes.AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .Select(x => x.TimeId)
+            .ToListAsync(ct);
+
+    public async Task ConfigurarTimesLigaAsync(Guid ligaId, IReadOnlyList<Guid> teamIds, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Tipo != TipoCompetition.Liga)
+            throw new InvalidOperationException("A inscrição de times avulsa aplica-se apenas à Liga (pontos corridos). Use os grupos na Copa.");
+
+        if (liga.Status != LigaStatus.Criada)
+            throw new InvalidOperationException("Os times só podem ser configurados antes de iniciar a liga.");
+
+        var distinct = teamIds.Distinct().ToList();
+        if (distinct.Count < 2)
+            throw new InvalidOperationException("Selecione ao menos 2 times.");
+
+        var existentes = await _db.LigaTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        _db.LigaTimes.RemoveRange(existentes);
+
+        foreach (var timeId in distinct)
+            _db.LigaTimes.Add(new LigaTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId });
+
+        // Total de rodadas = nº de times - 1 (round-robin simples, cada um enfrenta o outro uma vez).
+        liga.TotalRodadas = distinct.Count - 1;
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
     }
@@ -1541,11 +1637,11 @@ public class LigaAdminService : ILigaAdminService
             l.CampeaoTimeId, l.Campeao?.TeamName);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
-        new(p.PartidaId, p.RodadaId, p.Rodada.Numero, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
+        new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",
             p.GolsCasa, p.GolsFora, p.Status, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm);
 
     private static LigaEventoDto ToEventoDto(LigaEventoPartida ev) =>
-        new(ev.EventoId, ev.PartidaId, ev.Tipo, ev.TimeId, ev.Time.TeamName, ev.JogadorId, ev.Jogador.Name,
+        new(ev.EventoId, ev.PartidaId, ev.Tipo, ev.TimeId, ev.Time?.TeamName ?? "?", ev.JogadorId, ev.Jogador?.Name ?? "?",
             ev.AssistenteId, ev.Assistente?.Name, ev.Minuto, ev.CriadoEm);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>

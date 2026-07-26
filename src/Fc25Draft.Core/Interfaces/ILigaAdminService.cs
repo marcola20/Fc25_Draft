@@ -52,6 +52,10 @@ public interface ILigaAdminService
     Task<IReadOnlyList<LigaGrupoTimeDto>> ListGruposAsync(Guid ligaId, CancellationToken ct);
     Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
 
+    // Times inscritos (Liga de pontos corridos)
+    Task<IReadOnlyList<Guid>> ListTimesLigaAsync(Guid ligaId, CancellationToken ct);
+    Task ConfigurarTimesLigaAsync(Guid ligaId, IReadOnlyList<Guid> teamIds, CancellationToken ct);
+
     // Tiebreaker (Liga)
     Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct);
     Task<LigaDto> IniciarMiniLigaAsync(Guid ligaId, CancellationToken ct);

@@ -2,6 +2,7 @@ namespace Fc25Draft.Core.Enums
 {
     public enum PositionType
     {
+        None = 0,
         Goleiro = 1,
         Zagueiro = 2,
         LateralEsquerdo = 3,

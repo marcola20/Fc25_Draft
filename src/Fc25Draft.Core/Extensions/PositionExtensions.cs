@@ -5,21 +5,22 @@ namespace Fc25Draft.Core.Extensions
 {
     public static class PositionExtensions
     {
+        // Vocabulário único de código de posição (estilo internacional GK/CB/LB…).
         private static readonly Dictionary<string, short> PositionCodeLookup = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["GOL"] = (short)PositionType.Goleiro,
-            ["ZAG"] = (short)PositionType.Zagueiro,
-            ["LE"]  = (short)PositionType.LateralEsquerdo,
-            ["LD"]  = (short)PositionType.LateralDireito,
-            ["VOL"] = (short)PositionType.Volante,
-            ["MLG"] = (short)PositionType.MeiaLigacao,
-            ["MAT"] = (short)PositionType.MeiaAtacante,
-            ["ME"]  = (short)PositionType.MeiaEsquerda,
-            ["PE"]  = (short)PositionType.PontaEsquerda,
-            ["MD"]  = (short)PositionType.MeiaDireita,
-            ["PD"]  = (short)PositionType.PontaDireita,
-            ["CA"]  = (short)PositionType.Centroavante,
-            ["SA"]  = (short)PositionType.SegundoAtacante
+            ["GK"]  = (short)PositionType.Goleiro,
+            ["CB"]  = (short)PositionType.Zagueiro,
+            ["LB"]  = (short)PositionType.LateralEsquerdo,
+            ["RB"]  = (short)PositionType.LateralDireito,
+            ["CDM"] = (short)PositionType.Volante,
+            ["CM"]  = (short)PositionType.MeiaLigacao,
+            ["CAM"] = (short)PositionType.MeiaAtacante,
+            ["LM"]  = (short)PositionType.MeiaEsquerda,
+            ["LW"]  = (short)PositionType.PontaEsquerda,
+            ["RM"]  = (short)PositionType.MeiaDireita,
+            ["RW"]  = (short)PositionType.PontaDireita,
+            ["ST"]  = (short)PositionType.Centroavante,
+            ["CF"]  = (short)PositionType.SegundoAtacante
         };
 
         public static int ToPositionId(this string positionName)
@@ -72,19 +73,19 @@ namespace Fc25Draft.Core.Extensions
         {
             return positionId switch
             {
-                (int)PositionType.Goleiro         => "GOL",
-                (int)PositionType.Zagueiro        => "ZAG",
-                (int)PositionType.LateralEsquerdo => "LE",
-                (int)PositionType.LateralDireito  => "LD",
-                (int)PositionType.Volante         => "VOL",
-                (int)PositionType.MeiaLigacao     => "MLG",
-                (int)PositionType.MeiaAtacante    => "MAT",
-                (int)PositionType.MeiaEsquerda    => "ME",
-                (int)PositionType.PontaEsquerda   => "PE",
-                (int)PositionType.MeiaDireita     => "MD",
-                (int)PositionType.PontaDireita    => "PD",
-                (int)PositionType.Centroavante    => "CA",
-                (int)PositionType.SegundoAtacante => "SA",
+                (int)PositionType.Goleiro         => "GK",
+                (int)PositionType.Zagueiro        => "CB",
+                (int)PositionType.LateralEsquerdo => "LB",
+                (int)PositionType.LateralDireito  => "RB",
+                (int)PositionType.Volante         => "CDM",
+                (int)PositionType.MeiaLigacao     => "CM",
+                (int)PositionType.MeiaAtacante    => "CAM",
+                (int)PositionType.MeiaEsquerda    => "LM",
+                (int)PositionType.PontaEsquerda   => "LW",
+                (int)PositionType.MeiaDireita     => "RM",
+                (int)PositionType.PontaDireita    => "RW",
+                (int)PositionType.Centroavante    => "ST",
+                (int)PositionType.SegundoAtacante => "CF",
                 _ => positionId.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
         }

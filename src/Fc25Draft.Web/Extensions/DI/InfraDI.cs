@@ -12,12 +12,17 @@ namespace Fc25Draft.Web.Extensions.DI
 
             var cs = ResolveConnectionStringFrom(cfg, env);
 
-            services.AddDbContext<DraftDbContext>(opt =>
+            // Fábrica de contexto (para componentes de vida longa criarem contextos curtos por operação)
+            // + shim scoped que mantém as injeções scoped de DraftDbContext existentes funcionando.
+            services.AddDbContextFactory<DraftDbContext>(opt =>
                 opt.UseNpgsql(cs, npgsql =>
                         npgsql.MigrationsAssembly(typeof(DraftDbContext).Assembly.FullName)
                                .EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null))
                    .EnableSensitiveDataLogging(env.IsDevelopment())
                    .EnableDetailedErrors(env.IsDevelopment()));
+
+            services.AddScoped<DraftDbContext>(sp =>
+                sp.GetRequiredService<IDbContextFactory<DraftDbContext>>().CreateDbContext());
 
             services.AddHealthChecks().AddNpgSql(cs);
 

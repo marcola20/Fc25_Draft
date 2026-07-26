@@ -23,4 +23,5 @@ public class Liga
     public ICollection<LigaPunicao> Punicoes { get; set; } = new List<LigaPunicao>();
     public ICollection<LigaKnockoutJogo> KnockoutJogos { get; set; } = new List<LigaKnockoutJogo>();
     public ICollection<LigaGrupoTime> Grupos { get; set; } = new List<LigaGrupoTime>();
+    public ICollection<LigaTime> Times { get; set; } = new List<LigaTime>();
 }
