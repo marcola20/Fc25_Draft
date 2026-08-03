@@ -163,3 +163,91 @@ a, .btn-link {
     cursor: default;
 }
 
+/* ── Compartilhar imagem (tabela / rodada) ───────────────────── */
+
+/* Elementos que só aparecem na imagem gerada (cabeçalho/rodapé de marca). */
+.share-only {
+    display: none;
+}
+
+/* Cartão capturado pelo html2canvas. Na tela é transparente/sem borda;
+   quando renderizado para imagem ganha fundo branco + moldura. */
+.share-capture {
+    background: #ffffff;
+}
+
+.share-capture.share-rendering {
+    padding: 16px 18px 12px;
+    border-radius: 14px;
+    border: 1px solid #e6e6e6;
+}
+
+    /* Tabelas largas não devem ser cortadas na imagem gerada. */
+    .share-capture.share-rendering .table-responsive {
+        overflow: visible;
+    }
+
+    /* Mostra os nomes dos times (escondidos no mobile) na imagem da rodada. */
+    .share-capture.share-rendering .d-none.d-md-inline {
+        display: inline !important;
+    }
+
+/* Cabeçalho de marca da imagem compartilhada */
+.share-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #0D1B2A;
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+}
+
+    .share-brand img {
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+    .share-brand .share-brand-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: .5px;
+    }
+
+    .share-brand .share-brand-sub {
+        font-size: .8rem;
+        color: #f4d35e;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+
+    .share-brand .share-brand-meta {
+        margin-left: auto;
+        text-align: right;
+        font-size: .68rem;
+        color: #cbd5e1;
+        line-height: 1.35;
+        white-space: nowrap;
+    }
+
+/* Rodapé de marca da imagem compartilhada */
+.share-footer {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #e6e6e6;
+    text-align: center;
+    font-size: .72rem;
+    color: #64748b;
+    font-weight: 600;
+    letter-spacing: .3px;
+}
+
+    .share-footer strong {
+        color: #0D1B2A;
+    }
+

@@ -141,3 +141,91 @@ window.fc25Unsaved = (function () {
         disable: disable
     };
 })();
+
+// Geração e compartilhamento de imagem (tabela / rodada) para WhatsApp e afins.
+window.fc25ShareImage = (function () {
+    function waitForImages(el) {
+        const imgs = Array.from(el.querySelectorAll('img'));
+        return Promise.all(imgs.map(img => {
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            return new Promise(resolve => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+            });
+        }));
+    }
+
+    async function toBlob(elementId) {
+        if (typeof html2canvas !== 'function') {
+            throw new Error('html2canvas não carregado.');
+        }
+
+        const el = document.getElementById(elementId);
+        if (!el) {
+            throw new Error('Elemento não encontrado: ' + elementId);
+        }
+
+        await waitForImages(el);
+
+        const canvas = await html2canvas(el, {
+            backgroundColor: '#ffffff',
+            scale: Math.min(window.devicePixelRatio || 1, 2) * 1.5,
+            useCORS: true,
+            logging: false,
+            onclone: function (clonedDoc) {
+                const clonedEl = clonedDoc.getElementById(elementId);
+                if (!clonedEl) return;
+                // Revela elementos que só aparecem na imagem gerada.
+                clonedEl.querySelectorAll('.share-only').forEach(function (e) {
+                    e.style.display = '';
+                });
+                clonedEl.classList.add('share-rendering');
+            }
+        });
+
+        return await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+    }
+
+    // Retorna: 'shared' | 'downloaded' | 'error'
+    async function capture(elementId, fileName, title, text) {
+        try {
+            const blob = await toBlob(elementId);
+            if (!blob) return 'error';
+
+            const safeName = (fileName && fileName.trim()) ? fileName : 'cbfv.png';
+            const file = new File([blob], safeName, { type: 'image/png' });
+
+            // Caminho preferido (celular): abre a folha de compartilhamento nativa (WhatsApp etc.)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: title || 'CBFV',
+                        text: text || ''
+                    });
+                    return 'shared';
+                } catch (err) {
+                    // Usuário cancelou a folha de compartilhamento.
+                    if (err && err.name === 'AbortError') return 'shared';
+                    // Qualquer outro erro cai para o download.
+                }
+            }
+
+            // Fallback (desktop): baixa o PNG.
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = safeName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return 'downloaded';
+        } catch (error) {
+            console.error('Erro ao gerar imagem de compartilhamento:', error);
+            return 'error';
+        }
+    }
+
+    return { capture: capture };
+})();
