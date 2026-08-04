@@ -208,7 +208,7 @@ window.fc25ShareImage = (function () {
     }
 
     // Retorna: 'shared' | 'downloaded' | 'error'
-    async function capture(elementId, fileName, title, text) {
+    async function capture(elementId, fileName, text) {
         try {
             const blob = await toBlob(elementId);
             if (!blob) return 'error';
@@ -217,12 +217,16 @@ window.fc25ShareImage = (function () {
             const file = new File([blob], safeName, { type: 'image/png' });
 
             // Caminho preferido (celular): abre a folha de compartilhamento nativa (WhatsApp etc.)
-            // Compartilha SOMENTE a imagem — sem texto — para não virar mensagem separada.
-            // A imagem já traz competição, rodada e site no cabeçalho; a legenda o
-            // usuário escreve junto da foto no próprio WhatsApp.
+            // Envia a imagem + o texto JUNTOS. No celular o WhatsApp usa o texto como
+            // legenda da foto (fica tudo numa mensagem só). Em alguns apps de desktop o
+            // texto pode aparecer separado — limitação do app receptor, não dá para forçar.
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                const shareData = { files: [file] };
+                if (text && text.trim()) {
+                    shareData.text = text;
+                }
                 try {
-                    await navigator.share({ files: [file] });
+                    await navigator.share(shareData);
                     return 'shared';
                 } catch (err) {
                     // Usuário cancelou a folha de compartilhamento.

@@ -48,6 +48,11 @@
 
     private bool _sharing;
 
+    // Legenda enviada junto da imagem (vira legenda da foto no WhatsApp do celular).
+    private string Caption => string.IsNullOrWhiteSpace(Subtitulo)
+        ? $"{Titulo}\nhttps://cbfv-app.onrender.com/liga"
+        : $"{Titulo} — {Subtitulo}\nhttps://cbfv-app.onrender.com/liga";
+
     private async Task Share()
     {
         if (_sharing) return;
@@ -57,7 +62,7 @@
 
         try
         {
-            await JS.InvokeAsync<string>("fc25ShareImage.capture", Id, Arquivo);
+            await JS.InvokeAsync<string>("fc25ShareImage.capture", Id, Arquivo, Caption);
         }
         catch
         {
