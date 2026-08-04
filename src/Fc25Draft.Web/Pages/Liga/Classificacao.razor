@@ -45,6 +45,10 @@
             if (itensGrupo.Count == 0) continue;
 
             <h5 class="mt-3 mb-2">Grupo @grupo</h5>
+            <ShareableCard Id='@($"cap-classif-grupo-{grupo}")'
+                           Titulo="@LigaNome"
+                           Subtitulo='@($"Classificação — Grupo {grupo}")'
+                           Arquivo='@($"cbfv-grupo-{grupo}.png")'>
             <div class="table-responsive mb-4">
                 <table class="table table-sm table-hover align-middle">
                     <thead class="table-dark">
@@ -84,6 +88,7 @@
                     </tbody>
                 </table>
             </div>
+            </ShareableCard>
         }
 
         <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
@@ -94,6 +99,7 @@
     else
     {
         <!-- Liga: tabela única -->
+        <ShareableCard Id="cap-classif-liga" Titulo="@LigaNome" Subtitulo="Classificação" Arquivo="cbfv-classificacao.png">
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
@@ -151,6 +157,7 @@
                 <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
             </div>
         }
+        </ShareableCard>
     }
 </div>
 
@@ -160,6 +167,8 @@
     private Guid _ligaId;
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
     private bool _loading = true;
+
+    private string LigaNome => _liga?.Nome ?? "CBFV";
 
     protected override async Task OnInitializedAsync()
     {

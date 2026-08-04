@@ -5,7 +5,6 @@
 @inject ILigaPublicService LigaService
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
-@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Liga</PageTitle>
@@ -85,11 +84,10 @@
                 }
                 else
                 {
-                    <div class="d-flex justify-content-end mb-2">
-                        @ShareButton("cap-tabela-copa", $"Classificação — Grupo {_grupoSelecionado}", $"cbfv-grupo-{_grupoSelecionado}.png")
-                    </div>
-                    <div id="cap-tabela-copa" class="share-capture">
-                        @ShareBrand($"Classificação — Grupo {_grupoSelecionado}")
+                    <ShareableCard Id="cap-tabela-copa"
+                                   Titulo="@LigaNome"
+                                   Subtitulo='@($"Classificação — Grupo {_grupoSelecionado}")'
+                                   Arquivo='@($"cbfv-grupo-{_grupoSelecionado}.png")'>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle" style="font-size:0.875rem;">
                                 <thead class="table-dark">
@@ -135,18 +133,16 @@
                             <span><span class="badge bg-success me-1">●</span> Avança (1º-2º)</span>
                             <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
                         </div>
-                        <div class="share-footer share-only">🎮 <strong>CBFV</strong> — Liga de FIFA/FC • cbfv-app.onrender.com</div>
-                    </div>
+                    </ShareableCard>
                 }
             }
             else
             {
                 <!-- Liga: tabela única -->
-                <div class="d-flex justify-content-end mb-2">
-                    @ShareButton("cap-tabela-liga", "Classificação", "cbfv-classificacao.png")
-                </div>
-                <div id="cap-tabela-liga" class="share-capture">
-                    @ShareBrand("Classificação")
+                <ShareableCard Id="cap-tabela-liga"
+                               Titulo="@LigaNome"
+                               Subtitulo="Classificação"
+                               Arquivo="cbfv-classificacao.png">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
@@ -199,18 +195,14 @@
                             <span><span class="badge bg-danger px-2">&nbsp;</span> Eliminado (11º–12º)</span>
                         </div>
                     }
-                    <div class="share-footer share-only">🎮 <strong>CBFV</strong> — Liga de FIFA/FC • cbfv-app.onrender.com</div>
-                </div>
+                </ShareableCard>
             }
 
             <!-- Matches/Rounds -->
             @if (_rodadas.Any())
             {
                 <hr class="my-4" />
-                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                    <h5 class="text-uppercase text-muted small fw-bold mb-0">Partidas</h5>
-                    @ShareButton("cap-rodada", $"Rodada {_rodadaAtual?.Numero}", $"cbfv-rodada-{_rodadaAtual?.Numero}.png")
-                </div>
+                <h5 class="text-uppercase text-muted small fw-bold mb-3">Partidas</h5>
 
                 <div class="d-flex align-items-center gap-2 mb-3">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
@@ -220,8 +212,10 @@
 
                 @if (_rodadaAtual is not null)
                 {
-                    <div id="cap-rodada" class="share-capture">
-                        @ShareBrand($"Rodada {_rodadaAtual.Numero}")
+                    <ShareableCard Id="cap-rodada"
+                                   Titulo="@LigaNome"
+                                   Subtitulo='@($"Rodada {_rodadaAtual.Numero}")'
+                                   Arquivo='@($"cbfv-rodada-{_rodadaAtual.Numero}.png")'>
                         <div class="list-group">
                             @foreach (var p in _rodadaAtual.Partidas)
                             {
@@ -253,8 +247,7 @@
                             </div>
                             }
                         </div>
-                        <div class="share-footer share-only">🎮 <strong>CBFV</strong> — Liga de FIFA/FC • cbfv-app.onrender.com</div>
-                    </div>
+                    </ShareableCard>
                 }
             }
             else
@@ -272,6 +265,7 @@
             }
             else
             {
+                <ShareableCard Id="cap-knockout" Titulo="@LigaNome" Subtitulo="Mata-Mata" Arquivo="cbfv-mata-mata.png">
                 <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
                 <div class="row g-3 mb-4">
                     @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
@@ -317,6 +311,7 @@
                         </div>
                     </div>
                 }
+                </ShareableCard>
             }
         }
 
@@ -556,58 +551,7 @@
 
     private bool _authInitialized;
 
-    private string? _sharingId;
-
-    private RenderFragment ShareBrand(string subtitulo) => @<div class="share-brand share-only">
-        <img src="/images/logobranca.png" alt="CBFV" />
-        <div>
-            <div class="share-brand-title">@(_liga?.Nome ?? "CBFV")</div>
-            <div class="share-brand-sub">@subtitulo</div>
-        </div>
-        <div class="share-brand-meta">
-            <div>🎮 CBFV</div>
-            <div>cbfv-app.onrender.com</div>
-        </div>
-    </div>;
-
-    private RenderFragment ShareButton(string elementId, string subtitulo, string arquivo) => @<button type="button"
-        class="btn btn-sm btn-success"
-        @onclick="() => Compartilhar(elementId, subtitulo, arquivo)"
-        disabled="@(_sharingId is not null)">
-        @if (_sharingId == elementId)
-        {
-            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-            <span>Gerando…</span>
-        }
-        else
-        {
-            <span>📷 Compartilhar</span>
-        }
-    </button>;
-
-    private async Task Compartilhar(string elementId, string subtitulo, string arquivo)
-    {
-        if (_sharingId is not null) return;
-
-        _sharingId = elementId;
-        StateHasChanged();
-
-        try
-        {
-            var titulo = _liga?.Nome ?? "CBFV";
-            var texto = $"{titulo} — {subtitulo}\ncbfv-app.onrender.com";
-            await JS.InvokeAsync<string>("fc25ShareImage.capture", elementId, arquivo, titulo, texto);
-        }
-        catch
-        {
-            // silencioso — o usuário pode tentar novamente
-        }
-        finally
-        {
-            _sharingId = null;
-            StateHasChanged();
-        }
-    }
+    private string LigaNome => _liga?.Nome ?? "CBFV";
 
     private LigaRodadaComPartidasDto? _rodadaAtual =>
         _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;

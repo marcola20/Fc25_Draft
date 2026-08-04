@@ -155,6 +155,10 @@ window.fc25ShareImage = (function () {
         }));
     }
 
+    // Largura fixa (px) do cartão gerado — mantém a imagem no formato "print"
+    // legível no WhatsApp, independente da largura da página (evita banner esticado).
+    const RENDER_WIDTH = 700;
+
     async function toBlob(elementId) {
         if (typeof html2canvas !== 'function') {
             throw new Error('html2canvas não carregado.');
@@ -167,23 +171,40 @@ window.fc25ShareImage = (function () {
 
         await waitForImages(el);
 
-        const canvas = await html2canvas(el, {
-            backgroundColor: '#ffffff',
-            scale: Math.min(window.devicePixelRatio || 1, 2) * 1.5,
-            useCORS: true,
-            logging: false,
-            onclone: function (clonedDoc) {
-                const clonedEl = clonedDoc.getElementById(elementId);
-                if (!clonedEl) return;
-                // Revela elementos que só aparecem na imagem gerada.
-                clonedEl.querySelectorAll('.share-only').forEach(function (e) {
-                    e.style.display = '';
-                });
-                clonedEl.classList.add('share-rendering');
-            }
-        });
+        // Fixa a largura do elemento durante a captura para o html2canvas medir
+        // o tamanho certo do canvas, depois restaura o layout original.
+        const prevWidth = el.style.width;
+        const prevMaxWidth = el.style.maxWidth;
+        el.style.width = RENDER_WIDTH + 'px';
+        el.style.maxWidth = RENDER_WIDTH + 'px';
 
-        return await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+        try {
+            const canvas = await html2canvas(el, {
+                backgroundColor: '#ffffff',
+                // Alta resolução (nitidez) mesmo em telas sem retina.
+                scale: Math.max(2, window.devicePixelRatio || 1),
+                useCORS: true,
+                logging: false,
+                windowWidth: 1200,
+                onclone: function (clonedDoc) {
+                    const clonedEl = clonedDoc.getElementById(elementId);
+                    if (!clonedEl) return;
+                    clonedEl.style.width = RENDER_WIDTH + 'px';
+                    clonedEl.style.maxWidth = RENDER_WIDTH + 'px';
+                    clonedEl.style.margin = '0';
+                    // Revela elementos que só aparecem na imagem gerada.
+                    clonedEl.querySelectorAll('.share-only').forEach(function (e) {
+                        e.style.display = '';
+                    });
+                    clonedEl.classList.add('share-rendering');
+                }
+            });
+
+            return await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+        } finally {
+            el.style.width = prevWidth;
+            el.style.maxWidth = prevMaxWidth;
+        }
     }
 
     // Retorna: 'shared' | 'downloaded' | 'error'
@@ -196,13 +217,12 @@ window.fc25ShareImage = (function () {
             const file = new File([blob], safeName, { type: 'image/png' });
 
             // Caminho preferido (celular): abre a folha de compartilhamento nativa (WhatsApp etc.)
+            // Compartilha SOMENTE a imagem — sem texto — para não virar mensagem separada.
+            // A imagem já traz competição, rodada e site no cabeçalho; a legenda o
+            // usuário escreve junto da foto no próprio WhatsApp.
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
-                    await navigator.share({
-                        files: [file],
-                        title: title || 'CBFV',
-                        text: text || ''
-                    });
+                    await navigator.share({ files: [file] });
                     return 'shared';
                 } catch (err) {
                     // Usuário cancelou a folha de compartilhamento.

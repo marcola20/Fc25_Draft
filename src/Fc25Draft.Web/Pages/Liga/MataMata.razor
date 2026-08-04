@@ -32,6 +32,7 @@
     }
     else
     {
+        <ShareableCard Id="cap-matamata" Titulo="@LigaNome" Subtitulo="Mata-Mata" Arquivo="cbfv-mata-mata.png">
         <!-- Copa: sem Play-In nem Quartas -->
         @if (_liga?.Tipo != TipoCompetition.Copa)
         {
@@ -91,6 +92,7 @@
                 </div>
             </div>
         }
+        </ShareableCard>
     }
 </div>
 
@@ -101,6 +103,8 @@
     private Guid _ligaId;
     private IReadOnlyList<LigaKnockoutJogoDto> _jogos = Array.Empty<LigaKnockoutJogoDto>();
     private bool _loading = true;
+
+    private string LigaNome => _liga?.Nome ?? "CBFV";
 
     protected override async Task OnInitializedAsync()
     {
