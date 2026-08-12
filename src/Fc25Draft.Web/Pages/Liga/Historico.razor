@@ -40,6 +40,9 @@
                             <th class="text-center" style="width:130px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
                                 🅰️ Assist. @SortIcon("assistencias")
                             </th>
+                            <th class="text-center" style="width:90px;cursor:pointer;user-select:none;" @onclick='() => SetSort("ga")'>
+                                G/A @SortIcon("ga")
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -50,6 +53,7 @@
                                 <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.JogadorNome</td>
                                 <td class="text-center fw-bold" style="width:90px;">@item.TotalGols</td>
                                 <td class="text-center text-muted" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
+                                <td class="text-center fw-bold" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>
                             </tr>
                         }
                     </tbody>
@@ -88,7 +92,7 @@
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="card border-primary">
                             <div class="card-body">
                                 <h6 class="card-title">Total de Gols</h6>
@@ -96,11 +100,19 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="card border-success">
                             <div class="card-body">
                                 <h6 class="card-title">Assistências</h6>
                                 <h2 class="mb-0">@_jogadorSelecionado.TotalAssistencias</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-dark">
+                            <div class="card-body">
+                                <h6 class="card-title">Participações em Gols (G/A)</h6>
+                                <h2 class="mb-0">@(_jogadorSelecionado.TotalGols + _jogadorSelecionado.TotalAssistencias)</h2>
                             </div>
                         </div>
                     </div>
@@ -114,6 +126,7 @@
                                 <th>Competição</th>
                                 <th class="text-center" style="width:70px;">⚽</th>
                                 <th class="text-center" style="width:70px;">Assist.</th>
+                                <th class="text-center" style="width:70px;">G/A</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -127,6 +140,7 @@
                                     </td>
                                     <td class="text-center fw-bold">@comp.Gols</td>
                                     <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
+                                    <td class="text-center fw-bold">@(comp.Gols + comp.Assistencias)</td>
                                 </tr>
                             }
                         </tbody>
@@ -151,13 +165,18 @@
     private const int _pageSize = 20;
     private int _totalPages => (int)Math.Ceiling(_artilheiros.Count / (double)_pageSize);
 
-    private IEnumerable<HistoricoArtilheiroDto> SortedItems => _sortBy == "assistencias"
-        ? (_sortAsc
+    private IEnumerable<HistoricoArtilheiroDto> SortedItems => _sortBy switch
+    {
+        "assistencias" => _sortAsc
             ? _artilheiros.OrderBy(x => x.TotalAssistencias).ThenBy(x => x.TotalGols)
-            : _artilheiros.OrderByDescending(x => x.TotalAssistencias).ThenByDescending(x => x.TotalGols))
-        : (_sortAsc
+            : _artilheiros.OrderByDescending(x => x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
+        "ga" => _sortAsc
+            ? _artilheiros.OrderBy(x => x.TotalGols + x.TotalAssistencias).ThenBy(x => x.TotalGols)
+            : _artilheiros.OrderByDescending(x => x.TotalGols + x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
+        _ => _sortAsc
             ? _artilheiros.OrderBy(x => x.TotalGols).ThenBy(x => x.TotalAssistencias)
-            : _artilheiros.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias));
+            : _artilheiros.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias),
+    };
 
     private IEnumerable<HistoricoArtilheiroDto> PagedItems =>
         SortedItems.Skip((_page - 1) * _pageSize).Take(_pageSize);
