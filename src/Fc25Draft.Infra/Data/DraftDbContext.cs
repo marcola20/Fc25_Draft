@@ -48,6 +48,8 @@ public class DraftDbContext : DbContext
     public DbSet<PricingConfig> PricingConfigs => Set<PricingConfig>();
     public DbSet<TransferConfig> TransferConfigs => Set<TransferConfig>();
 
+    public DbSet<HallOfFameEntry> HallOfFame => Set<HallOfFameEntry>();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.HasPostgresExtension("unaccent");

@@ -1,0 +1,103 @@
+@page "/hall-of-fame"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Services
+@inject IHallOfFameService HallOfFameService
+
+<PageTitle>Hall of Fame - Campeões</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar o Hall of Fame:</strong> @_erro</div>
+    }
+    else
+    {
+        <div class="mb-4 text-center">
+            <h1 class="h3 mb-1">🏆 Hall of Fame</h1>
+            <p class="text-muted mb-0">Os campeões de todas as competições</p>
+        </div>
+
+        @if (!_entradas.Any())
+        {
+            <div class="alert alert-info text-center">Nenhum campeão registrado ainda.</div>
+        }
+        else
+        {
+            @foreach (var tipo in _ordemTipos)
+            {
+                var doTipo = _entradas.Where(e => e.Tipo == tipo).ToList();
+                if (!doTipo.Any()) { continue; }
+
+                <div class="mb-4">
+                    <h2 class="h5 border-bottom pb-2 mb-3">@TipoLabel(tipo) <span class="text-muted">(@doTipo.Count)</span></h2>
+                    <div class="row g-3">
+                        @foreach (var entrada in doTipo)
+                        {
+                            <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                                <div class="card h-100 shadow-sm text-center">
+                                    <div class="card-body">
+                                        <img src="@TeamEscudoResolver.GetEscudo(entrada.TimeCampeao)"
+                                             alt="Escudo @entrada.TimeCampeao"
+                                             style="width:72px;height:72px;object-fit:contain;"
+                                             class="mb-2" />
+                                        <h3 class="h6 mb-1">@entrada.TimeCampeao</h3>
+                                        <p class="text-muted small mb-2">@entrada.Descricao</p>
+                                        <div>
+                                            <span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span>
+                                            @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
+                                            {
+                                                <span class="badge bg-secondary">@entrada.Temporada</span>
+                                            }
+                                            else if (entrada.Ano.HasValue)
+                                            {
+                                                <span class="badge bg-secondary">@entrada.Ano</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _erro;
+    private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
+
+    private static readonly TipoCompetition[] _ordemTipos =
+        { TipoCompetition.Liga, TipoCompetition.Copa, TipoCompetition.Supercopa };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string TipoLabel(TipoCompetition tipo) => tipo switch
+    {
+        TipoCompetition.Copa => "Copa",
+        TipoCompetition.Supercopa => "Supercopa",
+        _ => "Liga"
+    };
+}

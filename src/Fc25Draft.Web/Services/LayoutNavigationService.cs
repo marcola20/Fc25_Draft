@@ -34,6 +34,7 @@ public class LayoutNavigationService
         new("Liga", new List<MenuItem>
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
+            new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
             new("Regulamento", "/regulamento", "oi oi-document")
@@ -44,6 +45,7 @@ public class LayoutNavigationService
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
+            new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
@@ -230,6 +232,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Configurações")
+            }
+        },
+        ["/hall-of-fame"] = new PageDefinition
+        {
+            Route = "/hall-of-fame",
+            Title = "Hall of Fame",
+            Subtitle = "Os campeões de todas as competições",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Hall of Fame")
+            }
+        },
+        ["/admin/hall-of-fame"] = new PageDefinition
+        {
+            Route = "/admin/hall-of-fame",
+            Title = "Gerenciar Hall of Fame",
+            Subtitle = "Administração dos campeões — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Hall of Fame")
             }
         }
     };

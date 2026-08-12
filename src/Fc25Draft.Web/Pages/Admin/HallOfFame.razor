@@ -1,0 +1,278 @@
+@page "/admin/hall-of-fame"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IHallOfFameService HallOfFameService
+
+<PageTitle>Administração do Hall of Fame</PageTitle>
+
+<div class="container-fluid py-3">
+    <h1 class="h3 mb-3">Hall of Fame — Campeões</h1>
+
+    @if (!string.IsNullOrEmpty(_erro))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_erro
+            <button type="button" class="btn-close" @onclick="() => _erro = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_ok))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_ok
+            <button type="button" class="btn-close" @onclick="() => _ok = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">@(_editandoId.HasValue ? "Editar campeão" : "Adicionar campeão")</div>
+                <div class="card-body">
+                    <div class="mb-3 text-center">
+                        <img src="@TeamEscudoResolver.GetEscudo(_formTime)"
+                             alt="Escudo do time"
+                             style="width:64px;height:64px;object-fit:contain;" />
+                        @if (!string.IsNullOrWhiteSpace(_formTime) && !TeamEscudoResolver.HasEscudo(_formTime))
+                        {
+                            <div class="text-muted small mt-1">Sem escudo cadastrado para este nome — será exibido o escudo padrão.</div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Time campeão</label>
+                        <input class="form-control" @bind="_formTime" @bind:event="oninput" maxlength="120"
+                               placeholder="Ex.: Flamengo" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de competição</label>
+                        <select class="form-select" @bind="_formTipo">
+                            <option value="@TipoCompetition.Liga">Liga</option>
+                            <option value="@TipoCompetition.Copa">Copa</option>
+                            <option value="@TipoCompetition.Supercopa">Supercopa</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <input class="form-control" @bind="_formDescricao" maxlength="200"
+                               placeholder="Ex.: Campeão do Brasileirão" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Ano</label>
+                            <input type="number" class="form-control" @bind="_formAno" placeholder="2025" />
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Temporada</label>
+                            <input class="form-control" @bind="_formTemporada" maxlength="60"
+                                   placeholder="Ex.: 2025 ou 2024/25" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="Salvar" disabled="@_saving">
+                            @(_editandoId.HasValue ? "Salvar alterações" : "Adicionar")
+                        </button>
+                        @if (_editandoId.HasValue)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="CancelarEdicao" disabled="@_saving">Cancelar</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            @if (_loading)
+            {
+                <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+            }
+            else if (!_entradas.Any())
+            {
+                <div class="alert alert-info">Nenhum campeão cadastrado.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width:56px;"></th>
+                                <th>Time</th>
+                                <th>Descrição</th>
+                                <th class="text-center">Tipo</th>
+                                <th class="text-center">Temporada</th>
+                                <th class="text-end" style="width:130px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entrada in _entradas)
+                            {
+                                <tr>
+                                    <td><img src="@TeamEscudoResolver.GetEscudo(entrada.TimeCampeao)" alt="Escudo @entrada.TimeCampeao" style="width:32px;height:32px;object-fit:contain;" /></td>
+                                    <td class="fw-bold">@entrada.TimeCampeao</td>
+                                    <td>@entrada.Descricao</td>
+                                    <td class="text-center"><span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span></td>
+                                    <td class="text-center text-muted">@(entrada.Temporada ?? (entrada.Ano?.ToString()) ?? "—")</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(entrada)" disabled="@_saving">Editar</button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarExcluir(entrada)" disabled="@_saving">Excluir</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (_entradaParaExcluir is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Excluir campeão</h5>
+                    <button type="button" class="btn-close" @onclick="() => _entradaParaExcluir = null"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Remover <strong>@_entradaParaExcluir.TimeCampeao</strong> (@_entradaParaExcluir.Descricao) do Hall of Fame?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _entradaParaExcluir = null" disabled="@_saving">Cancelar</button>
+                    <button class="btn btn-danger" @onclick="Excluir" disabled="@_saving">Excluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string? _erro;
+    private string? _ok;
+    private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
+
+    private Guid? _editandoId;
+    private string _formTime = string.Empty;
+    private string _formDescricao = string.Empty;
+    private TipoCompetition _formTipo = TipoCompetition.Liga;
+    private int? _formAno;
+    private string _formTemporada = string.Empty;
+
+    private HallOfFameEntryDto? _entradaParaExcluir;
+
+    protected override async Task OnInitializedAsync() => await CarregarDados();
+
+    private async Task CarregarDados()
+    {
+        _loading = true;
+        try
+        {
+            _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            if (_editandoId.HasValue)
+            {
+                await HallOfFameService.UpdateAsync(_editandoId.Value,
+                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formAno, _formTemporada),
+                    CancellationToken.None);
+                _ok = "Campeão atualizado.";
+            }
+            else
+            {
+                await HallOfFameService.CreateAsync(
+                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formAno, _formTemporada),
+                    CancellationToken.None);
+                _ok = "Campeão adicionado.";
+            }
+            LimparFormulario();
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Editar(HallOfFameEntryDto entrada)
+    {
+        _editandoId = entrada.Id;
+        _formTime = entrada.TimeCampeao;
+        _formDescricao = entrada.Descricao;
+        _formTipo = entrada.Tipo;
+        _formAno = entrada.Ano;
+        _formTemporada = entrada.Temporada ?? string.Empty;
+        _erro = null; _ok = null;
+    }
+
+    private void CancelarEdicao() => LimparFormulario();
+
+    private void LimparFormulario()
+    {
+        _editandoId = null;
+        _formTime = string.Empty;
+        _formDescricao = string.Empty;
+        _formTipo = TipoCompetition.Liga;
+        _formAno = null;
+        _formTemporada = string.Empty;
+    }
+
+    private void ConfirmarExcluir(HallOfFameEntryDto entrada) => _entradaParaExcluir = entrada;
+
+    private async Task Excluir()
+    {
+        if (_entradaParaExcluir is null) return;
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            await HallOfFameService.DeleteAsync(_entradaParaExcluir.Id, CancellationToken.None);
+            _ok = "Campeão removido.";
+            if (_editandoId == _entradaParaExcluir.Id) LimparFormulario();
+            _entradaParaExcluir = null;
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string TipoLabel(TipoCompetition tipo) => tipo switch
+    {
+        TipoCompetition.Copa => "Copa",
+        TipoCompetition.Supercopa => "Supercopa",
+        _ => "Liga"
+    };
+}

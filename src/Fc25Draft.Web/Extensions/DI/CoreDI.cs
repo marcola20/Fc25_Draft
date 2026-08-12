@@ -47,6 +47,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransferOfferService, TransferOfferService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
             services.AddScoped<ILigaPublicService, LigaPublicService>();
+            services.AddScoped<IHallOfFameService, HallOfFameService>();
             services.AddSingleton<LotteryStateService>();
             services.AddSingleton<MarketUpdateService>();
             services.AddSingleton<IMarketBroadcaster>(sp => sp.GetRequiredService<MarketUpdateService>());
