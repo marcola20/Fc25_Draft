@@ -18,8 +18,8 @@ public static class LineupTemplateCatalog
     private static readonly short[] LD   = { 2, 3, 4, 5, 6, 10, 11 };
     private static readonly short[] VOL  = { 3, 4, 5, 6, 7 };
     private static readonly short[] MLG  = { 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-    private static readonly short[] ME   = { 7, 8, 9 };
-    private static readonly short[] MD   = { 7, 10, 11 };
+    private static readonly short[] ME   = { 3, 4, 7, 8, 9, 13 };
+    private static readonly short[] MD   = { 3, 4, 7, 10, 11, 13 };
     private static readonly short[] MAT  = { 6, 7, 8, 9, 10, 11, 12, 13 };
     private static readonly short[] PE   = { 7, 8, 9, 10, 11, 13 };
     private static readonly short[] PD   = { 7, 8, 9, 10, 11, 13 };
