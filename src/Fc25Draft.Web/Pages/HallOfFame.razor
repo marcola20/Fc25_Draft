@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Services
 @inject IHallOfFameService HallOfFameService
+@inject EscudoService EscudoService
 
 <PageTitle>Hall of Fame - Campeões</PageTitle>
 
@@ -42,7 +43,7 @@
                             <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
                                 <div class="card h-100 shadow-sm text-center">
                                     <div class="card-body">
-                                        <img src="@TeamEscudoResolver.GetEscudo(entrada.TimeCampeao)"
+                                        <img src="@EscudoService.GetEscudo(entrada.TimeCampeao)"
                                              alt="Escudo @entrada.TimeCampeao"
                                              style="width:72px;height:72px;object-fit:contain;"
                                              class="mb-2" />

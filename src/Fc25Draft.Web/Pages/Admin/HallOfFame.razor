@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IHallOfFameService HallOfFameService
+@inject EscudoService EscudoService
 
 <PageTitle>Administração do Hall of Fame</PageTitle>
 
@@ -33,10 +34,10 @@
                 <div class="card-header">@(_editandoId.HasValue ? "Editar campeão" : "Adicionar campeão")</div>
                 <div class="card-body">
                     <div class="mb-3 text-center">
-                        <img src="@TeamEscudoResolver.GetEscudo(_formTime)"
+                        <img src="@EscudoService.GetEscudo(_formTime)"
                              alt="Escudo do time"
                              style="width:64px;height:64px;object-fit:contain;" />
-                        @if (!string.IsNullOrWhiteSpace(_formTime) && !TeamEscudoResolver.HasEscudo(_formTime))
+                        @if (!string.IsNullOrWhiteSpace(_formTime) && !EscudoService.HasEscudo(_formTime))
                         {
                             <div class="text-muted small mt-1">Sem escudo cadastrado para este nome — será exibido o escudo padrão.</div>
                         }
@@ -122,7 +123,7 @@
                             @foreach (var entrada in _entradas)
                             {
                                 <tr>
-                                    <td><img src="@TeamEscudoResolver.GetEscudo(entrada.TimeCampeao)" alt="Escudo @entrada.TimeCampeao" style="width:32px;height:32px;object-fit:contain;" /></td>
+                                    <td><img src="@EscudoService.GetEscudo(entrada.TimeCampeao)" alt="Escudo @entrada.TimeCampeao" style="width:32px;height:32px;object-fit:contain;" /></td>
                                     <td class="fw-bold">@entrada.TimeCampeao</td>
                                     <td class="text-muted">@(entrada.Tecnico ?? "—")</td>
                                     <td>@entrada.Descricao</td>

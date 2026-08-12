@@ -71,6 +71,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketHubClient>();
             services.AddScoped<TeamAccessService>();
             services.AddScoped<ToastService>();
+            services.AddSingleton<EscudoService>();
             services.AddScoped<LayoutNavigationService>();
             services.AddScoped<LayoutState>();
 
