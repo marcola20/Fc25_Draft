@@ -47,6 +47,10 @@
                                              style="width:72px;height:72px;object-fit:contain;"
                                              class="mb-2" />
                                         <h3 class="h6 mb-1">@entrada.TimeCampeao</h3>
+                                        @if (!string.IsNullOrWhiteSpace(entrada.Tecnico))
+                                        {
+                                            <p class="small mb-1">👤 @entrada.Tecnico</p>
+                                        }
                                         <p class="text-muted small mb-2">@entrada.Descricao</p>
                                         <div>
                                             <span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span>

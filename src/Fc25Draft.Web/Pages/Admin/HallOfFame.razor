@@ -58,6 +58,12 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Técnico</label>
+                        <input class="form-control" @bind="_formTecnico" maxlength="120"
+                               placeholder="Ex.: nome do técnico" />
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Descrição</label>
                         <input class="form-control" @bind="_formDescricao" maxlength="200"
                                placeholder="Ex.: Campeão do Brasileirão" />
@@ -105,6 +111,7 @@
                             <tr>
                                 <th style="width:56px;"></th>
                                 <th>Time</th>
+                                <th>Técnico</th>
                                 <th>Descrição</th>
                                 <th class="text-center">Tipo</th>
                                 <th class="text-center">Temporada</th>
@@ -117,6 +124,7 @@
                                 <tr>
                                     <td><img src="@TeamEscudoResolver.GetEscudo(entrada.TimeCampeao)" alt="Escudo @entrada.TimeCampeao" style="width:32px;height:32px;object-fit:contain;" /></td>
                                     <td class="fw-bold">@entrada.TimeCampeao</td>
+                                    <td class="text-muted">@(entrada.Tecnico ?? "—")</td>
                                     <td>@entrada.Descricao</td>
                                     <td class="text-center"><span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span></td>
                                     <td class="text-center text-muted">@(entrada.Temporada ?? (entrada.Ano?.ToString()) ?? "—")</td>
@@ -164,6 +172,7 @@
 
     private Guid? _editandoId;
     private string _formTime = string.Empty;
+    private string _formTecnico = string.Empty;
     private string _formDescricao = string.Empty;
     private TipoCompetition _formTipo = TipoCompetition.Liga;
     private int? _formAno;
@@ -198,14 +207,14 @@
             if (_editandoId.HasValue)
             {
                 await HallOfFameService.UpdateAsync(_editandoId.Value,
-                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formAno, _formTemporada),
+                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada),
                     CancellationToken.None);
                 _ok = "Campeão atualizado.";
             }
             else
             {
                 await HallOfFameService.CreateAsync(
-                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formAno, _formTemporada),
+                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada),
                     CancellationToken.None);
                 _ok = "Campeão adicionado.";
             }
@@ -226,6 +235,7 @@
     {
         _editandoId = entrada.Id;
         _formTime = entrada.TimeCampeao;
+        _formTecnico = entrada.Tecnico ?? string.Empty;
         _formDescricao = entrada.Descricao;
         _formTipo = entrada.Tipo;
         _formAno = entrada.Ano;
@@ -239,6 +249,7 @@
     {
         _editandoId = null;
         _formTime = string.Empty;
+        _formTecnico = string.Empty;
         _formDescricao = string.Empty;
         _formTipo = TipoCompetition.Liga;
         _formAno = null;

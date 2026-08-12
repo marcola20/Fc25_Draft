@@ -36,8 +36,9 @@ public class HallOfFameService : IHallOfFameService
             Descricao = NormalizarDescricao(request.Descricao),
             Tipo = request.Tipo,
             TimeCampeao = NormalizarTime(request.TimeCampeao),
+            Tecnico = NormalizarOpcional(request.Tecnico),
             Ano = request.Ano,
-            Temporada = NormalizarTemporada(request.Temporada),
+            Temporada = NormalizarOpcional(request.Temporada),
             CriadoEm = now,
             AtualizadoEm = now
         };
@@ -55,8 +56,9 @@ public class HallOfFameService : IHallOfFameService
         entry.Descricao = NormalizarDescricao(request.Descricao);
         entry.Tipo = request.Tipo;
         entry.TimeCampeao = NormalizarTime(request.TimeCampeao);
+        entry.Tecnico = NormalizarOpcional(request.Tecnico);
         entry.Ano = request.Ano;
-        entry.Temporada = NormalizarTemporada(request.Temporada);
+        entry.Temporada = NormalizarOpcional(request.Temporada);
         entry.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
@@ -88,12 +90,12 @@ public class HallOfFameService : IHallOfFameService
         return valor;
     }
 
-    private static string? NormalizarTemporada(string? temporada)
+    private static string? NormalizarOpcional(string? valor)
     {
-        var valor = temporada?.Trim();
-        return string.IsNullOrWhiteSpace(valor) ? null : valor;
+        var v = valor?.Trim();
+        return string.IsNullOrWhiteSpace(v) ? null : v;
     }
 
     private static HallOfFameEntryDto ToDto(HallOfFameEntry e) =>
-        new(e.HallOfFameId, e.Descricao, e.Tipo, e.TimeCampeao, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
+        new(e.HallOfFameId, e.Descricao, e.Tipo, e.TimeCampeao, e.Tecnico, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
 }
