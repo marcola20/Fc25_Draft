@@ -78,7 +78,7 @@
                         <div class="col-6 mb-3">
                             <label class="form-label">Temporada</label>
                             <input class="form-control" @bind="_formTemporada" maxlength="60"
-                                   placeholder="Ex.: 2025 ou 2024/25" />
+                                   placeholder="Ex.: 1 (vira &quot;1ª Temporada&quot;)" />
                         </div>
                     </div>
 
@@ -128,7 +128,7 @@
                                     <td class="text-muted">@(entrada.Tecnico ?? "—")</td>
                                     <td>@entrada.Descricao</td>
                                     <td class="text-center"><span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span></td>
-                                    <td class="text-center text-muted">@(entrada.Temporada ?? (entrada.Ano?.ToString()) ?? "—")</td>
+                                    <td class="text-center text-muted">@(entrada.Temporada is not null ? TemporadaLabel(entrada.Temporada) : (entrada.Ano?.ToString() ?? "—"))</td>
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(entrada)" disabled="@_saving">Editar</button>
                                         <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarExcluir(entrada)" disabled="@_saving">Excluir</button>
@@ -287,4 +287,10 @@
         TipoCompetition.Supercopa => "Supercopa",
         _ => "Liga"
     };
+
+    private static string TemporadaLabel(string temporada)
+    {
+        var t = temporada.Trim();
+        return int.TryParse(t, out var n) ? $"{n}ª Temporada" : t;
+    }
 }

@@ -57,7 +57,7 @@
                                             <span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span>
                                             @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
                                             {
-                                                <span class="badge bg-secondary text-wrap">@entrada.Temporada</span>
+                                                <span class="badge bg-secondary text-wrap">@TemporadaLabel(entrada.Temporada)</span>
                                             }
                                             else if (entrada.Ano.HasValue)
                                             {
@@ -105,4 +105,11 @@
         TipoCompetition.Supercopa => "Supercopa",
         _ => "Liga"
     };
+
+    // Se a temporada for um número (ex.: "1"), exibe "1ª Temporada"; caso contrário, mostra o texto como está.
+    private static string TemporadaLabel(string temporada)
+    {
+        var t = temporada.Trim();
+        return int.TryParse(t, out var n) ? $"{n}ª Temporada" : t;
+    }
 }
