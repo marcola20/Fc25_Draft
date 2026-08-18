@@ -235,7 +235,7 @@ public class LigaPublicService : ILigaPublicService
     }
 
     private sealed record GolFlat(
-        int JogadorId, string JogadorNome, int? AssistenteId,
+        int JogadorId, string JogadorNome, int? AssistenteId, string? AssistenteNome,
         Guid LigaId, string LigaNome, TipoCompetition LigaTipo);
 
     public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct)
@@ -248,43 +248,63 @@ public class LigaPublicService : ILigaPublicService
                 e.JogadorId,
                 e.Jogador.Name,
                 e.AssistenteId,
+                e.Assistente == null ? null : e.Assistente.Name,
                 e.Partida.Rodada.LigaId,
                 e.Partida.Rodada.Liga.Nome,
                 e.Partida.Rodada.Liga.Tipo))
             .ToListAsync(ct);
 
-        // Assistências pré-computadas em passos únicos (evita O(jogadores × eventos)).
-        var assistPorJogador = gols
-            .Where(g => g.AssistenteId.HasValue)
-            .GroupBy(g => g.AssistenteId!.Value)
+        var nomesPorJogador = new Dictionary<int, string>();
+        foreach (var g in gols)
+        {
+            nomesPorJogador[g.JogadorId] = g.JogadorNome;
+            if (g.AssistenteId.HasValue && g.AssistenteNome is not null)
+                nomesPorJogador[g.AssistenteId.Value] = g.AssistenteNome;
+        }
+
+        var ligaInfoPorId = gols
+            .Select(g => (g.LigaId, g.LigaNome, g.LigaTipo))
+            .Distinct()
+            .ToDictionary(x => x.LigaId, x => (x.LigaNome, x.LigaTipo));
+
+        var golsPorJogadorLiga = gols
+            .GroupBy(g => (g.JogadorId, g.LigaId))
             .ToDictionary(g => g.Key, g => g.Count());
 
         var assistPorJogadorLiga = gols
             .Where(g => g.AssistenteId.HasValue)
-            .GroupBy(g => (Jogador: g.AssistenteId!.Value, g.LigaId))
+            .GroupBy(g => (JogadorId: g.AssistenteId!.Value, g.LigaId))
             .ToDictionary(g => g.Key, g => g.Count());
 
-        var resultado = gols
-            .GroupBy(g => g.JogadorId)
+        // União das chaves (jogador, liga) vindas de gols OU assistências, para não
+        // perder competições em que o jogador só deu assistência (sem marcar gol).
+        var chavesJogadorLiga = golsPorJogadorLiga.Keys.Concat(assistPorJogadorLiga.Keys).Distinct();
+
+        var resultado = chavesJogadorLiga
+            .GroupBy(k => k.JogadorId)
             .Select(pg =>
             {
                 var jogadorId = pg.Key;
                 var competicoes = pg
-                    .GroupBy(g => (g.LigaId, g.LigaNome, g.LigaTipo))
-                    .Select(cg => new ArtilheiroCompetitionDetalheDto(
-                        cg.Key.LigaId,
-                        cg.Key.LigaNome,
-                        cg.Key.LigaTipo,
-                        cg.Count(),
-                        assistPorJogadorLiga.GetValueOrDefault((jogadorId, cg.Key.LigaId), 0)))
+                    .Select(k =>
+                    {
+                        var (ligaNome, ligaTipo) = ligaInfoPorId[k.LigaId];
+                        return new ArtilheiroCompetitionDetalheDto(
+                            k.LigaId,
+                            ligaNome,
+                            ligaTipo,
+                            golsPorJogadorLiga.GetValueOrDefault(k, 0),
+                            assistPorJogadorLiga.GetValueOrDefault(k, 0));
+                    })
                     .OrderByDescending(x => x.Gols)
+                    .ThenByDescending(x => x.Assistencias)
                     .ToArray();
 
                 return new HistoricoArtilheiroDto(
                     jogadorId,
-                    pg.First().JogadorNome,
-                    pg.Count(),
-                    assistPorJogador.GetValueOrDefault(jogadorId, 0),
+                    nomesPorJogador.GetValueOrDefault(jogadorId, "?"),
+                    competicoes.Sum(c => c.Gols),
+                    competicoes.Sum(c => c.Assistencias),
                     competicoes);
             })
             .OrderByDescending(x => x.TotalGols)

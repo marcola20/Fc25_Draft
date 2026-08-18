@@ -41,20 +41,37 @@
         </div>
         <p class="text-muted small mb-3">Status: <strong>@LigaStatusLabel(_liga.Status)</strong></p>
 
-        <ul class="nav nav-tabs mb-3">
-            <li class="nav-item">
-                <button class="nav-link @(_tab == "classif" ? "active" : "")" @onclick='() => _tab = "classif"'>Classificação</button>
-            </li>
-            @if (_liga.Status != LigaStatus.PrimeiraFase && _liga.Status != LigaStatus.Criada)
-            {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <ul class="nav nav-tabs mb-0">
                 <li class="nav-item">
-                    <button class="nav-link @(_tab == "knockout" ? "active" : "")" @onclick='() => _tab = "knockout"'>Mata-Mata</button>
+                    <button class="nav-link @(_tab == "classif" ? "active" : "")" @onclick='() => _tab = "classif"'>Classificação</button>
                 </li>
+                @if (_liga.Status != LigaStatus.PrimeiraFase && _liga.Status != LigaStatus.Criada)
+                {
+                    <li class="nav-item">
+                        <button class="nav-link @(_tab == "knockout" ? "active" : "")" @onclick='() => _tab = "knockout"'>Mata-Mata</button>
+                    </li>
+                }
+                <li class="nav-item">
+                    <button class="nav-link @(_tab == "stats" ? "active" : "")" @onclick='() => _tab = "stats"'>Estatísticas</button>
+                </li>
+            </ul>
+
+            @if (_tab == "classif" && _classif.Any())
+            {
+                <button type="button" class="btn btn-sm btn-success" @onclick="CompartilharClassificacao" disabled="@_sharingClassif">
+                    @if (_sharingClassif)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Gerando…</span>
+                    }
+                    else
+                    {
+                        <span>📷 Compartilhar</span>
+                    }
+                </button>
             }
-            <li class="nav-item">
-                <button class="nav-link @(_tab == "stats" ? "active" : "")" @onclick='() => _tab = "stats"'>Estatísticas</button>
-            </li>
-        </ul>
+        </div>
 
         <!-- ── Classificação ── -->
         @if (_tab == "classif")
@@ -87,7 +104,9 @@
                     <ShareableCard Id="cap-tabela-copa"
                                    Titulo="@LigaNome"
                                    Subtitulo='@($"Classificação — Grupo {_grupoSelecionado}")'
-                                   Arquivo='@($"cbfv-grupo-{_grupoSelecionado}.png")'>
+                                   Arquivo='@($"cbfv-grupo-{_grupoSelecionado}.png")'
+                                   MostrarBotao="false"
+                                   @ref="_classifCardRef">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle" style="font-size:0.875rem;">
                                 <thead class="table-dark">
@@ -142,7 +161,9 @@
                 <ShareableCard Id="cap-tabela-liga"
                                Titulo="@LigaNome"
                                Subtitulo="Classificação"
-                               Arquivo="cbfv-classificacao.png">
+                               Arquivo="cbfv-classificacao.png"
+                               MostrarBotao="false"
+                               @ref="_classifCardRef">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
@@ -204,10 +225,27 @@
                 <hr class="my-4" />
                 <h5 class="text-uppercase text-muted small fw-bold mb-3">Partidas</h5>
 
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
-                    <span class="fw-bold px-2">Rodada @(_rodadaAtual?.Numero)</span>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
+                        <span class="fw-bold px-2">Rodada @(_rodadaAtual?.Numero)</span>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                    </div>
+
+                    @if (_rodadaAtual is not null)
+                    {
+                        <button type="button" class="btn btn-sm btn-success" @onclick="CompartilharRodada" disabled="@_sharingRodada">
+                            @if (_sharingRodada)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Gerando…</span>
+                            }
+                            else
+                            {
+                                <span>📷 Compartilhar</span>
+                            }
+                        </button>
+                    }
                 </div>
 
                 @if (_rodadaAtual is not null)
@@ -215,7 +253,9 @@
                     <ShareableCard Id="cap-rodada"
                                    Titulo="@LigaNome"
                                    Subtitulo='@($"Rodada {_rodadaAtual.Numero}")'
-                                   Arquivo='@($"cbfv-rodada-{_rodadaAtual.Numero}.png")'>
+                                   Arquivo='@($"cbfv-rodada-{_rodadaAtual.Numero}.png")'
+                                   MostrarBotao="false"
+                                   @ref="_rodadaCardRef">
                         <div class="list-group">
                             @foreach (var p in _rodadaAtual.Partidas)
                             {
@@ -532,6 +572,29 @@
     private int _rodadaIdx;
     private bool _loading = true;
     private GrupoCopa _grupoSelecionado = GrupoCopa.A;
+
+    private ShareableCard? _classifCardRef;
+    private ShareableCard? _rodadaCardRef;
+    private bool _sharingClassif;
+    private bool _sharingRodada;
+
+    private async Task CompartilharClassificacao()
+    {
+        if (_sharingClassif || _classifCardRef is null) return;
+        _sharingClassif = true;
+        StateHasChanged();
+        try { await _classifCardRef.Share(); }
+        finally { _sharingClassif = false; StateHasChanged(); }
+    }
+
+    private async Task CompartilharRodada()
+    {
+        if (_sharingRodada || _rodadaCardRef is null) return;
+        _sharingRodada = true;
+        StateHasChanged();
+        try { await _rodadaCardRef.Share(); }
+        finally { _sharingRodada = false; StateHasChanged(); }
+    }
     private Guid _ligaId = Guid.Empty;
 
     private LigaDto? _liga;

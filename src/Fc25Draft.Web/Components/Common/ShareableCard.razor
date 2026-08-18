@@ -4,19 +4,22 @@
    captura o bloco como imagem PNG para compartilhar (WhatsApp etc.).
    O cabeçalho e o rodapé de marca (.share-only) só aparecem na imagem gerada. *@
 
-<div class="d-flex justify-content-end mb-2">
-    <button type="button" class="btn btn-sm btn-success" @onclick="Share" disabled="@_sharing">
-        @if (_sharing)
-        {
-            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-            <span>Gerando…</span>
-        }
-        else
-        {
-            <span>📷 Compartilhar</span>
-        }
-    </button>
-</div>
+@if (MostrarBotao)
+{
+    <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-sm btn-success" @onclick="Share" disabled="@_sharing">
+            @if (_sharing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                <span>Gerando…</span>
+            }
+            else
+            {
+                <span>📷 Compartilhar</span>
+            }
+        </button>
+    </div>
+}
 
 <div id="@Id" class="share-capture">
     <div class="share-brand share-only">
@@ -44,6 +47,7 @@
     [Parameter] public string Titulo { get; set; } = "CBFV";
     [Parameter] public string? Subtitulo { get; set; }
     [Parameter] public string Arquivo { get; set; } = "cbfv.png";
+    [Parameter] public bool MostrarBotao { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private bool _sharing;
@@ -53,7 +57,7 @@
         ? $"{Titulo}\nhttps://cbfv-app.onrender.com/liga"
         : $"{Titulo} — {Subtitulo}\nhttps://cbfv-app.onrender.com/liga";
 
-    private async Task Share()
+    public async Task Share()
     {
         if (_sharing) return;
 

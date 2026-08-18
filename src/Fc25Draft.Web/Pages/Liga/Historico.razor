@@ -3,6 +3,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@implements IDisposable
 @inject ILigaPublicService LigaService
 
 <PageTitle>Histórico - Artilheiros</PageTitle>
@@ -28,8 +29,8 @@
                 <div class="input-group">
                     <span class="input-group-text">🔎</span>
                     <input class="form-control" placeholder="Pesquisar jogador pelo nome"
-                           value="@_busca" @oninput="OnBuscaChanged" />
-                    @if (!string.IsNullOrWhiteSpace(_busca))
+                           value="@_buscaRaw" @oninput="OnBuscaChanged" />
+                    @if (!string.IsNullOrWhiteSpace(_buscaRaw))
                     {
                         <button type="button" class="btn btn-outline-secondary" @onclick="LimparBusca">✕</button>
                     }
@@ -178,7 +179,13 @@
 
     private string _sortBy = "gols";
     private bool _sortAsc = false;
+
+    // _buscaRaw reflete o texto exatamente como digitado (liga o <input>); _busca só é
+    // atualizado após uma pequena pausa (debounce). Isso evita que o round-trip do Blazor
+    // Server sobrescreva o campo com um valor desatualizado enquanto o usuário digita rápido.
     private string _busca = string.Empty;
+    private string _buscaRaw = string.Empty;
+    private CancellationTokenSource? _buscaDebounceCts;
 
     // Pagination
     private int _page = 1;
@@ -228,16 +235,46 @@
 
     private void OnBuscaChanged(ChangeEventArgs e)
     {
-        _busca = e.Value?.ToString() ?? string.Empty;
+        _buscaRaw = e.Value?.ToString() ?? string.Empty;
+
+        _buscaDebounceCts?.Cancel();
+        _buscaDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _buscaDebounceCts = cts;
+
+        _ = AplicarBuscaComDebounceAsync(cts.Token);
+    }
+
+    private async Task AplicarBuscaComDebounceAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(300, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        _busca = _buscaRaw;
         _page = 1;
         _jogadorSelecionado = null;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void LimparBusca()
     {
+        _buscaDebounceCts?.Cancel();
+        _buscaRaw = string.Empty;
         _busca = string.Empty;
         _page = 1;
         _jogadorSelecionado = null;
+    }
+
+    public void Dispose()
+    {
+        _buscaDebounceCts?.Cancel();
+        _buscaDebounceCts?.Dispose();
     }
 
     private void GoToPage(int p)
