@@ -1,4 +1,5 @@
 @page "/liga/historico"
+@using Fc25Draft.Web.Utilities
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
@@ -22,9 +23,27 @@
             <p class="text-muted">Estatísticas de todas as competições</p>
         </div>
 
+        <div class="row mb-3">
+            <div class="col-md-6 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text">🔎</span>
+                    <input class="form-control" placeholder="Pesquisar jogador pelo nome"
+                           value="@_busca" @oninput="OnBuscaChanged" />
+                    @if (!string.IsNullOrWhiteSpace(_busca))
+                    {
+                        <button type="button" class="btn btn-outline-secondary" @onclick="LimparBusca">✕</button>
+                    }
+                </div>
+            </div>
+        </div>
+
         @if (!_artilheiros.Any())
         {
             <div class="alert alert-info">Nenhum gol registrado no histórico.</div>
+        }
+        else if (!FilteredItems.Any())
+        {
+            <div class="alert alert-warning">Nenhum jogador encontrado para "<strong>@_busca</strong>".</div>
         }
         else
         {
@@ -79,7 +98,7 @@
                         </li>
                     </ul>
                 </nav>
-                <p class="text-center text-muted small mt-1">@_artilheiros.Count jogadores · página @_page de @_totalPages</p>
+                <p class="text-center text-muted small mt-1">@_totalFiltrados jogadores · página @_page de @_totalPages</p>
             }
         }
 
@@ -159,23 +178,37 @@
 
     private string _sortBy = "gols";
     private bool _sortAsc = false;
+    private string _busca = string.Empty;
 
     // Pagination
     private int _page = 1;
     private const int _pageSize = 20;
-    private int _totalPages => (int)Math.Ceiling(_artilheiros.Count / (double)_pageSize);
+    private int _totalFiltrados => FilteredItems.Count();
+    private int _totalPages => (int)Math.Ceiling(_totalFiltrados / (double)_pageSize);
+
+    private IEnumerable<HistoricoArtilheiroDto> FilteredItems
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_busca))
+                return _artilheiros;
+
+            var termo = TextoBusca.Normalizar(_busca);
+            return _artilheiros.Where(x => TextoBusca.Normalizar(x.JogadorNome).Contains(termo));
+        }
+    }
 
     private IEnumerable<HistoricoArtilheiroDto> SortedItems => _sortBy switch
     {
         "assistencias" => _sortAsc
-            ? _artilheiros.OrderBy(x => x.TotalAssistencias).ThenBy(x => x.TotalGols)
-            : _artilheiros.OrderByDescending(x => x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
+            ? FilteredItems.OrderBy(x => x.TotalAssistencias).ThenBy(x => x.TotalGols)
+            : FilteredItems.OrderByDescending(x => x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
         "ga" => _sortAsc
-            ? _artilheiros.OrderBy(x => x.TotalGols + x.TotalAssistencias).ThenBy(x => x.TotalGols)
-            : _artilheiros.OrderByDescending(x => x.TotalGols + x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
+            ? FilteredItems.OrderBy(x => x.TotalGols + x.TotalAssistencias).ThenBy(x => x.TotalGols)
+            : FilteredItems.OrderByDescending(x => x.TotalGols + x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
         _ => _sortAsc
-            ? _artilheiros.OrderBy(x => x.TotalGols).ThenBy(x => x.TotalAssistencias)
-            : _artilheiros.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias),
+            ? FilteredItems.OrderBy(x => x.TotalGols).ThenBy(x => x.TotalAssistencias)
+            : FilteredItems.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias),
     };
 
     private IEnumerable<HistoricoArtilheiroDto> PagedItems =>
@@ -191,6 +224,20 @@
             _sortAsc = false;
         }
         _page = 1;
+    }
+
+    private void OnBuscaChanged(ChangeEventArgs e)
+    {
+        _busca = e.Value?.ToString() ?? string.Empty;
+        _page = 1;
+        _jogadorSelecionado = null;
+    }
+
+    private void LimparBusca()
+    {
+        _busca = string.Empty;
+        _page = 1;
+        _jogadorSelecionado = null;
     }
 
     private void GoToPage(int p)

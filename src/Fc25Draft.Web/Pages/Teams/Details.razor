@@ -74,6 +74,18 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Temporada ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Temporada">
+                Temporada
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Historico ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Historico">
+                Histórico
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Negotiations ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Negotiations"
                     disabled="@(!_canQuickSell)">
@@ -85,6 +97,14 @@ else
     @if (_activeMainTab == MainTab.Negotiations)
     {
         <Negotiations TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)" />
+    }
+    else if (_activeMainTab == MainTab.Temporada)
+    {
+        <TimeTemporadaTab TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Historico)
+    {
+        <TimeHistoricoTab TeamId="@Id" />
     }
     else
     {
@@ -671,6 +691,8 @@ else
     private enum MainTab
     {
         Info,
+        Temporada,
+        Historico,
         Negotiations
     }
 

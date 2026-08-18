@@ -17,4 +17,10 @@ public interface ILigaPublicService
     Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct);
     Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct);
     Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct);
+
+    /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
+    Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);
+
+    /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
+    Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);
 }

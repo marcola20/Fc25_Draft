@@ -187,3 +187,67 @@ public record AssistenciaCompetitionDetalheDto(
     string NomeCompeticion,
     TipoCompetition TipoCompeticion,
     int Assistencias);
+
+// ---------------------------------------------------------------------------
+// Histórico e temporada por time (aba em /teams/details/{id})
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Linha do histórico de um jogador <b>pelo time</b>: só contabiliza eventos
+/// registrados enquanto ele defendia esse time (o TimeId do evento).
+/// </summary>
+public record TimeHistoricoJogadorDto(
+    int JogadorId,
+    string JogadorNome,
+    bool NoElencoAtual,
+    int Gols,
+    int Assistencias);
+
+public record TimeHistoricoDto(
+    Guid TimeId,
+    string TimeNome,
+    int TotalGols,
+    int TotalAssistencias,
+    IReadOnlyList<TimeHistoricoJogadorDto> Jogadores);
+
+public record TimeTemporadaCompeticaoDto(
+    Guid LigaId,
+    string Nome,
+    TipoCompetition Tipo,
+    LigaStatus Status,
+    int? Posicao,
+    GrupoCopa? Grupo,
+    int Pontos,
+    int Jogos,
+    int Vitorias,
+    int Empates,
+    int Derrotas,
+    int GolsPro,
+    int GolsContra,
+    int SaldoGols,
+    string? FaseLabel);
+
+public record TimeTemporadaJogadorDto(
+    int JogadorId,
+    string JogadorNome,
+    short PositionId,
+    string Posicao,
+    // CleanSheets só é preenchido para goleiros, zagueiros e laterais.
+    int? CleanSheets,
+    int Gols,
+    int Assistencias,
+    int CartoesAmarelos,
+    int CartoesVermelhos);
+
+public record TimeTemporadaDto(
+    Guid TimeId,
+    string TimeNome,
+    IReadOnlyList<TimeTemporadaCompeticaoDto> Competicoes,
+    IReadOnlyList<TimeTemporadaJogadorDto> Jogadores,
+    int Vitorias,
+    int Empates,
+    int Derrotas,
+    int GolsPro,
+    int GolsContra,
+    int JogosEncerrados,
+    int CleanSheets);

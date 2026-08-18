@@ -1,0 +1,266 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_erro is not null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar a temporada:</strong> @_erro</div>
+}
+else if (_dados is null)
+{
+    <div class="alert alert-warning mb-0">Time não encontrado.</div>
+}
+else
+{
+    <h4 class="mb-3">Campanha na temporada</h4>
+
+    @if (_dados.Competicoes.Count == 0)
+    {
+        <div class="alert alert-info">Este time não está inscrito em nenhuma competição ativa.</div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            @foreach (var comp in _dados.Competicoes)
+            {
+                <div class="col-12 col-lg-6">
+                    <div class="card h-100 @(comp.Tipo == TipoCompetition.Copa ? "border-warning" : "border-primary")">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h5 class="card-title mb-0">@comp.Nome</h5>
+                                    <span class="badge @(comp.Tipo == TipoCompetition.Copa ? "bg-warning text-dark" : "bg-primary")">
+                                        @TipoLabel(comp.Tipo)
+                                    </span>
+                                    <span class="badge bg-light text-dark">@StatusLabel(comp.Status)</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="display-6 mb-0 lh-1">@(comp.Posicao?.ToString() ?? "—")º</div>
+                                    <small class="text-muted">
+                                        @(comp.Grupo is not null ? $"Grupo {comp.Grupo}" : "na tabela")
+                                    </small>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(comp.FaseLabel))
+                            {
+                                <p class="mb-2"><span class="badge bg-dark">@comp.FaseLabel</span></p>
+                            }
+
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0 text-center align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th title="Pontos">Pts</th>
+                                            <th title="Jogos">J</th>
+                                            <th title="Vitórias">V</th>
+                                            <th title="Empates">E</th>
+                                            <th title="Derrotas">D</th>
+                                            <th title="Gols feitos">GF</th>
+                                            <th title="Gols sofridos">GS</th>
+                                            <th title="Saldo de gols">SG</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="fw-bold">@comp.Pontos</td>
+                                            <td>@comp.Jogos</td>
+                                            <td class="text-success fw-semibold">@comp.Vitorias</td>
+                                            <td>@comp.Empates</td>
+                                            <td class="text-danger fw-semibold">@comp.Derrotas</td>
+                                            <td>@comp.GolsPro</td>
+                                            <td>@comp.GolsContra</td>
+                                            <td class="fw-semibold">@(comp.SaldoGols > 0 ? "+" : "")@comp.SaldoGols</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="row g-2 mb-4">
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Vitórias</div><h4 class="mb-0 text-success">@_dados.Vitorias</h4>
+                </div></div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Empates</div><h4 class="mb-0">@_dados.Empates</h4>
+                </div></div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Derrotas</div><h4 class="mb-0 text-danger">@_dados.Derrotas</h4>
+                </div></div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Gols feitos</div><h4 class="mb-0">@_dados.GolsPro</h4>
+                </div></div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Gols sofridos</div><h4 class="mb-0">@_dados.GolsContra</h4>
+                </div></div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Clean sheets</div><h4 class="mb-0">@_dados.CleanSheets</h4>
+                </div></div>
+            </div>
+        </div>
+    }
+
+    <h4 class="mb-1">Elenco atual na temporada</h4>
+    <p class="text-muted small">
+        Números somados das competições ativas, contando só o que foi feito por este time.
+        Clean sheets são as @_dados.CleanSheets partidas sem sofrer gol
+        (de @_dados.JogosEncerrados encerradas) e aparecem para goleiros, zagueiros e laterais.
+    </p>
+
+    @if (_dados.Jogadores.Count == 0)
+    {
+        <div class="alert alert-info mb-0">Nenhum jogador no elenco.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle" style="font-size:0.875rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start" style="cursor:pointer;user-select:none;" @onclick='() => SetSort("nome")'>
+                            Jogador @SortIcon("nome")
+                        </th>
+                        <th style="cursor:pointer;user-select:none;" @onclick='() => SetSort("posicao")'>
+                            Posição @SortIcon("posicao")
+                        </th>
+                        <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" title="Clean sheets" @onclick='() => SetSort("cs")'>
+                            🧤 CS @SortIcon("cs")
+                        </th>
+                        <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
+                            ⚽ Gols @SortIcon("gols")
+                        </th>
+                        <th class="text-center" style="width:100px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
+                            🅰️ Assist. @SortIcon("assistencias")
+                        </th>
+                        <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" @onclick='() => SetSort("ga")'>
+                            G/A @SortIcon("ga")
+                        </th>
+                        <th class="text-center" style="width:70px;" title="Cartões amarelos">🟨</th>
+                        <th class="text-center" style="width:70px;" title="Cartões vermelhos">🟥</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var j in Ordenados)
+                    {
+                        <tr>
+                            <td>@j.JogadorNome</td>
+                            <td class="text-muted small">@j.Posicao</td>
+                            <td class="text-center">@(j.CleanSheets?.ToString() ?? "—")</td>
+                            <td class="text-center fw-bold">@(j.Gols > 0 ? j.Gols.ToString() : "—")</td>
+                            <td class="text-center">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "—")</td>
+                            <td class="text-center fw-bold">@(j.Gols + j.Assistencias)</td>
+                            <td class="text-center">@(j.CartoesAmarelos > 0 ? j.CartoesAmarelos.ToString() : "—")</td>
+                            <td class="text-center">@(j.CartoesVermelhos > 0 ? j.CartoesVermelhos.ToString() : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private bool _loading = true;
+    private string? _erro;
+    private TimeTemporadaDto? _dados;
+
+    private string _sortBy = "posicao";
+    private bool _sortAsc = true;
+
+    private IEnumerable<TimeTemporadaJogadorDto> Jogadores =>
+        _dados?.Jogadores ?? Enumerable.Empty<TimeTemporadaJogadorDto>();
+
+    private IEnumerable<TimeTemporadaJogadorDto> Ordenados => _sortBy switch
+    {
+        "nome" => Ordenar(j => j.JogadorNome),
+        "cs" => Ordenar(j => j.CleanSheets ?? -1),
+        "gols" => Ordenar(j => j.Gols),
+        "assistencias" => Ordenar(j => j.Assistencias),
+        "ga" => Ordenar(j => j.Gols + j.Assistencias),
+        _ => Ordenar(j => (int)j.PositionId),
+    };
+
+    private IEnumerable<TimeTemporadaJogadorDto> Ordenar<TKey>(Func<TimeTemporadaJogadorDto, TKey> chave) =>
+        _sortAsc
+            ? Jogadores.OrderBy(chave).ThenBy(j => j.JogadorNome, StringComparer.OrdinalIgnoreCase)
+            : Jogadores.OrderByDescending(chave).ThenBy(j => j.JogadorNome, StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_dados?.TimeId == TeamId) return;
+
+        _loading = true;
+        _erro = null;
+        try
+        {
+            _dados = await LigaService.GetTemporadaTimeAsync(TeamId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SetSort(string col)
+    {
+        if (_sortBy == col)
+            _sortAsc = !_sortAsc;
+        else
+        {
+            _sortBy = col;
+            // Nome e posição fazem mais sentido crescentes; números, decrescentes.
+            _sortAsc = col is "nome" or "posicao";
+        }
+    }
+
+    private string SortIcon(string col)
+    {
+        if (_sortBy != col) return "⇅";
+        return _sortAsc ? "↑" : "↓";
+    }
+
+    private static string TipoLabel(TipoCompetition tipo) => tipo switch
+    {
+        TipoCompetition.Copa => "Copa",
+        TipoCompetition.Supercopa => "Supercopa",
+        _ => "Liga"
+    };
+
+    private static string StatusLabel(LigaStatus status) => status switch
+    {
+        LigaStatus.Criada => "Criada",
+        LigaStatus.PrimeiraFase => "Primeira fase",
+        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.Playoffs => "Playoffs",
+        LigaStatus.Encerrada => "Encerrada",
+        LigaStatus.DecisaoCampeao => "Decisão do título",
+        LigaStatus.MiniLiga => "Mini-liga",
+        _ => status.ToString()
+    };
+}

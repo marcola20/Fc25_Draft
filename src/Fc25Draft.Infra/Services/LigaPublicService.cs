@@ -1,6 +1,7 @@
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
+using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
@@ -297,6 +298,228 @@ public class LigaPublicService : ILigaPublicService
     {
         var historico = await GetHistoricoArtilheirosAsync(ct);
         return historico.FirstOrDefault(h => h.JogadorId == jogadorId);
+    }
+
+    private sealed record EventoTimeFlat(
+        TipoEvento Tipo, int JogadorId, string JogadorNome,
+        int? AssistenteId, string? AssistenteNome);
+
+    public async Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var timeNome = await _db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == timeId)
+            .Select(t => t.TeamName)
+            .FirstOrDefaultAsync(ct);
+
+        if (timeNome is null) return null;
+
+        // O TimeId do evento é o time pelo qual o gol foi marcado, então filtrar
+        // por ele já exclui o que o jogador fez em outros times.
+        var eventos = await _db.LigaEventos
+            .AsNoTracking()
+            .Where(e => e.TimeId == timeId && e.Tipo == TipoEvento.Gol)
+            .Select(e => new EventoTimeFlat(
+                e.Tipo,
+                e.JogadorId,
+                e.Jogador.Name,
+                e.AssistenteId,
+                e.Assistente!.Name))
+            .ToListAsync(ct);
+
+        var golsPorJogador = eventos
+            .GroupBy(e => e.JogadorId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var assistPorJogador = eventos
+            .Where(e => e.AssistenteId.HasValue)
+            .GroupBy(e => e.AssistenteId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        // Nomes vêm do próprio evento — assim quem já saiu do time continua aparecendo.
+        var nomes = new Dictionary<int, string>();
+        foreach (var e in eventos)
+        {
+            nomes[e.JogadorId] = e.JogadorNome;
+            if (e.AssistenteId.HasValue && e.AssistenteNome is not null)
+                nomes[e.AssistenteId.Value] = e.AssistenteNome;
+        }
+
+        var elencoAtual = await _db.TeamRosters
+            .AsNoTracking()
+            .Where(r => r.TeamId == timeId)
+            .Select(r => r.PlayerId)
+            .ToListAsync(ct);
+
+        var elencoSet = elencoAtual.ToHashSet();
+
+        var jogadores = nomes.Keys
+            .Select(id => new TimeHistoricoJogadorDto(
+                id,
+                nomes[id],
+                elencoSet.Contains(id),
+                golsPorJogador.GetValueOrDefault(id, 0),
+                assistPorJogador.GetValueOrDefault(id, 0)))
+            .OrderByDescending(j => j.Gols + j.Assistencias)
+            .ThenByDescending(j => j.Gols)
+            .ThenBy(j => j.JogadorNome)
+            .ToArray();
+
+        return new TimeHistoricoDto(
+            timeId,
+            timeNome,
+            jogadores.Sum(j => j.Gols),
+            jogadores.Sum(j => j.Assistencias),
+            jogadores);
+    }
+
+    private static readonly short[] PosicoesDefensivas =
+    {
+        (short)PositionType.Goleiro,
+        (short)PositionType.Zagueiro,
+        (short)PositionType.LateralEsquerdo,
+        (short)PositionType.LateralDireito
+    };
+
+    public async Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var timeNome = await _db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == timeId)
+            .Select(t => t.TeamName)
+            .FirstOrDefaultAsync(ct);
+
+        if (timeNome is null) return null;
+
+        // Temporada = competições ainda não encerradas.
+        var ligas = await _db.Ligas
+            .AsNoTracking()
+            .Where(l => l.Status != LigaStatus.Encerrada)
+            .OrderBy(l => l.Tipo)
+            .ThenByDescending(l => l.CriadoEm)
+            .ToListAsync(ct);
+
+        var ligaIds = ligas.Select(l => l.LigaId).ToArray();
+
+        // Traz a classificação inteira das ligas ativas: a posição na Copa é
+        // relativa ao grupo, então precisamos dos adversários para calculá-la.
+        var classifs = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(c => ligaIds.Contains(c.LigaId))
+            .Select(c => new
+            {
+                c.LigaId, c.TimeId, c.Posicao, c.Grupo, c.Pontos, c.Jogos,
+                c.Vitorias, c.Empates, c.Derrotas, c.GolsPro, c.GolsContra
+            })
+            .ToListAsync(ct);
+
+        var knockouts = await _db.LigaKnockoutJogos
+            .AsNoTracking()
+            .Where(k => ligaIds.Contains(k.LigaId)
+                        && (k.TimeCasaId == timeId || k.TimeForaId == timeId))
+            .Select(k => new { k.LigaId, k.Fase, k.VencedorId })
+            .ToListAsync(ct);
+
+        var competicoes = new List<TimeTemporadaCompeticaoDto>();
+        foreach (var liga in ligas)
+        {
+            var c = classifs.FirstOrDefault(x => x.LigaId == liga.LigaId && x.TimeId == timeId);
+            if (c is null) continue;
+
+            int? posicao = c.Posicao;
+            if (liga.Tipo == TipoCompetition.Copa && c.Grupo is not null)
+            {
+                // Reordena dentro do grupo para não exibir a posição geral da competição.
+                posicao = classifs
+                    .Where(x => x.LigaId == liga.LigaId && x.Grupo == c.Grupo)
+                    .OrderBy(x => x.Posicao)
+                    .Select((x, i) => new { x.TimeId, Pos = i + 1 })
+                    .First(x => x.TimeId == timeId).Pos;
+            }
+
+            competicoes.Add(new TimeTemporadaCompeticaoDto(
+                liga.LigaId, liga.Nome, liga.Tipo, liga.Status,
+                posicao, c.Grupo, c.Pontos, c.Jogos,
+                c.Vitorias, c.Empates, c.Derrotas,
+                c.GolsPro, c.GolsContra, c.GolsPro - c.GolsContra,
+                FaseAlcancadaLabel(knockouts
+                    .Where(k => k.LigaId == liga.LigaId)
+                    .Select(k => (k.Fase, k.VencedorId)), timeId)));
+        }
+
+        // Clean sheet é apurado por partida encerrada do time nas competições ativas.
+        var partidas = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => ligaIds.Contains(p.Rodada.LigaId)
+                        && p.Status == PartidaStatus.Encerrada
+                        && (p.TimeCasaId == timeId || p.TimeForaId == timeId))
+            .Select(p => new { p.TimeCasaId, p.GolsCasa, p.GolsFora })
+            .ToListAsync(ct);
+
+        var cleanSheets = partidas.Count(p => (p.TimeCasaId == timeId ? p.GolsFora : p.GolsCasa) == 0);
+
+        var eventos = await _db.LigaEventos
+            .AsNoTracking()
+            .Where(e => e.TimeId == timeId && ligaIds.Contains(e.Partida.Rodada.LigaId))
+            .Select(e => new { e.Tipo, e.JogadorId, e.AssistenteId })
+            .ToListAsync(ct);
+
+        var elenco = await _db.TeamRosters
+            .AsNoTracking()
+            .Where(r => r.TeamId == timeId)
+            .Select(r => new { r.PlayerId, r.Player.Name, r.Player.PositionId })
+            .ToListAsync(ct);
+
+        var jogadores = elenco
+            .Select(p => new TimeTemporadaJogadorDto(
+                p.PlayerId,
+                p.Name,
+                p.PositionId,
+                ((int)p.PositionId).ToPositionName(),
+                PosicoesDefensivas.Contains(p.PositionId) ? cleanSheets : null,
+                eventos.Count(e => e.Tipo == TipoEvento.Gol && e.JogadorId == p.PlayerId),
+                eventos.Count(e => e.Tipo == TipoEvento.Gol && e.AssistenteId == p.PlayerId),
+                eventos.Count(e => e.Tipo == TipoEvento.CartaoAmarelo && e.JogadorId == p.PlayerId),
+                eventos.Count(e => e.Tipo == TipoEvento.CartaoVermelho && e.JogadorId == p.PlayerId)))
+            .OrderBy(p => p.PositionId)
+            .ThenBy(p => p.JogadorNome, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new TimeTemporadaDto(
+            timeId,
+            timeNome,
+            competicoes,
+            jogadores,
+            competicoes.Sum(x => x.Vitorias),
+            competicoes.Sum(x => x.Empates),
+            competicoes.Sum(x => x.Derrotas),
+            competicoes.Sum(x => x.GolsPro),
+            competicoes.Sum(x => x.GolsContra),
+            partidas.Count,
+            cleanSheets);
+    }
+
+    /// <summary>Traduz a fase mais avançada que o time alcançou no mata-mata.</summary>
+    private static string? FaseAlcancadaLabel(IEnumerable<(FaseKnockout Fase, Guid? VencedorId)> jogos, Guid timeId)
+    {
+        var maisAvancado = jogos
+            .OrderByDescending(j => j.Fase)
+            .Select(j => (Fase: j.Fase, VencedorId: j.VencedorId))
+            .FirstOrDefault();
+
+        if (maisAvancado.Fase == FaseKnockout.None) return null;
+
+        var label = FaseLabelMap.GetValueOrDefault(maisAvancado.Fase, maisAvancado.Fase.ToString());
+
+        if (maisAvancado.VencedorId is null)
+            return $"Disputando: {label}";
+
+        if (maisAvancado.Fase == FaseKnockout.Final)
+            return maisAvancado.VencedorId == timeId ? "Campeão" : "Vice-campeão";
+
+        return maisAvancado.VencedorId == timeId
+            ? $"Classificado — {label}"
+            : $"Eliminado — {label}";
     }
 
     private static LigaDto ToDto(Liga l) =>
