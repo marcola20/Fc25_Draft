@@ -234,7 +234,8 @@ public class DraftStateService
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Não foi possível localizar as regras da rodada atual.");
 
-            var isTeamToken = string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.OrdinalIgnoreCase);
+            var isTeamToken = string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.OrdinalIgnoreCase)
+                || (currentPick.Team.AuxToken is not null && string.Equals(normalizedToken, currentPick.Team.AuxToken, StringComparison.OrdinalIgnoreCase));
             if (!isTeamToken)
             {
                 var isAdmin = await _db.Teams

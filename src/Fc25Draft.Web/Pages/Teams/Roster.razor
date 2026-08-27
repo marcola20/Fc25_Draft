@@ -132,6 +132,12 @@ else
                             <p class="team-owner">
                                 Responsável: <strong>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</strong>
                             </p>
+                            @if (!string.IsNullOrWhiteSpace(team.AuxiliarName))
+                            {
+                                <p class="team-owner">
+                                    Auxiliar: <strong>@team.AuxiliarName</strong>
+                                </p>
+                            }
                             <p class="team-count">
                                 <strong>@team.Jogadores</strong> jogador@(team.Jogadores == 1 ? "" : "es") cadastrados.
                             </p>

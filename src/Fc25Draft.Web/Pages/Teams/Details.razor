@@ -42,6 +42,12 @@ else
         <dt class="col-sm-3">Responsável</dt>
         <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
 
+        @if (!string.IsNullOrWhiteSpace(team.AuxiliarName))
+        {
+            <dt class="col-sm-3">Auxiliar</dt>
+            <dd class="col-sm-9">@team.AuxiliarName</dd>
+        }
+
         <dt class="col-sm-3">Jogadores</dt>
         <dd class="col-sm-9">@team.Jogadores</dd>
 
@@ -55,6 +61,12 @@ else
         {
             <dt class="col-sm-3">Token do Time</dt>
             <dd class="col-sm-9"><code>@team.Token</code></dd>
+
+            @if (!string.IsNullOrWhiteSpace(team.AuxToken))
+            {
+                <dt class="col-sm-3">Token do Auxiliar</dt>
+                <dd class="col-sm-9"><code>@team.AuxToken</code></dd>
+            }
         }
     </dl>
 

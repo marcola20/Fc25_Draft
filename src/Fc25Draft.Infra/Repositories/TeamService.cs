@@ -48,7 +48,7 @@ public class TeamService : ITeamService
 
     public async Task<Guid> CreateAsync(TeamCreateDto dto)
     {
-        Validate(dto.TeamName, dto.OwnerName);
+        Validate(dto.TeamName, dto.OwnerName, dto.AuxiliarName);
 
         var normalizedName = dto.TeamName.Trim();
 
@@ -58,12 +58,16 @@ public class TeamService : ITeamService
             throw new InvalidOperationException($"Já existe uma equipe com o nome '{normalizedName}'.");
         }
 
+        var auxiliarName = NormalizeOwner(dto.AuxiliarName);
+
         var entity = new Team
         {
             TeamId = Guid.NewGuid(),
             TeamName = normalizedName,
             OwnerName = NormalizeOwner(dto.OwnerName),
-            Token = Guid.NewGuid().ToString("N")
+            Token = Guid.NewGuid().ToString("N"),
+            AuxiliarName = auxiliarName,
+            AuxToken = auxiliarName is null ? null : Guid.NewGuid().ToString("N")
         };
 
         _db.Teams.Add(entity);
@@ -74,7 +78,7 @@ public class TeamService : ITeamService
 
     public async Task UpdateAsync(Guid id, TeamUpdateDto dto)
     {
-        Validate(dto.TeamName, dto.OwnerName);
+        Validate(dto.TeamName, dto.OwnerName, dto.AuxiliarName);
 
         var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
                      ?? throw new KeyNotFoundException("Equipe não encontrada.");
@@ -89,6 +93,19 @@ public class TeamService : ITeamService
 
         entity.TeamName = normalizedName;
         entity.OwnerName = NormalizeOwner(dto.OwnerName);
+
+        var auxiliarName = NormalizeOwner(dto.AuxiliarName);
+        entity.AuxiliarName = auxiliarName;
+        if (auxiliarName is null)
+        {
+            // Sem auxiliar: revoga o token para que ele deixe de autenticar.
+            entity.AuxToken = null;
+        }
+        else if (entity.AuxToken is null)
+        {
+            // Auxiliar recém-definido: gera o token dele automaticamente.
+            entity.AuxToken = Guid.NewGuid().ToString("N");
+        }
 
         await _db.SaveChangesAsync();
     }
@@ -110,7 +127,7 @@ public class TeamService : ITeamService
         }
     }
 
-    private static void Validate(string teamName, string? ownerName)
+    private static void Validate(string teamName, string? ownerName, string? auxiliarName = null)
     {
         if (string.IsNullOrWhiteSpace(teamName))
         {
@@ -126,6 +143,11 @@ public class TeamService : ITeamService
         if (!string.IsNullOrWhiteSpace(ownerName) && ownerName.Trim().Length > 80)
         {
             throw new ArgumentException("O nome do responsável deve ter no máximo 80 caracteres.", nameof(ownerName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(auxiliarName) && auxiliarName.Trim().Length > 80)
+        {
+            throw new ArgumentException("O nome do auxiliar deve ter no máximo 80 caracteres.", nameof(auxiliarName));
         }
     }
 

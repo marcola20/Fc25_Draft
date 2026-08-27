@@ -46,6 +46,7 @@ else
                 <tr>
                     <th>Equipe</th>
                     <th>Responsável</th>
+                    <th>Auxiliar</th>
                     <th>Jogadores</th>
                     <th class="text-end">Ações</th>
                 </tr>
@@ -56,6 +57,7 @@ else
                     <tr>
                         <td>@team.TeamName</td>
                         <td>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</td>
+                        <td>@(string.IsNullOrWhiteSpace(team.AuxiliarName) ? "-" : team.AuxiliarName)</td>
                         <td>@team.Jogadores</td>
                         <td class="text-end">
                             <button class="btn btn-link" @onclick="() => ViewDetails(team.TeamId)">Detalhes</button>

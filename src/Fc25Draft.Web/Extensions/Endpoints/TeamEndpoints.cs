@@ -49,7 +49,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.TeamId,
                         t.TeamName,
                         t.OwnerName,
-                        t.Roster.Count))
+                        t.Roster.Count,
+                        t.AuxiliarName))
                     .ToListAsync(ct);
 
                 return Results.Ok(new PagedResult<TeamListItemDto>(items, total, currentPage, currentPageSize));
@@ -82,6 +83,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.TeamName,
                         t.OwnerName,
                         t.Token,
+                        t.AuxiliarName,
+                        t.AuxToken,
                         Jogadores = t.Roster.Count,
                         t.Budget,
                         t.QuickSellCount,
@@ -93,9 +96,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 var includeToken = httpContext.User.IsInRole("Admin");
                 var teamToken = includeToken ? team.Token : string.Empty;
+                var auxToken = includeToken ? team.AuxToken : null;
                 var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
 
-                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount);
+                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken);
                 return Results.Ok(dto);
             });
 
@@ -109,7 +113,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 var identity = await db.Teams
                     .AsNoTracking()
-                    .Where(t => t.Token == normalized)
+                    .Where(t => t.Token == normalized || t.AuxToken == normalized)
                     .Select(t => new TeamIdentityDto(t.TeamId, t.TeamName))
                     .FirstOrDefaultAsync(ct);
 
@@ -141,7 +145,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault()))
-                            .ToList()))
+                            .ToList(),
+                        t.AuxiliarName))
                     .ToListAsync(ct);
 
                 return Results.Ok(roster);
@@ -169,7 +174,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault()))
-                            .ToList()))
+                            .ToList(),
+                        t.AuxiliarName))
                     .FirstOrDefaultAsync(ct);
 
                 return roster is null ? Results.NotFound() : Results.Ok(roster);
@@ -562,18 +568,21 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
         var normalized = token.Trim();
 
-        var teamToken = await db.Teams
+        var teamTokens = await db.Teams
             .AsNoTracking()
             .Where(t => t.TeamId == teamId)
-            .Select(t => t.Token)
+            .Select(t => new { t.Token, t.AuxToken })
             .FirstOrDefaultAsync(ct);
 
-        if (teamToken is null)
+        if (teamTokens is null)
         {
             return Results.Json(new { message = "Time não encontrado." }, statusCode: StatusCodes.Status404NotFound);
         }
 
-        if (!string.Equals(teamToken, normalized, StringComparison.OrdinalIgnoreCase))
+        var matches = string.Equals(teamTokens.Token, normalized, StringComparison.OrdinalIgnoreCase)
+            || (teamTokens.AuxToken is not null && string.Equals(teamTokens.AuxToken, normalized, StringComparison.OrdinalIgnoreCase));
+
+        if (!matches)
         {
             return Results.Json(new { message = "Token do time inválido." }, statusCode: StatusCodes.Status403Forbidden);
         }

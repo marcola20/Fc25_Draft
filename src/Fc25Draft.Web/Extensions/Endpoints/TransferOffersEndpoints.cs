@@ -174,7 +174,7 @@ public static class TransferOffersEndpoints
 
         var normalized = tokenHeader.Trim();
         var team = await db.Teams.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == normalized, ct);
+            .FirstOrDefaultAsync(t => t.Token == normalized || t.AuxToken == normalized, ct);
 
         return team?.TeamId;
     }

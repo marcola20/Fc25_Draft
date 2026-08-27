@@ -93,7 +93,7 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         // Fallback to Teams with IsAdmin flag (for backward compatibility)
         var team = await _db.Teams
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == providedToken, Context.RequestAborted);
+            .FirstOrDefaultAsync(t => t.Token == providedToken || t.AuxToken == providedToken, Context.RequestAborted);
 
         if (team is null)
             return AuthenticateResult.Fail("Token inválido.");

@@ -3,15 +3,16 @@ using System.Collections.Generic;
 
 namespace Fc25Draft.Core.DTOs;
 
-public record TeamCreateDto(string TeamName, string? OwnerName);
+public record TeamCreateDto(string TeamName, string? OwnerName, string? AuxiliarName = null);
 
-public record TeamUpdateDto(string TeamName, string? OwnerName);
+public record TeamUpdateDto(string TeamName, string? OwnerName, string? AuxiliarName = null);
 
 public record TeamListItemDto(
     Guid TeamId,
     string TeamName,
     string? OwnerName,
-    int Jogadores);
+    int Jogadores,
+    string? AuxiliarName = null);
 
 public record TeamDetailsDto(
     Guid TeamId,
@@ -21,7 +22,9 @@ public record TeamDetailsDto(
     int Jogadores,
     string Caixa,
     int QuickSellCount,
-    int TransferCount);
+    int TransferCount,
+    string? AuxiliarName = null,
+    string? AuxToken = null);
 
 public record TeamIdentityDto(
     Guid TeamId,
@@ -31,7 +34,8 @@ public record TeamRosterDto(
     Guid TeamId,
     string TeamName,
     string? OwnerName,
-    IReadOnlyList<TeamRosterPlayerDto> Jogadores);
+    IReadOnlyList<TeamRosterPlayerDto> Jogadores,
+    string? AuxiliarName = null);
 
 public record TeamRosterPlayerDto(
     Guid PlayerGuid,
