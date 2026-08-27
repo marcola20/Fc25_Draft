@@ -107,7 +107,41 @@ public class TeamLineupService : ITeamLineupService
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
 
+        await SeedMissingBaselinesAsync(entities, ct);
+
         return entities.Select(MapToAdminDto).ToList();
+    }
+
+    // Escalações criadas antes desta feature (ou cujo retrato nunca foi salvo por
+    // algum outro motivo) não têm base de comparação — sem isso, o diff nunca
+    // aparece, mesmo com edições reais. Na primeira leitura, grava o estado atual
+    // como retrato inicial, para que edições a partir de agora sejam rastreadas.
+    // Importante: isso NÃO recupera mudanças que já aconteceram antes dessa leitura
+    // (não existe histórico anterior a este ponto para comparar).
+    private async Task SeedMissingBaselinesAsync(List<TeamLineup> entities, CancellationToken ct)
+    {
+        var missingIds = entities.Where(e => e.LastSeenSnapshotJson is null).Select(e => e.LineupId).ToList();
+        if (missingIds.Count == 0) return;
+
+        var trackedEntities = await _dbContext.TeamLineups
+            .Where(l => missingIds.Contains(l.LineupId))
+            .ToListAsync(ct);
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var tracked in trackedEntities)
+        {
+            var detached = entities.First(e => e.LineupId == tracked.LineupId);
+            var snapshot = JsonSerializer.Serialize(MapToDto(detached));
+
+            tracked.LastSeenSnapshotJson = snapshot;
+            tracked.LastSeenAtUtc = now;
+
+            // Mantém a lista já carregada em sincronia, para essa mesma resposta já refletir o retrato recém-criado.
+            detached.LastSeenSnapshotJson = snapshot;
+            detached.LastSeenAtUtc = now;
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     public async Task AcknowledgeLineupAsync(Guid lineupId, CancellationToken ct)
