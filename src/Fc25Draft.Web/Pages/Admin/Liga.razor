@@ -1,13 +1,19 @@
 @page "/admin/liga"
+@page "/admin/liga/{LigaId:guid}"
+@page "/admin/liga/{LigaId:guid}/rodada/{RodadaId:guid}"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Components.Liga
+@using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject ILigaAdminService AdminSvc
 @inject ILigaPublicService PublicSvc
 @inject ITeamService TeamSvc
 @inject NavigationManager Nav
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
 
 <PageTitle>Administração da Liga</PageTitle>
 
@@ -31,7 +37,7 @@
 
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3">
-        <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>_tab="liga"'>Liga</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>SetTab("liga")'>Liga</button></li>
         @if (_ligaAtual?.Tipo == TipoCompetition.Copa)
         {
             <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
@@ -40,8 +46,8 @@
         {
             <li class="nav-item"><button class="nav-link @(_tab=="times"?"active":"")" @onclick='()=>SetTab("times")' disabled="@(_ligaAtual == null)">Times</button></li>
         }
-        <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>_tab="rodadas"' disabled="@(_ligaAtual == null)">Rodadas</button></li>
-        <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>_tab="partidas"' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>SetTab("rodadas")' disabled="@(_ligaAtual == null)">Rodadas</button></li>
+        <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>SetTab("partidas")' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="punicoes"?"active":"")" @onclick='()=>_tab="punicoes"' disabled="@(_ligaAtual == null)">Punições</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="knockout"?"active":"")" @onclick='()=>_tab="knockout"' disabled="@(_ligaAtual == null)">Mata-Mata</button></li>
     </ul>
@@ -390,7 +396,7 @@
                             }
                             @if (p.Status == PartidaStatus.EmAndamento)
                             {
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Stats</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirStats(p.PartidaId)">Stats</button>
                                 <button class="btn btn-sm btn-warning" @onclick="() => EncerrarPartida(p.PartidaId)">Encerrar</button>
                                 @if (_rodadaSelecionada?.Numero == -1)
                                 {
@@ -400,7 +406,7 @@
                             }
                             @if (p.Status == PartidaStatus.Encerrada)
                             {
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => IrParaStats(p.PartidaId)">Ver Stats</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirStats(p.PartidaId)">Ver Stats</button>
                                 @if (p.TemPenaltis && p.PenaltisVencedorId is Guid pv)
                                 {
                                     <span class="badge bg-warning text-dark align-self-center">Pên.: @(pv == p.TimeCasaId ? p.TimeCasaNome : p.TimeForaNome)</span>
@@ -555,7 +561,7 @@
                                         }
                                         else
                                         {
-                                            <a href="/admin/liga/stats/@jogo.PartidaId?return=/admin/liga" class="btn btn-sm btn-outline-primary">Stats</a>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirStats(jogo.PartidaId!.Value)">Stats</button>
                                             <button class="btn btn-sm btn-warning" @onclick="() => MostrarEncerrarKnockout(jogo)" disabled="@_saving">Encerrar</button>
                                         }
                                     </div>
@@ -599,10 +605,36 @@
     }
 </div>
 
+<!-- ── Modal de Stats da Partida (gols/cartões) ── -->
+@if (_statsPartidaId is not null)
+{
+    <div class="modal fade show d-block" style="background-color:rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content" style="max-height:85vh;">
+                <div class="modal-header">
+                    <h5 class="modal-title">Stats da Partida</h5>
+                    <button type="button" class="btn-close" @onclick="FecharStats"></button>
+                </div>
+                <div class="modal-body" style="overflow-y:auto;">
+                    <PartidaStatsEditor PartidaId="_statsPartidaId.Value" OnChanged="AtualizarAposEvento" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="FecharStats">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+    [Parameter] public Guid? LigaId { get; set; }
+    [Parameter] public Guid? RodadaId { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] [Parameter] public string? TabQuery { get; set; }
+
     private string _tab = "liga";
     private string? _erro, _ok;
     private bool _saving;
+    private Guid? _statsPartidaId;
 
     // Liga
     private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
@@ -654,7 +686,7 @@
     private bool _knockoutTemPenaltis;
     private string? _knockoutPenaltisVencedor;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await CarregarDados();
     }
@@ -665,17 +697,19 @@
         var (teams, _) = await TeamSvc.SearchAsync(null, 1, 100);
         _times = teams.Select(t => new TeamListItemDto(t.TeamId, t.TeamName, t.OwnerName, 0)).ToList();
 
-        if (_ligaAtual is null && _ligas.Any())
-            _ligaAtual = _ligas[0];
+        _ligaAtual = LigaId.HasValue ? _ligas.FirstOrDefault(l => l.LigaId == LigaId.Value) : null;
 
         if (_ligaAtual is not null)
         {
-            _ligaAtual = _ligas.FirstOrDefault(l => l.LigaId == _ligaAtual.LigaId) ?? _ligaAtual;
             _rodadas = await AdminSvc.ListRodadasAsync(_ligaAtual.LigaId, CancellationToken.None);
             _punicoes = await AdminSvc.ListPunicoesAsync(_ligaAtual.LigaId, CancellationToken.None);
             _knockoutJogos = await PublicSvc.GetKnockoutAsync(_ligaAtual.LigaId, CancellationToken.None);
-            if (_rodadaSelecionada is not null)
-                _partidas = await AdminSvc.ListPartidasAsync(_rodadaSelecionada.RodadaId, CancellationToken.None);
+
+            _rodadaSelecionada = RodadaId.HasValue ? _rodadas.FirstOrDefault(r => r.RodadaId == RodadaId.Value) : null;
+            _partidas = _rodadaSelecionada is not null
+                ? await AdminSvc.ListPartidasAsync(_rodadaSelecionada.RodadaId, CancellationToken.None)
+                : Array.Empty<LigaPartidaDto>();
+
             if (_ligaAtual.Tipo == TipoCompetition.Copa)
             {
                 _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
@@ -685,8 +719,76 @@
             {
                 _timesLigaSel = (await AdminSvc.ListTimesLigaAsync(_ligaAtual.LigaId, CancellationToken.None)).ToHashSet();
             }
+
+            _tab = RodadaId.HasValue ? "partidas" : (string.IsNullOrEmpty(TabQuery) ? "rodadas" : TabQuery);
         }
+        else
+        {
+            _rodadaSelecionada = null;
+            _partidas = Array.Empty<LigaPartidaDto>();
+            _tab = "liga";
+        }
+
+        AtualizarBreadcrumb();
     }
+
+    private void AtualizarBreadcrumb()
+    {
+        var crumbs = new List<BreadcrumbSegment>
+        {
+            new("Início", "/home"),
+            new("Admin", "/admin/liga"),
+            new("Liga", "/admin/liga")
+        };
+
+        if (_ligaAtual is not null)
+        {
+            crumbs.Add(new BreadcrumbSegment(_ligaAtual.Nome, $"/admin/liga/{_ligaAtual.LigaId}"));
+            if (_rodadaSelecionada is not null)
+                crumbs.Add(new BreadcrumbSegment(RodadaLabel(_rodadaSelecionada.Numero)));
+            else if (_tab != "rodadas")
+                crumbs.Add(new BreadcrumbSegment(TabLabel(_tab)));
+        }
+
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/admin/liga"),
+            breadcrumbs: crumbs,
+            subtitle: _ligaAtual is null ? "Administração da Liga" : $"Administração — {_ligaAtual.Nome}");
+    }
+
+    private static string TabLabel(string tab) => tab switch
+    {
+        "grupos" => "Grupos Copa",
+        "times" => "Times",
+        "rodadas" => "Rodadas",
+        "partidas" => "Partidas",
+        "punicoes" => "Punições",
+        "knockout" => "Mata-Mata",
+        _ => "Liga"
+    };
+
+    private void SetTab(string tab)
+    {
+        if (_ligaAtual is null) { Nav.NavigateTo("/admin/liga"); return; }
+
+        var baseUrl = $"/admin/liga/{_ligaAtual.LigaId}";
+        Nav.NavigateTo(tab switch
+        {
+            "rodadas" => baseUrl,
+            "partidas" when _rodadaSelecionada is not null => $"{baseUrl}/rodada/{_rodadaSelecionada.RodadaId}",
+            _ => $"{baseUrl}?tab={tab}"
+        });
+    }
+
+    private void AbrirStats(Guid partidaId) => _statsPartidaId = partidaId;
+
+    private async Task FecharStats()
+    {
+        _statsPartidaId = null;
+        await CarregarDados();
+    }
+
+    private async Task AtualizarAposEvento() => await CarregarDados();
 
     private void ToggleTimeLiga(Guid id, bool on)
     {
@@ -714,8 +816,6 @@
         for (int i = 0; i < 6; i++) { _grupoA[i] = i < a.Length ? a[i] : ""; _grupoB[i] = i < b.Length ? b[i] : ""; }
     }
 
-    private void SetTab(string tab) { _tab = tab; }
-
     private async Task SalvarLiga()
     {
         _erro = null; _saving = true;
@@ -741,14 +841,7 @@
     private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
     private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
 
-    private async Task SelecionarLiga(LigaDto liga)
-    {
-        _ligaAtual = liga;
-        _rodadaSelecionada = null;
-        _partidas = Array.Empty<LigaPartidaDto>();
-        _tab = "rodadas";
-        await CarregarDados();
-    }
+    private void SelecionarLiga(LigaDto liga) => Nav.NavigateTo($"/admin/liga/{liga.LigaId}");
 
     private async Task IniciarFase(Guid ligaId)
     {
@@ -832,10 +925,12 @@
         _saving = true;
         try
         {
+            var apagouAtual = _ligaParaDeleter.LigaId == LigaId;
             await AdminSvc.DeleteLigaAsync(_ligaParaDeleter.LigaId, CancellationToken.None);
             _ok = $"Liga '{_ligaParaDeleter.Nome}' apagada.";
             _ligaParaDeleter = null;
-            await CarregarDados();
+            if (apagouAtual) Nav.NavigateTo("/admin/liga");
+            else await CarregarDados();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
@@ -868,41 +963,34 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
-    private async Task SelecionarRodada(LigaRodadaDto r)
-    {
-        _rodadaSelecionada = r;
-        _partidas = await AdminSvc.ListPartidasAsync(r.RodadaId, CancellationToken.None);
-        _tab = "partidas";
-    }
+    private void SelecionarRodada(LigaRodadaDto r) => Nav.NavigateTo($"/admin/liga/{_ligaAtual!.LigaId}/rodada/{r.RodadaId}");
 
     private async Task CriarPartida()
     {
         if (!Guid.TryParse(_novaCasa, out var casa) || !Guid.TryParse(_novaFora, out var fora)) { _erro = "Selecione os dois times."; return; }
         _saving = true;
-        try { await AdminSvc.CreatePartidaAsync(_rodadaSelecionada!.RodadaId, new LigaPartidaCreateRequest(casa, fora), CancellationToken.None); _showCriarPartida = false; _novaCasa = null; _novaFora = null; await SelecionarRodada(_rodadaSelecionada); }
+        try { await AdminSvc.CreatePartidaAsync(_rodadaSelecionada!.RodadaId, new LigaPartidaCreateRequest(casa, fora), CancellationToken.None); _showCriarPartida = false; _novaCasa = null; _novaFora = null; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }
 
     private async Task IniciarPartida(Guid id)
     {
-        try { await AdminSvc.IniciarPartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        try { await AdminSvc.IniciarPartidaAsync(id, CancellationToken.None); await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
     }
 
     private async Task EncerrarPartida(Guid id)
     {
-        try { await AdminSvc.EncerrarPartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        try { await AdminSvc.EncerrarPartidaAsync(id, CancellationToken.None); await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
     }
 
     private async Task DeletarPartida(Guid id)
     {
-        try { await AdminSvc.DeletePartidaAsync(id, CancellationToken.None); await SelecionarRodada(_rodadaSelecionada!); }
+        try { await AdminSvc.DeletePartidaAsync(id, CancellationToken.None); await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
     }
-
-    private void IrParaStats(Guid partidaId) => Nav.NavigateTo($"/admin/liga/stats/{partidaId}?return=/admin/liga");
 
     private void MostrarWO(LigaPartidaDto p) { _woPartida = p; _woTimeId = null; }
 
@@ -910,7 +998,7 @@
     {
         if (!Guid.TryParse(_woTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
         _saving = true;
-        try { await AdminSvc.AplicarWOAsync(_woPartida!.PartidaId, timeId, CancellationToken.None); _woPartida = null; _woTimeId = null; _ok = "W.O. aplicado."; await SelecionarRodada(_rodadaSelecionada!); }
+        try { await AdminSvc.AplicarWOAsync(_woPartida!.PartidaId, timeId, CancellationToken.None); _woPartida = null; _woTimeId = null; _ok = "W.O. aplicado."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }
@@ -921,7 +1009,7 @@
     {
         if (!Guid.TryParse(_penTimeId, out var timeId)) { _erro = "Selecione o vencedor dos pênaltis."; return; }
         _saving = true;
-        try { await AdminSvc.EncerrarPartidaComPenaltisAsync(_penPartida!.PartidaId, timeId, CancellationToken.None); _penPartida = null; _penTimeId = null; _ok = "Jogo encerrado nos pênaltis."; await SelecionarRodada(_rodadaSelecionada!); }
+        try { await AdminSvc.EncerrarPartidaComPenaltisAsync(_penPartida!.PartidaId, timeId, CancellationToken.None); _penPartida = null; _penTimeId = null; _ok = "Jogo encerrado nos pênaltis."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }
@@ -1013,7 +1101,7 @@
         {
             var partida = await AdminSvc.CriarPartidaKnockoutAsync(jogo.KnockoutJogoId, CancellationToken.None);
             await CarregarDados();
-            Nav.NavigateTo($"/admin/liga/stats/{partida.PartidaId}?return=/admin/liga");
+            AbrirStats(partida.PartidaId);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }

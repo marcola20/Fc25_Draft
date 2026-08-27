@@ -2,8 +2,8 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Components.Liga
 @inject ILigaPublicService LigaService
-@inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @implements IDisposable
 
@@ -511,7 +511,11 @@
                     <button type="button" class="btn-close" @onclick="FecharDetalhesPartida"></button>
                 </div>
                 <div class="modal-body">
-                    @if (_eventoPartida.Any())
+                    @if (_showEditor)
+                    {
+                        <PartidaStatsEditor PartidaId="_partidaDetalhes.PartidaId" OnChanged="AtualizarAoVivo" />
+                    }
+                    else if (_eventoPartida.Any())
                     {
                         var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
                         if (gols.Any())
@@ -564,7 +568,11 @@
                     }
                 </div>
                 <div class="modal-footer">
-                    @if (AdminAuth.IsAdmin)
+                    @if (_showEditor)
+                    {
+                        <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false">← Voltar</button>
+                    }
+                    else if (AdminAuth.IsAdmin)
                     {
                         <button type="button" class="btn btn-primary me-auto" @onclick="EditarStats">✏️ Editar stats</button>
                     }
@@ -616,6 +624,7 @@
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
 
     private bool _mostraDetalhesPartida = false;
+    private bool _showEditor;
     private LigaPartidaDto? _partidaDetalhes;
     private IReadOnlyList<LigaEventoDto> _eventoPartida = Array.Empty<LigaEventoDto>();
 
@@ -650,7 +659,22 @@
     private void EditarStats()
     {
         if (_partidaDetalhes is null) return;
-        Navigation.NavigateTo($"/admin/liga/stats/{_partidaDetalhes.PartidaId}?return=/liga");
+        _showEditor = true;
+    }
+
+    private async Task AtualizarAoVivo()
+    {
+        if (_partidaDetalhes is null) return;
+
+        _eventoPartida = await LigaService.GetEventosPartidaAsync(_partidaDetalhes.PartidaId, CancellationToken.None);
+
+        // Gols/cartões podem alterar o placar e a classificação: recarrega mantendo a rodada visível.
+        var idxAtual = _rodadaIdx;
+        await LoadLigaDataAsync(_ligaId);
+        if (idxAtual < _rodadas.Count) _rodadaIdx = idxAtual;
+
+        var atualizada = _rodadas.SelectMany(r => r.Partidas).FirstOrDefault(p => p.PartidaId == _partidaDetalhes.PartidaId);
+        if (atualizada is not null) _partidaDetalhes = atualizada;
     }
 
     public void Dispose()
@@ -733,6 +757,7 @@
     private void FecharDetalhesPartida()
     {
         _mostraDetalhesPartida = false;
+        _showEditor = false;
         _partidaDetalhes = null;
         _eventoPartida = Array.Empty<LigaEventoDto>();
     }

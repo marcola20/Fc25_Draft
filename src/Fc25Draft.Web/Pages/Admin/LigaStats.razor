@@ -1,301 +1,35 @@
 @page "/admin/liga/stats/{PartidaId:guid}"
-@using Fc25Draft.Core.DTOs
-@using Fc25Draft.Core.Enums
-@using Fc25Draft.Core.Interfaces
-@using Fc25Draft.Infra.Data
+@using Fc25Draft.Web.Components.Liga
+@using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.EntityFrameworkCore
 @attribute [Authorize(Roles = "Admin")]
-@inject ILigaAdminService AdminSvc
-@inject DraftDbContext Db
 @inject NavigationManager Nav
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
 
 <PageTitle>Stats da Partida</PageTitle>
 
 <div class="container-fluid py-3">
     <button class="btn btn-sm btn-outline-secondary mb-3" @onclick='() => Nav.NavigateTo(ReturnUrl ?? "/admin/liga")'>← Voltar</button>
 
-    @if (_partida is null)
-    {
-        <div class="alert alert-info">Carregando...</div>
-    }
-    else
-    {
-        <h1 class="h4 mb-1">@_partida.TimeCasaNome <span class="text-muted">@_partida.GolsCasa – @_partida.GolsFora</span> @_partida.TimeForaNome</h1>
-        <div class="text-muted small mb-3">
-            Status: <strong>@_partida.Status</strong>
-            @if (_partida.IsWO) { <span class="badge bg-danger ms-1">W.O.</span> }
-            @if (_partida.TemPenaltis) { <span class="badge bg-info text-dark ms-1">Pênaltis</span> }
-        </div>
-
-        @if (!string.IsNullOrEmpty(_erro))
-        {
-            <div class="alert alert-danger alert-dismissible">@_erro <button class="btn-close" @onclick='()=>_erro=null'></button></div>
-        }
-        @if (!string.IsNullOrEmpty(_ok))
-        {
-            <div class="alert alert-success alert-dismissible">@_ok <button class="btn-close" @onclick='()=>_ok=null'></button></div>
-        }
-
-        <div class="row g-3 mb-4">
-            <!-- Registrar Gol -->
-            <div class="col-12 col-md-6">
-                <div class="card">
-                    <div class="card-header fw-bold">⚽ Registrar Gol</div>
-                    <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label small">Time (que marca o gol no placar)</label>
-                            <select class="form-select" @bind="_golTimeId" @bind:after="OnGolTimeChanged">
-                                <option value="">Selecione...</option>
-                                <option value="@_partida.TimeCasaId">@_partida.TimeCasaNome</option>
-                                <option value="@_partida.TimeForaId">@_partida.TimeForaNome</option>
-                            </select>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" id="golContra" @bind="_golContra" @bind:after="OnGolContraChanged" disabled="@(string.IsNullOrEmpty(_golTimeId))" />
-                            <label class="form-check-label small" for="golContra">Gol contra (marcado pelo adversário)</label>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Jogador @(_golContra ? "(autor do gol contra, time adversário)" : "(gol)")</label>
-                            <select class="form-select" @bind="_golJogadorId">
-                                <option value="">Selecione...</option>
-                                @foreach (var j in _jogadoresDoTime)
-                                {
-                                    <option value="@j.PlayerId">@j.Name</option>
-                                }
-                            </select>
-                        </div>
-                        @if (!_golContra)
-                        {
-                            <div class="mb-2">
-                                <label class="form-label small">Assistência (opcional)</label>
-                                <select class="form-select" @bind="_golAssistenteId">
-                                    <option value="">Sem assistência</option>
-                                    @foreach (var j in _jogadoresDoTime)
-                                    {
-                                        <option value="@j.PlayerId">@j.Name</option>
-                                    }
-                                </select>
-                            </div>
-                        }
-                        <div class="mb-2">
-                            <label class="form-label small">Minuto (opcional)</label>
-                            <input type="number" class="form-control" min="1" max="120" @bind="_golMinuto" />
-                        </div>
-                        <button class="btn btn-primary btn-sm" @onclick="RegistrarGol" disabled="@_saving">Registrar @(_golContra ? "Gol Contra" : "Gol")</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Registrar Cartão -->
-            <div class="col-12 col-md-6">
-                <div class="card">
-                    <div class="card-header fw-bold">🟨 Registrar Cartão</div>
-                    <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label small">Tipo</label>
-                            <select class="form-select" @bind="_cartaoTipo">
-                                <option value="@TipoEvento.CartaoAmarelo">Amarelo</option>
-                                <option value="@TipoEvento.CartaoVermelho">Vermelho</option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Time</label>
-                            <select class="form-select" @bind="_cartaoTimeId" @bind:after="OnCartaoTimeChanged">
-                                <option value="">Selecione...</option>
-                                <option value="@_partida.TimeCasaId">@_partida.TimeCasaNome</option>
-                                <option value="@_partida.TimeForaId">@_partida.TimeForaNome</option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Jogador</label>
-                            <select class="form-select" @bind="_cartaoJogadorId">
-                                <option value="">Selecione...</option>
-                                @foreach (var j in _jogadoresDoTimeCartao)
-                                {
-                                    <option value="@j.PlayerId">@j.Name</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Minuto (opcional)</label>
-                            <input type="number" class="form-control" min="1" max="120" @bind="_cartaoMinuto" />
-                        </div>
-                        <button class="btn btn-warning btn-sm" @onclick="RegistrarCartao" disabled="@_saving">Registrar Cartão</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Lista de Eventos -->
-        <h5 class="mb-2">Eventos da Partida</h5>
-        @if (!_eventos.Any())
-        {
-            <div class="text-muted">Nenhum evento registrado.</div>
-        }
-        else
-        {
-            <div class="list-group">
-                @foreach (var ev in _eventos)
-                {
-                    <div class="list-group-item d-flex align-items-center gap-2">
-                        <span>@EventoIcon(ev.Tipo)</span>
-                        @if (ev.Minuto.HasValue) { <span class="badge bg-secondary">@ev.Minuto'</span> }
-                        <span class="fw-semibold">@ev.JogadorNome</span>
-                        @if (ev.Tipo == TipoEvento.GolContra)
-                        {
-                            <span class="badge bg-danger">contra</span>
-                            <span class="text-muted small">(gol para @ev.TimeNome)</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted small">(@ev.TimeNome)</span>
-                        }
-                        @if (ev.AssistenteNome is not null)
-                        {
-                            <span class="text-muted small">Assist.: @ev.AssistenteNome</span>
-                        }
-                        <button class="btn btn-sm btn-outline-danger ms-auto" @onclick="() => DeletarEvento(ev.EventoId)" disabled="@_saving">×</button>
-                    </div>
-                }
-            </div>
-        }
-    }
+    <PartidaStatsEditor PartidaId="PartidaId" />
 </div>
 
 @code {
     [Parameter] public Guid PartidaId { get; set; }
     [SupplyParameterFromQuery(Name = "return")] [Parameter] public string? ReturnUrl { get; set; }
 
-    private LigaPartidaDto? _partida;
-    private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();
-    private string? _erro, _ok;
-    private bool _saving;
-
-    // Jogadores por time (cache simples)
-    private Dictionary<Guid, List<PlayerListItemDto>> _jogadoresPorTime = new();
-    private List<PlayerListItemDto> _jogadoresDoTime = new();
-    private List<PlayerListItemDto> _jogadoresDoTimeCartao = new();
-
-    // Gol form
-    private string? _golTimeId;
-    private bool _golContra;
-    private string? _golJogadorId;
-    private string? _golAssistenteId;
-    private int? _golMinuto;
-
-    // Cartão form
-    private TipoEvento _cartaoTipo = TipoEvento.CartaoAmarelo;
-    private string? _cartaoTimeId;
-    private string? _cartaoJogadorId;
-    private int? _cartaoMinuto;
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnParametersSet()
     {
-        await CarregarPartida();
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/admin/liga"),
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin", "/admin/liga"),
+                new("Liga", ReturnUrl ?? "/admin/liga"),
+                new("Stats da Partida")
+            },
+            subtitle: "Lançamento de eventos da partida");
     }
-
-    private async Task CarregarPartida()
-    {
-        _partida = await AdminSvc.GetPartidaByIdAsync(PartidaId, CancellationToken.None);
-        _eventos = await AdminSvc.ListEventosAsync(PartidaId, CancellationToken.None);
-    }
-
-    private async Task OnGolTimeChanged()
-    {
-        _golJogadorId = null; _golAssistenteId = null;
-        await AtualizarJogadoresGol();
-    }
-
-    private async Task OnGolContraChanged()
-    {
-        _golJogadorId = null; _golAssistenteId = null;
-        await AtualizarJogadoresGol();
-    }
-
-    private async Task AtualizarJogadoresGol()
-    {
-        if (!Guid.TryParse(_golTimeId, out var tid)) { _jogadoresDoTime = new(); return; }
-
-        // Gol contra: quem marca é jogador do time adversário ao que recebe o gol no placar.
-        var idParaListar = _golContra
-            ? (tid == _partida!.TimeCasaId ? _partida.TimeForaId : _partida.TimeCasaId)
-            : tid;
-
-        _jogadoresDoTime = await GetJogadoresDoTime(idParaListar);
-    }
-
-    private async Task OnCartaoTimeChanged()
-    {
-        _cartaoJogadorId = null;
-        if (Guid.TryParse(_cartaoTimeId, out var tid))
-            _jogadoresDoTimeCartao = await GetJogadoresDoTime(tid);
-        else
-            _jogadoresDoTimeCartao = new();
-    }
-
-    private async Task<List<PlayerListItemDto>> GetJogadoresDoTime(Guid teamId)
-    {
-        if (_jogadoresPorTime.TryGetValue(teamId, out var cached)) return cached;
-        var jogadores = await Db.TeamRosters
-            .Where(r => r.TeamId == teamId)
-            .OrderBy(r => r.Player.Name)
-            .Select(r => new PlayerListItemDto(
-                r.Player.PlayerId, r.Player.Name,
-                r.Player.PositionId, r.Player.Position.Name,
-                r.Player.Overall, r.Player.Age,
-                "Normal", null))
-            .ToListAsync();
-        _jogadoresPorTime[teamId] = jogadores;
-        return jogadores;
-    }
-
-    private async Task RegistrarGol()
-    {
-        if (!Guid.TryParse(_golTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
-        if (!int.TryParse(_golJogadorId, out var jogId)) { _erro = "Selecione o jogador."; return; }
-        int? assId = _golContra ? null : (int.TryParse(_golAssistenteId, out var a) ? a : null);
-        _saving = true;
-        try
-        {
-            await AdminSvc.AddGolAsync(PartidaId, new LigaGolRequest(timeId, jogId, assId, _golMinuto, _golContra), CancellationToken.None);
-            _ok = _golContra ? "Gol contra registrado!" : "Gol registrado!";
-            _golTimeId = null; _golContra = false; _golJogadorId = null; _golAssistenteId = null; _golMinuto = null; _jogadoresDoTime = new();
-            await CarregarPartida();
-        }
-        catch (Exception ex) { _erro = ex.Message; }
-        finally { _saving = false; }
-    }
-
-    private async Task RegistrarCartao()
-    {
-        if (!Guid.TryParse(_cartaoTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
-        if (!int.TryParse(_cartaoJogadorId, out var jogId)) { _erro = "Selecione o jogador."; return; }
-        _saving = true;
-        try
-        {
-            await AdminSvc.AddCartaoAsync(PartidaId, new LigaCartaoRequest(timeId, jogId, _cartaoTipo, _cartaoMinuto), CancellationToken.None);
-            _ok = "Cartão registrado!"; _cartaoTimeId = null; _cartaoJogadorId = null; _cartaoMinuto = null; _jogadoresDoTimeCartao = new();
-            await CarregarPartida();
-        }
-        catch (Exception ex) { _erro = ex.Message; }
-        finally { _saving = false; }
-    }
-
-    private async Task DeletarEvento(Guid eventoId)
-    {
-        _saving = true;
-        try { await AdminSvc.DeleteEventoAsync(eventoId, CancellationToken.None); _ok = "Evento removido."; await CarregarPartida(); }
-        catch (Exception ex) { _erro = ex.Message; }
-        finally { _saving = false; }
-    }
-
-    private static string EventoIcon(TipoEvento t) => t switch
-    {
-        TipoEvento.Gol => "⚽",
-        TipoEvento.GolContra => "⚽",
-        TipoEvento.CartaoAmarelo => "🟨",
-        TipoEvento.CartaoVermelho => "🟥",
-        _ => "•"
-    };
 }
