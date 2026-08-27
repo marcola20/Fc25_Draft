@@ -113,10 +113,18 @@ else
                 @if (lineup.LastChange is not null && lineup.LastChange.Changes.Count > 0)
                 {
                     <div class="lineup-changes-banner">
-                        <div class="lineup-changes-banner-title">
-                            🔔 Mudanças em @BrazilTime.FormatDateTime(lineup.LastChange.ChangedAtUtc)
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <div class="lineup-changes-banner-title mb-0">
+                                🔔 Mudanças desde a última vez que você viu
+                            </div>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-success"
+                                    @onclick="() => AcknowledgeAsync(lineup.LineupId)"
+                                    disabled="@IsAcknowledging(lineup.LineupId)">
+                                @(IsAcknowledging(lineup.LineupId) ? "Marcando..." : "✓ Marcar como visto")
+                            </button>
                         </div>
-                        <ul class="lineup-changes-list mb-0">
+                        <ul class="lineup-changes-list mb-0 mt-2">
                             @foreach (var change in lineup.LastChange.Changes)
                             {
                                 <li>
@@ -269,6 +277,7 @@ else
     private readonly List<TeamListItemDto> teams = new();
     private readonly List<AdminLineupOverviewDto> lineups = new();
     private readonly Dictionary<Guid, bool> lineupDetailsState = new();
+    private readonly HashSet<Guid> acknowledgingLineupIds = new();
     private bool isLoading = true;
     private string? errorMessage;
     private Guid selectedTeamId = Guid.Empty;
@@ -414,6 +423,30 @@ else
 
     private static bool Changed(AdminLineupOverviewDto lineup, string category, string field)
         => lineup.LastChange?.Changes.Any(c => c.Category == category && c.Field == field) == true;
+
+    private bool IsAcknowledging(Guid lineupId) => acknowledgingLineupIds.Contains(lineupId);
+
+    private async Task AcknowledgeAsync(Guid lineupId)
+    {
+        if (!acknowledgingLineupIds.Add(lineupId)) return;
+        StateHasChanged();
+
+        try
+        {
+            await AdminLineupsApiClient.AcknowledgeAsync(lineupId);
+            await LoadLineupsAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "AdminLineups: erro ao marcar escalação {LineupId} como vista", lineupId);
+            errorMessage = "Não foi possível marcar a escalação como vista. Tente novamente.";
+        }
+        finally
+        {
+            acknowledgingLineupIds.Remove(lineupId);
+            StateHasChanged();
+        }
+    }
 
     public void Dispose()
     {

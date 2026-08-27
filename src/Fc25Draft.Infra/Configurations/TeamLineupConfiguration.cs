@@ -14,6 +14,7 @@ public class TeamLineupConfiguration : IEntityTypeConfiguration<TeamLineup>
         e.Property(x => x.AutoSubstitution).IsRequired().HasDefaultValue(1);
         e.Property(x => x.CreatedAt).IsRequired();
         e.Property(x => x.UpdatedAt).IsRequired();
+        e.Property(x => x.LastSeenSnapshotJson);
 
         e.HasIndex(x => new { x.TeamId, x.IsActive })
          .HasDatabaseName("IX_Lineup_Team_Active");

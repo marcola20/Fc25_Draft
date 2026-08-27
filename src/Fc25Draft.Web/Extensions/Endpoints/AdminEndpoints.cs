@@ -55,6 +55,31 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            adminApi.MapPost("/lineups/{lineupId:guid}/acknowledge", async (
+                Guid lineupId,
+                ITeamLineupService lineupService,
+                ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var logger = loggerFactory.CreateLogger("AdminLineupsEndpoints");
+
+                try
+                {
+                    await lineupService.AcknowledgeLineupAsync(lineupId, ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    logger.LogWarning(ex, "AdminLineups:Acknowledge lineup not found {LineupId}", lineupId);
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status404NotFound);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "AdminLineups:Unexpected error acknowledging lineup {LineupId}", lineupId);
+                    return Results.Json(new { message = "Não foi possível marcar a escalação como vista." }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+            });
+
             var adminTransferApi = adminApi.MapGroup("/transfer");
 
             adminTransferApi.MapPost("/sell", async (

@@ -107,18 +107,22 @@ public class TeamLineupService : ITeamLineupService
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
 
-        var lineupIds = entities.Select(e => e.LineupId).ToList();
-        var latestChanges = await _dbContext.TeamLineupChangeLogs
-            .AsNoTracking()
-            .Where(c => lineupIds.Contains(c.LineupId))
-            .GroupBy(c => c.LineupId)
-            .Select(g => g.OrderByDescending(c => c.ChangedAtUtc).First())
-            .ToListAsync(ct);
-        var changesByLineup = latestChanges.ToDictionary(c => c.LineupId);
+        return entities.Select(MapToAdminDto).ToList();
+    }
 
-        return entities
-            .Select(e => MapToAdminDto(e, changesByLineup.GetValueOrDefault(e.LineupId)))
-            .ToList();
+    public async Task AcknowledgeLineupAsync(Guid lineupId, CancellationToken ct)
+    {
+        if (lineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(lineupId));
+
+        var dto = await LoadLineupDtoAsync(lineupId, ct);
+
+        var entity = await _dbContext.TeamLineups.FirstOrDefaultAsync(l => l.LineupId == lineupId, ct)
+            ?? throw new KeyNotFoundException("Escalação não encontrada.");
+
+        entity.LastSeenSnapshotJson = JsonSerializer.Serialize(dto);
+        entity.LastSeenAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<TeamLineupDto> CreateLineupAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -225,7 +229,25 @@ public class TeamLineupService : ITeamLineupService
             }
         });
 
-        return await LoadLineupDtoAsync(newLineupId, ct);
+        var created = await LoadLineupDtoAsync(newLineupId, ct);
+
+        // Retrato inicial: até o ADM olhar de novo, nada aqui conta como "mudança".
+        try
+        {
+            var entity = await _dbContext.TeamLineups.FirstOrDefaultAsync(l => l.LineupId == newLineupId, ct);
+            if (entity is not null)
+            {
+                entity.LastSeenSnapshotJson = JsonSerializer.Serialize(created);
+                entity.LastSeenAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+                await _dbContext.SaveChangesAsync(ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Não foi possível registrar o retrato inicial da escalação {LineupId}.", newLineupId);
+        }
+
+        return created;
     }
 
     public async Task<TeamLineupDto> UpdateLineupAsync(Guid teamId, Guid lineupId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -242,8 +264,6 @@ public class TeamLineupService : ITeamLineupService
         var name = NormalizeName(request.Name);
         var autoSubstitution = NormalizeAutoSubstitution(request.AutoSubstitution);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        var before = await LoadLineupDtoAsync(lineupId, ct);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
@@ -340,36 +360,28 @@ public class TeamLineupService : ITeamLineupService
             }
         });
 
-        var after = await LoadLineupDtoAsync(lineupId, ct);
-
-        try
-        {
-            await RecordChangeLogAsync(lineupId, before, after, ct);
-        }
-        catch (Exception ex)
-        {
-            // Não fatal: a escalação já foi salva com sucesso, só o registro do diff falhou.
-            _logger.LogWarning(ex, "Não foi possível registrar o log de mudanças da escalação {LineupId}.", lineupId);
-        }
-
-        return after;
+        return await LoadLineupDtoAsync(lineupId, ct);
     }
 
-    private async Task RecordChangeLogAsync(Guid lineupId, TeamLineupDto before, TeamLineupDto after, CancellationToken ct)
+    private static LineupChangeLogDto? BuildLastChange(TeamLineup entity, TeamLineupDto current)
     {
-        var changes = ComputeLineupChanges(before, after);
-        if (changes.Count == 0) return;
+        if (entity.LastSeenSnapshotJson is null) return null;
 
-        var entry = new TeamLineupChangeLog
+        TeamLineupDto? baseline;
+        try
         {
-            ChangeLogId = Guid.NewGuid(),
-            LineupId = lineupId,
-            ChangedAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
-            ChangesJson = JsonSerializer.Serialize(changes)
-        };
+            baseline = JsonSerializer.Deserialize<TeamLineupDto>(entity.LastSeenSnapshotJson);
+        }
+        catch (JsonException)
+        {
+            // Retrato corrompido/formato antigo — ignora silenciosamente, não é crítico.
+            return null;
+        }
 
-        _dbContext.TeamLineupChangeLogs.Add(entry);
-        await _dbContext.SaveChangesAsync(ct);
+        if (baseline is null) return null;
+
+        var changes = ComputeLineupChanges(baseline, current);
+        return changes.Count == 0 ? null : new LineupChangeLogDto(entity.LastSeenAtUtc, changes);
     }
 
     private static List<LineupChangeEntryDto> ComputeLineupChanges(TeamLineupDto before, TeamLineupDto after)
@@ -1141,23 +1153,10 @@ public class TeamLineupService : ITeamLineupService
             player.PlayerId, player.PlayerGuid, player.Name, player.Position.Name, player.PositionId);
     }
 
-    private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity, TeamLineupChangeLog? changeLog)
+    private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity)
     {
         var dto = MapToDto(entity);
-
-        LineupChangeLogDto? lastChange = null;
-        if (changeLog is not null)
-        {
-            try
-            {
-                var entries = JsonSerializer.Deserialize<List<LineupChangeEntryDto>>(changeLog.ChangesJson) ?? new();
-                lastChange = new LineupChangeLogDto(changeLog.ChangeLogId, changeLog.ChangedAtUtc, entries);
-            }
-            catch (JsonException)
-            {
-                // Log corrompido/formato antigo — ignora silenciosamente, não é crítico.
-            }
-        }
+        var lastChange = BuildLastChange(entity, dto);
 
         return new AdminLineupOverviewDto(
             dto.LineupId,

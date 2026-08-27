@@ -151,7 +151,9 @@ public sealed record LineupChangeEntryDto(
     string? OldValue,
     string? NewValue);
 
+// Diff entre o último retrato marcado como "visto" pelo ADM e o estado atual da
+// escalação — pode acumular várias edições do time, e mudanças que se cancelam
+// (ex.: trocou o titular e trocou de volta) simplesmente não aparecem aqui.
 public sealed record LineupChangeLogDto(
-    Guid ChangeLogId,
-    DateTime ChangedAtUtc,
+    DateTime? LastSeenAtUtc,
     IReadOnlyList<LineupChangeEntryDto> Changes);

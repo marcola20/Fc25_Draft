@@ -11,6 +11,12 @@ public class TeamLineup
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    // Retrato (snapshot JSON de TeamLineupDto) da escalação na última vez que um ADM
+    // marcou como visto. Usado para calcular o que mudou desde então — não é um
+    // histórico de saves, é só o "último ponto de comparação" do ADM.
+    public string? LastSeenSnapshotJson { get; set; }
+    public DateTime? LastSeenAtUtc { get; set; }
+
     public int? CaptainPlayerId { get; set; }
     public int? ShortFreeKick1PlayerId { get; set; }
     public int? ShortFreeKick2PlayerId { get; set; }

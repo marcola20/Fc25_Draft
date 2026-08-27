@@ -32,4 +32,11 @@ public class AdminLineupsApiClient
         var payload = await response.Content.ReadFromJsonAsync<IReadOnlyList<AdminLineupOverviewDto>>(cancellationToken: ct);
         return payload ?? Array.Empty<AdminLineupOverviewDto>();
     }
+
+    public async Task AcknowledgeAsync(Guid lineupId, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        using var response = await client.PostAsync($"api/admin/lineups/{lineupId}/acknowledge", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

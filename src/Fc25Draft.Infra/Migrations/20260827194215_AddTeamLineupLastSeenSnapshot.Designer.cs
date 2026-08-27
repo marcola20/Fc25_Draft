@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    [Migration("20260827190851_AddTeamLineupChangeLog")]
-    partial class AddTeamLineupChangeLog
+    [Migration("20260827194215_AddTeamLineupLastSeenSnapshot")]
+    partial class AddTeamLineupLastSeenSnapshot
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1175,6 +1175,12 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastSeenAtUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("LastSeenSnapshotJson")
+                        .HasColumnType("text");
+
                     b.Property<int?>("LongFreeKickPlayerId")
                         .HasColumnType("integer");
 
@@ -1266,30 +1272,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("DefensePlayer2Id");
 
                     b.ToTable("TeamLineupAdvancedInstructions");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineupChangeLog", b =>
-                {
-                    b.Property<Guid>("ChangeLogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ChangedAtUtc")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("ChangesJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("LineupId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ChangeLogId");
-
-                    b.HasIndex("LineupId", "ChangedAtUtc")
-                        .HasDatabaseName("IX_LineupChangeLog_Lineup_ChangedAt");
-
-                    b.ToTable("TeamLineupChangeLogs");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineupDefensiveInstructions", b =>
@@ -2006,17 +1988,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("DefensePlayer1");
 
                     b.Navigation("DefensePlayer2");
-
-                    b.Navigation("Lineup");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineupChangeLog", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.TeamLineup", "Lineup")
-                        .WithMany()
-                        .HasForeignKey("LineupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Lineup");
                 });
