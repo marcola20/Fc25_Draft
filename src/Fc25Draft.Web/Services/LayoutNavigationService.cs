@@ -163,6 +163,17 @@ public class LayoutNavigationService
                 new("Regulamento")
             }
         },
+        ["/manual"] = new PageDefinition
+        {
+            Route = "/manual",
+            Title = "Manual do Técnico",
+            Subtitle = "Guia para novos técnicos e auxiliares",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Manual do Técnico")
+            }
+        },
         ["/liga"] = new PageDefinition
         {
             Route = "/liga",
