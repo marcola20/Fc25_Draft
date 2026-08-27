@@ -65,9 +65,9 @@ public class TeamService : ITeamService
             TeamId = Guid.NewGuid(),
             TeamName = normalizedName,
             OwnerName = NormalizeOwner(dto.OwnerName),
-            Token = Guid.NewGuid().ToString("N"),
+            Token = GenerateToken(),
             AuxiliarName = auxiliarName,
-            AuxToken = auxiliarName is null ? null : Guid.NewGuid().ToString("N")
+            AuxToken = auxiliarName is null ? null : GenerateToken()
         };
 
         _db.Teams.Add(entity);
@@ -104,7 +104,7 @@ public class TeamService : ITeamService
         else if (entity.AuxToken is null)
         {
             // Auxiliar recém-definido: gera o token dele automaticamente.
-            entity.AuxToken = Guid.NewGuid().ToString("N");
+            entity.AuxToken = GenerateToken();
         }
 
         await _db.SaveChangesAsync();
@@ -150,6 +150,8 @@ public class TeamService : ITeamService
             throw new ArgumentException("O nome do auxiliar deve ter no máximo 80 caracteres.", nameof(auxiliarName));
         }
     }
+
+    private static string GenerateToken() => Guid.NewGuid().ToString().ToUpperInvariant();
 
     private static string? NormalizeOwner(string? ownerName)
     {
