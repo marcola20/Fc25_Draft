@@ -138,4 +138,20 @@ public sealed record AdminLineupOverviewDto(
     TeamLineupDefensiveInstructionsDto? DefensiveInstructions,
     TeamLineupAdvancedInstructionsDto? AdvancedInstructions,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    LineupChangeLogDto? LastChange = null);
+
+// Uma entrada de diff entre a versão anterior e a atual de uma escalação.
+// Category+Field identifica unicamente o campo (ex.: "Instrução ofensiva"/"Estilo",
+// "Titular"/"Lateral Esquerdo") — usado tanto para montar o resumo textual quanto
+// para destacar visualmente o item correspondente na tela de detalhes.
+public sealed record LineupChangeEntryDto(
+    string Category,
+    string Field,
+    string? OldValue,
+    string? NewValue);
+
+public sealed record LineupChangeLogDto(
+    Guid ChangeLogId,
+    DateTime ChangedAtUtc,
+    IReadOnlyList<LineupChangeEntryDto> Changes);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
@@ -106,7 +107,18 @@ public class TeamLineupService : ITeamLineupService
             .ThenBy(l => l.CreatedAt)
             .ToListAsync(ct);
 
-        return entities.Select(MapToAdminDto).ToList();
+        var lineupIds = entities.Select(e => e.LineupId).ToList();
+        var latestChanges = await _dbContext.TeamLineupChangeLogs
+            .AsNoTracking()
+            .Where(c => lineupIds.Contains(c.LineupId))
+            .GroupBy(c => c.LineupId)
+            .Select(g => g.OrderByDescending(c => c.ChangedAtUtc).First())
+            .ToListAsync(ct);
+        var changesByLineup = latestChanges.ToDictionary(c => c.LineupId);
+
+        return entities
+            .Select(e => MapToAdminDto(e, changesByLineup.GetValueOrDefault(e.LineupId)))
+            .ToList();
     }
 
     public async Task<TeamLineupDto> CreateLineupAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -231,6 +243,8 @@ public class TeamLineupService : ITeamLineupService
         var autoSubstitution = NormalizeAutoSubstitution(request.AutoSubstitution);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
+        var before = await LoadLineupDtoAsync(lineupId, ct);
+
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -326,8 +340,153 @@ public class TeamLineupService : ITeamLineupService
             }
         });
 
-        return await LoadLineupDtoAsync(lineupId, ct);
+        var after = await LoadLineupDtoAsync(lineupId, ct);
+
+        try
+        {
+            await RecordChangeLogAsync(lineupId, before, after, ct);
+        }
+        catch (Exception ex)
+        {
+            // Não fatal: a escalação já foi salva com sucesso, só o registro do diff falhou.
+            _logger.LogWarning(ex, "Não foi possível registrar o log de mudanças da escalação {LineupId}.", lineupId);
+        }
+
+        return after;
     }
+
+    private async Task RecordChangeLogAsync(Guid lineupId, TeamLineupDto before, TeamLineupDto after, CancellationToken ct)
+    {
+        var changes = ComputeLineupChanges(before, after);
+        if (changes.Count == 0) return;
+
+        var entry = new TeamLineupChangeLog
+        {
+            ChangeLogId = Guid.NewGuid(),
+            LineupId = lineupId,
+            ChangedAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
+            ChangesJson = JsonSerializer.Serialize(changes)
+        };
+
+        _dbContext.TeamLineupChangeLogs.Add(entry);
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    private static List<LineupChangeEntryDto> ComputeLineupChanges(TeamLineupDto before, TeamLineupDto after)
+    {
+        var changes = new List<LineupChangeEntryDto>();
+
+        if (!string.Equals(before.Name, after.Name, StringComparison.Ordinal))
+            changes.Add(new LineupChangeEntryDto("Geral", "Nome da escalação", before.Name, after.Name));
+
+        if (!string.Equals(before.Formation, after.Formation, StringComparison.Ordinal))
+            changes.Add(new LineupChangeEntryDto("Geral", "Formação", before.Formation, after.Formation));
+
+        if (before.AutoSubstitution != after.AutoSubstitution)
+            changes.Add(new LineupChangeEntryDto("Geral", "Substituições automáticas",
+                LineupLabels.AutoSubstitution(before.AutoSubstitution), LineupLabels.AutoSubstitution(after.AutoSubstitution)));
+
+        DiffSlots("Titular", before.Starters, after.Starters, changes);
+        DiffSlots("Reserva", before.Bench, after.Bench, changes);
+
+        DiffRole("Capitão", before.Roles.Captain, after.Roles.Captain, changes);
+        DiffRole("Falta curta", before.Roles.ShortFreeKick1, after.Roles.ShortFreeKick1, changes);
+        DiffRole("Falta curta 2", before.Roles.ShortFreeKick2, after.Roles.ShortFreeKick2, changes);
+        DiffRole("Falta longa", before.Roles.LongFreeKick, after.Roles.LongFreeKick, changes);
+        DiffRole("Pênaltis", before.Roles.Penalties, after.Roles.Penalties, changes);
+        DiffRole("Escanteio esq.", before.Roles.CornerLeft, after.Roles.CornerLeft, changes);
+        DiffRole("Escanteio dir.", before.Roles.CornerRight, after.Roles.CornerRight, changes);
+        DiffRole("Ataque 1", before.Roles.AttackingPlayer1, after.Roles.AttackingPlayer1, changes);
+        DiffRole("Ataque 2", before.Roles.AttackingPlayer2, after.Roles.AttackingPlayer2, changes);
+        DiffRole("Ataque 3", before.Roles.AttackingPlayer3, after.Roles.AttackingPlayer3, changes);
+
+        if (before.OffensiveInstructions is { } bo && after.OffensiveInstructions is { } ao)
+        {
+            const string cat = "Instrução ofensiva";
+            if (bo.OffensiveStyle != ao.OffensiveStyle)
+                changes.Add(new LineupChangeEntryDto(cat, "Estilo", LineupLabels.OffensiveStyle(bo.OffensiveStyle), LineupLabels.OffensiveStyle(ao.OffensiveStyle)));
+            if (bo.Playmaker != ao.Playmaker)
+                changes.Add(new LineupChangeEntryDto(cat, "Provocador", LineupLabels.Playmaker(bo.Playmaker), LineupLabels.Playmaker(ao.Playmaker)));
+            if (bo.AttackArea != ao.AttackArea)
+                changes.Add(new LineupChangeEntryDto(cat, "Área de ataque", LineupLabels.AttackArea(bo.AttackArea), LineupLabels.AttackArea(ao.AttackArea)));
+            if (bo.Positioning != ao.Positioning)
+                changes.Add(new LineupChangeEntryDto(cat, "Posicionamento", LineupLabels.Positioning(bo.Positioning), LineupLabels.Positioning(ao.Positioning)));
+            if (bo.SupportRange != ao.SupportRange)
+                changes.Add(new LineupChangeEntryDto(cat, "Alcance de apoio", bo.SupportRange.ToString(), ao.SupportRange.ToString()));
+        }
+
+        if (before.DefensiveInstructions is { } bd && after.DefensiveInstructions is { } ad)
+        {
+            const string cat = "Instrução defensiva";
+            if (bd.DefensiveStyle != ad.DefensiveStyle)
+                changes.Add(new LineupChangeEntryDto(cat, "Estilo", LineupLabels.DefensiveStyle(bd.DefensiveStyle), LineupLabels.DefensiveStyle(ad.DefensiveStyle)));
+            if (bd.ContainmentArea != ad.ContainmentArea)
+                changes.Add(new LineupChangeEntryDto(cat, "Área de contenção", LineupLabels.ContainmentArea(bd.ContainmentArea), LineupLabels.ContainmentArea(ad.ContainmentArea)));
+            if (bd.Pressure != ad.Pressure)
+                changes.Add(new LineupChangeEntryDto(cat, "Pressão", LineupLabels.Pressure(bd.Pressure), LineupLabels.Pressure(ad.Pressure)));
+            if (bd.DefensiveLine != ad.DefensiveLine)
+                changes.Add(new LineupChangeEntryDto(cat, "Linha defensiva", bd.DefensiveLine.ToString(), ad.DefensiveLine.ToString()));
+            if (bd.Density != ad.Density)
+                changes.Add(new LineupChangeEntryDto(cat, "Densidade", bd.Density.ToString(), ad.Density.ToString()));
+        }
+
+        if (before.AdvancedInstructions is { } ba && after.AdvancedInstructions is { } aa)
+        {
+            const string cat = "Instrução avançada";
+            if (ba.Attack1 != aa.Attack1 || ba.AttackPlayer1Id != aa.AttackPlayer1Id)
+                changes.Add(new LineupChangeEntryDto(cat, "Ataque 1",
+                    FormatAdvanced(LineupLabels.AdvancedAttack(ba.Attack1), ba.AttackPlayer1),
+                    FormatAdvanced(LineupLabels.AdvancedAttack(aa.Attack1), aa.AttackPlayer1)));
+            if (ba.Attack2 != aa.Attack2 || ba.AttackPlayer2Id != aa.AttackPlayer2Id)
+                changes.Add(new LineupChangeEntryDto(cat, "Ataque 2",
+                    FormatAdvanced(LineupLabels.AdvancedAttack(ba.Attack2), ba.AttackPlayer2),
+                    FormatAdvanced(LineupLabels.AdvancedAttack(aa.Attack2), aa.AttackPlayer2)));
+            if (ba.Defense1 != aa.Defense1 || ba.DefensePlayer1Id != aa.DefensePlayer1Id)
+                changes.Add(new LineupChangeEntryDto(cat, "Defesa 1",
+                    FormatAdvanced(LineupLabels.AdvancedDefense(ba.Defense1), ba.DefensePlayer1),
+                    FormatAdvanced(LineupLabels.AdvancedDefense(aa.Defense1), aa.DefensePlayer1)));
+            if (ba.Defense2 != aa.Defense2 || ba.DefensePlayer2Id != aa.DefensePlayer2Id)
+                changes.Add(new LineupChangeEntryDto(cat, "Defesa 2",
+                    FormatAdvanced(LineupLabels.AdvancedDefense(ba.Defense2), ba.DefensePlayer2),
+                    FormatAdvanced(LineupLabels.AdvancedDefense(aa.Defense2), aa.DefensePlayer2)));
+        }
+
+        return changes;
+    }
+
+    private static void DiffSlots(string category, IReadOnlyList<TeamLineupSlotDto> before, IReadOnlyList<TeamLineupSlotDto> after, List<LineupChangeEntryDto> changes)
+    {
+        var beforeByCode = before.ToDictionary(s => s.SlotCode, StringComparer.OrdinalIgnoreCase);
+        foreach (var afterSlot in after)
+        {
+            // Slot novo (mudou de formação, por exemplo) — não há "antes" comparável, então não reporta.
+            if (!beforeByCode.TryGetValue(afterSlot.SlotCode, out var beforeSlot)) continue;
+
+            var beforePlayerId = beforeSlot.Player?.PlayerId;
+            var afterPlayerId = afterSlot.Player?.PlayerId;
+            if (beforePlayerId == afterPlayerId) continue;
+
+            changes.Add(new LineupChangeEntryDto(
+                category,
+                afterSlot.DisplayName,
+                beforeSlot.Player?.Name ?? "Vazio",
+                afterSlot.Player?.Name ?? "Vazio"));
+        }
+    }
+
+    private static void DiffRole(string label, TeamLineupSlotPlayerDto? before, TeamLineupSlotPlayerDto? after, List<LineupChangeEntryDto> changes)
+    {
+        if (before?.PlayerId == after?.PlayerId) return;
+
+        changes.Add(new LineupChangeEntryDto(
+            "Função especial",
+            label,
+            before?.Name ?? "Melhor na função",
+            after?.Name ?? "Melhor na função"));
+    }
+
+    private static string FormatAdvanced(string label, TeamLineupSlotPlayerDto? player)
+        => player is null ? label : $"{label} — {player.Name}";
 
     public async Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct)
     {
@@ -982,9 +1141,24 @@ public class TeamLineupService : ITeamLineupService
             player.PlayerId, player.PlayerGuid, player.Name, player.Position.Name, player.PositionId);
     }
 
-    private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity)
+    private static AdminLineupOverviewDto MapToAdminDto(TeamLineup entity, TeamLineupChangeLog? changeLog)
     {
         var dto = MapToDto(entity);
+
+        LineupChangeLogDto? lastChange = null;
+        if (changeLog is not null)
+        {
+            try
+            {
+                var entries = JsonSerializer.Deserialize<List<LineupChangeEntryDto>>(changeLog.ChangesJson) ?? new();
+                lastChange = new LineupChangeLogDto(changeLog.ChangeLogId, changeLog.ChangedAtUtc, entries);
+            }
+            catch (JsonException)
+            {
+                // Log corrompido/formato antigo — ignora silenciosamente, não é crítico.
+            }
+        }
+
         return new AdminLineupOverviewDto(
             dto.LineupId,
             dto.TeamId,
@@ -1000,6 +1174,7 @@ public class TeamLineupService : ITeamLineupService
             dto.DefensiveInstructions,
             dto.AdvancedInstructions,
             dto.CreatedAtUtc,
-            dto.UpdatedAtUtc);
+            dto.UpdatedAtUtc,
+            lastChange);
     }
 }

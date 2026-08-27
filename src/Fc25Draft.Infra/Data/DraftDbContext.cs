@@ -21,6 +21,7 @@ public class DraftDbContext : DbContext
     public DbSet<TeamLineupOffensiveInstructions> TeamLineupOffensiveInstructions => Set<TeamLineupOffensiveInstructions>();
     public DbSet<TeamLineupDefensiveInstructions> TeamLineupDefensiveInstructions => Set<TeamLineupDefensiveInstructions>();
     public DbSet<TeamLineupAdvancedInstructions> TeamLineupAdvancedInstructions => Set<TeamLineupAdvancedInstructions>();
+    public DbSet<TeamLineupChangeLog> TeamLineupChangeLogs => Set<TeamLineupChangeLog>();
     public DbSet<AdminActionsLog> AdminActionsLogs => Set<AdminActionsLog>();
     public DbSet<MarketCycle> MarketCycles => Set<MarketCycle>();
     public DbSet<MarketItem> MarketItems => Set<MarketItem>();
