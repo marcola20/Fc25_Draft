@@ -518,6 +518,27 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
             });
 
+            adminTeamsApi.MapPost("/{id:guid}/regenerate-token", async (ITeamService teamService, Guid id) =>
+            {
+                try
+                {
+                    var token = await teamService.RegenerateTokenAsync(id);
+                    return Results.Ok(new { token });
+                }
+                catch (KeyNotFoundException) { return Results.NotFound(); }
+            });
+
+            adminTeamsApi.MapPost("/{id:guid}/regenerate-aux-token", async (ITeamService teamService, Guid id) =>
+            {
+                try
+                {
+                    var token = await teamService.RegenerateAuxTokenAsync(id);
+                    return Results.Ok(new { token });
+                }
+                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+            });
+
             adminTeamsApi.MapPost("/adjust-budget", async (
                 HttpContext httpContext,
                 AdminAdjustBudgetRequestDto request,

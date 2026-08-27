@@ -14,6 +14,11 @@
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
 
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
 @if (isLoading)
 {
     <p><em>Carregando...</em></p>
@@ -48,6 +53,46 @@ else
             <div class="form-text">Ao preencher, um token de acesso próprio é gerado automaticamente para o auxiliar, com as mesmas permissões do responsável. Ao limpar o campo, o acesso do auxiliar é revogado.</div>
         </div>
 
+        @if (Id.HasValue)
+        {
+            <div class="card mb-3">
+                <div class="card-header">Tokens de acesso</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label d-block">Token do Responsável</label>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <code>@currentToken</code>
+                            <button type="button" class="btn btn-sm btn-outline-warning" @onclick="HandleRegenerateTokenAsync" disabled="@isRegeneratingToken">
+                                @(isRegeneratingToken ? "Gerando..." : "Regenerar")
+                            </button>
+                        </div>
+                        <div class="form-text">O token atual deixa de funcionar imediatamente ao regenerar.</div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(model.AuxiliarName))
+                    {
+                        <div class="mb-0">
+                            <label class="form-label d-block">Token do Auxiliar</label>
+                            @if (string.IsNullOrWhiteSpace(currentAuxToken))
+                            {
+                                <div class="text-muted small">Será gerado automaticamente ao salvar.</div>
+                            }
+                            else
+                            {
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <code>@currentAuxToken</code>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" @onclick="HandleRegenerateAuxTokenAsync" disabled="@isRegeneratingAuxToken">
+                                        @(isRegeneratingAuxToken ? "Gerando..." : "Regenerar")
+                                    </button>
+                                </div>
+                                <div class="form-text">O token atual deixa de funcionar imediatamente ao regenerar.</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="d-flex gap-2">
             <button class="btn btn-primary" type="submit" disabled="@isSaving">Salvar</button>
             <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancelar</button>
@@ -62,9 +107,14 @@ else
     private readonly TeamFormModel model = new();
     private EditContext? editContext;
     private string? errorMessage;
+    private string? successMessage;
     private bool isSaving;
     private bool isLoading = true;
     private bool authInitialized;
+    private string? currentToken;
+    private string? currentAuxToken;
+    private bool isRegeneratingToken;
+    private bool isRegeneratingAuxToken;
 
     private string Title => Id.HasValue ? "Editar Time" : "Novo Time";
 
@@ -111,10 +161,58 @@ else
             model.TeamName = details.TeamName;
             model.OwnerName = details.OwnerName;
             model.AuxiliarName = details.AuxiliarName;
+            currentToken = details.Token;
+            currentAuxToken = details.AuxToken;
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+        }
+    }
+
+    private async Task HandleRegenerateTokenAsync()
+    {
+        if (!Id.HasValue) return;
+
+        isRegeneratingToken = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            currentToken = await TeamsApiClient.RegenerateTokenAsync(Id.Value);
+            successMessage = "Token do responsável regenerado.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isRegeneratingToken = false;
+        }
+    }
+
+    private async Task HandleRegenerateAuxTokenAsync()
+    {
+        if (!Id.HasValue) return;
+
+        isRegeneratingAuxToken = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            currentAuxToken = await TeamsApiClient.RegenerateAuxTokenAsync(Id.Value);
+            successMessage = "Token do auxiliar regenerado.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isRegeneratingAuxToken = false;
         }
     }
 
@@ -133,6 +231,7 @@ else
 
         isSaving = true;
         errorMessage = null;
+        successMessage = null;
 
         try
         {

@@ -172,6 +172,26 @@ public class TeamsApiClient
         await EnsureSuccessAsync(response);
     }
 
+    public async Task<string> RegenerateTokenAsync(Guid id, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PostAsync($"api/admin/teams/{id}/regenerate-token", null, ct);
+        await EnsureSuccessAsync(response);
+
+        var result = await response.Content.ReadFromJsonAsync<TokenResultDto>(cancellationToken: ct);
+        return result?.Token ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
+    public async Task<string> RegenerateAuxTokenAsync(Guid id, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PostAsync($"api/admin/teams/{id}/regenerate-aux-token", null, ct);
+        await EnsureSuccessAsync(response);
+
+        var result = await response.Content.ReadFromJsonAsync<TokenResultDto>(cancellationToken: ct);
+        return result?.Token ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
@@ -213,4 +233,5 @@ public class TeamsApiClient
     }
 
     private sealed record ApiErrorResponse(string? Message);
+    private sealed record TokenResultDto(string Token);
 }

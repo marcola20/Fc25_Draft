@@ -151,6 +151,33 @@ public class TeamService : ITeamService
         }
     }
 
+    public async Task<string> RegenerateTokenAsync(Guid id)
+    {
+        var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
+                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
+
+        entity.Token = GenerateToken();
+        await _db.SaveChangesAsync();
+
+        return entity.Token;
+    }
+
+    public async Task<string> RegenerateAuxTokenAsync(Guid id)
+    {
+        var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
+                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
+
+        if (string.IsNullOrWhiteSpace(entity.AuxiliarName))
+        {
+            throw new InvalidOperationException("Este time não tem auxiliar cadastrado.");
+        }
+
+        entity.AuxToken = GenerateToken();
+        await _db.SaveChangesAsync();
+
+        return entity.AuxToken;
+    }
+
     private static string GenerateToken() => Guid.NewGuid().ToString().ToUpperInvariant();
 
     private static string? NormalizeOwner(string? ownerName)
