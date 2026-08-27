@@ -513,7 +513,7 @@
                 <div class="modal-body">
                     @if (_eventoPartida.Any())
                     {
-                        var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol).ToList();
+                        var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
                         if (gols.Any())
                         {
                             <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
@@ -522,7 +522,16 @@
                                 {
                                     <li class="mb-2">
                                         <span class="badge bg-primary me-2">@gol.Minuto'</span>
-                                        <strong>@gol.JogadorNome</strong> (@gol.TimeNome)
+                                        <strong>@gol.JogadorNome</strong>
+                                        @if (gol.Tipo == TipoEvento.GolContra)
+                                        {
+                                            <span class="badge bg-danger ms-1">contra</span>
+                                            <text> (gol para @gol.TimeNome)</text>
+                                        }
+                                        else
+                                        {
+                                            <text> (@gol.TimeNome)</text>
+                                        }
                                         @if (!string.IsNullOrEmpty(gol.AssistenteNome))
                                         {
                                             <span class="text-muted small">- Assistência: @gol.AssistenteNome</span>

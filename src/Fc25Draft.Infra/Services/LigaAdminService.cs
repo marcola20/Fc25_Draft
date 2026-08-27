@@ -608,7 +608,7 @@ public class LigaAdminService : ILigaAdminService
         if (!await _db.Players.AnyAsync(p => p.PlayerId == request.JogadorId, ct))
             throw new InvalidOperationException("Jogador não encontrado.");
 
-        if (request.AssistenteId.HasValue &&
+        if (!request.GolContra && request.AssistenteId.HasValue &&
             !await _db.Players.AnyAsync(p => p.PlayerId == request.AssistenteId.Value, ct))
             throw new InvalidOperationException("Assistente não encontrado.");
 
@@ -616,10 +616,10 @@ public class LigaAdminService : ILigaAdminService
         {
             EventoId = Guid.NewGuid(),
             PartidaId = partidaId,
-            Tipo = TipoEvento.Gol,
+            Tipo = request.GolContra ? TipoEvento.GolContra : TipoEvento.Gol,
             TimeId = request.TimeId,
             JogadorId = request.JogadorId,
-            AssistenteId = request.AssistenteId,
+            AssistenteId = request.GolContra ? null : request.AssistenteId,
             Minuto = request.Minuto,
             CriadoEm = _time.GetUtcNow().UtcDateTime
         };
@@ -682,7 +682,7 @@ public class LigaAdminService : ILigaAdminService
 
         var partida = evento.Partida;
 
-        if (evento.Tipo == TipoEvento.Gol)
+        if (evento.Tipo == TipoEvento.Gol || evento.Tipo == TipoEvento.GolContra)
         {
             if (evento.TimeId == partida.TimeCasaId && partida.GolsCasa > 0)
                 partida.GolsCasa--;

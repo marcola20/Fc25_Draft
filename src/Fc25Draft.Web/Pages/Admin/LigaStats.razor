@@ -44,15 +44,19 @@
                     <div class="card-header fw-bold">⚽ Registrar Gol</div>
                     <div class="card-body">
                         <div class="mb-2">
-                            <label class="form-label small">Time</label>
+                            <label class="form-label small">Time (que marca o gol no placar)</label>
                             <select class="form-select" @bind="_golTimeId" @bind:after="OnGolTimeChanged">
                                 <option value="">Selecione...</option>
                                 <option value="@_partida.TimeCasaId">@_partida.TimeCasaNome</option>
                                 <option value="@_partida.TimeForaId">@_partida.TimeForaNome</option>
                             </select>
                         </div>
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" id="golContra" @bind="_golContra" @bind:after="OnGolContraChanged" disabled="@(string.IsNullOrEmpty(_golTimeId))" />
+                            <label class="form-check-label small" for="golContra">Gol contra (marcado pelo adversário)</label>
+                        </div>
                         <div class="mb-2">
-                            <label class="form-label small">Jogador (gol)</label>
+                            <label class="form-label small">Jogador @(_golContra ? "(autor do gol contra, time adversário)" : "(gol)")</label>
                             <select class="form-select" @bind="_golJogadorId">
                                 <option value="">Selecione...</option>
                                 @foreach (var j in _jogadoresDoTime)
@@ -61,21 +65,24 @@
                                 }
                             </select>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Assistência (opcional)</label>
-                            <select class="form-select" @bind="_golAssistenteId">
-                                <option value="">Sem assistência</option>
-                                @foreach (var j in _jogadoresDoTime)
-                                {
-                                    <option value="@j.PlayerId">@j.Name</option>
-                                }
-                            </select>
-                        </div>
+                        @if (!_golContra)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label small">Assistência (opcional)</label>
+                                <select class="form-select" @bind="_golAssistenteId">
+                                    <option value="">Sem assistência</option>
+                                    @foreach (var j in _jogadoresDoTime)
+                                    {
+                                        <option value="@j.PlayerId">@j.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        }
                         <div class="mb-2">
                             <label class="form-label small">Minuto (opcional)</label>
                             <input type="number" class="form-control" min="1" max="120" @bind="_golMinuto" />
                         </div>
-                        <button class="btn btn-primary btn-sm" @onclick="RegistrarGol" disabled="@_saving">Registrar Gol</button>
+                        <button class="btn btn-primary btn-sm" @onclick="RegistrarGol" disabled="@_saving">Registrar @(_golContra ? "Gol Contra" : "Gol")</button>
                     </div>
                 </div>
             </div>
@@ -135,7 +142,15 @@
                         <span>@EventoIcon(ev.Tipo)</span>
                         @if (ev.Minuto.HasValue) { <span class="badge bg-secondary">@ev.Minuto'</span> }
                         <span class="fw-semibold">@ev.JogadorNome</span>
-                        <span class="text-muted small">(@ev.TimeNome)</span>
+                        @if (ev.Tipo == TipoEvento.GolContra)
+                        {
+                            <span class="badge bg-danger">contra</span>
+                            <span class="text-muted small">(gol para @ev.TimeNome)</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">(@ev.TimeNome)</span>
+                        }
                         @if (ev.AssistenteNome is not null)
                         {
                             <span class="text-muted small">Assist.: @ev.AssistenteNome</span>
@@ -164,6 +179,7 @@
 
     // Gol form
     private string? _golTimeId;
+    private bool _golContra;
     private string? _golJogadorId;
     private string? _golAssistenteId;
     private int? _golMinuto;
@@ -188,10 +204,25 @@
     private async Task OnGolTimeChanged()
     {
         _golJogadorId = null; _golAssistenteId = null;
-        if (Guid.TryParse(_golTimeId, out var tid))
-            _jogadoresDoTime = await GetJogadoresDoTime(tid);
-        else
-            _jogadoresDoTime = new();
+        await AtualizarJogadoresGol();
+    }
+
+    private async Task OnGolContraChanged()
+    {
+        _golJogadorId = null; _golAssistenteId = null;
+        await AtualizarJogadoresGol();
+    }
+
+    private async Task AtualizarJogadoresGol()
+    {
+        if (!Guid.TryParse(_golTimeId, out var tid)) { _jogadoresDoTime = new(); return; }
+
+        // Gol contra: quem marca é jogador do time adversário ao que recebe o gol no placar.
+        var idParaListar = _golContra
+            ? (tid == _partida!.TimeCasaId ? _partida.TimeForaId : _partida.TimeCasaId)
+            : tid;
+
+        _jogadoresDoTime = await GetJogadoresDoTime(idParaListar);
     }
 
     private async Task OnCartaoTimeChanged()
@@ -223,12 +254,13 @@
     {
         if (!Guid.TryParse(_golTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
         if (!int.TryParse(_golJogadorId, out var jogId)) { _erro = "Selecione o jogador."; return; }
-        int? assId = int.TryParse(_golAssistenteId, out var a) ? a : null;
+        int? assId = _golContra ? null : (int.TryParse(_golAssistenteId, out var a) ? a : null);
         _saving = true;
         try
         {
-            await AdminSvc.AddGolAsync(PartidaId, new LigaGolRequest(timeId, jogId, assId, _golMinuto), CancellationToken.None);
-            _ok = "Gol registrado!"; _golTimeId = null; _golJogadorId = null; _golAssistenteId = null; _golMinuto = null; _jogadoresDoTime = new();
+            await AdminSvc.AddGolAsync(PartidaId, new LigaGolRequest(timeId, jogId, assId, _golMinuto, _golContra), CancellationToken.None);
+            _ok = _golContra ? "Gol contra registrado!" : "Gol registrado!";
+            _golTimeId = null; _golContra = false; _golJogadorId = null; _golAssistenteId = null; _golMinuto = null; _jogadoresDoTime = new();
             await CarregarPartida();
         }
         catch (Exception ex) { _erro = ex.Message; }
@@ -261,6 +293,7 @@
     private static string EventoIcon(TipoEvento t) => t switch
     {
         TipoEvento.Gol => "⚽",
+        TipoEvento.GolContra => "⚽",
         TipoEvento.CartaoAmarelo => "🟨",
         TipoEvento.CartaoVermelho => "🟥",
         _ => "•"

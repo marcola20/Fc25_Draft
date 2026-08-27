@@ -77,7 +77,8 @@ public record LigaGolRequest(
     [Required] Guid TimeId,
     [Required] int JogadorId,
     int? AssistenteId,
-    [Range(1, 120)] int? Minuto);
+    [Range(1, 120)] int? Minuto,
+    bool GolContra = false);
 
 public record LigaCartaoRequest(
     [Required] Guid TimeId,
