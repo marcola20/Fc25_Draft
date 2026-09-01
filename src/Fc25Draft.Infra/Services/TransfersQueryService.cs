@@ -90,8 +90,8 @@ public class TransfersQueryService : ITransfersQueryService
         query = filter.SortBy switch
         {
             TransfersSortBy.Amount => filter.SortDescending
-                ? query.OrderByDescending(h => h.Amount).ThenByDescending(h => h.PerformedAtUtc)
-                : query.OrderBy(h => h.Amount).ThenBy(h => h.PerformedAtUtc),
+                ? query.OrderByDescending(h => h.Amount ?? 0m).ThenByDescending(h => h.PerformedAtUtc)
+                : query.OrderBy(h => h.Amount ?? 0m).ThenBy(h => h.PerformedAtUtc),
             _ => filter.SortDescending
                 ? query.OrderByDescending(h => h.PerformedAtUtc)
                 : query.OrderBy(h => h.PerformedAtUtc)
