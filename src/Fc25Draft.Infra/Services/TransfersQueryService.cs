@@ -87,8 +87,17 @@ public class TransfersQueryService : ITransfersQueryService
         var total = await query.CountAsync(ct).ConfigureAwait(false);
         var skip = (filter.Page - 1) * size;
 
+        query = filter.SortBy switch
+        {
+            TransfersSortBy.Amount => filter.SortDescending
+                ? query.OrderByDescending(h => h.Amount).ThenByDescending(h => h.PerformedAtUtc)
+                : query.OrderBy(h => h.Amount).ThenBy(h => h.PerformedAtUtc),
+            _ => filter.SortDescending
+                ? query.OrderByDescending(h => h.PerformedAtUtc)
+                : query.OrderBy(h => h.PerformedAtUtc)
+        };
+
         var items = await query
-            .OrderByDescending(h => h.PerformedAtUtc)
             .Skip(skip)
             .Take(size)
             .Select(h => new TransferListItemDto

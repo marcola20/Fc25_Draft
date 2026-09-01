@@ -12,6 +12,14 @@ public record class TransfersFilter
     public DateTime? FromUtc { get; init; }
     public DateTime? ToUtc { get; init; }
     public string? NotesQuery { get; init; }
+    public TransfersSortBy SortBy { get; init; } = TransfersSortBy.Date;
+    public bool SortDescending { get; init; } = true;
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 20;
+}
+
+public enum TransfersSortBy
+{
+    Date,
+    Amount
 }

@@ -70,6 +70,9 @@ public class TransfersClient
             query["type"] = "1"; // TransferType.MarketAuction
         }
 
+        query["sortBy"] = request.SortBy;
+        query["sortDir"] = request.SortDescending ? "desc" : "asc";
+
         var url = QueryHelpers.AddQueryString("/api/transfers/history", query);
         var client = await _clientFactory.CreateAsync().ConfigureAwait(false);
 

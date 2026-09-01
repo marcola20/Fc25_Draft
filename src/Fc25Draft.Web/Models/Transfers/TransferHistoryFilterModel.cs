@@ -66,6 +66,8 @@ public class TransferHistoryQueryRequest
     public DateTime? DateToUtc { get; init; }
     public string? NotesQuery { get; init; }
     public bool OnlyAcquisitions { get; init; }
+    public string SortBy { get; init; } = "date";
+    public bool SortDescending { get; init; } = true;
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 20;
 }

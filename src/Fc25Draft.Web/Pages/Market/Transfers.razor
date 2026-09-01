@@ -109,11 +109,11 @@ else
         <table class="table table-striped table-sm align-middle">
             <thead>
                 <tr>
-                    <th scope="col">Data/Hora</th>
+                    <th scope="col" style="cursor:pointer;user-select:none;" @onclick='() => SetSortAsync("date")'>Data/Hora @SortIcon("date")</th>
                     <th scope="col">Jogador</th>
                     <th scope="col">Saiu do time</th>
                     <th scope="col">Foi para o time</th>
-                    <th scope="col">Valor</th>
+                    <th scope="col" style="cursor:pointer;user-select:none;" @onclick='() => SetSortAsync("amount")'>Valor @SortIcon("amount")</th>
                     <th scope="col" class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -239,6 +239,9 @@ else
     private bool _isAdmin;
     private string? _selectedCycleId;
     private List<MarketCycleDto> _cycleOptions = new();
+
+    private string _sortBy = "date";
+    private bool _sortDescending = true;
 
     private int TotalPages => _page is null || _page.PageSize <= 0
         ? 1
@@ -404,6 +407,8 @@ else
                 DateToUtc = selectedCycleGuid.HasValue ? null : Model.PeriodEndUtc,
                 NotesQuery = Model.NotesQuery,
                 OnlyAcquisitions = Model.OnlyAcquisitions,
+                SortBy = _sortBy,
+                SortDescending = _sortDescending,
                 Page = Model.Page,
                 PageSize = Model.PageSize
             };
@@ -442,7 +447,34 @@ else
         _selectedTeamId = null;
         _playerIdText = null;
         _selectedCycleId = null;
+        _sortBy = "date";
+        _sortDescending = true;
         await LoadAsync(1, CancellationToken.None);
+    }
+
+    private async Task SetSortAsync(string column)
+    {
+        if (_sortBy == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortBy = column;
+            _sortDescending = true;
+        }
+
+        await LoadAsync(1, CancellationToken.None);
+    }
+
+    private string SortIcon(string column)
+    {
+        if (_sortBy != column)
+        {
+            return "⇅";
+        }
+
+        return _sortDescending ? "↓" : "↑";
     }
 
     private static string FormatTeam(string? name)

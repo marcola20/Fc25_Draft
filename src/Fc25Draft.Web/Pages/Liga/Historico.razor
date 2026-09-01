@@ -75,6 +75,43 @@
                                 <td class="text-center text-muted" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
                                 <td class="text-center fw-bold" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>
                             </tr>
+                            @if (_jogadorSelecionado == item)
+                            {
+                                <tr>
+                                    <td colspan="5" class="p-0 border-0">
+                                        <div class="p-3 bg-light border-top border-bottom">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Gols por Competição</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Competição</th>
+                                                            <th class="text-center" style="width:70px;">⚽</th>
+                                                            <th class="text-center" style="width:70px;">Assist.</th>
+                                                            <th class="text-center" style="width:70px;">G/A</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var comp in item.Competicoes)
+                                                        {
+                                                            <tr>
+                                                                <td>
+                                                                    <span>@comp.NomeCompeticion</span>
+                                                                    <br />
+                                                                    <small class="text-muted">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
+                                                                </td>
+                                                                <td class="text-center fw-bold">@comp.Gols</td>
+                                                                <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
+                                                                <td class="text-center fw-bold">@(comp.Gols + comp.Assistencias)</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -101,72 +138,6 @@
                 </nav>
                 <p class="text-center text-muted small mt-1">@_totalFiltrados jogadores · página @_page de @_totalPages</p>
             }
-        }
-
-        @if (_jogadorSelecionado is not null)
-        {
-            <div class="mt-4 p-3 border rounded bg-light">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">@_jogadorSelecionado.JogadorNome</h5>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _jogadorSelecionado = null">Fechar</button>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="card border-primary">
-                            <div class="card-body">
-                                <h6 class="card-title">Total de Gols</h6>
-                                <h2 class="mb-0">@_jogadorSelecionado.TotalGols</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-success">
-                            <div class="card-body">
-                                <h6 class="card-title">Assistências</h6>
-                                <h2 class="mb-0">@_jogadorSelecionado.TotalAssistencias</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-dark">
-                            <div class="card-body">
-                                <h6 class="card-title">Participações em Gols (G/A)</h6>
-                                <h2 class="mb-0">@(_jogadorSelecionado.TotalGols + _jogadorSelecionado.TotalAssistencias)</h2>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <h6 class="text-uppercase text-muted small fw-bold mb-2">Gols por Competição</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Competição</th>
-                                <th class="text-center" style="width:70px;">⚽</th>
-                                <th class="text-center" style="width:70px;">Assist.</th>
-                                <th class="text-center" style="width:70px;">G/A</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var comp in _jogadorSelecionado.Competicoes)
-                            {
-                                <tr>
-                                    <td>
-                                        <span>@comp.NomeCompeticion</span>
-                                        <br />
-                                        <small class="text-muted">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
-                                    </td>
-                                    <td class="text-center fw-bold">@comp.Gols</td>
-                                    <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
-                                    <td class="text-center fw-bold">@(comp.Gols + comp.Assistencias)</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
         }
     }
 </div>
@@ -308,6 +279,6 @@
 
     private void SelecionarJogador(HistoricoArtilheiroDto jogador)
     {
-        _jogadorSelecionado = jogador;
+        _jogadorSelecionado = _jogadorSelecionado == jogador ? null : jogador;
     }
 }

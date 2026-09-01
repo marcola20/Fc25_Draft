@@ -64,6 +64,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             [FromQuery(Name = "dateFromUtc")] public string? FromUtcRaw { get; init; }
             [FromQuery(Name = "dateToUtc")] public string? ToUtcRaw { get; init; }
             [FromQuery(Name = "q")] public string? NotesQuery { get; init; }
+            [FromQuery(Name = "sortBy")] public string? SortByRaw { get; init; }
+            [FromQuery(Name = "sortDir")] public string? SortDirRaw { get; init; }
             [FromQuery(Name = "page")] public string? PageRaw { get; init; }
             [FromQuery(Name = "pageSize")] public string? PageSizeRaw { get; init; }
 
@@ -105,6 +107,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 var sanitizedPage = page.HasValue && page.Value > 0 ? page.Value : 1;
                 var sanitizedPageSize = pageSize.HasValue && pageSize.Value > 0 ? Math.Min(pageSize.Value, 100) : 20;
 
+                var sortBy = string.Equals(SortByRaw, "amount", StringComparison.OrdinalIgnoreCase)
+                    ? TransfersSortBy.Amount
+                    : TransfersSortBy.Date;
+                var sortDescending = !string.Equals(SortDirRaw, "asc", StringComparison.OrdinalIgnoreCase);
+
                 filter = new TransfersFilter
                 {
                     TeamId = NormalizeGuid(teamId),
@@ -114,6 +121,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     FromUtc = fromUtc,
                     ToUtc = toUtc,
                     NotesQuery = string.IsNullOrWhiteSpace(NotesQuery) ? null : NotesQuery.Trim(),
+                    SortBy = sortBy,
+                    SortDescending = sortDescending,
                     Page = sanitizedPage,
                     PageSize = sanitizedPageSize
                 };
