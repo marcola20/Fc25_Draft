@@ -11,5 +11,7 @@ public interface ITeamLineupService
     Task SetActiveLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct);
     Task<TeamLineupDto> DuplicateLineupAsync(Guid teamId, Guid sourceLineupId, CancellationToken ct);
     Task<IReadOnlyList<AdminLineupOverviewDto>> GetAdminLineupsAsync(Guid? teamId, CancellationToken ct);
-    Task AcknowledgeLineupAsync(Guid lineupId, CancellationToken ct);
+    // seenUpdatedAtUtc: estado da escalação que o ADM tinha na tela. Retorna false quando
+    // o time salvou algo depois disso — marcar como visto ali apagaria mudanças não lidas.
+    Task<bool> AcknowledgeLineupAsync(Guid lineupId, DateTime? seenUpdatedAtUtc, CancellationToken ct);
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
@@ -33,10 +34,24 @@ public class AdminLineupsApiClient
         return payload ?? Array.Empty<AdminLineupOverviewDto>();
     }
 
-    public async Task AcknowledgeAsync(Guid lineupId, CancellationToken ct = default)
+    // Retorna false quando o time alterou a escalação depois que a tela foi carregada
+    // (409): nesse caso nada é marcado como visto, para não engolir mudanças não lidas.
+    public async Task<bool> AcknowledgeAsync(Guid lineupId, DateTime? seenUpdatedAtUtc, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
-        using var response = await client.PostAsync($"api/admin/lineups/{lineupId}/acknowledge", null, ct);
+        var url = $"api/admin/lineups/{lineupId}/acknowledge";
+        if (seenUpdatedAtUtc.HasValue)
+        {
+            url += $"?seenUpdatedAtTicks={seenUpdatedAtUtc.Value.Ticks}";
+        }
+
+        using var response = await client.PostAsync(url, null, ct);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            return false;
+        }
+
         response.EnsureSuccessStatusCode();
+        return true;
     }
 }

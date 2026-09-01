@@ -119,7 +119,7 @@ else
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-outline-success"
-                                    @onclick="() => AcknowledgeAsync(lineup.LineupId)"
+                                    @onclick="() => AcknowledgeAsync(lineup.LineupId, lineup.UpdatedAtUtc)"
                                     disabled="@IsAcknowledging(lineup.LineupId)">
                                 @(IsAcknowledging(lineup.LineupId) ? "Marcando..." : "✓ Marcar como visto")
                             </button>
@@ -426,15 +426,20 @@ else
 
     private bool IsAcknowledging(Guid lineupId) => acknowledgingLineupIds.Contains(lineupId);
 
-    private async Task AcknowledgeAsync(Guid lineupId)
+    private async Task AcknowledgeAsync(Guid lineupId, DateTime seenUpdatedAtUtc)
     {
         if (!acknowledgingLineupIds.Add(lineupId)) return;
         StateHasChanged();
 
         try
         {
-            await AdminLineupsApiClient.AcknowledgeAsync(lineupId);
+            var acknowledged = await AdminLineupsApiClient.AcknowledgeAsync(lineupId, seenUpdatedAtUtc);
             await LoadLineupsAsync(CancellationToken.None);
+
+            if (!acknowledged)
+            {
+                errorMessage = "O time alterou a escalação enquanto você conferia. A lista foi atualizada — revise as mudanças novas antes de marcar como vista.";
+            }
         }
         catch (Exception ex)
         {

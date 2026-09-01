@@ -91,14 +91,11 @@ public class TeamLineupService : ITeamLineupService
             .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer1).ThenInclude(p => p!.Position)
             .Include(l => l.AdvancedInstructions).ThenInclude(a => a!.DefensePlayer2).ThenInclude(p => p!.Position);
 
-        if (teamId.HasValue && teamId.Value != Guid.Empty)
+        var filtroTimeId = teamId.HasValue && teamId.Value != Guid.Empty ? teamId.Value : (Guid?)null;
+        if (filtroTimeId is { } idTime)
         {
-            await EnsureTeamExistsAsync(teamId.Value, ct);
-            query = query.Where(l => l.TeamId == teamId.Value);
-        }
-        else
-        {
-            query = query.Where(l => l.IsActive);
+            await EnsureTeamExistsAsync(idTime, ct);
+            query = query.Where(l => l.TeamId == idTime);
         }
 
         var entities = await query
@@ -109,7 +106,17 @@ public class TeamLineupService : ITeamLineupService
 
         await SeedMissingBaselinesAsync(entities, ct);
 
-        return entities.Select(MapToAdminDto).ToList();
+        var overviews = entities.Select(MapToAdminDto);
+
+        // Sem filtro de time a visão é das escalações ativas — mas uma escalação inativa
+        // com mudanças ainda não vistas também precisa aparecer: senão o time edita (ou
+        // desativa) uma escalação e o ADM nunca fica sabendo que houve alteração.
+        if (filtroTimeId is null)
+        {
+            overviews = overviews.Where(l => l.IsActive || l.LastChange is not null);
+        }
+
+        return overviews.ToList();
     }
 
     // Escalações criadas antes desta feature (ou cujo retrato nunca foi salvo por
@@ -144,19 +151,28 @@ public class TeamLineupService : ITeamLineupService
         await _dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task AcknowledgeLineupAsync(Guid lineupId, CancellationToken ct)
+    public async Task<bool> AcknowledgeLineupAsync(Guid lineupId, DateTime? seenUpdatedAtUtc, CancellationToken ct)
     {
         if (lineupId == Guid.Empty) throw new ArgumentException("Escalação inválida.", nameof(lineupId));
 
-        var dto = await LoadLineupDtoAsync(lineupId, ct);
-
         var entity = await _dbContext.TeamLineups.FirstOrDefaultAsync(l => l.LineupId == lineupId, ct)
             ?? throw new KeyNotFoundException("Escalação não encontrada.");
+
+        // O ADM só pode dar baixa no que ele realmente viu. Se o time salvou de novo entre
+        // o carregamento da tela e o clique, o retrato tirado agora incluiria mudanças que
+        // ninguém leu — elas sumiriam para sempre do aviso.
+        if (seenUpdatedAtUtc.HasValue && entity.UpdatedAt > seenUpdatedAtUtc.Value)
+        {
+            return false;
+        }
+
+        var dto = await LoadLineupDtoAsync(lineupId, ct);
 
         entity.LastSeenSnapshotJson = JsonSerializer.Serialize(dto);
         entity.LastSeenAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
         await _dbContext.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task<TeamLineupDto> CreateLineupAsync(Guid teamId, TeamLineupSaveRequestDto request, CancellationToken ct)
@@ -351,35 +367,44 @@ public class TeamLineupService : ITeamLineupService
                     }
                 }
 
-                if (request.OffensiveInstructions is not null)
+                // Instrução ausente no request significa "o time limpou este bloco".
+                // Manter a linha antiga fazia a alteração sumir duas vezes: não era gravada
+                // no banco e, por consequência, também não entrava no diff do ADM.
+                var offensiveExisting = await _dbContext.TeamLineupOffensiveInstructions
+                    .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                if (request.OffensiveInstructions is null)
                 {
-                    var existing = await _dbContext.TeamLineupOffensiveInstructions
-                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
-                    if (existing is null)
-                        await _dbContext.TeamLineupOffensiveInstructions.AddAsync(BuildOffensiveInstructions(lineupId, request.OffensiveInstructions), ct);
-                    else
-                        ApplyOffensiveInstructions(existing, request.OffensiveInstructions);
+                    if (offensiveExisting is not null)
+                        _dbContext.TeamLineupOffensiveInstructions.Remove(offensiveExisting);
                 }
+                else if (offensiveExisting is null)
+                    await _dbContext.TeamLineupOffensiveInstructions.AddAsync(BuildOffensiveInstructions(lineupId, request.OffensiveInstructions), ct);
+                else
+                    ApplyOffensiveInstructions(offensiveExisting, request.OffensiveInstructions);
 
-                if (request.DefensiveInstructions is not null)
+                var defensiveExisting = await _dbContext.TeamLineupDefensiveInstructions
+                    .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                if (request.DefensiveInstructions is null)
                 {
-                    var existing = await _dbContext.TeamLineupDefensiveInstructions
-                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
-                    if (existing is null)
-                        await _dbContext.TeamLineupDefensiveInstructions.AddAsync(BuildDefensiveInstructions(lineupId, request.DefensiveInstructions), ct);
-                    else
-                        ApplyDefensiveInstructions(existing, request.DefensiveInstructions);
+                    if (defensiveExisting is not null)
+                        _dbContext.TeamLineupDefensiveInstructions.Remove(defensiveExisting);
                 }
+                else if (defensiveExisting is null)
+                    await _dbContext.TeamLineupDefensiveInstructions.AddAsync(BuildDefensiveInstructions(lineupId, request.DefensiveInstructions), ct);
+                else
+                    ApplyDefensiveInstructions(defensiveExisting, request.DefensiveInstructions);
 
-                if (request.AdvancedInstructions is not null)
+                var advancedExisting = await _dbContext.TeamLineupAdvancedInstructions
+                    .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
+                if (request.AdvancedInstructions is null)
                 {
-                    var existing = await _dbContext.TeamLineupAdvancedInstructions
-                        .FirstOrDefaultAsync(x => x.LineupId == lineupId, ct);
-                    if (existing is null)
-                        await _dbContext.TeamLineupAdvancedInstructions.AddAsync(BuildAdvancedInstructions(lineupId, request.AdvancedInstructions), ct);
-                    else
-                        ApplyAdvancedInstructions(existing, request.AdvancedInstructions);
+                    if (advancedExisting is not null)
+                        _dbContext.TeamLineupAdvancedInstructions.Remove(advancedExisting);
                 }
+                else if (advancedExisting is null)
+                    await _dbContext.TeamLineupAdvancedInstructions.AddAsync(BuildAdvancedInstructions(lineupId, request.AdvancedInstructions), ct);
+                else
+                    ApplyAdvancedInstructions(advancedExisting, request.AdvancedInstructions);
 
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -432,6 +457,10 @@ public class TeamLineupService : ITeamLineupService
             changes.Add(new LineupChangeEntryDto("Geral", "Substituições automáticas",
                 LineupLabels.AutoSubstitution(before.AutoSubstitution), LineupLabels.AutoSubstitution(after.AutoSubstitution)));
 
+        if (before.IsActive != after.IsActive)
+            changes.Add(new LineupChangeEntryDto("Geral", "Escalação ativa",
+                before.IsActive ? "Sim" : "Não", after.IsActive ? "Sim" : "Não"));
+
         DiffSlots("Titular", before.Starters, after.Starters, changes);
         DiffSlots("Reserva", before.Bench, after.Bench, changes);
 
@@ -446,39 +475,57 @@ public class TeamLineupService : ITeamLineupService
         DiffRole("Ataque 2", before.Roles.AttackingPlayer2, after.Roles.AttackingPlayer2, changes);
         DiffRole("Ataque 3", before.Roles.AttackingPlayer3, after.Roles.AttackingPlayer3, changes);
 
-        if (before.OffensiveInstructions is { } bo && after.OffensiveInstructions is { } ao)
+        // Um dos lados pode não ter o bloco (escalação criada sem instruções, ou o time
+        // usou o "limpar"). Comparar só quando os dois existem escondia justamente as
+        // mudanças de ligar/desligar o bloco inteiro.
+        var bo = before.OffensiveInstructions;
+        var ao = after.OffensiveInstructions;
+        if (bo is not null || ao is not null)
         {
             const string cat = "Instrução ofensiva";
-            if (bo.OffensiveStyle != ao.OffensiveStyle)
-                changes.Add(new LineupChangeEntryDto(cat, "Estilo", LineupLabels.OffensiveStyle(bo.OffensiveStyle), LineupLabels.OffensiveStyle(ao.OffensiveStyle)));
-            if (bo.Playmaker != ao.Playmaker)
-                changes.Add(new LineupChangeEntryDto(cat, "Provocador", LineupLabels.Playmaker(bo.Playmaker), LineupLabels.Playmaker(ao.Playmaker)));
-            if (bo.AttackArea != ao.AttackArea)
-                changes.Add(new LineupChangeEntryDto(cat, "Área de ataque", LineupLabels.AttackArea(bo.AttackArea), LineupLabels.AttackArea(ao.AttackArea)));
-            if (bo.Positioning != ao.Positioning)
-                changes.Add(new LineupChangeEntryDto(cat, "Posicionamento", LineupLabels.Positioning(bo.Positioning), LineupLabels.Positioning(ao.Positioning)));
-            if (bo.SupportRange != ao.SupportRange)
-                changes.Add(new LineupChangeEntryDto(cat, "Alcance de apoio", bo.SupportRange.ToString(), ao.SupportRange.ToString()));
+            AddIfChanged(changes, cat, "Estilo",
+                bo is null ? null : LineupLabels.OffensiveStyle(bo.OffensiveStyle),
+                ao is null ? null : LineupLabels.OffensiveStyle(ao.OffensiveStyle));
+            AddIfChanged(changes, cat, "Provocador",
+                bo is null ? null : LineupLabels.Playmaker(bo.Playmaker),
+                ao is null ? null : LineupLabels.Playmaker(ao.Playmaker));
+            AddIfChanged(changes, cat, "Área de ataque",
+                bo is null ? null : LineupLabels.AttackArea(bo.AttackArea),
+                ao is null ? null : LineupLabels.AttackArea(ao.AttackArea));
+            AddIfChanged(changes, cat, "Posicionamento",
+                bo is null ? null : LineupLabels.Positioning(bo.Positioning),
+                ao is null ? null : LineupLabels.Positioning(ao.Positioning));
+            AddIfChanged(changes, cat, "Alcance de apoio",
+                bo?.SupportRange.ToString(), ao?.SupportRange.ToString());
         }
 
-        if (before.DefensiveInstructions is { } bd && after.DefensiveInstructions is { } ad)
+        var bd = before.DefensiveInstructions;
+        var ad = after.DefensiveInstructions;
+        if (bd is not null || ad is not null)
         {
             const string cat = "Instrução defensiva";
-            if (bd.DefensiveStyle != ad.DefensiveStyle)
-                changes.Add(new LineupChangeEntryDto(cat, "Estilo", LineupLabels.DefensiveStyle(bd.DefensiveStyle), LineupLabels.DefensiveStyle(ad.DefensiveStyle)));
-            if (bd.ContainmentArea != ad.ContainmentArea)
-                changes.Add(new LineupChangeEntryDto(cat, "Área de contenção", LineupLabels.ContainmentArea(bd.ContainmentArea), LineupLabels.ContainmentArea(ad.ContainmentArea)));
-            if (bd.Pressure != ad.Pressure)
-                changes.Add(new LineupChangeEntryDto(cat, "Pressão", LineupLabels.Pressure(bd.Pressure), LineupLabels.Pressure(ad.Pressure)));
-            if (bd.DefensiveLine != ad.DefensiveLine)
-                changes.Add(new LineupChangeEntryDto(cat, "Linha defensiva", bd.DefensiveLine.ToString(), ad.DefensiveLine.ToString()));
-            if (bd.Density != ad.Density)
-                changes.Add(new LineupChangeEntryDto(cat, "Densidade", bd.Density.ToString(), ad.Density.ToString()));
+            AddIfChanged(changes, cat, "Estilo",
+                bd is null ? null : LineupLabels.DefensiveStyle(bd.DefensiveStyle),
+                ad is null ? null : LineupLabels.DefensiveStyle(ad.DefensiveStyle));
+            AddIfChanged(changes, cat, "Área de contenção",
+                bd is null ? null : LineupLabels.ContainmentArea(bd.ContainmentArea),
+                ad is null ? null : LineupLabels.ContainmentArea(ad.ContainmentArea));
+            AddIfChanged(changes, cat, "Pressão",
+                bd is null ? null : LineupLabels.Pressure(bd.Pressure),
+                ad is null ? null : LineupLabels.Pressure(ad.Pressure));
+            AddIfChanged(changes, cat, "Linha defensiva",
+                bd?.DefensiveLine.ToString(), ad?.DefensiveLine.ToString());
+            AddIfChanged(changes, cat, "Densidade",
+                bd?.Density.ToString(), ad?.Density.ToString());
         }
 
-        if (before.AdvancedInstructions is { } ba && after.AdvancedInstructions is { } aa)
+        if (before.AdvancedInstructions is not null || after.AdvancedInstructions is not null)
         {
             const string cat = "Instrução avançada";
+            // Sem bloco avançado == tudo "Desligado": normalizar deixa o diff funcionar
+            // igual nos dois sentidos (ligou pela primeira vez / limpou tudo).
+            var ba = before.AdvancedInstructions ?? AdvancedDesligado;
+            var aa = after.AdvancedInstructions ?? AdvancedDesligado;
             if (ba.Attack1 != aa.Attack1 || ba.AttackPlayer1Id != aa.AttackPlayer1Id)
                 changes.Add(new LineupChangeEntryDto(cat, "Ataque 1",
                     FormatAdvanced(LineupLabels.AdvancedAttack(ba.Attack1), ba.AttackPlayer1),
@@ -503,20 +550,38 @@ public class TeamLineupService : ITeamLineupService
     private static void DiffSlots(string category, IReadOnlyList<TeamLineupSlotDto> before, IReadOnlyList<TeamLineupSlotDto> after, List<LineupChangeEntryDto> changes)
     {
         var beforeByCode = before.ToDictionary(s => s.SlotCode, StringComparer.OrdinalIgnoreCase);
+        var afterByCode = after.ToDictionary(s => s.SlotCode, StringComparer.OrdinalIgnoreCase);
+
         foreach (var afterSlot in after)
         {
-            // Slot novo (mudou de formação, por exemplo) — não há "antes" comparável, então não reporta.
-            if (!beforeByCode.TryGetValue(afterSlot.SlotCode, out var beforeSlot)) continue;
+            if (beforeByCode.TryGetValue(afterSlot.SlotCode, out var beforeSlot))
+            {
+                if (beforeSlot.Player?.PlayerId == afterSlot.Player?.PlayerId) continue;
 
-            var beforePlayerId = beforeSlot.Player?.PlayerId;
-            var afterPlayerId = afterSlot.Player?.PlayerId;
-            if (beforePlayerId == afterPlayerId) continue;
+                changes.Add(new LineupChangeEntryDto(
+                    category,
+                    afterSlot.DisplayName,
+                    beforeSlot.Player?.Name ?? SlotVazio,
+                    afterSlot.Player?.Name ?? SlotVazio));
+            }
+            else if (afterSlot.Player is not null)
+            {
+                // Posição que passou a existir por causa de uma troca de formação. Antes
+                // esse caso era ignorado, e uma escalação remontada em outra formação
+                // aparecia para o ADM quase sem mudança nenhuma.
+                changes.Add(new LineupChangeEntryDto(
+                    category, afterSlot.DisplayName, SlotInexistente, afterSlot.Player.Name));
+            }
+        }
 
+        foreach (var beforeSlot in before)
+        {
+            if (afterByCode.ContainsKey(beforeSlot.SlotCode)) continue;
+            if (beforeSlot.Player is null) continue;
+
+            // Posição que deixou de existir na nova formação — o jogador saiu dali.
             changes.Add(new LineupChangeEntryDto(
-                category,
-                afterSlot.DisplayName,
-                beforeSlot.Player?.Name ?? "Vazio",
-                afterSlot.Player?.Name ?? "Vazio"));
+                category, beforeSlot.DisplayName, beforeSlot.Player.Name, SlotInexistente));
         }
     }
 
@@ -533,6 +598,23 @@ public class TeamLineupService : ITeamLineupService
 
     private static string FormatAdvanced(string label, TeamLineupSlotPlayerDto? player)
         => player is null ? label : $"{label} — {player.Name}";
+
+    private const string ValorNaoDefinido = "Não definido";
+    private const string SlotVazio = "Vazio";
+    private const string SlotInexistente = "Posição não existe nesta formação";
+
+    // Ausência do bloco avançado equivale a tudo "Desligado" (1 = Desligado).
+    private static readonly TeamLineupAdvancedInstructionsDto AdvancedDesligado =
+        new(1, null, 1, null, 1, null, 1, null, null, null, null, null);
+
+    private static void AddIfChanged(List<LineupChangeEntryDto> changes, string category, string field, string? before, string? after)
+    {
+        var antes = before ?? ValorNaoDefinido;
+        var depois = after ?? ValorNaoDefinido;
+        if (string.Equals(antes, depois, StringComparison.Ordinal)) return;
+
+        changes.Add(new LineupChangeEntryDto(category, field, antes, depois));
+    }
 
     public async Task DeleteLineupAsync(Guid teamId, Guid lineupId, CancellationToken ct)
     {
@@ -766,7 +848,27 @@ public class TeamLineupService : ITeamLineupService
             }
         });
 
-        return await LoadLineupDtoAsync(newLineupId, ct);
+        var duplicated = await LoadLineupDtoAsync(newLineupId, ct);
+
+        // Mesmo tratamento da criação: sem retrato inicial a cópia ficava sem base de
+        // comparação, e o diff só começava a existir depois da primeira leitura do ADM
+        // (perdendo tudo que o time editasse nesse meio-tempo).
+        try
+        {
+            var entity = await _dbContext.TeamLineups.FirstOrDefaultAsync(l => l.LineupId == newLineupId, ct);
+            if (entity is not null)
+            {
+                entity.LastSeenSnapshotJson = JsonSerializer.Serialize(duplicated);
+                entity.LastSeenAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+                await _dbContext.SaveChangesAsync(ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Não foi possível registrar o retrato inicial da escalação duplicada {LineupId}.", newLineupId);
+        }
+
+        return duplicated;
     }
 
     private async Task EnsureTeamExistsAsync(Guid teamId, CancellationToken ct)

@@ -57,6 +57,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             adminApi.MapPost("/lineups/{lineupId:guid}/acknowledge", async (
                 Guid lineupId,
+                long? seenUpdatedAtTicks,
                 ITeamLineupService lineupService,
                 ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
@@ -65,7 +66,18 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 try
                 {
-                    await lineupService.AcknowledgeLineupAsync(lineupId, ct);
+                    var seenUpdatedAtUtc = seenUpdatedAtTicks.HasValue
+                        ? new DateTime(seenUpdatedAtTicks.Value, DateTimeKind.Unspecified)
+                        : (DateTime?)null;
+
+                    var acknowledged = await lineupService.AcknowledgeLineupAsync(lineupId, seenUpdatedAtUtc, ct);
+                    if (!acknowledged)
+                    {
+                        return Results.Json(
+                            new { message = "A escalação foi alterada depois que a tela foi carregada." },
+                            statusCode: StatusCodes.Status409Conflict);
+                    }
+
                     return Results.NoContent();
                 }
                 catch (KeyNotFoundException ex)
