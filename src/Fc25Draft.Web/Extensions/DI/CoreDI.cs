@@ -48,6 +48,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ILigaAdminService, LigaAdminService>();
             services.AddScoped<ILigaPublicService, LigaPublicService>();
             services.AddScoped<IHallOfFameService, HallOfFameService>();
+            services.AddScoped<IDraftWishlistService, DraftWishlistService>();
             services.AddSingleton<LotteryStateService>();
             services.AddSingleton<MarketUpdateService>();
             services.AddSingleton<IMarketBroadcaster>(sp => sp.GetRequiredService<MarketUpdateService>());
@@ -66,6 +67,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<MarketClient>();
             services.AddScoped<TransfersClient>();
             services.AddScoped<TransferOffersApiClient>();
+            services.AddScoped<DraftWishlistApiClient>();
             services.AddScoped<MarketCycleClient>();
             services.AddScoped<IMarketItemGenerationClient, MarketItemGenerationClient>();
             services.AddScoped<MarketHubClient>();

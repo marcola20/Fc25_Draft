@@ -1,0 +1,655 @@
+@page "/draft/pre-draft"
+@page "/pre-draft"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Common
+@using Fc25Draft.Web.Components.Draft
+@using Fc25Draft.Web.Services
+@inject PlayersApiClient PlayersApiClient
+@inject DraftWishlistApiClient WishlistApi
+@inject IPositionService PositionService
+@inject AdminAuthService AdminAuth
+@inject NavigationManager Navigation
+@inject ILogger<Fc25Draft.Web.Pages.Drafts.Wishlist> Logger
+
+@implements IDisposable
+
+<PageHeader Title="Pré-Draft: meus 8 jogadores"
+            Subtitle="@($"Escolha os {MaxJogadores} jogadores mais interessantes para o draft (overall de {OverallMinimo} a {OverallMaximo}) e envie a lista do seu time.")"
+            Actions="@BuildHeaderActions()" />
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="status">
+        @successMessage
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4 order-lg-2">
+        <div class="card shadow-sm sticky-lg-top" style="top: 1rem;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Meus @MaxJogadores jogadores</strong>
+                <span class="badge @(selected.Count == MaxJogadores ? "bg-success" : "bg-secondary")">@selected.Count/@MaxJogadores</span>
+            </div>
+            <div class="card-body">
+                @if (!authInitialized)
+                {
+                    <p class="text-muted small mb-3"><em>Verificando token...</em></p>
+                }
+                else if (AdminAuth.IsAuthenticated)
+                {
+                    @if (!string.IsNullOrWhiteSpace(teamName))
+                    {
+                        <p class="small mb-2">Time: <strong>@teamName</strong></p>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(tokenNotice))
+                    {
+                        <p class="small text-warning mb-2">@tokenNotice</p>
+                    }
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <label for="wishlistToken" class="form-label">Token do time</label>
+                        <div class="input-group">
+                            <input id="wishlistToken"
+                                   type="password"
+                                   class="form-control"
+                                   value="@tokenInput"
+                                   @oninput="e => tokenInput = e.Value?.ToString() ?? string.Empty"
+                                   autocomplete="one-time-code"
+                                   placeholder="Cole o token para enviar" />
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    title="Carregar a lista já enviada por este token"
+                                    disabled="@(isLoadingWishlist || string.IsNullOrWhiteSpace(tokenInput))"
+                                    @onclick="LoadWishlistFromInputAsync">
+                                Carregar
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(tokenNotice))
+                        {
+                            <div class="form-text text-warning">@tokenNotice</div>
+                        }
+                        else
+                        {
+                            <div class="form-text">Se já entrou com o token na página inicial, ele é usado automaticamente.</div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(teamName))
+                {
+                    @if (enviadoEm.HasValue)
+                    {
+                        <p class="small text-success mb-3">
+                            Lista enviada em @enviadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm"). Enviar de novo substitui a anterior.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-3">Nenhuma lista enviada ainda.</p>
+                    }
+                }
+
+                @if (isLoadingWishlist)
+                {
+                    <p class="text-muted"><em>Carregando lista...</em></p>
+                }
+                else if (selected.Count == 0)
+                {
+                    <p class="text-muted">Nenhum jogador selecionado. Use o botão <strong>Adicionar</strong> na lista de jogadores.</p>
+                }
+                else
+                {
+                    <ol class="list-group list-group-numbered mb-3">
+                        @for (var i = 0; i < selected.Count; i++)
+                        {
+                            var index = i;
+                            var item = selected[i];
+                            <li class="list-group-item d-flex align-items-center gap-2 @(item.Disponivel ? string.Empty : "list-group-item-warning")">
+                                <div class="flex-grow-1 ms-1">
+                                    <div class="fw-semibold">@item.Name</div>
+                                    <small class="text-muted">
+                                        @item.PositionName · Overall @item.Overall
+                                        @if (!item.Disponivel)
+                                        {
+                                            <span class="ms-1">· já escolhido por um time</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
+                                    <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0 || isSubmitting)" @onclick="() => Move(index, -1)">↑</button>
+                                    <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == selected.Count - 1 || isSubmitting)" @onclick="() => Move(index, 1)">↓</button>
+                                    <button type="button" class="btn btn-outline-danger" title="Remover" disabled="@isSubmitting" @onclick="() => Remove(item.PlayerId)">✕</button>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
+
+                <button type="button" class="btn btn-success w-100" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Enviando...</span>
+                    }
+                    else
+                    {
+                        <span>Enviar meus @MaxJogadores</span>
+                    }
+                </button>
+                @if (selected.Count != MaxJogadores)
+                {
+                    <div class="form-text text-center">Selecione exatamente @MaxJogadores jogadores para enviar.</div>
+                }
+                <button type="button" class="btn btn-link btn-sm w-100 mt-1" disabled="@(selected.Count == 0 || isSubmitting)" @onclick="ClearSelection">Limpar seleção</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8 order-lg-1">
+        <DraftPlayerFilters Positions="@positions"
+                            IsLoading="@isLoadingPlayers"
+                            OnFilterChanged="@OnFilterChangedAsync"
+                            OverallMinLimit="@OverallMinimo"
+                            OverallMaxLimit="@OverallMaximo"
+                            InitialOverallMax="@OverallMaximo" />
+
+        @if (isLoadingPlayers)
+        {
+            <p><em>Carregando jogadores disponíveis...</em></p>
+        }
+        else if (players.Count == 0)
+        {
+            <p>Nenhum jogador disponível com esses filtros.</p>
+        }
+        else
+        {
+            <p class="text-muted">@GetPlayersSummary()</p>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Jogador</th>
+                            <th>Posição</th>
+                            <th>
+                                <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="@(() => ChangeSortAsync("overall"))">
+                                    Overall
+                                    @if (sortBy == "overall")
+                                    {
+                                        <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                    }
+                                </button>
+                            </th>
+                            <th>
+                                <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="@(() => ChangeSortAsync("age"))">
+                                    Idade
+                                    @if (sortBy == "age")
+                                    {
+                                        <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                    }
+                                </button>
+                            </th>
+                            <th class="text-end">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var player in players)
+                        {
+                            var isSelected = IsSelected(player.PlayerId);
+                            <tr class="@(isSelected ? "table-success" : string.Empty)">
+                                <td>@player.Name</td>
+                                <td>@player.PositionName</td>
+                                <td>@player.Overall</td>
+                                <td>@(player.Age?.ToString() ?? "-")</td>
+                                <td class="text-end">
+                                    @if (isSelected)
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@isSubmitting" @onclick="() => Remove(player.PlayerId)">Remover</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-primary btn-sm" disabled="@(selected.Count >= MaxJogadores || isSubmitting)" @onclick="() => Add(player)">Adicionar</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (totalPages > 1)
+            {
+                var visiblePages = GetVisiblePageNumbers();
+                <nav aria-label="Paginação de jogadores">
+                    <ul class="pagination">
+                        <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
+                            <button type="button" class="page-link" @onclick="() => ChangePageAsync(currentPage - 1)" disabled="@(currentPage == 1)">Anterior</button>
+                        </li>
+                        @if (visiblePages.Count > 0 && visiblePages[0] > 1)
+                        {
+                            <li class="page-item">
+                                <button type="button" class="page-link" @onclick="() => ChangePageAsync(1)">1</button>
+                            </li>
+                            @if (visiblePages[0] > 2)
+                            {
+                                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                            }
+                        }
+                        @foreach (var page in visiblePages)
+                        {
+                            <li class="page-item @(page == currentPage ? "active" : string.Empty)">
+                                <button type="button" class="page-link" @onclick="() => ChangePageAsync(page)">@(page)</button>
+                            </li>
+                        }
+                        @if (visiblePages.Count > 0 && visiblePages[visiblePages.Count - 1] < totalPages)
+                        {
+                            @if (visiblePages[visiblePages.Count - 1] < totalPages - 1)
+                            {
+                                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                            }
+                            <li class="page-item">
+                                <button type="button" class="page-link" @onclick="() => ChangePageAsync(totalPages)">@totalPages</button>
+                            </li>
+                        }
+                        <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
+                            <button type="button" class="page-link" @onclick="() => ChangePageAsync(currentPage + 1)" disabled="@(currentPage == totalPages)">Próximo</button>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private const int PageSize = 25;
+    private const int MaxJogadores = DraftWishlistRules.MaxJogadores;
+    private const int OverallMinimo = DraftWishlistRules.OverallMinimo;
+    private const int OverallMaximo = DraftWishlistRules.OverallMaximo;
+
+    private readonly List<Position> positions = new();
+    private readonly List<PlayerListItemDto> players = new();
+    private readonly List<SelectedPlayer> selected = new();
+
+    private DraftPlayerFilters.PlayerFilterState currentFilter = new(null, new HashSet<short>(), null, OverallMaximo);
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private int totalPlayers;
+    private string sortBy = "overall";
+    private bool sortDescending = true;
+
+    private bool isLoadingPlayers = true;
+    private bool isLoadingWishlist;
+    private bool isSubmitting;
+    private bool authInitialized;
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string? tokenNotice;
+    private string? teamName;
+    private DateTime? enviadoEm;
+    private string tokenInput = string.Empty;
+
+    private sealed record SelectedPlayer(int PlayerId, string Name, string PositionName, int Overall, bool Disponivel);
+
+    private string? EffectiveToken => AdminAuth.IsAuthenticated
+        ? AdminAuth.Token
+        : (string.IsNullOrWhiteSpace(tokenInput) ? null : tokenInput.Trim());
+
+    private bool CanSubmit => selected.Count == MaxJogadores && !isSubmitting && !isLoadingWishlist && !string.IsNullOrWhiteSpace(EffectiveToken);
+
+    private RenderFragment? BuildHeaderActions()
+    {
+        if (!authInitialized || !AdminAuth.IsAdmin)
+        {
+            return null;
+        }
+
+        return builder =>
+        {
+            builder.OpenElement(0, "button");
+            builder.AddAttribute(1, "type", "button");
+            builder.AddAttribute(2, "class", "btn btn-outline-primary");
+            builder.AddAttribute(3, "onclick", EventCallback.Factory.Create(this, () => Navigation.NavigateTo("/admin/pre-draft")));
+            builder.AddContent(4, "Ver votos (admin)");
+            builder.CloseElement();
+        };
+    }
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPositionsAsync();
+        await LoadPlayersAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+
+        if (AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token))
+        {
+            await LoadWishlistAsync(AdminAuth.Token);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            positions.Clear();
+            positions.AddRange(await PositionService.GetAllAsync());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar posições.");
+        }
+    }
+
+    private async Task LoadPlayersAsync()
+    {
+        isLoadingPlayers = true;
+        players.Clear();
+
+        try
+        {
+            var result = await PlayersApiClient.GetAsync(
+                currentFilter.SearchTerm,
+                currentFilter.PositionIds,
+                onlyAvailable: true,
+                currentFilter.OverallMin,
+                currentFilter.OverallMax,
+                sortBy,
+                sortDescending ? "desc" : "asc",
+                currentPage,
+                PageSize);
+
+            players.AddRange(result.Items);
+            totalPlayers = result.Total;
+            totalPages = Math.Max(1, (int)Math.Ceiling(totalPlayers / (double)PageSize));
+
+            if (currentPage > totalPages)
+            {
+                currentPage = totalPages;
+                await LoadPlayersAsync();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar jogadores do pré-draft.");
+        }
+        finally
+        {
+            isLoadingPlayers = false;
+        }
+    }
+
+    private async Task OnFilterChangedAsync(DraftPlayerFilters.PlayerFilterState state)
+    {
+        var min = state.OverallMin.HasValue ? Math.Max(OverallMinimo, state.OverallMin.Value) : (int?)null;
+        var max = state.OverallMax.HasValue ? Math.Min(OverallMaximo, state.OverallMax.Value) : OverallMaximo;
+
+        if (min.HasValue && min > max)
+        {
+            errorMessage = "Overall mínimo não pode ser maior que o máximo.";
+            return;
+        }
+
+        errorMessage = null;
+        currentFilter = new DraftPlayerFilters.PlayerFilterState(state.SearchTerm, state.PositionIds, min, max);
+        currentPage = 1;
+        await LoadPlayersAsync();
+    }
+
+    private async Task ChangePageAsync(int page)
+    {
+        if (page < 1 || page == currentPage || page > totalPages)
+        {
+            return;
+        }
+
+        currentPage = page;
+        await LoadPlayersAsync();
+    }
+
+    private async Task ChangeSortAsync(string column)
+    {
+        if (sortBy == column)
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortBy = column;
+            sortDescending = true;
+        }
+
+        currentPage = 1;
+        await LoadPlayersAsync();
+    }
+
+    private bool IsSelected(int playerId) => selected.Any(s => s.PlayerId == playerId);
+
+    private void Add(PlayerListItemDto player)
+    {
+        if (IsSelected(player.PlayerId))
+        {
+            return;
+        }
+
+        if (selected.Count >= MaxJogadores)
+        {
+            errorMessage = $"Você já selecionou {MaxJogadores} jogadores. Remova um para adicionar outro.";
+            return;
+        }
+
+        errorMessage = null;
+        successMessage = null;
+        selected.Add(new SelectedPlayer(player.PlayerId, player.Name, player.PositionName, player.Overall, true));
+    }
+
+    private void Remove(int playerId)
+    {
+        successMessage = null;
+        selected.RemoveAll(s => s.PlayerId == playerId);
+    }
+
+    private void Move(int index, int delta)
+    {
+        var target = index + delta;
+        if (index < 0 || index >= selected.Count || target < 0 || target >= selected.Count)
+        {
+            return;
+        }
+
+        (selected[index], selected[target]) = (selected[target], selected[index]);
+    }
+
+    private void ClearSelection()
+    {
+        successMessage = null;
+        selected.Clear();
+    }
+
+    private async Task LoadWishlistFromInputAsync()
+    {
+        var token = EffectiveToken;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        await LoadWishlistAsync(token);
+    }
+
+    private async Task LoadWishlistAsync(string token)
+    {
+        isLoadingWishlist = true;
+        tokenNotice = null;
+
+        try
+        {
+            var dto = await WishlistApi.GetMineAsync(token);
+            ApplyWishlist(dto);
+        }
+        catch (InvalidOperationException ex)
+        {
+            teamName = null;
+            enviadoEm = null;
+            tokenNotice = AdminAuth.IsAuthenticated
+                ? $"{ex.Message} Listas só podem ser enviadas com o token de um time."
+                : ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar lista do pré-draft.");
+        }
+        finally
+        {
+            isLoadingWishlist = false;
+        }
+    }
+
+    private void ApplyWishlist(DraftWishlistDto dto)
+    {
+        teamName = dto.TeamName;
+        enviadoEm = dto.EnviadoEm;
+
+        if (dto.Jogadores.Count > 0)
+        {
+            selected.Clear();
+            selected.AddRange(dto.Jogadores
+                .OrderBy(j => j.Ordem)
+                .Select(j => new SelectedPlayer(j.PlayerId, j.Name, j.PositionName, j.Overall, j.Disponivel)));
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        var token = EffectiveToken;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            errorMessage = "Informe o token do time para enviar a lista.";
+            return;
+        }
+
+        if (selected.Count != MaxJogadores)
+        {
+            errorMessage = $"Selecione exatamente {MaxJogadores} jogadores.";
+            return;
+        }
+
+        errorMessage = null;
+        successMessage = null;
+        isSubmitting = true;
+
+        try
+        {
+            var dto = await WishlistApi.SaveAsync(token, selected.Select(s => s.PlayerId).ToList());
+            ApplyWishlist(dto);
+            tokenNotice = null;
+            successMessage = $"✅ Lista de {dto.TeamName} enviada com sucesso!";
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Não foi possível enviar a lista. Tente novamente.";
+            Logger.LogError(ex, "Erro ao enviar lista do pré-draft.");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private IReadOnlyList<int> GetVisiblePageNumbers()
+    {
+        const int maxVisiblePages = 5;
+
+        if (totalPages <= maxVisiblePages)
+        {
+            return Enumerable.Range(1, totalPages).ToList();
+        }
+
+        var start = Math.Max(1, currentPage - 2);
+        var end = Math.Min(totalPages, start + maxVisiblePages - 1);
+        start = Math.Max(1, end - maxVisiblePages + 1);
+
+        return Enumerable.Range(start, end - start + 1).ToList();
+    }
+
+    private string GetPlayersSummary()
+    {
+        if (totalPlayers == 0)
+        {
+            return "Nenhum jogador encontrado.";
+        }
+
+        var start = (currentPage - 1) * PageSize + 1;
+        var end = Math.Min(totalPlayers, start + players.Count - 1);
+        return $"Mostrando {start}-{end} de {totalPlayers} jogadores disponíveis.";
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            if (AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token))
+            {
+                await LoadWishlistAsync(AdminAuth.Token);
+            }
+            else
+            {
+                teamName = null;
+                enviadoEm = null;
+                tokenNotice = null;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

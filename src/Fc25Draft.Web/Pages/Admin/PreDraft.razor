@@ -1,0 +1,292 @@
+@page "/admin/pre-draft"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Common
+@using Fc25Draft.Web.Services
+@inject DraftWishlistApiClient WishlistApi
+@inject AdminAuthService AdminAuth
+@inject ILogger<Fc25Draft.Web.Pages.Admin.PreDraft> Logger
+
+@implements IDisposable
+
+<PageHeader Title="Pré-Draft: votos"
+            Subtitle="Jogadores que apareceram nas listas de 8 enviadas pelos times. Visível apenas para administradores." />
+
+@if (!authInitialized)
+{
+    <p><em>Verificando permissões...</em></p>
+}
+else if (!AdminAuth.IsAdmin)
+{
+    <div class="alert alert-warning" role="alert">
+        Acesso restrito. Entre com o token de administrador na página inicial para ver os votos do pré-draft.
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <ul class="nav nav-pills" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link @(activeTab == Tab.Votos ? "active" : string.Empty)" @onclick="() => activeTab = Tab.Votos">
+                    Jogadores com votos
+                    @if (votes.Count > 0)
+                    {
+                        <span class="badge bg-light text-dark ms-1">@votes.Count</span>
+                    }
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link @(activeTab == Tab.Times ? "active" : string.Empty)" @onclick="() => activeTab = Tab.Times">
+                    Listas por time
+                    @if (lists.Count > 0)
+                    {
+                        <span class="badge bg-light text-dark ms-1">@lists.Count</span>
+                    }
+                </button>
+            </li>
+        </ul>
+        <div class="d-flex align-items-center gap-2">
+            @if (activeTab == Tab.Votos)
+            {
+                <input type="search"
+                       class="form-control form-control-sm"
+                       style="max-width: 220px;"
+                       placeholder="Filtrar por nome"
+                       value="@voteFilter"
+                       @oninput="e => voteFilter = e.Value?.ToString() ?? string.Empty" />
+            }
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isLoading" @onclick="LoadAsync">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                }
+                Atualizar
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <p><em>Carregando votos...</em></p>
+    }
+    else if (activeTab == Tab.Votos)
+    {
+        var filtered = FilteredVotes();
+        @if (votes.Count == 0)
+        {
+            <p class="text-muted">Nenhum time enviou a lista ainda.</p>
+        }
+        else if (filtered.Count == 0)
+        {
+            <p class="text-muted">Nenhum jogador encontrado com esse filtro.</p>
+        }
+        else
+        {
+            <p class="text-muted">
+                @lists.Count @(lists.Count == 1 ? "time enviou" : "times enviaram") a lista.
+                @votes.Count @(votes.Count == 1 ? "jogador recebeu" : "jogadores receberam") pelo menos um voto.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Jogador</th>
+                            <th>Posição</th>
+                            <th>Overall</th>
+                            <th>Idade</th>
+                            <th class="text-center">Votos</th>
+                            <th class="text-center" title="Melhor posição em que apareceu numa lista">Melhor pos.</th>
+                            <th>Times (posição na lista)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < filtered.Count; i++)
+                        {
+                            var v = filtered[i];
+                            <tr class="@(v.Disponivel ? string.Empty : "table-warning")">
+                                <td class="text-muted">@(i + 1)</td>
+                                <td>
+                                    <span class="fw-semibold">@v.Name</span>
+                                    @if (!v.Disponivel)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1">já escolhido</span>
+                                    }
+                                </td>
+                                <td>@v.PositionName</td>
+                                <td>@v.Overall</td>
+                                <td>@(v.Age?.ToString() ?? "-")</td>
+                                <td class="text-center">
+                                    <span class="badge rounded-pill @(v.Votos >= 3 ? "bg-danger" : v.Votos == 2 ? "bg-primary" : "bg-secondary")">@v.Votos</span>
+                                </td>
+                                <td class="text-center">@v.MelhorPosicao º</td>
+                                <td>
+                                    @foreach (var t in v.Times)
+                                    {
+                                        <span class="badge bg-light text-dark border me-1 mb-1">@t.TeamName <small class="text-muted">(@t.Ordem º)</small></span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else
+    {
+        @if (lists.Count == 0)
+        {
+            <p class="text-muted">Nenhum time enviou a lista ainda.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Enviado em</th>
+                            <th>Jogadores (em ordem)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var list in lists)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@list.TeamName</td>
+                                <td class="text-nowrap">@(list.EnviadoEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                <td>
+                                    <ol class="mb-0 ps-3">
+                                        @foreach (var j in list.Jogadores)
+                                        {
+                                            <li class="@(j.Disponivel ? string.Empty : "text-muted text-decoration-line-through")">
+                                                @j.Name <small class="text-muted">(@j.PositionName, @j.Overall)</small>
+                                            </li>
+                                        }
+                                    </ol>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+@code {
+    private enum Tab { Votos, Times }
+
+    private readonly List<DraftWishlistVoteDto> votes = new();
+    private readonly List<DraftWishlistDto> lists = new();
+    private Tab activeTab = Tab.Votos;
+    private string voteFilter = string.Empty;
+    private bool authInitialized;
+    private bool isLoading;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+        StateHasChanged();
+
+        if (AdminAuth.IsAdmin)
+        {
+            await LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (!AdminAuth.IsAdmin)
+        {
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var votesTask = WishlistApi.GetVotesAsync();
+            var listsTask = WishlistApi.GetAllAsync();
+            await Task.WhenAll(votesTask, listsTask);
+
+            votes.Clear();
+            votes.AddRange(votesTask.Result);
+            lists.Clear();
+            lists.AddRange(listsTask.Result);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar votos do pré-draft.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private List<DraftWishlistVoteDto> FilteredVotes()
+    {
+        if (string.IsNullOrWhiteSpace(voteFilter))
+        {
+            return votes;
+        }
+
+        var term = voteFilter.Trim();
+        return votes
+            .Where(v => v.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase))
+            .ToList();
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            if (AdminAuth.IsAdmin)
+            {
+                await LoadAsync();
+            }
+            else
+            {
+                votes.Clear();
+                lists.Clear();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

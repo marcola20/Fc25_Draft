@@ -60,11 +60,11 @@
 <div class="row g-3 align-items-end mb-4 draft-filter-group">
     <div class="col-4 col-sm-4 col-md-3 col-lg-2">
         <label class="form-label" for="overallMin">Overall mínimo</label>
-        <InputNumber TValue="int?" id="overallMin" class="form-control" min="70" max="99" @bind-Value="overallMin" />
+        <InputNumber TValue="int?" id="overallMin" class="form-control" min="@OverallMinLimit" max="@OverallMaxLimit" @bind-Value="overallMin" />
     </div>
     <div class="col-5 col-sm-4 col-md-3 col-lg-2">
         <label class="form-label" for="overallMax">Overall máximo</label>
-        <InputNumber TValue="int?" id="overallMax" class="form-control" min="70" max="99" @bind-Value="overallMax" />
+        <InputNumber TValue="int?" id="overallMax" class="form-control" min="@OverallMinLimit" max="@OverallMaxLimit" @bind-Value="overallMax" />
     </div>
     <div class="col-3 col-sm-4 col-md-3 col-lg-2 d-flex flex-column justify-content-end gap-2">
         <label class="form-label d-none d-sm-block">&nbsp;</label>
@@ -76,6 +76,10 @@
     [Parameter] public List<Position> Positions { get; set; } = new();
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public EventCallback<PlayerFilterState> OnFilterChanged { get; set; }
+    [Parameter] public int OverallMinLimit { get; set; } = 70;
+    [Parameter] public int OverallMaxLimit { get; set; } = 99;
+    [Parameter] public int? InitialOverallMin { get; set; }
+    [Parameter] public int? InitialOverallMax { get; set; }
 
     private readonly HashSet<short> selectedPositionIds = new();
     private string searchTerm = string.Empty;
@@ -84,6 +88,12 @@
     private bool isDropdownOpen;
 
     public record PlayerFilterState(string? SearchTerm, HashSet<short> PositionIds, int? OverallMin, int? OverallMax);
+
+    protected override void OnInitialized()
+    {
+        overallMin = InitialOverallMin;
+        overallMax = InitialOverallMax;
+    }
 
     private Task OnSearchSubmitAsync() => NotifyFilterChangedAsync();
 

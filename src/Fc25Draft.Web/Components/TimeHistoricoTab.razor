@@ -55,11 +55,12 @@ else
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
         <div class="input-group input-group-sm" style="max-width:320px;">
             <span class="input-group-text">🔎</span>
-            <input class="form-control" placeholder="Pesquisar jogador pelo nome"
-                   value="@_busca" @oninput="OnBuscaChanged" />
+            @* Input não controlado (sem value="@...") para o re-render não apagar letras digitadas. *@
+            <input @key="_buscaInputKey" class="form-control" placeholder="Pesquisar jogador pelo nome"
+                   @oninput="OnBuscaChanged" />
             @if (!string.IsNullOrWhiteSpace(_busca))
             {
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => _busca = string.Empty">✕</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="LimparBusca">✕</button>
             }
         </div>
         <div class="form-check form-switch mb-0">
@@ -130,6 +131,7 @@ else
     private TimeHistoricoDto? _dados;
 
     private string _busca = string.Empty;
+    private int _buscaInputKey;
     private bool _somenteElenco;
     private string _sortBy = "ga";
     private bool _sortAsc;
@@ -188,6 +190,12 @@ else
     }
 
     private void OnBuscaChanged(ChangeEventArgs e) => _busca = e.Value?.ToString() ?? string.Empty;
+
+    private void LimparBusca()
+    {
+        _busca = string.Empty;
+        _buscaInputKey++;
+    }
 
     private void OnSomenteElencoChanged(ChangeEventArgs e) => _somenteElenco = e.Value is true;
 

@@ -50,6 +50,8 @@ public class DraftDbContext : DbContext
 
     public DbSet<HallOfFameEntry> HallOfFame => Set<HallOfFameEntry>();
 
+    public DbSet<DraftWishlistEntry> DraftWishlistEntries => Set<DraftWishlistEntry>();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.HasPostgresExtension("unaccent");

@@ -524,21 +524,17 @@
                             <ul class="list-unstyled">
                                 @foreach (var gol in gols)
                                 {
-                                    <li class="mb-2">
-                                        <span class="badge bg-primary me-2">@gol.Minuto'</span>
+                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                        <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="badge bg-primary">@gol.Minuto'</span>
                                         <strong>@gol.JogadorNome</strong>
                                         @if (gol.Tipo == TipoEvento.GolContra)
                                         {
-                                            <span class="badge bg-danger ms-1">contra</span>
-                                            <text> (gol para @gol.TimeNome)</text>
-                                        }
-                                        else
-                                        {
-                                            <text> (@gol.TimeNome)</text>
+                                            <span class="badge bg-danger">contra</span>
                                         }
                                         @if (!string.IsNullOrEmpty(gol.AssistenteNome))
                                         {
-                                            <span class="text-muted small">- Assistência: @gol.AssistenteNome</span>
+                                            <span class="text-muted small">Assistência: @gol.AssistenteNome</span>
                                         }
                                     </li>
                                 }
@@ -553,10 +549,11 @@
                             <ul class="list-unstyled">
                                 @foreach (var cartao in cartoes)
                                 {
-                                    <li class="mb-2">
-                                        <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger") me-2">@cartao.Minuto'</span>
-                                        <strong>@cartao.JogadorNome</strong> (@cartao.TimeNome)
-                                        <span class="ms-2">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
+                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                        <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span>
+                                        <strong>@cartao.JogadorNome</strong>
+                                        <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
                                     </li>
                                 }
                             </ul>

@@ -163,6 +163,7 @@ api.MapDraftEndpoints()
    .MapTransferOffersEndpoints()
    .MapMarketEndpoints()
    .MapMarketHistoryEndpoints()
+   .MapDraftWishlistEndpoints()
    .MapAdminEndpoints()
    .MapLigaEndpoints();
 
