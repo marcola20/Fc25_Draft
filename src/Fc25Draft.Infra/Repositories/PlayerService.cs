@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -105,8 +105,76 @@ public class PlayerService : IPlayerService
         var entity = await _db.Players.FirstOrDefaultAsync(p => p.PlayerId == id)
                      ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
+        var blockers = await GetDeleteBlockersAsync(id);
+        if (blockers.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Não é possível excluir \"{entity.Name}\" porque ele está vinculado a: {string.Join(", ", blockers)}. " +
+                "Remova esses vínculos antes de excluir o jogador.");
+        }
+
         _db.Players.Remove(entity);
-        await _db.SaveChangesAsync();
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException(
+                $"Não foi possível excluir \"{entity.Name}\" porque ele está vinculado a outros registros.", ex);
+        }
+    }
+
+    private async Task<List<string>> GetDeleteBlockersAsync(int id)
+    {
+        var blockers = new List<string>();
+
+        async Task CheckAsync<T>(IQueryable<T> query, string singular, string plural)
+        {
+            var count = await query.CountAsync();
+            if (count > 0)
+            {
+                blockers.Add(count == 1 ? $"1 {singular}" : $"{count} {plural}");
+            }
+        }
+
+        await CheckAsync(_db.TeamRosters.Where(r => r.PlayerId == id),
+            "elenco de time", "elencos de times");
+
+        await CheckAsync(_db.DraftPicks.Where(d => d.PlayerId == id),
+            "escolha de draft", "escolhas de draft");
+
+        await CheckAsync(_db.TeamLineupSlots.Where(s => s.PlayerId == id),
+            "escalação", "escalações");
+
+        await CheckAsync(_db.TeamLineups.Where(l =>
+                l.CaptainPlayerId == id ||
+                l.ShortFreeKick1PlayerId == id ||
+                l.ShortFreeKick2PlayerId == id ||
+                l.LongFreeKickPlayerId == id ||
+                l.PenaltiesPlayerId == id ||
+                l.CornerLeftPlayerId == id ||
+                l.CornerRightPlayerId == id ||
+                l.AttackingPlayer1Id == id ||
+                l.AttackingPlayer2Id == id ||
+                l.AttackingPlayer3Id == id)
+            .Select(l => l.LineupId),
+            "função de escalação (capitão/cobrador)", "funções de escalação (capitão/cobrador)");
+
+        await CheckAsync(_db.MarketItems.Where(m => m.PlayerId == id),
+            "item de mercado", "itens de mercado");
+
+        await CheckAsync(_db.MarketTransactions.Where(t => t.PlayerId == id),
+            "transação de mercado", "transações de mercado");
+
+        await CheckAsync(_db.TransferHistories.Where(h => h.PlayerId == id),
+            "registro no histórico de transferências", "registros no histórico de transferências");
+
+        await CheckAsync(_db.TransferOfferPlayers.Where(o => o.PlayerId == id),
+            "proposta de troca", "propostas de troca");
+
+        return blockers;
     }
 
     public async Task<PlayerImportResultDto> ImportCsvAsync(Stream csvStream, CancellationToken ct = default)

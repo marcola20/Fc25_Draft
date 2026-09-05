@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
 @using System.Linq
+@using Microsoft.AspNetCore.WebUtilities
 @inject PlayersApiClient PlayersApiClient
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
@@ -117,6 +118,33 @@
                 @onclick="ApplyFiltersAsync">
             Filtrar
         </button>
+    </div>
+    <div class="col-12 col-sm-auto pt-md-4 ms-sm-auto">
+        @if (isDownloadDropdownOpen)
+        {
+            <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="CloseDownloadDropdown"></div>
+        }
+        <div class="position-relative" style="z-index: 1010;">
+            <button type="button"
+                    class="btn btn-outline-secondary dropdown-toggle w-100 w-sm-auto"
+                    style="height: 40px; padding: 0 18px; font-size: 0.95rem; font-weight: 500;"
+                    id="playerDownloadMenu"
+                    title="Baixa a lista de acordo com os filtros aplicados"
+                    disabled="@(isLoading || totalPlayers == 0)"
+                    @onclick="ToggleDownloadDropdown"
+                    aria-expanded="@isDownloadDropdownOpen">
+                Baixar lista
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow-sm @(isDownloadDropdownOpen ? "show" : string.Empty)"
+                 aria-labelledby="playerDownloadMenu"
+                 style="z-index: 1050;@(isDownloadDropdownOpen ? string.Empty : " display: none;")"
+                 @onclick:stopPropagation>
+                <h6 class="dropdown-header">@GetDownloadSummary()</h6>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("csv"))">CSV</button>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("xlsx"))">Excel (XLSX)</button>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("json"))">JSON</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -271,12 +299,16 @@ else
     private bool authInitialized;
     private bool isImporting;
     private bool isPositionDropdownOpen;
+    private bool isDownloadDropdownOpen;
     private string importInputKey = Guid.NewGuid().ToString();
     private string? importSuccessMessage;
     private string? importErrorMessage;
     private readonly List<string> importErrors = new();
     private int? overallMin;
     private int? overallMax;
+    private string? appliedSearch;
+    private int? appliedOverallMin;
+    private int? appliedOverallMax;
     private string sortBy = "overall";
     private bool sortDescending = true;
 
@@ -417,6 +449,9 @@ else
                 PageSize);
             players.AddRange(result.Items);
             totalPlayers = result.Total;
+            appliedSearch = search;
+            appliedOverallMin = overallMin;
+            appliedOverallMax = overallMax;
             totalPages = Math.Max(1, (int)Math.Ceiling(totalPlayers / (double)PageSize));
             if (currentPage > totalPages)
             {
@@ -517,15 +552,95 @@ else
 
     private void DownloadExport(string format)
     {
+        isDownloadDropdownOpen = false;
+
         var path = format switch
         {
-            "csv" => "api/players/export/csv",
             "json" => "api/players/export/json",
             "xlsx" => "api/players/export/xlsx",
             _ => "api/players/export/csv"
         };
 
-        Navigation.NavigateTo(path, forceLoad: true);
+        Navigation.NavigateTo(BuildExportUrl(path), forceLoad: true);
+    }
+
+    private string BuildExportUrl(string path)
+    {
+        var query = new List<KeyValuePair<string, string?>>();
+
+        if (!string.IsNullOrWhiteSpace(appliedSearch))
+        {
+            query.Add(new("q", appliedSearch.Trim()));
+        }
+
+        foreach (var id in selectedPositionIds.OrderBy(id => id))
+        {
+            query.Add(new("pos", id.ToString()));
+        }
+
+        if (onlyAvailable)
+        {
+            query.Add(new("onlyAvailable", "true"));
+        }
+
+        if (appliedOverallMin.HasValue)
+        {
+            query.Add(new("overallMin", appliedOverallMin.Value.ToString()));
+        }
+
+        if (appliedOverallMax.HasValue)
+        {
+            query.Add(new("overallMax", appliedOverallMax.Value.ToString()));
+        }
+
+        query.Add(new("sortBy", sortBy));
+        query.Add(new("sortOrder", sortDescending ? "desc" : "asc"));
+
+        return QueryHelpers.AddQueryString(path, query);
+    }
+
+    private string GetDownloadSummary()
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(appliedSearch))
+        {
+            parts.Add($"nome \"{appliedSearch.Trim()}\"");
+        }
+
+        if (selectedPositionIds.Count > 0)
+        {
+            parts.Add(GetSelectedPositionsLabel());
+        }
+
+        if (onlyAvailable)
+        {
+            parts.Add("somente disponíveis");
+        }
+
+        if (appliedOverallMin.HasValue || appliedOverallMax.HasValue)
+        {
+            parts.Add((appliedOverallMin, appliedOverallMax) switch
+            {
+                ({ } min, { } max) => $"overall {min}-{max}",
+                ({ } min, null) => $"overall ≥ {min}",
+                (null, { } max) => $"overall ≤ {max}",
+                _ => string.Empty
+            });
+        }
+
+        var count = totalPlayers == 1 ? "1 jogador" : $"{totalPlayers} jogadores";
+        return parts.Count == 0 ? $"{count} (sem filtros)" : $"{count} · {string.Join(", ", parts)}";
+    }
+
+    private void ToggleDownloadDropdown()
+    {
+        isDownloadDropdownOpen = !isDownloadDropdownOpen;
+    }
+
+    private void CloseDownloadDropdown()
+    {
+        isDownloadDropdownOpen = false;
     }
 
     private IReadOnlyList<int> GetVisiblePageNumbers()

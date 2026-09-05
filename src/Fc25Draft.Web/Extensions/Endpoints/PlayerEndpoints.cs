@@ -39,49 +39,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 var currentPage = page < 1 ? 1 : page;
                 var currentPageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 100);
 
-                var query = db.Players.AsNoTracking().Where(p => true);
-
                 if (overallMin.HasValue && overallMax.HasValue && overallMin > overallMax)
                     return Results.BadRequest(new { message = "Overall mínimo não pode ser maior que o máximo." });
 
-                if (!string.IsNullOrWhiteSpace(q))
-                {
-                    var pattern = $"%{q.Trim()}%";
-                    query = query.Where(p => EF.Functions.ILike(
-                        EF.Functions.Unaccent(p.Name),
-                        EF.Functions.Unaccent(pattern)));
-                }
-
-                if (pos?.Length > 0)
-                {
-                    var positions = pos.Distinct().ToList();
-                    query = query.Where(p => positions.Contains(p.PositionId));
-                }
-
-                if (onlyAvailable is true)
-                    query = query.Where(p => !p.TeamRosters.Any());
-
-                if (overallMin.HasValue)
-                    query = query.Where(p => p.Overall >= overallMin.Value);
-
-                if (overallMax.HasValue)
-                    query = query.Where(p => p.Overall <= overallMax.Value);
-
-                var normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? "overall" : sortBy.Trim().ToLowerInvariant();
-                var normalizedSortOrder = string.IsNullOrWhiteSpace(sortOrder) ? "desc" : sortOrder.Trim().ToLowerInvariant();
-                var sortDescending = normalizedSortOrder != "asc";
-
-                IOrderedQueryable<Player> orderedQuery = normalizedSortBy switch
-                {
-                    "age" when sortDescending => query.OrderByDescending(p => p.Age ?? int.MinValue),
-                    "age" => query.OrderBy(p => p.Age ?? int.MaxValue),
-                    "overall" when sortDescending => query.OrderByDescending(p => p.Overall),
-                    "overall" => query.OrderBy(p => p.Overall),
-                    _ when sortDescending => query.OrderByDescending(p => p.Overall),
-                    _ => query.OrderBy(p => p.Overall)
-                };
-
-                orderedQuery = orderedQuery.ThenBy(p => p.Name);
+                var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax);
+                var orderedQuery = ApplySort(query, sortBy, sortOrder);
 
                 var total = await query.CountAsync(ct);
 
@@ -122,31 +84,59 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return player is null ? Results.NotFound() : Results.Ok(player);
             });
 
-            playersApi.MapGet("/export/csv", async (DraftDbContext db, CancellationToken ct) =>
+            playersApi.MapGet("/export/csv", async (
+                DraftDbContext db,
+                string? q,
+                [FromQuery(Name = "pos")] short[]? pos,
+                bool? onlyAvailable,
+                int? overallMin,
+                int? overallMax,
+                string? sortBy,
+                string? sortOrder,
+                CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
                 var csv = BuildPlayerCsv(players);
                 return Results.File(Encoding.UTF8.GetBytes(csv), "text/csv", "jogadores.csv");
             });
 
-            playersApi.MapGet("/export/json", async (DraftDbContext db, CancellationToken ct) =>
+            playersApi.MapGet("/export/json", async (
+                DraftDbContext db,
+                string? q,
+                [FromQuery(Name = "pos")] short[]? pos,
+                bool? onlyAvailable,
+                int? overallMin,
+                int? overallMax,
+                string? sortBy,
+                string? sortOrder,
+                CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
                 var json = JsonSerializer.Serialize(players, new JsonSerializerOptions { WriteIndented = true });
                 return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "jogadores.json");
             });
 
-            playersApi.MapGet("/export/xlsx", async (DraftDbContext db, CancellationToken ct) =>
+            playersApi.MapGet("/export/xlsx", async (
+                DraftDbContext db,
+                string? q,
+                [FromQuery(Name = "pos")] short[]? pos,
+                bool? onlyAvailable,
+                int? overallMin,
+                int? overallMax,
+                string? sortBy,
+                string? sortOrder,
+                CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
 
                 using var workbook = new XLWorkbook();
                 var worksheet = workbook.Worksheets.Add("Jogadores");
                 worksheet.Cell(1, 1).Value = "Nome";
                 worksheet.Cell(1, 2).Value = "Posição";
                 worksheet.Cell(1, 3).Value = "Overall";
-                worksheet.Cell(1, 4).Value = "Status";
-                worksheet.Cell(1, 5).Value = "Time";
+                worksheet.Cell(1, 4).Value = "Idade";
+                worksheet.Cell(1, 5).Value = "Status";
+                worksheet.Cell(1, 6).Value = "Time";
 
                 for (var i = 0; i < players.Count; i++)
                 {
@@ -155,8 +145,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     worksheet.Cell(row, 1).Value = p.Nome;
                     worksheet.Cell(row, 2).Value = p.Posicao;
                     worksheet.Cell(row, 3).Value = p.Overall;
-                    worksheet.Cell(row, 4).Value = p.Status;
-                    worksheet.Cell(row, 5).Value = p.Time ?? string.Empty;
+                    if (p.Idade.HasValue)
+                        worksheet.Cell(row, 4).Value = p.Idade.Value;
+                    worksheet.Cell(row, 5).Value = p.Status;
+                    worksheet.Cell(row, 6).Value = p.Time ?? string.Empty;
                 }
 
                 worksheet.Columns().AdjustToContents();
@@ -248,28 +240,91 @@ namespace Fc25Draft.Web.Extensions.Endpoints
         }
 
         #region Helper
-        private static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(DraftDbContext db, CancellationToken ct)
+        private static IQueryable<Player> BuildFilteredQuery(
+            DraftDbContext db,
+            string? q,
+            short[]? pos,
+            bool? onlyAvailable,
+            int? overallMin,
+            int? overallMax)
         {
-            var players = await db.Players
-                .AsNoTracking()
-                .OrderBy(p => p.Name)
+            var query = db.Players.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var pattern = $"%{q.Trim()}%";
+                query = query.Where(p => EF.Functions.ILike(
+                    EF.Functions.Unaccent(p.Name),
+                    EF.Functions.Unaccent(pattern)));
+            }
+
+            if (pos?.Length > 0)
+            {
+                var positions = pos.Distinct().ToList();
+                query = query.Where(p => positions.Contains(p.PositionId));
+            }
+
+            if (onlyAvailable is true)
+                query = query.Where(p => !p.TeamRosters.Any());
+
+            if (overallMin.HasValue)
+                query = query.Where(p => p.Overall >= overallMin.Value);
+
+            if (overallMax.HasValue)
+                query = query.Where(p => p.Overall <= overallMax.Value);
+
+            return query;
+        }
+
+        private static IOrderedQueryable<Player> ApplySort(IQueryable<Player> query, string? sortBy, string? sortOrder)
+        {
+            var normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? "overall" : sortBy.Trim().ToLowerInvariant();
+            var normalizedSortOrder = string.IsNullOrWhiteSpace(sortOrder) ? "desc" : sortOrder.Trim().ToLowerInvariant();
+            var sortDescending = normalizedSortOrder != "asc";
+
+            IOrderedQueryable<Player> orderedQuery = normalizedSortBy switch
+            {
+                "age" when sortDescending => query.OrderByDescending(p => p.Age ?? int.MinValue),
+                "age" => query.OrderBy(p => p.Age ?? int.MaxValue),
+                "overall" when sortDescending => query.OrderByDescending(p => p.Overall),
+                "overall" => query.OrderBy(p => p.Overall),
+                _ when sortDescending => query.OrderByDescending(p => p.Overall),
+                _ => query.OrderBy(p => p.Overall)
+            };
+
+            return orderedQuery.ThenBy(p => p.Name);
+        }
+
+        private static async Task<List<PlayerExportDto>> LoadPlayerExportAsync(
+            DraftDbContext db,
+            string? q,
+            short[]? pos,
+            bool? onlyAvailable,
+            int? overallMin,
+            int? overallMax,
+            string? sortBy,
+            string? sortOrder,
+            CancellationToken ct)
+        {
+            var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax);
+            var orderedQuery = ApplySort(query, sortBy, sortOrder);
+
+            return await orderedQuery
                 .Select(p => new PlayerExportDto(
                     p.Name,
                     p.Position.Name,
                     p.Overall,
+                    p.Age,
                     p.TeamRosters.Any() ? "Escolhido" : "Disponível",
                     p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()
                 ))
                 .ToListAsync(ct);
-
-            return players;
         }
-
 
         private static string BuildPlayerCsv(List<PlayerExportDto> players)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Nome;Posição;Overall;Status;Time");
+            sb.AppendLine("Nome;Posição;Overall;Idade;Status;Time");
 
             foreach (var p in players)
             {
@@ -277,6 +332,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     Csv(p.Nome),
                     Csv(p.Posicao),
                     p.Overall.ToString(CultureInfo.InvariantCulture),
+                    p.Idade?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     Csv(p.Status),
                     Csv(p.Time ?? string.Empty)));
             }
@@ -291,7 +347,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }
         }
 
-        private sealed record PlayerExportDto(string Nome, string Posicao, int Overall, string Status, string? Time);
+        private sealed record PlayerExportDto(string Nome, string Posicao, int Overall, int? Idade, string Status, string? Time);
         #endregion
     }
 }
