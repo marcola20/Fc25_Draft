@@ -215,6 +215,16 @@ public class TransferOfferService : ITransferOfferService
         return offers.Select(MapToDto).ToList();
     }
 
+    public async Task<IReadOnlyList<TransferOfferListItemDto>> GetAllPendingOffersAsync(CancellationToken ct)
+    {
+        var offers = await QueryOffers()
+            .Where(o => o.Status == OfferStatus.Pending)
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .ToListAsync(ct);
+
+        return offers.Select(MapToDto).ToList();
+    }
+
     public async Task<IReadOnlyList<TransferOfferListItemDto>> GetSentOffersAsync(Guid teamId, CancellationToken ct)
     {
         var offers = await QueryOffers()

@@ -1,12 +1,14 @@
 @page "/mercado/negociacoes"
 @page "/admin/negociacoes"
 @using System.Globalization
+@using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Authorization
 @inject AdminAuthService AdminAuth
 @inject TeamsApiClient TeamsApiClient
 @inject AdminTransfersApiClient AdminTransfersApiClient
 @inject BudgetsApiClient BudgetsApiClient
 @inject MarketApiClient MarketApiClient
+@inject TransferOffersApiClient TransferOffersApiClient
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Admin.Transfers> Logger
@@ -65,6 +67,16 @@ else
             <button type="button" class="nav-link @(selectedTab == "market" ? "active" : null)"
                     @onclick='() => SelectTab("market")'>
                 Mercado
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(selectedTab == "offers" ? "active" : null)"
+                    @onclick='() => SelectTab("offers")'>
+                Propostas
+                @if (pendingOffers.Count > 0)
+                {
+                    <span class="badge bg-warning text-dark ms-1">@pendingOffers.Count</span>
+                }
             </button>
         </li>
     </ul>
@@ -516,6 +528,106 @@ else
                 }
             </div>
             break;
+        case "offers":
+            <div>
+                @if (!string.IsNullOrEmpty(offersErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@offersErrorMessage</div>
+                }
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="text-muted small">Propostas entre times ainda pendentes de resposta. Somente visualização.</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="LoadPendingOffersAsync" disabled="@isLoadingOffers">
+                        @(isLoadingOffers ? "Carregando..." : "Recarregar")
+                    </button>
+                </div>
+
+                @if (isLoadingOffers && pendingOffers.Count == 0)
+                {
+                    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+                }
+                else if (pendingOffers.Count == 0)
+                {
+                    <div class="alert alert-info" role="alert">Nenhuma proposta pendente no momento.</div>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        @foreach (var offer in pendingOffers)
+                        {
+                            <div class="col-12 col-xl-6">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start mb-2">
+                                            <div>
+                                                <div class="fw-bold">@offer.FromTeamName <span class="text-muted">→</span> @offer.ToTeamName</div>
+                                                <div class="small text-muted">@BrazilTime.FormatDateTime(offer.CreatedAtUtc)</div>
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-info">@TranslateOfferType(offer.Type)</span>
+                                                <span class="badge bg-warning text-dark">Pendente</span>
+                                                @if (offer.ParentOfferId.HasValue)
+                                                {
+                                                    <span class="badge bg-secondary">Contraproposta</span>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        @if (offer.TargetPlayers.Count > 0)
+                                        {
+                                            <div class="small text-muted">@offer.FromTeamName pede:</div>
+                                            <div class="mb-2">
+                                                @foreach (var p in offer.TargetPlayers)
+                                                {
+                                                    <span class="badge bg-danger me-1 mb-1">@p.Name (@p.Position, @p.Overall)</span>
+                                                }
+                                            </div>
+                                        }
+
+                                        @if (offer.OfferedPlayers.Count > 0)
+                                        {
+                                            <div class="small text-muted">@offer.FromTeamName oferece:</div>
+                                            <div class="mb-2">
+                                                @foreach (var p in offer.OfferedPlayers)
+                                                {
+                                                    <span class="badge bg-success me-1 mb-1">@p.Name (@p.Position, @p.Overall)</span>
+                                                }
+                                            </div>
+                                        }
+
+                                        @if (offer.Money > 0)
+                                        {
+                                            <div class="mb-1">
+                                                <strong>Valor:</strong> @FormatCurrency(offer.Money)
+                                                @if (!string.IsNullOrWhiteSpace(offer.MoneyPayerTeamName))
+                                                {
+                                                    <span class="text-muted small"> (pago por @offer.MoneyPayerTeamName)</span>
+                                                }
+                                            </div>
+                                        }
+
+                                        @if (offer.SellOnPercentage > 0)
+                                        {
+                                            <div class="mb-1"><strong>Percentual de revenda:</strong> @offer.SellOnPercentage%</div>
+                                        }
+
+                                        @if (!string.IsNullOrWhiteSpace(offer.Clauses))
+                                        {
+                                            <div class="mb-1"><strong>Cláusulas:</strong> @offer.Clauses</div>
+                                        }
+
+                                        @if (!string.IsNullOrWhiteSpace(offer.Notes))
+                                        {
+                                            <div class="small text-muted"><strong>Obs.:</strong> @offer.Notes</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            break;
     }
 }
 
@@ -558,6 +670,9 @@ else
     private string? marketErrorMessage;
     private string? marketReason;
     private Guid? resettingItemId;
+    private readonly List<TransferOfferListItemDto> pendingOffers = new();
+    private string? offersErrorMessage;
+    private bool isLoadingOffers;
 
 
     private bool isLoadingData = true;
@@ -615,7 +730,43 @@ else
     {
         selectedTab = tab;
         ClearMessages();
+
+        if (tab == "offers")
+        {
+            _ = LoadPendingOffersAsync();
+        }
     }
+
+    private async Task LoadPendingOffersAsync()
+    {
+        if (isLoadingOffers) return;
+
+        isLoadingOffers = true;
+        offersErrorMessage = null;
+        try
+        {
+            var offers = await TransferOffersApiClient.GetAllPendingAsAdminAsync();
+            pendingOffers.Clear();
+            pendingOffers.AddRange(offers);
+        }
+        catch (Exception ex)
+        {
+            offersErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingOffers = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string TranslateOfferType(string type) => type switch
+    {
+        "Sale" => "Venda",
+        "Loan" => "Empréstimo",
+        "Swap" => "Troca",
+        _ => type
+    };
 
     private async Task LoadDataAsync()
     {

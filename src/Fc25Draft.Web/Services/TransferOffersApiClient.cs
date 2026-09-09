@@ -73,6 +73,17 @@ public class TransferOffersApiClient
             ?? Array.Empty<TransferOfferListItemDto>();
     }
 
+    /// <summary>Lista todas as propostas pendentes entre times. Requer sessão de administrador.</summary>
+    public async Task<IReadOnlyList<TransferOfferListItemDto>> GetAllPendingAsAdminAsync(CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        using var response = await client.GetAsync("api/admin/offers/pending", ct);
+        await EnsureSuccessAsync(response, ct);
+
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TransferOfferListItemDto>>(cancellationToken: ct)
+            ?? Array.Empty<TransferOfferListItemDto>();
+    }
+
     public async Task<TransferOfferListItemDto?> GetByIdAsync(Guid offerId, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync();

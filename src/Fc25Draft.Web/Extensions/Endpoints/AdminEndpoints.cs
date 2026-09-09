@@ -30,6 +30,12 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             adminApi.MapGet("/validate", () => Results.Ok(new { status = "ok" }));
 
+            adminApi.MapGet("/offers/pending", async (ITransferOfferService offerService, CancellationToken ct) =>
+            {
+                var offers = await offerService.GetAllPendingOffersAsync(ct);
+                return Results.Ok(offers);
+            });
+
             adminApi.MapGet("/lineups", async (
                 Guid? teamId,
                 ITeamLineupService lineupService,

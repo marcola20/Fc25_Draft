@@ -11,5 +11,8 @@ public interface ITransferOfferService
     Task<IReadOnlyList<TransferOfferListItemDto>> GetSentOffersAsync(Guid teamId, CancellationToken ct);
     Task<IReadOnlyList<TransferOfferListItemDto>> GetFinishedOffersAsync(Guid teamId, CancellationToken ct);
     Task<TransferOfferListItemDto?> GetByIdAsync(Guid offerId, CancellationToken ct);
+
+    /// <summary>Todas as propostas pendentes entre times, de qualquer time (uso administrativo).</summary>
+    Task<IReadOnlyList<TransferOfferListItemDto>> GetAllPendingOffersAsync(CancellationToken ct);
     Task<TransferOfferListItemDto> CancelOfferAsync(Guid offerId, Guid teamId, CancellationToken ct);
 }
