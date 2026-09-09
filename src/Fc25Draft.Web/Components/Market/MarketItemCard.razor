@@ -12,6 +12,7 @@
 @using Fc25Draft.Web.Utilities
 @using System.Reflection
 @inject Fc25Draft.Web.Services.MarketClient Client
+@inject Fc25Draft.Web.Services.AdminTransfersApiClient AdminTransfersApiClient
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
 
@@ -152,6 +153,44 @@
             }
         }
 
+        @if (CanResetBids)
+        {
+            <div class="d-flex flex-column gap-2 border-top pt-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="text-muted small">Admin</span>
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm ms-auto"
+                            disabled="@_isSubmitting"
+                            @onclick="ShowResetBidsConfirm">
+                        Zerar lances
+                    </button>
+                </div>
+
+                @if (_showResetConfirm)
+                {
+                    <div class="alert alert-danger py-2 mb-0" role="alert">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="me-auto small">
+                                Zerar todos os lances em @Item.PlayerName? @FormatCurrency(Item.CurrentLeaderAmount!.Value) volta ao caixa de @(Item.CurrentLeaderTeamName ?? "time líder").
+                            </span>
+                            <button type="button"
+                                    class="btn btn-danger btn-sm"
+                                    disabled="@_isSubmitting"
+                                    @onclick="ConfirmResetBidsAsync">
+                                Confirmar
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    disabled="@_isSubmitting"
+                                    @onclick="CancelResetBids">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
         @if (!string.IsNullOrEmpty(_infoMessage))
         {
             <div class="alert alert-info mb-0" role="status">@_infoMessage</div>
@@ -189,6 +228,10 @@
     [Parameter]
     public EventCallback<Guid> OnEditEnd { get; set; }
 
+    /// <summary>Quando verdadeiro, exibe as ações administrativas do item (zerar lances).</summary>
+    [Parameter]
+    public bool IsAdmin { get; set; }
+
     private readonly BidFormModel _model = new();
     private EditContext? _editContext;
     private ValidationMessageStore? _validationMessageStore;
@@ -201,6 +244,7 @@
     private Task? _timerTask;
     private bool _isSubmitting;
     private bool _showBuyConfirm;
+    private bool _showResetConfirm;
     private string? _infoMessage;
     private string? _errorMessage;
     private bool _isEditing;
@@ -215,6 +259,50 @@
     private bool IsBuyNowDisabled => _isSubmitting || IsExpired || !Item.IsActive;
 
     private bool CanBuyNow => Item.IsActive && Item.BuyNowPrice.HasValue;
+
+    private bool CanResetBids => IsAdmin && Item.IsActive && !IsExpired && Item.CurrentLeaderAmount.HasValue;
+
+    private void ShowResetBidsConfirm()
+    {
+        _errorMessage = null;
+        _infoMessage = null;
+        _showResetConfirm = true;
+    }
+
+    private void CancelResetBids() => _showResetConfirm = false;
+
+    private async Task ConfirmResetBidsAsync()
+    {
+        if (_isSubmitting) return;
+
+        _isSubmitting = true;
+        _errorMessage = null;
+        _infoMessage = null;
+
+        try
+        {
+            var message = await AdminTransfersApiClient.ResetMarketBidsAsync(
+                Item.ItemId,
+                new Fc25Draft.Core.DTOs.AdminResetMarketBidsRequestDto(null),
+                _lifetimeCts?.Token ?? CancellationToken.None);
+
+            _showResetConfirm = false;
+            _infoMessage = message;
+            await OnBidPlaced.InvokeAsync(Item);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao zerar lances do item {ItemId}", Item.ItemId);
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
 
     private bool IsCurrentTeamLeader => CurrentTeamId.HasValue && Item.CurrentLeaderTeamId.HasValue && Item.CurrentLeaderTeamId.Value == CurrentTeamId.Value;
 

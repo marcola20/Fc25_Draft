@@ -25,6 +25,7 @@
 @inject TeamAccessService TeamAccess
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject AdminAuthService AdminAuth
 @implements IAsyncDisposable
 
 <PageTitle>Mercado de Transferências</PageTitle>
@@ -96,7 +97,8 @@
                                     OnBought="@(EventCallback.Factory.Create<CoreItemVm>(this, HandleBoughtAsync))"
                                     OnTeamTokenMissing="@(EventCallback.Factory.Create(this, HandleTeamTokenMissingAsync))"
                                     OnEditStart="HandleEditStart"
-                                    OnEditEnd="HandleEditEnd" />
+                                    OnEditEnd="HandleEditEnd"
+                                    IsAdmin="AdminAuth.IsAdmin" />
                 </div>
             }
         </div>
@@ -420,6 +422,17 @@ else
 
         try
         {
+            await AdminAuth.EnsureInitializedAsync();
+            AdminAuth.AuthenticationChanged += OnAdminAuthenticationChanged;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Não foi possível verificar o acesso administrativo no mercado.");
+        }
+
+        try
+        {
             var hubToken = _lifetimeCts?.Token ?? CancellationToken.None;
             await Hub.ConnectAsync(hubToken);
             _hubConnected = Hub.IsConnected;
@@ -558,6 +571,8 @@ else
         var ct = PrepareNewLoadCts();
         await LoadPageAsync(1, ct);
     }
+
+    private void OnAdminAuthenticationChanged() => _ = InvokeAsync(StateHasChanged);
 
     private async Task HandleBidPlacedAsync(CoreItemVm vm)
     {
@@ -1430,6 +1445,7 @@ else
         MarketUpdates.OnBidUpdated -= HandleMarketUpdateEvent;
         MarketUpdates.OnItemBought -= HandleMarketUpdateEvent;
         MarketUpdates.OnItemClosed -= HandleMarketUpdateEvent;
+        AdminAuth.AuthenticationChanged -= OnAdminAuthenticationChanged;
 
         _loadCts?.Cancel();
         _loadCts?.Dispose();
