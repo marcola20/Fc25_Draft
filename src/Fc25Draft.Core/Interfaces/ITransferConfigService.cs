@@ -9,4 +9,10 @@ public interface ITransferConfigService
 
     /// <summary>Persiste os limites de transferências.</summary>
     Task<TransferConfigDto> UpdateAsync(TransferConfigDto dto, CancellationToken ct);
+
+    /// <summary>Lista o contador de vendas rápidas de cada time, ordenado por nome.</summary>
+    Task<IReadOnlyList<TeamQuickSellStatusDto>> GetQuickSellStatusAsync(CancellationToken ct);
+
+    /// <summary>Zera o contador de vendas rápidas (quick sell) de todos os times. Retorna a quantidade de times afetados.</summary>
+    Task<int> ResetQuickSellCountsAsync(CancellationToken ct);
 }

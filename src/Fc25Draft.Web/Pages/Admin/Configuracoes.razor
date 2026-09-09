@@ -9,6 +9,7 @@
 @inject ITransferConfigService TransferCfg
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Configurações</PageTitle>
 
@@ -169,6 +170,50 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="col-12 col-lg-5">
+                    <div class="card border-danger">
+                        <div class="card-header fw-bold text-danger">Zerar vendas rápidas</div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Zera o contador de quick-sells de <strong>todos os times</strong>, liberando o limite da janela novamente.
+                                Não desfaz vendas já feitas nem altera o caixa.
+                            </p>
+                            <button class="btn btn-outline-danger" @onclick="ZerarQuickSells" disabled="@_saving">
+                                @(_saving ? "Zerando..." : "Zerar quick-sells de todos os times")
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr><th>Time</th><th class="text-end">Usados</th><th class="text-end">Restantes</th></tr>
+                                </thead>
+                                <tbody>
+                                    @if (_quickSells.Count == 0)
+                                    {
+                                        <tr><td colspan="3" class="text-muted text-center">Nenhum time cadastrado.</td></tr>
+                                    }
+                                    @foreach (var t in _quickSells)
+                                    {
+                                        var restantes = Math.Max(0, _maxQuickSellSalvo - t.QuickSellCount);
+                                        <tr>
+                                            <td>
+                                                @t.TeamName
+                                                @if (!string.IsNullOrWhiteSpace(t.OwnerName))
+                                                {
+                                                    <span class="text-muted small"> · @t.OwnerName</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">@t.QuickSellCount</td>
+                                            <td class="text-end fw-bold @(restantes == 0 ? "text-danger" : "")">@restantes/@_maxQuickSellSalvo</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer small text-muted">Restantes = limite salvo (@_maxQuickSellSalvo) menos as vendas rápidas já feitas na janela.</div>
+                    </div>
+                </div>
             </div>
         }
     }
@@ -186,6 +231,8 @@
 
     // Transferências
     private int _maxQuickSell, _maxTransfers, _minRoster;
+    private int _maxQuickSellSalvo;
+    private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
 
     private record Exemplo(string Label, short PositionId, int Overall, int Age);
     private static readonly Exemplo[] _exemplos =
@@ -206,6 +253,7 @@
 
             var tcfg = await TransferCfg.GetAsync(CancellationToken.None);
             AplicarTransf(tcfg);
+            await CarregarQuickSells();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _loading = false; }
@@ -214,9 +262,13 @@
     private void AplicarTransf(TransferConfigDto t)
     {
         _maxQuickSell = t.MaxQuickSellPerWindow;
+        _maxQuickSellSalvo = t.MaxQuickSellPerWindow;
         _maxTransfers = t.MaxTransfers;
         _minRoster = t.MinRosterSize;
     }
+
+    private async Task CarregarQuickSells()
+        => _quickSells = await TransferCfg.GetQuickSellStatusAsync(CancellationToken.None);
 
     private async Task SalvarTransf()
     {
@@ -226,6 +278,24 @@
             var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster), CancellationToken.None);
             AplicarTransf(salvo);
             _ok = "Limites de transferências salvos.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task ZerarQuickSells()
+    {
+        var confirmado = await JSRuntime.InvokeAsync<bool>("confirm", "Zerar o contador de vendas rápidas de TODOS os times? Esta ação não pode ser desfeita.");
+        if (!confirmado) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var afetados = await TransferCfg.ResetQuickSellCountsAsync(CancellationToken.None);
+            await CarregarQuickSells();
+            _ok = afetados == 0
+                ? "Nenhum time tinha vendas rápidas para zerar."
+                : $"Vendas rápidas zeradas em {afetados} time(s).";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }

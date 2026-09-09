@@ -49,6 +49,22 @@ public class TransferConfigService : ITransferConfigService
         return ToDto(cfg);
     }
 
+    public async Task<IReadOnlyList<TeamQuickSellStatusDto>> GetQuickSellStatusAsync(CancellationToken ct)
+    {
+        return await _db.Teams
+            .AsNoTracking()
+            .OrderBy(t => t.TeamName)
+            .Select(t => new TeamQuickSellStatusDto(t.TeamId, t.TeamName, t.OwnerName, t.QuickSellCount))
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> ResetQuickSellCountsAsync(CancellationToken ct)
+    {
+        return await _db.Teams
+            .Where(t => t.QuickSellCount != 0)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.QuickSellCount, 0), ct);
+    }
+
     private static void Validate(TransferConfigDto d)
     {
         if (d.MaxQuickSellPerWindow < 0) throw new InvalidOperationException("O limite de vendas rápidas não pode ser negativo.");
