@@ -617,9 +617,21 @@ public partial class AdminTransferService
         if (string.IsNullOrWhiteSpace(adminToken))
             throw new AdminForbiddenException("Token de administrador ausente.");
 
+        var normalized = adminToken.Trim();
+
+        // Tokens dedicados de administrador (mesma regra do AdminTokenAuthenticationHandler).
+        var dedicated = await _dbContext.AdminTokens
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Token == normalized && t.IsActive, ct)
+            .ConfigureAwait(false);
+
+        if (dedicated is not null)
+            return dedicated.AdminTokenId;
+
+        // Compatibilidade: token de time com flag de administrador.
         var team = await _dbContext.Teams
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == adminToken.Trim() && t.IsAdmin, ct)
+            .FirstOrDefaultAsync(t => t.Token == normalized && t.IsAdmin, ct)
             .ConfigureAwait(false);
 
         if (team is null)
