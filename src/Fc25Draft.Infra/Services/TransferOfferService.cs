@@ -322,12 +322,14 @@ public class TransferOfferService : ITransferOfferService
         var fromTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == fromTeam.TeamId, ct);
         var toTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == toTeam.TeamId, ct);
 
-        // Se toTeam perde jogadores (targetPlayers), precisa ter mais que o mínimo para não ficar abaixo
-        if (targetPlayers.Count > 0 && toTeamRosterCount <= cfg.MinRosterSize)
+        // targetPlayers saem de toTeam e entram em fromTeam; offeredPlayers saem de fromTeam e entram em toTeam.
+        // Considera o saldo líquido (saídas e entradas) de cada time.
+        var toTeamAfter = toTeamRosterCount - targetPlayers.Count + offeredPlayers.Count;
+        if (targetPlayers.Count > 0 && toTeamAfter < cfg.MinRosterSize)
             throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
 
-        // Se fromTeam perde jogadores (offeredPlayers numa troca), idem
-        if (offeredPlayers.Count > 0 && offer.Type == OfferType.Swap && fromTeamRosterCount <= cfg.MinRosterSize)
+        var fromTeamAfter = fromTeamRosterCount - offeredPlayers.Count + targetPlayers.Count;
+        if (offeredPlayers.Count > 0 && fromTeamAfter < cfg.MinRosterSize)
             throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
