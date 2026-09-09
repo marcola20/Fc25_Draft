@@ -45,6 +45,13 @@ public class AdminTransfersApiClient
         return await ReadMessageAsync(response);
     }
 
+    public async Task<string> ResetMarketBidsAsync(Guid itemId, AdminResetMarketBidsRequestDto request, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PostAsJsonAsync($"api/admin/market/items/{itemId}/reset-bids", request, ct);
+        return await ReadMessageAsync(response);
+    }
+
     private static async Task<string> ReadMessageAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)

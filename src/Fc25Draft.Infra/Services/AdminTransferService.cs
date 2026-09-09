@@ -20,15 +20,130 @@ public partial class AdminTransferService
     private readonly DraftDbContext _dbContext;
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionLogService _transactionLogService;
+    private readonly IMarketBroadcaster? _broadcaster;
 
     public AdminTransferService(
         DraftDbContext dbContext,
         ITransactionLogService transactionLogService,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IMarketBroadcaster? broadcaster = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _transactionLogService = transactionLogService ?? throw new ArgumentNullException(nameof(transactionLogService));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _broadcaster = broadcaster;
+    }
+
+    /// <summary>
+    /// Zera os lances de um item ativo do mercado: exclui todos os lances, devolve o valor bloqueado
+    /// ao time líder e deixa o item sem líder para receber novos lances.
+    /// </summary>
+    public async Task<string> ResetMarketBidsAsync(string adminToken, Guid itemId, string? reason, CancellationToken ct)
+    {
+        if (itemId == Guid.Empty) throw new ArgumentException("Item de mercado inválido.", nameof(itemId));
+
+        var adminTokenGuid = await EnsureValidAdminTokenAsync(adminToken, ct).ConfigureAwait(false);
+        var normalizedReason = NormalizeReason(reason);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var culture = CultureInfo.GetCultureInfo("pt-BR");
+
+        MarketItem? resetItem = null;
+        var removedBids = 0;
+        string? leaderName = null;
+        decimal? releasedAmount = null;
+
+        await RunInExecutionStrategyAsync(async ctoken =>
+        {
+            var item = await _dbContext.MarketItems
+                .Include(i => i.Player).ThenInclude(p => p.Position)
+                .FirstOrDefaultAsync(i => i.ItemId == itemId, ctoken)
+                .ConfigureAwait(false)
+                ?? throw new KeyNotFoundException("Item de mercado não encontrado.");
+
+            if (item.Status != MarketItemStatus.Active)
+                throw new AdminConflictException("Só é possível zerar lances de itens ativos no mercado.");
+
+            var bids = await _dbContext.MarketBids
+                .Where(b => b.ItemId == itemId)
+                .ToListAsync(ctoken)
+                .ConfigureAwait(false);
+            removedBids = bids.Count;
+
+            var previousLeaderId = item.CurrentLeaderTeamId;
+            if (previousLeaderId.HasValue)
+            {
+                var leader = await _dbContext.Teams
+                    .FirstOrDefaultAsync(t => t.TeamId == previousLeaderId.Value, ctoken)
+                    .ConfigureAwait(false);
+
+                if (leader is not null)
+                {
+                    var amount = decimal.Round(item.CurrentLeaderAmount ?? 0m, 2, MidpointRounding.AwayFromZero);
+                    leader.BudgetBlocked = Math.Max(0m, leader.BudgetBlocked - amount);
+                    releasedAmount = amount;
+                    leaderName = string.IsNullOrWhiteSpace(leader.TeamName) ? leader.TeamId.ToString() : leader.TeamName;
+                }
+            }
+
+            if (removedBids == 0 && !previousLeaderId.HasValue)
+                throw new AdminConflictException("Este item não possui lances para zerar.");
+
+            _dbContext.MarketBids.RemoveRange(bids);
+
+            item.CurrentLeaderTeamId = null;
+            item.CurrentLeaderAmount = null;
+            item.CurrentLeaderTeam = null;
+            item.LastUpdateUtc = now;
+
+            var notes = leaderName is null
+                ? string.Format(culture, "Lances de {0} zerados pelo administrador.", item.Player.Name)
+                : string.Format(culture, "Lances de {0} zerados pelo administrador. Valor de {1} devolvido ao caixa disponível de {2}.",
+                    item.Player.Name, (releasedAmount ?? 0m).ToString("C", culture), leaderName);
+            if (normalizedReason is not null)
+                notes += $" Motivo: {normalizedReason}";
+
+            await _transactionLogService.LogMarketAsync(
+                item,
+                MarketTransactionType.BidsReset,
+                null,
+                previousLeaderId,
+                releasedAmount,
+                adminTokenGuid.ToString(),
+                notes,
+                now,
+                ctoken).ConfigureAwait(false);
+
+            var logEntry = new AdminActionsLog
+            {
+                ActionId = Guid.NewGuid(),
+                ActionType = AdminActionType.ResetMarketItemBids,
+                PerformedBy = adminTokenGuid.ToString(),
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    itemId,
+                    playerId = item.PlayerId,
+                    removedBids,
+                    previousLeaderTeamId = previousLeaderId,
+                    releasedAmount,
+                    reason = normalizedReason
+                }, JsonOptions),
+                CreatedAtUtc = now
+            };
+            await _dbContext.AdminActionsLogs.AddAsync(logEntry, ctoken).ConfigureAwait(false);
+
+            await _dbContext.SaveChangesAsync(ctoken).ConfigureAwait(false);
+            resetItem = item;
+        }, ct).ConfigureAwait(false);
+
+        if (_broadcaster is not null && resetItem is not null)
+        {
+            var vm = MarketService.ToVm(MarketService.ToDto(resetItem));
+            await _broadcaster.BidUpdatedAsync(resetItem.CycleId, vm, CancellationToken.None).ConfigureAwait(false);
+        }
+
+        return leaderName is null
+            ? $"Lances zerados ({removedBids} lance(s) excluído(s))."
+            : $"Lances zerados ({removedBids} lance(s) excluído(s)). {(releasedAmount ?? 0m).ToString("C", culture)} devolvido ao caixa disponível de {leaderName}.";
     }
 
     public async Task AdjustBudgetAsync(string adminToken, Guid teamId, decimal delta, string? reason, CancellationToken ct)

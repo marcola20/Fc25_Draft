@@ -8,5 +8,6 @@ public enum MarketTransactionType
     BuyNow = 3,
     ItemCanceled = 4,
     AuctionSettled = 5,
-    AuctionExpired = 6
+    AuctionExpired = 6,
+    BidsReset = 7
 }

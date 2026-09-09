@@ -118,6 +118,39 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             var adminMarketApi = api.MapGroup("/admin/market").RequireAuthorization("AdminOnly");
             adminMarketApi.MapMarketCycleEndpoints();
 
+            adminMarketApi.MapPost("/items/{itemId:guid}/reset-bids", async (
+                HttpContext httpContext,
+                Guid itemId,
+                AdminResetMarketBidsRequestDto? request,
+                AdminTransferService adminTransferService,
+                CancellationToken ct) =>
+            {
+                if (!EndpointHelpers.TryGetAdminToken(httpContext, out var adminToken, out var errorResult))
+                    return errorResult!;
+
+                try
+                {
+                    var message = await adminTransferService.ResetMarketBidsAsync(adminToken!, itemId, request?.Reason, ct);
+                    return Results.Ok(new { message });
+                }
+                catch (AdminForbiddenException ex)
+                {
+                    return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (AdminConflictException ex)
+                {
+                    return Results.Conflict(new { message = ex.Message });
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return Results.NotFound(new { message = ex.Message });
+                }
+            });
+
             adminMarketApi.MapPost("/refresh", async (IMarketCycleGenerator cycleGenerator, CancellationToken ct) =>
             {
                 var now = DateTime.UtcNow;

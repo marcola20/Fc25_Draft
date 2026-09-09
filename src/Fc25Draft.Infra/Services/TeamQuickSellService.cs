@@ -59,7 +59,9 @@ public class TeamQuickSellService : ITeamQuickSellService
                     .ConfigureAwait(false)
                     ?? throw new QuickSellException("Time não encontrado.", StatusCodes.Status404NotFound);
 
-                if (!string.Equals(team.Token, normalizedToken, StringComparison.OrdinalIgnoreCase))
+                var tokenValido = string.Equals(team.Token, normalizedToken, StringComparison.OrdinalIgnoreCase)
+                    || (team.AuxToken is not null && string.Equals(team.AuxToken, normalizedToken, StringComparison.OrdinalIgnoreCase));
+                if (!tokenValido)
                     throw new QuickSellException("Token do time inválido.", StatusCodes.Status403Forbidden);
 
                 var player = await _dbContext.Players

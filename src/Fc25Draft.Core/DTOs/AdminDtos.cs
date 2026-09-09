@@ -4,6 +4,8 @@ public record AdminAdjustBudgetRequestDto(Guid TeamId, decimal Delta, string? Re
 
 public record AdminCancelMarketItemRequestDto(string? Reason);
 
+public record AdminResetMarketBidsRequestDto(string? Reason);
+
 public record AdminSellPlayersRequestDto(Guid FromTeamId, Guid ToTeamId, Guid[] PlayerIds, decimal Amount, string? Reason);
 
 public record AdminSwapPlayersRequestDto(

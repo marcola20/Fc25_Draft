@@ -12,6 +12,7 @@ public static class MarketTransactionTypeExtensions
         MarketTransactionType.AuctionSettled => "Leilão concluído",
         MarketTransactionType.AuctionExpired => "Leilão expirado",
         MarketTransactionType.ItemCanceled => "Item cancelado",
+        MarketTransactionType.BidsReset => "Lances zerados",
         _ => "Atualização do mercado"
     };
 }

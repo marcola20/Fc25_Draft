@@ -10,6 +10,7 @@
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Admin.Transfers> Logger
+@inject IJSRuntime JSRuntime
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -58,6 +59,12 @@ else
             <button type="button" class="nav-link @(selectedTab == "budget" ? "active" : null)"
                     @onclick='() => SelectTab("budget")'>
                 Ajustar orçamento
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(selectedTab == "market" ? "active" : null)"
+                    @onclick='() => SelectTab("market")'>
+                Mercado
             </button>
         </li>
     </ul>
@@ -445,6 +452,70 @@ else
                 </EditForm>
             </div>
             break;
+        case "market":
+            <div>
+                @if (!string.IsNullOrEmpty(marketSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@marketSuccessMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(marketErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@marketErrorMessage</div>
+                }
+
+                <p class="text-muted small">
+                    Zerar os lances de um jogador exclui todos os lances do item, devolve o valor bloqueado ao caixa disponível do time líder
+                    e deixa o item sem líder para receber novos lances. O item continua ativo no mercado.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label" for="market-reason">Motivo (opcional)</label>
+                    <input id="market-reason" class="form-control" maxlength="200" @bind="marketReason" placeholder="Registrado no histórico do mercado" />
+                </div>
+
+                @if (marketItems.Count == 0)
+                {
+                    <div class="alert alert-info" role="alert">Nenhum item ativo no mercado.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Jogador</th>
+                                    <th>Posição</th>
+                                    <th class="text-end">OVR</th>
+                                    <th>Líder</th>
+                                    <th class="text-end">Lance atual</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in marketItems)
+                                {
+                                    var hasBids = item.CurrentLeaderTeamId.HasValue;
+                                    <tr>
+                                        <td>@item.PlayerName</td>
+                                        <td>@item.Position</td>
+                                        <td class="text-end">@item.Ovr</td>
+                                        <td>@(hasBids ? item.CurrentLeaderTeamName : "-")</td>
+                                        <td class="text-end">@(item.CurrentLeaderAmount.HasValue ? FormatCurrency(item.CurrentLeaderAmount.Value) : "-")</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm"
+                                                    disabled="@(!hasBids || isSubmittingMarket)"
+                                                    @onclick="() => ResetMarketBidsAsync(item)">
+                                                @(isSubmittingMarket && resettingItemId == item.ItemId ? "Zerando..." : "Zerar lances")
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+            break;
     }
 }
 
@@ -483,6 +554,10 @@ else
     private string? moveErrorMessage;
     private string? budgetSuccessMessage;
     private string? budgetErrorMessage;
+    private string? marketSuccessMessage;
+    private string? marketErrorMessage;
+    private string? marketReason;
+    private Guid? resettingItemId;
 
 
     private bool isLoadingData = true;
@@ -491,6 +566,7 @@ else
     private bool isSubmittingSwap;
     private bool isSubmittingMove;
     private bool isSubmittingBudget;
+    private bool isSubmittingMarket;
 
     protected override void OnInitialized()
     {
@@ -1104,6 +1180,42 @@ else
         finally
         {
             isSubmittingBudget = false;
+        }
+    }
+
+    private async Task ResetMarketBidsAsync(MarketItemDto item)
+    {
+        var leader = string.IsNullOrWhiteSpace(item.CurrentLeaderTeamName) ? "o time líder" : item.CurrentLeaderTeamName;
+        var amountText = item.CurrentLeaderAmount.HasValue ? FormatCurrency(item.CurrentLeaderAmount.Value) : "o valor bloqueado";
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Zerar todos os lances em {item.PlayerName}? {amountText} será devolvido ao caixa disponível de {leader}. Esta ação não pode ser desfeita.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSubmittingMarket = true;
+        resettingItemId = item.ItemId;
+        marketErrorMessage = null;
+        marketSuccessMessage = null;
+
+        try
+        {
+            var reason = string.IsNullOrWhiteSpace(marketReason) ? null : marketReason.Trim();
+            var message = await AdminTransfersApiClient.ResetMarketBidsAsync(item.ItemId, new AdminResetMarketBidsRequestDto(reason));
+            marketSuccessMessage = $"{item.PlayerName}: {message}";
+            marketReason = null;
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            marketErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmittingMarket = false;
+            resettingItemId = null;
         }
     }
 

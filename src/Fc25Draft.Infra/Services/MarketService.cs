@@ -512,7 +512,7 @@ public class MarketService : IMarketService
         return token.Trim().ToUpperInvariant();
     }
 
-    private static MarketItemDto ToDto(MarketItem item)
+    internal static MarketItemDto ToDto(MarketItem item)
     {
         var positionName = item.Player.Position?.Name ?? string.Empty;
         var age = item.Player.Age ?? 0;
@@ -553,7 +553,7 @@ public class MarketService : IMarketService
             cycle.Notes);
     }
 
-    private static MarketItemVm ToVm(MarketItemDto dto) => new MarketItemVm
+    internal static MarketItemVm ToVm(MarketItemDto dto) => new MarketItemVm
     {
         ItemId = dto.ItemId,
         CycleId = dto.CycleId,

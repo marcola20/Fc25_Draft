@@ -42,6 +42,10 @@ public static class MarketHistoryTextFormatter
                 => $"Leilão de {player} expirou sem vencedor.",
             MarketTransactionType.AuctionExpired
                 => "Leilão expirou sem vencedor.",
+            MarketTransactionType.BidsReset when player is not null
+                => $"Lances de {player} zerados pelo administrador.",
+            MarketTransactionType.BidsReset
+                => "Lances zerados pelo administrador.",
             _ when !string.IsNullOrWhiteSpace(destination)
                 => $"{origin} → {destination}",
             _ => origin
