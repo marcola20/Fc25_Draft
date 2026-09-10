@@ -44,6 +44,31 @@
                 <span class="badge @(selected.Count == MaxJogadores ? "bg-success" : "bg-secondary")">@selected.Count/@MaxJogadores</span>
             </div>
             <div class="card-body">
+                @if (edicoes.Count > 0)
+                {
+                    <div class="mb-3">
+                        <label for="wishlistVersao" class="form-label small mb-1">Versão da lista</label>
+                        <select id="wishlistVersao"
+                                class="form-select form-select-sm"
+                                value="@versaoSelecionada"
+                                disabled="@(isLoadingWishlist || isSubmitting || edicoes.Count == 1)"
+                                @onchange="OnVersaoChangedAsync">
+                            @foreach (var edicao in edicoes)
+                            {
+                                <option value="@edicao.Numero">@edicao.Nome @(edicao.Aberta ? "· aberta" : "· encerrada")</option>
+                            }
+                        </select>
+                        @if (!PodeEditar)
+                        {
+                            <div class="form-text text-warning">
+                                @(VisualizandoAtual
+                                    ? "Os envios desta versão estão encerrados. Aguarde a abertura da próxima."
+                                    : "Você está vendo uma versão anterior. Envios só na versão atual.")
+                            </div>
+                        }
+                    </div>
+                }
+
                 @if (!authInitialized)
                 {
                     <p class="text-muted small mb-3"><em>Verificando token...</em></p>
@@ -95,13 +120,31 @@
                     @if (enviadoEm.HasValue)
                     {
                         <p class="small text-success mb-3">
-                            Lista enviada em @enviadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm"). Enviar de novo substitui a anterior.
+                            Lista da @VersaoSelecionadaNome enviada em @enviadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm").
+                            @if (PodeEditar)
+                            {
+                                <span>Enviar de novo substitui a anterior.</span>
+                            }
                         </p>
                     }
                     else
                     {
-                        <p class="small text-muted mb-3">Nenhuma lista enviada ainda.</p>
+                        <p class="small text-muted mb-3">Nenhuma lista enviada na @VersaoSelecionadaNome.</p>
                     }
+                }
+
+                @if (PodeImportarAnterior)
+                {
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm w-100 mb-3"
+                            disabled="@(isImporting || isLoadingWishlist)"
+                            @onclick="ImportarVersaoAnteriorAsync">
+                        @if (isImporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Importar minha lista da @VersaoAnterior!.Nome (só os ainda disponíveis)
+                    </button>
                 }
 
                 @if (isLoadingWishlist)
@@ -110,7 +153,16 @@
                 }
                 else if (selected.Count == 0)
                 {
-                    <p class="text-muted">Nenhum jogador selecionado. Use o botão <strong>Adicionar</strong> na lista de jogadores.</p>
+                    <p class="text-muted">
+                        @if (PodeEditar)
+                        {
+                            <span>Nenhum jogador selecionado. Use o botão <strong>Adicionar</strong> na lista de jogadores.</span>
+                        }
+                        else
+                        {
+                            <span>Nenhum jogador nesta versão.</span>
+                        }
+                    </p>
                 }
                 else
                 {
@@ -130,32 +182,38 @@
                                         }
                                     </small>
                                 </div>
-                                <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
-                                    <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0 || isSubmitting)" @onclick="() => Move(index, -1)">↑</button>
-                                    <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == selected.Count - 1 || isSubmitting)" @onclick="() => Move(index, 1)">↓</button>
-                                    <button type="button" class="btn btn-outline-danger" title="Remover" disabled="@isSubmitting" @onclick="() => Remove(item.PlayerId)">✕</button>
-                                </div>
+                                @if (PodeEditar)
+                                {
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
+                                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0 || isSubmitting)" @onclick="() => Move(index, -1)">↑</button>
+                                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == selected.Count - 1 || isSubmitting)" @onclick="() => Move(index, 1)">↓</button>
+                                        <button type="button" class="btn btn-outline-danger" title="Remover" disabled="@isSubmitting" @onclick="() => Remove(item.PlayerId)">✕</button>
+                                    </div>
+                                }
                             </li>
                         }
                     </ol>
                 }
 
-                <button type="button" class="btn btn-success w-100" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
-                    @if (isSubmitting)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Enviando...</span>
-                    }
-                    else
-                    {
-                        <span>Enviar meus @MaxJogadores</span>
-                    }
-                </button>
-                @if (selected.Count != MaxJogadores)
+                @if (PodeEditar)
                 {
-                    <div class="form-text text-center">Selecione exatamente @MaxJogadores jogadores para enviar.</div>
+                    <button type="button" class="btn btn-success w-100" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Enviando...</span>
+                        }
+                        else
+                        {
+                            <span>Enviar meus @MaxJogadores</span>
+                        }
+                    </button>
+                    @if (selected.Count != MaxJogadores)
+                    {
+                        <div class="form-text text-center">Selecione exatamente @MaxJogadores jogadores para enviar.</div>
+                    }
+                    <button type="button" class="btn btn-link btn-sm w-100 mt-1" disabled="@(selected.Count == 0 || isSubmitting)" @onclick="ClearSelection">Limpar seleção</button>
                 }
-                <button type="button" class="btn btn-link btn-sm w-100 mt-1" disabled="@(selected.Count == 0 || isSubmitting)" @onclick="ClearSelection">Limpar seleção</button>
             </div>
         </div>
     </div>
@@ -216,7 +274,14 @@
                                 <td>@player.Overall</td>
                                 <td>@(player.Age?.ToString() ?? "-")</td>
                                 <td class="text-end">
-                                    @if (isSelected)
+                                    @if (!PodeEditar)
+                                    {
+                                        @if (isSelected)
+                                        {
+                                            <span class="badge bg-success">na lista</span>
+                                        }
+                                    }
+                                    else if (isSelected)
                                     {
                                         <button type="button" class="btn btn-outline-danger btn-sm" disabled="@isSubmitting" @onclick="() => Remove(player.PlayerId)">Remover</button>
                                     }
@@ -284,6 +349,7 @@
     private readonly List<Position> positions = new();
     private readonly List<PlayerListItemDto> players = new();
     private readonly List<SelectedPlayer> selected = new();
+    private readonly List<DraftWishlistEdicaoDto> edicoes = new();
 
     private DraftPlayerFilters.PlayerFilterState currentFilter = new(null, new HashSet<short>(), null, OverallMaximo);
     private int currentPage = 1;
@@ -295,6 +361,7 @@
     private bool isLoadingPlayers = true;
     private bool isLoadingWishlist;
     private bool isSubmitting;
+    private bool isImporting;
     private bool authInitialized;
 
     private string? errorMessage;
@@ -303,6 +370,7 @@
     private string? teamName;
     private DateTime? enviadoEm;
     private string tokenInput = string.Empty;
+    private int? versaoSelecionada;
 
     private sealed record SelectedPlayer(int PlayerId, string Name, string PositionName, int Overall, bool Disponivel);
 
@@ -310,7 +378,30 @@
         ? AdminAuth.Token
         : (string.IsNullOrWhiteSpace(tokenInput) ? null : tokenInput.Trim());
 
-    private bool CanSubmit => selected.Count == MaxJogadores && !isSubmitting && !isLoadingWishlist && !string.IsNullOrWhiteSpace(EffectiveToken);
+    /// <summary>Versão atual: a aberta ou, se nenhuma estiver aberta, a mais recente.</summary>
+    private DraftWishlistEdicaoDto? EdicaoAtual => edicoes.FirstOrDefault(e => e.Aberta) ?? edicoes.FirstOrDefault();
+
+    private DraftWishlistEdicaoDto? EdicaoSelecionada => edicoes.FirstOrDefault(e => e.Numero == versaoSelecionada);
+
+    private DraftWishlistEdicaoDto? VersaoAnterior => EdicaoAtual is null
+        ? null
+        : edicoes.Where(e => e.Numero < EdicaoAtual.Numero).OrderByDescending(e => e.Numero).FirstOrDefault();
+
+    private bool VisualizandoAtual => EdicaoAtual is not null && versaoSelecionada == EdicaoAtual.Numero;
+
+    /// <summary>Só dá para montar e enviar lista na versão atual, enquanto ela estiver aberta.</summary>
+    private bool PodeEditar => edicoes.Count == 0 || (VisualizandoAtual && EdicaoAtual!.Aberta);
+
+    private bool PodeImportarAnterior =>
+        PodeEditar &&
+        VersaoAnterior is not null &&
+        !enviadoEm.HasValue &&
+        !string.IsNullOrWhiteSpace(teamName) &&
+        !string.IsNullOrWhiteSpace(EffectiveToken);
+
+    private string VersaoSelecionadaNome => EdicaoSelecionada?.Nome ?? "versão atual";
+
+    private bool CanSubmit => PodeEditar && selected.Count == MaxJogadores && !isSubmitting && !isLoadingWishlist && !string.IsNullOrWhiteSpace(EffectiveToken);
 
     private RenderFragment? BuildHeaderActions()
     {
@@ -337,6 +428,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadEdicoesAsync();
         await LoadPositionsAsync();
         await LoadPlayersAsync();
     }
@@ -358,6 +450,22 @@
         }
 
         StateHasChanged();
+    }
+
+    private async Task LoadEdicoesAsync()
+    {
+        try
+        {
+            var items = await WishlistApi.GetEdicoesAsync();
+            edicoes.Clear();
+            edicoes.AddRange(items);
+            versaoSelecionada = EdicaoAtual?.Numero;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar versões do pré-draft.");
+        }
     }
 
     private async Task LoadPositionsAsync()
@@ -458,11 +566,31 @@
         await LoadPlayersAsync();
     }
 
+    private async Task OnVersaoChangedAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var numero) || numero == versaoSelecionada)
+        {
+            return;
+        }
+
+        versaoSelecionada = numero;
+        selected.Clear();
+        enviadoEm = null;
+        successMessage = null;
+        errorMessage = null;
+
+        var token = EffectiveToken;
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            await LoadWishlistAsync(token);
+        }
+    }
+
     private bool IsSelected(int playerId) => selected.Any(s => s.PlayerId == playerId);
 
     private void Add(PlayerListItemDto player)
     {
-        if (IsSelected(player.PlayerId))
+        if (!PodeEditar || IsSelected(player.PlayerId))
         {
             return;
         }
@@ -480,6 +608,11 @@
 
     private void Remove(int playerId)
     {
+        if (!PodeEditar)
+        {
+            return;
+        }
+
         successMessage = null;
         selected.RemoveAll(s => s.PlayerId == playerId);
     }
@@ -519,7 +652,7 @@
 
         try
         {
-            var dto = await WishlistApi.GetMineAsync(token);
+            var dto = await WishlistApi.GetMineAsync(token, versaoSelecionada);
             ApplyWishlist(dto);
         }
         catch (InvalidOperationException ex)
@@ -545,6 +678,7 @@
     {
         teamName = dto.TeamName;
         enviadoEm = dto.EnviadoEm;
+        versaoSelecionada = dto.Versao;
 
         if (dto.Jogadores.Count > 0)
         {
@@ -552,6 +686,55 @@
             selected.AddRange(dto.Jogadores
                 .OrderBy(j => j.Ordem)
                 .Select(j => new SelectedPlayer(j.PlayerId, j.Name, j.PositionName, j.Overall, j.Disponivel)));
+        }
+    }
+
+    private async Task ImportarVersaoAnteriorAsync()
+    {
+        var token = EffectiveToken;
+        var anterior = VersaoAnterior;
+        if (string.IsNullOrWhiteSpace(token) || anterior is null)
+        {
+            return;
+        }
+
+        isImporting = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var dto = await WishlistApi.GetMineAsync(token, anterior.Numero);
+            var disponiveis = dto.Jogadores.Where(j => j.Disponivel).OrderBy(j => j.Ordem).ToList();
+            var foraDeTimes = dto.Jogadores.Count - disponiveis.Count;
+
+            if (dto.Jogadores.Count == 0)
+            {
+                errorMessage = $"Seu time não enviou lista na {anterior.Nome}.";
+                return;
+            }
+
+            selected.Clear();
+            selected.AddRange(disponiveis
+                .Take(MaxJogadores)
+                .Select(j => new SelectedPlayer(j.PlayerId, j.Name, j.PositionName, j.Overall, true)));
+
+            successMessage = foraDeTimes == 0
+                ? $"{selected.Count} jogadores importados da {anterior.Nome}. Revise e envie."
+                : $"{selected.Count} jogadores importados da {anterior.Nome}. {foraDeTimes} já {(foraDeTimes == 1 ? "está em um time e ficou" : "estão em times e ficaram")} de fora: complete a lista e envie.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Não foi possível importar a lista anterior. Tente novamente.";
+            Logger.LogError(ex, "Erro ao importar lista anterior do pré-draft.");
+        }
+        finally
+        {
+            isImporting = false;
         }
     }
 
@@ -579,11 +762,13 @@
             var dto = await WishlistApi.SaveAsync(token, selected.Select(s => s.PlayerId).ToList());
             ApplyWishlist(dto);
             tokenNotice = null;
-            successMessage = $"✅ Lista de {dto.TeamName} enviada com sucesso!";
+            successMessage = $"✅ Lista de {dto.TeamName} enviada com sucesso na {dto.VersaoNome}!";
+            await LoadEdicoesAsync();
         }
         catch (InvalidOperationException ex)
         {
             errorMessage = ex.Message;
+            await LoadEdicoesAsync();
         }
         catch (Exception ex)
         {

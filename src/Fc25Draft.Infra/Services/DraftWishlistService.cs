@@ -18,15 +18,37 @@ public class DraftWishlistService : IDraftWishlistService
         _time = time ?? TimeProvider.System;
     }
 
-    public async Task<DraftWishlistDto> GetByTokenAsync(string token, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DraftWishlistEdicaoDto>> GetEdicoesAsync(CancellationToken ct = default)
+    {
+        await GetOrCreateEdicaoAtualAsync(ct);
+
+        return await _db.DraftWishlistEdicoes
+            .AsNoTracking()
+            .OrderByDescending(e => e.Numero)
+            .Select(e => new DraftWishlistEdicaoDto(
+                e.Numero,
+                e.Nome,
+                e.CriadoEm,
+                e.EncerradoEm,
+                e.EncerradoEm == null,
+                e.Entradas.Select(x => x.TeamId).Distinct().Count()))
+            .ToListAsync(ct);
+    }
+
+    public async Task<DraftWishlistDto> GetByTokenAsync(string token, int? versao = null, CancellationToken ct = default)
     {
         var team = await ResolveTeamAsync(token, ct);
-        return await BuildDtoAsync(team.TeamId, team.TeamName, ct);
+        var edicao = await ResolveEdicaoAsync(versao, ct);
+        return await BuildDtoAsync(edicao, team.TeamId, team.TeamName, ct);
     }
 
     public async Task<DraftWishlistDto> SaveAsync(string token, IReadOnlyList<int> playerIds, CancellationToken ct = default)
     {
         var team = await ResolveTeamAsync(token, ct);
+        var edicao = await GetOrCreateEdicaoAtualAsync(ct);
+
+        if (!edicao.Aberta)
+            throw new InvalidOperationException($"Os envios da {edicao.Nome} estão encerrados.");
 
         if (playerIds is null || playerIds.Count == 0)
             throw new InvalidOperationException("Informe os jogadores da lista.");
@@ -62,7 +84,7 @@ public class DraftWishlistService : IDraftWishlistService
         var now = _time.GetUtcNow().UtcDateTime;
 
         var existentes = await _db.DraftWishlistEntries
-            .Where(e => e.TeamId == team.TeamId)
+            .Where(e => e.Versao == edicao.Numero && e.TeamId == team.TeamId)
             .ToListAsync(ct);
         _db.DraftWishlistEntries.RemoveRange(existentes);
 
@@ -71,6 +93,7 @@ public class DraftWishlistService : IDraftWishlistService
             _db.DraftWishlistEntries.Add(new DraftWishlistEntry
             {
                 DraftWishlistEntryId = Guid.NewGuid(),
+                Versao = edicao.Numero,
                 TeamId = team.TeamId,
                 PlayerId = ids[i],
                 Ordem = i + 1,
@@ -80,13 +103,16 @@ public class DraftWishlistService : IDraftWishlistService
 
         await _db.SaveChangesAsync(ct);
 
-        return await BuildDtoAsync(team.TeamId, team.TeamName, ct);
+        return await BuildDtoAsync(edicao, team.TeamId, team.TeamName, ct);
     }
 
-    public async Task<IReadOnlyList<DraftWishlistDto>> GetAllAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DraftWishlistDto>> GetAllAsync(int? versao = null, CancellationToken ct = default)
     {
+        var edicao = await ResolveEdicaoAsync(versao, ct);
+
         var rows = await _db.DraftWishlistEntries
             .AsNoTracking()
+            .Where(e => e.Versao == edicao.Numero)
             .Select(e => new
             {
                 e.TeamId,
@@ -108,6 +134,9 @@ public class DraftWishlistService : IDraftWishlistService
             .GroupBy(r => new { r.TeamId, r.TeamName })
             .OrderBy(g => g.Key.TeamName)
             .Select(g => new DraftWishlistDto(
+                edicao.Numero,
+                edicao.Nome,
+                edicao.Aberta,
                 g.Key.TeamId,
                 g.Key.TeamName,
                 g.Max(r => (DateTime?)r.CriadoEm),
@@ -115,10 +144,13 @@ public class DraftWishlistService : IDraftWishlistService
             .ToList();
     }
 
-    public async Task<IReadOnlyList<DraftWishlistVoteDto>> GetVotesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DraftWishlistVoteDto>> GetVotesAsync(int? versao = null, CancellationToken ct = default)
     {
+        var edicao = await ResolveEdicaoAsync(versao, ct);
+
         var rows = await _db.DraftWishlistEntries
             .AsNoTracking()
+            .Where(e => e.Versao == edicao.Numero)
             .Select(e => new
             {
                 e.PlayerId,
@@ -164,6 +196,96 @@ public class DraftWishlistService : IDraftWishlistService
             .ToList();
     }
 
+    public async Task<DraftWishlistEdicaoDto> AbrirNovaEdicaoAsync(string? nome, CancellationToken ct = default)
+    {
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        var edicoes = await _db.DraftWishlistEdicoes.ToListAsync(ct);
+        foreach (var aberta in edicoes.Where(e => e.Aberta))
+            aberta.EncerradoEm = now;
+
+        var numero = edicoes.Count == 0 ? 1 : edicoes.Max(e => e.Numero) + 1;
+        var nomeNormalizado = string.IsNullOrWhiteSpace(nome) ? $"Versão {numero}" : nome.Trim();
+        if (nomeNormalizado.Length > 80)
+            throw new InvalidOperationException("O nome da versão deve ter no máximo 80 caracteres.");
+
+        var nova = new DraftWishlistEdicao
+        {
+            Numero = numero,
+            Nome = nomeNormalizado,
+            CriadoEm = now,
+            EncerradoEm = null
+        };
+
+        _db.DraftWishlistEdicoes.Add(nova);
+        await _db.SaveChangesAsync(ct);
+
+        return ToDto(nova, 0);
+    }
+
+    public async Task<DraftWishlistEdicaoDto> AlterarStatusEdicaoAsync(int numero, bool aberta, CancellationToken ct = default)
+    {
+        var edicoes = await _db.DraftWishlistEdicoes.ToListAsync(ct);
+        var alvo = edicoes.FirstOrDefault(e => e.Numero == numero)
+            ?? throw new InvalidOperationException("Versão não encontrada.");
+
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        if (aberta)
+        {
+            foreach (var outra in edicoes.Where(e => e.Numero != numero && e.Aberta))
+                outra.EncerradoEm = now;
+            alvo.EncerradoEm = null;
+        }
+        else if (alvo.Aberta)
+        {
+            alvo.EncerradoEm = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        var totalListas = await _db.DraftWishlistEntries
+            .Where(e => e.Versao == numero)
+            .Select(e => e.TeamId)
+            .Distinct()
+            .CountAsync(ct);
+
+        return ToDto(alvo, totalListas);
+    }
+
+    /// <summary>Versão atual: a aberta, ou a de maior número se nenhuma estiver aberta. Cria a versão 1 se não houver nenhuma.</summary>
+    private async Task<DraftWishlistEdicao> GetOrCreateEdicaoAtualAsync(CancellationToken ct)
+    {
+        var atual = await _db.DraftWishlistEdicoes
+            .AsNoTracking()
+            .OrderByDescending(e => e.EncerradoEm == null)
+            .ThenByDescending(e => e.Numero)
+            .FirstOrDefaultAsync(ct);
+
+        if (atual is not null)
+            return atual;
+
+        atual = new DraftWishlistEdicao
+        {
+            Numero = 1,
+            Nome = "Versão 1",
+            CriadoEm = _time.GetUtcNow().UtcDateTime
+        };
+        _db.DraftWishlistEdicoes.Add(atual);
+        await _db.SaveChangesAsync(ct);
+        _db.Entry(atual).State = EntityState.Detached;
+        return atual;
+    }
+
+    private async Task<DraftWishlistEdicao> ResolveEdicaoAsync(int? versao, CancellationToken ct)
+    {
+        if (!versao.HasValue)
+            return await GetOrCreateEdicaoAtualAsync(ct);
+
+        return await _db.DraftWishlistEdicoes.AsNoTracking().FirstOrDefaultAsync(e => e.Numero == versao.Value, ct)
+            ?? throw new InvalidOperationException("Versão não encontrada.");
+    }
+
     private async Task<Team> ResolveTeamAsync(string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -177,11 +299,11 @@ public class DraftWishlistService : IDraftWishlistService
         return team ?? throw new UnauthorizedAccessException("Token do time inválido.");
     }
 
-    private async Task<DraftWishlistDto> BuildDtoAsync(Guid teamId, string teamName, CancellationToken ct)
+    private async Task<DraftWishlistDto> BuildDtoAsync(DraftWishlistEdicao edicao, Guid teamId, string teamName, CancellationToken ct)
     {
         var rows = await _db.DraftWishlistEntries
             .AsNoTracking()
-            .Where(e => e.TeamId == teamId)
+            .Where(e => e.Versao == edicao.Numero && e.TeamId == teamId)
             .OrderBy(e => e.Ordem)
             .Select(e => new
             {
@@ -199,9 +321,15 @@ public class DraftWishlistService : IDraftWishlistService
             .ToListAsync(ct);
 
         return new DraftWishlistDto(
+            edicao.Numero,
+            edicao.Nome,
+            edicao.Aberta,
             teamId,
             teamName,
             rows.Count == 0 ? null : rows.Max(r => r.CriadoEm),
             rows.Select(r => r.Jogador).ToList());
     }
+
+    private static DraftWishlistEdicaoDto ToDto(DraftWishlistEdicao e, int totalListas) =>
+        new(e.Numero, e.Nome, e.CriadoEm, e.EncerradoEm, e.Aberta, totalListas);
 }

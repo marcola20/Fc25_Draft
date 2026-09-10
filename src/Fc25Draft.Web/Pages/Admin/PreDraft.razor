@@ -5,6 +5,7 @@
 @using Fc25Draft.Web.Services
 @inject DraftWishlistApiClient WishlistApi
 @inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
 @inject ILogger<Fc25Draft.Web.Pages.Admin.PreDraft> Logger
 
 @implements IDisposable
@@ -31,6 +32,98 @@ else
             <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => errorMessage = null"></button>
         </div>
     }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="status">
+            @successMessage
+            <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body py-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label for="adminVersao" class="form-label mb-1">Versão</label>
+                    <select id="adminVersao"
+                            class="form-select"
+                            value="@versaoSelecionada"
+                            disabled="@(isLoading || isChangingEdicao || edicoes.Count == 0)"
+                            @onchange="OnVersaoChangedAsync">
+                        @foreach (var edicao in edicoes)
+                        {
+                            <option value="@edicao.Numero">
+                                @edicao.Nome · @(edicao.Aberta ? "aberta" : "encerrada") · @edicao.TotalListas @(edicao.TotalListas == 1 ? "lista" : "listas")
+                            </option>
+                        }
+                    </select>
+                    @if (EdicaoSelecionada is not null)
+                    {
+                        <div class="form-text">
+                            Criada em @EdicaoSelecionada.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@(EdicaoSelecionada.EncerradoEm.HasValue ? $" · encerrada em {EdicaoSelecionada.EncerradoEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}" : string.Empty)
+                        </div>
+                    }
+                </div>
+                <div class="col-md-8 d-flex flex-wrap gap-2 justify-content-md-end">
+                    @if (EdicaoSelecionada is not null)
+                    {
+                        @if (EdicaoSelecionada.Aberta)
+                        {
+                            <button type="button" class="btn btn-outline-warning" disabled="@isChangingEdicao" @onclick="() => AlterarStatusAsync(false)">
+                                Encerrar envios da @EdicaoSelecionada.Nome
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-success" disabled="@isChangingEdicao" @onclick="() => AlterarStatusAsync(true)">
+                                Reabrir envios da @EdicaoSelecionada.Nome
+                            </button>
+                        }
+                    }
+                    @if (!showNovaVersao)
+                    {
+                        <button type="button" class="btn btn-primary" disabled="@isChangingEdicao" @onclick="() => showNovaVersao = true">
+                            Abrir nova versão
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (showNovaVersao)
+            {
+                <div class="border-top mt-3 pt-3">
+                    <p class="small text-muted mb-2">
+                        A versão aberta hoje é encerrada e fica preservada como está. A nova versão começa vazia: cada time
+                        monta e envia a lista de novo (pode importar a anterior, sem os jogadores que já estão em times).
+                    </p>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label for="novaVersaoNome" class="form-label mb-1">Nome da nova versão (opcional)</label>
+                            <input id="novaVersaoNome"
+                                   class="form-control"
+                                   maxlength="80"
+                                   placeholder="@($"Versão {ProximoNumero}")"
+                                   value="@novaVersaoNome"
+                                   @oninput="e => novaVersaoNome = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div class="col-md-7 d-flex gap-2">
+                            <button type="button" class="btn btn-success" disabled="@isChangingEdicao" @onclick="AbrirNovaVersaoAsync">
+                                @if (isChangingEdicao)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                }
+                                Confirmar nova versão
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@isChangingEdicao" @onclick="() => { showNovaVersao = false; novaVersaoNome = string.Empty; }">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <ul class="nav nav-pills" role="tablist">
@@ -82,7 +175,7 @@ else
         var filtered = FilteredVotes();
         @if (votes.Count == 0)
         {
-            <p class="text-muted">Nenhum time enviou a lista ainda.</p>
+            <p class="text-muted">Nenhum time enviou a lista na @VersaoNome ainda.</p>
         }
         else if (filtered.Count == 0)
         {
@@ -91,6 +184,7 @@ else
         else
         {
             <p class="text-muted">
+                @VersaoNome:
                 @lists.Count @(lists.Count == 1 ? "time enviou" : "times enviaram") a lista.
                 @votes.Count @(votes.Count == 1 ? "jogador recebeu" : "jogadores receberam") pelo menos um voto.
             </p>
@@ -145,7 +239,7 @@ else
     {
         @if (lists.Count == 0)
         {
-            <p class="text-muted">Nenhum time enviou a lista ainda.</p>
+            <p class="text-muted">Nenhum time enviou a lista na @VersaoNome ainda.</p>
         }
         else
         {
@@ -188,11 +282,23 @@ else
 
     private readonly List<DraftWishlistVoteDto> votes = new();
     private readonly List<DraftWishlistDto> lists = new();
+    private readonly List<DraftWishlistEdicaoDto> edicoes = new();
     private Tab activeTab = Tab.Votos;
     private string voteFilter = string.Empty;
     private bool authInitialized;
     private bool isLoading;
+    private bool isChangingEdicao;
+    private bool showNovaVersao;
+    private string novaVersaoNome = string.Empty;
     private string? errorMessage;
+    private string? successMessage;
+    private int? versaoSelecionada;
+
+    private DraftWishlistEdicaoDto? EdicaoSelecionada => edicoes.FirstOrDefault(e => e.Numero == versaoSelecionada);
+
+    private string VersaoNome => EdicaoSelecionada?.Nome ?? "versão atual";
+
+    private int ProximoNumero => edicoes.Count == 0 ? 1 : edicoes.Max(e => e.Numero) + 1;
 
     protected override void OnInitialized()
     {
@@ -217,6 +323,18 @@ else
         }
     }
 
+    private async Task LoadEdicoesAsync()
+    {
+        var items = await WishlistApi.GetEdicoesAsync();
+        edicoes.Clear();
+        edicoes.AddRange(items);
+
+        if (!versaoSelecionada.HasValue || edicoes.All(e => e.Numero != versaoSelecionada))
+        {
+            versaoSelecionada = (edicoes.FirstOrDefault(e => e.Aberta) ?? edicoes.FirstOrDefault())?.Numero;
+        }
+    }
+
     private async Task LoadAsync()
     {
         if (!AdminAuth.IsAdmin)
@@ -229,8 +347,10 @@ else
 
         try
         {
-            var votesTask = WishlistApi.GetVotesAsync();
-            var listsTask = WishlistApi.GetAllAsync();
+            await LoadEdicoesAsync();
+
+            var votesTask = WishlistApi.GetVotesAsync(versaoSelecionada);
+            var listsTask = WishlistApi.GetAllAsync(versaoSelecionada);
             await Task.WhenAll(votesTask, listsTask);
 
             votes.Clear();
@@ -246,6 +366,92 @@ else
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task OnVersaoChangedAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var numero) || numero == versaoSelecionada)
+        {
+            return;
+        }
+
+        versaoSelecionada = numero;
+        successMessage = null;
+        await LoadAsync();
+    }
+
+    private async Task AbrirNovaVersaoAsync()
+    {
+        var confirmado = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            $"Abrir a Versão {ProximoNumero}? A versão aberta hoje será encerrada (as listas dela ficam guardadas) e os times terão que enviar de novo.");
+        if (!confirmado)
+        {
+            return;
+        }
+
+        isChangingEdicao = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var nova = await WishlistApi.AbrirNovaEdicaoAsync(string.IsNullOrWhiteSpace(novaVersaoNome) ? null : novaVersaoNome);
+            showNovaVersao = false;
+            novaVersaoNome = string.Empty;
+            versaoSelecionada = nova.Numero;
+            successMessage = $"{nova.Nome} aberta. As listas anteriores continuam disponíveis no seletor de versão.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao abrir nova versão do pré-draft.");
+        }
+        finally
+        {
+            isChangingEdicao = false;
+        }
+    }
+
+    private async Task AlterarStatusAsync(bool aberta)
+    {
+        var edicao = EdicaoSelecionada;
+        if (edicao is null)
+        {
+            return;
+        }
+
+        var pergunta = aberta
+            ? $"Reabrir os envios da {edicao.Nome}? Qualquer outra versão aberta será encerrada."
+            : $"Encerrar os envios da {edicao.Nome}? Os times não poderão mais enviar ou alterar a lista nela.";
+        var confirmado = await JSRuntime.InvokeAsync<bool>("confirm", pergunta);
+        if (!confirmado)
+        {
+            return;
+        }
+
+        isChangingEdicao = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var atualizada = await WishlistApi.AlterarStatusEdicaoAsync(edicao.Numero, aberta);
+            successMessage = atualizada.Aberta
+                ? $"Envios da {atualizada.Nome} reabertos."
+                : $"Envios da {atualizada.Nome} encerrados.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao alterar status da versão do pré-draft.");
+        }
+        finally
+        {
+            isChangingEdicao = false;
         }
     }
 
@@ -279,6 +485,7 @@ else
             {
                 votes.Clear();
                 lists.Clear();
+                edicoes.Clear();
             }
 
             StateHasChanged();

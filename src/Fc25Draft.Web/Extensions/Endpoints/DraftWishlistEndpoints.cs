@@ -9,7 +9,10 @@ public static class DraftWishlistEndpoints
     {
         var api = routes.MapGroup("/draft/wishlist");
 
-        api.MapGet(string.Empty, async (HttpContext httpContext, IDraftWishlistService service, CancellationToken ct) =>
+        api.MapGet("/edicoes", async (IDraftWishlistService service, CancellationToken ct) =>
+            Results.Ok(await service.GetEdicoesAsync(ct)));
+
+        api.MapGet(string.Empty, async (HttpContext httpContext, IDraftWishlistService service, int? versao, CancellationToken ct) =>
         {
             var token = ReadTeamToken(httpContext);
             if (token is null)
@@ -17,11 +20,15 @@ public static class DraftWishlistEndpoints
 
             try
             {
-                return Results.Ok(await service.GetByTokenAsync(token, ct));
+                return Results.Ok(await service.GetByTokenAsync(token, versao, ct));
             }
             catch (UnauthorizedAccessException ex)
             {
                 return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
             }
         });
 
@@ -55,11 +62,60 @@ public static class DraftWishlistEndpoints
 
         var adminApi = routes.MapGroup("/admin/draft/wishlist").RequireAuthorization("AdminOnly");
 
-        adminApi.MapGet(string.Empty, async (IDraftWishlistService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
+        adminApi.MapGet(string.Empty, async (IDraftWishlistService service, int? versao, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.GetAllAsync(versao, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
 
-        adminApi.MapGet("/votes", async (IDraftWishlistService service, CancellationToken ct) =>
-            Results.Ok(await service.GetVotesAsync(ct)));
+        adminApi.MapGet("/votes", async (IDraftWishlistService service, int? versao, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.GetVotesAsync(versao, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+        adminApi.MapPost("/edicoes", async (
+            IDraftWishlistService service,
+            DraftWishlistNovaEdicaoRequestDto? request,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.AbrirNovaEdicaoAsync(request?.Nome, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+        adminApi.MapPut("/edicoes/{numero:int}/status", async (
+            IDraftWishlistService service,
+            int numero,
+            DraftWishlistEdicaoStatusRequestDto request,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.AlterarStatusEdicaoAsync(numero, request.Aberta, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
 
         return routes;
     }
