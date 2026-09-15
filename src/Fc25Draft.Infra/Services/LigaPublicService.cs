@@ -71,14 +71,47 @@ public class LigaPublicService : ILigaPublicService
             c.Grupo)).ToArray();
     }
 
+    private const string SemTimeLabel = "Sem time";
+
+    /// <summary>
+    /// Time atual de cada jogador (elenco vigente), e nao o time pelo qual o evento
+    /// foi registrado — assim quem foi transferido aparece no clube novo e quem foi
+    /// dispensado aparece como "Sem time".
+    /// </summary>
+    private async Task<Dictionary<int, (Guid TimeId, string TimeNome)>> GetTimesAtuaisAsync(
+        IReadOnlyCollection<int> jogadorIds, CancellationToken ct)
+    {
+        if (jogadorIds.Count == 0) return new Dictionary<int, (Guid, string)>();
+
+        var rosters = await _db.TeamRosters
+            .AsNoTracking()
+            .Where(r => jogadorIds.Contains(r.PlayerId))
+            .Select(r => new { r.PlayerId, r.TeamId, r.Team.TeamName })
+            .ToListAsync(ct);
+
+        return rosters
+            .GroupBy(r => r.PlayerId)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var r = g.First();
+                return (r.TeamId, r.TeamName);
+            });
+    }
+
+    private static (Guid TimeId, string TimeNome) ResolveTimeAtual(
+        IReadOnlyDictionary<int, (Guid TimeId, string TimeNome)> timesAtuais, int jogadorId) =>
+        timesAtuais.TryGetValue(jogadorId, out var time) ? time : (Guid.Empty, SemTimeLabel);
+
     public async Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct)
     {
         var eventos = await _db.LigaEventos
             .AsNoTracking()
             .Where(x => x.Partida.Rodada.LigaId == ligaId)
             .Include(x => x.Jogador)
-            .Include(x => x.Time)
             .ToListAsync(ct);
+
+        var timesAtuais = await GetTimesAtuaisAsync(
+            eventos.Where(e => e.Tipo == TipoEvento.Gol).Select(e => e.JogadorId).Distinct().ToArray(), ct);
 
         var gols = eventos
             .Where(e => e.Tipo == TipoEvento.Gol)
@@ -87,11 +120,12 @@ public class LigaPublicService : ILigaPublicService
             {
                 var primeiro = g.First();
                 var assistencias = eventos.Count(e => e.Tipo == TipoEvento.Gol && e.AssistenteId == primeiro.JogadorId);
+                var (timeId, timeNome) = ResolveTimeAtual(timesAtuais, primeiro.JogadorId);
                 return new LigaArtilheiroDto(
                     primeiro.JogadorId,
                     primeiro.Jogador.Name,
-                    primeiro.TimeId,
-                    primeiro.Time.TeamName,
+                    timeId,
+                    timeNome,
                     g.Count(),
                     assistencias);
             })
@@ -109,21 +143,22 @@ public class LigaPublicService : ILigaPublicService
             .Where(x => x.Tipo == TipoEvento.Gol && x.AssistenteId != null
                         && x.Partida.Rodada.LigaId == ligaId)
             .Include(x => x.Assistente)
-                .ThenInclude(a => a!.TeamRosters)
-                    .ThenInclude(r => r.Team)
             .ToListAsync(ct);
+
+        var timesAtuais = await GetTimesAtuaisAsync(
+            eventos.Select(e => e.AssistenteId!.Value).Distinct().ToArray(), ct);
 
         return eventos
             .GroupBy(e => e.AssistenteId!.Value)
             .Select(g =>
             {
                 var player = g.First().Assistente!;
-                var roster = player.TeamRosters.FirstOrDefault();
+                var (timeId, timeNome) = ResolveTimeAtual(timesAtuais, player.PlayerId);
                 return new LigaArtilheiroDto(
                     player.PlayerId,
                     player.Name,
-                    roster?.TeamId ?? Guid.Empty,
-                    roster?.Team?.TeamName ?? "—",
+                    timeId,
+                    timeNome,
                     0,
                     g.Count());
             })
@@ -139,19 +174,22 @@ public class LigaPublicService : ILigaPublicService
             .Where(x => (x.Tipo == TipoEvento.CartaoAmarelo || x.Tipo == TipoEvento.CartaoVermelho)
                         && x.Partida.Rodada.LigaId == ligaId)
             .Include(x => x.Jogador)
-            .Include(x => x.Time)
             .ToListAsync(ct);
+
+        var timesAtuais = await GetTimesAtuaisAsync(
+            eventos.Select(e => e.JogadorId).Distinct().ToArray(), ct);
 
         return eventos
             .GroupBy(e => e.JogadorId)
             .Select(g =>
             {
                 var primeiro = g.First();
+                var (timeId, timeNome) = ResolveTimeAtual(timesAtuais, primeiro.JogadorId);
                 return new LigaCartaoEstatDto(
                     primeiro.JogadorId,
                     primeiro.Jogador.Name,
-                    primeiro.TimeId,
-                    primeiro.Time.TeamName,
+                    timeId,
+                    timeNome,
                     g.Count(e => e.Tipo == TipoEvento.CartaoAmarelo),
                     g.Count(e => e.Tipo == TipoEvento.CartaoVermelho));
             })

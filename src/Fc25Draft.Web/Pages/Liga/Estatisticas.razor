@@ -51,7 +51,7 @@
                             <tr>
                                 <td class="text-muted">@rankArt</td>
                                 <td class="fw-semibold">@a.JogadorNome</td>
-                                <td>@a.TimeNome</td>
+                                <td class="@(a.TimeId == Guid.Empty ? "fst-italic text-muted" : "")">@a.TimeNome</td>
                                 <td class="text-center fw-bold">@a.Gols</td>
                                 <td class="text-center">@a.Assistencias</td>
                             </tr>
@@ -87,7 +87,7 @@
                             <tr>
                                 <td class="text-muted">@rankAss</td>
                                 <td class="fw-semibold">@a.JogadorNome</td>
-                                <td>@a.TimeNome</td>
+                                <td class="@(a.TimeId == Guid.Empty ? "fst-italic text-muted" : "")">@a.TimeNome</td>
                                 <td class="text-center fw-bold">@a.Assistencias</td>
                                 <td class="text-center">@a.Gols</td>
                             </tr>
@@ -122,7 +122,7 @@
                             <tr>
                                 <td class="text-muted">@rankCart</td>
                                 <td class="fw-semibold">@c.JogadorNome</td>
-                                <td>@c.TimeNome</td>
+                                <td class="@(c.TimeId == Guid.Empty ? "fst-italic text-muted" : "")">@c.TimeNome</td>
                                 <td class="text-center text-warning fw-bold">@c.CartoesAmarelos</td>
                                 <td class="text-center text-danger fw-bold">@c.CartoesVermelhos</td>
                             </tr>
