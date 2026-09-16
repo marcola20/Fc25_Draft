@@ -10,6 +10,7 @@ public class LigaRodadaConfiguration : IEntityTypeConfiguration<LigaRodada>
     {
         e.HasKey(x => x.RodadaId);
         e.Property(x => x.Numero).IsRequired();
+        e.Property(x => x.Desempate).HasDefaultValue(false);
 
         e.HasOne(x => x.Liga)
             .WithMany(x => x.Rodadas)

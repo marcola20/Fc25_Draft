@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
 @inject NavigationManager Navigation
 
@@ -41,8 +42,9 @@
         <!-- Copa: tabelas separadas por grupo -->
         @foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
         {
-            var itensGrupo = _classif.Where(c => c.Grupo == grupo).ToList();
+            var itensGrupo = OrdenarGrupo(grupo);
             if (itensGrupo.Count == 0) continue;
+            var posicoes = LigaDesempate.PosicoesCopa(itensGrupo, c => c.TimeId, CopaStats, _decisivos);
 
             <h5 class="mt-3 mb-2">Grupo @grupo</h5>
             <ShareableCard Id='@($"cap-classif-grupo-{grupo}")'
@@ -66,12 +68,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @{ int grupoPos = 0; }
-                        @foreach (var item in itensGrupo.OrderBy(x => x.Posicao))
+                        @for (int i = 0; i < itensGrupo.Count; i++)
                         {
-                            grupoPos++;
-                            <tr class="@CopaRowClass(grupoPos)">
-                                <td><span class="badge @CopaBadgeClass(grupoPos)">@grupoPos</span></td>
+                            var item = itensGrupo[i];
+                            var grupoPos = posicoes[i];
+                            var emDecisao = posicoes.Count(x => x == grupoPos) > 1;
+                            <tr class="@CopaRowClass(grupoPos, emDecisao)" title="@(emDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
+                                <td><span class="badge @CopaBadgeClass(grupoPos, emDecisao)">@grupoPos</span></td>
                                 <td class="fw-semibold">@item.TimeNome</td>
                                 <td class="text-center fw-bold">@item.Pontos</td>
                                 <td class="text-center">@item.Jogos</td>
@@ -91,9 +94,38 @@
             </ShareableCard>
         }
 
+        @if (_jogosDecisivos.Count > 0)
+        {
+            <h6 class="text-uppercase text-muted small fw-bold mt-3 mb-2">Jogo Decisivo</h6>
+            <ul class="list-group mb-3">
+                @foreach (var jd in _jogosDecisivos)
+                {
+                    <li class="list-group-item py-2 small d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-semibold">@jd.TimeCasaNome</span>
+                        <span class="fw-bold">
+                            @(jd.Status == PartidaStatus.Agendada ? "vs" : $"{jd.GolsCasa} – {jd.GolsFora}")
+                        </span>
+                        <span class="fw-semibold">@jd.TimeForaNome</span>
+                        @if (_decisivos.VencedorEntre(jd.TimeCasaId, jd.TimeForaId) is Guid vencedorId)
+                        {
+                            <span class="badge bg-success">
+                                Classificado: @(vencedorId == jd.TimeCasaId ? jd.TimeCasaNome : jd.TimeForaNome)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">A disputar</span>
+                        }
+                        <span class="text-muted">não vale pontos</span>
+                    </li>
+                }
+            </ul>
+        }
+
         <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
             <span><span class="badge bg-success me-1">●</span> Avança (1º-2º do grupo)</span>
             <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
+            <span><span class="badge bg-primary me-1">●</span> Empatados (Pts, V e SG) — jogo decisivo</span>
         </div>
     }
     else
@@ -166,6 +198,8 @@
     private IReadOnlyList<LigaDto>? _ligas;
     private Guid _ligaId;
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
+    private IReadOnlyList<LigaPartidaDto> _jogosDecisivos = Array.Empty<LigaPartidaDto>();
+    private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
     private bool _loading = true;
 
     private string LigaNome => _liga?.Nome ?? "CBFV";
@@ -181,7 +215,7 @@
         if (_liga is not null)
         {
             _ligaId = _liga.LigaId;
-            _classif = await LigaService.GetClassificacaoAsync(_ligaId, CancellationToken.None);
+            await CarregarAsync(_ligaId);
         }
 
         _loading = false;
@@ -195,9 +229,18 @@
             _liga = _ligas?.FirstOrDefault(l => l.LigaId == id);
             _loading = true;
             StateHasChanged();
-            _classif = await LigaService.GetClassificacaoAsync(_ligaId, CancellationToken.None);
+            await CarregarAsync(_ligaId);
             _loading = false;
         }
+    }
+
+    private async Task CarregarAsync(Guid ligaId)
+    {
+        _classif = await LigaService.GetClassificacaoAsync(ligaId, CancellationToken.None);
+
+        var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
+        _jogosDecisivos = rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas).ToArray();
+        _decisivos = LigaDesempate.DosJogos(_jogosDecisivos);
     }
 
     private string GetRowClass(LigaClassificacaoItemDto item)
@@ -246,8 +289,27 @@
         _ => "bg-danger"
     };
 
-    private static string CopaRowClass(int pos) => pos <= 2 ? "table-success" : "table-danger";
-    private static string CopaBadgeClass(int pos) => pos <= 2 ? "bg-success" : "bg-danger";
+    // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
+    // para a tabela já refletir o desempate mesmo antes do próximo recálculo.
+    private List<LigaClassificacaoItemDto> OrdenarGrupo(GrupoCopa grupo) =>
+        LigaDesempate.Ordenar(
+            _classif!.Where(c => c.Grupo == grupo),
+            TipoCompetition.Copa,
+            c => c.TimeId,
+            CopaStats,
+            Array.Empty<ConfrontoDireto>(),
+            _decisivos);
+
+    // Copa: Pontos → Vitórias → Saldo de Gols. Quem empatar nos três divide a posição
+    // e a vaga sai em jogo decisivo — por isso a linha fica azul.
+    private static DesempateStats CopaStats(LigaClassificacaoItemDto c) =>
+        new(c.Pontos, c.Vitorias, c.SaldoGols, c.GolsPro);
+
+    private static string CopaRowClass(int pos, bool emDecisao) =>
+        emDecisao ? "table-primary" : pos <= 2 ? "table-success" : "table-danger";
+
+    private static string CopaBadgeClass(int pos, bool emDecisao) =>
+        emDecisao ? "bg-primary" : pos <= 2 ? "bg-success" : "bg-danger";
 
     private static string StatusLabel(LigaStatus s) => s switch
     {

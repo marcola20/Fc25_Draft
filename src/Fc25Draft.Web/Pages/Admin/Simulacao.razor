@@ -1,0 +1,531 @@
+@page "/admin/liga/simulacao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Models.Navigation
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ILigaPublicService LigaService
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Simulação</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+        <h1 class="h3 mb-0">Simulação</h1>
+        @if (_ligas.Count > 0)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                @foreach (var l in _ligas)
+                {
+                    <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
+                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                    </option>
+                }
+            </select>
+        }
+        @if (_edicoes > 0)
+        {
+            <span class="badge bg-warning text-dark">@_edicoes @(_edicoes == 1 ? "placar alterado" : "placares alterados")</span>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="RestaurarTudo">↺ Restaurar resultados reais</button>
+        }
+    </div>
+
+    <div class="alert alert-info py-2 small mb-3">
+        <strong>Nada aqui é salvo.</strong> Os placares editados valem só nesta tela, para testar cenários de
+        classificação. Recarregar a página volta tudo para os resultados reais.
+    </div>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_liga is null)
+    {
+        <div class="alert alert-warning">Nenhuma liga ativa no momento.</div>
+    }
+    else if (_tabela.Count == 0)
+    {
+        <div class="alert alert-info">Classificação ainda não disponível para esta competição.</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <!-- ── Classificação simulada ── -->
+            <div class="col-12 col-xl-7">
+                @foreach (var bloco in Blocos())
+                {
+                    @if (bloco.Titulo is not null)
+                    {
+                        <h5 class="mt-1 mb-2">@bloco.Titulo</h5>
+                    }
+
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width:38px;">#</th>
+                                    <th>Time</th>
+                                    <th class="text-center" title="Pontos">Pts</th>
+                                    <th class="text-center" title="Jogos">J</th>
+                                    <th class="text-center" title="Vitórias">V</th>
+                                    <th class="text-center" title="Empates">E</th>
+                                    <th class="text-center" title="Derrotas">D</th>
+                                    <th class="text-center" title="Gols Pró">GP</th>
+                                    <th class="text-center" title="Gols Contra">GC</th>
+                                    <th class="text-center" title="Saldo de Gols">SG</th>
+                                    <th class="text-center" title="Variação em relação à classificação real">Δ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in bloco.Times)
+                                {
+                                    <tr class="@RowClass(t)">
+                                        <td><span class="badge @BadgeClass(t)">@t.Posicao</span></td>
+                                        <td class="fw-semibold" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <img src="@EscudoUrl(t.Nome)" alt="" width="20" height="20" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            @t.Nome
+                                            @if (t.PontosDescontados > 0)
+                                            {
+                                                <span class="badge bg-danger ms-1" title="Pontos descontados por punição">-@t.PontosDescontados</span>
+                                            }
+                                        </td>
+                                        <td class="text-center fw-bold">@t.Pontos</td>
+                                        <td class="text-center">@t.Jogos</td>
+                                        <td class="text-center">@t.Vitorias</td>
+                                        <td class="text-center">@t.Empates</td>
+                                        <td class="text-center">@t.Derrotas</td>
+                                        <td class="text-center">@t.GolsPro</td>
+                                        <td class="text-center">@t.GolsContra</td>
+                                        <td class="text-center @(t.SaldoGols > 0 ? "text-success" : t.SaldoGols < 0 ? "text-danger" : "")">
+                                            @(t.SaldoGols > 0 ? "+" : "")@t.SaldoGols
+                                        </td>
+                                        <td class="text-center small @DeltaClass(t)">@DeltaLabel(t)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (_liga.Tipo == TipoCompetition.Copa)
+                {
+                    <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
+                        <span><span class="badge bg-success me-1">●</span> Avança (1º-2º do grupo)</span>
+                        <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
+                        <span><span class="badge bg-primary me-1">●</span> Empatados (Pts, V e SG) — jogo decisivo</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
+                        <span><span class="badge bg-warning text-dark me-1">●</span> Bye (1º-2º)</span>
+                        <span><span class="badge bg-success me-1">●</span> QF direto (3º-6º)</span>
+                        <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
+                        <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
+                    </div>
+                }
+            </div>
+
+            <!-- ── Rodadas editáveis ── -->
+            <div class="col-12 col-xl-5">
+                @if (_rodadas.Count == 0)
+                {
+                    <div class="text-muted small">Nenhuma rodada registrada.</div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_todasRodadas || _rodadaIdx == 0)">‹</button>
+                            <span class="fw-bold px-1">@(_todasRodadas ? "Todas as rodadas" : $"Rodada {_rodadas[_rodadaIdx].Numero}")</span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_todasRodadas || _rodadaIdx == _rodadas.Count - 1)">›</button>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="todasRodadas" @bind="_todasRodadas" />
+                            <label class="form-check-label small" for="todasRodadas">Ver todas</label>
+                        </div>
+                    </div>
+
+                    @foreach (var rodada in _todasRodadas ? _rodadas : new[] { _rodadas[_rodadaIdx] }.ToList())
+                    {
+                        @if (_todasRodadas)
+                        {
+                            <h6 class="text-uppercase text-muted small fw-bold mt-3 mb-1">Rodada @rodada.Numero</h6>
+                        }
+
+                        <div class="list-group mb-2">
+                            @foreach (var p in _partidas.Where(x => x.RodadaId == rodada.RodadaId))
+                            {
+                                <div @key="p" class="list-group-item py-2 px-2 d-flex align-items-center gap-2 @(p.Editada ? "list-group-item-warning" : "")">
+                                    <div class="d-flex align-items-center justify-content-end gap-1" style="flex:1;min-width:0;">
+                                        <span class="small fw-semibold text-end d-none d-sm-inline text-truncate">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="@p.TimeCasaNome" title="@p.TimeCasaNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                    </div>
+
+                                    <input type="number" min="0" max="99" inputmode="numeric"
+                                           class="form-control form-control-sm text-center px-1" style="width:52px;flex:0 0 auto;"
+                                           aria-label="@($"Gols de {p.TimeCasaNome}")"
+                                           @bind="p.GolsCasa" @bind:event="oninput" @bind:after="Recalcular" />
+                                    <span class="text-muted">–</span>
+                                    <input type="number" min="0" max="99" inputmode="numeric"
+                                           class="form-control form-control-sm text-center px-1" style="width:52px;flex:0 0 auto;"
+                                           aria-label="@($"Gols de {p.TimeForaNome}")"
+                                           @bind="p.GolsFora" @bind:event="oninput" @bind:after="Recalcular" />
+
+                                    <div class="d-flex align-items-center gap-1" style="flex:1;min-width:0;">
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="@p.TimeForaNome" title="@p.TimeForaNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="small fw-semibold d-none d-sm-inline text-truncate">@p.TimeForaNome</span>
+                                    </div>
+
+                                    <button class="btn btn-sm btn-link text-secondary p-0 px-1" style="flex:0 0 auto;"
+                                            title="@(p.Editada ? "Voltar ao resultado real" : "Marcar como não disputada")"
+                                            @onclick="() => Restaurar(p)">
+                                        @(p.Editada ? "↺" : "✕")
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
+    private LigaDto? _liga;
+    private Guid _ligaId;
+
+    private IReadOnlyList<LigaClassificacaoItemDto> _classifReal = Array.Empty<LigaClassificacaoItemDto>();
+    private List<LigaRodadaComPartidasDto> _rodadas = new();
+    private List<PartidaSim> _partidas = new();
+
+    private List<TimeSim> _tabela = new();
+    private Dictionary<Guid, int> _posicoesReais = new();
+    private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+
+    private int _rodadaIdx;
+    private bool _todasRodadas;
+    private bool _loading = true;
+
+    private int _edicoes => _partidas.Count(p => p.Editada);
+
+    protected override void OnParametersSet()
+    {
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/admin/liga/simulacao"),
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin", "/admin/liga"),
+                new("Simulação")
+            },
+            subtitle: _liga is null ? "Cenários de classificação — Admin" : $"Cenários de classificação — {_liga.Nome}");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
+        _liga = await LigaService.GetAtualAsync(CancellationToken.None)
+                ?? (_ligas.Count > 0 ? _ligas[0] : null);
+
+        if (_liga is not null)
+        {
+            _ligaId = _liga.LigaId;
+            await CarregarAsync(_ligaId);
+        }
+
+        _loading = false;
+    }
+
+    private async Task OnLigaChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+
+        _ligaId = id;
+        _liga = _ligas.FirstOrDefault(l => l.LigaId == id);
+        _loading = true;
+        StateHasChanged();
+
+        await CarregarAsync(id);
+
+        _loading = false;
+    }
+
+    private async Task CarregarAsync(Guid ligaId)
+    {
+        _classifReal = await LigaService.GetClassificacaoAsync(ligaId, CancellationToken.None);
+
+        var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
+        // Numero > 0 exclui as rodadas sentinela do mata-mata e do jogo decisivo da Liga;
+        // o jogo decisivo da Copa fica de fora porque não vale pontos — só o resultado dele
+        // entra, para manter o vencedor à frente do empatado.
+        _rodadas = rodadas.Where(r => r.Numero > 0 && !r.Desempate).OrderBy(r => r.Numero).ToList();
+        _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));
+
+        _partidas = _rodadas
+            .SelectMany(r => r.Partidas)
+            .Select(PartidaSim.DoReal)
+            .ToList();
+
+        // Posição real serve de referência para mostrar a variação do cenário simulado.
+        _posicoesReais = Montar(real: true).ToDictionary(t => t.TimeId, t => t.Posicao);
+
+        _todasRodadas = false;
+        _rodadaIdx = 0;
+        for (int i = _rodadas.Count - 1; i >= 0; i--)
+        {
+            if (_rodadas[i].Partidas.Any(p => p.Status != PartidaStatus.Agendada))
+            {
+                _rodadaIdx = i;
+                break;
+            }
+        }
+
+        Recalcular();
+    }
+
+    private void Recalcular() => _tabela = Montar(real: false);
+
+    private void Restaurar(PartidaSim p)
+    {
+        // Já no resultado real: o botão passa a limpar o placar (partida "não disputada").
+        if (p.Editada) p.VoltarAoReal();
+        else { p.GolsCasa = null; p.GolsFora = null; }
+
+        Recalcular();
+    }
+
+    private void RestaurarTudo()
+    {
+        foreach (var p in _partidas) p.VoltarAoReal();
+        Recalcular();
+    }
+
+    private void RodadaAnterior() { if (_rodadaIdx > 0) _rodadaIdx--; }
+    private void RodadaProxima() { if (_rodadaIdx < _rodadas.Count - 1) _rodadaIdx++; }
+
+    // ── Cálculo da tabela ─────────────────────────────────────────────────────
+
+    private List<TimeSim> Montar(bool real)
+    {
+        var times = _classifReal.ToDictionary(
+            c => c.TimeId,
+            c => new TimeSim(c.TimeId, c.TimeNome, c.Grupo, c.PontosDescontados));
+
+        var confrontos = new List<ConfrontoDireto>();
+
+        foreach (var p in _partidas)
+        {
+            var golsCasa = real ? p.RealGolsCasa : p.GolsCasa;
+            var golsFora = real ? p.RealGolsFora : p.GolsFora;
+            if (golsCasa is null || golsFora is null) continue;
+
+            if (!times.TryGetValue(p.TimeCasaId, out var casa)) continue;
+            if (!times.TryGetValue(p.TimeForaId, out var fora)) continue;
+
+            casa.Registrar(golsCasa.Value, golsFora.Value);
+            fora.Registrar(golsFora.Value, golsCasa.Value);
+
+            // WO não entra no confronto direto, igual ao recálculo oficial.
+            if (!p.IsWO)
+                confrontos.Add(new ConfrontoDireto(p.TimeCasaId, p.TimeForaId, golsCasa.Value, golsFora.Value));
+        }
+
+        var tipo = _liga?.Tipo ?? TipoCompetition.Liga;
+        var todos = times.Values.ToList();
+
+        if (tipo != TipoCompetition.Copa)
+        {
+            var ordenados = LigaDesempate.Ordenar(todos, tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+            for (int i = 0; i < ordenados.Count; i++) ordenados[i].Posicao = i + 1;
+            return ordenados;
+        }
+
+        // Copa: cada grupo é ordenado isoladamente e empatados dividem a posição.
+        var resultado = new List<TimeSim>(todos.Count);
+        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        {
+            var doGrupo = LigaDesempate.Ordenar(
+                todos.Where(t => t.Grupo == grupo), tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+
+            var posicoes = LigaDesempate.PosicoesCopa(doGrupo, t => t.TimeId, TimeSim.Stats, _decisivos);
+            for (int i = 0; i < doGrupo.Count; i++)
+            {
+                doGrupo[i].Posicao = posicoes[i];
+                doGrupo[i].EmDecisao = posicoes.Count(x => x == posicoes[i]) > 1;
+            }
+
+            resultado.AddRange(doGrupo);
+        }
+
+        resultado.AddRange(todos.Where(t => t.Grupo is null));
+        return resultado;
+    }
+
+    /// <summary>Uma tabela por grupo na Copa; tabela única na Liga.</summary>
+    private IEnumerable<(string? Titulo, List<TimeSim> Times)> Blocos()
+    {
+        if (_liga?.Tipo != TipoCompetition.Copa)
+        {
+            yield return (null, _tabela);
+            yield break;
+        }
+
+        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        {
+            var doGrupo = _tabela.Where(t => t.Grupo == grupo).ToList();
+            if (doGrupo.Count > 0) yield return ($"Grupo {grupo}", doGrupo);
+        }
+    }
+
+    // ── Estilo ────────────────────────────────────────────────────────────────
+
+    private int Delta(TimeSim t) =>
+        _posicoesReais.TryGetValue(t.TimeId, out var real) ? real - t.Posicao : 0;
+
+    private string DeltaLabel(TimeSim t) => Delta(t) switch
+    {
+        > 0 => $"▲{Delta(t)}",
+        < 0 => $"▼{-Delta(t)}",
+        _ => "–"
+    };
+
+    private string DeltaClass(TimeSim t) => Delta(t) switch
+    {
+        > 0 => "text-success fw-bold",
+        < 0 => "text-danger fw-bold",
+        _ => "text-muted"
+    };
+
+
+    private string RowClass(TimeSim t)
+    {
+        if (_liga?.Tipo == TipoCompetition.Copa)
+            return t.EmDecisao ? "table-primary" : t.Posicao <= 2 ? "table-success" : "table-danger";
+
+        return t.Posicao switch
+        {
+            1 or 2 => "table-warning",
+            3 or 4 or 5 or 6 => "table-success",
+            7 or 8 or 9 or 10 => "table-info",
+            _ => "table-danger"
+        };
+    }
+
+    private string BadgeClass(TimeSim t)
+    {
+        if (_liga?.Tipo == TipoCompetition.Copa)
+            return t.EmDecisao ? "bg-primary" : t.Posicao <= 2 ? "bg-success" : "bg-danger";
+
+        return t.Posicao switch
+        {
+            1 or 2 => "bg-warning text-dark",
+            3 or 4 or 5 or 6 => "bg-success",
+            7 or 8 or 9 or 10 => "bg-info text-dark",
+            _ => "bg-danger"
+        };
+    }
+
+    private static string EscudoUrl(string? teamName)
+    {
+        if (string.IsNullOrWhiteSpace(teamName)) return "/images/escudos/escudo.png";
+        var normalized = teamName.Normalize(System.Text.NormalizationForm.FormD);
+        var clean = new string(normalized.Where(c =>
+            System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) !=
+            System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        return $"/images/escudos/{clean}.png";
+    }
+
+    // ── Modelos da simulação ──────────────────────────────────────────────────
+
+    private sealed class PartidaSim
+    {
+        public Guid RodadaId { get; init; }
+        public Guid TimeCasaId { get; init; }
+        public string TimeCasaNome { get; init; } = "";
+        public Guid TimeForaId { get; init; }
+        public string TimeForaNome { get; init; } = "";
+        public bool IsWO { get; init; }
+
+        /// <summary>Placar real; null quando a partida ainda não foi disputada.</summary>
+        public int? RealGolsCasa { get; init; }
+        public int? RealGolsFora { get; init; }
+
+        /// <summary>Placar do cenário; null significa partida não disputada (não pontua).</summary>
+        public int? GolsCasa { get; set; }
+        public int? GolsFora { get; set; }
+
+        public bool Editada => GolsCasa != RealGolsCasa || GolsFora != RealGolsFora;
+
+        public void VoltarAoReal()
+        {
+            GolsCasa = RealGolsCasa;
+            GolsFora = RealGolsFora;
+        }
+
+        public static PartidaSim DoReal(LigaPartidaDto p)
+        {
+            var disputada = p.Status != PartidaStatus.Agendada;
+            return new PartidaSim
+            {
+                RodadaId = p.RodadaId,
+                TimeCasaId = p.TimeCasaId,
+                TimeCasaNome = p.TimeCasaNome,
+                TimeForaId = p.TimeForaId,
+                TimeForaNome = p.TimeForaNome,
+                IsWO = p.IsWO,
+                RealGolsCasa = disputada ? p.GolsCasa : null,
+                RealGolsFora = disputada ? p.GolsFora : null,
+                GolsCasa = disputada ? p.GolsCasa : null,
+                GolsFora = disputada ? p.GolsFora : null
+            };
+        }
+    }
+
+    private sealed class TimeSim
+    {
+        public TimeSim(Guid timeId, string nome, GrupoCopa? grupo, int pontosDescontados)
+        {
+            TimeId = timeId;
+            Nome = nome;
+            Grupo = grupo;
+            PontosDescontados = pontosDescontados;
+        }
+
+        public Guid TimeId { get; }
+        public string Nome { get; }
+        public GrupoCopa? Grupo { get; }
+        public int PontosDescontados { get; }
+
+        public int Jogos { get; private set; }
+        public int Vitorias { get; private set; }
+        public int Empates { get; private set; }
+        public int Derrotas { get; private set; }
+        public int GolsPro { get; private set; }
+        public int GolsContra { get; private set; }
+
+        public int SaldoGols => GolsPro - GolsContra;
+        public int Pontos => (Vitorias * 3) + Empates - PontosDescontados;
+
+        public int Posicao { get; set; }
+        public bool EmDecisao { get; set; }
+
+        public void Registrar(int golsFeitos, int golsSofridos)
+        {
+            Jogos++;
+            GolsPro += golsFeitos;
+            GolsContra += golsSofridos;
+
+            if (golsFeitos > golsSofridos) Vitorias++;
+            else if (golsFeitos == golsSofridos) Empates++;
+            else Derrotas++;
+        }
+
+        public static DesempateStats Stats(TimeSim t) => new(t.Pontos, t.Vitorias, t.SaldoGols, t.GolsPro);
+    }
+}

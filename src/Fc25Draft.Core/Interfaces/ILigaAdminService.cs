@@ -50,6 +50,12 @@ public interface ILigaAdminService
 
     // Copa grupos
     Task<IReadOnlyList<LigaGrupoTimeDto>> ListGruposAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Empates de Pts/V/SG nos grupos e o jogo decisivo de cada um, quando já criado.</summary>
+    Task<IReadOnlyList<LigaEmpateCopaDto>> ListEmpatesCopaAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Cria o jogo decisivo entre dois times empatados de um grupo (não vale pontos).</summary>
+    Task<LigaPartidaDto> GerarJogoDecisivoCopaAsync(Guid ligaId, Guid timeAId, Guid timeBId, CancellationToken ct);
     Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
 
     // Times inscritos (Liga de pontos corridos)

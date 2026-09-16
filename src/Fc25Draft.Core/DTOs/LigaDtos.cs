@@ -31,13 +31,15 @@ public record LigaRodadaDto(
     Guid RodadaId,
     Guid LigaId,
     int Numero,
-    int TotalPartidas);
+    int TotalPartidas,
+    bool Desempate = false);
 
 public record LigaRodadaComPartidasDto(
     Guid RodadaId,
     Guid LigaId,
     int Numero,
-    IReadOnlyList<LigaPartidaDto> Partidas);
+    IReadOnlyList<LigaPartidaDto> Partidas,
+    bool Desempate = false);
 
 public record LigaPartidaDto(
     Guid PartidaId,
@@ -102,6 +104,24 @@ public record LigaClassificacaoItemDto(
     int CartoesVermelhos,
     int PontosDescontados,
     GrupoCopa? Grupo = null);
+
+/// <summary>
+/// Empate de Pts/V/SG dentro de um grupo da Copa e o jogo decisivo correspondente,
+/// quando já existe.
+/// </summary>
+public record LigaEmpateCopaDto(
+    GrupoCopa Grupo,
+    int Posicao,
+    Guid TimeAId,
+    string TimeANome,
+    Guid TimeBId,
+    string TimeBNome,
+    Guid? PartidaId,
+    PartidaStatus? StatusPartida,
+    int? GolsTimeA,
+    int? GolsTimeB,
+    Guid? VencedorId,
+    string? VencedorNome);
 
 public record LigaGrupoTimeDto(
     Guid LigaId,

@@ -45,6 +45,7 @@ public class LayoutNavigationService
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
+            new("Simulação da Liga", "/admin/liga/simulacao", "oi oi-calculator", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
@@ -231,6 +232,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Liga")
+            }
+        },
+        ["/admin/liga/simulacao"] = new PageDefinition
+        {
+            Route = "/admin/liga/simulacao",
+            Title = "Simulação da Liga",
+            Subtitle = "Cenários de classificação — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Simulação")
             }
         },
         ["/admin/configuracoes"] = new PageDefinition

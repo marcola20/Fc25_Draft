@@ -3,6 +3,7 @@ using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Extensions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -243,7 +244,8 @@ public class LigaPublicService : ILigaPublicService
                 p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
                 p.TimeForaId, p.TimeFora?.TeamName ?? "?",
                 p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
-                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm)).ToArray()
+                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm)).ToArray(),
+            r.Desempate
         )).ToArray();
     }
 
@@ -464,11 +466,9 @@ public class LigaPublicService : ILigaPublicService
         var classifs = await _db.LigaClassificacoes
             .AsNoTracking()
             .Where(c => ligaIds.Contains(c.LigaId))
-            .Select(c => new
-            {
+            .Select(c => new ClassifFlat(
                 c.LigaId, c.TimeId, c.Posicao, c.Grupo, c.Pontos, c.Jogos,
-                c.Vitorias, c.Empates, c.Derrotas, c.GolsPro, c.GolsContra
-            })
+                c.Vitorias, c.Empates, c.Derrotas, c.GolsPro, c.GolsContra))
             .ToListAsync(ct);
 
         var knockouts = await _db.LigaKnockoutJogos
@@ -477,6 +477,29 @@ public class LigaPublicService : ILigaPublicService
                         && (k.TimeCasaId == timeId || k.TimeForaId == timeId))
             .Select(k => new { k.LigaId, k.Fase, k.VencedorId })
             .ToListAsync(ct);
+
+        // Jogos decisivos encerrados: na Copa, o vencedor fica à frente do empatado.
+        var jogosDecisivos = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Rodada.Desempate
+                        && p.Status == PartidaStatus.Encerrada)
+            .Select(p => new
+            {
+                p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId,
+                p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId
+            })
+            .ToListAsync(ct);
+
+        var decisivosPorLiga = jogosDecisivos
+            .GroupBy(j => j.LigaId)
+            .ToDictionary(
+                g => g.Key,
+                g => new JogosDecisivos(g
+                    .Select(j => (Vencedor: LigaDesempate.VencedorDoJogoDecisivo(
+                        j.TimeCasaId, j.TimeForaId, j.GolsCasa, j.GolsFora, j.TemPenaltis, j.PenaltisVencedorId),
+                        j.TimeCasaId, j.TimeForaId))
+                    .Where(x => x.Vencedor is not null)
+                    .Select(x => (x.Vencedor!.Value, x.Vencedor == x.TimeCasaId ? x.TimeForaId : x.TimeCasaId))));
 
         var competicoes = new List<TimeTemporadaCompeticaoDto>();
         foreach (var liga in ligas)
@@ -488,11 +511,21 @@ public class LigaPublicService : ILigaPublicService
             if (liga.Tipo == TipoCompetition.Copa && c.Grupo is not null)
             {
                 // Reordena dentro do grupo para não exibir a posição geral da competição.
-                posicao = classifs
-                    .Where(x => x.LigaId == liga.LigaId && x.Grupo == c.Grupo)
-                    .OrderBy(x => x.Posicao)
-                    .Select((x, i) => new { x.TimeId, Pos = i + 1 })
-                    .First(x => x.TimeId == timeId).Pos;
+                // Empatados em Pts/V/SG dividem a mesma posição (jogo decisivo).
+                var decisivos = decisivosPorLiga.GetValueOrDefault(liga.LigaId, JogosDecisivos.Nenhum);
+
+                var doGrupo = LigaDesempate.Ordenar(
+                    classifs.Where(x => x.LigaId == liga.LigaId && x.Grupo == c.Grupo),
+                    TipoCompetition.Copa,
+                    x => x.TimeId,
+                    ClassifFlat.Stats,
+                    Array.Empty<ConfrontoDireto>(),
+                    decisivos);
+
+                var posicoesGrupo = LigaDesempate.PosicoesCopa(
+                    doGrupo, x => x.TimeId, ClassifFlat.Stats, decisivos);
+
+                posicao = posicoesGrupo[doGrupo.FindIndex(x => x.TimeId == timeId)];
             }
 
             competicoes.Add(new TimeTemporadaCompeticaoDto(
@@ -558,6 +591,24 @@ public class LigaPublicService : ILigaPublicService
     }
 
     /// <summary>Traduz a fase mais avançada que o time alcançou no mata-mata.</summary>
+    /// <summary>Linha de classificação achatada, usada no cálculo da posição por grupo.</summary>
+    private sealed record ClassifFlat(
+        Guid LigaId,
+        Guid TimeId,
+        int Posicao,
+        GrupoCopa? Grupo,
+        int Pontos,
+        int Jogos,
+        int Vitorias,
+        int Empates,
+        int Derrotas,
+        int GolsPro,
+        int GolsContra)
+    {
+        public static DesempateStats Stats(ClassifFlat c) =>
+            new(c.Pontos, c.Vitorias, c.GolsPro - c.GolsContra, c.GolsPro);
+    }
+
     private static string? FaseAlcancadaLabel(IEnumerable<(FaseKnockout Fase, Guid? VencedorId)> jogos, Guid timeId)
     {
         var maisAvancado = jogos

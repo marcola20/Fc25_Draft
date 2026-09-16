@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Components.Liga
 @inject ILigaPublicService LigaService
 @inject AdminAuthService AdminAuth
@@ -82,7 +83,8 @@
             }
             else if (_liga.Tipo == TipoCompetition.Copa)
             {
-                var itensGrupo = _classif.Where(c => c.Grupo == _grupoSelecionado).OrderBy(x => x.Posicao).ToList();
+                var itensGrupo = OrdenarGrupo(_grupoSelecionado);
+                var posicoesGrupo = LigaDesempate.PosicoesCopa(itensGrupo, c => c.TimeId, CopaStats, _decisivos);
 
                 <!-- Copa: seletor de grupo -->
                 <div class="mb-3 d-flex gap-2">
@@ -124,10 +126,10 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = i + 1 }))
+                                    @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = posicoesGrupo[i], EmDecisao = posicoesGrupo.Count(p => p == posicoesGrupo[i]) > 1 }))
                                     {
-                                        <tr class="@(item.Position <= 2 ? "table-success" : "table-danger")" style="height:44px;">
-                                            <td style="width:40px;"><span class="badge @(item.Position <= 2 ? "bg-success" : "bg-danger")">@item.Position</span></td>
+                                        <tr class="@CopaRowClass(item.Position, item.EmDecisao)" style="height:44px;" title="@(item.EmDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
+                                            <td style="width:40px;"><span class="badge @CopaBadgeClass(item.Position, item.EmDecisao)">@item.Position</span></td>
                                             <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                                 <img src="@EscudoUrl(item.Item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
                                                 <span class="fw-semibold">@item.Item.TimeNome</span>
@@ -151,6 +153,7 @@
                         <div class="d-flex flex-wrap gap-3 mt-2 small text-muted">
                             <span><span class="badge bg-success me-1">●</span> Avança (1º-2º)</span>
                             <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
+                            <span><span class="badge bg-primary me-1">●</span> Empatados (Pts, V e SG) — jogo decisivo</span>
                         </div>
                     </ShareableCard>
                 }
@@ -228,7 +231,13 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                     <div class="d-flex align-items-center gap-2">
                         <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
-                        <span class="fw-bold px-2">Rodada @(_rodadaAtual?.Numero)</span>
+                        <span class="fw-bold px-2">
+                            Rodada @(_rodadaAtual?.Numero)
+                            @if (_rodadaAtual?.Desempate == true)
+                            {
+                                <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
+                            }
+                        </span>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
                     </div>
 
@@ -625,6 +634,7 @@
     private IReadOnlyList<LigaClassificacaoItemDto> _classif = Array.Empty<LigaClassificacaoItemDto>();
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
     private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
+    private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
@@ -718,6 +728,9 @@
         _classif = await LigaService.GetClassificacaoAsync(ligaId, CancellationToken.None);
         var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
         _rodadas = rodadas.Where(r => r.Numero > 0).ToArray();
+        // O jogo decisivo da Copa aparece como rodada normal, mas não soma pontos:
+        // o que ele resolve é a ordem entre os empatados.
+        _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));
         _knockoutJogos = await LigaService.GetKnockoutAsync(ligaId, CancellationToken.None);
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
@@ -803,6 +816,28 @@
         LigaStatus.Encerrada => "Encerrada",
         _ => s.ToString()
     };
+
+    // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
+    // para a tabela já refletir o desempate mesmo antes do próximo recálculo.
+    private List<LigaClassificacaoItemDto> OrdenarGrupo(GrupoCopa grupo) =>
+        LigaDesempate.Ordenar(
+            _classif.Where(c => c.Grupo == grupo),
+            TipoCompetition.Copa,
+            c => c.TimeId,
+            CopaStats,
+            Array.Empty<ConfrontoDireto>(),
+            _decisivos);
+
+    // Copa: Pontos → Vitórias → Saldo de Gols. Empatados nos três dividem a posição
+    // e decidem a vaga em jogo decisivo — linha azul.
+    private static DesempateStats CopaStats(LigaClassificacaoItemDto c) =>
+        new(c.Pontos, c.Vitorias, c.SaldoGols, c.GolsPro);
+
+    private static string CopaRowClass(int pos, bool emDecisao) =>
+        emDecisao ? "table-primary" : pos <= 2 ? "table-success" : "table-danger";
+
+    private static string CopaBadgeClass(int pos, bool emDecisao) =>
+        emDecisao ? "bg-primary" : pos <= 2 ? "bg-success" : "bg-danger";
 
     private static string EscudoUrl(string? teamName)
     {

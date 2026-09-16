@@ -41,6 +41,7 @@
         @if (_ligaAtual?.Tipo == TipoCompetition.Copa)
         {
             <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
+            <li class="nav-item"><button class="nav-link @(_tab=="decisivo"?"active":"")" @onclick='()=>SetTab("decisivo")' disabled="@(_ligaAtual == null)">Jogo Decisivo</button></li>
         }
         @if (_ligaAtual?.Tipo == TipoCompetition.Liga)
         {
@@ -266,6 +267,72 @@
         }
     }
 
+    <!-- ─ Tab: Jogo Decisivo (Copa) ─ -->
+    @if (_tab == "decisivo" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
+    {
+        <div class="alert alert-secondary py-2 small">
+            Empate em <strong>Pontos, Vitórias e Saldo de Gols</strong> é resolvido em jogo decisivo.
+            Ele entra como uma rodada extra (rodada @(_ligaAtual.TotalRodadas + 1)), <strong>não soma pontos</strong>
+            na classificação e, depois de encerrado, coloca o vencedor à frente do adversário — inclusive
+            na hora de montar as semifinais.
+        </div>
+
+        @if (!_empatesCopa.Any())
+        {
+            <div class="alert alert-info">Nenhum empate a resolver nos grupos.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var empate in _empatesCopa)
+                {
+                    <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                        <span class="badge bg-dark">Grupo @empate.Grupo</span>
+                        <span class="badge bg-secondary">@(empate.Posicao)º</span>
+
+                        <span class="fw-semibold">@empate.TimeANome</span>
+                        <span class="text-muted">vs</span>
+                        <span class="fw-semibold">@empate.TimeBNome</span>
+
+                        <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+                            @if (empate.PartidaId is null)
+                            {
+                                <span class="badge bg-primary">Empatados</span>
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="() => GerarJogoDecisivo(empate)"
+                                        disabled="@(_saving || _ligaAtual.Status != LigaStatus.PrimeiraFase)">
+                                    Criar jogo decisivo
+                                </button>
+                            }
+                            else if (empate.VencedorId is not null)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-success">Classificado: @empate.VencedorNome</span>
+                            }
+                            else if (empate.StatusPartida == PartidaStatus.Encerrada)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-warning text-dark">Empatado — registre os pênaltis</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Jogo criado — a disputar</span>
+                            }
+
+                            @if (empate.PartidaId is not null && _rodadaDesempate is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="@($"/admin/liga/{_ligaAtual.LigaId}/rodada/{_rodadaDesempate.RodadaId}")">
+                                    Abrir rodada
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
     <!-- ─ Tab: Times (Liga) ─ -->
     @if (_tab == "times" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
     {
@@ -323,6 +390,10 @@
                     <div class="card @(_rodadaSelecionada?.RodadaId == r.RodadaId ? "border-primary border-2" : "")">
                         <div class="card-body py-2 text-center">
                             <div class="fw-bold">@RodadaLabel(r.Numero)</div>
+                            @if (r.Desempate)
+                            {
+                                <span class="badge bg-primary" title="Não vale pontos na classificação">Jogo Decisivo</span>
+                            }
                             <div class="small text-muted">@r.TotalPartidas partidas</div>
                             <div class="d-flex gap-1 justify-content-center mt-1">
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => SelecionarRodada(r)">Gerenciar</button>
@@ -344,6 +415,10 @@
     {
         <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
             <span class="fw-semibold">@RodadaLabel(_rodadaSelecionada.Numero)</span>
+            @if (_rodadaSelecionada.Desempate)
+            {
+                <span class="badge bg-primary" title="Não vale pontos na classificação">Jogo Decisivo — não vale pontos</span>
+            }
             <button class="btn btn-primary btn-sm" @onclick="() => _showCriarPartida = !_showCriarPartida">+ Nova Partida</button>
         </div>
 
@@ -652,6 +727,8 @@
 
     // Grupos Copa
     private IReadOnlyList<LigaGrupoTimeDto> _grupos = Array.Empty<LigaGrupoTimeDto>();
+    private IReadOnlyList<LigaEmpateCopaDto> _empatesCopa = Array.Empty<LigaEmpateCopaDto>();
+    private LigaRodadaDto? _rodadaDesempate;
     private readonly string[] _grupoA = new string[6];
     private readonly string[] _grupoB = new string[6];
 
@@ -713,6 +790,8 @@
             if (_ligaAtual.Tipo == TipoCompetition.Copa)
             {
                 _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
+                _empatesCopa = await AdminSvc.ListEmpatesCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
                 PreencherSelects();
             }
             else
@@ -762,6 +841,7 @@
         "times" => "Times",
         "rodadas" => "Rodadas",
         "partidas" => "Partidas",
+        "decisivo" => "Jogo Decisivo",
         "punicoes" => "Punições",
         "knockout" => "Mata-Mata",
         _ => "Liga"
@@ -778,6 +858,32 @@
             "partidas" when _rodadaSelecionada is not null => $"{baseUrl}/rodada/{_rodadaSelecionada.RodadaId}",
             _ => $"{baseUrl}?tab={tab}"
         });
+    }
+
+    private async Task GerarJogoDecisivo(LigaEmpateCopaDto empate)
+    {
+        if (_ligaAtual is null || _saving) return;
+
+        _saving = true;
+        _erro = null;
+        _ok = null;
+
+        try
+        {
+            await AdminSvc.GerarJogoDecisivoCopaAsync(
+                _ligaAtual.LigaId, empate.TimeAId, empate.TimeBId, CancellationToken.None);
+
+            _ok = $"Jogo decisivo criado: {empate.TimeANome} x {empate.TimeBNome}.";
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private void AbrirStats(Guid partidaId) => _statsPartidaId = partidaId;
