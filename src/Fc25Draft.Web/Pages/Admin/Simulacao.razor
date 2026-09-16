@@ -76,7 +76,7 @@
                                     <th class="text-center" title="Gols Pró">GP</th>
                                     <th class="text-center" title="Gols Contra">GC</th>
                                     <th class="text-center" title="Saldo de Gols">SG</th>
-                                    <th class="text-center" title="Variação em relação à classificação real">Δ</th>
+                                    <th class="text-center" title="Linhas que o time subiu ou desceu em relação à classificação real">Δ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -205,7 +205,7 @@
     private List<PartidaSim> _partidas = new();
 
     private List<TimeSim> _tabela = new();
-    private Dictionary<Guid, int> _posicoesReais = new();
+    private Dictionary<Guid, (int Ordem, int Posicao)> _situacaoReal = new();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
 
     private int _rodadaIdx;
@@ -272,8 +272,9 @@
             .Select(PartidaSim.DoReal)
             .ToList();
 
-        // Posição real serve de referência para mostrar a variação do cenário simulado.
-        _posicoesReais = Montar(real: true).ToDictionary(t => t.TimeId, t => t.Posicao);
+        // A referência da variação é a linha real na tabela, e não o número da classificação:
+        // empatados dividem o mesmo número, o que inflaria o Δ de quem só trocou de linha.
+        _situacaoReal = Montar(real: true).ToDictionary(t => t.TimeId, t => (t.Ordem, t.Posicao));
 
         _todasRodadas = false;
         _rodadaIdx = 0;
@@ -342,7 +343,11 @@
         if (tipo != TipoCompetition.Copa)
         {
             var ordenados = LigaDesempate.Ordenar(todos, tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
-            for (int i = 0; i < ordenados.Count; i++) ordenados[i].Posicao = i + 1;
+            for (int i = 0; i < ordenados.Count; i++)
+            {
+                ordenados[i].Posicao = i + 1;
+                ordenados[i].Ordem = i + 1;
+            }
             return ordenados;
         }
 
@@ -357,6 +362,7 @@
             for (int i = 0; i < doGrupo.Count; i++)
             {
                 doGrupo[i].Posicao = posicoes[i];
+                doGrupo[i].Ordem = i + 1;
                 doGrupo[i].EmDecisao = posicoes.Count(x => x == posicoes[i]) > 1;
             }
 
@@ -385,8 +391,15 @@
 
     // ── Estilo ────────────────────────────────────────────────────────────────
 
-    private int Delta(TimeSim t) =>
-        _posicoesReais.TryGetValue(t.TimeId, out var real) ? real - t.Posicao : 0;
+    private int Delta(TimeSim t)
+    {
+        if (!_situacaoReal.TryGetValue(t.TimeId, out var real)) return 0;
+
+        // Trocar de linha com quem está empatado não é ganho nem perda: a posição é a mesma.
+        if (real.Posicao == t.Posicao) return 0;
+
+        return real.Ordem - t.Ordem;
+    }
 
     private string DeltaLabel(TimeSim t) => Delta(t) switch
     {
@@ -513,6 +526,9 @@
         public int Pontos => (Vitorias * 3) + Empates - PontosDescontados;
 
         public int Posicao { get; set; }
+
+        /// <summary>Linha ocupada na tabela (1, 2, 3...), mesmo quando a posição é dividida.</summary>
+        public int Ordem { get; set; }
         public bool EmDecisao { get; set; }
 
         public void Registrar(int golsFeitos, int golsSofridos)
