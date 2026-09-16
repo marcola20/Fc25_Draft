@@ -41,7 +41,7 @@
             <a href="/liga/historico" class="btn btn-sm btn-outline-secondary">📊 Histórico</a>
             <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simulação</a>
         </div>
-        <p class="text-muted small mb-3">Status: <strong>@LigaStatusLabel(_liga.Status)</strong></p>
+        <p class="text-muted small mb-3">Status: <strong>@LigaStatusLabel(_liga.Status, _liga.Tipo)</strong></p>
 
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <ul class="nav nav-tabs mb-0">
@@ -316,6 +316,9 @@
             else
             {
                 <ShareableCard Id="cap-knockout" Titulo="@LigaNome" Subtitulo="Mata-Mata" Arquivo="cbfv-mata-mata.png">
+                @if (_liga.Tipo != TipoCompetition.Copa)
+                {
+                <!-- Play-In e Quartas só na Liga: a Copa vai direto dos grupos para as semifinais -->
                 <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
                 <div class="row g-3 mb-4">
                     @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
@@ -339,6 +342,7 @@
                         }
                     }
                 </div>
+                }
 
                 <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Semifinais</h5>
                 <div class="row g-3 mb-4">
@@ -808,11 +812,12 @@
         _ => "Agendada"
     };
 
-    private static string LigaStatusLabel(LigaStatus s) => s switch
+    private static string LigaStatusLabel(LigaStatus s, TipoCompetition tipo) => s switch
     {
         LigaStatus.Criada => "Criada",
-        LigaStatus.PrimeiraFase => "Primeira Fase",
-        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Copa ? "Fase de Grupos" : "Primeira Fase",
+        // Na Copa o status interno PlayIn corresponde ao mata-mata (semifinais e final).
+        LigaStatus.PlayIn => tipo == TipoCompetition.Copa ? "Mata-Mata" : "Play-In",
         LigaStatus.Playoffs => "Playoffs",
         LigaStatus.Encerrada => "Encerrada",
         _ => s.ToString()

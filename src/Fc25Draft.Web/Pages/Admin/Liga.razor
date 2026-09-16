@@ -473,7 +473,7 @@
                             {
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirStats(p.PartidaId)">Stats</button>
                                 <button class="btn btn-sm btn-warning" @onclick="() => EncerrarPartida(p.PartidaId)">Encerrar</button>
-                                @if (_rodadaSelecionada?.Numero == -1)
+                                @if (_rodadaSelecionada?.Numero == -1 || _rodadaSelecionada?.Desempate == true)
                                 {
                                     <button class="btn btn-sm btn-outline-warning" @onclick="() => MostrarPenaltis(p)">Pênaltis</button>
                                 }
@@ -768,7 +768,27 @@
         await CarregarDados();
     }
 
+    // A página recebe parâmetros de duas fontes: a rota (liga/rodada) e a query string (?tab=).
+    // Quando as duas mudam na mesma navegação — ex.: de "?tab=decisivo" para ".../rodada/{id}" —
+    // o Blazor chama OnParametersSetAsync duas vezes em paralelo, e as duas cargas disputariam o
+    // mesmo DbContext do circuito ("a second operation was started on this context"). Por isso a
+    // carga é serializada: a segunda espera a primeira terminar.
+    private readonly SemaphoreSlim _cargaLock = new(1, 1);
+
     private async Task CarregarDados()
+    {
+        await _cargaLock.WaitAsync();
+        try
+        {
+            await CarregarDadosCoreAsync();
+        }
+        finally
+        {
+            _cargaLock.Release();
+        }
+    }
+
+    private async Task CarregarDadosCoreAsync()
     {
         _ligas = await AdminSvc.ListAsync(CancellationToken.None);
         var (teams, _) = await TeamSvc.SearchAsync(null, 1, 100);
@@ -1247,7 +1267,7 @@
     {
         LigaStatus.Criada => "Não iniciada",
         LigaStatus.PrimeiraFase => tipo == TipoCompetition.Liga ? "Em andamento" : "Fase de Grupos",
-        LigaStatus.PlayIn => "Play-In",
+        LigaStatus.PlayIn => tipo == TipoCompetition.Copa ? "Mata-Mata" : "Play-In",
         LigaStatus.Playoffs => "Playoffs",
         LigaStatus.DecisaoCampeao => "Decisão Campeão",
         LigaStatus.MiniLiga => "Mini Liga",

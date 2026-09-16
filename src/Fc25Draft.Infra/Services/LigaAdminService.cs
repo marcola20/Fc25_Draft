@@ -299,12 +299,13 @@ public class LigaAdminService : ILigaAdminService
             throw new InvalidOperationException(
                 "Só é possível reverter uma liga que esteja em Play-In, Playoffs, Decisão Campeão ou Mini Liga.");
 
-        // Remove apenas o que é gerado DEPOIS da 1ª fase (mata-mata e rodadas de desempate:
-        // mini liga com Numero=0, jogo decisivo da Liga com Numero=-1 e o jogo decisivo da Copa),
-        // preservando as rodadas regulares.
+        // Remove apenas o que é gerado DEPOIS da 1ª fase (mata-mata e rodadas de desempate da Liga:
+        // mini liga com Numero=0 e jogo decisivo com Numero=-1), preservando as rodadas regulares.
         var knockouts = await _db.LigaKnockoutJogos.Where(x => x.LigaId == ligaId).ToListAsync(ct);
+        // O jogo decisivo da Copa (Desempate) é disputado ainda na fase de grupos, então fica:
+        // apagá-lo desfaria o desempate e bloquearia o reencerramento da fase.
         var miniRodadas = await _db.LigaRodadas
-            .Where(x => x.LigaId == ligaId && (x.Numero <= 0 || x.Desempate))
+            .Where(x => x.LigaId == ligaId && x.Numero <= 0)
             .ToListAsync(ct);
         var miniRodadaIds = miniRodadas.Select(r => r.RodadaId).ToList();
         var miniPartidas = await _db.LigaPartidas.Where(x => miniRodadaIds.Contains(x.RodadaId)).ToListAsync(ct);
@@ -1050,11 +1051,11 @@ public class LigaAdminService : ILigaAdminService
         if (classifA.Count < 2 || classifB.Count < 2)
             throw new InvalidOperationException("Precisa de ao menos 2 classificados por grupo.");
 
-        // Semi1: 1A vs 2B, Semi2: 1B vs 2A
+        // Semifinais dentro do grupo (regulamento): Semi1 = 1ºA x 2ºA, Semi2 = 1ºB x 2ºB.
         var jogos = new[]
         {
-            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi1, TimeCasaId = classifA[0].TimeId, TimeForaId = classifB[1].TimeId },
-            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi2, TimeCasaId = classifB[0].TimeId, TimeForaId = classifA[1].TimeId },
+            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi1, TimeCasaId = classifA[0].TimeId, TimeForaId = classifA[1].TimeId },
+            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi2, TimeCasaId = classifB[0].TimeId, TimeForaId = classifB[1].TimeId },
             new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Final }
         };
 
