@@ -1,11 +1,10 @@
+@page "/liga/simulacao"
 @page "/admin/liga/simulacao"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Models.Navigation
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "Admin")]
 @inject ILigaPublicService LigaService
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -121,10 +120,8 @@
                 else
                 {
                     <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
-                        <span><span class="badge bg-warning text-dark me-1">●</span> Bye (1º-2º)</span>
-                        <span><span class="badge bg-success me-1">●</span> QF direto (3º-6º)</span>
-                        <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
-                        <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
+                        <span><span class="badge bg-success me-1">●</span> Campeão (1º)</span>
+                        <span><span class="badge bg-primary me-1">●</span> Empate no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
                     </div>
                 }
             </div>
@@ -214,23 +211,30 @@
 
     private int _edicoes => _partidas.Count(p => p.Editada);
 
-    protected override void OnParametersSet()
+    /// <summary>Competição a abrir, vinda do botão da página da Liga.</summary>
+    [SupplyParameterFromQuery(Name = "liga")] public Guid? LigaQuery { get; set; }
+
+    protected override void OnParametersSet() => AtualizarCabecalho();
+
+    // Chamado de novo ao trocar de competição, para o subtítulo não ficar com o nome anterior.
+    private void AtualizarCabecalho()
     {
         LayoutState.SetPage(
-            NavigationService.GetPageDefinition("/admin/liga/simulacao"),
+            NavigationService.GetPageDefinition("/liga/simulacao"),
             breadcrumbs: new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
-                new("Admin", "/admin/liga"),
+                new("Liga", "/liga"),
                 new("Simulação")
             },
-            subtitle: _liga is null ? "Cenários de classificação — Admin" : $"Cenários de classificação — {_liga.Nome}");
+            subtitle: _liga is null ? "Cenários de classificação" : $"Cenários de classificação — {_liga.Nome}");
     }
 
     protected override async Task OnInitializedAsync()
     {
         _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
-        _liga = await LigaService.GetAtualAsync(CancellationToken.None)
+        _liga = _ligas.FirstOrDefault(l => l.LigaId == LigaQuery)
+                ?? await LigaService.GetAtualAsync(CancellationToken.None)
                 ?? (_ligas.Count > 0 ? _ligas[0] : null);
 
         if (_liga is not null)
@@ -239,6 +243,7 @@
             await CarregarAsync(_ligaId);
         }
 
+        AtualizarCabecalho();
         _loading = false;
     }
 
@@ -253,6 +258,7 @@
 
         await CarregarAsync(id);
 
+        AtualizarCabecalho();
         _loading = false;
     }
 
@@ -348,6 +354,17 @@
                 ordenados[i].Posicao = i + 1;
                 ordenados[i].Ordem = i + 1;
             }
+
+            // Empate no topo em Pts, V, SG e GP (igual ao encerramento da temporada): o título sai
+            // em jogo decisivo (2 times) ou mini liga (3+), então ninguém aparece como campeão.
+            if (ordenados.Count > 1)
+            {
+                var lider = TimeSim.Stats(ordenados[0]);
+                var empatadosNoTopo = ordenados.TakeWhile(t => TimeSim.Stats(t) == lider).ToList();
+                if (empatadosNoTopo.Count > 1)
+                    foreach (var t in empatadosNoTopo) t.EmDecisao = true;
+            }
+
             return ordenados;
         }
 
@@ -421,13 +438,8 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "table-primary" : t.Posicao <= 2 ? "table-success" : "table-danger";
 
-        return t.Posicao switch
-        {
-            1 or 2 => "table-warning",
-            3 or 4 or 5 or 6 => "table-success",
-            7 or 8 or 9 or 10 => "table-info",
-            _ => "table-danger"
-        };
+        // Liga: pontos corridos, o 1º é campeão — não há faixas de playoff.
+        return t.EmDecisao ? "table-primary" : t.Posicao == 1 ? "table-success" : "";
     }
 
     private string BadgeClass(TimeSim t)
@@ -435,13 +447,7 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "bg-primary" : t.Posicao <= 2 ? "bg-success" : "bg-danger";
 
-        return t.Posicao switch
-        {
-            1 or 2 => "bg-warning text-dark",
-            3 or 4 or 5 or 6 => "bg-success",
-            7 or 8 or 9 or 10 => "bg-info text-dark",
-            _ => "bg-danger"
-        };
+        return t.EmDecisao ? "bg-primary" : t.Posicao == 1 ? "bg-success" : "bg-secondary";
     }
 
     private static string EscudoUrl(string? teamName)

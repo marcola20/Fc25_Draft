@@ -34,6 +34,7 @@ public class LayoutNavigationService
         new("Liga", new List<MenuItem>
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
+            new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
@@ -45,7 +46,6 @@ public class LayoutNavigationService
             new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
-            new("Simulação da Liga", "/admin/liga/simulacao", "oi oi-calculator", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
@@ -234,15 +234,15 @@ public class LayoutNavigationService
                 new("Liga")
             }
         },
-        ["/admin/liga/simulacao"] = new PageDefinition
+        ["/liga/simulacao"] = new PageDefinition
         {
-            Route = "/admin/liga/simulacao",
-            Title = "Simulação da Liga",
-            Subtitle = "Cenários de classificação — Admin",
+            Route = "/liga/simulacao",
+            Title = "Simulação",
+            Subtitle = "Cenários de classificação",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
-                new("Admin"),
+                new("Liga", "/liga"),
                 new("Simulação")
             }
         },
