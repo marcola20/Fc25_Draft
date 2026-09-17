@@ -1,12 +1,26 @@
 @page "/liga/estatisticas"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
 
 <PageTitle>Estatísticas</PageTitle>
 
 <div class="container-fluid py-3">
-    <h1 class="h3 mb-3">Estatísticas</h1>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <h1 class="h3 mb-0">Estatísticas</h1>
+        @if (_ligas.Count > 1)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                @foreach (var l in _ligas)
+                {
+                    <option value="@l.LigaId" selected="@(l.LigaId == _liga?.LigaId)">
+                        @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
+                    </option>
+                }
+            </select>
+        }
+    </div>
 
     @if (_loading)
     {
@@ -140,6 +154,7 @@
 
 @code {
     private LigaDto? _liga;
+    private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
     private IReadOnlyList<LigaArtilheiroDto>? _artilheiros;
     private IReadOnlyList<LigaCartaoEstatDto>? _cartoes;
     private bool _loading = true;
@@ -147,12 +162,27 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
         _liga = await LigaService.GetAtualAsync(CancellationToken.None);
-        if (_liga is not null)
-        {
-            _artilheiros = await LigaService.GetArtilheirosAsync(_liga.LigaId, CancellationToken.None);
-            _cartoes = await LigaService.GetCartoesEstatAsync(_liga.LigaId, CancellationToken.None);
-        }
+        await CarregarAsync();
         _loading = false;
+    }
+
+    private async Task OnLigaChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+
+        _liga = _ligas.FirstOrDefault(l => l.LigaId == id);
+        _loading = true;
+        StateHasChanged();
+        await CarregarAsync();
+        _loading = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        if (_liga is null) return;
+        _artilheiros = await LigaService.GetArtilheirosAsync(_liga.LigaId, CancellationToken.None);
+        _cartoes = await LigaService.GetCartoesEstatAsync(_liga.LigaId, CancellationToken.None);
     }
 }

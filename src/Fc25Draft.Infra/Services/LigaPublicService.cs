@@ -17,18 +17,24 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<LigaDto?> GetAtualAsync(CancellationToken ct)
     {
-        var liga = await _db.Ligas
-            .AsNoTracking()
-            .Where(x => x.Status != LigaStatus.Encerrada)
-            .OrderByDescending(x => x.CriadoEm)
+        var liga = await OrdenarPorRelevancia(_db.Ligas.AsNoTracking().Where(x => x.Status != LigaStatus.Encerrada))
             .FirstOrDefaultAsync(ct)
-            ?? await _db.Ligas
-                .AsNoTracking()
-                .OrderByDescending(x => x.CriadoEm)
+            ?? await OrdenarPorRelevancia(_db.Ligas.AsNoTracking())
                 .FirstOrDefaultAsync(ct);
 
         return liga is null ? null : ToDto(liga);
     }
+
+    /// <summary>
+    /// Temporada mais recente primeiro; dentro dela, Liga antes de Copa e Série A antes da B.
+    /// Assim a "liga atual" não depende de qual competição foi cadastrada por último.
+    /// </summary>
+    private static IQueryable<Liga> OrdenarPorRelevancia(IQueryable<Liga> ligas) =>
+        ligas
+            .OrderByDescending(x => x.Temporada ?? 0)
+            .ThenBy(x => x.Tipo)
+            .ThenBy(x => x.Divisao ?? Divisao.SerieA)
+            .ThenByDescending(x => x.CriadoEm);
 
     public async Task<LigaDto?> GetByIdAsync(Guid ligaId, CancellationToken ct)
     {
@@ -38,10 +44,7 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<IReadOnlyList<LigaDto>> ListAtivasAsync(CancellationToken ct)
     {
-        var ligas = await _db.Ligas
-            .AsNoTracking()
-            .Where(x => x.Status != LigaStatus.Encerrada)
-            .OrderByDescending(x => x.CriadoEm)
+        var ligas = await OrdenarPorRelevancia(_db.Ligas.AsNoTracking().Where(x => x.Status != LigaStatus.Encerrada))
             .ToListAsync(ct);
 
         return ligas.Select(ToDto).ToArray();
@@ -632,7 +635,8 @@ public class LigaPublicService : ILigaPublicService
     }
 
     private static LigaDto ToDto(Liga l) =>
-        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
+        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
+            l.CampeaoTimeId, null, l.Temporada, l.Divisao);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase],

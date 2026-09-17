@@ -14,18 +14,26 @@ public record LigaDto(
     DateTime CriadoEm,
     DateTime AtualizadoEm,
     Guid? CampeaoTimeId = null,
-    string? CampeaoNome = null);
+    string? CampeaoNome = null,
+    int? Temporada = null,
+    Divisao? Divisao = null);
 
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,
     DateTime DataInicio,
     DateTime DataFim,
-    TipoCompetition Tipo = TipoCompetition.Liga);
+    TipoCompetition Tipo = TipoCompetition.Liga,
+    int? Temporada = null,
+    Divisao? Divisao = null);
 
+/// <summary>Campos nulos mantêm o valor atual; <paramref name="RemoverDivisao"/> tira a divisão da liga.</summary>
 public record LigaUpdateRequest(
     [MaxLength(120)] string? Nome,
     DateTime? DataInicio,
-    DateTime? DataFim);
+    DateTime? DataFim,
+    int? Temporada = null,
+    Divisao? Divisao = null,
+    bool RemoverDivisao = false);
 
 public record LigaRodadaDto(
     Guid RodadaId,

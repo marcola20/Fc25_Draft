@@ -11,6 +11,13 @@ public class Liga
     public DateTime DataFim { get; set; }
     public LigaStatus Status { get; set; } = LigaStatus.Criada;
     public TipoCompetition Tipo { get; set; } = TipoCompetition.Liga;
+
+    /// <summary>Ano da temporada (ex.: 2010). Agrupa Série A, Série B e Copa disputadas juntas.</summary>
+    public int? Temporada { get; set; }
+
+    /// <summary>Divisão da Liga de pontos corridos; nulo para Copa/Supercopa.</summary>
+    public Divisao? Divisao { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 

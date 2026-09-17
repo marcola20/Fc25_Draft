@@ -23,6 +23,8 @@ public class LigaAdminService : ILigaAdminService
 
     public async Task<LigaDto> CreateAsync(LigaCreateRequest request, CancellationToken ct)
     {
+        await ValidarTemporadaDivisaoAsync(null, request.Tipo, request.Temporada, request.Divisao, ct);
+
         var now = _time.GetUtcNow().UtcDateTime;
         var liga = new Liga
         {
@@ -33,6 +35,8 @@ public class LigaAdminService : ILigaAdminService
             DataFim = request.DataFim,
             Status = LigaStatus.Criada,
             Tipo = request.Tipo,
+            Temporada = request.Temporada,
+            Divisao = request.Divisao,
             CriadoEm = now,
             AtualizadoEm = now
         };
@@ -61,13 +65,39 @@ public class LigaAdminService : ILigaAdminService
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
+        var temporada = request.Temporada ?? liga.Temporada;
+        var divisao = request.RemoverDivisao ? null : request.Divisao ?? liga.Divisao;
+        await ValidarTemporadaDivisaoAsync(liga.LigaId, liga.Tipo, temporada, divisao, ct);
+
         if (request.Nome is not null) liga.Nome = request.Nome.Trim();
         if (request.DataInicio.HasValue) liga.DataInicio = request.DataInicio.Value;
         if (request.DataFim.HasValue) liga.DataFim = request.DataFim.Value;
+        liga.Temporada = temporada;
+        liga.Divisao = divisao;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
         return ToDto(liga);
+    }
+
+    private async Task ValidarTemporadaDivisaoAsync(Guid? ligaId, TipoCompetition tipo, int? temporada, Divisao? divisao, CancellationToken ct)
+    {
+        if (temporada is < 1900 or > 2999)
+            throw new InvalidOperationException("Temporada deve ser um ano válido (ex.: 2010).");
+
+        if (divisao is null) return;
+
+        if (tipo != TipoCompetition.Liga)
+            throw new InvalidOperationException("Só Ligas de pontos corridos têm divisão.");
+
+        if (temporada is null)
+            throw new InvalidOperationException("Informe a temporada para definir a divisão.");
+
+        var ocupada = await _db.Ligas.AnyAsync(
+            x => x.Temporada == temporada && x.Divisao == divisao && x.LigaId != ligaId, ct);
+        if (ocupada)
+            throw new InvalidOperationException(
+                $"Já existe uma liga da {LigaLabels.DivisaoNome(divisao.Value)} na temporada {temporada}.");
     }
 
     public async Task<LigaDto> IniciarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
@@ -1022,6 +1052,23 @@ public class LigaAdminService : ILigaAdminService
         if (distinct.Count < 2)
             throw new InvalidOperationException("Selecione ao menos 2 times.");
 
+        // Um time disputa só uma divisão por temporada.
+        if (liga.Temporada is not null && liga.Divisao is not null)
+        {
+            var emOutraDivisao = await _db.LigaTimes
+                .Where(x => distinct.Contains(x.TimeId)
+                            && x.LigaId != ligaId
+                            && x.Liga.Temporada == liga.Temporada
+                            && x.Liga.Divisao != null
+                            && x.Liga.Divisao != liga.Divisao)
+                .Select(x => new { x.Time.TeamName, x.Liga.Divisao })
+                .FirstOrDefaultAsync(ct);
+
+            if (emOutraDivisao is not null)
+                throw new InvalidOperationException(
+                    $"{emOutraDivisao.TeamName} já está na {LigaLabels.DivisaoNome(emOutraDivisao.Divisao!.Value)} da temporada {liga.Temporada}.");
+        }
+
         var existentes = await _db.LigaTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
         _db.LigaTimes.RemoveRange(existentes);
 
@@ -1817,7 +1864,7 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
-            l.CampeaoTimeId, l.Campeao?.TeamName);
+            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",

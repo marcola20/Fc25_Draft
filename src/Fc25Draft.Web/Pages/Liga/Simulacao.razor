@@ -20,7 +20,7 @@
                 @foreach (var l in _ligas)
                 {
                     <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
-                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                        @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
                     </option>
                 }
             </select>

@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Components.Liga
 @using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Authorization
@@ -72,6 +73,23 @@
                                 <option value="@TipoCompetition.Copa">Copa (grupos A e B)</option>
                             </select>
                         </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label class="form-label">Temporada</label>
+                                <input type="number" class="form-control" placeholder="Ex.: 2010" @bind="_formTemporada" />
+                            </div>
+                            @if (_formTipo == TipoCompetition.Liga)
+                            {
+                                <div class="col">
+                                    <label class="form-label">Divisão</label>
+                                    <select class="form-select" @bind="_formDivisao">
+                                        <option value="">Sem divisão</option>
+                                        <option value="@Divisao.SerieA">Série A</option>
+                                        <option value="@Divisao.SerieB">Série B</option>
+                                    </select>
+                                </div>
+                            }
+                        </div>
                         <div class="mb-2">
                             <label class="form-label">Início</label>
                             <input type="date" class="form-control" @bind="_formInicio" />
@@ -100,7 +118,11 @@
                             <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
                                 <div class="flex-grow-1">
                                     <span class="fw-semibold">@liga.Nome</span>
-                                    <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@(liga.Tipo == TipoCompetition.Copa ? "Copa" : "Liga")</span>
+                                    <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@LigaLabels.Competicao(liga.Tipo, liga.Divisao)</span>
+                                    @if (liga.Temporada is not null)
+                                    {
+                                        <span class="badge ms-1 bg-light text-dark border">Temporada @liga.Temporada</span>
+                                    }
                                     <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
                                     @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
                                     {
@@ -724,6 +746,8 @@
     private DateTime _formInicio = DateTime.Today;
     private DateTime _formFim = DateTime.Today.AddMonths(2);
     private TipoCompetition _formTipo = TipoCompetition.Liga;
+    private int? _formTemporada;
+    private Divisao? _formDivisao;
 
     // Grupos Copa
     private IReadOnlyList<LigaGrupoTimeDto> _grupos = Array.Empty<LigaGrupoTimeDto>();
@@ -949,12 +973,15 @@
         {
             if (_editandoLigaId.HasValue)
             {
-                await AdminSvc.UpdateAsync(_editandoLigaId.Value, new LigaUpdateRequest(_formNome, _formInicio, _formFim), CancellationToken.None);
+                await AdminSvc.UpdateAsync(_editandoLigaId.Value,
+                    new LigaUpdateRequest(_formNome, _formInicio, _formFim, _formTemporada, _formDivisao, RemoverDivisao: _formDivisao is null),
+                    CancellationToken.None);
                 _ok = "Liga atualizada.";
             }
             else
             {
-                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo), CancellationToken.None);
+                var divisao = _formTipo == TipoCompetition.Liga ? _formDivisao : null;
+                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo, _formTemporada, divisao), CancellationToken.None);
                 _ok = "Liga criada.";
             }
             CancelarEdicao();
@@ -964,8 +991,8 @@
         finally { _saving = false; }
     }
 
-    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
-    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
+    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); _formTemporada = l.Temporada; _formDivisao = l.Divisao; }
+    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); _formTemporada = null; _formDivisao = null; }
 
     private void SelecionarLiga(LigaDto liga) => Nav.NavigateTo($"/admin/liga/{liga.LigaId}");
 
