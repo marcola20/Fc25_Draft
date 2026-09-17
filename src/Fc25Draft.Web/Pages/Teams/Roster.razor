@@ -2,6 +2,7 @@
 @page "/teams/roster"
 @using Fc25Draft.Core.DTOs
 @inject TeamsApiClient TeamsApiClient
+@inject EscudoService EscudoService
 @inject NavigationManager Navigation
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -176,27 +177,11 @@ else
         ["Vasco"] = "#1a1a1a",
     };
 
-    private static readonly Dictionary<string, string> TeamEscudos = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Botafogo"] = "/images/escudos/Botafogo.png",
-        ["Corinthians"] = "/images/escudos/Corinthians.png",
-        ["Coritiba"] = "/images/escudos/Coritiba.png",
-        ["Cruzeiro"] = "/images/escudos/Cruzeiro.png",
-        ["Flamengo"] = "/images/escudos/Flamengo.png",
-        ["Fluminense"] = "/images/escudos/Fluminense.png",
-        ["Grêmio"] = "/images/escudos/Gremio.png",
-        ["Internacional"] = "/images/escudos/Internacional.png",
-        ["Palmeiras"] = "/images/escudos/Palmeiras.png",
-        ["Santos"] = "/images/escudos/Santos.png",
-        ["São Paulo"] = "/images/escudos/Sao Paulo.png",
-        ["Vasco"] = "/images/escudos/Vasco.png",
-    };
-
     private static string GetTeamColor(string name)
         => TeamColors.TryGetValue(name, out var c) ? c : "#888780";
 
-    private static string GetTeamEscudo(string name)
-        => TeamEscudos.TryGetValue(name, out var e) ? e : "/images/escudos/default.png";
+    // Escudo vem da pasta wwwroot/images/escudos: basta o arquivo ter o nome do time.
+    private string GetTeamEscudo(string name) => EscudoService.GetEscudo(name);
 
     protected override async Task OnInitializedAsync()
     {
