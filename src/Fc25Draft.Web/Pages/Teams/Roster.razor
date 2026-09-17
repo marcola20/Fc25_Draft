@@ -177,8 +177,18 @@ else
         ["Vasco"] = "#1a1a1a",
     };
 
+    /// <summary>Cores dos times conhecidos; para os demais, uma cor fixa derivada do nome.</summary>
+    private static readonly string[] CoresExtras =
+        { "#1a6b2f", "#1a3e8c", "#c8102e", "#8b0000", "#006437", "#3b6ab5", "#7c3aed", "#b45309", "#0f766e", "#2b2b2b" };
+
     private static string GetTeamColor(string name)
-        => TeamColors.TryGetValue(name, out var c) ? c : "#888780";
+    {
+        if (TeamColors.TryGetValue(name, out var cor)) return cor;
+        if (string.IsNullOrWhiteSpace(name)) return "#888780";
+
+        var soma = name.Where(char.IsLetterOrDigit).Sum(c => (int)char.ToLowerInvariant(c));
+        return CoresExtras[soma % CoresExtras.Length];
+    }
 
     // Escudo vem da pasta wwwroot/images/escudos: basta o arquivo ter o nome do time.
     private string GetTeamEscudo(string name) => EscudoService.GetEscudo(name);
