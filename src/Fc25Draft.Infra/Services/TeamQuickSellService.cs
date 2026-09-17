@@ -86,8 +86,9 @@ public class TeamQuickSellService : ITeamQuickSellService
                     .CountAsync(r => r.TeamId == teamId, ct)
                     .ConfigureAwait(false);
 
-                if (rosterCount <= cfg.MinRosterSize)
-                    throw new QuickSellException($"Você não pode realizar esta ação. O time ficaria com menos de {cfg.MinRosterSize} jogadores.", StatusCodes.Status409Conflict);
+                var minRoster = cfg.MinRosterSizeFor(team);
+                if (rosterCount <= minRoster)
+                    throw new QuickSellException($"Você não pode realizar esta ação. O time ficaria com menos de {minRoster} jogadores.", StatusCodes.Status409Conflict);
 
                 if (team.QuickSellCount >= cfg.MaxQuickSellPerWindow)
                     throw new QuickSellException($"Limite de vendas rápidas da janela atingido ({team.QuickSellCount}/{cfg.MaxQuickSellPerWindow}).", StatusCodes.Status429TooManyRequests);

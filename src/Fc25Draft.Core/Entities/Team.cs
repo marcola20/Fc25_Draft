@@ -14,6 +14,12 @@ public class Team
     public int TransferCount { get; set; }
     public bool IsAdmin { get; set; }
 
+    /// <summary>
+    /// Mínimo de elenco temporário só deste time (ex.: perdeu jogadores no draft de expansão).
+    /// Nulo usa <see cref="TransferConfig.MinRosterSize"/>.
+    /// </summary>
+    public int? MinRosterSizeOverride { get; set; }
+
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();
     public ICollection<MarketBid> MarketBids { get; set; } = new List<MarketBid>();

@@ -21,6 +21,7 @@ public class LayoutNavigationService
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document"),
+            new("Jogadores Protegidos", "/draft/protecao", "oi oi-shield"),
             new("Picks do Draft", "/picks", "oi oi-tag"),
             new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
@@ -48,6 +49,7 @@ public class LayoutNavigationService
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
+            new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
@@ -244,6 +246,19 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga", "/liga"),
                 new("Simulação")
+            }
+        },
+        ["/draft/protecao"] = CreateDefinition("Jogadores Protegidos", "Draft", "/draft/protecao"),
+        ["/admin/draft-expansao"] = new PageDefinition
+        {
+            Route = "/admin/draft-expansao",
+            Title = "Draft de Expansão",
+            Subtitle = "Proteções, escolhas e compensações — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Draft de Expansão")
             }
         },
         ["/admin/configuracoes"] = new PageDefinition

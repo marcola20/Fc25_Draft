@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Hubs;
 using Fc25Draft.Web.Security;
@@ -18,17 +19,20 @@ public class DraftStateService
     private readonly IHubContext<DraftHub> _hubContext;
     private readonly ILogger<DraftStateService> _logger;
     private readonly SecurityOptions _securityOptions;
+    private readonly DraftExpansaoService _expansao;
 
     public DraftStateService(
         DraftDbContext db,
         IHubContext<DraftHub> hubContext,
         ILogger<DraftStateService> logger,
-        IOptions<SecurityOptions> securityOptions)
+        IOptions<SecurityOptions> securityOptions,
+        DraftExpansaoService expansao)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
         _securityOptions = securityOptions.Value;
+        _expansao = expansao;
     }
 
     public async Task<DraftStateDto> GetStateAsync(CancellationToken ct = default)
@@ -104,7 +108,9 @@ public class DraftStateService
             nextTeamId,
             nextTeamName,
             nextTeamOwner,
-            currentPick is null && totalPicks > 0 && completedPicks == totalPicks);
+            currentPick is null && totalPicks > 0 && completedPicks == totalPicks,
+            draft.Tipo == DraftTipo.Expansao,
+            draft.Tipo == DraftTipo.Expansao && draft.ProtecaoEncerradaEm is null && currentPick is not null);
     }
 
     public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(
@@ -140,10 +146,10 @@ public class DraftStateService
             .Select(r => new { r.OverallMin, r.OverallMax })
             .FirstOrDefaultAsync(ct);
 
-        var query = _db.Players
-            .AsNoTracking()
-            .Include(p => p.Position)
-            .Where(p => !p.TeamRosters.Any());
+        var query = _db.Players.AsNoTracking();
+        query = draft.Tipo == DraftTipo.Expansao
+            ? await _expansao.FiltrarDisponiveisAsync(query, draft, ct)
+            : query.Where(p => !p.TeamRosters.Any());
 
         if (positionIds is { Count: > 0 })
         {
@@ -194,7 +200,8 @@ public class DraftStateService
                 p.PositionId,
                 p.Position.Name,
                 p.Overall,
-                p.Age))
+                p.Age,
+                p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
             .ToListAsync(ct);
 
         return players;
@@ -261,27 +268,36 @@ public class DraftStateService
                 throw new InvalidOperationException($"❌ Este jogador excede o overall máximo ({overallMax}) permitido nesta rodada.");
             }
 
-            var alreadyInRoster = await _db.TeamRosters.AnyAsync(r => r.PlayerId == playerId, ct);
-            if (alreadyInRoster)
+            Team? fromTeam = null;
+            if (draft.Tipo == DraftTipo.Expansao)
             {
-                throw new InvalidOperationException("❌ Este jogador já está vinculado a um time.");
+                fromTeam = await _expansao.ExecutarEscolhaAsync(draft, currentPick, player, ct);
+            }
+            else
+            {
+                var alreadyInRoster = await _db.TeamRosters.AnyAsync(r => r.PlayerId == playerId, ct);
+                if (alreadyInRoster)
+                {
+                    throw new InvalidOperationException("❌ Este jogador já está vinculado a um time.");
+                }
+
+                player.CurrentTeamId = currentPick.TeamId;
+                _db.TeamRosters.Add(new TeamRoster
+                {
+                    TeamId = currentPick.TeamId,
+                    PlayerId = player.PlayerId
+                });
             }
 
             currentPick.PlayerId = player.PlayerId;
             currentPick.PickedAtUtc = DateTime.UtcNow;
-
-            _db.TeamRosters.Add(new TeamRoster
-            {
-                TeamId = currentPick.TeamId,
-                PlayerId = player.PlayerId
-            });
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
             var state = await GetStateAsync(ct);
 
-            var selection = BuildSelectionInfo(currentPick, player, state);
+            var selection = BuildSelectionInfo(currentPick, player, state, fromTeam?.TeamName);
 
             try
             {
@@ -296,16 +312,19 @@ public class DraftStateService
         });
     }
 
-    private DraftPickSelectionDto BuildSelectionInfo(DraftPick pick, Player player, DraftStateDto state)
+    private DraftPickSelectionDto BuildSelectionInfo(DraftPick pick, Player player, DraftStateDto state, string? fromTeam)
     {
+        // Draft de expansão: mostra de onde o jogador saiu.
+        var playerLabel = fromTeam is null ? player.Name : $"{player.Name} ({fromTeam})";
+
         var nextTeamName = state.DraftCompleted
             ? "Draft concluído"
             : string.IsNullOrWhiteSpace(state.CurrentTeamName)
                 ? "A definir"
                 : state.CurrentTeamName!;
 
-        var message = BuildWhatsappMessage(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
-        var shareUrl = BuildWhatsappUrl(pick.Team.TeamName, player.Name, pick.PickInRound, pick.RoundNumber, nextTeamName);
+        var message = BuildWhatsappMessage(pick.Team.TeamName, playerLabel, pick.PickInRound, pick.RoundNumber, nextTeamName);
+        var shareUrl = BuildWhatsappUrl(pick.Team.TeamName, playerLabel, pick.PickInRound, pick.RoundNumber, nextTeamName);
 
         var groupLink = string.IsNullOrWhiteSpace(_securityOptions.WhatsappGroupLink)
             ? null

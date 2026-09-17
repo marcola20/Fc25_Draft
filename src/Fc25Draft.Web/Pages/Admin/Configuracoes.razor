@@ -214,6 +214,49 @@
                         <div class="card-footer small text-muted">Restantes = limite salvo (@_maxQuickSellSalvo) menos as vendas rápidas já feitas na janela.</div>
                     </div>
                 </div>
+
+                <div class="col-12 col-lg-7">
+                    <div class="card">
+                        <div class="card-header fw-bold">Mínimo de elenco temporário</div>
+                        <div class="card-body pb-0">
+                            <p class="text-muted small mb-2">
+                                Libera um time para ficar abaixo do mínimo geral (@_minRosterSalvo) por um tempo, por exemplo quem perdeu jogadores
+                                no draft de expansão. Deixe em branco para usar o mínimo geral.
+                            </p>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Time</th><th class="text-end">Elenco</th><th style="width: 9rem">Mínimo temporário</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var t in _elencos)
+                                    {
+                                        var abaixo = t.Elenco < (t.MinimoTemporario ?? _minRosterSalvo);
+                                        <tr>
+                                            <td>
+                                                @t.TeamName
+                                                @if (t.MinimoTemporario is not null)
+                                                {
+                                                    <span class="badge bg-warning text-dark ms-1">temporário</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold @(abaixo ? "text-danger" : "")">@t.Elenco</td>
+                                            <td>
+                                                <input type="number" min="0" class="form-control form-control-sm" placeholder="@_minRosterSalvo"
+                                                       value="@_minimosEditados.GetValueOrDefault(t.TeamId)"
+                                                       @onchange="e => _minimosEditados[t.TeamId] = e.Value?.ToString()" />
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SalvarMinimoTemporario(t)" disabled="@_saving">Salvar</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         }
     }
@@ -231,8 +274,10 @@
 
     // Transferências
     private int _maxQuickSell, _maxTransfers, _minRoster;
-    private int _maxQuickSellSalvo;
+    private int _maxQuickSellSalvo, _minRosterSalvo;
     private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
+    private IReadOnlyList<TeamElencoMinimoDto> _elencos = Array.Empty<TeamElencoMinimoDto>();
+    private readonly Dictionary<Guid, string?> _minimosEditados = new();
 
     private record Exemplo(string Label, short PositionId, int Overall, int Age);
     private static readonly Exemplo[] _exemplos =
@@ -254,6 +299,7 @@
             var tcfg = await TransferCfg.GetAsync(CancellationToken.None);
             AplicarTransf(tcfg);
             await CarregarQuickSells();
+            await CarregarElencos();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _loading = false; }
@@ -265,10 +311,44 @@
         _maxQuickSellSalvo = t.MaxQuickSellPerWindow;
         _maxTransfers = t.MaxTransfers;
         _minRoster = t.MinRosterSize;
+        _minRosterSalvo = t.MinRosterSize;
     }
 
     private async Task CarregarQuickSells()
         => _quickSells = await TransferCfg.GetQuickSellStatusAsync(CancellationToken.None);
+
+    private async Task CarregarElencos()
+    {
+        _elencos = await TransferCfg.ListElencoMinimoAsync(CancellationToken.None);
+        _minimosEditados.Clear();
+        foreach (var t in _elencos)
+            _minimosEditados[t.TeamId] = t.MinimoTemporario?.ToString();
+    }
+
+    private async Task SalvarMinimoTemporario(TeamElencoMinimoDto time)
+    {
+        _erro = null; _ok = null;
+
+        var texto = _minimosEditados.GetValueOrDefault(time.TeamId);
+        int? minimo = null;
+        if (!string.IsNullOrWhiteSpace(texto))
+        {
+            if (!int.TryParse(texto, out var valor)) { _erro = "Informe um número inteiro."; return; }
+            minimo = valor;
+        }
+
+        _saving = true;
+        try
+        {
+            await TransferCfg.SetElencoMinimoTemporarioAsync(time.TeamId, minimo, CancellationToken.None);
+            await CarregarElencos();
+            _ok = minimo is null
+                ? $"{time.TeamName} voltou a usar o mínimo geral ({_minRosterSalvo})."
+                : $"{time.TeamName} pode ficar com até {minimo} jogadores temporariamente.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
 
     private async Task SalvarTransf()
     {

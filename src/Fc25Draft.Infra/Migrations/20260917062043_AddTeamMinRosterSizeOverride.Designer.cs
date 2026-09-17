@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260917062043_AddTeamMinRosterSizeOverride")]
+    partial class AddTeamMinRosterSizeOverride
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,26 +148,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<decimal?>("FatorCompensacao")
-                        .HasColumnType("numeric(6,3)");
-
-                    b.Property<int?>("MaxPerdasPorTime")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<DateTime?>("ProtecaoEncerradaEm")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int?>("ProtegidosPorTime")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Tipo")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
 
                     b.Property<int>("TotalRounds")
                         .HasColumnType("integer");
@@ -185,12 +171,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("OverallPick")
                         .HasColumnType("integer");
 
-                    b.Property<decimal?>("Compensacao")
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid?>("FromTeamId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("PickInRound")
                         .HasColumnType("integer");
 
@@ -208,8 +188,6 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("DraftId", "OverallPick");
 
-                    b.HasIndex("FromTeamId");
-
                     b.HasIndex("PlayerId");
 
                     b.HasIndex("TeamId");
@@ -224,34 +202,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("DraftId", "TeamId", "RoundNumber");
 
                     b.ToTable("DraftPicks");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.DraftProtecao", b =>
-                {
-                    b.Property<Guid>("DraftId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<bool>("EscolhidoPeloTime")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("DraftId", "PlayerId");
-
-                    b.HasIndex("PlayerId");
-
-                    b.HasIndex("TeamId");
-
-                    b.HasIndex("DraftId", "TeamId");
-
-                    b.ToTable("DraftProtecoes");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftRound", b =>
@@ -1676,11 +1626,6 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "FromTeam")
-                        .WithMany()
-                        .HasForeignKey("FromTeamId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
                         .WithMany("DraftPicks")
                         .HasForeignKey("PlayerId")
@@ -1700,38 +1645,9 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Navigation("Draft");
 
-                    b.Navigation("FromTeam");
-
                     b.Navigation("Player");
 
                     b.Navigation("Round");
-
-                    b.Navigation("Team");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.DraftProtecao", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.Draft", "Draft")
-                        .WithMany("Protecoes")
-                        .HasForeignKey("DraftId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Draft");
-
-                    b.Navigation("Player");
 
                     b.Navigation("Team");
                 });
@@ -2311,8 +2227,6 @@ namespace Fc25Draft.Infra.Migrations
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
                 {
                     b.Navigation("Picks");
-
-                    b.Navigation("Protecoes");
 
                     b.Navigation("Rounds");
                 });

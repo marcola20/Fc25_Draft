@@ -6,5 +6,6 @@ public enum TransferType
     MarketAuction = 1,
     TeamSale = 2,
     TeamTrade = 3,
-    QuickSell = 4
+    QuickSell = 4,
+    ExpansionDraft = 5
 }

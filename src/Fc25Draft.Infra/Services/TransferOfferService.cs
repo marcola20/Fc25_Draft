@@ -335,12 +335,14 @@ public class TransferOfferService : ITransferOfferService
         // targetPlayers saem de toTeam e entram em fromTeam; offeredPlayers saem de fromTeam e entram em toTeam.
         // Considera o saldo líquido (saídas e entradas) de cada time.
         var toTeamAfter = toTeamRosterCount - targetPlayers.Count + offeredPlayers.Count;
-        if (targetPlayers.Count > 0 && toTeamAfter < cfg.MinRosterSize)
-            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
+        var toTeamMin = cfg.MinRosterSizeFor(toTeam);
+        if (targetPlayers.Count > 0 && toTeamAfter < toTeamMin)
+            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de {toTeamMin} jogadores.");
 
         var fromTeamAfter = fromTeamRosterCount - offeredPlayers.Count + targetPlayers.Count;
-        if (offeredPlayers.Count > 0 && fromTeamAfter < cfg.MinRosterSize)
-            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de {cfg.MinRosterSize} jogadores.");
+        var fromTeamMin = cfg.MinRosterSizeFor(fromTeam);
+        if (offeredPlayers.Count > 0 && fromTeamAfter < fromTeamMin)
+            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de {fromTeamMin} jogadores.");
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {

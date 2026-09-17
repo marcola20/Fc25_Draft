@@ -19,7 +19,9 @@ public record DraftStateDto(
     Guid? NextTeamId,
     string? NextTeamName,
     string? NextTeamOwner,
-    bool DraftCompleted)
+    bool DraftCompleted,
+    bool IsExpansao = false,
+    bool AguardandoProtecao = false)
 {
     public static DraftStateDto Empty { get; } = new(
         null,
@@ -48,7 +50,8 @@ public record AvailablePlayerDto(
     short PositionId,
     string PositionName,
     int Overall,
-    int? Age);
+    int? Age,
+    string? TeamName = null);
 
 public record DraftPickRequestDto(int PlayerId, string Token);
 

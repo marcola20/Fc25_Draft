@@ -52,6 +52,24 @@
 
 <DraftStateCard IsLoading="@isLoadingState" State="@state" />
 
+@if (state is { IsExpansao: true, DraftCompleted: false })
+{
+    @if (state.AguardandoProtecao)
+    {
+        <div class="alert alert-warning">
+            🛡️ <strong>Draft de expansão:</strong> os times existentes ainda estão definindo os jogadores protegidos.
+            As escolhas começam quando o admin encerrar as listas. <a href="/draft/protecao">Montar minha lista de protegidos</a>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            🆕 <strong>Draft de expansão:</strong> os times novos escolhem jogadores não protegidos dos times existentes.
+            Quem perde um jogador recebe compensação pelo valor de mercado.
+        </div>
+    }
+}
+
 <DraftPlayerFilters Positions="@positions" IsLoading="@isLoadingPlayers" OnFilterChanged="@OnFilterChangedAsync" />
 
 <DraftPlayerTable Players="@availablePlayers" IsLoading="@isLoadingPlayers" DisableSelection="@DisableSelection" OnPlayerSelected="@OpenModal" />

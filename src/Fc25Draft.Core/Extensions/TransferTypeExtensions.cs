@@ -10,6 +10,7 @@ public static class TransferTypeExtensions
         TransferType.TeamSale => "Venda entre times",
         TransferType.TeamTrade => "Troca entre times",
         TransferType.QuickSell => "Venda rápida",
+        TransferType.ExpansionDraft => "Draft de expansão",
         _ => type.ToString()
     };
 }
