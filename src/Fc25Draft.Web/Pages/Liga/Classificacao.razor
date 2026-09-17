@@ -3,6 +3,7 @@
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
 @inject NavigationManager Navigation
 
@@ -180,15 +181,16 @@
             </table>
         </div>
 
-        @if (_liga?.Status != LigaStatus.PrimeiraFase && _liga?.Status != LigaStatus.Criada)
-        {
-            <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
-                <span><span class="badge bg-success me-1">●</span> Bye (1º-2º)</span>
-                <span><span class="badge bg-success me-1">●</span> QF direto (3º-6º)</span>
-                <span><span class="badge bg-info text-dark me-1">●</span> Play-In (7º-10º)</span>
-                <span><span class="badge bg-danger me-1">●</span> Eliminado (11º-12º)</span>
-            </div>
-        }
+        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
+            @foreach (var zona in LigaZonas.ZonasDaTabela(_regra, _classif.Count))
+            {
+                <span><span class="badge @ZonaEstilo.Badge(zona) me-1">●</span> @LigaZonas.Rotulo(zona)</span>
+            }
+            @if (_classif.Any(EmpateNoTopo))
+            {
+                <span><span class="badge @ZonaEstilo.BadgeEmpateTopo me-1">●</span> Empate no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
+            }
+        </div>
         </ShareableCard>
     }
 </div>
@@ -200,6 +202,7 @@
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
     private IReadOnlyList<LigaPartidaDto> _jogosDecisivos = Array.Empty<LigaPartidaDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+    private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private bool _loading = true;
 
     private string LigaNome => _liga?.Nome ?? "CBFV";
@@ -243,51 +246,28 @@
         _decisivos = LigaDesempate.DosJogos(_jogosDecisivos);
     }
 
-    private string GetRowClass(LigaClassificacaoItemDto item)
+    // Zonas valem durante a temporada também ("se terminasse hoje").
+    private string GetRowClass(LigaClassificacaoItemDto item) =>
+        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, item.Posicao, _classif?.Count ?? 0));
+
+    private string GetBadgeClass(LigaClassificacaoItemDto item) =>
+        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, item.Posicao, _classif?.Count ?? 0));
+
+    /// <summary>
+    /// Empatado com o líder em Pts, V, SG e GP depois do fim da fase regular: o título sai em
+    /// jogo decisivo ou mini liga. Durante a temporada não marca (no começo todos estão zerados).
+    /// </summary>
+    private bool EmpateNoTopo(LigaClassificacaoItemDto item)
     {
-        // During Primeira Fase, all teams same color (no qualifications yet)
-        if (_liga?.Status == LigaStatus.PrimeiraFase || _liga?.Status == LigaStatus.Criada)
-            return "table-success";
+        if (_classif is not { Count: > 1 } || _liga?.Status is LigaStatus.Criada or LigaStatus.PrimeiraFase or LigaStatus.Encerrada)
+            return false;
 
-        if (_classif is null || _classif.Count == 0) return RowClass(item.Posicao);
+        var lider = _classif[0];
+        bool IgualAoLider(LigaClassificacaoItemDto c) =>
+            c.Pontos == lider.Pontos && c.Vitorias == lider.Vitorias && c.SaldoGols == lider.SaldoGols && c.GolsPro == lider.GolsPro;
 
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
-            return "table-success";
-
-        return RowClass(item.Posicao);
+        return IgualAoLider(item) && _classif.Count(IgualAoLider) > 1;
     }
-
-    private string GetBadgeClass(LigaClassificacaoItemDto item)
-    {
-        if (_classif is null || _classif.Count == 0) return BadgeClass(item.Posicao);
-
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
-            return "bg-success";
-
-        return BadgeClass(item.Posicao);
-    }
-
-    private static string RowClass(int pos) => pos switch
-    {
-        1 or 2 => "table-warning",
-        3 or 4 or 5 or 6 => "table-success",
-        7 or 8 or 9 or 10 => "table-info",
-        _ => "table-danger"
-    };
-
-    private static string BadgeClass(int pos) => pos switch
-    {
-        1 or 2 => "bg-warning text-dark",
-        3 or 4 or 5 or 6 => "bg-success",
-        7 or 8 or 9 or 10 => "bg-info text-dark",
-        _ => "bg-danger"
-    };
 
     // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
     // para a tabela já refletir o desempate mesmo antes do próximo recálculo.

@@ -16,7 +16,9 @@ public record LigaDto(
     Guid? CampeaoTimeId = null,
     string? CampeaoNome = null,
     int? Temporada = null,
-    Divisao? Divisao = null);
+    Divisao? Divisao = null,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
 
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,
@@ -24,7 +26,9 @@ public record LigaCreateRequest(
     DateTime DataFim,
     TipoCompetition Tipo = TipoCompetition.Liga,
     int? Temporada = null,
-    Divisao? Divisao = null);
+    Divisao? Divisao = null,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
 
 /// <summary>Campos nulos mantêm o valor atual; <paramref name="RemoverDivisao"/> tira a divisão da liga.</summary>
 public record LigaUpdateRequest(
@@ -33,7 +37,9 @@ public record LigaUpdateRequest(
     DateTime? DataFim,
     int? Temporada = null,
     Divisao? Divisao = null,
-    bool RemoverDivisao = false);
+    bool RemoverDivisao = false,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
 
 public record LigaRodadaDto(
     Guid RodadaId,
@@ -120,6 +126,25 @@ public record LigaClassificacaoItemDto(
 public record LigaEmpateCopaDto(
     GrupoCopa Grupo,
     int Posicao,
+    Guid TimeAId,
+    string TimeANome,
+    Guid TimeBId,
+    string TimeBNome,
+    Guid? PartidaId,
+    PartidaStatus? StatusPartida,
+    int? GolsTimeA,
+    int? GolsTimeB,
+    Guid? VencedorId,
+    string? VencedorNome);
+
+/// <summary>
+/// Empate total (inclusive no confronto direto) entre o <paramref name="Posicao"/>º e o seguinte,
+/// numa posição que muda a zona — e o jogo decisivo, quando já criado.
+/// </summary>
+public record LigaEmpateZonaDto(
+    int Posicao,
+    string ZonaTimeA,
+    string ZonaTimeB,
     Guid TimeAId,
     string TimeANome,
     Guid TimeBId,

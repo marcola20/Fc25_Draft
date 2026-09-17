@@ -47,6 +47,18 @@
         @if (_ligaAtual?.Tipo == TipoCompetition.Liga)
         {
             <li class="nav-item"><button class="nav-link @(_tab=="times"?"active":"")" @onclick='()=>SetTab("times")' disabled="@(_ligaAtual == null)">Times</button></li>
+            @if (_ligaAtual?.Divisao is not null)
+            {
+                <li class="nav-item">
+                    <button class="nav-link @(_tab=="decisivo-zona"?"active":"")" @onclick='()=>SetTab("decisivo-zona")'>
+                        Jogo Decisivo
+                        @if (_empatesZona.Any(e => e.VencedorId is null))
+                        {
+                            <span class="badge bg-danger ms-1">@_empatesZona.Count(e => e.VencedorId is null)</span>
+                        }
+                    </button>
+                </li>
+            }
         }
         <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>SetTab("rodadas")' disabled="@(_ligaAtual == null)">Rodadas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>SetTab("partidas")' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
@@ -82,7 +94,7 @@
                             {
                                 <div class="col">
                                     <label class="form-label">Divisão</label>
-                                    <select class="form-select" @bind="_formDivisao">
+                                    <select class="form-select" @bind="_formDivisao" @bind:after="AoMudarDivisao">
                                         <option value="">Sem divisão</option>
                                         <option value="@Divisao.SerieA">Série A</option>
                                         <option value="@Divisao.SerieB">Série B</option>
@@ -90,6 +102,24 @@
                                 </div>
                             }
                         </div>
+                        @if (_formTipo == TipoCompetition.Liga && _formDivisao is not null)
+                        {
+                            <div class="row g-2 mb-2">
+                                <div class="col">
+                                    <label class="form-label">@(_formDivisao == Divisao.SerieA ? "Caem direto" : "Sobem direto")</label>
+                                    <input type="number" min="0" class="form-control" @bind="_formVagasDiretas" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Vão ao playoff</label>
+                                    <input type="number" min="0" class="form-control" @bind="_formVagasPlayoff" />
+                                </div>
+                                <div class="col-12 form-text mt-0">
+                                    @(_formDivisao == Divisao.SerieA
+                                        ? "Os últimos caem direto; os que vêm logo acima jogam o playoff contra a Série B."
+                                        : "Os primeiros sobem direto; os que vêm logo abaixo jogam o playoff contra a Série A.")
+                                </div>
+                            </div>
+                        }
                         <div class="mb-2">
                             <label class="form-label">Início</label>
                             <input type="date" class="form-control" @bind="_formInicio" />
@@ -122,6 +152,12 @@
                                     @if (liga.Temporada is not null)
                                     {
                                         <span class="badge ms-1 bg-light text-dark border">Temporada @liga.Temporada</span>
+                                    }
+                                    @if (liga.Divisao is not null && (liga.VagasDiretas > 0 || liga.VagasPlayoff > 0))
+                                    {
+                                        <span class="badge ms-1 bg-light text-dark border">
+                                            @(liga.Divisao == Divisao.SerieA ? "↓" : "↑")@(liga.VagasDiretas ?? 0) direto · @(liga.VagasPlayoff ?? 0) playoff
+                                        </span>
                                     }
                                     <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
                                     @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
@@ -330,6 +366,73 @@
                             {
                                 <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
                                 <span class="badge bg-success">Classificado: @empate.VencedorNome</span>
+                            }
+                            else if (empate.StatusPartida == PartidaStatus.Encerrada)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-warning text-dark">Empatado — registre os pênaltis</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Jogo criado — a disputar</span>
+                            }
+
+                            @if (empate.PartidaId is not null && _rodadaDesempate is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="@($"/admin/liga/{_ligaAtual.LigaId}/rodada/{_rodadaDesempate.RodadaId}")">
+                                    Abrir rodada
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- ─ Tab: Jogo Decisivo (zonas da Liga) ─ -->
+    @if (_tab == "decisivo-zona" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
+    {
+        <div class="alert alert-secondary py-2 small">
+            Nas posições que mudam de zona (acesso, playoff, rebaixamento), o desempate segue
+            <strong>Pontos → Vitórias → Saldo → Gols Pró → Confronto direto</strong>. Se ainda assim os times ficarem iguais,
+            a posição sai em jogo decisivo: rodada extra que <strong>não soma pontos</strong> e coloca o vencedor à frente.
+            Os empates só aparecem depois de todos os jogos regulares, e a temporada não encerra com empate pendente.
+            Empate no topo continua indo para a decisão de campeão.
+        </div>
+
+        @if (!_empatesZona.Any())
+        {
+            <div class="alert alert-info">Nenhum empate a resolver nas zonas.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var empate in _empatesZona)
+                {
+                    <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                        <span class="badge bg-secondary">@(empate.Posicao)º x @(empate.Posicao + 1)º</span>
+                        <span class="small text-muted">@empate.ZonaTimeA × @empate.ZonaTimeB</span>
+
+                        <span class="fw-semibold">@empate.TimeANome</span>
+                        <span class="text-muted">vs</span>
+                        <span class="fw-semibold">@empate.TimeBNome</span>
+
+                        <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+                            @if (empate.PartidaId is null)
+                            {
+                                <span class="badge bg-primary">Empatados</span>
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="() => GerarJogoDecisivoZona(empate)"
+                                        disabled="@(_saving || _ligaAtual.Status != LigaStatus.PrimeiraFase)">
+                                    Criar jogo decisivo
+                                </button>
+                            }
+                            else if (empate.VencedorId is not null)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-success">À frente: @empate.VencedorNome</span>
                             }
                             else if (empate.StatusPartida == PartidaStatus.Encerrada)
                             {
@@ -748,10 +851,20 @@
     private TipoCompetition _formTipo = TipoCompetition.Liga;
     private int? _formTemporada;
     private Divisao? _formDivisao;
+    private int? _formVagasDiretas, _formVagasPlayoff;
+
+    // Padrão das próximas temporadas: 1 direto + 1 no playoff (dá para ajustar, ex.: 2 + 0 na transição de 12 para 10).
+    private void AoMudarDivisao()
+    {
+        if (_formDivisao is null) { _formVagasDiretas = null; _formVagasPlayoff = null; return; }
+        _formVagasDiretas ??= 1;
+        _formVagasPlayoff ??= 1;
+    }
 
     // Grupos Copa
     private IReadOnlyList<LigaGrupoTimeDto> _grupos = Array.Empty<LigaGrupoTimeDto>();
     private IReadOnlyList<LigaEmpateCopaDto> _empatesCopa = Array.Empty<LigaEmpateCopaDto>();
+    private IReadOnlyList<LigaEmpateZonaDto> _empatesZona = Array.Empty<LigaEmpateZonaDto>();
     private LigaRodadaDto? _rodadaDesempate;
     private readonly string[] _grupoA = new string[6];
     private readonly string[] _grupoB = new string[6];
@@ -841,6 +954,8 @@
             else
             {
                 _timesLigaSel = (await AdminSvc.ListTimesLigaAsync(_ligaAtual.LigaId, CancellationToken.None)).ToHashSet();
+                _empatesZona = await AdminSvc.ListEmpatesZonaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
             }
 
             _tab = RodadaId.HasValue ? "partidas" : (string.IsNullOrEmpty(TabQuery) ? "rodadas" : TabQuery);
@@ -885,7 +1000,7 @@
         "times" => "Times",
         "rodadas" => "Rodadas",
         "partidas" => "Partidas",
-        "decisivo" => "Jogo Decisivo",
+        "decisivo" or "decisivo-zona" => "Jogo Decisivo",
         "punicoes" => "Punições",
         "knockout" => "Mata-Mata",
         _ => "Liga"
@@ -902,6 +1017,30 @@
             "partidas" when _rodadaSelecionada is not null => $"{baseUrl}/rodada/{_rodadaSelecionada.RodadaId}",
             _ => $"{baseUrl}?tab={tab}"
         });
+    }
+
+    private async Task GerarJogoDecisivoZona(LigaEmpateZonaDto empate)
+    {
+        if (_ligaAtual is null || _saving) return;
+
+        _saving = true;
+        _erro = null;
+        _ok = null;
+
+        try
+        {
+            await AdminSvc.GerarJogoDecisivoZonaAsync(_ligaAtual.LigaId, empate.TimeAId, empate.TimeBId, CancellationToken.None);
+            _ok = $"Jogo decisivo criado: {empate.TimeANome} x {empate.TimeBNome}.";
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task GerarJogoDecisivo(LigaEmpateCopaDto empate)
@@ -974,14 +1113,14 @@
             if (_editandoLigaId.HasValue)
             {
                 await AdminSvc.UpdateAsync(_editandoLigaId.Value,
-                    new LigaUpdateRequest(_formNome, _formInicio, _formFim, _formTemporada, _formDivisao, RemoverDivisao: _formDivisao is null),
+                    new LigaUpdateRequest(_formNome, _formInicio, _formFim, _formTemporada, _formDivisao, RemoverDivisao: _formDivisao is null, VagasDiretas: _formVagasDiretas ?? 0, VagasPlayoff: _formVagasPlayoff ?? 0),
                     CancellationToken.None);
                 _ok = "Liga atualizada.";
             }
             else
             {
                 var divisao = _formTipo == TipoCompetition.Liga ? _formDivisao : null;
-                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo, _formTemporada, divisao), CancellationToken.None);
+                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo, _formTemporada, divisao, _formVagasDiretas, _formVagasPlayoff), CancellationToken.None);
                 _ok = "Liga criada.";
             }
             CancelarEdicao();
@@ -991,8 +1130,8 @@
         finally { _saving = false; }
     }
 
-    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); _formTemporada = l.Temporada; _formDivisao = l.Divisao; }
-    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); _formTemporada = null; _formDivisao = null; }
+    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); _formTemporada = l.Temporada; _formDivisao = l.Divisao; _formVagasDiretas = l.VagasDiretas; _formVagasPlayoff = l.VagasPlayoff; }
+    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); _formTemporada = null; _formDivisao = null; _formVagasDiretas = null; _formVagasPlayoff = null; }
 
     private void SelecionarLiga(LigaDto liga) => Nav.NavigateTo($"/admin/liga/{liga.LigaId}");
 

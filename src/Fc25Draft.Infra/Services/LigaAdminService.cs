@@ -24,6 +24,7 @@ public class LigaAdminService : ILigaAdminService
     public async Task<LigaDto> CreateAsync(LigaCreateRequest request, CancellationToken ct)
     {
         await ValidarTemporadaDivisaoAsync(null, request.Tipo, request.Temporada, request.Divisao, ct);
+        ValidarVagas(request.Divisao, request.VagasDiretas, request.VagasPlayoff);
 
         var now = _time.GetUtcNow().UtcDateTime;
         var liga = new Liga
@@ -37,6 +38,8 @@ public class LigaAdminService : ILigaAdminService
             Tipo = request.Tipo,
             Temporada = request.Temporada,
             Divisao = request.Divisao,
+            VagasDiretas = request.Divisao is null ? null : request.VagasDiretas,
+            VagasPlayoff = request.Divisao is null ? null : request.VagasPlayoff,
             CriadoEm = now,
             AtualizadoEm = now
         };
@@ -68,16 +71,30 @@ public class LigaAdminService : ILigaAdminService
         var temporada = request.Temporada ?? liga.Temporada;
         var divisao = request.RemoverDivisao ? null : request.Divisao ?? liga.Divisao;
         await ValidarTemporadaDivisaoAsync(liga.LigaId, liga.Tipo, temporada, divisao, ct);
+        var vagasDiretas = divisao is null ? null : request.VagasDiretas ?? liga.VagasDiretas;
+        var vagasPlayoff = divisao is null ? null : request.VagasPlayoff ?? liga.VagasPlayoff;
+        ValidarVagas(divisao, vagasDiretas, vagasPlayoff);
 
         if (request.Nome is not null) liga.Nome = request.Nome.Trim();
         if (request.DataInicio.HasValue) liga.DataInicio = request.DataInicio.Value;
         if (request.DataFim.HasValue) liga.DataFim = request.DataFim.Value;
         liga.Temporada = temporada;
         liga.Divisao = divisao;
+        liga.VagasDiretas = vagasDiretas;
+        liga.VagasPlayoff = vagasPlayoff;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
         return ToDto(liga);
+    }
+
+    private static void ValidarVagas(Divisao? divisao, int? vagasDiretas, int? vagasPlayoff)
+    {
+        if (vagasDiretas < 0 || vagasPlayoff < 0)
+            throw new InvalidOperationException("As vagas de acesso/rebaixamento não podem ser negativas.");
+
+        if (divisao is null && (vagasDiretas > 0 || vagasPlayoff > 0))
+            throw new InvalidOperationException("Acesso e rebaixamento só existem em ligas com divisão (Série A ou B).");
     }
 
     private async Task ValidarTemporadaDivisaoAsync(Guid? ligaId, TipoCompetition tipo, int? temporada, Divisao? divisao, CancellationToken ct)
@@ -263,6 +280,9 @@ public class LigaAdminService : ILigaAdminService
             // Liga (pontos corridos): o campeão é o 1º colocado. Só há fase extra em caso
             // de empate no topo — jogo decisivo (2 times) ou mini liga (3+). Sem empate,
             // a competição encerra direto no líder (não há playoffs no formato da Liga).
+            // Com acesso/rebaixamento, empate total numa posição de zona precisa estar resolvido antes.
+            await GarantirDesempatesDeZonaAsync(liga, ct);
+
             var classif = await _db.LigaClassificacoes
                 .AsNoTracking()
                 .Where(x => x.LigaId == ligaId)
@@ -350,6 +370,7 @@ public class LigaAdminService : ILigaAdminService
         liga.Status = LigaStatus.PrimeiraFase;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
+        await RecalcularPosicoesAsync(ligaId, ct); // o jogo de título apagado deixa de mexer na ordem
         return ToDto(liga);
     }
 
@@ -1239,21 +1260,31 @@ public class LigaAdminService : ILigaAdminService
         if (!LigaDesempate.EmpatadosNaCopa(StatsDaClassificacao(a), StatsDaClassificacao(b)))
             throw new InvalidOperationException("Os times não estão empatados em Pontos, Vitórias e Saldo de Gols.");
 
+        var partidaId = await AdicionarJogoDecisivoAsync(liga, timeAId, timeBId, ct);
+        return await GetPartidaDtoAsync(partidaId, ct);
+    }
+
+    /// <summary>
+    /// Cria o jogo decisivo na rodada de desempate (depois da última regular), que não soma pontos
+    /// e, encerrado, coloca o vencedor à frente do adversário.
+    /// </summary>
+    private async Task<Guid> AdicionarJogoDecisivoAsync(Liga liga, Guid timeAId, Guid timeBId, CancellationToken ct)
+    {
         var rodada = await _db.LigaRodadas
             .Include(r => r.Partidas)
-            .FirstOrDefaultAsync(x => x.LigaId == ligaId && x.Desempate, ct);
+            .FirstOrDefaultAsync(x => x.LigaId == liga.LigaId && x.Desempate, ct);
 
         if (rodada is null)
         {
-            // Entra como a rodada seguinte à última da fase de grupos (Copa: rodada 7).
+            // Entra como a rodada seguinte à última (Copa: rodada 7).
             var maiorNumero = await _db.LigaRodadas
-                .Where(x => x.LigaId == ligaId)
+                .Where(x => x.LigaId == liga.LigaId)
                 .MaxAsync(x => (int?)x.Numero, ct) ?? 0;
 
             rodada = new LigaRodada
             {
                 RodadaId = Guid.NewGuid(),
-                LigaId = ligaId,
+                LigaId = liga.LigaId,
                 Numero = Math.Max(liga.TotalRodadas, maiorNumero) + 1,
                 Desempate = true
             };
@@ -1277,7 +1308,148 @@ public class LigaAdminService : ILigaAdminService
         rodada.Partidas.Add(partida);
 
         await _db.SaveChangesAsync(ct);
-        return await GetPartidaDtoAsync(partida.PartidaId, ct);
+        return partida.PartidaId;
+    }
+
+    // ── Desempate nas zonas (Liga com acesso/rebaixamento) ───────────────────
+
+    private sealed record EmpateZona(
+        int Posicao,
+        ZonaClassificacao ZonaA,
+        ZonaClassificacao ZonaB,
+        LigaClassificacao TimeA,
+        LigaClassificacao TimeB,
+        LigaPartida? Partida,
+        Guid? VencedorId);
+
+    /// <summary>
+    /// Empates que decidem zona: iguais em Pontos, Vitórias, Saldo, Gols Pró e confronto direto,
+    /// numa fronteira de zona, depois de todos os jogos regulares. Inclui os já levados a jogo decisivo.
+    /// </summary>
+    private async Task<List<EmpateZona>> CalcularEmpatesZonaAsync(Liga liga, CancellationToken ct)
+    {
+        var regra = LigaRegraZonas.De(liga.Tipo, liga.Divisao, liga.VagasDiretas, liga.VagasPlayoff);
+        if (!regra.TemAcessoRebaixamento) return new List<EmpateZona>();
+
+        var partidasRegulares = _db.LigaPartidas
+            .Where(p => p.Rodada.LigaId == liga.LigaId && p.Rodada.Numero > 0 && !p.Rodada.Desempate);
+        if (!await partidasRegulares.AnyAsync(ct)
+            || await partidasRegulares.AnyAsync(p => p.Status != PartidaStatus.Encerrada, ct))
+            return new List<EmpateZona>();
+
+        var classifs = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Include(x => x.Time)
+            .Where(x => x.LigaId == liga.LigaId)
+            .ToListAsync(ct);
+
+        var confrontos = await CarregarConfrontosAsync(liga.LigaId, ct);
+        var decisivos = await CarregarJogosDecisivosAsync(liga.LigaId, ct);
+        var jogosDecisivos = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => p.Rodada.LigaId == liga.LigaId && p.Rodada.Desempate)
+            .ToListAsync(ct);
+
+        var ordenados = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+        var semDecisivo = LigaDesempate.PosicoesLiga(ordenados, c => c.TimeId, StatsDaClassificacao, confrontos);
+        var total = ordenados.Count;
+        var empates = new List<EmpateZona>();
+
+        foreach (var posicao in LigaZonas.Fronteiras(regra, total))
+        {
+            var a = ordenados[posicao - 1];
+            var b = ordenados[posicao];
+
+            // Empate total ignorando o jogo decisivo: assim o empate continua listado depois de resolvido.
+            if (semDecisivo[posicao - 1] != semDecisivo[posicao]) continue;
+
+            var partida = jogosDecisivos.FirstOrDefault(p =>
+                (p.TimeCasaId == a.TimeId && p.TimeForaId == b.TimeId) ||
+                (p.TimeCasaId == b.TimeId && p.TimeForaId == a.TimeId));
+
+            empates.Add(new EmpateZona(
+                posicao,
+                LigaZonas.Zona(regra, posicao, total),
+                LigaZonas.Zona(regra, posicao + 1, total),
+                a, b, partida,
+                partida is null ? null : decisivos.VencedorEntre(a.TimeId, b.TimeId)));
+        }
+
+        return empates;
+    }
+
+    public async Task<IReadOnlyList<LigaEmpateZonaDto>> ListEmpatesZonaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
+        if (liga is null) return Array.Empty<LigaEmpateZonaDto>();
+
+        var empates = await CalcularEmpatesZonaAsync(liga, ct);
+
+        return empates.Select(e =>
+        {
+            // Placar na ordem da dupla exibida, não na de casa/fora.
+            var aEmCasa = e.Partida?.TimeCasaId == e.TimeA.TimeId;
+            return new LigaEmpateZonaDto(
+                e.Posicao,
+                RotuloZona(e.ZonaA),
+                RotuloZona(e.ZonaB),
+                e.TimeA.TimeId, e.TimeA.Time.TeamName,
+                e.TimeB.TimeId, e.TimeB.Time.TeamName,
+                e.Partida?.PartidaId,
+                e.Partida?.Status,
+                e.Partida is null ? null : aEmCasa ? e.Partida.GolsCasa : e.Partida.GolsFora,
+                e.Partida is null ? null : aEmCasa ? e.Partida.GolsFora : e.Partida.GolsCasa,
+                e.VencedorId,
+                e.VencedorId == e.TimeA.TimeId ? e.TimeA.Time.TeamName
+                    : e.VencedorId == e.TimeB.TimeId ? e.TimeB.Time.TeamName : null);
+        }).ToList();
+
+        static string RotuloZona(ZonaClassificacao z) => z == ZonaClassificacao.Nenhuma ? "Fora das zonas" : LigaZonas.Rotulo(z);
+    }
+
+    public async Task<LigaPartidaDto> GerarJogoDecisivoZonaAsync(Guid ligaId, Guid timeAId, Guid timeBId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Status != LigaStatus.PrimeiraFase)
+            throw new InvalidOperationException("O jogo decisivo de zona só pode ser criado antes de encerrar a temporada.");
+
+        var empate = (await CalcularEmpatesZonaAsync(liga, ct)).FirstOrDefault(e =>
+            (e.TimeA.TimeId == timeAId && e.TimeB.TimeId == timeBId) ||
+            (e.TimeA.TimeId == timeBId && e.TimeB.TimeId == timeAId))
+            ?? throw new InvalidOperationException(
+                "Esses times não estão empatados numa posição de zona (ou ainda há jogos regulares a disputar).");
+
+        var partidaId = await AdicionarJogoDecisivoAsync(liga, empate.TimeA.TimeId, empate.TimeB.TimeId, ct);
+        return await GetPartidaDtoAsync(partidaId, ct);
+    }
+
+    /// <summary>Impede encerrar a temporada com empate de zona sem jogo decisivo resolvido.</summary>
+    private async Task GarantirDesempatesDeZonaAsync(Liga liga, CancellationToken ct)
+    {
+        var pendente = (await CalcularEmpatesZonaAsync(liga, ct)).FirstOrDefault(e => e.VencedorId is null);
+        if (pendente is null) return;
+
+        throw new InvalidOperationException(
+            $"{pendente.TimeA.Time.TeamName} e {pendente.TimeB.Time.TeamName} estão empatados em todos os critérios " +
+            $"(inclusive confronto direto), e a diferença é entre \"{LigaZonas.Rotulo(pendente.ZonaA)}\" e " +
+            $"\"{(pendente.ZonaB == ZonaClassificacao.Nenhuma ? "Fora das zonas" : LigaZonas.Rotulo(pendente.ZonaB))}\". " +
+            "Crie e encerre o jogo decisivo (aba Jogo Decisivo) antes de encerrar a temporada.");
+    }
+
+    private async Task<List<ConfrontoDireto>> CarregarConfrontosAsync(Guid ligaId, CancellationToken ct)
+    {
+        var encerradas = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => p.Rodada.LigaId == ligaId && !p.Rodada.Desempate
+                        && p.Status == PartidaStatus.Encerrada && !p.IsWO)
+            .Select(p => new { p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
+            .ToListAsync(ct);
+
+        return encerradas
+            .Select(p => new ConfrontoDireto(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora))
+            .ToList();
     }
 
     /// <summary>
@@ -1400,6 +1572,7 @@ public class LigaAdminService : ILigaAdminService
         liga.CampeaoTimeId = campeaoId;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
+        await RecalcularPosicoesAsync(ligaId, ct);
         return ToDto(liga);
     }
 
@@ -1731,17 +1904,7 @@ public class LigaAdminService : ILigaAdminService
         if (liga is null) return;
 
         var classifs = await _db.LigaClassificacoes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
-
-        var encerradas = await _db.LigaPartidas
-            .AsNoTracking()
-            .Where(p => p.Rodada.LigaId == ligaId && !p.Rodada.Desempate
-                        && p.Status == PartidaStatus.Encerrada && !p.IsWO)
-            .Select(p => new { p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
-            .ToListAsync(ct);
-
-        var confrontos = encerradas
-            .Select(p => new ConfrontoDireto(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora))
-            .ToList();
+        var confrontos = await CarregarConfrontosAsync(ligaId, ct);
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
 
@@ -1759,7 +1922,9 @@ public class LigaAdminService : ILigaAdminService
         }
         else
         {
-            resultado = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, Stats, confrontos);
+            // Jogo decisivo de zona (rodada de desempate) separa quem segue igual após o confronto direto.
+            resultado = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, Stats, confrontos, decisivos);
+            await AplicarDecisaoDeTituloAsync(ligaId, resultado, ct);
         }
 
         for (int j = 0; j < resultado.Count; j++)
@@ -1769,6 +1934,32 @@ public class LigaAdminService : ILigaAdminService
 
         static DesempateStats Stats(LigaClassificacao c) =>
             new(c.Pontos, c.Vitorias, c.SaldoGols, c.GolsPro);
+    }
+
+    /// <summary>
+    /// Jogo decisivo do título (Numero = -1) encerrado: vencedor em 1º e perdedor em 2º, mesmo que o
+    /// confronto direto dissesse outra coisa — na Série B isso decide acesso direto x playoff.
+    /// </summary>
+    private async Task AplicarDecisaoDeTituloAsync(Guid ligaId, List<LigaClassificacao> ordenados, CancellationToken ct)
+    {
+        var jogo = await _db.LigaPartidas
+            .AsNoTracking()
+            .Where(p => p.Rodada.LigaId == ligaId && p.Rodada.Numero == NumeroJogoDecisivo && p.Status == PartidaStatus.Encerrada)
+            .FirstOrDefaultAsync(ct);
+        if (jogo is null) return;
+
+        var vencedorId = LigaDesempate.VencedorDoJogoDecisivo(
+            jogo.TimeCasaId, jogo.TimeForaId, jogo.GolsCasa, jogo.GolsFora, jogo.TemPenaltis, jogo.PenaltisVencedorId);
+        if (vencedorId is not Guid v) return;
+
+        var perdedorId = v == jogo.TimeCasaId ? jogo.TimeForaId : jogo.TimeCasaId;
+        var vencedor = ordenados.FirstOrDefault(c => c.TimeId == v);
+        var perdedor = ordenados.FirstOrDefault(c => c.TimeId == perdedorId);
+        if (vencedor is null || perdedor is null) return;
+
+        ordenados.Remove(vencedor);
+        ordenados.Remove(perdedor);
+        ordenados.InsertRange(0, new[] { vencedor, perdedor });
     }
 
     private static void EnsureEntry(Dictionary<Guid, (int, int, int, int, int, int, int, int, int)> d, Guid id)
@@ -1864,7 +2055,7 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
-            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao);
+            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",

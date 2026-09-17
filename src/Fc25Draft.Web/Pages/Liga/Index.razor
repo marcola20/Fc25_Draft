@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Components.Liga
+@using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
 @inject AdminAuthService AdminAuth
 @implements IDisposable
@@ -211,15 +212,16 @@
                         </table>
                     </div>
 
-                    @if (_liga.Status != LigaStatus.PrimeiraFase && _liga.Status != LigaStatus.Criada)
-                    {
-                        <div class="d-flex gap-3 flex-wrap mb-1 small">
-                            <span><span class="badge bg-success px-2">&nbsp;</span> Bye (1º–2º)</span>
-                            <span><span class="badge bg-success px-2">&nbsp;</span> QF direto (3º–6º)</span>
-                            <span><span class="badge bg-info px-2">&nbsp;</span> Play-In (7º–10º)</span>
-                            <span><span class="badge bg-danger px-2">&nbsp;</span> Eliminado (11º–12º)</span>
-                        </div>
-                    }
+                    <div class="d-flex gap-3 flex-wrap mb-1 small">
+                        @foreach (var zona in LigaZonas.ZonasDaTabela(_regra, _classif.Count))
+                        {
+                            <span><span class="badge @ZonaEstilo.Badge(zona) px-2">&nbsp;</span> @LigaZonas.Rotulo(zona)</span>
+                        }
+                        @if (_classif.Any(EmpateNoTopo))
+                        {
+                            <span><span class="badge @ZonaEstilo.BadgeEmpateTopo px-2">&nbsp;</span> Empate no topo — jogo decisivo ou mini liga</span>
+                        }
+                    </div>
                 </ShareableCard>
             }
 
@@ -640,6 +642,7 @@
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
     private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+    private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
@@ -786,16 +789,24 @@
         _eventoPartida = Array.Empty<LigaEventoDto>();
     }
 
-    private string GetRowClass(LigaClassificacaoItemDto item)
-    {
-        // Only highlight 1st place in green
-        return item.Posicao == 1 ? "table-success" : "";
-    }
+    // Zonas valem durante a temporada também ("se terminasse hoje").
+    private string GetRowClass(LigaClassificacaoItemDto item) =>
+        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, item.Posicao, _classif.Count));
 
-    private string GetBadgeClass(LigaClassificacaoItemDto item)
+    private string GetBadgeClass(LigaClassificacaoItemDto item) =>
+        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, item.Posicao, _classif.Count));
+
+    /// <summary>Empatado com o líder (Pts, V, SG, GP) aguardando decisão de título.</summary>
+    private bool EmpateNoTopo(LigaClassificacaoItemDto item)
     {
-        // Only highlight 1st place in green
-        return item.Posicao == 1 ? "bg-success" : "bg-secondary";
+        if (_classif.Count < 2 || _liga?.Status is not (LigaStatus.DecisaoCampeao or LigaStatus.MiniLiga))
+            return false;
+
+        var lider = _classif[0];
+        bool IgualAoLider(LigaClassificacaoItemDto c) =>
+            c.Pontos == lider.Pontos && c.Vitorias == lider.Vitorias && c.SaldoGols == lider.SaldoGols && c.GolsPro == lider.GolsPro;
+
+        return IgualAoLider(item) && _classif.Count(IgualAoLider) > 1;
     }
 
     private static string StatusBadge(PartidaStatus s) => s switch
