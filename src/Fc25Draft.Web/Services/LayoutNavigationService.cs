@@ -15,7 +15,8 @@ public class LayoutNavigationService
         }),
         new("Times", new List<MenuItem>
         {
-            new("Elencos", "/times/elencos", "oi oi-people")
+            new("Elencos", "/times/elencos", "oi oi-people"),
+            new("Cadastro de Times", "/teams", "oi oi-plus", RequiredRole: "Admin")
         }),
         new("Draft", new List<MenuItem>
         {
@@ -78,6 +79,8 @@ public class LayoutNavigationService
             }
         },
         ["/times/elencos"] = CreateDefinition("Elencos", "Times", "/times/elencos"),
+        ["/teams"] = CreateDefinition("Cadastro de Times", "Times", "/teams", true),
+        ["/teams/edit"] = CreateDefinition("Cadastro de Times", "Times", "/teams", true),
         ["/teams/roster"] = CreateDefinition("Elencos", "Times", "/times/elencos"),
         ["/draft/controle"] = CreateDefinition("Controle do Draft", "Draft", "/draft/controle"),
         ["/draft"] = CreateDefinition("Controle do Draft", "Draft", "/draft/controle"),

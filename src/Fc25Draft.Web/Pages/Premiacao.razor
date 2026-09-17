@@ -14,34 +14,43 @@
 
     private sealed record LeaguePrize(string Position, string Prize, string RowClass, string BadgeClass, string BarClass, int BarWidth);
 
+    // Série A: 10 times. Quem fica pelo caminho recebe mais para reconstruir; o rebaixado leva
+    // o mesmo que os times da Série B, então descer não dá vantagem de caixa na divisão de baixo.
     private static readonly IReadOnlyList<LeaguePrize> LeaguePrizes = new List<LeaguePrize>
     {
-        new("12°", "50 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",    100),
-        new("11°", "44 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",     88),
-        new("10°", "38 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  76),
-        new("9°",  "32 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  64),
-        new("8°",  "26 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  52),
-        new("7°",  "21 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  42),
-        new("6°",  "16 Mi", "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    32),
-        new("5°",  "12 Mi", "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    24),
-        new("4°",   "9 Mi", "prem-row-green",  "prem-badge-green",  "prem-bar-green",   18),
-        new("3°",   "6 Mi", "prem-row-green",  "prem-badge-green",  "prem-bar-green",   12),
-        new("2°",   "4 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",     8),
-        new("1° 🏆","2 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",     4),
+        new("10° ⬇", "40 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",    100),
+        new("9°",    "40 Mi", "prem-row-red",    "prem-badge-red",    "prem-bar-red",    100),
+        new("8°",    "34 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  85),
+        new("7°",    "29 Mi", "prem-row-orange", "prem-badge-orange", "prem-bar-orange",  73),
+        new("6°",    "24 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  60),
+        new("5°",    "20 Mi", "prem-row-yellow", "prem-badge-yellow", "prem-bar-yellow",  50),
+        new("4°",    "15 Mi", "prem-row-blue",   "prem-badge-blue",   "prem-bar-blue",    38),
+        new("3°",    "15 Mi", "prem-row-green",  "prem-badge-green",  "prem-bar-green",   38),
+        new("2°",    "15 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",    38),
+        new("1° 🏆", "15 Mi", "prem-row-gold",   "prem-badge-gold",   "prem-bar-gold",    38),
+    };
+
+    // Série B: valor único, igual para todos — inclusive para quem sobe.
+    private static readonly IReadOnlyList<LeaguePrize> SerieBPrizes = new List<LeaguePrize>
+    {
+        new("1° 🏆 ⬆", "40 Mi", "prem-row-gold", "prem-badge-gold", "prem-bar-gold", 100),
+        new("2° ⚔",    "40 Mi", "prem-row-blue", "prem-badge-blue", "prem-bar-blue", 100),
+        new("Demais",  "40 Mi", "prem-row-red",  "prem-badge-red",  "prem-bar-red",  100),
     };
 }
 
 <div class="prem-page">
 
-    <!-- LIGA -->
+    <!-- SÉRIE A -->
     <section class="prem-section">
         <div class="prem-section-header">
             <span class="prem-section-icon">🏆</span>
-            <h3>Liga — Prêmio por Classificação</h3>
+            <h3>Série A — Prêmio por Classificação</h3>
         </div>
         <p class="prem-section-desc">
             Quanto <strong>pior a posição</strong>, maior o prêmio — mecanismo de equilíbrio para próxima temporada.
-            O campeão leva o título; os últimos levam mais grana para reconstruir.
+            O campeão leva o título; quem escapou por pouco leva mais grana para reconstruir.
+            Do <strong>4° ao 1°</strong> o valor é o mesmo.
         </p>
 
         <div class="prem-league-grid">
@@ -58,6 +67,40 @@
                 </div>
             }
         </div>
+    </section>
+
+    <hr class="prem-divider" />
+
+    <!-- SÉRIE B -->
+    <section class="prem-section">
+        <div class="prem-section-header">
+            <span class="prem-section-icon">🥈</span>
+            <h3>Série B — Prêmio Único</h3>
+        </div>
+        <p class="prem-section-desc">
+            Na Série B <strong>todos os times recebem o mesmo valor</strong>, inclusive quem sobe.
+            É o mesmo prêmio do rebaixado da Série A: quem desce leva elenco melhor, mas não leva mais dinheiro.
+        </p>
+
+        <div class="prem-league-grid">
+            @foreach (var item in SerieBPrizes)
+            {
+                <div class="prem-prize-row @item.RowClass">
+                    <div class="prem-prize-pos">
+                        <span class="prem-pos-badge @item.BadgeClass">@item.Position</span>
+                    </div>
+                    <div class="prem-prize-bar-wrap">
+                        <div class="prem-prize-bar @item.BarClass" style="width: @item.BarWidth%"></div>
+                    </div>
+                    <div class="prem-prize-value">@item.Prize</div>
+                </div>
+            }
+        </div>
+
+        <p class="prem-section-desc">
+            ⬆ O <strong>campeão sobe direto</strong> para a Série A. O <strong>2° disputa o playoff de acesso</strong>,
+            em jogo único contra quem ficou logo acima da zona de rebaixamento da Série A.
+        </p>
     </section>
 
     <hr class="prem-divider" />
