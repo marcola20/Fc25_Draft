@@ -11,6 +11,47 @@
     {
         LayoutState.SetPage(NavigationService.GetPageDefinition("/formato"));
     }
+
+    private sealed record DataCalendario(int Numero, string Competicao, string? Detalhe, string Classe);
+
+    /// <summary>
+    /// Abre na Supercopa e fecha na final da Copa. As rodadas de liga andam em dupla (Série B e,
+    /// em seguida, Série A) e as rodadas de grupo da Copa entram entre elas.
+    /// </summary>
+    private static readonly IReadOnlyList<DataCalendario> Calendario = MontarCalendario();
+
+    private static List<DataCalendario> MontarCalendario()
+    {
+        const int rodadasSerieA = 9;
+        const int rodadasSerieB = 7;
+        const int rodadasGrupoCopa = 5; // grupos de 5 precisam de 5 rodadas (um time folga por rodada)
+
+        var datas = new List<DataCalendario>();
+        void Add(string competicao, string? detalhe, string classe) =>
+            datas.Add(new DataCalendario(datas.Count + 1, competicao, detalhe, classe));
+
+        Add("Supercopa", "abre a temporada", "fmt-cal-final");
+
+        int serieA = 1, serieB = 1, copa = 1;
+
+        // A cada duas duplas de liga entra uma rodada de grupo da Copa.
+        while (serieA <= rodadasSerieA || serieB <= rodadasSerieB || copa <= rodadasGrupoCopa)
+        {
+            for (int dupla = 0; dupla < 2; dupla++)
+            {
+                if (serieB <= rodadasSerieB) Add("Série B", $"Rodada {serieB++}", "fmt-cal-special");
+                if (serieA <= rodadasSerieA) Add("Série A", $"Rodada {serieA++}", "fmt-cal-liga");
+            }
+
+            if (copa <= rodadasGrupoCopa) Add("Copa", $"Rodada {copa++} · grupos", "fmt-cal-copa");
+        }
+
+        Add("Copa", "Quartas de final", "fmt-cal-semi");
+        Add("Copa", "Semifinais", "fmt-cal-semi");
+        Add("Copa", "Final", "fmt-cal-final");
+
+        return datas;
+    }
 }
 
 <div class="formato-page">
@@ -178,7 +219,7 @@
                 <div class="fmt-stat-label">Grupos</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">4</div>
+                <div class="fmt-stat-number">4-5</div>
                 <div class="fmt-stat-label">Times por Grupo</div>
             </div>
             <div class="fmt-stat-card">
@@ -198,9 +239,9 @@
             </div>
 
             <p class="fmt-desc">
-                <strong>16 times</strong> divididos em <strong>4 grupos de 4</strong>, definidos por <strong>sorteio em 3 potes</strong>:
-                cada grupo recebe 1 time do pote 1, 1 do pote 2 e 2 do pote 3.
-                Dentro do grupo, todos se enfrentam uma vez (<strong>3 rodadas</strong>) e os <strong>2 melhores avançam</strong>.
+                Todos os times da temporada entram na Copa, divididos em <strong>4 grupos</strong> por <strong>sorteio em potes</strong>.
+                Com <strong>18 times</strong> ficam <strong>2 grupos de 4 e 2 de 5</strong>; os times do último pote é que completam os grupos maiores.
+                Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>.
             </p>
 
             <div class="fmt-groups-grid">
@@ -347,112 +388,50 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">20</div>
+                <div class="fmt-stat-number">@Calendario.Count</div>
                 <div class="fmt-stat-label">Datas</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">11</div>
-                <div class="fmt-stat-label">Rodadas de Liga</div>
+                <div class="fmt-stat-number">9</div>
+                <div class="fmt-stat-label">Rodadas da Série A</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">6</div>
-                <div class="fmt-stat-label">Rodadas da Copa</div>
+                <div class="fmt-stat-number">7</div>
+                <div class="fmt-stat-label">Rodadas da Série B</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">3</div>
-                <div class="fmt-stat-label">Datas Especiais</div>
+                <div class="fmt-stat-number">8</div>
+                <div class="fmt-stat-label">Datas da Copa</div>
             </div>
         </div>
 
+        <p class="fmt-desc">
+            A temporada abre com a <strong>Supercopa</strong> e fecha com a <strong>final da Copa</strong>.
+            As rodadas de liga vêm sempre em dupla: primeiro a <strong>Série B</strong>, logo depois a <strong>Série A</strong>.
+        </p>
+
         <div class="fmt-cal-legend">
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-liga"></span>Liga</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Mercado / All-Star</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Semifinais</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Final</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-liga"></span>Série A</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Série B</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa — grupos</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Copa — mata-mata</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Decisões</span>
         </div>
 
         <div class="fmt-cal-grid">
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">1</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 1</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">2</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 1</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">3</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 2</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">4</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 3</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">5</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 2</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">6</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 4</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">7</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 3</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">8</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 5</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">9</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 6</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">10</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 4</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-special">
-                <span class="fmt-cal-num">11</span>
-                <span class="fmt-cal-comp">Mercado / All-Star</span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">12</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 7</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">13</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 5</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">14</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 8</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">15</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 9</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">16</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 6</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">17</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 10</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-semi">
-                <span class="fmt-cal-num">18</span>
-                <span class="fmt-cal-comp">Semis da Copa</span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">19</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 11 · última</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-final">
-                <span class="fmt-cal-num">20</span>
-                <span class="fmt-cal-comp">Final da Copa</span>
-            </div>
+            @foreach (var data in Calendario)
+            {
+                <div class="fmt-cal-card @data.Classe">
+                    <span class="fmt-cal-num">@data.Numero</span>
+                    <span class="fmt-cal-comp">
+                        @data.Competicao
+                        @if (data.Detalhe is not null)
+                        {
+                            <small>@data.Detalhe</small>
+                        }
+                    </span>
+                </div>
+            }
         </div>
     </section>
 

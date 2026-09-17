@@ -168,12 +168,19 @@ public record LigaCopaPoteTimeDto(Guid TimeId, string TimeNome, int Pote, GrupoC
 /// <summary>Potes do sorteio da Copa e o que falta para sortear.</summary>
 public record LigaCopaSorteioDto(
     Guid LigaId,
-    int TotalGrupos,
-    int TimesPorGrupo,
+    IReadOnlyList<int> TamanhosDosGrupos,
     bool JaSorteada,
     bool PodeSortear,
     string? Impedimento,
-    IReadOnlyList<LigaCopaPoteTimeDto> Times);
+    IReadOnlyList<LigaCopaPoteTimeDto> Times)
+{
+    public int TotalGrupos => TamanhosDosGrupos.Count;
+
+    /// <summary>Ex.: "4 grupos: 4, 4, 5 e 5 times".</summary>
+    public string ResumoDosGrupos => TamanhosDosGrupos.Count == 0
+        ? "—"
+        : $"{TotalGrupos} grupos: {string.Join(", ", TamanhosDosGrupos)} times";
+}
 
 public record LigaCopaPotesRequest(IReadOnlyDictionary<Guid, int> PotePorTime);
 

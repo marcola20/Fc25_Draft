@@ -261,9 +261,9 @@
     @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
     {
         <div class="alert alert-secondary py-2 small">
-            Monte os <strong>potes</strong> e sorteie: cada pote distribui seus times <strong>igualmente entre os grupos</strong>.
-            No formato de <strong>4 grupos de 4</strong>, os potes 1 e 2 têm 4 times (um por grupo) e o pote 3 tem 8 (dois por grupo).
-            O sorteio grava os grupos e pode ser refeito enquanto a Copa não começar.
+            Monte os <strong>potes</strong> e sorteie: os times de cada pote se espalham entre os grupos, começando pelos grupos com mais vagas.
+            Os grupos ficam do tamanho mais parecido possível — com <strong>18 times</strong> saem <strong>4, 4, 5 e 5</strong>; com 16, quatro grupos de 4.
+            Deixe para o <strong>último pote</strong> quem você quer nos grupos maiores. O sorteio pode ser refeito enquanto a Copa não começar.
         </div>
 
         <div class="row g-3">
@@ -317,7 +317,7 @@
                         }
                         else if (_sorteio is not null)
                         {
-                            <span class="text-muted small">@_sorteio.TotalGrupos grupos de @_sorteio.TimesPorGrupo times</span>
+                            <span class="text-muted small">@_sorteio.ResumoDosGrupos</span>
                         }
                     </div>
                 </div>

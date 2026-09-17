@@ -227,8 +227,9 @@ public class LigaAdminService : ILigaAdminService
     /// </summary>
     private static List<List<(Guid, Guid)>> GerarRodadasDosGrupos(List<List<Guid>> grupos)
     {
+        // Grupo ímpar precisa de uma rodada a mais: em cada rodada um time folga.
         var porGrupo = grupos
-            .Select(times => GerarRoundRobinParcial(times, times.Count - 1))
+            .Select(times => GerarRoundRobinParcial(times, times.Count % 2 == 0 ? times.Count - 1 : times.Count))
             .ToList();
 
         var totalRodadas = porGrupo.Max(g => g.Count);
@@ -1043,8 +1044,25 @@ public class LigaAdminService : ILigaAdminService
         return grupos.Select(g => new LigaGrupoTimeDto(g.LigaId, g.TimeId, g.Time.TeamName, g.Grupo)).ToArray();
     }
 
-    /// <summary>Times por grupo no sorteio da Copa (4 grupos de 4 no formato atual).</summary>
-    private const int TimesPorGrupoCopa = 4;
+    /// <summary>Grupos da Copa no formato atual (A, B, C e D).</summary>
+    private const int GruposDaCopa = 4;
+
+    /// <summary>
+    /// Tamanho de cada grupo, o mais parecido possível: 16 times viram 4+4+4+4 e 18 viram 4+4+5+5,
+    /// com os grupos maiores no fim (C e D).
+    /// </summary>
+    private static List<int> TamanhosDosGrupos(int totalTimes)
+    {
+        if (totalTimes < 8) return new List<int>();
+
+        var grupos = Math.Min(GruposDaCopa, totalTimes / 3);
+        var baseTimes = totalTimes / grupos;
+        var sobra = totalTimes % grupos;
+
+        return Enumerable.Range(0, grupos)
+            .Select(i => baseTimes + (i >= grupos - sobra ? 1 : 0))
+            .ToList();
+    }
 
     public async Task<LigaCopaSorteioDto?> GetSorteioCopaAsync(Guid ligaId, CancellationToken ct)
     {
@@ -1065,42 +1083,20 @@ public class LigaAdminService : ILigaAdminService
             .OrderBy(t => t.Pote).ThenBy(t => t.TimeNome)
             .ToList();
 
-        var totalGrupos = times.Count / TimesPorGrupoCopa;
+        var tamanhos = TamanhosDosGrupos(times.Count);
         var impedimento =
             liga.Status != LigaStatus.Criada ? "A Copa já começou: o sorteio só vale antes de iniciar."
             : times.Count == 0 ? "Monte os potes antes de sortear."
-            : ValidarPotes(times.Select(t => t.Pote).ToList());
+            : times.Count < 8 ? $"São {times.Count} times: a Copa precisa de pelo menos 8 (2 grupos)."
+            : null;
 
         return new LigaCopaSorteioDto(
             ligaId,
-            totalGrupos,
-            TimesPorGrupoCopa,
+            tamanhos,
             grupos.Count > 0,
             impedimento is null,
             impedimento,
             times);
-    }
-
-    /// <summary>Times precisam encher grupos inteiros e cada pote precisa render o mesmo tanto por grupo.</summary>
-    private static string? ValidarPotes(IReadOnlyList<int> potes)
-    {
-        var total = potes.Count;
-        if (total % TimesPorGrupoCopa != 0)
-            return $"São {total} times: o total precisa ser múltiplo de {TimesPorGrupoCopa} (grupos de {TimesPorGrupoCopa}).";
-
-        var grupos = total / TimesPorGrupoCopa;
-        if (grupos < 2)
-            return "A Copa precisa de pelo menos 2 grupos.";
-
-        foreach (var pote in potes.GroupBy(p => p).OrderBy(g => g.Key))
-        {
-            if (pote.Key < 1)
-                return "Todo time da Copa precisa estar num pote (1, 2, 3...).";
-            if (pote.Count() % grupos != 0)
-                return $"O pote {pote.Key} tem {pote.Count()} times: precisa ser múltiplo de {grupos} para dividir entre os grupos.";
-        }
-
-        return null;
     }
 
     public async Task<LigaCopaSorteioDto> ConfigurarPotesCopaAsync(Guid ligaId, LigaCopaPotesRequest request, CancellationToken ct)
@@ -1138,16 +1134,31 @@ public class LigaAdminService : ILigaAdminService
 
         var grupos = Enumerable.Range(0, sorteio.TotalGrupos).Select(i => (GrupoCopa)i).ToList();
         var vagasPorGrupo = grupos.ToDictionary(g => g, _ => new List<Guid>());
+        var vagasRestantes = grupos
+            .Select((g, i) => (Grupo: g, Vagas: sorteio.TamanhosDosGrupos[i]))
+            .ToDictionary(x => x.Grupo, x => x.Vagas);
         var random = Random.Shared;
 
-        // Pote a pote: embaralha os times e distribui um a um pelos grupos, em rodadas.
+        // Pote a pote: cada grupo recebe um time do pote antes de qualquer grupo receber o segundo.
+        // Entre os empatados, vai para quem tem mais vagas sobrando — assim o resto do pote cai
+        // nos grupos maiores, e o desempate final é no sorteio.
         foreach (var pote in sorteio.Times.GroupBy(t => t.Pote).OrderBy(p => p.Key))
         {
-            var sorteados = pote.Select(t => t.TimeId).OrderBy(_ => random.Next()).ToList();
-            var porGrupo = sorteados.Count / grupos.Count;
+            var recebidosDoPote = grupos.ToDictionary(g => g, _ => 0);
 
-            for (int i = 0; i < sorteados.Count; i++)
-                vagasPorGrupo[grupos[i / porGrupo]].Add(sorteados[i]);
+            foreach (var timeId in pote.Select(t => t.TimeId).OrderBy(_ => random.Next()))
+            {
+                var destino = vagasRestantes
+                    .Where(v => v.Value > 0)
+                    .OrderBy(v => recebidosDoPote[v.Key])
+                    .ThenByDescending(v => v.Value)
+                    .ThenBy(_ => random.Next())
+                    .First().Key;
+
+                vagasPorGrupo[destino].Add(timeId);
+                vagasRestantes[destino]--;
+                recebidosDoPote[destino]++;
+            }
         }
 
         var antigos = await _db.LigaGruposTimes.Where(g => g.LigaId == ligaId).ToListAsync(ct);
@@ -1158,7 +1169,8 @@ public class LigaAdminService : ILigaAdminService
                 _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = grupo });
 
         var liga = await _db.Ligas.FirstAsync(x => x.LigaId == ligaId, ct);
-        liga.TotalRodadas = TimesPorGrupoCopa - 1; // round-robin dentro do grupo
+        var maior = sorteio.TamanhosDosGrupos.Max();
+        liga.TotalRodadas = maior % 2 == 0 ? maior - 1 : maior; // round-robin do maior grupo (ímpar tem folga)
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
