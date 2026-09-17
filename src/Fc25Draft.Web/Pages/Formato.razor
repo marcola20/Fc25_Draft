@@ -174,12 +174,12 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">2</div>
+                <div class="fmt-stat-number">4</div>
                 <div class="fmt-stat-label">Grupos</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">?</div>
-                <div class="fmt-stat-label">Times por Grupo (a definir)</div>
+                <div class="fmt-stat-number">4</div>
+                <div class="fmt-stat-label">Times por Grupo</div>
             </div>
             <div class="fmt-stat-card">
                 <div class="fmt-stat-number">2</div>
@@ -197,47 +197,31 @@
                 <span>Fase de Grupos</span>
             </div>
 
+            <p class="fmt-desc">
+                <strong>16 times</strong> divididos em <strong>4 grupos de 4</strong>, definidos por <strong>sorteio em 3 potes</strong>:
+                cada grupo recebe 1 time do pote 1, 1 do pote 2 e 2 do pote 3.
+                Dentro do grupo, todos se enfrentam uma vez (<strong>3 rodadas</strong>) e os <strong>2 melhores avançam</strong>.
+            </p>
+
             <div class="fmt-groups-grid">
-                <div class="fmt-group-card">
-                    <div class="fmt-group-header fmt-group-a">Grupo A</div>
-                    <div class="fmt-group-body">
-                        <div class="fmt-group-teams">
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A1</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A2</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A3</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A4</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A5</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A6</div>
-                        </div>
-                        <div class="fmt-group-desc">Enfrenta todos do <strong>Grupo B</strong> (cross-group)</div>
-                        <div class="fmt-group-advance">
-                            <span class="fmt-advance-badge">✅ Top 2 avançam</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="fmt-groups-vs">
-                    <div class="fmt-groups-vs-label">Cross-Group</div>
-                    <div class="fmt-groups-vs-arrow">↔</div>
-                </div>
-
-                <div class="fmt-group-card">
-                    <div class="fmt-group-header fmt-group-b">Grupo B</div>
-                    <div class="fmt-group-body">
-                        <div class="fmt-group-teams">
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B1</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B2</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B3</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B4</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B5</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B6</div>
-                        </div>
-                        <div class="fmt-group-desc">Enfrenta todos do <strong>Grupo A</strong> (cross-group)</div>
-                        <div class="fmt-group-advance">
-                            <span class="fmt-advance-badge">✅ Top 2 avançam</span>
+                @foreach (var grupo in new[] { "A", "B", "C", "D" })
+                {
+                    <div class="fmt-group-card">
+                        <div class="fmt-group-header @(grupo is "A" or "C" ? "fmt-group-a" : "fmt-group-b")">Grupo @grupo</div>
+                        <div class="fmt-group-body">
+                            <div class="fmt-group-teams">
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Pote 1</div>
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 2</div>
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
+                            </div>
+                            <div class="fmt-group-desc">Todos contra todos <strong>dentro do grupo</strong></div>
+                            <div class="fmt-group-advance">
+                                <span class="fmt-advance-badge">✅ Top 2 avançam</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                }
             </div>
         </div>
 
@@ -249,22 +233,46 @@
 
             <div class="fmt-knockout-bracket">
                 <div class="fmt-knockout-col">
-                    <div class="fmt-ko-match fmt-ko-match-a">
-                        <div class="fmt-ko-label">Semifinal — Grupo A</div>
-                        <div class="fmt-ko-matchup">
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">A1°</span>
-                                <span class="fmt-ko-name">1º do Grupo A</span>
+                    @foreach (var (numero, casa, fora) in new[] { (1, "A", "B"), (2, "B", "A"), (3, "C", "D"), (4, "D", "C") })
+                    {
+                        <div class="fmt-ko-match @(numero % 2 == 1 ? "fmt-ko-match-a" : "fmt-ko-match-b")">
+                            <div class="fmt-ko-label">Quartas @numero</div>
+                            <div class="fmt-ko-matchup">
+                                <div class="fmt-ko-team">
+                                    <span class="fmt-ko-seed fmt-seed-a">@(casa)1°</span>
+                                    <span class="fmt-ko-name">1º do Grupo @casa</span>
+                                </div>
+                                <div class="fmt-ko-vs">VS</div>
+                                <div class="fmt-ko-team">
+                                    <span class="fmt-ko-seed fmt-seed-b">@(fora)2°</span>
+                                    <span class="fmt-ko-name">2º do Grupo @fora</span>
+                                </div>
                             </div>
-                            <div class="fmt-ko-vs">VS</div>
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">A2°</span>
-                                <span class="fmt-ko-name">2º do Grupo A</span>
+                            <div class="fmt-ko-result">
+                                <span class="fmt-result-win">Vencedor → Semifinal</span>
+                                <span class="fmt-result-lose">Perdedor → Eliminado</span>
                             </div>
                         </div>
-                        <div class="fmt-ko-result">
-                            <span class="fmt-result-win">Vencedor → Final</span>
-                            <span class="fmt-result-lose">Perdedor → Eliminado</span>
+                    }
+                </div>
+
+                <div class="fmt-knockout-arrow">→</div>
+
+                <div class="fmt-knockout-col">
+                    <div class="fmt-ko-match fmt-ko-match-a">
+                        <div class="fmt-ko-label">Semifinal 1</div>
+                        <div class="fmt-ko-matchup">
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">W1</span><span class="fmt-ko-name">Vencedor Quartas 1</span></div>
+                            <div class="fmt-ko-vs">VS</div>
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">W4</span><span class="fmt-ko-name">Vencedor Quartas 4</span></div>
+                        </div>
+                    </div>
+                    <div class="fmt-ko-match fmt-ko-match-b">
+                        <div class="fmt-ko-label">Semifinal 2</div>
+                        <div class="fmt-ko-matchup">
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">W2</span><span class="fmt-ko-name">Vencedor Quartas 2</span></div>
+                            <div class="fmt-ko-vs">VS</div>
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">W3</span><span class="fmt-ko-name">Vencedor Quartas 3</span></div>
                         </div>
                     </div>
                 </div>
@@ -276,40 +284,17 @@
                         <div class="fmt-ko-label">🏆 Final</div>
                         <div class="fmt-ko-matchup">
                             <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">W-A</span>
-                                <span class="fmt-ko-name">Vencedor SF-A</span>
+                                <span class="fmt-ko-seed fmt-seed-a">W-S1</span>
+                                <span class="fmt-ko-name">Vencedor Semifinal 1</span>
                             </div>
                             <div class="fmt-ko-vs">VS</div>
                             <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">W-B</span>
-                                <span class="fmt-ko-name">Vencedor SF-B</span>
+                                <span class="fmt-ko-seed fmt-seed-b">W-S2</span>
+                                <span class="fmt-ko-name">Vencedor Semifinal 2</span>
                             </div>
                         </div>
                         <div class="fmt-ko-result">
                             <span class="fmt-result-win fmt-result-champion">🏆 Campeão da Copa</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="fmt-knockout-arrow">←</div>
-
-                <div class="fmt-knockout-col">
-                    <div class="fmt-ko-match fmt-ko-match-b">
-                        <div class="fmt-ko-label">Semifinal — Grupo B</div>
-                        <div class="fmt-ko-matchup">
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">B1°</span>
-                                <span class="fmt-ko-name">1º do Grupo B</span>
-                            </div>
-                            <div class="fmt-ko-vs">VS</div>
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">B2°</span>
-                                <span class="fmt-ko-name">2º do Grupo B</span>
-                            </div>
-                        </div>
-                        <div class="fmt-ko-result">
-                            <span class="fmt-result-win">Vencedor → Final</span>
-                            <span class="fmt-result-lose">Perdedor → Eliminado</span>
                         </div>
                     </div>
                 </div>
@@ -321,7 +306,7 @@
                 <div class="fmt-flow-icon">📋</div>
                 <div class="fmt-flow-content">
                     <strong>Fase de Grupos</strong>
-                    <span>2 grupos · cada um enfrenta todos do outro grupo</span>
+                    <span>4 grupos de 4 · 3 rodadas dentro do grupo</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>

@@ -388,7 +388,7 @@
 
         // Copa: cada grupo é ordenado isoladamente e empatados dividem a posição.
         var resultado = new List<TimeSim>(todos.Count);
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        foreach (var grupo in GruposDaCopa())
         {
             var doGrupo = LigaDesempate.Ordenar(
                 todos.Where(t => t.Grupo == grupo), tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
@@ -408,6 +408,10 @@
         return resultado;
     }
 
+    /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
+    private IEnumerable<GrupoCopa> GruposDaCopa() =>
+        _classifReal.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g);
+
     /// <summary>Uma tabela por grupo na Copa; tabela única na Liga.</summary>
     private IEnumerable<(string? Titulo, List<TimeSim> Times)> Blocos()
     {
@@ -417,7 +421,7 @@
             yield break;
         }
 
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        foreach (var grupo in GruposDaCopa())
         {
             var doGrupo = _tabela.Where(t => t.Grupo == grupo).ToList();
             if (doGrupo.Count > 0) yield return ($"Grupo {grupo}", doGrupo);

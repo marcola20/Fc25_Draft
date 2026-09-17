@@ -15,6 +15,7 @@
 @inject NavigationManager Nav
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject IJSRuntime JS
 
 <PageTitle>Administração da Liga</PageTitle>
 
@@ -41,6 +42,7 @@
         <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>SetTab("liga")'>Liga</button></li>
         @if (_ligaAtual?.Tipo == TipoCompetition.Copa)
         {
+            <li class="nav-item"><button class="nav-link @(_tab=="sorteio"?"active":"")" @onclick='()=>SetTab("sorteio")' disabled="@(_ligaAtual == null)">Sortear Copa</button></li>
             <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
             <li class="nav-item"><button class="nav-link @(_tab=="decisivo"?"active":"")" @onclick='()=>SetTab("decisivo")' disabled="@(_ligaAtual == null)">Jogo Decisivo</button></li>
         }
@@ -253,6 +255,103 @@
                 </div>
             </div>
         }
+    }
+
+    <!-- ─ Tab: Sortear Copa ─ -->
+    @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
+    {
+        <div class="alert alert-secondary py-2 small">
+            Monte os <strong>potes</strong> e sorteie: cada pote distribui seus times <strong>igualmente entre os grupos</strong>.
+            No formato de <strong>4 grupos de 4</strong>, os potes 1 e 2 têm 4 times (um por grupo) e o pote 3 tem 8 (dois por grupo).
+            O sorteio grava os grupos e pode ser refeito enquanto a Copa não começar.
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-7">
+                <div class="card">
+                    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-bold">Potes</span>
+                        @foreach (var pote in new[] { 1, 2, 3 })
+                        {
+                            <span class="badge bg-dark">Pote @pote: @_potePorTime.Count(x => x.Value == pote)</span>
+                        }
+                        <span class="badge bg-light text-dark border">Na Copa: @_potePorTime.Count(x => x.Value > 0)</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                                @foreach (var t in _times)
+                                {
+                                    var timeId = t.TeamId;
+                                    <tr>
+                                        <td class="fw-semibold">@t.TeamName</td>
+                                        <td style="width: 11rem">
+                                            <select class="form-select form-select-sm"
+                                                    value="@(_potePorTime.GetValueOrDefault(timeId))"
+                                                    @onchange="e => DefinirPote(timeId, e.Value?.ToString())">
+                                                <option value="0">Fora da Copa</option>
+                                                <option value="1">Pote 1</option>
+                                                <option value="2">Pote 2</option>
+                                                <option value="3">Pote 3</option>
+                                            </select>
+                                        </td>
+                                        <td style="width: 7rem" class="text-end">
+                                            @if (_sorteio?.Times.FirstOrDefault(x => x.TimeId == timeId)?.Grupo is GrupoCopa grupoSorteado)
+                                            {
+                                                <span class="badge bg-primary">Grupo @grupoSorteado</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+                        <button class="btn btn-outline-primary" @onclick="SalvarPotes" disabled="@_saving">Salvar potes</button>
+                        <button class="btn btn-success" @onclick="SortearCopa" disabled="@(_saving || _sorteio?.PodeSortear != true)">
+                            🎲 @(_sorteio?.JaSorteada == true ? "Sortear de novo" : "Sortear grupos")
+                        </button>
+                        @if (_sorteio?.Impedimento is not null)
+                        {
+                            <span class="text-muted small">@_sorteio.Impedimento</span>
+                        }
+                        else if (_sorteio is not null)
+                        {
+                            <span class="text-muted small">@_sorteio.TotalGrupos grupos de @_sorteio.TimesPorGrupo times</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-5">
+                @if (_sorteio is not null && _sorteio.JaSorteada)
+                {
+                    <div class="row g-2">
+                        @foreach (var grupo in _sorteio.Times.Where(t => t.Grupo is not null).GroupBy(t => t.Grupo!.Value).OrderBy(g => g.Key))
+                        {
+                            <div class="col-12 col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header fw-bold">Grupo @grupo.Key</div>
+                                    <ul class="list-group list-group-flush">
+                                        @foreach (var t in grupo.OrderBy(x => x.Pote))
+                                        {
+                                            <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                                <span>@t.TimeNome</span>
+                                                <span class="badge bg-secondary">Pote @t.Pote</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">Os grupos aparecem aqui depois do sorteio.</div>
+                }
+            </div>
+        </div>
     }
 
     <!-- ─ Tab: Grupos Copa ─ -->
@@ -860,6 +959,11 @@
     private IReadOnlyList<LigaEmpateZonaDto> _empatesZona = Array.Empty<LigaEmpateZonaDto>();
     private LigaRodadaDto? _rodadaDesempate;
     private readonly Dictionary<Guid, GrupoCopa?> _grupoPorTime = new();
+    private readonly Dictionary<Guid, int> _potePorTime = new();
+    private LigaCopaSorteioDto? _sorteio;
+
+    private void DefinirPote(Guid timeId, string? valor) =>
+        _potePorTime[timeId] = int.TryParse(valor, out var pote) ? pote : 0;
 
     private int RodadasDaCopa => Math.Max(
         _grupoPorTime.Count(x => x.Value == GrupoCopa.A),
@@ -948,6 +1052,8 @@
                 _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _empatesCopa = await AdminSvc.ListEmpatesCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
+                _sorteio = await AdminSvc.GetSorteioCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                AplicarSorteio();
                 PreencherSelects();
             }
             else
@@ -996,6 +1102,7 @@
     private static string TabLabel(string tab) => tab switch
     {
         "grupos" => "Grupos Copa",
+        "sorteio" => "Sortear Copa",
         "times" => "Times",
         "rodadas" => "Rodadas",
         "partidas" => "Partidas",
@@ -1320,6 +1427,43 @@
     {
         try { await AdminSvc.RemoverPunicaoAsync(id, CancellationToken.None); _ok = "Punição removida."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task SalvarPotes()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            _sorteio = await AdminSvc.ConfigurarPotesCopaAsync(
+                _ligaAtual!.LigaId, new LigaCopaPotesRequest(new Dictionary<Guid, int>(_potePorTime)), CancellationToken.None);
+            AplicarSorteio();
+            _ok = _sorteio.Impedimento is null ? "Potes salvos. Pode sortear." : $"Potes salvos. {_sorteio.Impedimento}";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task SortearCopa()
+    {
+        if (_sorteio?.JaSorteada == true &&
+            !await JS.InvokeAsync<bool>("confirm", "Já existe um sorteio. Refazer e trocar os grupos?")) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var grupos = await AdminSvc.SortearCopaAsync(_ligaAtual!.LigaId, CancellationToken.None);
+            _ok = $"Sorteio feito: {string.Join(" · ", grupos.GroupBy(g => g.Grupo).OrderBy(g => g.Key).Select(g => $"Grupo {g.Key}: {string.Join(", ", g.Select(x => x.TimeNome))}"))}";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void AplicarSorteio()
+    {
+        _potePorTime.Clear();
+        foreach (var t in _sorteio?.Times ?? Array.Empty<LigaCopaPoteTimeDto>())
+            _potePorTime[t.TimeId] = t.Pote;
     }
 
     private async Task SalvarGrupos()

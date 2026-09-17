@@ -65,6 +65,15 @@ public interface ILigaAdminService
     /// <summary>Cria o jogo decisivo entre dois times com empate total numa posição de zona (não vale pontos).</summary>
     Task<LigaPartidaDto> GerarJogoDecisivoZonaAsync(Guid ligaId, Guid timeAId, Guid timeBId, CancellationToken ct);
 
+    /// <summary>Potes do sorteio da Copa, com o grupo de cada time quando o sorteio já ocorreu.</summary>
+    Task<LigaCopaSorteioDto?> GetSorteioCopaAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Define em que pote cada time da Copa entra (pote 0 ou ausente = fora da Copa).</summary>
+    Task<LigaCopaSorteioDto> ConfigurarPotesCopaAsync(Guid ligaId, LigaCopaPotesRequest request, CancellationToken ct);
+
+    /// <summary>Sorteia os grupos: cada pote distribui seus times igualmente entre os grupos.</summary>
+    Task<IReadOnlyList<LigaGrupoTimeDto>> SortearCopaAsync(Guid ligaId, CancellationToken ct);
+
     Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
 
     // Times inscritos (Liga de pontos corridos)

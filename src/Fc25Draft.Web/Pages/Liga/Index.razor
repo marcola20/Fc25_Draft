@@ -89,13 +89,14 @@
                 var posicoesGrupo = LigaDesempate.PosicoesCopa(itensGrupo, c => c.TimeId, CopaStats, _decisivos);
 
                 <!-- Copa: seletor de grupo -->
-                <div class="mb-3 d-flex gap-2">
-                    <button class="btn @(_grupoSelecionado == GrupoCopa.A ? "btn-primary" : "btn-outline-primary")" @onclick='() => _grupoSelecionado = GrupoCopa.A'>
-                        Grupo A
-                    </button>
-                    <button class="btn @(_grupoSelecionado == GrupoCopa.B ? "btn-primary" : "btn-outline-primary")" @onclick='() => _grupoSelecionado = GrupoCopa.B'>
-                        Grupo B
-                    </button>
+                <div class="mb-3 d-flex gap-2 flex-wrap">
+                    @foreach (var grupo in GruposDaCopa())
+                    {
+                        var atual = grupo;
+                        <button class="btn @(_grupoSelecionado == atual ? "btn-primary" : "btn-outline-primary")" @onclick="() => _grupoSelecionado = atual">
+                            Grupo @atual
+                        </button>
+                    }
                 </div>
 
                 <!-- Copa: tabela do grupo selecionado -->
@@ -611,6 +612,10 @@
     private int _rodadaIdx;
     private bool _loading = true;
     private GrupoCopa _grupoSelecionado = GrupoCopa.A;
+
+    /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
+    private IEnumerable<GrupoCopa> GruposDaCopa() =>
+        _classif.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g);
 
     private ShareableCard? _classifCardRef;
     private ShareableCard? _rodadaCardRef;

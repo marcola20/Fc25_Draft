@@ -163,6 +163,20 @@ public record LigaGrupoTimeDto(
     string TimeNome,
     GrupoCopa Grupo);
 
+public record LigaCopaPoteTimeDto(Guid TimeId, string TimeNome, int Pote, GrupoCopa? Grupo);
+
+/// <summary>Potes do sorteio da Copa e o que falta para sortear.</summary>
+public record LigaCopaSorteioDto(
+    Guid LigaId,
+    int TotalGrupos,
+    int TimesPorGrupo,
+    bool JaSorteada,
+    bool PodeSortear,
+    string? Impedimento,
+    IReadOnlyList<LigaCopaPoteTimeDto> Times);
+
+public record LigaCopaPotesRequest(IReadOnlyDictionary<Guid, int> PotePorTime);
+
 public record LigaConfigurarGruposRequest(
     IReadOnlyList<Guid> TimesGrupoA,
     IReadOnlyList<Guid> TimesGrupoB);

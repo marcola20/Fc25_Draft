@@ -169,11 +169,13 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.Time)
             .ToListAsync(ct);
 
-        var grupoA = grupos.Where(x => x.Grupo == GrupoCopa.A).Select(x => x.TimeId).ToList();
-        var grupoB = grupos.Where(x => x.Grupo == GrupoCopa.B).Select(x => x.TimeId).ToList();
+        var porGrupo = grupos
+            .GroupBy(x => x.Grupo)
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.TimeId).ToList());
 
-        if (grupoA.Count < 2 || grupoB.Count < 2)
-            throw new InvalidOperationException("Cada grupo da Copa precisa de pelo menos 2 times.");
+        if (porGrupo.Count < 2 || porGrupo.Values.Any(t => t.Count < 2))
+            throw new InvalidOperationException("A Copa precisa de pelo menos 2 grupos, com 2 times ou mais em cada.");
 
         // Classificação com grupo definido
         foreach (var g in grupos)
@@ -194,8 +196,8 @@ public class LigaAdminService : ILigaAdminService
         var jaTemRodadas = await _db.LigaRodadas.AnyAsync(x => x.LigaId == liga.LigaId, ct);
         if (jaTemRodadas) return;
 
-        // Cada time de um grupo enfrenta todos os do outro grupo.
-        var jogos = GerarCrossGroup(grupoA, grupoB);
+        // Fase de grupos: cada time enfrenta os do próprio grupo (grupo de 4 = 3 rodadas).
+        var jogos = GerarRodadasDosGrupos(porGrupo.Values.ToList());
         liga.TotalRodadas = jogos.Count;
         for (int r = 0; r < jogos.Count; r++)
         {
@@ -220,41 +222,30 @@ public class LigaAdminService : ILigaAdminService
     }
 
     /// <summary>
-    /// Gera schedule cross-group: cada time de A joga contra cada time de B (36 jogos, 6 rodadas).
+    /// Rodadas da fase de grupos: round-robin dentro de cada grupo, com os jogos de todos os
+    /// grupos acontecendo na mesma rodada. Grupos menores simplesmente acabam antes.
     /// </summary>
-    private static List<List<(Guid, Guid)>> GerarCrossGroup(List<Guid> a, List<Guid> b)
+    private static List<List<(Guid, Guid)>> GerarRodadasDosGrupos(List<List<Guid>> grupos)
     {
-        // Cada time de A enfrenta cada time de B (|A| × |B| jogos). Com grupos de tamanhos
-        // diferentes, o grupo menor é completado com folgas: sobram times de fora por rodada.
-        var maior = a.Count >= b.Count ? a : b;
-        var menor = a.Count >= b.Count ? b : a;
-        var menorEhA = menor == a;
+        var porGrupo = grupos
+            .Select(times => GerarRoundRobinParcial(times, times.Count - 1))
+            .ToList();
 
-        var rodadas = maior.Count;
-        var comFolga = menor.Concat(Enumerable.Repeat(Guid.Empty, rodadas - menor.Count)).ToList();
-        var resultado = new List<List<(Guid, Guid)>>(rodadas);
+        var totalRodadas = porGrupo.Max(g => g.Count);
+        var rodadas = new List<List<(Guid, Guid)>>(totalRodadas);
 
-        for (int r = 0; r < rodadas; r++)
+        for (int r = 0; r < totalRodadas; r++)
         {
-            var rodada = new List<(Guid, Guid)>(menor.Count);
+            var rodada = new List<(Guid, Guid)>();
+            foreach (var grupo in porGrupo.Where(g => r < g.Count))
+                rodada.AddRange(grupo[r]);
 
-            for (int i = 0; i < rodadas; i++)
-            {
-                var doMenor = comFolga[(i + r) % rodadas];
-                if (doMenor == Guid.Empty) continue; // time do grupo maior folga nesta rodada
-
-                var doMaior = maior[i];
-                var (timeA, timeB) = menorEhA ? (doMenor, doMaior) : (doMaior, doMenor);
-
-                // Alterna o mando entre as rodadas para equilibrar casa e fora.
-                rodada.Add(r % 2 == 0 ? (timeA, timeB) : (timeB, timeA));
-            }
-
-            resultado.Add(rodada);
+            rodadas.Add(rodada);
         }
 
-        return resultado;
+        return rodadas;
     }
+
 
     public async Task<LigaDto> EncerrarPrimeiraFaseAsync(Guid ligaId, CancellationToken ct)
     {
@@ -1052,6 +1043,128 @@ public class LigaAdminService : ILigaAdminService
         return grupos.Select(g => new LigaGrupoTimeDto(g.LigaId, g.TimeId, g.Time.TeamName, g.Grupo)).ToArray();
     }
 
+    /// <summary>Times por grupo no sorteio da Copa (4 grupos de 4 no formato atual).</summary>
+    private const int TimesPorGrupoCopa = 4;
+
+    public async Task<LigaCopaSorteioDto?> GetSorteioCopaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
+        if (liga is null || liga.Tipo != TipoCompetition.Copa) return null;
+
+        var potes = await _db.LigaCopaPotes.AsNoTracking()
+            .Where(p => p.LigaId == ligaId)
+            .Select(p => new { p.TimeId, p.Time.TeamName, p.Pote })
+            .ToListAsync(ct);
+
+        var grupos = await _db.LigaGruposTimes.AsNoTracking()
+            .Where(g => g.LigaId == ligaId)
+            .ToDictionaryAsync(g => g.TimeId, g => g.Grupo, ct);
+
+        var times = potes
+            .Select(p => new LigaCopaPoteTimeDto(p.TimeId, p.TeamName, p.Pote, grupos.TryGetValue(p.TimeId, out var g) ? g : null))
+            .OrderBy(t => t.Pote).ThenBy(t => t.TimeNome)
+            .ToList();
+
+        var totalGrupos = times.Count / TimesPorGrupoCopa;
+        var impedimento =
+            liga.Status != LigaStatus.Criada ? "A Copa já começou: o sorteio só vale antes de iniciar."
+            : times.Count == 0 ? "Monte os potes antes de sortear."
+            : ValidarPotes(times.Select(t => t.Pote).ToList());
+
+        return new LigaCopaSorteioDto(
+            ligaId,
+            totalGrupos,
+            TimesPorGrupoCopa,
+            grupos.Count > 0,
+            impedimento is null,
+            impedimento,
+            times);
+    }
+
+    /// <summary>Times precisam encher grupos inteiros e cada pote precisa render o mesmo tanto por grupo.</summary>
+    private static string? ValidarPotes(IReadOnlyList<int> potes)
+    {
+        var total = potes.Count;
+        if (total % TimesPorGrupoCopa != 0)
+            return $"São {total} times: o total precisa ser múltiplo de {TimesPorGrupoCopa} (grupos de {TimesPorGrupoCopa}).";
+
+        var grupos = total / TimesPorGrupoCopa;
+        if (grupos < 2)
+            return "A Copa precisa de pelo menos 2 grupos.";
+
+        foreach (var pote in potes.GroupBy(p => p).OrderBy(g => g.Key))
+        {
+            if (pote.Key < 1)
+                return "Todo time da Copa precisa estar num pote (1, 2, 3...).";
+            if (pote.Count() % grupos != 0)
+                return $"O pote {pote.Key} tem {pote.Count()} times: precisa ser múltiplo de {grupos} para dividir entre os grupos.";
+        }
+
+        return null;
+    }
+
+    public async Task<LigaCopaSorteioDto> ConfigurarPotesCopaAsync(Guid ligaId, LigaCopaPotesRequest request, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (liga.Tipo != TipoCompetition.Copa)
+            throw new InvalidOperationException("Os potes são exclusivos da Copa.");
+
+        if (liga.Status != LigaStatus.Criada)
+            throw new InvalidOperationException("Os potes só podem ser mexidos antes de iniciar a Copa.");
+
+        var escolhidos = request.PotePorTime.Where(x => x.Value > 0).ToList();
+        if (escolhidos.Any(x => x.Value > 9))
+            throw new InvalidOperationException("Número de pote inválido.");
+
+        var anteriores = await _db.LigaCopaPotes.Where(p => p.LigaId == ligaId).ToListAsync(ct);
+        _db.LigaCopaPotes.RemoveRange(anteriores);
+
+        foreach (var (timeId, pote) in escolhidos)
+            _db.LigaCopaPotes.Add(new LigaCopaPote { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Pote = pote });
+
+        await _db.SaveChangesAsync(ct);
+        return (await GetSorteioCopaAsync(ligaId, ct))!;
+    }
+
+    public async Task<IReadOnlyList<LigaGrupoTimeDto>> SortearCopaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var sorteio = await GetSorteioCopaAsync(ligaId, ct)
+            ?? throw new InvalidOperationException("Copa não encontrada.");
+
+        if (!sorteio.PodeSortear)
+            throw new InvalidOperationException(sorteio.Impedimento ?? "Não é possível sortear agora.");
+
+        var grupos = Enumerable.Range(0, sorteio.TotalGrupos).Select(i => (GrupoCopa)i).ToList();
+        var vagasPorGrupo = grupos.ToDictionary(g => g, _ => new List<Guid>());
+        var random = Random.Shared;
+
+        // Pote a pote: embaralha os times e distribui um a um pelos grupos, em rodadas.
+        foreach (var pote in sorteio.Times.GroupBy(t => t.Pote).OrderBy(p => p.Key))
+        {
+            var sorteados = pote.Select(t => t.TimeId).OrderBy(_ => random.Next()).ToList();
+            var porGrupo = sorteados.Count / grupos.Count;
+
+            for (int i = 0; i < sorteados.Count; i++)
+                vagasPorGrupo[grupos[i / porGrupo]].Add(sorteados[i]);
+        }
+
+        var antigos = await _db.LigaGruposTimes.Where(g => g.LigaId == ligaId).ToListAsync(ct);
+        _db.LigaGruposTimes.RemoveRange(antigos);
+
+        foreach (var (grupo, times) in vagasPorGrupo)
+            foreach (var timeId in times)
+                _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = grupo });
+
+        var liga = await _db.Ligas.FirstAsync(x => x.LigaId == ligaId, ct);
+        liga.TotalRodadas = TimesPorGrupoCopa - 1; // round-robin dentro do grupo
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+
+        await _db.SaveChangesAsync(ct);
+        return await ListGruposAsync(ligaId, ct);
+    }
+
     public async Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct)
     {
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
@@ -1080,8 +1193,8 @@ public class LigaAdminService : ILigaAdminService
         foreach (var timeId in request.TimesGrupoB)
             _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.B });
 
-        // Cada rodada cruza os grupos: o número de rodadas é o tamanho do maior deles.
-        liga.TotalRodadas = Math.Max(request.TimesGrupoA.Count, request.TimesGrupoB.Count);
+        // Round-robin dentro do grupo: rodadas = tamanho do maior grupo - 1.
+        liga.TotalRodadas = Math.Max(request.TimesGrupoA.Count, request.TimesGrupoB.Count) - 1;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
@@ -1149,21 +1262,52 @@ public class LigaAdminService : ILigaAdminService
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
 
-        var classifA = OrdenarGrupoCopa(classifs, GrupoCopa.A, decisivos).Take(2).ToList();
-        var classifB = OrdenarGrupoCopa(classifs, GrupoCopa.B, decisivos).Take(2).ToList();
+        var gruposDaCopa = classifs
+            .Where(c => c.Grupo is not null)
+            .Select(c => c.Grupo!.Value)
+            .Distinct()
+            .OrderBy(g => g)
+            .ToList();
 
-        if (classifA.Count < 2 || classifB.Count < 2)
+        var classificados = gruposDaCopa.ToDictionary(
+            g => g,
+            g => OrdenarGrupoCopa(classifs, g, decisivos).Take(2).ToList());
+
+        if (classificados.Values.Any(c => c.Count < 2))
             throw new InvalidOperationException("Precisa de ao menos 2 classificados por grupo.");
 
-        // Semifinais dentro do grupo (regulamento): Semi1 = 1ºA x 2ºA, Semi2 = 1ºB x 2ºB.
-        var jogos = new[]
+        List<LigaKnockoutJogo> jogos;
+
+        if (gruposDaCopa.Count >= 4)
         {
-            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi1, TimeCasaId = classifA[0].TimeId, TimeForaId = classifA[1].TimeId },
-            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Semi2, TimeCasaId = classifB[0].TimeId, TimeForaId = classifB[1].TimeId },
-            new LigaKnockoutJogo { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = FaseKnockout.Final }
-        };
+            // Quartas cruzando os grupos: 1ºA x 2ºB, 1ºB x 2ºA, 1ºC x 2ºD, 1ºD x 2ºC.
+            var (a, b, c, d) = (gruposDaCopa[0], gruposDaCopa[1], gruposDaCopa[2], gruposDaCopa[3]);
+            jogos = new List<LigaKnockoutJogo>
+            {
+                Jogo(FaseKnockout.QF1, classificados[a][0].TimeId, classificados[b][1].TimeId),
+                Jogo(FaseKnockout.QF2, classificados[b][0].TimeId, classificados[a][1].TimeId),
+                Jogo(FaseKnockout.QF3, classificados[c][0].TimeId, classificados[d][1].TimeId),
+                Jogo(FaseKnockout.QF4, classificados[d][0].TimeId, classificados[c][1].TimeId),
+                Jogo(FaseKnockout.Semi1),
+                Jogo(FaseKnockout.Semi2),
+                Jogo(FaseKnockout.Final)
+            };
+        }
+        else
+        {
+            // Dois grupos: semifinais dentro do próprio grupo (1º x 2º).
+            jogos = new List<LigaKnockoutJogo>
+            {
+                Jogo(FaseKnockout.Semi1, classificados[gruposDaCopa[0]][0].TimeId, classificados[gruposDaCopa[0]][1].TimeId),
+                Jogo(FaseKnockout.Semi2, classificados[gruposDaCopa[1]][0].TimeId, classificados[gruposDaCopa[1]][1].TimeId),
+                Jogo(FaseKnockout.Final)
+            };
+        }
 
         _db.LigaKnockoutJogos.AddRange(jogos);
+
+        LigaKnockoutJogo Jogo(FaseKnockout fase, Guid? casa = null, Guid? fora = null) =>
+            new() { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = fase, TimeCasaId = casa, TimeForaId = fora };
         await _db.SaveChangesAsync(ct);
 
         return await GetKnockoutDtosAsync(ligaId, ct);
@@ -1227,7 +1371,7 @@ public class LigaAdminService : ILigaAdminService
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
         var empates = new List<LigaEmpateCopaDto>();
 
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        foreach (var grupo in classifs.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g))
         {
             var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos);
             var posicoes = LigaDesempate.PosicoesCopa(doGrupo, c => c.TimeId, StatsDaClassificacao, decisivos);
@@ -1502,12 +1646,13 @@ public class LigaAdminService : ILigaAdminService
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
 
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        // Empate dentro da faixa que decide a vaga (1º-2º) deixaria o mata-mata indefinido.
+        foreach (var grupo in classifs.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g))
         {
             var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos);
             var posicoes = LigaDesempate.PosicoesCopa(doGrupo, c => c.TimeId, StatsDaClassificacao, decisivos);
 
-            for (int i = 0; i + 1 < doGrupo.Count && posicoes[i] <= 3; i++)
+            for (int i = 0; i + 1 < doGrupo.Count && posicoes[i] <= 2; i++)
             {
                 if (posicoes[i] != posicoes[i + 1]) continue;
 
@@ -2113,10 +2258,10 @@ public class LigaAdminService : ILigaAdminService
         [FaseKnockout.PlayIn_A] = "Play-In Jogo 1 (9º vs 10º)",
         [FaseKnockout.PlayIn_B] = "Play-In Jogo 2 (7º vs 8º)",
         [FaseKnockout.PlayIn_C] = "Play-In Jogo 3 (Decisivo)",
-        [FaseKnockout.QF1] = "Quartas - 1º vs Vencedor Play-In 3",
-        [FaseKnockout.QF2] = "Quartas - 2º vs Vencedor Play-In 2",
-        [FaseKnockout.QF3] = "Quartas - 3º vs 6º",
-        [FaseKnockout.QF4] = "Quartas - 4º vs 5º",
+        [FaseKnockout.QF1] = "Quartas 1 — 1º Grupo A x 2º Grupo B",
+        [FaseKnockout.QF2] = "Quartas 2 — 1º Grupo B x 2º Grupo A",
+        [FaseKnockout.QF3] = "Quartas 3 — 1º Grupo C x 2º Grupo D",
+        [FaseKnockout.QF4] = "Quartas 4 — 1º Grupo D x 2º Grupo C",
         [FaseKnockout.Semi1] = "Semifinal 1",
         [FaseKnockout.Semi2] = "Semifinal 2",
         [FaseKnockout.Final] = "Final"

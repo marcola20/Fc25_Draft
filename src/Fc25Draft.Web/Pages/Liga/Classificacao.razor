@@ -41,7 +41,7 @@
     else if (_liga?.Tipo == TipoCompetition.Copa)
     {
         <!-- Copa: tabelas separadas por grupo -->
-        @foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        @foreach (var grupo in GruposDaCopa())
         {
             var itensGrupo = OrdenarGrupo(grupo);
             if (itensGrupo.Count == 0) continue;
@@ -268,6 +268,14 @@
 
         return IgualAoLider(item) && _classif.Count(IgualAoLider) > 1;
     }
+
+    /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
+    private IEnumerable<GrupoCopa> GruposDaCopa() =>
+        (_classif ?? Array.Empty<LigaClassificacaoItemDto>())
+            .Where(c => c.Grupo is not null)
+            .Select(c => c.Grupo!.Value)
+            .Distinct()
+            .OrderBy(g => g);
 
     // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
     // para a tabela já refletir o desempate mesmo antes do próximo recálculo.
