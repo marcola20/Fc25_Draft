@@ -172,8 +172,8 @@ public class LigaAdminService : ILigaAdminService
         var grupoA = grupos.Where(x => x.Grupo == GrupoCopa.A).Select(x => x.TimeId).ToList();
         var grupoB = grupos.Where(x => x.Grupo == GrupoCopa.B).Select(x => x.TimeId).ToList();
 
-        if (grupoA.Count != 6 || grupoB.Count != 6)
-            throw new InvalidOperationException("Copa requer exatamente 6 times em cada grupo.");
+        if (grupoA.Count < 2 || grupoB.Count < 2)
+            throw new InvalidOperationException("Cada grupo da Copa precisa de pelo menos 2 times.");
 
         // Classificação com grupo definido
         foreach (var g in grupos)
@@ -194,9 +194,10 @@ public class LigaAdminService : ILigaAdminService
         var jaTemRodadas = await _db.LigaRodadas.AnyAsync(x => x.LigaId == liga.LigaId, ct);
         if (jaTemRodadas) return;
 
-        // Gera 6 rodadas com jogos cross-group (A vs B)
+        // Cada time de um grupo enfrenta todos os do outro grupo.
         var jogos = GerarCrossGroup(grupoA, grupoB);
-        for (int r = 0; r < liga.TotalRodadas; r++)
+        liga.TotalRodadas = jogos.Count;
+        for (int r = 0; r < jogos.Count; r++)
         {
             var rodada = new LigaRodada
             {
@@ -223,24 +224,33 @@ public class LigaAdminService : ILigaAdminService
     /// </summary>
     private static List<List<(Guid, Guid)>> GerarCrossGroup(List<Guid> a, List<Guid> b)
     {
-        // Round-robin across two groups: 6 rodadas × 6 jogos
-        // Usamos rotação do grupo B mantendo A fixo para distribuir os confrontos
-        var resultado = new List<List<(Guid, Guid)>>();
-        var bRot = new List<Guid>(b);
+        // Cada time de A enfrenta cada time de B (|A| × |B| jogos). Com grupos de tamanhos
+        // diferentes, o grupo menor é completado com folgas: sobram times de fora por rodada.
+        var maior = a.Count >= b.Count ? a : b;
+        var menor = a.Count >= b.Count ? b : a;
+        var menorEhA = menor == a;
 
-        for (int r = 0; r < a.Count; r++)
+        var rodadas = maior.Count;
+        var comFolga = menor.Concat(Enumerable.Repeat(Guid.Empty, rodadas - menor.Count)).ToList();
+        var resultado = new List<List<(Guid, Guid)>>(rodadas);
+
+        for (int r = 0; r < rodadas; r++)
         {
-            var rodada = new List<(Guid, Guid)>();
-            for (int i = 0; i < a.Count; i++)
+            var rodada = new List<(Guid, Guid)>(menor.Count);
+
+            for (int i = 0; i < rodadas; i++)
             {
-                if (r % 2 == 0)
-                    rodada.Add((a[i], bRot[i]));
-                else
-                    rodada.Add((bRot[i], a[i]));
+                var doMenor = comFolga[(i + r) % rodadas];
+                if (doMenor == Guid.Empty) continue; // time do grupo maior folga nesta rodada
+
+                var doMaior = maior[i];
+                var (timeA, timeB) = menorEhA ? (doMenor, doMaior) : (doMaior, doMenor);
+
+                // Alterna o mando entre as rodadas para equilibrar casa e fora.
+                rodada.Add(r % 2 == 0 ? (timeA, timeB) : (timeB, timeA));
             }
+
             resultado.Add(rodada);
-            // Rotaciona B
-            bRot = new List<Guid> { bRot[^1] }.Concat(bRot.Take(bRot.Count - 1)).ToList();
         }
 
         return resultado;
@@ -1044,7 +1054,7 @@ public class LigaAdminService : ILigaAdminService
 
     public async Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct)
     {
-        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
         if (liga.Tipo != TipoCompetition.Copa)
@@ -1053,11 +1063,11 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.Criada)
             throw new InvalidOperationException("Grupos só podem ser configurados antes de iniciar a copa.");
 
-        if (request.TimesGrupoA.Count != 6 || request.TimesGrupoB.Count != 6)
-            throw new InvalidOperationException("Cada grupo deve ter exatamente 6 times.");
+        if (request.TimesGrupoA.Count < 2 || request.TimesGrupoB.Count < 2)
+            throw new InvalidOperationException("Cada grupo precisa de pelo menos 2 times (os 2 primeiros vão ao mata-mata).");
 
         var todos = request.TimesGrupoA.Concat(request.TimesGrupoB).ToList();
-        if (todos.Distinct().Count() != 12)
+        if (todos.Distinct().Count() != todos.Count)
             throw new InvalidOperationException("Times repetidos entre os grupos.");
 
         // Remove grupos anteriores
@@ -1069,6 +1079,10 @@ public class LigaAdminService : ILigaAdminService
 
         foreach (var timeId in request.TimesGrupoB)
             _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.B });
+
+        // Cada rodada cruza os grupos: o número de rodadas é o tamanho do maior deles.
+        liga.TotalRodadas = Math.Max(request.TimesGrupoA.Count, request.TimesGrupoB.Count);
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
     }

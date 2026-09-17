@@ -258,48 +258,41 @@
     <!-- ─ Tab: Grupos Copa ─ -->
     @if (_tab == "grupos" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
     {
-        <div class="row g-3">
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header fw-bold">Grupo A</div>
-                    <div class="card-body">
-                        @for (int i = 0; i < 6; i++)
-                        {
-                            var idx = i;
-                            <div class="mb-2">
-                                <select class="form-select form-select-sm" @bind="_grupoA[idx]">
-                                    <option value="">Selecione...</option>
-                                    @foreach (var t in _times)
-                                    {
-                                        <option value="@t.TeamId">@t.TeamName</option>
-                                    }
-                                </select>
-                            </div>
-                        }
-                    </div>
-                </div>
+        <div class="alert alert-secondary py-2 small">
+            Os grupos podem ter <strong>qualquer tamanho</strong> (mínimo 2 em cada, porque os 2 primeiros de cada grupo vão ao mata-mata).
+            Cada time enfrenta <strong>todos os do outro grupo</strong>: o número de rodadas é o tamanho do maior grupo, e quem sobrar folga na rodada.
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-bold">Times da Copa</span>
+                <span class="badge bg-primary">Grupo A: @_grupoPorTime.Count(x => x.Value == GrupoCopa.A)</span>
+                <span class="badge bg-info text-dark">Grupo B: @_grupoPorTime.Count(x => x.Value == GrupoCopa.B)</span>
+                <span class="badge bg-light text-dark border">Rodadas: @RodadasDaCopa</span>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header fw-bold">Grupo B</div>
-                    <div class="card-body">
-                        @for (int i = 0; i < 6; i++)
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <tbody>
+                        @foreach (var t in _times)
                         {
-                            var idx = i;
-                            <div class="mb-2">
-                                <select class="form-select form-select-sm" @bind="_grupoB[idx]">
-                                    <option value="">Selecione...</option>
-                                    @foreach (var t in _times)
-                                    {
-                                        <option value="@t.TeamId">@t.TeamName</option>
-                                    }
-                                </select>
-                            </div>
+                            var timeId = t.TeamId;
+                            <tr>
+                                <td class="fw-semibold">@t.TeamName</td>
+                                <td style="width: 12rem">
+                                    <select class="form-select form-select-sm"
+                                            value="@(_grupoPorTime.TryGetValue(timeId, out var g) && g is not null ? g.ToString() : "")"
+                                            @onchange="e => DefinirGrupo(timeId, e.Value?.ToString())">
+                                        <option value="">Fora da Copa</option>
+                                        <option value="@GrupoCopa.A">Grupo A</option>
+                                        <option value="@GrupoCopa.B">Grupo B</option>
+                                    </select>
+                                </td>
+                            </tr>
                         }
-                    </div>
-                </div>
+                    </tbody>
+                </table>
             </div>
-            <div class="col-12">
+            <div class="card-footer">
                 <button class="btn btn-primary" @onclick="SalvarGrupos" disabled="@_saving">Salvar Grupos</button>
             </div>
         </div>
@@ -866,8 +859,14 @@
     private IReadOnlyList<LigaEmpateCopaDto> _empatesCopa = Array.Empty<LigaEmpateCopaDto>();
     private IReadOnlyList<LigaEmpateZonaDto> _empatesZona = Array.Empty<LigaEmpateZonaDto>();
     private LigaRodadaDto? _rodadaDesempate;
-    private readonly string[] _grupoA = new string[6];
-    private readonly string[] _grupoB = new string[6];
+    private readonly Dictionary<Guid, GrupoCopa?> _grupoPorTime = new();
+
+    private int RodadasDaCopa => Math.Max(
+        _grupoPorTime.Count(x => x.Value == GrupoCopa.A),
+        _grupoPorTime.Count(x => x.Value == GrupoCopa.B));
+
+    private void DefinirGrupo(Guid timeId, string? valor) =>
+        _grupoPorTime[timeId] = Enum.TryParse<GrupoCopa>(valor, out var grupo) ? grupo : null;
 
     // Times
     private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
@@ -1100,9 +1099,9 @@
 
     private void PreencherSelects()
     {
-        var a = _grupos.Where(g => g.Grupo == GrupoCopa.A).Select(g => g.TimeId.ToString()).ToArray();
-        var b = _grupos.Where(g => g.Grupo == GrupoCopa.B).Select(g => g.TimeId.ToString()).ToArray();
-        for (int i = 0; i < 6; i++) { _grupoA[i] = i < a.Length ? a[i] : ""; _grupoB[i] = i < b.Length ? b[i] : ""; }
+        _grupoPorTime.Clear();
+        foreach (var g in _grupos)
+            _grupoPorTime[g.TimeId] = g.Grupo;
     }
 
     private async Task SalvarLiga()
@@ -1325,14 +1324,14 @@
 
     private async Task SalvarGrupos()
     {
-        var a = _grupoA.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
-        var b = _grupoB.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
-        if (a.Count != 6 || b.Count != 6) { _erro = "Selecione exatamente 6 times em cada grupo."; return; }
+        var a = _grupoPorTime.Where(x => x.Value == GrupoCopa.A).Select(x => x.Key).ToList();
+        var b = _grupoPorTime.Where(x => x.Value == GrupoCopa.B).Select(x => x.Key).ToList();
+        if (a.Count < 2 || b.Count < 2) { _erro = "Cada grupo precisa de pelo menos 2 times."; return; }
         _saving = true;
         try
         {
             await AdminSvc.ConfigurarGruposCopaAsync(_ligaAtual!.LigaId, new LigaConfigurarGruposRequest(a, b), CancellationToken.None);
-            _ok = "Grupos configurados.";
+            _ok = $"Grupos configurados: {a.Count} x {b.Count} times, {Math.Max(a.Count, b.Count)} rodadas.";
             await CarregarDados();
         }
         catch (Exception ex) { _erro = ex.Message; }
