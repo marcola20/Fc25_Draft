@@ -50,6 +50,7 @@ public class LayoutNavigationService
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
+            new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
@@ -249,6 +250,18 @@ public class LayoutNavigationService
             }
         },
         ["/draft/protecao"] = CreateDefinition("Jogadores Protegidos", "Draft", "/draft/protecao"),
+        ["/admin/temporada"] = new PageDefinition
+        {
+            Route = "/admin/temporada",
+            Title = "Virada de Temporada",
+            Subtitle = "Playoff de acesso e próxima temporada — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Virada de Temporada")
+            }
+        },
         ["/admin/draft-expansao"] = new PageDefinition
         {
             Route = "/admin/draft-expansao",

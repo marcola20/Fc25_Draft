@@ -1,0 +1,336 @@
+@page "/admin/temporada"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ILigaTemporadaService TemporadaSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Virada de Temporada</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_temporadas.Count == 0)
+    {
+        <div class="alert alert-info">Nenhuma liga com temporada cadastrada.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <label class="form-label mb-0">Temporada</label>
+            <select class="form-select w-auto" @onchange="OnTemporadaChanged">
+                @foreach (var t in _temporadas)
+                {
+                    <option value="@t" selected="@(t == _temporada)">@t</option>
+                }
+            </select>
+        </div>
+
+        @if (_resumo is null)
+        {
+            <div class="alert alert-info">Temporada sem Série A ou Série B.</div>
+        }
+        else
+        {
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">Divisões</div>
+                        <ul class="list-group list-group-flush">
+                            @foreach (var liga in new[] { _resumo.SerieA, _resumo.SerieB }.Where(l => l is not null))
+                            {
+                                <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge bg-dark">@LigaLabels.Competicao(liga!.Tipo, liga.Divisao)</span>
+                                    <span class="fw-semibold">@liga.Nome</span>
+                                    <span class="badge @(liga.Status == LigaStatus.Encerrada ? "bg-success" : "bg-warning text-dark")">
+                                        @(liga.Status == LigaStatus.Encerrada ? "Encerrada" : "Em andamento")
+                                    </span>
+                                    <span class="text-muted small ms-auto">
+                                        @(liga.Divisao == Divisao.SerieA ? "↓" : "↑")@(liga.VagasDiretas ?? 0) direto · @(liga.VagasPlayoff ?? 0) playoff
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">Playoff de acesso</div>
+                        <div class="card-body">
+                            @if (_resumo.Playoffs.Count == 0)
+                            {
+                                <p class="text-muted small mb-2">
+                                    Jogo único entre quem está logo acima da zona de queda na Série A e quem ficou logo abaixo do acesso na Série B.
+                                    Ele não soma pontos e entra como rodada extra da Série A, onde você registra o placar (e os pênaltis, se empatar).
+                                </p>
+                                <button class="btn btn-primary" @onclick="CriarPlayoff" disabled="@(_salvando || !_resumo.PodeCriarPlayoff)">
+                                    Criar playoff de acesso
+                                </button>
+                                @if (!_resumo.PodeCriarPlayoff)
+                                {
+                                    <div class="form-text">Disponível com as duas divisões encerradas e vaga de playoff configurada.</div>
+                                }
+                            }
+                            else
+                            {
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var p in _resumo.Playoffs)
+                                    {
+                                        <li class="list-group-item d-flex flex-wrap align-items-center gap-2 px-0">
+                                            <span class="fw-semibold">@p.TimeSerieANome</span>
+                                            <span class="fw-bold">@(p.Status == PartidaStatus.Agendada ? "vs" : $"{p.GolsSerieA} – {p.GolsSerieB}")</span>
+                                            <span class="fw-semibold">@p.TimeSerieBNome</span>
+                                            @if (p.VencedorNome is not null)
+                                            {
+                                                <span class="badge bg-success ms-auto">Vaga na Série A: @p.VencedorNome</span>
+                                            }
+                                            else if (p.Status == PartidaStatus.Encerrada)
+                                            {
+                                                <span class="badge bg-warning text-dark ms-auto">Empatado — registre os pênaltis</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary ms-auto">A disputar</span>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                                @if (_resumo.SerieA is not null)
+                                {
+                                    <a class="btn btn-sm btn-outline-secondary mt-2" href="@($"/admin/liga/{_resumo.SerieA.LigaId}?tab=rodadas")">Abrir rodadas da Série A</a>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Como a temporada termina</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr><th>#</th><th>Time</th><th>Divisão</th><th>Situação</th><th>Próxima temporada</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in _resumo.Times)
+                            {
+                                <tr class="@ZonaEstilo.Linha(t.Zona)">
+                                    <td>@t.Posicao</td>
+                                    <td class="fw-semibold">@t.Nome</td>
+                                    <td>@LigaLabels.DivisaoNome(t.Divisao)</td>
+                                    <td>@t.Situacao</td>
+                                    <td>@(t.DivisaoProxima is null ? "—" : LigaLabels.DivisaoNome(t.DivisaoProxima.Value))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header fw-bold">Gerar temporada @(_temporada + 1)</div>
+                <div class="card-body">
+                    @if (_resumo.Impedimento is not null)
+                    {
+                        <div class="alert alert-warning mb-3">@_resumo.Impedimento</div>
+                    }
+
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Nome da Série A</label>
+                            <input class="form-control" @bind="_nomeA" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Nome da Série B</label>
+                            <input class="form-control" @bind="_nomeB" disabled="@(!_criarSerieB)" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Início</label>
+                            <input type="date" class="form-control" @bind="_inicio" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Fim</label>
+                            <input type="date" class="form-control" @bind="_fim" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Série A: caem / playoff</label>
+                            <div class="d-flex gap-1">
+                                <input type="number" min="0" class="form-control" @bind="_vagasDiretasA" />
+                                <input type="number" min="0" class="form-control" @bind="_vagasPlayoffA" />
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Série B: sobem / playoff</label>
+                            <div class="d-flex gap-1">
+                                <input type="number" min="0" class="form-control" @bind="_vagasDiretasB" disabled="@(!_criarSerieB)" />
+                                <input type="number" min="0" class="form-control" @bind="_vagasPlayoffB" disabled="@(!_criarSerieB)" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="criarB" @bind="_criarSerieB" />
+                                <label class="form-check-label" for="criarB">Criar a Série B</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (_criarSerieB && _resumo.TimesSemDivisao.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Times que entram na Série B <span class="text-muted small">(não disputaram esta temporada)</span></label>
+                            <div class="border rounded p-2" style="max-height: 14rem; overflow-y: auto">
+                                @foreach (var t in _resumo.TimesSemDivisao)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="extra-@t.TimeId"
+                                               checked="@_extras.Contains(t.TimeId)" @onchange="() => AlternarExtra(t.TimeId)" />
+                                        <label class="form-check-label" for="extra-@t.TimeId">@t.Nome <span class="text-muted small">elenco @t.Elenco</span></label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="alert alert-light border mt-3 mb-2 small">
+                        Série A: <strong>@ContarProxima(Divisao.SerieA)</strong> times ·
+                        Série B: <strong>@(ContarProxima(Divisao.SerieB) + _extras.Count)</strong> times
+                        @if (_resumo.Times.Any(t => t.DivisaoProxima is null))
+                        {
+                            <span class="text-warning">· @_resumo.Times.Count(t => t.DivisaoProxima is null) time(s) dependem do playoff</span>
+                        }
+                    </div>
+
+                    <button class="btn btn-success" @onclick="GerarProxima" disabled="@(_salvando || !_resumo.PodeGerarProxima)">
+                        Gerar temporada @(_temporada + 1)
+                    </button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private int _temporada;
+    private TemporadaResumoDto? _resumo;
+
+    private string _nomeA = "", _nomeB = "";
+    private DateTime _inicio = DateTime.Today, _fim = DateTime.Today.AddMonths(2);
+    private int _vagasDiretasA = 1, _vagasPlayoffA = 1, _vagasDiretasB = 1, _vagasPlayoffB = 1;
+    private bool _criarSerieB = true;
+    private readonly HashSet<Guid> _extras = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/temporada"));
+        try
+        {
+            _temporadas = await TemporadaSvc.ListTemporadasAsync(CancellationToken.None);
+            _temporada = _temporadas.FirstOrDefault();
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _resumo = _temporadas.Count == 0 ? null : await TemporadaSvc.GetResumoAsync(_temporada, CancellationToken.None);
+        _extras.Clear();
+        if (_resumo is null) return;
+
+        var proxima = _temporada + 1;
+        _nomeA = ProximoNome(_resumo.SerieA?.Nome, proxima, "Série A");
+        _nomeB = ProximoNome(_resumo.SerieB?.Nome, proxima, "Série B");
+        _criarSerieB = true;
+        _vagasDiretasA = _vagasPlayoffA = _vagasDiretasB = _vagasPlayoffB = 1;
+    }
+
+    /// <summary>Repete o nome da divisão trocando o ano; sem ano no nome, usa "Série X {temporada}".</summary>
+    private static string ProximoNome(string? nomeAtual, int proximaTemporada, string padrao)
+    {
+        if (string.IsNullOrWhiteSpace(nomeAtual)) return $"{padrao} {proximaTemporada}";
+
+        var comAno = System.Text.RegularExpressions.Regex.Replace(
+            nomeAtual, @"(19|2[0-9])[0-9]{2}", proximaTemporada.ToString());
+
+        return comAno == nomeAtual ? $"{nomeAtual} {proximaTemporada}" : comAno;
+    }
+
+    private async Task OnTemporadaChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var t)) return;
+        _erro = null; _ok = null;
+        _temporada = t;
+        await CarregarAsync();
+    }
+
+    private void AlternarExtra(Guid timeId)
+    {
+        if (!_extras.Remove(timeId)) _extras.Add(timeId);
+    }
+
+    private int ContarProxima(Divisao divisao) => _resumo?.Times.Count(t => t.DivisaoProxima == divisao) ?? 0;
+
+    private async Task CriarPlayoff()
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var jogos = await TemporadaSvc.CriarPlayoffAcessoAsync(_temporada, CancellationToken.None);
+            _ok = $"Playoff criado: {string.Join(", ", jogos.Select(j => $"{j.TimeSerieANome} x {j.TimeSerieBNome}"))}.";
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task GerarProxima()
+    {
+        if (_resumo is null) return;
+
+        var resumoTimes = $"Série A com {ContarProxima(Divisao.SerieA)} times" +
+                          (_criarSerieB ? $" e Série B com {ContarProxima(Divisao.SerieB) + _extras.Count}" : "");
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Gerar a temporada {_temporada + 1} ({resumoTimes})?")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var criadas = await TemporadaSvc.GerarProximaTemporadaAsync(
+                new GerarProximaTemporadaRequest(
+                    _temporada, _nomeA, _nomeB, _inicio, _fim,
+                    _vagasDiretasA, _vagasPlayoffA, _vagasDiretasB, _vagasPlayoffB,
+                    _extras.ToList(), _criarSerieB),
+                CancellationToken.None);
+
+            _ok = $"Temporada {_temporada + 1} criada: {string.Join(", ", criadas.Select(l => l.Nome))}. Gere as rodadas em Gerenciar Liga.";
+            _temporadas = await TemporadaSvc.ListTemporadasAsync(CancellationToken.None);
+            _temporada = _temporada + 1;
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}
