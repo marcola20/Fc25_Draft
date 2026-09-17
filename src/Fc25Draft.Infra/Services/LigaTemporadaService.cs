@@ -56,7 +56,8 @@ public class LigaTemporadaService : ILigaTemporadaService
             podeCriarPlayoff,
             impedimento is null,
             impedimento,
-            proximaExiste);
+            proximaExiste,
+            await CarregarSupercopaAsync(temporada, ct));
     }
 
     public async Task<IReadOnlyList<TemporadaPlayoffDto>> CriarPlayoffAcessoAsync(int temporada, CancellationToken ct)
@@ -98,6 +99,29 @@ public class LigaTemporadaService : ILigaTemporadaService
 
         var atualizado = await CarregarAsync(temporada, ct);
         return atualizado!.Playoffs.Select(p => p.Dto).ToList();
+    }
+
+    public async Task<LigaDto> CriarSupercopaAsync(int temporada, string? nome, DateTime data, CancellationToken ct)
+    {
+        var supercopa = await CarregarSupercopaAsync(temporada, ct);
+        if (supercopa.LigaId is not null)
+            throw new InvalidOperationException("A Supercopa desta temporada já foi criada.");
+        if (!supercopa.PodeCriar)
+            throw new InvalidOperationException(supercopa.Impedimento ?? "Não é possível criar a Supercopa agora.");
+
+        var criada = await _ligas.CreateAsync(new LigaCreateRequest(
+            string.IsNullOrWhiteSpace(nome) ? $"Supercopa CBFV {temporada}" : nome.Trim(),
+            data, data, TipoCompetition.Supercopa, temporada), ct);
+
+        var casa = supercopa.CampeaoSerieAId!.Value;
+        var fora = supercopa.CampeaoCopaId!.Value;
+
+        await _ligas.ConfigurarTimesLigaAsync(criada.LigaId, new[] { casa, fora }, ct);
+        await _ligas.IniciarPrimeiraFaseAsync(criada.LigaId, ct);
+        var rodada = await _ligas.CreateRodadaAsync(criada.LigaId, ct);
+        await _ligas.CreatePartidaAsync(rodada.RodadaId, new LigaPartidaCreateRequest(casa, fora), ct);
+
+        return (await _ligas.GetByIdAsync(criada.LigaId, ct))!;
     }
 
     public async Task<IReadOnlyList<LigaDto>> GerarProximaTemporadaAsync(GerarProximaTemporadaRequest request, CancellationToken ct)
@@ -149,6 +173,53 @@ public class LigaTemporadaService : ILigaTemporadaService
         }
 
         return criadas;
+    }
+
+    private async Task<TemporadaSupercopaDto> CarregarSupercopaAsync(int temporada, CancellationToken ct)
+    {
+        var daTemporada = await _db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada == temporada)
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.CampeaoTimeId, Campeao = l.Campeao != null ? l.Campeao.TeamName : null })
+            .ToListAsync(ct);
+
+        var serieA = daTemporada.FirstOrDefault(l => l.Tipo == TipoCompetition.Liga && l.Divisao == Divisao.SerieA);
+        var copa = daTemporada.FirstOrDefault(l => l.Tipo == TipoCompetition.Copa);
+        var supercopa = daTemporada.FirstOrDefault(l => l.Tipo == TipoCompetition.Supercopa);
+
+        int? golsA = null, golsCopa = null;
+        if (supercopa is not null)
+        {
+            var partida = await _db.LigaPartidas.AsNoTracking()
+                .Where(p => p.Rodada.LigaId == supercopa.LigaId)
+                .OrderBy(p => p.Rodada.Numero)
+                .FirstOrDefaultAsync(ct);
+
+            if (partida is not null && partida.Status != PartidaStatus.Agendada)
+            {
+                var casaEhSerieA = partida.TimeCasaId == serieA?.CampeaoTimeId;
+                golsA = casaEhSerieA ? partida.GolsCasa : partida.GolsFora;
+                golsCopa = casaEhSerieA ? partida.GolsFora : partida.GolsCasa;
+            }
+        }
+
+        var impedimento =
+            serieA?.CampeaoTimeId is null ? "A Série A da temporada ainda não tem campeão."
+            : copa is null ? "A temporada não tem Copa cadastrada."
+            : copa.CampeaoTimeId is null ? "A Copa da temporada ainda não tem campeão."
+            : serieA.CampeaoTimeId == copa.CampeaoTimeId ? "O mesmo time venceu a Série A e a Copa: não há Supercopa."
+            : null;
+
+        return new TemporadaSupercopaDto(
+            supercopa?.LigaId,
+            supercopa?.Nome,
+            supercopa?.Status,
+            serieA?.CampeaoTimeId, serieA?.Campeao,
+            copa?.CampeaoTimeId, copa?.Campeao,
+            golsA, golsCopa,
+            supercopa?.CampeaoTimeId,
+            supercopa?.Campeao,
+            supercopa is null && impedimento is null,
+            impedimento);
     }
 
     // ── Estado da temporada ──────────────────────────────────────────────────

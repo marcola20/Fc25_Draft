@@ -124,6 +124,55 @@
             </div>
 
             <div class="card mb-3">
+                <div class="card-header fw-bold">Supercopa</div>
+                <div class="card-body">
+                    @{ var sc = _resumo.Supercopa; }
+                    <p class="text-muted small mb-2">
+                        Jogo único entre o <strong>campeão da Série A</strong> e o <strong>campeão da Copa</strong> da temporada.
+                    </p>
+
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="badge bg-success">Série A: @(sc.CampeaoSerieANome ?? "—")</span>
+                        <span class="text-muted">x</span>
+                        <span class="badge bg-primary">Copa: @(sc.CampeaoCopaNome ?? "—")</span>
+                        @if (sc.GolsSerieA is not null)
+                        {
+                            <span class="fw-bold">@sc.GolsSerieA – @sc.GolsCopa</span>
+                        }
+                        @if (sc.CampeaoNome is not null)
+                        {
+                            <span class="badge bg-warning text-dark">🏆 Campeão: @sc.CampeaoNome</span>
+                        }
+                    </div>
+
+                    @if (sc.LigaId is null)
+                    {
+                        <div class="d-flex flex-wrap align-items-end gap-2">
+                            <div>
+                                <label class="form-label">Nome</label>
+                                <input class="form-control" @bind="_nomeSupercopa" placeholder="@($"Supercopa CBFV {_temporada}")" />
+                            </div>
+                            <div>
+                                <label class="form-label">Data</label>
+                                <input type="date" class="form-control" @bind="_dataSupercopa" />
+                            </div>
+                            <button class="btn btn-primary" @onclick="CriarSupercopa" disabled="@(_salvando || !sc.PodeCriar)">Criar Supercopa</button>
+                        </div>
+                        @if (sc.Impedimento is not null)
+                        {
+                            <div class="form-text">@sc.Impedimento</div>
+                        }
+                    }
+                    else
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@($"/admin/liga/{sc.LigaId}?tab=rodadas")">
+                            Abrir @sc.Nome (@(sc.Status == LigaStatus.Encerrada ? "encerrada" : "registrar o jogo"))
+                        </a>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-3">
                 <div class="card-header fw-bold">Como a temporada termina</div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
@@ -241,6 +290,8 @@
     private int _vagasDiretasA = 1, _vagasPlayoffA = 1, _vagasDiretasB = 1, _vagasPlayoffB = 1;
     private bool _criarSerieB = true;
     private readonly HashSet<Guid> _extras = new();
+    private string _nomeSupercopa = "";
+    private DateTime _dataSupercopa = DateTime.Today;
 
     protected override async Task OnInitializedAsync()
     {
@@ -293,6 +344,20 @@
     }
 
     private int ContarProxima(Divisao divisao) => _resumo?.Times.Count(t => t.DivisaoProxima == divisao) ?? 0;
+
+    private async Task CriarSupercopa()
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var liga = await TemporadaSvc.CriarSupercopaAsync(_temporada, _nomeSupercopa, _dataSupercopa, CancellationToken.None);
+            _ok = $"{liga.Nome} criada. Registre o placar na rodada da competição.";
+            _nomeSupercopa = "";
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
 
     private async Task CriarPlayoff()
     {

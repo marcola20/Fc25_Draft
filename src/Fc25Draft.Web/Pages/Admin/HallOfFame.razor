@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
@@ -57,6 +58,18 @@
                             <option value="@TipoCompetition.Supercopa">Supercopa</option>
                         </select>
                     </div>
+
+                    @if (_formTipo == TipoCompetition.Liga)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Divisão</label>
+                            <select class="form-select" @bind="_formDivisao">
+                                <option value="">Sem divisão (antes da Série B)</option>
+                                <option value="@Divisao.SerieA">Série A</option>
+                                <option value="@Divisao.SerieB">Série B</option>
+                            </select>
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label class="form-label">Técnico</label>
@@ -127,7 +140,7 @@
                                     <td class="fw-bold">@entrada.TimeCampeao</td>
                                     <td class="text-muted">@(entrada.Tecnico ?? "—")</td>
                                     <td>@entrada.Descricao</td>
-                                    <td class="text-center"><span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span></td>
+                                    <td class="text-center"><span class="badge bg-dark">@RotuloCompeticao(entrada)</span></td>
                                     <td class="text-center text-muted">@(entrada.Temporada is not null ? TemporadaLabel(entrada.Temporada) : (entrada.Ano?.ToString() ?? "—"))</td>
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(entrada)" disabled="@_saving">Editar</button>
@@ -176,6 +189,7 @@
     private string _formTecnico = string.Empty;
     private string _formDescricao = string.Empty;
     private TipoCompetition _formTipo = TipoCompetition.Liga;
+    private Divisao? _formDivisao;
     private int? _formAno;
     private string _formTemporada = string.Empty;
 
@@ -208,14 +222,14 @@
             if (_editandoId.HasValue)
             {
                 await HallOfFameService.UpdateAsync(_editandoId.Value,
-                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada),
+                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada, _formDivisao),
                     CancellationToken.None);
                 _ok = "Campeão atualizado.";
             }
             else
             {
                 await HallOfFameService.CreateAsync(
-                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada),
+                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada, _formDivisao),
                     CancellationToken.None);
                 _ok = "Campeão adicionado.";
             }
@@ -239,6 +253,7 @@
         _formTecnico = entrada.Tecnico ?? string.Empty;
         _formDescricao = entrada.Descricao;
         _formTipo = entrada.Tipo;
+        _formDivisao = entrada.Divisao;
         _formAno = entrada.Ano;
         _formTemporada = entrada.Temporada ?? string.Empty;
         _erro = null; _ok = null;
@@ -253,6 +268,7 @@
         _formTecnico = string.Empty;
         _formDescricao = string.Empty;
         _formTipo = TipoCompetition.Liga;
+        _formDivisao = null;
         _formAno = null;
         _formTemporada = string.Empty;
     }
@@ -280,6 +296,8 @@
             _saving = false;
         }
     }
+
+    private static string RotuloCompeticao(HallOfFameEntryDto e) => LigaLabels.Competicao(e.Tipo, e.Divisao);
 
     private static string TipoLabel(TipoCompetition tipo) => tipo switch
     {

@@ -75,6 +75,53 @@ public class LigaPublicService : ILigaPublicService
             c.Grupo)).ToArray();
     }
 
+    public async Task<IReadOnlyList<TimeTrajetoriaDto>> GetTrajetoriaTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var participacoes = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(c => c.TimeId == timeId
+                        && c.Liga.Tipo == TipoCompetition.Liga
+                        && c.Liga.Divisao != null
+                        && c.Liga.Temporada != null)
+            .Select(c => new
+            {
+                Temporada = c.Liga.Temporada!.Value,
+                Divisao = c.Liga.Divisao!.Value,
+                c.Liga.Nome,
+                c.Liga.Status,
+                c.Liga.VagasDiretas,
+                c.Liga.VagasPlayoff,
+                Campeao = c.Liga.CampeaoTimeId == timeId,
+                c.Posicao,
+                TotalTimes = _db.LigaClassificacoes.Count(x => x.LigaId == c.LigaId)
+            })
+            .OrderBy(c => c.Temporada)
+            .ToListAsync(ct);
+
+        var trajetoria = new List<TimeTrajetoriaDto>(participacoes.Count);
+
+        for (int i = 0; i < participacoes.Count; i++)
+        {
+            var p = participacoes[i];
+            var regra = LigaRegraZonas.De(TipoCompetition.Liga, p.Divisao, p.VagasDiretas, p.VagasPlayoff);
+            var encerrada = p.Status == LigaStatus.Encerrada;
+
+            // Subiu ou desceu = comparação com a divisão da temporada anterior do próprio time.
+            var anterior = i > 0 ? participacoes[i - 1] : null;
+            var movimento = anterior is null || anterior.Divisao == p.Divisao
+                ? null
+                : anterior.Divisao == Divisao.SerieB ? "Promovido" : "Rebaixado";
+
+            trajetoria.Add(new TimeTrajetoriaDto(
+                p.Temporada, p.Divisao, p.Nome, p.Posicao, p.TotalTimes, encerrada, p.Campeao,
+                encerrada ? LigaZonas.Zona(regra, p.Posicao, p.TotalTimes) : ZonaClassificacao.Nenhuma,
+                movimento));
+        }
+
+        trajetoria.Reverse();
+        return trajetoria;
+    }
+
     private const string SemTimeLabel = "Sem time";
 
     /// <summary>

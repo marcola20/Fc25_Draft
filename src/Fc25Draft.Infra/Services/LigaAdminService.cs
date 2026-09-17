@@ -267,7 +267,28 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.PrimeiraFase)
             throw new InvalidOperationException("Liga não está na primeira fase.");
 
-        if (liga.Tipo == TipoCompetition.Copa)
+        if (liga.Tipo == TipoCompetition.Supercopa)
+        {
+            // Jogo único: o campeão sai do placar (ou dos pênaltis), sem passar pela classificação.
+            var decisao = await _db.LigaPartidas.AsNoTracking()
+                .Where(p => p.Rodada.LigaId == ligaId)
+                .OrderBy(p => p.Rodada.Numero)
+                .FirstOrDefaultAsync(ct)
+                ?? throw new InvalidOperationException("A Supercopa não tem partida cadastrada.");
+
+            if (decisao.Status != PartidaStatus.Encerrada)
+                throw new InvalidOperationException("Encerre a partida da Supercopa antes de encerrar a competição.");
+
+            var campeao = LigaDesempate.VencedorDoJogoDecisivo(
+                decisao.TimeCasaId, decisao.TimeForaId, decisao.GolsCasa, decisao.GolsFora,
+                decisao.TemPenaltis, decisao.PenaltisVencedorId)
+                ?? throw new InvalidOperationException(
+                    "A Supercopa terminou empatada. Registre o vencedor nos pênaltis antes de encerrar.");
+
+            liga.Status = LigaStatus.Encerrada;
+            liga.CampeaoTimeId = campeao;
+        }
+        else if (liga.Tipo == TipoCompetition.Copa)
         {
             // Empate sem jogo decisivo no topo do grupo deixaria a semifinal indefinida.
             await GarantirDesempatesDaCopaAsync(ligaId, ct);
@@ -1063,8 +1084,9 @@ public class LigaAdminService : ILigaAdminService
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
-        if (liga.Tipo != TipoCompetition.Liga)
-            throw new InvalidOperationException("A inscrição de times avulsa aplica-se apenas à Liga (pontos corridos). Use os grupos na Copa.");
+        // Copa inscreve pelos grupos; Liga e Supercopa inscrevem a lista de times direto.
+        if (liga.Tipo == TipoCompetition.Copa)
+            throw new InvalidOperationException("Na Copa a inscrição é feita pelos grupos, não pela lista de times.");
 
         if (liga.Status != LigaStatus.Criada)
             throw new InvalidOperationException("Os times só podem ser configurados antes de iniciar a liga.");

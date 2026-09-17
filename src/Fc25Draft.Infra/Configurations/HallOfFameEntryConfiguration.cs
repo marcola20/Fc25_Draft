@@ -12,6 +12,7 @@ public class HallOfFameEntryConfiguration : IEntityTypeConfiguration<HallOfFameE
         e.HasKey(x => x.HallOfFameId);
         e.Property(x => x.Descricao).IsRequired().HasMaxLength(200);
         e.Property(x => x.Tipo).HasConversion<int>().HasDefaultValue(TipoCompetition.Liga);
+        e.Property(x => x.Divisao).HasConversion<int?>();
         e.Property(x => x.TimeCampeao).IsRequired().HasMaxLength(120);
         e.Property(x => x.Tecnico).HasMaxLength(120);
         e.Property(x => x.Temporada).HasMaxLength(60);

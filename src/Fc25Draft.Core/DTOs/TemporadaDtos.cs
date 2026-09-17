@@ -28,6 +28,22 @@ public record TemporadaPlayoffDto(
 /// <summary>Time sem divisão na temporada (ex.: entrou pelo draft de expansão).</summary>
 public record TemporadaTimeLivreDto(Guid TimeId, string Nome, int Elenco);
 
+/// <summary>Supercopa da temporada: campeão da Série A x campeão da Copa, em jogo único.</summary>
+public record TemporadaSupercopaDto(
+    Guid? LigaId,
+    string? Nome,
+    LigaStatus? Status,
+    Guid? CampeaoSerieAId,
+    string? CampeaoSerieANome,
+    Guid? CampeaoCopaId,
+    string? CampeaoCopaNome,
+    int? GolsSerieA,
+    int? GolsCopa,
+    Guid? CampeaoId,
+    string? CampeaoNome,
+    bool PodeCriar,
+    string? Impedimento);
+
 public record TemporadaResumoDto(
     int Temporada,
     LigaDto? SerieA,
@@ -38,7 +54,8 @@ public record TemporadaResumoDto(
     bool PodeCriarPlayoff,
     bool PodeGerarProxima,
     string? Impedimento,
-    bool ProximaTemporadaJaExiste);
+    bool ProximaTemporadaJaExiste,
+    TemporadaSupercopaDto Supercopa);
 
 public record GerarProximaTemporadaRequest(
     int TemporadaOrigem,

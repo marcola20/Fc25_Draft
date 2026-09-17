@@ -21,6 +21,9 @@ public interface ILigaPublicService
     /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
     Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Trajetória do time por temporada: divisão, posição, títulos, acessos e rebaixamentos.</summary>
+    Task<IReadOnlyList<TimeTrajetoriaDto>> GetTrajetoriaTimeAsync(Guid timeId, CancellationToken ct);
+
     /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
     Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);
 }

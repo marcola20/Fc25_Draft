@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Services
 @inject IHallOfFameService HallOfFameService
 @inject EscudoService EscudoService
@@ -54,7 +55,7 @@
                                         }
                                         <p class="text-muted small mb-2">@entrada.Descricao</p>
                                         <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
-                                            <span class="badge bg-dark">@TipoLabel(entrada.Tipo)</span>
+                                            <span class="badge bg-dark">@LigaLabels.Competicao(entrada.Tipo, entrada.Divisao)</span>
                                             @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
                                             {
                                                 <span class="badge bg-secondary text-wrap">@TemporadaLabel(entrada.Temporada)</span>

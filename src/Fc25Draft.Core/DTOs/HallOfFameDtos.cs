@@ -7,6 +7,7 @@ public record HallOfFameEntryDto(
     Guid Id,
     string Descricao,
     TipoCompetition Tipo,
+    Divisao? Divisao,
     string TimeCampeao,
     string? Tecnico,
     int? Ano,
@@ -20,7 +21,8 @@ public record HallOfFameCreateRequest(
     [Required, MaxLength(120)] string TimeCampeao,
     [MaxLength(120)] string? Tecnico = null,
     int? Ano = null,
-    [MaxLength(60)] string? Temporada = null);
+    [MaxLength(60)] string? Temporada = null,
+    Divisao? Divisao = null);
 
 public record HallOfFameUpdateRequest(
     [Required, MaxLength(200)] string Descricao,
@@ -28,4 +30,5 @@ public record HallOfFameUpdateRequest(
     [Required, MaxLength(120)] string TimeCampeao,
     [MaxLength(120)] string? Tecnico = null,
     int? Ano = null,
-    [MaxLength(60)] string? Temporada = null);
+    [MaxLength(60)] string? Temporada = null,
+    Divisao? Divisao = null);

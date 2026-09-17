@@ -1,4 +1,5 @@
 using Fc25Draft.Core.Enums;
+using Fc25Draft.Core.Utilities;
 using System.ComponentModel.DataAnnotations;
 
 namespace Fc25Draft.Core.DTOs;
@@ -256,6 +257,18 @@ public record TimeHistoricoJogadorDto(
     bool NoElencoAtual,
     int Gols,
     int Assistencias);
+
+/// <summary>Uma temporada na trajetória do time: onde jogou, como terminou e se subiu ou desceu.</summary>
+public record TimeTrajetoriaDto(
+    int Temporada,
+    Divisao Divisao,
+    string LigaNome,
+    int Posicao,
+    int TotalTimes,
+    bool Encerrada,
+    bool Campeao,
+    ZonaClassificacao Zona,
+    string? Movimento);
 
 public record TimeHistoricoDto(
     Guid TimeId,
