@@ -240,23 +240,30 @@
 
             <p class="fmt-desc">
                 Todos os times da temporada entram na Copa, divididos em <strong>4 grupos</strong> por <strong>sorteio em potes</strong>.
-                Com <strong>18 times</strong> ficam <strong>2 grupos de 4 e 2 de 5</strong>; os times do último pote é que completam os grupos maiores.
-                Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>.
+                Com <strong>18 times</strong> ficam <strong>2 grupos de 4 (A e B) e 2 de 5 (C e D)</strong>; os times do último pote é que completam os grupos maiores.
+                Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>. A fase de grupos tem
+                <strong>5 rodadas</strong>: nos grupos de 4, os times folgam em duas delas.
             </p>
 
             <div class="fmt-groups-grid">
-                @foreach (var grupo in new[] { "A", "B", "C", "D" })
+                @foreach (var (grupo, times) in new[] { ("A", 4), ("B", 4), ("C", 5), ("D", 5) })
                 {
                     <div class="fmt-group-card">
-                        <div class="fmt-group-header @(grupo is "A" or "C" ? "fmt-group-a" : "fmt-group-b")">Grupo @grupo</div>
+                        <div class="fmt-group-header @(times == 4 ? "fmt-group-a" : "fmt-group-b")">
+                            Grupo @grupo <small>· @times times</small>
+                        </div>
                         <div class="fmt-group-body">
                             <div class="fmt-group-teams">
                                 <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Pote 1</div>
                                 <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 2</div>
-                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
-                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
+                                @for (int i = 0; i < times - 2; i++)
+                                {
+                                    <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
+                                }
                             </div>
-                            <div class="fmt-group-desc">Todos contra todos <strong>dentro do grupo</strong></div>
+                            <div class="fmt-group-desc">
+                                Todos contra todos <strong>dentro do grupo</strong> · @(times - 1) jogos
+                            </div>
                             <div class="fmt-group-advance">
                                 <span class="fmt-advance-badge">✅ Top 2 avançam</span>
                             </div>
