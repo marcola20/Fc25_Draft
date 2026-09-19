@@ -806,17 +806,14 @@
         _eventoPartida = Array.Empty<LigaEventoDto>();
     }
 
-    private string GetRowClass(LigaClassificacaoItemDto item)
-    {
-        // Only highlight 1st place in green
-        return item.Posicao == 1 ? "table-success" : "";
-    }
+    // Liga: 1º em verde (campeão), os dois últimos em vermelho.
+    private bool NaZonaVermelha(int posicao) => posicao > _classif.Count - 2;
 
-    private string GetBadgeClass(LigaClassificacaoItemDto item)
-    {
-        // Only highlight 1st place in green
-        return item.Posicao == 1 ? "bg-success" : "bg-secondary";
-    }
+    private string GetRowClass(LigaClassificacaoItemDto item) =>
+        item.Posicao == 1 ? "table-success" : NaZonaVermelha(item.Posicao) ? "table-danger" : "";
+
+    private string GetBadgeClass(LigaClassificacaoItemDto item) =>
+        item.Posicao == 1 ? "bg-success" : NaZonaVermelha(item.Posicao) ? "bg-danger" : "bg-secondary";
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {

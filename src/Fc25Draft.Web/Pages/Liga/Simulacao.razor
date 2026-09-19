@@ -438,8 +438,8 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "table-primary" : t.Posicao <= 2 ? "table-success" : "table-danger";
 
-        // Liga: pontos corridos, o 1º é campeão — não há faixas de playoff.
-        return t.EmDecisao ? "table-primary" : t.Posicao == 1 ? "table-success" : "";
+        // Liga: pontos corridos, o 1º é campeão e os dois últimos ficam em vermelho.
+        return t.EmDecisao ? "table-primary" : t.Posicao == 1 ? "table-success" : t.Posicao > _tabela.Count - 2 ? "table-danger" : "";
     }
 
     private string BadgeClass(TimeSim t)
@@ -447,7 +447,7 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "bg-primary" : t.Posicao <= 2 ? "bg-success" : "bg-danger";
 
-        return t.EmDecisao ? "bg-primary" : t.Posicao == 1 ? "bg-success" : "bg-secondary";
+        return t.EmDecisao ? "bg-primary" : t.Posicao == 1 ? "bg-success" : t.Posicao > _tabela.Count - 2 ? "bg-danger" : "bg-secondary";
     }
 
     private static string EscudoUrl(string? teamName)
