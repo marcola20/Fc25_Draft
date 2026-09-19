@@ -1,0 +1,29 @@
+# Banco local para desenvolvimento.
+# Subir:   docker compose up -d
+# Parar:   docker compose down        (mantém os dados)
+# Zerar:   docker compose down -v     (apaga os dados)
+#
+# Usuário/senha/banco batem com a connection string do appsettings.Development.json.
+services:
+  db:
+    # Mesma versão principal da produção (pg_dump não copia de servidor mais novo que ele).
+    image: postgres:18
+    container_name: cbfv-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "1909"
+      POSTGRES_DB: CBFV_DEVELOPMENT
+    ports:
+      - "5432:5432"
+    volumes:
+      # A partir do Postgres 18 a imagem guarda os dados em /var/lib/postgresql/<versão>.
+      - cbfv-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d CBFV_DEVELOPMENT"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cbfv-db-data:

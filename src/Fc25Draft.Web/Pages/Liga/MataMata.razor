@@ -2,7 +2,11 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Components.Liga
 @inject ILigaPublicService LigaService
+@inject ILigaAdminService AdminSvc
+@inject AdminAuthService AdminAuth
+@implements IDisposable
 
 <PageTitle>Mata-Mata</PageTitle>
 
@@ -45,7 +49,7 @@
                     if (jogo is not null)
                     {
                         <div class="col-12 col-md-4">
-                            <KnockoutCard Jogo="jogo" />
+                            <KnockoutCard Jogo="jogo" OnClick="AbrirJogo" />
                         </div>
                     }
                 }
@@ -60,7 +64,7 @@
                     if (jogo is not null)
                     {
                         <div class="col-12 col-md-3">
-                            <KnockoutCard Jogo="jogo" />
+                            <KnockoutCard Jogo="jogo" OnClick="AbrirJogo" />
                         </div>
                     }
                 }
@@ -76,7 +80,7 @@
                 if (jogo is not null)
                 {
                     <div class="col-12 col-md-6">
-                        <KnockoutCard Jogo="jogo" />
+                        <KnockoutCard Jogo="jogo" OnClick="AbrirJogo" />
                     </div>
                 }
             }
@@ -88,7 +92,7 @@
         {
             <div class="row g-3">
                 <div class="col-12 col-md-6 offset-md-3">
-                    <KnockoutCard Jogo="jogoFinal" Destaque="true" />
+                    <KnockoutCard Jogo="jogoFinal" Destaque="true" OnClick="AbrirJogo" />
                 </div>
             </div>
         }
@@ -96,7 +100,136 @@
     }
 </div>
 
-@* Componente inline do card *@
+<!-- Modal do jogo -->
+@if (_jogoAberto is not null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg" style="max-height: 80vh; overflow-y: auto;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <small class="text-muted d-block">@_jogoAberto.FaseLabel</small>
+                        <img src="@EscudoUrl(_jogoAberto.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
+                        @(_jogoAberto.TimeCasaNome ?? "A definir")
+                        <span class="text-muted mx-2">@(_jogoAberto.GolsCasa?.ToString() ?? "—") – @(_jogoAberto.GolsFora?.ToString() ?? "—")</span>
+                        @(_jogoAberto.TimeForaNome ?? "A definir")
+                        <img src="@EscudoUrl(_jogoAberto.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="FecharJogo"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_erro))
+                    {
+                        <div class="alert alert-danger alert-dismissible">@_erro <button class="btn-close" @onclick='()=>_erro=null'></button></div>
+                    }
+
+                    @if (_encerrando)
+                    {
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="temPen" @bind="_temPenaltis" />
+                            <label class="form-check-label" for="temPen">Foi para pênaltis?</label>
+                        </div>
+                        @if (_temPenaltis)
+                        {
+                            <label class="form-label small">Vencedor nos pênaltis</label>
+                            <select class="form-select" @bind="_penaltisVencedor">
+                                <option value="">Selecione...</option>
+                                <option value="@_jogoAberto.TimeCasaId">@_jogoAberto.TimeCasaNome</option>
+                                <option value="@_jogoAberto.TimeForaId">@_jogoAberto.TimeForaNome</option>
+                            </select>
+                        }
+                    }
+                    else if (_showEditor && _jogoAberto.PartidaId is Guid partidaId)
+                    {
+                        <PartidaStatsEditor PartidaId="partidaId" OnChanged="RecarregarJogoAberto" />
+                    }
+                    else if (!_jogoAberto.PartidaId.HasValue)
+                    {
+                        <div class="text-muted">Partida ainda não iniciada.</div>
+                    }
+                    else if (_eventos.Any())
+                    {
+                        var gols = _eventos.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
+                        if (gols.Any())
+                        {
+                            <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
+                            <ul class="list-unstyled">
+                                @foreach (var gol in gols)
+                                {
+                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                        <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="badge bg-primary">@gol.Minuto'</span>
+                                        <strong>@gol.JogadorNome</strong>
+                                        @if (gol.Tipo == TipoEvento.GolContra)
+                                        {
+                                            <span class="badge bg-danger">contra</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(gol.AssistenteNome))
+                                        {
+                                            <span class="text-muted small">Assistência: @gol.AssistenteNome</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            <hr />
+                        }
+
+                        var cartoes = _eventos.Where(e => e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho).ToList();
+                        if (cartoes.Any())
+                        {
+                            <h6 class="mb-3"><strong>🟨 Cartões</strong></h6>
+                            <ul class="list-unstyled">
+                                @foreach (var cartao in cartoes)
+                                {
+                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                        <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span>
+                                        <strong>@cartao.JogadorNome</strong>
+                                        <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-muted">Nenhum evento registrado.</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    @if (_encerrando)
+                    {
+                        <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _encerrando = false">← Voltar</button>
+                        <button type="button" class="btn btn-warning" @onclick="ConfirmarEncerrar" disabled="@_saving">Confirmar encerramento</button>
+                    }
+                    else if (_showEditor)
+                    {
+                        <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false">← Voltar</button>
+                    }
+                    else if (AdminAuth.IsAdmin && PodeEditar(_jogoAberto))
+                    {
+                        <div class="me-auto d-flex gap-2 flex-wrap">
+                            @if (!_jogoAberto.PartidaId.HasValue)
+                            {
+                                <button type="button" class="btn btn-primary" @onclick="CriarPartida" disabled="@_saving">▶️ Iniciar partida</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-primary" @onclick="() => _showEditor = true">✏️ Editar stats</button>
+                                @if (!_jogoAberto.VencedorId.HasValue)
+                                {
+                                    <button type="button" class="btn btn-warning" @onclick="MostrarEncerrar">🏁 Encerrar jogo</button>
+                                }
+                            }
+                        </div>
+                    }
+                    <button type="button" class="btn btn-secondary" @onclick="FecharJogo">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private LigaDto? _liga;
     private IReadOnlyList<LigaDto>? _ligas;
@@ -104,7 +237,22 @@
     private IReadOnlyList<LigaKnockoutJogoDto> _jogos = Array.Empty<LigaKnockoutJogoDto>();
     private bool _loading = true;
 
+    private LigaKnockoutJogoDto? _jogoAberto;
+    private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();
+    private bool _showEditor;
+    private bool _encerrando;
+    private bool _temPenaltis;
+    private string? _penaltisVencedor;
+    private bool _saving;
+    private string? _erro;
+    private bool _authInitialized;
+
     private string LigaNome => _liga?.Nome ?? "CBFV";
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,6 +269,25 @@
         _loading = false;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await AdminAuth.EnsureInitializedAsync();
+        _authInitialized = true;
+        StateHasChanged();
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!_authInitialized) return;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+
     private async Task OnLigaChanged(ChangeEventArgs e)
     {
         if (Guid.TryParse(e.Value?.ToString(), out var id))
@@ -132,5 +299,88 @@
             _jogos = await LigaService.GetKnockoutAsync(_ligaId, CancellationToken.None);
             _loading = false;
         }
+    }
+
+    // Só dá para mexer no jogo quando os dois times já estão definidos.
+    private static bool PodeEditar(LigaKnockoutJogoDto jogo) =>
+        jogo.TimeCasaId.HasValue && jogo.TimeForaId.HasValue;
+
+    private async Task AbrirJogo(LigaKnockoutJogoDto jogo)
+    {
+        _jogoAberto = jogo;
+        _showEditor = false;
+        _encerrando = false;
+        _erro = null;
+        _eventos = jogo.PartidaId is Guid pid
+            ? await LigaService.GetEventosPartidaAsync(pid, CancellationToken.None)
+            : Array.Empty<LigaEventoDto>();
+    }
+
+    private void FecharJogo()
+    {
+        _jogoAberto = null;
+        _showEditor = false;
+        _encerrando = false;
+        _erro = null;
+        _eventos = Array.Empty<LigaEventoDto>();
+    }
+
+    // Gols/cartões alteram o placar e encerrar avança o bracket: recarrega tudo e mantém o jogo aberto.
+    private async Task RecarregarJogoAberto()
+    {
+        _jogos = await LigaService.GetKnockoutAsync(_ligaId, CancellationToken.None);
+        if (_jogoAberto is null) return;
+        _jogoAberto = _jogos.FirstOrDefault(j => j.KnockoutJogoId == _jogoAberto.KnockoutJogoId) ?? _jogoAberto;
+        _eventos = _jogoAberto.PartidaId is Guid pid
+            ? await LigaService.GetEventosPartidaAsync(pid, CancellationToken.None)
+            : Array.Empty<LigaEventoDto>();
+    }
+
+    private async Task CriarPartida()
+    {
+        if (_jogoAberto is null) return;
+        _saving = true; _erro = null;
+        try
+        {
+            await AdminSvc.CriarPartidaKnockoutAsync(_jogoAberto.KnockoutJogoId, CancellationToken.None);
+            await RecarregarJogoAberto();
+            _showEditor = true;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void MostrarEncerrar()
+    {
+        _encerrando = true;
+        _temPenaltis = false;
+        _penaltisVencedor = null;
+        _erro = null;
+    }
+
+    private async Task ConfirmarEncerrar()
+    {
+        if (_jogoAberto is null) return;
+        Guid? penId = _temPenaltis && Guid.TryParse(_penaltisVencedor, out var g) ? g : null;
+        if (_temPenaltis && penId is null) { _erro = "Selecione o vencedor nos pênaltis."; return; }
+        _saving = true; _erro = null;
+        try
+        {
+            await AdminSvc.EncerrarKnockoutJogoAsync(_jogoAberto.KnockoutJogoId, new LigaEncerrarKnockoutRequest(_temPenaltis, penId), CancellationToken.None);
+            _encerrando = false;
+            await RecarregarJogoAberto();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private static string EscudoUrl(string? teamName)
+    {
+        if (string.IsNullOrWhiteSpace(teamName)) return "/images/escudos/escudo.png";
+        var normalized = teamName.Normalize(System.Text.NormalizationForm.FormD);
+        var clean = new string(normalized.Where(c =>
+            System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) !=
+            System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        return $"/images/escudos/{clean}.png";
     }
 }

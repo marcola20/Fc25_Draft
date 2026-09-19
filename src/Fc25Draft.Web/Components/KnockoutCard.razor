@@ -1,7 +1,9 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 
-<div class="card @(Destaque ? "border-warning border-2" : "") h-100">
+<div class="card @(Destaque ? "border-warning border-2" : "") h-100"
+     style="@(OnClick.HasDelegate ? "cursor:pointer;" : "")"
+     @onclick="() => OnClick.InvokeAsync(Jogo)">
     <div class="card-header d-flex justify-content-between align-items-center py-1 px-2 @(Destaque ? "bg-warning text-dark" : "bg-dark text-white")">
         <small class="fw-bold">@Jogo.FaseLabel</small>
         @if (Jogo.PartidaStatus.HasValue)
@@ -42,6 +44,7 @@
 @code {
     [Parameter, EditorRequired] public LigaKnockoutJogoDto Jogo { get; set; } = null!;
     [Parameter] public bool Destaque { get; set; }
+    [Parameter] public EventCallback<LigaKnockoutJogoDto> OnClick { get; set; }
 
     private bool IsVencedor(Guid? timeId) => timeId.HasValue && timeId == Jogo.VencedorId;
 
