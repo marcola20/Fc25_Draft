@@ -1,0 +1,212 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+@inject ILigaAdminService AdminSvc
+@inject AdminAuthService AdminAuth
+
+@* Detalhes de um jogo do mata-mata; admin pode iniciar a partida, editar stats e encerrar. *@
+<div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-lg" style="max-height: 80vh; overflow-y: auto;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <small class="text-muted d-block">@Jogo.FaseLabel</small>
+                    <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
+                    @(Jogo.TimeCasaNome ?? "A definir")
+                    <span class="text-muted mx-2">@(Jogo.GolsCasa?.ToString() ?? "—") – @(Jogo.GolsFora?.ToString() ?? "—")</span>
+                    @(Jogo.TimeForaNome ?? "A definir")
+                    <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
+                </h5>
+                <button type="button" class="btn-close" @onclick="() => OnFechar.InvokeAsync()"></button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_erro))
+                {
+                    <div class="alert alert-danger alert-dismissible">@_erro <button class="btn-close" @onclick='()=>_erro=null'></button></div>
+                }
+
+                @if (_encerrando)
+                {
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="temPen" @bind="_temPenaltis" />
+                        <label class="form-check-label" for="temPen">Foi para pênaltis?</label>
+                    </div>
+                    @if (_temPenaltis)
+                    {
+                        <label class="form-label small">Vencedor nos pênaltis</label>
+                        <select class="form-select" @bind="_penaltisVencedor">
+                            <option value="">Selecione...</option>
+                            <option value="@Jogo.TimeCasaId">@Jogo.TimeCasaNome</option>
+                            <option value="@Jogo.TimeForaId">@Jogo.TimeForaNome</option>
+                        </select>
+                    }
+                }
+                else if (_showEditor && Jogo.PartidaId is Guid partidaId)
+                {
+                    <PartidaStatsEditor PartidaId="partidaId" OnChanged="() => OnAlterado.InvokeAsync()" />
+                }
+                else if (!Jogo.PartidaId.HasValue)
+                {
+                    <div class="text-muted">Partida ainda não iniciada.</div>
+                }
+                else if (_eventos.Any())
+                {
+                    var gols = _eventos.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
+                    if (gols.Any())
+                    {
+                        <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
+                        <ul class="list-unstyled">
+                            @foreach (var gol in gols)
+                            {
+                                <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                    <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                    <span class="badge bg-primary">@gol.Minuto'</span>
+                                    <strong>@gol.JogadorNome</strong>
+                                    @if (gol.Tipo == TipoEvento.GolContra)
+                                    {
+                                        <span class="badge bg-danger">contra</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(gol.AssistenteNome))
+                                    {
+                                        <span class="text-muted small">Assistência: @gol.AssistenteNome</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                        <hr />
+                    }
+
+                    var cartoes = _eventos.Where(e => e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho).ToList();
+                    if (cartoes.Any())
+                    {
+                        <h6 class="mb-3"><strong>🟨 Cartões</strong></h6>
+                        <ul class="list-unstyled">
+                            @foreach (var cartao in cartoes)
+                            {
+                                <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
+                                    <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                    <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span>
+                                    <strong>@cartao.JogadorNome</strong>
+                                    <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+                else
+                {
+                    <div class="text-muted">Nenhum evento registrado.</div>
+                }
+            </div>
+            <div class="modal-footer">
+                @if (_encerrando)
+                {
+                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _encerrando = false">← Voltar</button>
+                    <button type="button" class="btn btn-warning" @onclick="ConfirmarEncerrar" disabled="@_saving">Confirmar encerramento</button>
+                }
+                else if (_showEditor)
+                {
+                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false">← Voltar</button>
+                }
+                else if (AdminAuth.IsAdmin && Jogo.TimeCasaId.HasValue && Jogo.TimeForaId.HasValue)
+                {
+                    <div class="me-auto d-flex gap-2 flex-wrap">
+                        @if (!Jogo.PartidaId.HasValue)
+                        {
+                            <button type="button" class="btn btn-primary" @onclick="CriarPartida" disabled="@_saving">▶️ Iniciar partida</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-primary" @onclick="() => _showEditor = true">✏️ Editar stats</button>
+                            @if (!Jogo.VencedorId.HasValue)
+                            {
+                                <button type="button" class="btn btn-warning" @onclick="MostrarEncerrar">🏁 Encerrar jogo</button>
+                            }
+                        }
+                    </div>
+                }
+                <button type="button" class="btn btn-secondary" @onclick="() => OnFechar.InvokeAsync()">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Jogo exibido. O pai deve repassar a versão atualizada após <see cref="OnAlterado"/>.</summary>
+    [Parameter, EditorRequired] public LigaKnockoutJogoDto Jogo { get; set; } = null!;
+    [Parameter] public EventCallback OnFechar { get; set; }
+    /// <summary>Disparado quando placar/eventos/bracket mudam: o pai recarrega os jogos.</summary>
+    [Parameter] public EventCallback OnAlterado { get; set; }
+
+    private LigaKnockoutJogoDto? _jogoCarregado;
+    private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();
+    private bool _showEditor;
+    private bool _encerrando;
+    private bool _temPenaltis;
+    private string? _penaltisVencedor;
+    private bool _saving;
+    private string? _erro;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Recarrega eventos quando abre outro jogo ou quando o pai repassa uma versão nova do mesmo.
+        if (ReferenceEquals(_jogoCarregado, Jogo)) return;
+        if (_jogoCarregado?.KnockoutJogoId != Jogo.KnockoutJogoId)
+        {
+            _showEditor = false;
+            _encerrando = false;
+            _erro = null;
+        }
+        _jogoCarregado = Jogo;
+        _eventos = Jogo.PartidaId is Guid pid
+            ? await LigaService.GetEventosPartidaAsync(pid, CancellationToken.None)
+            : Array.Empty<LigaEventoDto>();
+    }
+
+    private async Task CriarPartida()
+    {
+        _saving = true; _erro = null;
+        try
+        {
+            await AdminSvc.CriarPartidaKnockoutAsync(Jogo.KnockoutJogoId, CancellationToken.None);
+            _showEditor = true;
+            await OnAlterado.InvokeAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void MostrarEncerrar()
+    {
+        _encerrando = true;
+        _temPenaltis = false;
+        _penaltisVencedor = null;
+        _erro = null;
+    }
+
+    private async Task ConfirmarEncerrar()
+    {
+        Guid? penId = _temPenaltis && Guid.TryParse(_penaltisVencedor, out var g) ? g : null;
+        if (_temPenaltis && penId is null) { _erro = "Selecione o vencedor nos pênaltis."; return; }
+        _saving = true; _erro = null;
+        try
+        {
+            await AdminSvc.EncerrarKnockoutJogoAsync(Jogo.KnockoutJogoId, new LigaEncerrarKnockoutRequest(_temPenaltis, penId), CancellationToken.None);
+            _encerrando = false;
+            await OnAlterado.InvokeAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private static string EscudoUrl(string? teamName)
+    {
+        if (string.IsNullOrWhiteSpace(teamName)) return "/images/escudos/escudo.png";
+        var normalized = teamName.Normalize(System.Text.NormalizationForm.FormD);
+        var clean = new string(normalized.Where(c =>
+            System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) !=
+            System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        return $"/images/escudos/{clean}.png";
+    }
+}

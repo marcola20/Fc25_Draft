@@ -326,7 +326,7 @@
                         var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
                         if (jogo is not null)
                         {
-                            <div class="col-12 col-md-4"><KnockoutCard Jogo="jogo" /></div>
+                            <div class="col-12 col-md-4"><KnockoutCard Jogo="jogo" OnClick="AbrirJogoKnockout" /></div>
                         }
                     }
                 </div>
@@ -338,7 +338,7 @@
                         var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
                         if (jogo is not null)
                         {
-                            <div class="col-12 col-md-3"><KnockoutCard Jogo="jogo" /></div>
+                            <div class="col-12 col-md-3"><KnockoutCard Jogo="jogo" OnClick="AbrirJogoKnockout" /></div>
                         }
                     }
                 </div>
@@ -351,7 +351,7 @@
                         var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
                         if (jogo is not null)
                         {
-                            <div class="col-12 col-md-6"><KnockoutCard Jogo="jogo" /></div>
+                            <div class="col-12 col-md-6"><KnockoutCard Jogo="jogo" OnClick="AbrirJogoKnockout" /></div>
                         }
                     }
                 </div>
@@ -361,7 +361,7 @@
                     <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Final</h5>
                     <div class="row g-3">
                         <div class="col-12 col-md-6 offset-md-3">
-                            <KnockoutCard Jogo="jogoFinal" Destaque="true" />
+                            <KnockoutCard Jogo="jogoFinal" Destaque="true" OnClick="AbrirJogoKnockout" />
                         </div>
                     </div>
                 }
@@ -517,6 +517,12 @@
     }
 </div>
 
+<!-- Modal de jogo do mata-mata -->
+@if (_jogoKnockoutAberto is not null)
+{
+    <KnockoutJogoModal Jogo="_jogoKnockoutAberto" OnFechar="() => _jogoKnockoutAberto = null" OnAlterado="AtualizarAposKnockout" />
+}
+
 <!-- Match Details Modal -->
 @if (_mostraDetalhesPartida && _partidaDetalhes is not null)
 {
@@ -647,6 +653,7 @@
     private bool _mostraDetalhesPartida = false;
     private bool _showEditor;
     private LigaPartidaDto? _partidaDetalhes;
+    private LigaKnockoutJogoDto? _jogoKnockoutAberto;
     private IReadOnlyList<LigaEventoDto> _eventoPartida = Array.Empty<LigaEventoDto>();
 
     private string? _erro;
@@ -776,6 +783,19 @@
         _mostraDetalhesPartida = true;
         _eventoPartida = await LigaService.GetEventosPartidaAsync(partida.PartidaId, CancellationToken.None);
         StateHasChanged();
+    }
+
+    private void AbrirJogoKnockout(LigaKnockoutJogoDto jogo) => _jogoKnockoutAberto = jogo;
+
+    // Gols/cartões do mata-mata mexem nas estatísticas; encerrar avança o bracket.
+    private async Task AtualizarAposKnockout()
+    {
+        var idxAtual = _rodadaIdx;
+        await LoadLigaDataAsync(_ligaId);
+        if (idxAtual < _rodadas.Count) _rodadaIdx = idxAtual;
+
+        if (_jogoKnockoutAberto is not null)
+            _jogoKnockoutAberto = _knockoutJogos.FirstOrDefault(j => j.KnockoutJogoId == _jogoKnockoutAberto.KnockoutJogoId) ?? _jogoKnockoutAberto;
     }
 
     private void FecharDetalhesPartida()
