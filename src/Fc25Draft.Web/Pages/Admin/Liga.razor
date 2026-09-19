@@ -16,6 +16,8 @@
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject IJSRuntime JS
+@inject CopaSorteioAoVivoService SorteioAoVivo
+@implements IDisposable
 
 <PageTitle>Administração da Liga</PageTitle>
 
@@ -261,9 +263,10 @@
     @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
     {
         <div class="alert alert-secondary py-2 small">
-            Monte os <strong>potes</strong> e sorteie: os times de cada pote se espalham entre os grupos, começando pelos grupos com mais vagas.
-            Os grupos ficam do tamanho mais parecido possível — com <strong>18 times</strong> saem <strong>4, 4, 5 e 5</strong>; com 16, quatro grupos de 4.
-            Deixe para o <strong>último pote</strong> quem você quer nos grupos maiores. O sorteio pode ser refeito enquanto a Copa não começar.
+            Monte os <strong>4 potes</strong> e confirme. Ao sortear, a revelação é <strong>ao vivo para todo mundo</strong> na tela
+            <a href="/copa/sorteio" target="_blank">Sorteio da Copa</a>: um time a cada <strong>10 segundos</strong>, começando pelos cabeças de chave (pote 1),
+            depois pote 2, 3 e 4. Com <strong>18 times</strong> os grupos ficam <strong>4, 4, 5 e 5</strong>; o último pote completa os grupos maiores.
+            O sorteio pode ser refeito enquanto a Copa não começar.
         </div>
 
         <div class="row g-3">
@@ -271,7 +274,7 @@
                 <div class="card">
                     <div class="card-header d-flex flex-wrap align-items-center gap-2">
                         <span class="fw-bold">Potes</span>
-                        @foreach (var pote in new[] { 1, 2, 3 })
+                        @foreach (var pote in new[] { 1, 2, 3, 4 })
                         {
                             <span class="badge bg-dark">Pote @pote: @_potePorTime.Count(x => x.Value == pote)</span>
                         }
@@ -290,9 +293,10 @@
                                                     value="@(_potePorTime.GetValueOrDefault(timeId))"
                                                     @onchange="e => DefinirPote(timeId, e.Value?.ToString())">
                                                 <option value="0">Fora da Copa</option>
-                                                <option value="1">Pote 1</option>
+                                                <option value="1">Pote 1 (cabeças)</option>
                                                 <option value="2">Pote 2</option>
                                                 <option value="3">Pote 3</option>
+                                                <option value="4">Pote 4</option>
                                             </select>
                                         </td>
                                         <td style="width: 7rem" class="text-end">
@@ -307,10 +311,15 @@
                         </table>
                     </div>
                     <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
-                        <button class="btn btn-outline-primary" @onclick="SalvarPotes" disabled="@_saving">Salvar potes</button>
-                        <button class="btn btn-success" @onclick="SortearCopa" disabled="@(_saving || _sorteio?.PodeSortear != true)">
-                            🎲 @(_sorteio?.JaSorteada == true ? "Sortear de novo" : "Sortear grupos")
+                        <button class="btn btn-outline-primary" @onclick="SalvarPotes" disabled="@(_saving || SorteioAoVivo.EmAndamento)">Confirmar potes</button>
+                        <button class="btn btn-success" @onclick="SortearCopa" disabled="@(_saving || _sorteio?.PodeSortear != true || SorteioAoVivo.EmAndamento)">
+                            🎲 @(_sorteio?.JaSorteada == true ? "Sortear de novo ao vivo" : "Sortear e revelar ao vivo")
                         </button>
+                        @if (SorteioAoVivo.EmAndamento)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="() => SorteioAoVivo.RevelarTudo()">⏩ Revelar tudo</button>
+                        }
+                        <a class="btn btn-outline-dark" href="/copa/sorteio" target="_blank">📺 Tela do sorteio</a>
                         @if (_sorteio?.Impedimento is not null)
                         {
                             <span class="text-muted small">@_sorteio.Impedimento</span>
@@ -324,7 +333,18 @@
             </div>
 
             <div class="col-12 col-xl-5">
-                @if (_sorteio is not null && _sorteio.JaSorteada)
+                @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+                {
+                    <div class="alert alert-warning">
+                        🎲 Sorteio @(SorteioAoVivo.EmAndamento ? "acontecendo ao vivo" : "revelado") — acompanhe abaixo ou na
+                        <a href="/copa/sorteio" target="_blank">tela do sorteio</a>.
+                        @if (!SorteioAoVivo.EmAndamento)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => SorteioAoVivo.Limpar()">Tirar da tela</button>
+                        }
+                    </div>
+                }
+                else if (_sorteio is not null && _sorteio.JaSorteada)
                 {
                     <div class="row g-2">
                         @foreach (var grupo in _sorteio.Times.Where(t => t.Grupo is not null).GroupBy(t => t.Grupo!.Value).OrderBy(g => g.Key))
@@ -352,6 +372,13 @@
                 }
             </div>
         </div>
+
+        @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+        {
+            <div class="mt-3">
+                <CopaSorteioPainel />
+            </div>
+        }
     }
 
     <!-- ─ Tab: Grupos Copa ─ -->
@@ -1003,6 +1030,13 @@
     private bool _knockoutTemPenaltis;
     private string? _knockoutPenaltisVencedor;
 
+    // Os botões do sorteio dependem de a revelação ao vivo estar rodando.
+    protected override void OnInitialized() => SorteioAoVivo.OnChange += AoMudarSorteio;
+
+    private void AoMudarSorteio() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => SorteioAoVivo.OnChange -= AoMudarSorteio;
+
     protected override async Task OnParametersSetAsync()
     {
         await CarregarDados();
@@ -1451,8 +1485,11 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var grupos = await AdminSvc.SortearCopaAsync(_ligaAtual!.LigaId, CancellationToken.None);
-            _ok = $"Sorteio feito: {string.Join(" · ", grupos.GroupBy(g => g.Grupo).OrderBy(g => g.Key).Select(g => $"Grupo {g.Key}: {string.Join(", ", g.Select(x => x.TimeNome))}"))}";
+            // Os grupos são gravados agora; a revelação ao vivo só controla o que já apareceu na tela.
+            await AdminSvc.SortearCopaAsync(_ligaAtual!.LigaId, CancellationToken.None);
+            var sorteio = await AdminSvc.GetSorteioCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+            SorteioAoVivo.Iniciar(_ligaAtual.LigaId, _ligaAtual.Nome, sorteio!, TimeSpan.FromSeconds(10));
+            _ok = "Sorteio começou! Um time a cada 10 segundos na tela do sorteio.";
             await CarregarDados();
         }
         catch (Exception ex) { _erro = ex.Message; }

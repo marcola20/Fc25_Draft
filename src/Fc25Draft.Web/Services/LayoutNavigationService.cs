@@ -37,6 +37,7 @@ public class LayoutNavigationService
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
+            new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
@@ -253,6 +254,18 @@ public class LayoutNavigationService
             }
         },
         ["/draft/protecao"] = CreateDefinition("Jogadores Protegidos", "Draft", "/draft/protecao"),
+        ["/copa/sorteio"] = new PageDefinition
+        {
+            Route = "/copa/sorteio",
+            Title = "Sorteio da Copa",
+            Subtitle = "Potes e grupos, ao vivo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Sorteio da Copa")
+            }
+        },
         ["/admin/temporada"] = new PageDefinition
         {
             Route = "/admin/temporada",

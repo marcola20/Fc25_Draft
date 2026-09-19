@@ -52,6 +52,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<IHallOfFameService, HallOfFameService>();
             services.AddScoped<IDraftWishlistService, DraftWishlistService>();
             services.AddSingleton<LotteryStateService>();
+            services.AddSingleton<CopaSorteioAoVivoService>();
             services.AddSingleton<MarketUpdateService>();
             services.AddSingleton<IMarketBroadcaster>(sp => sp.GetRequiredService<MarketUpdateService>());
 
