@@ -245,11 +245,10 @@ public class LigaAdminService : ILigaAdminService
             if (classif.Count >= 2)
             {
                 var lider = classif[0];
+                // O título não sai em V/SG/GP: quem empatar em pontos com o líder
+                // disputa jogo decisivo (2 times) ou mini liga (3+).
                 var empatados = classif
-                    .Where(c => c.Pontos == lider.Pontos &&
-                                c.Vitorias == lider.Vitorias &&
-                                c.SaldoGols == lider.SaldoGols &&
-                                c.GolsPro == lider.GolsPro)
+                    .Where(c => c.Pontos == lider.Pontos)
                     .ToList();
 
                 if (empatados.Count >= 3)
@@ -1372,11 +1371,9 @@ public class LigaAdminService : ILigaAdminService
             .ToListAsync(ct);
 
         var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
+        // Mesmo critério do encerramento: empate em pontos com o líder.
         var empatados = classif
-            .Where(c => c.Pontos == lider.Pontos &&
-                        c.Vitorias == lider.Vitorias &&
-                        c.SaldoGols == lider.SaldoGols &&
-                        c.GolsPro == lider.GolsPro)
+            .Where(c => c.Pontos == lider.Pontos)
             .Select(c => c.TimeId)
             .ToList();
 
@@ -1423,11 +1420,9 @@ public class LigaAdminService : ILigaAdminService
             .ToListAsync(ct);
 
         var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
+        // Mesmo critério do encerramento: empate em pontos com o líder.
         var empatados = classif
-            .Where(c => c.Pontos == lider.Pontos &&
-                        c.Vitorias == lider.Vitorias &&
-                        c.SaldoGols == lider.SaldoGols &&
-                        c.GolsPro == lider.GolsPro)
+            .Where(c => c.Pontos == lider.Pontos)
             .Select(c => c.TimeId)
             .ToHashSet();
 

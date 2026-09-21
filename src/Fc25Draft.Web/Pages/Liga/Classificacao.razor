@@ -251,10 +251,8 @@
 
         if (_classif is null || _classif.Count == 0) return RowClass(item.Posicao);
 
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
+        // Empatados em pontos com o líder: o título sai em jogo decisivo / mini liga.
+        if (item.Pontos == _classif[0].Pontos)
             return "table-success";
 
         return RowClass(item.Posicao);
@@ -264,10 +262,7 @@
     {
         if (_classif is null || _classif.Count == 0) return BadgeClass(item.Posicao);
 
-        var topTeam = _classif[0];
-        // Highlight all teams tied with the leader in green
-        if (item.Pontos == topTeam.Pontos && item.Vitorias == topTeam.Vitorias &&
-            item.SaldoGols == topTeam.SaldoGols && item.GolsPro == topTeam.GolsPro)
+        if (item.Pontos == _classif[0].Pontos)
             return "bg-success";
 
         return BadgeClass(item.Posicao);

@@ -121,7 +121,7 @@
                 {
                     <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
                         <span><span class="badge bg-success me-1">●</span> Campeão (1º)</span>
-                        <span><span class="badge bg-primary me-1">●</span> Empate no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
+                        <span><span class="badge bg-primary me-1">●</span> Empate em pontos no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
                     </div>
                 }
             </div>
@@ -355,12 +355,12 @@
                 ordenados[i].Ordem = i + 1;
             }
 
-            // Empate no topo em Pts, V, SG e GP (igual ao encerramento da temporada): o título sai
+            // Empate em pontos no topo (igual ao encerramento da temporada): o título sai
             // em jogo decisivo (2 times) ou mini liga (3+), então ninguém aparece como campeão.
             if (ordenados.Count > 1)
             {
-                var lider = TimeSim.Stats(ordenados[0]);
-                var empatadosNoTopo = ordenados.TakeWhile(t => TimeSim.Stats(t) == lider).ToList();
+                var pontosLider = ordenados[0].Pontos;
+                var empatadosNoTopo = ordenados.TakeWhile(t => t.Pontos == pontosLider).ToList();
                 if (empatadosNoTopo.Count > 1)
                     foreach (var t in empatadosNoTopo) t.EmDecisao = true;
             }

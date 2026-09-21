@@ -806,14 +806,23 @@
         _eventoPartida = Array.Empty<LigaEventoDto>();
     }
 
-    // Liga: 1º em verde (campeão), os dois últimos em vermelho.
+    // Liga: 1º em verde (campeão), os dois últimos em vermelho. Empate em pontos no topo
+    // vai para jogo decisivo (2 times) ou mini liga (3+): os empatados ficam em azul.
     private bool NaZonaVermelha(int posicao) => posicao > _classif.Count - 2;
 
+    private bool EmpatadoNoTopo(LigaClassificacaoItemDto item) =>
+        _classif.Count > 1 && item.Pontos == _classif[0].Pontos
+        && _classif.Count(c => c.Pontos == _classif[0].Pontos) > 1;
+
     private string GetRowClass(LigaClassificacaoItemDto item) =>
-        item.Posicao == 1 ? "table-success" : NaZonaVermelha(item.Posicao) ? "table-danger" : "";
+        EmpatadoNoTopo(item) ? "table-primary"
+        : item.Posicao == 1 ? "table-success"
+        : NaZonaVermelha(item.Posicao) ? "table-danger" : "";
 
     private string GetBadgeClass(LigaClassificacaoItemDto item) =>
-        item.Posicao == 1 ? "bg-success" : NaZonaVermelha(item.Posicao) ? "bg-danger" : "bg-secondary";
+        EmpatadoNoTopo(item) ? "bg-primary"
+        : item.Posicao == 1 ? "bg-success"
+        : NaZonaVermelha(item.Posicao) ? "bg-danger" : "bg-secondary";
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {
