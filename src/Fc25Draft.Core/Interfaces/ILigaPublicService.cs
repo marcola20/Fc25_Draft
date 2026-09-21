@@ -7,6 +7,9 @@ public interface ILigaPublicService
     Task<LigaDto?> GetAtualAsync(CancellationToken ct);
     Task<LigaDto?> GetByIdAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaDto>> ListAtivasAsync(CancellationToken ct);
+
+    /// <summary>Todas as edições (em andamento e encerradas) com o resumo do formato de cada uma.</summary>
+    Task<IReadOnlyList<LigaEdicaoDto>> ListEdicoesAsync(CancellationToken ct);
     Task<IReadOnlyList<LigaClassificacaoItemDto>> GetClassificacaoAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetAssistenciasAsync(Guid ligaId, CancellationToken ct);

@@ -36,6 +36,7 @@ public class LayoutNavigationService
         new("Liga", new List<MenuItem>
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
+            new("Edições", "/liga/edicoes", "oi oi-calendar"),
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
@@ -191,6 +192,18 @@ public class LayoutNavigationService
             {
                 new("Início", "/home"),
                 new("Liga")
+            }
+        },
+        ["/liga/edicoes"] = new PageDefinition
+        {
+            Route = "/liga/edicoes",
+            Title = "Edições",
+            Subtitle = "Todas as temporadas e competições",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Edições")
             }
         },
         ["/liga/classificacao"] = new PageDefinition

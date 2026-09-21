@@ -22,7 +22,10 @@
     }
     else if (_liga is null)
     {
-        <div class="alert alert-info">Nenhuma liga ativa no momento.</div>
+        <div class="alert alert-info">
+            Nenhuma liga ativa no momento.
+            <a href="/liga/edicoes" class="alert-link">Ver as edições anteriores</a>.
+        </div>
     }
     else
     {
@@ -31,19 +34,42 @@
             @if (_ligas is not null && _ligas.Count > 1)
             {
                 <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
-                    @foreach (var l in _ligas)
+                    @if (_ligas.Any(l => l.Status != LigaStatus.Encerrada))
                     {
-                        <option value="@l.LigaId" selected="@(_ligaId == l.LigaId)">
-                            @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
-                        </option>
+                        <optgroup label="Em andamento">
+                            @foreach (var l in _ligas.Where(l => l.Status != LigaStatus.Encerrada))
+                            {
+                                <option value="@l.LigaId" selected="@(_ligaId == l.LigaId)">
+                                    @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
+                                </option>
+                            }
+                        </optgroup>
+                    }
+                    @* Edição encerrada só entra aqui quando foi aberta pela página de Edições. *@
+                    @if (_ligas.Any(l => l.Status == LigaStatus.Encerrada))
+                    {
+                        <optgroup label="Encerradas">
+                            @foreach (var l in _ligas.Where(l => l.Status == LigaStatus.Encerrada))
+                            {
+                                <option value="@l.LigaId" selected="@(_ligaId == l.LigaId)">
+                                    @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
+                                </option>
+                            }
+                        </optgroup>
                     }
                 </select>
             }
+            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary">📚 Edições</a>
             <a href="/liga/historico" class="btn btn-sm btn-outline-secondary">📊 Histórico</a>
             <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simulação</a>
         </div>
-        <p class="text-muted small mb-3">Status: <strong>@LigaStatusLabel(_liga.Status, _liga.Tipo)</strong></p>
-
+        <p class="text-muted small mb-3">
+            Status: <strong>@LigaLabels.Status(_liga.Status, _liga.Tipo)</strong>
+            @if (_liga.Status == LigaStatus.Encerrada && !string.IsNullOrWhiteSpace(CampeaoDaEdicao))
+            {
+                <span> — 🏆 Campeão: <strong>@CampeaoDaEdicao</strong></span>
+            }
+        </p>
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <ul class="nav nav-tabs mb-0">
                 <li class="nav-item">
@@ -214,7 +240,7 @@
                     </div>
 
                     <div class="d-flex gap-3 flex-wrap mb-1 small">
-                        @foreach (var zona in LigaZonas.ZonasDaTabela(_regra, _classif.Count))
+                        @foreach (var zona in ZonasDaLegenda())
                         {
                             <span><span class="badge @ZonaEstilo.Badge(zona) px-2">&nbsp;</span> @LigaZonas.Rotulo(zona)</span>
                         }
@@ -711,14 +737,29 @@
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 
+    /// <summary>Edição a abrir (link da página de Edições); vazio = liga atual.</summary>
+    [Parameter, SupplyParameterFromQuery(Name = "liga")]
+    public Guid? LigaDaUrl { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
+
+            if (LigaDaUrl is Guid daUrl && daUrl != Guid.Empty)
+            {
+                _liga = _ligas.FirstOrDefault(l => l.LigaId == daUrl)
+                        ?? await LigaService.GetByIdAsync(daUrl, CancellationToken.None);
+
+                // Edição encerrada entra no seletor para dar para voltar às que estão rolando.
+                if (_liga is not null && _ligas.All(l => l.LigaId != _liga.LigaId))
+                    _ligas = _ligas.Append(_liga).ToArray();
+            }
+
             // Padrão: liga atual; se não houver, cai para a primeira ativa.
-            _liga = await LigaService.GetAtualAsync(CancellationToken.None)
-                    ?? (_ligas.Count > 0 ? _ligas[0] : null);
+            _liga ??= await LigaService.GetAtualAsync(CancellationToken.None)
+                      ?? (_ligas.Count > 0 ? _ligas[0] : null);
 
             if (_liga is not null)
             {
@@ -745,6 +786,7 @@
         // o que ele resolve é a ordem entre os empatados.
         _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));
         _knockoutJogos = await LigaService.GetKnockoutAsync(ligaId, CancellationToken.None);
+        _tituloNoMataMata = _liga?.Tipo == TipoCompetition.Liga && _knockoutJogos.Count > 0;
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
@@ -794,12 +836,31 @@
         _eventoPartida = Array.Empty<LigaEventoDto>();
     }
 
+    // Edições antigas decidiam o título no mata-mata: lá o 1º da fase de pontos é só o líder,
+    // e não o campeão — por isso a zona de campeão some quando a edição teve final.
+    private bool _tituloNoMataMata;
+
+    private string? CampeaoDaEdicao =>
+        !string.IsNullOrWhiteSpace(_liga?.CampeaoNome)
+            ? _liga!.CampeaoNome
+            : _knockoutJogos.FirstOrDefault(j => j.Fase == FaseKnockout.Final)?.VencedorNome;
+
+    private ZonaClassificacao ZonaDaPosicao(int posicao)
+    {
+        var zona = LigaZonas.Zona(_regra, posicao, _classif.Count);
+        return _tituloNoMataMata && zona == ZonaClassificacao.Campeao ? ZonaClassificacao.Nenhuma : zona;
+    }
+
+    private IEnumerable<ZonaClassificacao> ZonasDaLegenda() =>
+        LigaZonas.ZonasDaTabela(_regra, _classif.Count)
+            .Where(z => !(_tituloNoMataMata && z == ZonaClassificacao.Campeao));
+
     // Zonas valem durante a temporada também ("se terminasse hoje").
     private string GetRowClass(LigaClassificacaoItemDto item) =>
-        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, item.Posicao, _classif.Count));
+        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(ZonaDaPosicao(item.Posicao));
 
     private string GetBadgeClass(LigaClassificacaoItemDto item) =>
-        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, item.Posicao, _classif.Count));
+        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(ZonaDaPosicao(item.Posicao));
 
     /// <summary>Empatado com o líder (Pts, V, SG, GP) aguardando decisão de título.</summary>
     private bool EmpateNoTopo(LigaClassificacaoItemDto item)
@@ -826,17 +887,6 @@
         PartidaStatus.EmAndamento => "Ao vivo",
         PartidaStatus.Encerrada => "Encerrada",
         _ => "Agendada"
-    };
-
-    private static string LigaStatusLabel(LigaStatus s, TipoCompetition tipo) => s switch
-    {
-        LigaStatus.Criada => "Criada",
-        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Copa ? "Fase de Grupos" : "Primeira Fase",
-        // Na Copa o status interno PlayIn corresponde ao mata-mata (semifinais e final).
-        LigaStatus.PlayIn => tipo == TipoCompetition.Copa ? "Mata-Mata" : "Play-In",
-        LigaStatus.Playoffs => "Playoffs",
-        LigaStatus.Encerrada => "Encerrada",
-        _ => s.ToString()
     };
 
     // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,

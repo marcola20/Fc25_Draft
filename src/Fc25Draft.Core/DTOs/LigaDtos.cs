@@ -21,6 +21,33 @@ public record LigaDto(
     int? VagasDiretas = null,
     int? VagasPlayoff = null);
 
+/// <summary>
+/// Uma edição de competição (atual ou já encerrada) com o resumo do que ela teve —
+/// times, grupos, rodadas e fases — porque o formato muda de temporada para temporada.
+/// </summary>
+public record LigaEdicaoDto(
+    Guid LigaId,
+    string Nome,
+    int? Temporada,
+    TipoCompetition Tipo,
+    Divisao? Divisao,
+    LigaStatus Status,
+    Guid? CampeaoTimeId,
+    string? CampeaoNome,
+    int TotalTimes,
+    int Grupos,
+    int Rodadas,
+    int PartidasJogadas,
+    int PartidasTotal,
+    IReadOnlyList<FaseKnockout> FasesMataMata,
+    int VagasDiretas,
+    int VagasPlayoff,
+    DateTime DataInicio,
+    DateTime DataFim)
+{
+    public bool Encerrada => Status == LigaStatus.Encerrada;
+}
+
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,
     DateTime DataInicio,
