@@ -11,6 +11,19 @@ public class Liga
     public DateTime DataFim { get; set; }
     public LigaStatus Status { get; set; } = LigaStatus.Criada;
     public TipoCompetition Tipo { get; set; } = TipoCompetition.Liga;
+
+    /// <summary>Ano da temporada (ex.: 2010). Agrupa Série A, Série B e Copa disputadas juntas.</summary>
+    public int? Temporada { get; set; }
+
+    /// <summary>Divisão da Liga de pontos corridos; nulo para Copa/Supercopa.</summary>
+    public Divisao? Divisao { get; set; }
+
+    /// <summary>Série A: últimos que caem direto. Série B: primeiros que sobem direto. Nulo/0 = nenhum.</summary>
+    public int? VagasDiretas { get; set; }
+
+    /// <summary>Série A: quem vem logo acima dos rebaixados e joga o playoff. Série B: quem vem logo abaixo dos promovidos.</summary>
+    public int? VagasPlayoff { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 

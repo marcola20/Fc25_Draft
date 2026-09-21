@@ -17,34 +17,130 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<LigaDto?> GetAtualAsync(CancellationToken ct)
     {
-        var liga = await _db.Ligas
-            .AsNoTracking()
-            .Where(x => x.Status != LigaStatus.Encerrada)
-            .OrderByDescending(x => x.CriadoEm)
+        var liga = await OrdenarPorRelevancia(_db.Ligas.AsNoTracking().Include(x => x.Campeao).Where(x => x.Status != LigaStatus.Encerrada))
             .FirstOrDefaultAsync(ct)
-            ?? await _db.Ligas
-                .AsNoTracking()
-                .OrderByDescending(x => x.CriadoEm)
+            ?? await OrdenarPorRelevancia(_db.Ligas.AsNoTracking().Include(x => x.Campeao))
                 .FirstOrDefaultAsync(ct);
 
         return liga is null ? null : ToDto(liga);
     }
 
+    /// <summary>
+    /// Temporada mais recente primeiro; dentro dela, Liga antes de Copa e Série A antes da B.
+    /// Assim a "liga atual" não depende de qual competição foi cadastrada por último.
+    /// </summary>
+    private static IQueryable<Liga> OrdenarPorRelevancia(IQueryable<Liga> ligas) =>
+        ligas
+            .OrderByDescending(x => x.Temporada ?? 0)
+            .ThenBy(x => x.Tipo)
+            .ThenBy(x => x.Divisao ?? Divisao.SerieA)
+            .ThenByDescending(x => x.CriadoEm);
+
     public async Task<LigaDto?> GetByIdAsync(Guid ligaId, CancellationToken ct)
     {
-        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
+        var liga = await _db.Ligas.AsNoTracking().Include(x => x.Campeao).FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
         return liga is null ? null : ToDto(liga);
     }
 
     public async Task<IReadOnlyList<LigaDto>> ListAtivasAsync(CancellationToken ct)
     {
-        var ligas = await _db.Ligas
-            .AsNoTracking()
-            .Where(x => x.Status != LigaStatus.Encerrada)
-            .OrderByDescending(x => x.CriadoEm)
+        var ligas = await OrdenarPorRelevancia(_db.Ligas.AsNoTracking().Include(x => x.Campeao).Where(x => x.Status != LigaStatus.Encerrada))
             .ToListAsync(ct);
 
         return ligas.Select(ToDto).ToArray();
+    }
+
+    public async Task<IReadOnlyList<LigaEdicaoDto>> ListEdicoesAsync(CancellationToken ct)
+    {
+        // O formato de cada edição sai dos próprios dados dela (times, grupos, rodadas e fases),
+        // porque a competição mudou de formato de uma temporada para outra.
+        var ligas = await OrdenarPorRelevancia(_db.Ligas.AsNoTracking())
+            .Select(l => new
+            {
+                l.LigaId,
+                l.Nome,
+                l.Temporada,
+                l.Tipo,
+                l.Divisao,
+                l.Status,
+                l.CampeaoTimeId,
+                CampeaoNome = l.Campeao != null ? l.Campeao.TeamName : null,
+                l.VagasDiretas,
+                l.VagasPlayoff,
+                l.DataInicio,
+                l.DataFim,
+                TimesInscritos = _db.LigaTimes.Count(t => t.LigaId == l.LigaId),
+                TimesNaTabela = _db.LigaClassificacoes.Count(c => c.LigaId == l.LigaId),
+                TimesNosGrupos = _db.LigaGruposTimes.Count(g => g.LigaId == l.LigaId),
+                Grupos = _db.LigaGruposTimes.Where(g => g.LigaId == l.LigaId).Select(g => g.Grupo).Distinct().Count(),
+                Rodadas = _db.LigaRodadas.Count(r => r.LigaId == l.LigaId && r.Numero > 0 && !r.Desempate),
+                PartidasTotal = _db.LigaPartidas.Count(p => p.Rodada.LigaId == l.LigaId),
+                PartidasJogadas = _db.LigaPartidas.Count(p => p.Rodada.LigaId == l.LigaId && p.Status == PartidaStatus.Encerrada)
+            })
+            .ToListAsync(ct);
+
+        var fasesPorLiga = (await _db.LigaKnockoutJogos
+                .AsNoTracking()
+                .Select(k => new { k.LigaId, k.Fase })
+                .Distinct()
+                .ToListAsync(ct))
+            .GroupBy(k => k.LigaId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<FaseKnockout>)g.Select(x => x.Fase).OrderBy(f => f).ToArray());
+
+        // Edições antigas foram encerradas sem gravar o campeão: nesses casos ele vem
+        // do vencedor da final e, se a edição não teve mata-mata, do 1º da tabela.
+        var campeaoDaFinal = (await _db.LigaKnockoutJogos
+                .AsNoTracking()
+                .Where(k => k.Fase == FaseKnockout.Final && k.VencedorId != null)
+                .Select(k => new { k.LigaId, TimeId = k.VencedorId!.Value, Nome = k.Vencedor!.TeamName })
+                .ToListAsync(ct))
+            .GroupBy(k => k.LigaId)
+            .ToDictionary(g => g.Key, g => (g.First().TimeId, g.First().Nome));
+
+        var liderDaTabela = (await _db.LigaClassificacoes
+                .AsNoTracking()
+                .Where(c => c.Posicao == 1)
+                .Select(c => new { c.LigaId, c.TimeId, Nome = c.Time.TeamName })
+                .ToListAsync(ct))
+            .GroupBy(c => c.LigaId)
+            // Vários "1º" na mesma liga = grupos da Copa ou empate no topo: não define campeão.
+            .Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => (g.First().TimeId, g.First().Nome));
+
+        (Guid? Id, string? Nome) Campeao(Guid ligaId, Guid? gravadoId, string? gravadoNome, LigaStatus status)
+        {
+            if (gravadoId is not null) return (gravadoId, gravadoNome);
+            if (status != LigaStatus.Encerrada) return (null, null);
+            if (campeaoDaFinal.TryGetValue(ligaId, out var daFinal)) return (daFinal.Item1, daFinal.Item2);
+            return liderDaTabela.TryGetValue(ligaId, out var lider) ? (lider.Item1, lider.Item2) : (null, null);
+        }
+
+        return ligas.Select(l =>
+        {
+            var campeao = Campeao(l.LigaId, l.CampeaoTimeId, l.CampeaoNome, l.Status);
+
+            return new LigaEdicaoDto(
+                l.LigaId,
+                l.Nome,
+                l.Temporada,
+                l.Tipo,
+                l.Divisao,
+                l.Status,
+                campeao.Id,
+                campeao.Nome,
+                Math.Max(l.TimesInscritos, Math.Max(l.TimesNaTabela, l.TimesNosGrupos)),
+                l.Grupos,
+                l.Rodadas,
+                l.PartidasJogadas,
+                l.PartidasTotal,
+                fasesPorLiga.GetValueOrDefault(l.LigaId, Array.Empty<FaseKnockout>()),
+                l.VagasDiretas ?? 0,
+                l.VagasPlayoff ?? 0,
+                l.DataInicio,
+                l.DataFim);
+        }).ToArray();
     }
 
     public async Task<IReadOnlyList<LigaClassificacaoItemDto>> GetClassificacaoAsync(Guid ligaId, CancellationToken ct)
@@ -70,6 +166,53 @@ public class LigaPublicService : ILigaPublicService
             c.CartoesAmarelos, c.CartoesVermelhos,
             punicoes.GetValueOrDefault(c.TimeId, 0),
             c.Grupo)).ToArray();
+    }
+
+    public async Task<IReadOnlyList<TimeTrajetoriaDto>> GetTrajetoriaTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var participacoes = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(c => c.TimeId == timeId
+                        && c.Liga.Tipo == TipoCompetition.Liga
+                        && c.Liga.Divisao != null
+                        && c.Liga.Temporada != null)
+            .Select(c => new
+            {
+                Temporada = c.Liga.Temporada!.Value,
+                Divisao = c.Liga.Divisao!.Value,
+                c.Liga.Nome,
+                c.Liga.Status,
+                c.Liga.VagasDiretas,
+                c.Liga.VagasPlayoff,
+                Campeao = c.Liga.CampeaoTimeId == timeId,
+                c.Posicao,
+                TotalTimes = _db.LigaClassificacoes.Count(x => x.LigaId == c.LigaId)
+            })
+            .OrderBy(c => c.Temporada)
+            .ToListAsync(ct);
+
+        var trajetoria = new List<TimeTrajetoriaDto>(participacoes.Count);
+
+        for (int i = 0; i < participacoes.Count; i++)
+        {
+            var p = participacoes[i];
+            var regra = LigaRegraZonas.De(TipoCompetition.Liga, p.Divisao, p.VagasDiretas, p.VagasPlayoff);
+            var encerrada = p.Status == LigaStatus.Encerrada;
+
+            // Subiu ou desceu = comparação com a divisão da temporada anterior do próprio time.
+            var anterior = i > 0 ? participacoes[i - 1] : null;
+            var movimento = anterior is null || anterior.Divisao == p.Divisao
+                ? null
+                : anterior.Divisao == Divisao.SerieB ? "Promovido" : "Rebaixado";
+
+            trajetoria.Add(new TimeTrajetoriaDto(
+                p.Temporada, p.Divisao, p.Nome, p.Posicao, p.TotalTimes, encerrada, p.Campeao,
+                encerrada ? LigaZonas.Zona(regra, p.Posicao, p.TotalTimes) : ZonaClassificacao.Nenhuma,
+                movimento));
+        }
+
+        trajetoria.Reverse();
+        return trajetoria;
     }
 
     private const string SemTimeLabel = "Sem time";
@@ -632,7 +775,8 @@ public class LigaPublicService : ILigaPublicService
     }
 
     private static LigaDto ToDto(Liga l) =>
-        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm);
+        new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
+            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase],
@@ -648,10 +792,10 @@ public class LigaPublicService : ILigaPublicService
         [FaseKnockout.PlayIn_A] = "Play-In Jogo 1 (9º vs 10º)",
         [FaseKnockout.PlayIn_B] = "Play-In Jogo 2 (7º vs 8º)",
         [FaseKnockout.PlayIn_C] = "Play-In Jogo 3 (Decisivo)",
-        [FaseKnockout.QF1] = "Quartas - 1º vs Vencedor Play-In 3",
-        [FaseKnockout.QF2] = "Quartas - 2º vs Vencedor Play-In 2",
-        [FaseKnockout.QF3] = "Quartas - 3º vs 6º",
-        [FaseKnockout.QF4] = "Quartas - 4º vs 5º",
+        [FaseKnockout.QF1] = "Quartas 1 — 1º Grupo A x 2º Grupo B",
+        [FaseKnockout.QF2] = "Quartas 2 — 1º Grupo B x 2º Grupo A",
+        [FaseKnockout.QF3] = "Quartas 3 — 1º Grupo C x 2º Grupo D",
+        [FaseKnockout.QF4] = "Quartas 4 — 1º Grupo D x 2º Grupo C",
         [FaseKnockout.Semi1] = "Semifinal 1",
         [FaseKnockout.Semi2] = "Semifinal 2",
         [FaseKnockout.Final] = "Final"

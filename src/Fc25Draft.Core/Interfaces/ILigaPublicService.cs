@@ -7,6 +7,9 @@ public interface ILigaPublicService
     Task<LigaDto?> GetAtualAsync(CancellationToken ct);
     Task<LigaDto?> GetByIdAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaDto>> ListAtivasAsync(CancellationToken ct);
+
+    /// <summary>Todas as edições (em andamento e encerradas) com o resumo do formato de cada uma.</summary>
+    Task<IReadOnlyList<LigaEdicaoDto>> ListEdicoesAsync(CancellationToken ct);
     Task<IReadOnlyList<LigaClassificacaoItemDto>> GetClassificacaoAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetAssistenciasAsync(Guid ligaId, CancellationToken ct);
@@ -20,6 +23,9 @@ public interface ILigaPublicService
 
     /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
     Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);
+
+    /// <summary>Trajetória do time por temporada: divisão, posição, títulos, acessos e rebaixamentos.</summary>
+    Task<IReadOnlyList<TimeTrajetoriaDto>> GetTrajetoriaTimeAsync(Guid timeId, CancellationToken ct);
 
     /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
     Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);

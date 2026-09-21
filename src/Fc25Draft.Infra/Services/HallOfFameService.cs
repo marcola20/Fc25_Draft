@@ -1,4 +1,5 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -35,6 +36,7 @@ public class HallOfFameService : IHallOfFameService
             HallOfFameId = Guid.NewGuid(),
             Descricao = NormalizarDescricao(request.Descricao),
             Tipo = request.Tipo,
+            Divisao = request.Tipo == TipoCompetition.Liga ? request.Divisao : null,
             TimeCampeao = NormalizarTime(request.TimeCampeao),
             Tecnico = NormalizarOpcional(request.Tecnico),
             Ano = request.Ano,
@@ -55,6 +57,7 @@ public class HallOfFameService : IHallOfFameService
 
         entry.Descricao = NormalizarDescricao(request.Descricao);
         entry.Tipo = request.Tipo;
+        entry.Divisao = request.Tipo == TipoCompetition.Liga ? request.Divisao : null;
         entry.TimeCampeao = NormalizarTime(request.TimeCampeao);
         entry.Tecnico = NormalizarOpcional(request.Tecnico);
         entry.Ano = request.Ano;
@@ -97,5 +100,5 @@ public class HallOfFameService : IHallOfFameService
     }
 
     private static HallOfFameEntryDto ToDto(HallOfFameEntry e) =>
-        new(e.HallOfFameId, e.Descricao, e.Tipo, e.TimeCampeao, e.Tecnico, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
+        new(e.HallOfFameId, e.Descricao, e.Tipo, e.Divisao, e.TimeCampeao, e.Tecnico, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
 }

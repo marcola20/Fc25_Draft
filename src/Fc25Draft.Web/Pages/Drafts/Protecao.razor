@@ -1,0 +1,224 @@
+@page "/draft/protecao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
+@inject DraftExpansaoService ExpansaoService
+@inject AdminAuthService AdminAuth
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@implements IDisposable
+
+<PageTitle>Jogadores protegidos</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (!_authInicializado || _carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (!AdminAuth.IsAuthenticated)
+    {
+        <div class="alert alert-info">Entre com o token do seu time (botão no topo da página) para montar a lista de protegidos.</div>
+    }
+    else
+    {
+        @if (AdminAuth.IsAdmin)
+        {
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <label class="form-label mb-0">Time</label>
+                <select class="form-select w-auto" @onchange="OnTimeAdminChanged">
+                    <option value="">— Selecione —</option>
+                    @foreach (var t in _times)
+                    {
+                        <option value="@t.TeamId" selected="@(t.TeamId == _teamId)">@t.TeamName</option>
+                    }
+                </select>
+                <span class="text-muted small">Como admin, você pode montar a lista de qualquer time.</span>
+            </div>
+        }
+
+        @if (_teamId is null)
+        {
+            @if (!AdminAuth.IsAdmin)
+            {
+                <div class="alert alert-warning">Token não reconhecido como de um time.</div>
+            }
+        }
+        else if (_protecao is null)
+        {
+            <div class="alert alert-info">Não há draft de expansão aguardando listas de protegidos para este time.</div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h2 class="h5 mb-1">@_protecao.TeamName — @_protecao.DraftNome</h2>
+                    <p class="mb-0 text-muted">
+                        Proteja <strong>@_protecao.Exigidos</strong> jogadores. Os outros ficam disponíveis para os times novos;
+                        cada time perde no máximo <strong>@_protecao.MaxPerdasPorTime</strong> e recebe compensação pelo valor de mercado.
+                    </p>
+                    @if (!_protecao.Aberta)
+                    {
+                        <div class="alert alert-secondary mt-3 mb-0">
+                            As listas estão encerradas. Quem não enviou teve os maiores overalls protegidos automaticamente.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Elenco (@_protecao.Elenco.Count)</span>
+                    <span class="badge @(_selecionados.Count == _protecao.Exigidos ? "bg-success" : "bg-secondary")">
+                        @_selecionados.Count/@_protecao.Exigidos protegidos
+                    </span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr><th style="width: 3rem"></th><th>Jogador</th><th>Posição</th><th class="text-end">Overall</th><th class="text-end">Idade</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in _protecao.Elenco)
+                            {
+                                var marcado = _selecionados.Contains(j.PlayerId);
+                                <tr class="@(marcado ? "table-success" : "")">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input" checked="@marcado"
+                                               disabled="@(!_protecao.Aberta || (!marcado && _selecionados.Count >= _protecao.Exigidos))"
+                                               @onchange="() => Alternar(j.PlayerId)" />
+                                    </td>
+                                    <td>
+                                        @j.Nome
+                                        @if (j.ProtecaoAutomatica)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1" title="Protegido automaticamente">auto</span>
+                                        }
+                                    </td>
+                                    <td>@j.Posicao</td>
+                                    <td class="text-end">@j.Overall</td>
+                                    <td class="text-end">@(j.Idade?.ToString() ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (_protecao.Aberta)
+                {
+                    <div class="card-footer">
+                        <button class="btn btn-primary" @onclick="SalvarAsync" disabled="@(_salvando || _selecionados.Count != _protecao.Exigidos)">
+                            @(_salvando ? "Salvando..." : "Salvar protegidos")
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _authInicializado;
+    private bool _carregando;
+    private bool _salvando;
+    private string? _erro, _ok;
+    private Guid? _teamId;
+    private List<(Guid TeamId, string TeamName)> _times = new();
+    private DraftProtecaoTimeDto? _protecao;
+    private readonly HashSet<int> _selecionados = new();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/draft/protecao"));
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await AdminAuth.EnsureInitializedAsync();
+        _authInicializado = true;
+        await CarregarAsync();
+        StateHasChanged();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _teamId = null;
+            _protecao = null;
+
+            if (!AdminAuth.IsAuthenticated) return;
+
+            if (AdminAuth.IsAdmin)
+            {
+                _times = await ExpansaoService.ListarTimesAsync(CancellationToken.None);
+                return;
+            }
+
+            var time = await ExpansaoService.ResolverTimeAsync(AdminAuth.Token, CancellationToken.None);
+            _teamId = time?.TeamId;
+            await CarregarProtecaoAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarProtecaoAsync()
+    {
+        _selecionados.Clear();
+        _protecao = _teamId is null ? null : await ExpansaoService.GetProtecaoDoTimeAsync(_teamId.Value, CancellationToken.None);
+        if (_protecao is null) return;
+
+        foreach (var j in _protecao.Elenco.Where(j => j.Protegido))
+            _selecionados.Add(j.PlayerId);
+    }
+
+    private async Task OnTimeAdminChanged(ChangeEventArgs e)
+    {
+        _erro = null; _ok = null;
+        _teamId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await CarregarProtecaoAsync();
+    }
+
+    private void Alternar(int playerId)
+    {
+        if (!_selecionados.Remove(playerId))
+            _selecionados.Add(playerId);
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (_teamId is null) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await ExpansaoService.SalvarProtecaoAsync(_teamId.Value, _selecionados.ToList(), CancellationToken.None);
+            await CarregarProtecaoAsync();
+            _ok = "Lista de protegidos salva. Você pode alterá-la até o admin encerrar as listas.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await CarregarAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+}

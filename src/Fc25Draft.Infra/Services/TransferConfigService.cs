@@ -65,6 +65,26 @@ public class TransferConfigService : ITransferConfigService
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.QuickSellCount, 0), ct);
     }
 
+    public async Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct)
+    {
+        return await _db.Teams
+            .AsNoTracking()
+            .OrderBy(t => t.TeamName)
+            .Select(t => new TeamElencoMinimoDto(t.TeamId, t.TeamName, t.OwnerName, t.Roster.Count, t.MinRosterSizeOverride))
+            .ToListAsync(ct);
+    }
+
+    public async Task SetElencoMinimoTemporarioAsync(Guid teamId, int? minimo, CancellationToken ct)
+    {
+        if (minimo < 0) throw new InvalidOperationException("O mínimo de jogadores não pode ser negativo.");
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+            ?? throw new InvalidOperationException("Time não encontrado.");
+
+        team.MinRosterSizeOverride = minimo;
+        await _db.SaveChangesAsync(ct);
+    }
+
     private static void Validate(TransferConfigDto d)
     {
         if (d.MaxQuickSellPerWindow < 0) throw new InvalidOperationException("O limite de vendas rápidas não pode ser negativo.");

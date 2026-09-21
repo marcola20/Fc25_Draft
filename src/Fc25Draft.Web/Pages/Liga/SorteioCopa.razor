@@ -1,0 +1,15 @@
+@page "/copa/sorteio"
+@using Fc25Draft.Web.Components.Liga
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Sorteio da Copa</PageTitle>
+
+<div class="container-fluid py-3">
+    <CopaSorteioPainel />
+</div>
+
+@code {
+    protected override void OnInitialized() =>
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/copa/sorteio"));
+}

@@ -38,7 +38,8 @@ public sealed class JogosDecisivos
 /// Critérios de desempate da classificação, compartilhados entre o recálculo oficial
 /// e a simulação do admin.
 /// <para>
-/// <b>Liga:</b> Pontos → Vitórias → Saldo de Gols → Gols Pró → Confronto direto.
+/// <b>Liga:</b> Pontos → Vitórias → Saldo de Gols → Gols Pró → Confronto direto → jogo decisivo
+/// (só nas posições que mudam de zona; empate no topo segue a decisão de campeão).
 /// </para>
 /// <para>
 /// <b>Copa:</b> Pontos → Vitórias → Saldo de Gols. Quem empatar nesses três critérios
@@ -123,14 +124,62 @@ public static class LigaDesempate
                 .TakeWhile(x => stats(x) == atual)
                 .ToList();
 
-            resultado.AddRange(empatados.Count > 1
-                ? AplicarConfrontoDireto(empatados, timeId, confrontos)
-                : empatados);
+            if (empatados.Count == 1)
+            {
+                resultado.AddRange(empatados);
+            }
+            else
+            {
+                // Confronto direto; quem segue igual nele só se separa por jogo decisivo (zonas da Liga).
+                var parciais = ParciaisConfrontoDireto(empatados.Select(timeId), confrontos);
+                var porConfronto = AplicarConfrontoDireto(empatados, timeId, parciais);
+
+                resultado.AddRange(decisivos is null
+                    ? porConfronto
+                    : PorBloco(porConfronto, (a, b) => parciais[timeId(a)] == parciais[timeId(b)],
+                        bloco => OrdenarPorJogoDecisivo(bloco, timeId, decisivos)));
+            }
 
             i += empatados.Count;
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// Numeração de uma Liga já ordenada: times iguais em Pontos, Vitórias, Saldo, Gols Pró
+    /// <b>e</b> no confronto direto entre eles dividem a posição — a menos que um jogo decisivo
+    /// entre os dois já tenha sido disputado.
+    /// </summary>
+    public static List<int> PosicoesLiga<T>(
+        IReadOnlyList<T> ordenados,
+        Func<T, Guid> timeId,
+        Func<T, DesempateStats> stats,
+        IReadOnlyList<ConfrontoDireto> confrontos,
+        JogosDecisivos? decisivos = null)
+    {
+        var posicoes = new List<int>(ordenados.Count);
+        int i = 0;
+
+        while (i < ordenados.Count)
+        {
+            var atual = stats(ordenados[i]);
+            var bloco = ordenados.Skip(i).TakeWhile(x => stats(x) == atual).ToList();
+            var parciais = ParciaisConfrontoDireto(bloco.Select(timeId), confrontos);
+
+            for (int k = 0; k < bloco.Count; k++)
+            {
+                var empatadoComAnterior = k > 0
+                    && parciais[timeId(bloco[k])] == parciais[timeId(bloco[k - 1])]
+                    && decisivos?.Decidiu(timeId(bloco[k]), timeId(bloco[k - 1])) != true;
+
+                posicoes.Add(empatadoComAnterior ? posicoes[^1] : i + k + 1);
+            }
+
+            i += bloco.Count;
+        }
+
+        return posicoes;
     }
 
     /// <summary>
@@ -163,15 +212,19 @@ public static class LigaDesempate
     private static List<T> PorBlocoEmpatado<T>(
         List<T> ordenados,
         Func<T, DesempateStats> stats,
-        Func<List<T>, List<T>> resolver)
+        Func<List<T>, List<T>> resolver) =>
+        PorBloco(ordenados, (a, b) => EmpatadosNaCopa(stats(a), stats(b)), resolver);
+
+    /// <summary>Aplica <paramref name="resolver"/> a cada sequência de itens considerados iguais.</summary>
+    private static List<T> PorBloco<T>(List<T> ordenados, Func<T, T, bool> iguais, Func<List<T>, List<T>> resolver)
     {
         var resultado = new List<T>(ordenados.Count);
         int i = 0;
 
         while (i < ordenados.Count)
         {
-            var atual = stats(ordenados[i]);
-            var bloco = ordenados.Skip(i).TakeWhile(x => EmpatadosNaCopa(stats(x), atual)).ToList();
+            var primeiro = ordenados[i];
+            var bloco = ordenados.Skip(i).TakeWhile(x => iguais(x, primeiro)).ToList();
 
             resultado.AddRange(bloco.Count > 1 ? resolver(bloco) : bloco);
             i += bloco.Count;
@@ -194,15 +247,29 @@ public static class LigaDesempate
     private static List<T> AplicarConfrontoDireto<T>(
         List<T> grupo,
         Func<T, Guid> timeId,
+        Dictionary<Guid, (int Pts, int V, int SG, int GP)> parciais)
+    {
+        if (parciais.Values.Distinct().Count() <= 1)
+            return grupo;
+
+        return grupo
+            .OrderByDescending(g => parciais[timeId(g)].Pts)
+            .ThenByDescending(g => parciais[timeId(g)].V)
+            .ThenByDescending(g => parciais[timeId(g)].SG)
+            .ThenByDescending(g => parciais[timeId(g)].GP)
+            .ThenBy(timeId)
+            .ToList();
+    }
+
+    /// <summary>Mini tabela só com os jogos entre os times empatados.</summary>
+    private static Dictionary<Guid, (int Pts, int V, int SG, int GP)> ParciaisConfrontoDireto(
+        IEnumerable<Guid> times,
         IReadOnlyList<ConfrontoDireto> confrontos)
     {
-        var ids = grupo.Select(timeId).ToHashSet();
+        var ids = times.ToHashSet();
         var h2h = confrontos
             .Where(p => ids.Contains(p.TimeCasaId) && ids.Contains(p.TimeForaId))
             .ToList();
-
-        if (h2h.Count == 0)
-            return grupo;
 
         var parciais = ids.ToDictionary(id => id, _ => (Pts: 0, V: 0, SG: 0, GP: 0));
 
@@ -224,12 +291,6 @@ public static class LigaDesempate
             parciais[p.TimeForaId] = (ptsFora, vFora, sgFora, gpFora);
         }
 
-        return grupo
-            .OrderByDescending(g => parciais[timeId(g)].Pts)
-            .ThenByDescending(g => parciais[timeId(g)].V)
-            .ThenByDescending(g => parciais[timeId(g)].SG)
-            .ThenByDescending(g => parciais[timeId(g)].GP)
-            .ThenBy(timeId)
-            .ToList();
+        return parciais;
     }
 }

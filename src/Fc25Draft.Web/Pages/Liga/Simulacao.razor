@@ -5,6 +5,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Models.Navigation
+@using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -20,7 +21,7 @@
                 @foreach (var l in _ligas)
                 {
                     <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
-                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                        @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
                     </option>
                 }
             </select>
@@ -120,8 +121,11 @@
                 else
                 {
                     <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
-                        <span><span class="badge bg-success me-1">●</span> Campeão (1º)</span>
-                        <span><span class="badge bg-primary me-1">●</span> Empate em pontos no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
+                        @foreach (var zona in LigaZonas.ZonasDaTabela(_regra, _tabela.Count))
+                        {
+                            <span><span class="badge @ZonaEstilo.Badge(zona) me-1">●</span> @LigaZonas.Rotulo(zona)</span>
+                        }
+                        <span><span class="badge @ZonaEstilo.BadgeEmpateTopo me-1">●</span> Empate que vai a jogo decisivo (no topo com 3+ times: mini liga)</span>
                     </div>
                 }
             </div>
@@ -204,6 +208,7 @@
     private List<TimeSim> _tabela = new();
     private Dictionary<Guid, (int Ordem, int Posicao)> _situacaoReal = new();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+    private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
 
     private int _rodadaIdx;
     private bool _todasRodadas;
@@ -365,12 +370,25 @@
                     foreach (var t in empatadosNoTopo) t.EmDecisao = true;
             }
 
+            // Empate total (inclusive confronto direto) numa posição que muda a zona: jogo decisivo.
+            // Só com todos os jogos com placar; antes disso quase todo mundo "empata".
+            var cenarioCompleto = _partidas.All(p => real
+                ? p.RealGolsCasa is not null && p.RealGolsFora is not null
+                : p.GolsCasa is not null && p.GolsFora is not null);
+            var posicoes = LigaDesempate.PosicoesLiga(ordenados, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+            foreach (var p in cenarioCompleto ? LigaZonas.Fronteiras(_regra, ordenados.Count) : Array.Empty<int>())
+            {
+                if (posicoes[p - 1] != posicoes[p]) continue;
+                ordenados[p - 1].EmDecisao = true;
+                ordenados[p].EmDecisao = true;
+            }
+
             return ordenados;
         }
 
         // Copa: cada grupo é ordenado isoladamente e empatados dividem a posição.
         var resultado = new List<TimeSim>(todos.Count);
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        foreach (var grupo in GruposDaCopa())
         {
             var doGrupo = LigaDesempate.Ordenar(
                 todos.Where(t => t.Grupo == grupo), tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
@@ -390,6 +408,10 @@
         return resultado;
     }
 
+    /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
+    private IEnumerable<GrupoCopa> GruposDaCopa() =>
+        _classifReal.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g);
+
     /// <summary>Uma tabela por grupo na Copa; tabela única na Liga.</summary>
     private IEnumerable<(string? Titulo, List<TimeSim> Times)> Blocos()
     {
@@ -399,7 +421,7 @@
             yield break;
         }
 
-        foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+        foreach (var grupo in GruposDaCopa())
         {
             var doGrupo = _tabela.Where(t => t.Grupo == grupo).ToList();
             if (doGrupo.Count > 0) yield return ($"Grupo {grupo}", doGrupo);
@@ -438,8 +460,8 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "table-primary" : t.Posicao <= 2 ? "table-success" : "table-danger";
 
-        // Liga: pontos corridos, o 1º é campeão e os dois últimos ficam em vermelho.
-        return t.EmDecisao ? "table-primary" : t.Posicao == 1 ? "table-success" : t.Posicao > _tabela.Count - 2 ? "table-danger" : "";
+        // Liga: campeão e, com Série A e B na temporada, as zonas de acesso/playoff/rebaixamento.
+        return t.EmDecisao ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, t.Posicao, _tabela.Count));
     }
 
     private string BadgeClass(TimeSim t)
@@ -447,7 +469,7 @@
         if (_liga?.Tipo == TipoCompetition.Copa)
             return t.EmDecisao ? "bg-primary" : t.Posicao <= 2 ? "bg-success" : "bg-danger";
 
-        return t.EmDecisao ? "bg-primary" : t.Posicao == 1 ? "bg-success" : t.Posicao > _tabela.Count - 2 ? "bg-danger" : "bg-secondary";
+        return t.EmDecisao ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, t.Posicao, _tabela.Count));
     }
 
     private static string EscudoUrl(string? teamName)

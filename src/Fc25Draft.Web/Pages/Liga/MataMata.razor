@@ -3,6 +3,7 @@
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Components.Liga
+@using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
 @inject AdminAuthService AdminAuth
 @implements IDisposable
@@ -18,7 +19,7 @@
                 @foreach (var l in _ligas)
                 {
                     <option value="@l.LigaId" selected="@(l.LigaId == _ligaId)">
-                        @l.Nome (@(l.Tipo == TipoCompetition.Copa ? "Copa" : "Liga"))
+                        @l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))
                     </option>
                 }
             </select>

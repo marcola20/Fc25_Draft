@@ -11,3 +11,11 @@ public record TeamQuickSellStatusDto(
     string TeamName,
     string? OwnerName,
     int QuickSellCount);
+
+/// <summary>Tamanho do elenco de um time e o mínimo temporário dele, se houver.</summary>
+public record TeamElencoMinimoDto(
+    Guid TeamId,
+    string TeamName,
+    string? OwnerName,
+    int Elenco,
+    int? MinimoTemporario);

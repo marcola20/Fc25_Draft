@@ -1,4 +1,5 @@
 using Fc25Draft.Core.Enums;
+using Fc25Draft.Core.Utilities;
 using System.ComponentModel.DataAnnotations;
 
 namespace Fc25Draft.Core.DTOs;
@@ -14,18 +15,59 @@ public record LigaDto(
     DateTime CriadoEm,
     DateTime AtualizadoEm,
     Guid? CampeaoTimeId = null,
-    string? CampeaoNome = null);
+    string? CampeaoNome = null,
+    int? Temporada = null,
+    Divisao? Divisao = null,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
+
+/// <summary>
+/// Uma edição de competição (atual ou já encerrada) com o resumo do que ela teve —
+/// times, grupos, rodadas e fases — porque o formato muda de temporada para temporada.
+/// </summary>
+public record LigaEdicaoDto(
+    Guid LigaId,
+    string Nome,
+    int? Temporada,
+    TipoCompetition Tipo,
+    Divisao? Divisao,
+    LigaStatus Status,
+    Guid? CampeaoTimeId,
+    string? CampeaoNome,
+    int TotalTimes,
+    int Grupos,
+    int Rodadas,
+    int PartidasJogadas,
+    int PartidasTotal,
+    IReadOnlyList<FaseKnockout> FasesMataMata,
+    int VagasDiretas,
+    int VagasPlayoff,
+    DateTime DataInicio,
+    DateTime DataFim)
+{
+    public bool Encerrada => Status == LigaStatus.Encerrada;
+}
 
 public record LigaCreateRequest(
     [Required, MaxLength(120)] string Nome,
     DateTime DataInicio,
     DateTime DataFim,
-    TipoCompetition Tipo = TipoCompetition.Liga);
+    TipoCompetition Tipo = TipoCompetition.Liga,
+    int? Temporada = null,
+    Divisao? Divisao = null,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
 
+/// <summary>Campos nulos mantêm o valor atual; <paramref name="RemoverDivisao"/> tira a divisão da liga.</summary>
 public record LigaUpdateRequest(
     [MaxLength(120)] string? Nome,
     DateTime? DataInicio,
-    DateTime? DataFim);
+    DateTime? DataFim,
+    int? Temporada = null,
+    Divisao? Divisao = null,
+    bool RemoverDivisao = false,
+    int? VagasDiretas = null,
+    int? VagasPlayoff = null);
 
 public record LigaRodadaDto(
     Guid RodadaId,
@@ -123,11 +165,51 @@ public record LigaEmpateCopaDto(
     Guid? VencedorId,
     string? VencedorNome);
 
+/// <summary>
+/// Empate total (inclusive no confronto direto) entre o <paramref name="Posicao"/>º e o seguinte,
+/// numa posição que muda a zona — e o jogo decisivo, quando já criado.
+/// </summary>
+public record LigaEmpateZonaDto(
+    int Posicao,
+    string ZonaTimeA,
+    string ZonaTimeB,
+    Guid TimeAId,
+    string TimeANome,
+    Guid TimeBId,
+    string TimeBNome,
+    Guid? PartidaId,
+    PartidaStatus? StatusPartida,
+    int? GolsTimeA,
+    int? GolsTimeB,
+    Guid? VencedorId,
+    string? VencedorNome);
+
 public record LigaGrupoTimeDto(
     Guid LigaId,
     Guid TimeId,
     string TimeNome,
     GrupoCopa Grupo);
+
+public record LigaCopaPoteTimeDto(Guid TimeId, string TimeNome, int Pote, GrupoCopa? Grupo);
+
+/// <summary>Potes do sorteio da Copa e o que falta para sortear.</summary>
+public record LigaCopaSorteioDto(
+    Guid LigaId,
+    IReadOnlyList<int> TamanhosDosGrupos,
+    bool JaSorteada,
+    bool PodeSortear,
+    string? Impedimento,
+    IReadOnlyList<LigaCopaPoteTimeDto> Times)
+{
+    public int TotalGrupos => TamanhosDosGrupos.Count;
+
+    /// <summary>Ex.: "4 grupos: 4, 4, 5 e 5 times".</summary>
+    public string ResumoDosGrupos => TamanhosDosGrupos.Count == 0
+        ? "—"
+        : $"{TotalGrupos} grupos: {string.Join(", ", TamanhosDosGrupos)} times";
+}
+
+public record LigaCopaPotesRequest(IReadOnlyDictionary<Guid, int> PotePorTime);
 
 public record LigaConfigurarGruposRequest(
     IReadOnlyList<Guid> TimesGrupoA,
@@ -223,6 +305,18 @@ public record TimeHistoricoJogadorDto(
     bool NoElencoAtual,
     int Gols,
     int Assistencias);
+
+/// <summary>Uma temporada na trajetória do time: onde jogou, como terminou e se subiu ou desceu.</summary>
+public record TimeTrajetoriaDto(
+    int Temporada,
+    Divisao Divisao,
+    string LigaNome,
+    int Posicao,
+    int TotalTimes,
+    bool Encerrada,
+    bool Campeao,
+    ZonaClassificacao Zona,
+    string? Movimento);
 
 public record TimeHistoricoDto(
     Guid TimeId,

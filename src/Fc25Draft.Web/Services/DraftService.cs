@@ -23,14 +23,21 @@ public class DraftService
         int totalRounds = 19,
         bool snake = false,
         IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool shuffleOrder = true,
+        Action<Draft>? configure = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(teamOrder);
 
-        if (teamOrder.Count != 12)
+        if (teamOrder.Count < 2)
         {
-            throw new ArgumentException("Drafts must contain exactly 12 teams.", nameof(teamOrder));
+            throw new ArgumentException("O draft precisa de pelo menos 2 times.", nameof(teamOrder));
+        }
+
+        if (teamOrder.Distinct().Count() != teamOrder.Count)
+        {
+            throw new ArgumentException("Um time aparece mais de uma vez na ordem do draft.", nameof(teamOrder));
         }
 
         if (totalRounds <= 0)
@@ -108,7 +115,10 @@ public class DraftService
 
             var random = Random.Shared;
             var baseOrder = teamOrder.ToArray();
-            Shuffle(baseOrder, random);
+            if (shuffleOrder)
+            {
+                Shuffle(baseOrder, random);
+            }
             var reversedOrder = new Guid[baseOrder.Length];
             for (var i = 0; i < baseOrder.Length; i++)
             {
@@ -139,7 +149,10 @@ public class DraftService
                 else
                 {
                     orderForRound = baseOrder.ToArray();
-                    Shuffle(orderForRound, random);
+                    if (shuffleOrder)
+                    {
+                        Shuffle(orderForRound, random);
+                    }
                 }
 
                 for (var pickIndex = 0; pickIndex < baseOrder.Length; pickIndex++)
@@ -161,6 +174,7 @@ public class DraftService
 
             draft.Rounds = rounds;
             draft.Picks = picks;
+            configure?.Invoke(draft);
 
             _db.Drafts.Add(draft);
 
@@ -193,36 +207,34 @@ public class DraftService
             throw new InvalidOperationException("Nenhuma equipe cadastrada para gerar o draft.");
         }
 
-        if (teamOrder.Count != 12)
-        {
-            throw new InvalidOperationException("O draft requer exatamente 12 equipes cadastradas.");
-        }
-
-        var existingDraft = await _db.Drafts
-            .OrderByDescending(d => d.CreatedAtUtc)
-            .FirstOrDefaultAsync(ct);
-
-        if (existingDraft is not null)
-        {
-            var totalExistingPicks = await _db.DraftPicks
-                .Where(p => p.DraftId == existingDraft.DraftId)
-                .CountAsync(ct);
-
-            var completedExistingPicks = await _db.DraftPicks
-                .Where(p => p.DraftId == existingDraft.DraftId && p.PlayerId != null)
-                .CountAsync(ct);
-
-            if (totalExistingPicks > 0 && completedExistingPicks < totalExistingPicks)
-            {
-                throw new InvalidOperationException("Não é possível gerar um novo draft enquanto o atual não foi concluído.");
-            }
-        }
+        await EnsureNoDraftInProgressAsync(ct);
 
         var draftName = string.IsNullOrWhiteSpace(name)
             ? $"DRAFT - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
 
         return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct);
+    }
+
+    /// <summary>Só existe um draft ativo (o mais recente); um novo não pode começar antes de ele terminar.</summary>
+    public async Task EnsureNoDraftInProgressAsync(CancellationToken ct = default)
+    {
+        var existingDraft = await _db.Drafts
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        if (existingDraft is null)
+        {
+            return;
+        }
+
+        var hasOpenPicks = await _db.DraftPicks
+            .AnyAsync(p => p.DraftId == existingDraft.DraftId && p.PlayerId == null, ct);
+
+        if (hasOpenPicks)
+        {
+            throw new InvalidOperationException("Não é possível gerar um novo draft enquanto o atual não foi concluído.");
+        }
     }
 
     public async Task<DraftRoundDetailsDto> AddRoundAsync(

@@ -15,12 +15,14 @@ public class LayoutNavigationService
         }),
         new("Times", new List<MenuItem>
         {
-            new("Elencos", "/times/elencos", "oi oi-people")
+            new("Elencos", "/times/elencos", "oi oi-people"),
+            new("Cadastro de Times", "/teams", "oi oi-plus", RequiredRole: "Admin")
         }),
         new("Draft", new List<MenuItem>
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document"),
+            new("Jogadores Protegidos", "/draft/protecao", "oi oi-shield"),
             new("Picks do Draft", "/picks", "oi oi-tag"),
             new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
@@ -34,7 +36,9 @@ public class LayoutNavigationService
         new("Liga", new List<MenuItem>
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
+            new("Edições", "/liga/edicoes", "oi oi-calendar"),
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
+            new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
@@ -48,6 +52,8 @@ public class LayoutNavigationService
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
+            new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
+            new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
         }, RequiredRole: "Admin")
     };
@@ -75,6 +81,8 @@ public class LayoutNavigationService
             }
         },
         ["/times/elencos"] = CreateDefinition("Elencos", "Times", "/times/elencos"),
+        ["/teams"] = CreateDefinition("Cadastro de Times", "Times", "/teams", true),
+        ["/teams/edit"] = CreateDefinition("Cadastro de Times", "Times", "/teams", true),
         ["/teams/roster"] = CreateDefinition("Elencos", "Times", "/times/elencos"),
         ["/draft/controle"] = CreateDefinition("Controle do Draft", "Draft", "/draft/controle"),
         ["/draft"] = CreateDefinition("Controle do Draft", "Draft", "/draft/controle"),
@@ -186,6 +194,18 @@ public class LayoutNavigationService
                 new("Liga")
             }
         },
+        ["/liga/edicoes"] = new PageDefinition
+        {
+            Route = "/liga/edicoes",
+            Title = "Edições",
+            Subtitle = "Todas as temporadas e competições",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Edições")
+            }
+        },
         ["/liga/classificacao"] = new PageDefinition
         {
             Route = "/liga/classificacao",
@@ -244,6 +264,43 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga", "/liga"),
                 new("Simulação")
+            }
+        },
+        ["/draft/protecao"] = CreateDefinition("Jogadores Protegidos", "Draft", "/draft/protecao"),
+        ["/copa/sorteio"] = new PageDefinition
+        {
+            Route = "/copa/sorteio",
+            Title = "Sorteio da Copa",
+            Subtitle = "Potes e grupos, ao vivo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Sorteio da Copa")
+            }
+        },
+        ["/admin/temporada"] = new PageDefinition
+        {
+            Route = "/admin/temporada",
+            Title = "Virada de Temporada",
+            Subtitle = "Playoff de acesso e próxima temporada — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Virada de Temporada")
+            }
+        },
+        ["/admin/draft-expansao"] = new PageDefinition
+        {
+            Route = "/admin/draft-expansao",
+            Title = "Draft de Expansão",
+            Subtitle = "Proteções, escolhas e compensações — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Draft de Expansão")
             }
         },
         ["/admin/configuracoes"] = new PageDefinition

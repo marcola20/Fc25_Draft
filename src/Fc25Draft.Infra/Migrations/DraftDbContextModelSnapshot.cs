@@ -145,9 +145,26 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<decimal?>("FatorCompensacao")
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<int?>("MaxPerdasPorTime")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProtecaoEncerradaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("ProtegidosPorTime")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tipo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("TotalRounds")
                         .HasColumnType("integer");
@@ -168,6 +185,12 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("OverallPick")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("Compensacao")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("FromTeamId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("PickInRound")
                         .HasColumnType("integer");
 
@@ -185,6 +208,8 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasKey("DraftId", "OverallPick");
 
+                    b.HasIndex("FromTeamId");
+
                     b.HasIndex("PlayerId");
 
                     b.HasIndex("TeamId");
@@ -199,6 +224,34 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("DraftId", "TeamId", "RoundNumber");
 
                     b.ToTable("DraftPicks");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DraftProtecao", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("EscolhidoPeloTime")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DraftId", "PlayerId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("DraftId", "TeamId");
+
+                    b.ToTable("DraftProtecoes");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftRound", b =>
@@ -298,6 +351,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int?>("Divisao")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Tecnico")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -359,12 +415,18 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("DataInicio")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<int?>("Divisao")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
                     b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Temporada")
                         .HasColumnType("integer");
 
                     b.Property<int>("Tipo")
@@ -377,9 +439,19 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(8);
 
+                    b.Property<int?>("VagasDiretas")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("VagasPlayoff")
+                        .HasColumnType("integer");
+
                     b.HasKey("LigaId");
 
                     b.HasIndex("CampeaoTimeId");
+
+                    b.HasIndex("Temporada", "Divisao")
+                        .IsUnique()
+                        .HasFilter("\"Temporada\" IS NOT NULL AND \"Divisao\" IS NOT NULL");
 
                     b.ToTable("Ligas");
                 });
@@ -437,6 +509,33 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.ToTable("LigaClassificacoes");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaCopaPote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LigaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Pote")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("LigaId", "Pote");
+
+                    b.HasIndex("LigaId", "TimeId")
+                        .IsUnique();
+
+                    b.ToTable("LigaCopaPotes", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.LigaEventoPartida", b =>
@@ -1161,6 +1260,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<int?>("MinRosterSizeOverride")
+                        .HasColumnType("integer");
+
                     b.Property<string>("OwnerName")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
@@ -1610,6 +1712,11 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "FromTeam")
+                        .WithMany()
+                        .HasForeignKey("FromTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
                         .WithMany("DraftPicks")
                         .HasForeignKey("PlayerId")
@@ -1629,9 +1736,38 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Navigation("Draft");
 
+                    b.Navigation("FromTeam");
+
                     b.Navigation("Player");
 
                     b.Navigation("Round");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DraftProtecao", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Draft", "Draft")
+                        .WithMany("Protecoes")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Draft");
+
+                    b.Navigation("Player");
 
                     b.Navigation("Team");
                 });
@@ -1696,6 +1832,25 @@ namespace Fc25Draft.Infra.Migrations
                         .WithMany()
                         .HasForeignKey("TimeId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Liga");
+
+                    b.Navigation("Time");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaCopaPote", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Liga", "Liga")
+                        .WithMany()
+                        .HasForeignKey("LigaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Liga");
@@ -2211,6 +2366,8 @@ namespace Fc25Draft.Infra.Migrations
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
                 {
                     b.Navigation("Picks");
+
+                    b.Navigation("Protecoes");
 
                     b.Navigation("Rounds");
                 });

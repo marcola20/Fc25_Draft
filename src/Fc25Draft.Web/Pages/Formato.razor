@@ -11,24 +11,65 @@
     {
         LayoutState.SetPage(NavigationService.GetPageDefinition("/formato"));
     }
+
+    private sealed record DataCalendario(int Numero, string Competicao, string? Detalhe, string Classe);
+
+    /// <summary>
+    /// Abre na Supercopa e fecha na final da Copa. As rodadas de liga andam em dupla (Série B e,
+    /// em seguida, Série A) e as rodadas de grupo da Copa entram entre elas.
+    /// </summary>
+    private static readonly IReadOnlyList<DataCalendario> Calendario = MontarCalendario();
+
+    private static List<DataCalendario> MontarCalendario()
+    {
+        const int rodadasSerieA = 9;
+        const int rodadasSerieB = 7;
+        const int rodadasGrupoCopa = 5; // grupos de 5 precisam de 5 rodadas (um time folga por rodada)
+
+        var datas = new List<DataCalendario>();
+        void Add(string competicao, string? detalhe, string classe) =>
+            datas.Add(new DataCalendario(datas.Count + 1, competicao, detalhe, classe));
+
+        Add("Supercopa", "abre a temporada", "fmt-cal-final");
+
+        int serieA = 1, serieB = 1, copa = 1;
+
+        // A cada duas duplas de liga entra uma rodada de grupo da Copa.
+        while (serieA <= rodadasSerieA || serieB <= rodadasSerieB || copa <= rodadasGrupoCopa)
+        {
+            for (int dupla = 0; dupla < 2; dupla++)
+            {
+                if (serieB <= rodadasSerieB) Add("Série B", $"Rodada {serieB++}", "fmt-cal-special");
+                if (serieA <= rodadasSerieA) Add("Série A", $"Rodada {serieA++}", "fmt-cal-liga");
+            }
+
+            if (copa <= rodadasGrupoCopa) Add("Copa", $"Rodada {copa++} · grupos", "fmt-cal-copa");
+        }
+
+        Add("Copa", "Quartas de final", "fmt-cal-semi");
+        Add("Copa", "Semifinais", "fmt-cal-semi");
+        Add("Copa", "Final", "fmt-cal-final");
+
+        return datas;
+    }
 }
 
 <div class="formato-page">
 
-    <!-- LIGA -->
+    <!-- SÉRIE A -->
     <section class="fmt-section">
         <div class="fmt-section-header">
             <span class="fmt-section-icon">🏆</span>
-            <h3>Liga</h3>
+            <h3>Série A</h3>
         </div>
 
         <div class="fmt-overview-grid fmt-overview-grid-3">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">12</div>
+                <div class="fmt-stat-number">10</div>
                 <div class="fmt-stat-label">Times</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">11</div>
+                <div class="fmt-stat-number">9</div>
                 <div class="fmt-stat-label">Rodadas</div>
             </div>
             <div class="fmt-stat-card">
@@ -39,8 +80,13 @@
 
         <div class="fmt-card fmt-card-liga">
             <p class="fmt-desc">
-                Todos os <strong>12 times</strong> se enfrentam em <strong>pontos corridos</strong> ao longo de <strong>11 rodadas</strong>.
-                O primeiro colocado ao final é o <strong>campeão da Liga</strong>.
+                Todos os <strong>10 times</strong> se enfrentam em <strong>pontos corridos</strong> ao longo de <strong>9 rodadas</strong>.
+                O primeiro colocado ao final é o <strong>campeão da Série A</strong>. O <strong>último cai</strong> para a Série B e o
+                <strong>9° disputa o playoff</strong> contra o 2° da Série B.
+            </p>
+            <p class="fmt-desc">
+                ⚠️ <strong>Nesta temporada de transição</strong>, com 12 times, <strong>caem 2 direto</strong> e não há playoff:
+                a Série A do ano que vem começa com 10.
             </p>
 
             <div class="fmt-tiebreak-section">
@@ -72,7 +118,7 @@
                 <div class="fmt-flow-icon">📋</div>
                 <div class="fmt-flow-content">
                     <strong>Todos contra Todos</strong>
-                    <span>11 rodadas · pontos corridos</span>
+                    <span>9 rodadas · pontos corridos</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>
@@ -87,10 +133,74 @@
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon">🏆</div>
                 <div class="fmt-flow-content">
-                    <strong>Campeão da Liga</strong>
+                    <strong>Campeão da Série A</strong>
                     <span>1° colocado ao final</span>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <!-- SÉRIE B E ACESSO -->
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🥈</span>
+            <h3>Série B e Acesso</h3>
+        </div>
+
+        <div class="fmt-card fmt-card-liga">
+            <p class="fmt-desc">
+                A <strong>Série B</strong> é a segunda divisão, disputada em <strong>pontos corridos</strong> com o mesmo regulamento da Série A.
+                O <strong>campeão sobe direto</strong> e o <strong>2° disputa o playoff de acesso</strong>.
+            </p>
+            <p class="fmt-desc">
+                O <strong>playoff de acesso</strong> é um <strong>jogo único</strong> entre o 2° da Série B e o 9° da Série A.
+                Quem vencer joga a Série A na temporada seguinte. Em caso de empate, a vaga sai nos <strong>pênaltis</strong>.
+            </p>
+        </div>
+
+        <div class="fmt-flow">
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon">🥇</div>
+                <div class="fmt-flow-content">
+                    <strong>Campeão da Série B</strong>
+                    <span>sobe direto</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector">→</div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon">⚔️</div>
+                <div class="fmt-flow-content">
+                    <strong>Playoff de acesso</strong>
+                    <span>2° da B x 9° da A · jogo único</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector">→</div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon">⬇️</div>
+                <div class="fmt-flow-content">
+                    <strong>Último da Série A</strong>
+                    <span>cai direto</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="fmt-divider" />
+
+    <!-- SUPERCOPA -->
+    <section class="fmt-section">
+        <div class="fmt-section-header">
+            <span class="fmt-section-icon">🌟</span>
+            <h3>Supercopa</h3>
+        </div>
+
+        <div class="fmt-card fmt-card-liga">
+            <p class="fmt-desc">
+                <strong>Jogo único</strong> entre o <strong>campeão da Série A</strong> e o <strong>campeão da Copa</strong> da temporada.
+                Empatou, vai para os <strong>pênaltis</strong>. Se o mesmo time vencer as duas competições, não há Supercopa.
+            </p>
         </div>
     </section>
 
@@ -105,11 +215,11 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">2</div>
+                <div class="fmt-stat-number">4</div>
                 <div class="fmt-stat-label">Grupos</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">6</div>
+                <div class="fmt-stat-number">4-5</div>
                 <div class="fmt-stat-label">Times por Grupo</div>
             </div>
             <div class="fmt-stat-card">
@@ -128,47 +238,38 @@
                 <span>Fase de Grupos</span>
             </div>
 
+            <p class="fmt-desc">
+                Todos os times da temporada entram na Copa, divididos em <strong>4 grupos</strong> por <strong>sorteio em potes</strong>.
+                Com <strong>18 times</strong> ficam <strong>2 grupos de 4 (A e B) e 2 de 5 (C e D)</strong>; os times do último pote é que completam os grupos maiores.
+                Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>. A fase de grupos tem
+                <strong>5 rodadas</strong>: nos grupos de 4, os times folgam em duas delas.
+            </p>
+
             <div class="fmt-groups-grid">
-                <div class="fmt-group-card">
-                    <div class="fmt-group-header fmt-group-a">Grupo A</div>
-                    <div class="fmt-group-body">
-                        <div class="fmt-group-teams">
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A1</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A2</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A3</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A4</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A5</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Time A6</div>
+                @foreach (var (grupo, times) in new[] { ("A", 4), ("B", 4), ("C", 5), ("D", 5) })
+                {
+                    <div class="fmt-group-card">
+                        <div class="fmt-group-header @(times == 4 ? "fmt-group-a" : "fmt-group-b")">
+                            Grupo @grupo <small>· @times times</small>
                         </div>
-                        <div class="fmt-group-desc">Enfrenta todos do <strong>Grupo B</strong> (cross-group)</div>
-                        <div class="fmt-group-advance">
-                            <span class="fmt-advance-badge">✅ Top 2 avançam</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="fmt-groups-vs">
-                    <div class="fmt-groups-vs-label">Cross-Group</div>
-                    <div class="fmt-groups-vs-arrow">↔</div>
-                </div>
-
-                <div class="fmt-group-card">
-                    <div class="fmt-group-header fmt-group-b">Grupo B</div>
-                    <div class="fmt-group-body">
-                        <div class="fmt-group-teams">
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B1</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B2</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B3</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B4</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B5</div>
-                            <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Time B6</div>
-                        </div>
-                        <div class="fmt-group-desc">Enfrenta todos do <strong>Grupo A</strong> (cross-group)</div>
-                        <div class="fmt-group-advance">
-                            <span class="fmt-advance-badge">✅ Top 2 avançam</span>
+                        <div class="fmt-group-body">
+                            <div class="fmt-group-teams">
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Pote 1</div>
+                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 2</div>
+                                @for (int i = 0; i < times - 2; i++)
+                                {
+                                    <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
+                                }
+                            </div>
+                            <div class="fmt-group-desc">
+                                Todos contra todos <strong>dentro do grupo</strong> · @(times - 1) jogos
+                            </div>
+                            <div class="fmt-group-advance">
+                                <span class="fmt-advance-badge">✅ Top 2 avançam</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                }
             </div>
         </div>
 
@@ -180,22 +281,46 @@
 
             <div class="fmt-knockout-bracket">
                 <div class="fmt-knockout-col">
-                    <div class="fmt-ko-match fmt-ko-match-a">
-                        <div class="fmt-ko-label">Semifinal — Grupo A</div>
-                        <div class="fmt-ko-matchup">
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">A1°</span>
-                                <span class="fmt-ko-name">1º do Grupo A</span>
+                    @foreach (var (numero, casa, fora) in new[] { (1, "A", "B"), (2, "B", "A"), (3, "C", "D"), (4, "D", "C") })
+                    {
+                        <div class="fmt-ko-match @(numero % 2 == 1 ? "fmt-ko-match-a" : "fmt-ko-match-b")">
+                            <div class="fmt-ko-label">Quartas @numero</div>
+                            <div class="fmt-ko-matchup">
+                                <div class="fmt-ko-team">
+                                    <span class="fmt-ko-seed fmt-seed-a">@(casa)1°</span>
+                                    <span class="fmt-ko-name">1º do Grupo @casa</span>
+                                </div>
+                                <div class="fmt-ko-vs">VS</div>
+                                <div class="fmt-ko-team">
+                                    <span class="fmt-ko-seed fmt-seed-b">@(fora)2°</span>
+                                    <span class="fmt-ko-name">2º do Grupo @fora</span>
+                                </div>
                             </div>
-                            <div class="fmt-ko-vs">VS</div>
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">A2°</span>
-                                <span class="fmt-ko-name">2º do Grupo A</span>
+                            <div class="fmt-ko-result">
+                                <span class="fmt-result-win">Vencedor → Semifinal</span>
+                                <span class="fmt-result-lose">Perdedor → Eliminado</span>
                             </div>
                         </div>
-                        <div class="fmt-ko-result">
-                            <span class="fmt-result-win">Vencedor → Final</span>
-                            <span class="fmt-result-lose">Perdedor → Eliminado</span>
+                    }
+                </div>
+
+                <div class="fmt-knockout-arrow">→</div>
+
+                <div class="fmt-knockout-col">
+                    <div class="fmt-ko-match fmt-ko-match-a">
+                        <div class="fmt-ko-label">Semifinal 1</div>
+                        <div class="fmt-ko-matchup">
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">W1</span><span class="fmt-ko-name">Vencedor Quartas 1</span></div>
+                            <div class="fmt-ko-vs">VS</div>
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">W4</span><span class="fmt-ko-name">Vencedor Quartas 4</span></div>
+                        </div>
+                    </div>
+                    <div class="fmt-ko-match fmt-ko-match-b">
+                        <div class="fmt-ko-label">Semifinal 2</div>
+                        <div class="fmt-ko-matchup">
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">W2</span><span class="fmt-ko-name">Vencedor Quartas 2</span></div>
+                            <div class="fmt-ko-vs">VS</div>
+                            <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">W3</span><span class="fmt-ko-name">Vencedor Quartas 3</span></div>
                         </div>
                     </div>
                 </div>
@@ -207,40 +332,17 @@
                         <div class="fmt-ko-label">🏆 Final</div>
                         <div class="fmt-ko-matchup">
                             <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-a">W-A</span>
-                                <span class="fmt-ko-name">Vencedor SF-A</span>
+                                <span class="fmt-ko-seed fmt-seed-a">W-S1</span>
+                                <span class="fmt-ko-name">Vencedor Semifinal 1</span>
                             </div>
                             <div class="fmt-ko-vs">VS</div>
                             <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">W-B</span>
-                                <span class="fmt-ko-name">Vencedor SF-B</span>
+                                <span class="fmt-ko-seed fmt-seed-b">W-S2</span>
+                                <span class="fmt-ko-name">Vencedor Semifinal 2</span>
                             </div>
                         </div>
                         <div class="fmt-ko-result">
                             <span class="fmt-result-win fmt-result-champion">🏆 Campeão da Copa</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="fmt-knockout-arrow">←</div>
-
-                <div class="fmt-knockout-col">
-                    <div class="fmt-ko-match fmt-ko-match-b">
-                        <div class="fmt-ko-label">Semifinal — Grupo B</div>
-                        <div class="fmt-ko-matchup">
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">B1°</span>
-                                <span class="fmt-ko-name">1º do Grupo B</span>
-                            </div>
-                            <div class="fmt-ko-vs">VS</div>
-                            <div class="fmt-ko-team">
-                                <span class="fmt-ko-seed fmt-seed-b">B2°</span>
-                                <span class="fmt-ko-name">2º do Grupo B</span>
-                            </div>
-                        </div>
-                        <div class="fmt-ko-result">
-                            <span class="fmt-result-win">Vencedor → Final</span>
-                            <span class="fmt-result-lose">Perdedor → Eliminado</span>
                         </div>
                     </div>
                 </div>
@@ -252,7 +354,7 @@
                 <div class="fmt-flow-icon">📋</div>
                 <div class="fmt-flow-content">
                     <strong>Fase de Grupos</strong>
-                    <span>2 grupos × 6 times</span>
+                    <span>4 grupos de 4 · 3 rodadas dentro do grupo</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>
@@ -293,112 +395,50 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">20</div>
+                <div class="fmt-stat-number">@Calendario.Count</div>
                 <div class="fmt-stat-label">Datas</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">11</div>
-                <div class="fmt-stat-label">Rodadas de Liga</div>
+                <div class="fmt-stat-number">9</div>
+                <div class="fmt-stat-label">Rodadas da Série A</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">6</div>
-                <div class="fmt-stat-label">Rodadas da Copa</div>
+                <div class="fmt-stat-number">7</div>
+                <div class="fmt-stat-label">Rodadas da Série B</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">3</div>
-                <div class="fmt-stat-label">Datas Especiais</div>
+                <div class="fmt-stat-number">8</div>
+                <div class="fmt-stat-label">Datas da Copa</div>
             </div>
         </div>
 
+        <p class="fmt-desc">
+            A temporada abre com a <strong>Supercopa</strong> e fecha com a <strong>final da Copa</strong>.
+            As rodadas de liga vêm sempre em dupla: primeiro a <strong>Série B</strong>, logo depois a <strong>Série A</strong>.
+        </p>
+
         <div class="fmt-cal-legend">
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-liga"></span>Liga</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Mercado / All-Star</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Semifinais</span>
-            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Final</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-liga"></span>Série A</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Série B</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa — grupos</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Copa — mata-mata</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Decisões</span>
         </div>
 
         <div class="fmt-cal-grid">
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">1</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 1</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">2</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 1</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">3</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 2</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">4</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 3</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">5</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 2</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">6</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 4</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">7</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 3</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">8</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 5</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">9</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 6</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">10</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 4</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-special">
-                <span class="fmt-cal-num">11</span>
-                <span class="fmt-cal-comp">Mercado / All-Star</span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">12</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 7</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">13</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 5</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">14</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 8</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">15</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 9</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-copa">
-                <span class="fmt-cal-num">16</span>
-                <span class="fmt-cal-comp">Copa<small>Rodada 6</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">17</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 10</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-semi">
-                <span class="fmt-cal-num">18</span>
-                <span class="fmt-cal-comp">Semis da Copa</span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-liga">
-                <span class="fmt-cal-num">19</span>
-                <span class="fmt-cal-comp">Liga<small>Rodada 11 · última</small></span>
-            </div>
-            <div class="fmt-cal-card fmt-cal-final">
-                <span class="fmt-cal-num">20</span>
-                <span class="fmt-cal-comp">Final da Copa</span>
-            </div>
+            @foreach (var data in Calendario)
+            {
+                <div class="fmt-cal-card @data.Classe">
+                    <span class="fmt-cal-num">@data.Numero</span>
+                    <span class="fmt-cal-comp">
+                        @data.Competicao
+                        @if (data.Detalhe is not null)
+                        {
+                            <small>@data.Detalhe</small>
+                        }
+                    </span>
+                </div>
+            }
         </div>
     </section>
 

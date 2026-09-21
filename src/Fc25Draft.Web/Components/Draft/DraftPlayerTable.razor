@@ -18,6 +18,10 @@ else
                     <th>Posição</th>
                     <th>Overall</th>
                     <th>Idade</th>
+                    @if (MostrarTime)
+                    {
+                        <th>Time atual</th>
+                    }
                     <th class="text-end">Ação</th>
                 </tr>
             </thead>
@@ -29,6 +33,10 @@ else
                         <td>@player.PositionName</td>
                         <td>@player.Overall</td>
                         <td>@(player.Age?.ToString() ?? "-")</td>
+                        @if (MostrarTime)
+                        {
+                            <td>@player.TeamName</td>
+                        }
                         <td class="text-end">
                             <button class="btn btn-primary" @onclick="() => OnPlayerSelected.InvokeAsync(player)" disabled="@DisableSelection">Escolher</button>
                         </td>
@@ -44,4 +52,7 @@ else
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public bool DisableSelection { get; set; }
     [Parameter] public EventCallback<AvailablePlayerDto> OnPlayerSelected { get; set; }
+
+    // No draft de expansão os jogadores vêm de outros times.
+    private bool MostrarTime => Players.Any(p => p.TeamName is not null);
 }

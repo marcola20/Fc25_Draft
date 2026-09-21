@@ -18,12 +18,15 @@ public class TransferConfig
 
     public DateTime AtualizadoEm { get; set; }
 
+    /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>
+    public int MinRosterSizeFor(Team team) => team.MinRosterSizeOverride ?? MinRosterSize;
+
     /// <summary>Valores padrão (equivalentes ao comportamento anterior, hardcoded).</summary>
     public static TransferConfig Default() => new()
     {
         Id = 1,
         MaxQuickSellPerWindow = 5,
         MaxTransfers = 5,
-        MinRosterSize = 15
+        MinRosterSize = 14
     };
 }

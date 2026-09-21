@@ -15,4 +15,10 @@ public interface ITransferConfigService
 
     /// <summary>Zera o contador de vendas rápidas (quick sell) de todos os times. Retorna a quantidade de times afetados.</summary>
     Task<int> ResetQuickSellCountsAsync(CancellationToken ct);
+
+    /// <summary>Lista o tamanho do elenco e o mínimo temporário de cada time, ordenado por nome.</summary>
+    Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct);
+
+    /// <summary>Define (ou remove, com nulo) o mínimo de elenco temporário de um time.</summary>
+    Task SetElencoMinimoTemporarioAsync(Guid teamId, int? minimo, CancellationToken ct);
 }

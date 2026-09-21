@@ -31,6 +31,13 @@ public class DraftPickConfiguration : IEntityTypeConfiguration<DraftPick>
          .HasForeignKey(x => x.TeamId)
          .OnDelete(DeleteBehavior.Restrict);
 
+        e.Property(x => x.Compensacao).HasColumnType("numeric(18,2)");
+
+        e.HasOne(x => x.FromTeam)
+         .WithMany()
+         .HasForeignKey(x => x.FromTeamId)
+         .OnDelete(DeleteBehavior.Restrict);
+
         e.HasOne(x => x.Player)
          .WithMany(pl => pl.DraftPicks)
          .HasForeignKey(x => x.PlayerId)

@@ -7,6 +7,9 @@ public class HallOfFameEntry
     public Guid HallOfFameId { get; set; }
     public string Descricao { get; set; } = null!;
     public TipoCompetition Tipo { get; set; } = TipoCompetition.Liga;
+
+    /// <summary>Divisão do título de Liga (Série A ou B). Nulo em Copa, Supercopa e nas temporadas sem divisão.</summary>
+    public Divisao? Divisao { get; set; }
     public string TimeCampeao { get; set; } = null!;
     public string? Tecnico { get; set; }
     public int? Ano { get; set; }

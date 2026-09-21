@@ -1,0 +1,154 @@
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Web.Services
+@inject CopaSorteioAoVivoService SorteioAoVivo
+@inject EscudoService EscudoService
+@implements IDisposable
+
+@if (Estado is null)
+{
+    <div class="alert alert-info mb-0">O sorteio da Copa ainda não começou.</div>
+}
+else
+{
+    var estado = Estado;
+    var ultima = estado.Ultima;
+
+    <div class="sorteio-destaque card mb-3 text-center">
+        <div class="card-body">
+            @if (estado.Terminado)
+            {
+                <div class="sorteio-titulo">🏆 Sorteio encerrado</div>
+                <div class="text-muted">Grupos da @estado.LigaNome definidos.</div>
+            }
+            else if (ultima is null)
+            {
+                <div class="sorteio-titulo">🎲 O sorteio vai começar</div>
+                <div class="text-muted">Primeiro saem os cabeças de chave (pote 1).</div>
+            }
+            else
+            {
+                <div class="text-muted small text-uppercase fw-bold">Pote @ultima.Pote</div>
+                <div class="d-flex align-items-center justify-content-center gap-3 my-2 sorteio-revelado" @key="ultima.Ordem">
+                    <img src="@EscudoService.GetEscudo(ultima.TimeNome)" alt="" class="sorteio-escudo" />
+                    <div class="text-start">
+                        <div class="sorteio-time">@ultima.TimeNome</div>
+                        <div class="sorteio-grupo">→ Grupo @ultima.Grupo</div>
+                    </div>
+                </div>
+            }
+
+            @if (!estado.Terminado)
+            {
+                <div class="mt-2">
+                    <span class="badge bg-dark fs-6">Próximo em @SegundosRestantes s</span>
+                    <span class="text-muted small ms-2">@estado.Reveladas de @estado.Sequencia.Count revelados</span>
+                </div>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar" style="width: @(estado.Reveladas * 100 / Math.Max(estado.Sequencia.Count, 1))%"></div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-header fw-bold">Potes</div>
+                <div class="card-body">
+                    @foreach (var pote in estado.Sequencia.GroupBy(r => r.Pote).OrderBy(p => p.Key))
+                    {
+                        <div class="mb-3">
+                            <div class="small fw-bold text-uppercase text-muted mb-1">
+                                Pote @pote.Key @(pote.Key == 1 ? "· cabeças de chave" : "")
+                            </div>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var t in pote.OrderBy(t => t.TimeNome))
+                                {
+                                    var saiu = t.Ordem <= estado.Reveladas;
+                                    <span class="badge @(saiu ? "bg-light text-muted border sorteio-saiu" : "bg-secondary")">@t.TimeNome</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-8">
+            <div class="row g-2">
+                @for (int i = 0; i < estado.TamanhosDosGrupos.Count; i++)
+                {
+                    var grupo = (GrupoCopa)i;
+                    var vagas = estado.TamanhosDosGrupos[i];
+                    var times = estado.JaReveladas.Where(r => r.Grupo == grupo).ToList();
+
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold d-flex justify-content-between">
+                                <span>Grupo @grupo</span>
+                                <span class="text-muted small">@times.Count/@vagas</span>
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                @for (int v = 0; v < vagas; v++)
+                                {
+                                    var t = v < times.Count ? times[v] : null;
+                                    var nova = t is not null && t.Ordem == ultima?.Ordem;
+                                    <li class="list-group-item d-flex align-items-center gap-2 py-1 @(nova ? "sorteio-novo" : "")">
+                                        @if (t is null)
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain" />
+                                            <span class="fw-semibold">@t.TimeNome</span>
+                                            <span class="badge bg-light text-dark border ms-auto">Pote @t.Pote</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .sorteio-titulo { font-size: 1.5rem; font-weight: 700; }
+    .sorteio-escudo { width: 72px; height: 72px; object-fit: contain; }
+    .sorteio-time { font-size: 1.75rem; font-weight: 800; line-height: 1.1; }
+    .sorteio-grupo { font-size: 1.1rem; font-weight: 600; color: var(--bs-primary); }
+    .sorteio-revelado { animation: sorteio-entra .6s ease-out; }
+    .sorteio-novo { animation: sorteio-brilho 2s ease-out; }
+    .sorteio-saiu { text-decoration: line-through; }
+    @@keyframes sorteio-entra { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+    @@keyframes sorteio-brilho { from { background-color: rgba(255, 193, 7, .45); } to { background-color: transparent; } }
+</style>
+
+@code {
+    private System.Threading.Timer? _relogio;
+
+    private CopaSorteioAoVivo? Estado => SorteioAoVivo.Estado;
+
+    private int SegundosRestantes =>
+        Estado?.ProximaEmUtc is DateTime proxima
+            ? Math.Max(0, (int)Math.Ceiling((proxima - DateTime.UtcNow).TotalSeconds))
+            : 0;
+
+    protected override void OnInitialized()
+    {
+        SorteioAoVivo.OnChange += AoMudar;
+        // Atualiza só a contagem regressiva; as revelações chegam pelo evento do serviço.
+        _relogio = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void AoMudar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        SorteioAoVivo.OnChange -= AoMudar;
+        _relogio?.Dispose();
+    }
+}

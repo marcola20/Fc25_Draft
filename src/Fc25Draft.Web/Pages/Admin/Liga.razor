@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Components.Liga
 @using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Authorization
@@ -14,6 +15,9 @@
 @inject NavigationManager Nav
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject IJSRuntime JS
+@inject CopaSorteioAoVivoService SorteioAoVivo
+@implements IDisposable
 
 <PageTitle>Administração da Liga</PageTitle>
 
@@ -40,12 +44,25 @@
         <li class="nav-item"><button class="nav-link @(_tab=="liga"?"active":"")" @onclick='()=>SetTab("liga")'>Liga</button></li>
         @if (_ligaAtual?.Tipo == TipoCompetition.Copa)
         {
+            <li class="nav-item"><button class="nav-link @(_tab=="sorteio"?"active":"")" @onclick='()=>SetTab("sorteio")' disabled="@(_ligaAtual == null)">Sortear Copa</button></li>
             <li class="nav-item"><button class="nav-link @(_tab=="grupos"?"active":"")" @onclick='()=>SetTab("grupos")' disabled="@(_ligaAtual == null)">Grupos Copa</button></li>
             <li class="nav-item"><button class="nav-link @(_tab=="decisivo"?"active":"")" @onclick='()=>SetTab("decisivo")' disabled="@(_ligaAtual == null)">Jogo Decisivo</button></li>
         }
         @if (_ligaAtual?.Tipo == TipoCompetition.Liga)
         {
             <li class="nav-item"><button class="nav-link @(_tab=="times"?"active":"")" @onclick='()=>SetTab("times")' disabled="@(_ligaAtual == null)">Times</button></li>
+            @if (_ligaAtual?.Divisao is not null)
+            {
+                <li class="nav-item">
+                    <button class="nav-link @(_tab=="decisivo-zona"?"active":"")" @onclick='()=>SetTab("decisivo-zona")'>
+                        Jogo Decisivo
+                        @if (_empatesZona.Any(e => e.VencedorId is null))
+                        {
+                            <span class="badge bg-danger ms-1">@_empatesZona.Count(e => e.VencedorId is null)</span>
+                        }
+                    </button>
+                </li>
+            }
         }
         <li class="nav-item"><button class="nav-link @(_tab=="rodadas"?"active":"")" @onclick='()=>SetTab("rodadas")' disabled="@(_ligaAtual == null)">Rodadas</button></li>
         <li class="nav-item"><button class="nav-link @(_tab=="partidas"?"active":"")" @onclick='()=>SetTab("partidas")' disabled="@(_rodadaSelecionada == null)">Partidas</button></li>
@@ -72,6 +89,41 @@
                                 <option value="@TipoCompetition.Copa">Copa (grupos A e B)</option>
                             </select>
                         </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label class="form-label">Temporada</label>
+                                <input type="number" class="form-control" placeholder="Ex.: 2010" @bind="_formTemporada" />
+                            </div>
+                            @if (_formTipo == TipoCompetition.Liga)
+                            {
+                                <div class="col">
+                                    <label class="form-label">Divisão</label>
+                                    <select class="form-select" @bind="_formDivisao" @bind:after="AoMudarDivisao">
+                                        <option value="">Sem divisão</option>
+                                        <option value="@Divisao.SerieA">Série A</option>
+                                        <option value="@Divisao.SerieB">Série B</option>
+                                    </select>
+                                </div>
+                            }
+                        </div>
+                        @if (_formTipo == TipoCompetition.Liga && _formDivisao is not null)
+                        {
+                            <div class="row g-2 mb-2">
+                                <div class="col">
+                                    <label class="form-label">@(_formDivisao == Divisao.SerieA ? "Caem direto" : "Sobem direto")</label>
+                                    <input type="number" min="0" class="form-control" @bind="_formVagasDiretas" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Vão ao playoff</label>
+                                    <input type="number" min="0" class="form-control" @bind="_formVagasPlayoff" />
+                                </div>
+                                <div class="col-12 form-text mt-0">
+                                    @(_formDivisao == Divisao.SerieA
+                                        ? "Os últimos caem direto; os que vêm logo acima jogam o playoff contra a Série B."
+                                        : "Os primeiros sobem direto; os que vêm logo abaixo jogam o playoff contra a Série A.")
+                                </div>
+                            </div>
+                        }
                         <div class="mb-2">
                             <label class="form-label">Início</label>
                             <input type="date" class="form-control" @bind="_formInicio" />
@@ -100,7 +152,17 @@
                             <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
                                 <div class="flex-grow-1">
                                     <span class="fw-semibold">@liga.Nome</span>
-                                    <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@(liga.Tipo == TipoCompetition.Copa ? "Copa" : "Liga")</span>
+                                    <span class="badge ms-1 @(liga.Tipo == TipoCompetition.Copa ? "bg-purple text-white" : "bg-dark")">@LigaLabels.Competicao(liga.Tipo, liga.Divisao)</span>
+                                    @if (liga.Temporada is not null)
+                                    {
+                                        <span class="badge ms-1 bg-light text-dark border">Temporada @liga.Temporada</span>
+                                    }
+                                    @if (liga.Divisao is not null && (liga.VagasDiretas > 0 || liga.VagasPlayoff > 0))
+                                    {
+                                        <span class="badge ms-1 bg-light text-dark border">
+                                            @(liga.Divisao == Divisao.SerieA ? "↓" : "↑")@(liga.VagasDiretas ?? 0) direto · @(liga.VagasPlayoff ?? 0) playoff
+                                        </span>
+                                    }
                                     <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
                                     @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
                                     {
@@ -197,51 +259,166 @@
         }
     }
 
+    <!-- ─ Tab: Sortear Copa ─ -->
+    @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
+    {
+        <div class="alert alert-secondary py-2 small">
+            Monte os <strong>4 potes</strong> e confirme. Ao sortear, a revelação é <strong>ao vivo para todo mundo</strong> na tela
+            <a href="/copa/sorteio" target="_blank">Sorteio da Copa</a>: um time a cada <strong>10 segundos</strong>, começando pelos cabeças de chave (pote 1),
+            depois pote 2, 3 e 4. Com <strong>18 times</strong> os grupos ficam <strong>4, 4, 5 e 5</strong>; o último pote completa os grupos maiores.
+            O sorteio pode ser refeito enquanto a Copa não começar.
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-7">
+                <div class="card">
+                    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-bold">Potes</span>
+                        @foreach (var pote in new[] { 1, 2, 3, 4 })
+                        {
+                            <span class="badge bg-dark">Pote @pote: @_potePorTime.Count(x => x.Value == pote)</span>
+                        }
+                        <span class="badge bg-light text-dark border">Na Copa: @_potePorTime.Count(x => x.Value > 0)</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                                @foreach (var t in _times)
+                                {
+                                    var timeId = t.TeamId;
+                                    <tr>
+                                        <td class="fw-semibold">@t.TeamName</td>
+                                        <td style="width: 11rem">
+                                            <select class="form-select form-select-sm"
+                                                    value="@(_potePorTime.GetValueOrDefault(timeId))"
+                                                    @onchange="e => DefinirPote(timeId, e.Value?.ToString())">
+                                                <option value="0">Fora da Copa</option>
+                                                <option value="1">Pote 1 (cabeças)</option>
+                                                <option value="2">Pote 2</option>
+                                                <option value="3">Pote 3</option>
+                                                <option value="4">Pote 4</option>
+                                            </select>
+                                        </td>
+                                        <td style="width: 7rem" class="text-end">
+                                            @if (_sorteio?.Times.FirstOrDefault(x => x.TimeId == timeId)?.Grupo is GrupoCopa grupoSorteado)
+                                            {
+                                                <span class="badge bg-primary">Grupo @grupoSorteado</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+                        <button class="btn btn-outline-primary" @onclick="SalvarPotes" disabled="@(_saving || SorteioAoVivo.EmAndamento)">Confirmar potes</button>
+                        <button class="btn btn-success" @onclick="SortearCopa" disabled="@(_saving || _sorteio?.PodeSortear != true || SorteioAoVivo.EmAndamento)">
+                            🎲 @(_sorteio?.JaSorteada == true ? "Sortear de novo ao vivo" : "Sortear e revelar ao vivo")
+                        </button>
+                        @if (SorteioAoVivo.EmAndamento)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="() => SorteioAoVivo.RevelarTudo()">⏩ Revelar tudo</button>
+                        }
+                        <a class="btn btn-outline-dark" href="/copa/sorteio" target="_blank">📺 Tela do sorteio</a>
+                        @if (_sorteio?.Impedimento is not null)
+                        {
+                            <span class="text-muted small">@_sorteio.Impedimento</span>
+                        }
+                        else if (_sorteio is not null)
+                        {
+                            <span class="text-muted small">@_sorteio.ResumoDosGrupos</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-5">
+                @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+                {
+                    <div class="alert alert-warning">
+                        🎲 Sorteio @(SorteioAoVivo.EmAndamento ? "acontecendo ao vivo" : "revelado") — acompanhe abaixo ou na
+                        <a href="/copa/sorteio" target="_blank">tela do sorteio</a>.
+                        @if (!SorteioAoVivo.EmAndamento)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => SorteioAoVivo.Limpar()">Tirar da tela</button>
+                        }
+                    </div>
+                }
+                else if (_sorteio is not null && _sorteio.JaSorteada)
+                {
+                    <div class="row g-2">
+                        @foreach (var grupo in _sorteio.Times.Where(t => t.Grupo is not null).GroupBy(t => t.Grupo!.Value).OrderBy(g => g.Key))
+                        {
+                            <div class="col-12 col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header fw-bold">Grupo @grupo.Key</div>
+                                    <ul class="list-group list-group-flush">
+                                        @foreach (var t in grupo.OrderBy(x => x.Pote))
+                                        {
+                                            <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                                <span>@t.TimeNome</span>
+                                                <span class="badge bg-secondary">Pote @t.Pote</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">Os grupos aparecem aqui depois do sorteio.</div>
+                }
+            </div>
+        </div>
+
+        @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+        {
+            <div class="mt-3">
+                <CopaSorteioPainel />
+            </div>
+        }
+    }
+
     <!-- ─ Tab: Grupos Copa ─ -->
     @if (_tab == "grupos" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
     {
-        <div class="row g-3">
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header fw-bold">Grupo A</div>
-                    <div class="card-body">
-                        @for (int i = 0; i < 6; i++)
-                        {
-                            var idx = i;
-                            <div class="mb-2">
-                                <select class="form-select form-select-sm" @bind="_grupoA[idx]">
-                                    <option value="">Selecione...</option>
-                                    @foreach (var t in _times)
-                                    {
-                                        <option value="@t.TeamId">@t.TeamName</option>
-                                    }
-                                </select>
-                            </div>
-                        }
-                    </div>
-                </div>
+        <div class="alert alert-secondary py-2 small">
+            Os grupos podem ter <strong>qualquer tamanho</strong> (mínimo 2 em cada, porque os 2 primeiros de cada grupo vão ao mata-mata).
+            Cada time enfrenta <strong>todos os do outro grupo</strong>: o número de rodadas é o tamanho do maior grupo, e quem sobrar folga na rodada.
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-bold">Times da Copa</span>
+                <span class="badge bg-primary">Grupo A: @_grupoPorTime.Count(x => x.Value == GrupoCopa.A)</span>
+                <span class="badge bg-info text-dark">Grupo B: @_grupoPorTime.Count(x => x.Value == GrupoCopa.B)</span>
+                <span class="badge bg-light text-dark border">Rodadas: @RodadasDaCopa</span>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header fw-bold">Grupo B</div>
-                    <div class="card-body">
-                        @for (int i = 0; i < 6; i++)
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <tbody>
+                        @foreach (var t in _times)
                         {
-                            var idx = i;
-                            <div class="mb-2">
-                                <select class="form-select form-select-sm" @bind="_grupoB[idx]">
-                                    <option value="">Selecione...</option>
-                                    @foreach (var t in _times)
-                                    {
-                                        <option value="@t.TeamId">@t.TeamName</option>
-                                    }
-                                </select>
-                            </div>
+                            var timeId = t.TeamId;
+                            <tr>
+                                <td class="fw-semibold">@t.TeamName</td>
+                                <td style="width: 12rem">
+                                    <select class="form-select form-select-sm"
+                                            value="@(_grupoPorTime.TryGetValue(timeId, out var g) && g is not null ? g.ToString() : "")"
+                                            @onchange="e => DefinirGrupo(timeId, e.Value?.ToString())">
+                                        <option value="">Fora da Copa</option>
+                                        <option value="@GrupoCopa.A">Grupo A</option>
+                                        <option value="@GrupoCopa.B">Grupo B</option>
+                                    </select>
+                                </td>
+                            </tr>
                         }
-                    </div>
-                </div>
+                    </tbody>
+                </table>
             </div>
-            <div class="col-12">
+            <div class="card-footer">
                 <button class="btn btn-primary" @onclick="SalvarGrupos" disabled="@_saving">Salvar Grupos</button>
             </div>
         </div>
@@ -308,6 +485,73 @@
                             {
                                 <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
                                 <span class="badge bg-success">Classificado: @empate.VencedorNome</span>
+                            }
+                            else if (empate.StatusPartida == PartidaStatus.Encerrada)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-warning text-dark">Empatado — registre os pênaltis</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Jogo criado — a disputar</span>
+                            }
+
+                            @if (empate.PartidaId is not null && _rodadaDesempate is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="@($"/admin/liga/{_ligaAtual.LigaId}/rodada/{_rodadaDesempate.RodadaId}")">
+                                    Abrir rodada
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- ─ Tab: Jogo Decisivo (zonas da Liga) ─ -->
+    @if (_tab == "decisivo-zona" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
+    {
+        <div class="alert alert-secondary py-2 small">
+            Nas posições que mudam de zona (acesso, playoff, rebaixamento), o desempate segue
+            <strong>Pontos → Vitórias → Saldo → Gols Pró → Confronto direto</strong>. Se ainda assim os times ficarem iguais,
+            a posição sai em jogo decisivo: rodada extra que <strong>não soma pontos</strong> e coloca o vencedor à frente.
+            Os empates só aparecem depois de todos os jogos regulares, e a temporada não encerra com empate pendente.
+            Empate no topo continua indo para a decisão de campeão.
+        </div>
+
+        @if (!_empatesZona.Any())
+        {
+            <div class="alert alert-info">Nenhum empate a resolver nas zonas.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var empate in _empatesZona)
+                {
+                    <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                        <span class="badge bg-secondary">@(empate.Posicao)º x @(empate.Posicao + 1)º</span>
+                        <span class="small text-muted">@empate.ZonaTimeA × @empate.ZonaTimeB</span>
+
+                        <span class="fw-semibold">@empate.TimeANome</span>
+                        <span class="text-muted">vs</span>
+                        <span class="fw-semibold">@empate.TimeBNome</span>
+
+                        <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+                            @if (empate.PartidaId is null)
+                            {
+                                <span class="badge bg-primary">Empatados</span>
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="() => GerarJogoDecisivoZona(empate)"
+                                        disabled="@(_saving || _ligaAtual.Status != LigaStatus.PrimeiraFase)">
+                                    Criar jogo decisivo
+                                </button>
+                            }
+                            else if (empate.VencedorId is not null)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-success">À frente: @empate.VencedorNome</span>
                             }
                             else if (empate.StatusPartida == PartidaStatus.Encerrada)
                             {
@@ -724,13 +968,36 @@
     private DateTime _formInicio = DateTime.Today;
     private DateTime _formFim = DateTime.Today.AddMonths(2);
     private TipoCompetition _formTipo = TipoCompetition.Liga;
+    private int? _formTemporada;
+    private Divisao? _formDivisao;
+    private int? _formVagasDiretas, _formVagasPlayoff;
+
+    // Padrão das próximas temporadas: 1 direto + 1 no playoff (dá para ajustar, ex.: 2 + 0 na transição de 12 para 10).
+    private void AoMudarDivisao()
+    {
+        if (_formDivisao is null) { _formVagasDiretas = null; _formVagasPlayoff = null; return; }
+        _formVagasDiretas ??= 1;
+        _formVagasPlayoff ??= 1;
+    }
 
     // Grupos Copa
     private IReadOnlyList<LigaGrupoTimeDto> _grupos = Array.Empty<LigaGrupoTimeDto>();
     private IReadOnlyList<LigaEmpateCopaDto> _empatesCopa = Array.Empty<LigaEmpateCopaDto>();
+    private IReadOnlyList<LigaEmpateZonaDto> _empatesZona = Array.Empty<LigaEmpateZonaDto>();
     private LigaRodadaDto? _rodadaDesempate;
-    private readonly string[] _grupoA = new string[6];
-    private readonly string[] _grupoB = new string[6];
+    private readonly Dictionary<Guid, GrupoCopa?> _grupoPorTime = new();
+    private readonly Dictionary<Guid, int> _potePorTime = new();
+    private LigaCopaSorteioDto? _sorteio;
+
+    private void DefinirPote(Guid timeId, string? valor) =>
+        _potePorTime[timeId] = int.TryParse(valor, out var pote) ? pote : 0;
+
+    private int RodadasDaCopa => Math.Max(
+        _grupoPorTime.Count(x => x.Value == GrupoCopa.A),
+        _grupoPorTime.Count(x => x.Value == GrupoCopa.B));
+
+    private void DefinirGrupo(Guid timeId, string? valor) =>
+        _grupoPorTime[timeId] = Enum.TryParse<GrupoCopa>(valor, out var grupo) ? grupo : null;
 
     // Times
     private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
@@ -762,6 +1029,13 @@
     private LigaKnockoutJogoDto? _knockoutJogoParaEncerrar;
     private bool _knockoutTemPenaltis;
     private string? _knockoutPenaltisVencedor;
+
+    // Os botões do sorteio dependem de a revelação ao vivo estar rodando.
+    protected override void OnInitialized() => SorteioAoVivo.OnChange += AoMudarSorteio;
+
+    private void AoMudarSorteio() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => SorteioAoVivo.OnChange -= AoMudarSorteio;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -812,11 +1086,15 @@
                 _grupos = await AdminSvc.ListGruposAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _empatesCopa = await AdminSvc.ListEmpatesCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
+                _sorteio = await AdminSvc.GetSorteioCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                AplicarSorteio();
                 PreencherSelects();
             }
             else
             {
                 _timesLigaSel = (await AdminSvc.ListTimesLigaAsync(_ligaAtual.LigaId, CancellationToken.None)).ToHashSet();
+                _empatesZona = await AdminSvc.ListEmpatesZonaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
             }
 
             _tab = RodadaId.HasValue ? "partidas" : (string.IsNullOrEmpty(TabQuery) ? "rodadas" : TabQuery);
@@ -858,10 +1136,11 @@
     private static string TabLabel(string tab) => tab switch
     {
         "grupos" => "Grupos Copa",
+        "sorteio" => "Sortear Copa",
         "times" => "Times",
         "rodadas" => "Rodadas",
         "partidas" => "Partidas",
-        "decisivo" => "Jogo Decisivo",
+        "decisivo" or "decisivo-zona" => "Jogo Decisivo",
         "punicoes" => "Punições",
         "knockout" => "Mata-Mata",
         _ => "Liga"
@@ -878,6 +1157,30 @@
             "partidas" when _rodadaSelecionada is not null => $"{baseUrl}/rodada/{_rodadaSelecionada.RodadaId}",
             _ => $"{baseUrl}?tab={tab}"
         });
+    }
+
+    private async Task GerarJogoDecisivoZona(LigaEmpateZonaDto empate)
+    {
+        if (_ligaAtual is null || _saving) return;
+
+        _saving = true;
+        _erro = null;
+        _ok = null;
+
+        try
+        {
+            await AdminSvc.GerarJogoDecisivoZonaAsync(_ligaAtual.LigaId, empate.TimeAId, empate.TimeBId, CancellationToken.None);
+            _ok = $"Jogo decisivo criado: {empate.TimeANome} x {empate.TimeBNome}.";
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task GerarJogoDecisivo(LigaEmpateCopaDto empate)
@@ -937,9 +1240,9 @@
 
     private void PreencherSelects()
     {
-        var a = _grupos.Where(g => g.Grupo == GrupoCopa.A).Select(g => g.TimeId.ToString()).ToArray();
-        var b = _grupos.Where(g => g.Grupo == GrupoCopa.B).Select(g => g.TimeId.ToString()).ToArray();
-        for (int i = 0; i < 6; i++) { _grupoA[i] = i < a.Length ? a[i] : ""; _grupoB[i] = i < b.Length ? b[i] : ""; }
+        _grupoPorTime.Clear();
+        foreach (var g in _grupos)
+            _grupoPorTime[g.TimeId] = g.Grupo;
     }
 
     private async Task SalvarLiga()
@@ -949,12 +1252,15 @@
         {
             if (_editandoLigaId.HasValue)
             {
-                await AdminSvc.UpdateAsync(_editandoLigaId.Value, new LigaUpdateRequest(_formNome, _formInicio, _formFim), CancellationToken.None);
+                await AdminSvc.UpdateAsync(_editandoLigaId.Value,
+                    new LigaUpdateRequest(_formNome, _formInicio, _formFim, _formTemporada, _formDivisao, RemoverDivisao: _formDivisao is null, VagasDiretas: _formVagasDiretas ?? 0, VagasPlayoff: _formVagasPlayoff ?? 0),
+                    CancellationToken.None);
                 _ok = "Liga atualizada.";
             }
             else
             {
-                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo), CancellationToken.None);
+                var divisao = _formTipo == TipoCompetition.Liga ? _formDivisao : null;
+                await AdminSvc.CreateAsync(new LigaCreateRequest(_formNome, _formInicio, _formFim, _formTipo, _formTemporada, divisao, _formVagasDiretas, _formVagasPlayoff), CancellationToken.None);
                 _ok = "Liga criada.";
             }
             CancelarEdicao();
@@ -964,8 +1270,8 @@
         finally { _saving = false; }
     }
 
-    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); }
-    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); }
+    private void EditarLiga(LigaDto l) { _editandoLigaId = l.LigaId; _formNome = l.Nome; _formTipo = l.Tipo; _formInicio = l.DataInicio.ToLocalTime(); _formFim = l.DataFim.ToLocalTime(); _formTemporada = l.Temporada; _formDivisao = l.Divisao; _formVagasDiretas = l.VagasDiretas; _formVagasPlayoff = l.VagasPlayoff; }
+    private void CancelarEdicao() { _editandoLigaId = null; _formNome = ""; _formTipo = TipoCompetition.Liga; _formInicio = DateTime.Today; _formFim = DateTime.Today.AddMonths(2); _formTemporada = null; _formDivisao = null; _formVagasDiretas = null; _formVagasPlayoff = null; }
 
     private void SelecionarLiga(LigaDto liga) => Nav.NavigateTo($"/admin/liga/{liga.LigaId}");
 
@@ -1157,16 +1463,56 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
+    private async Task SalvarPotes()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            _sorteio = await AdminSvc.ConfigurarPotesCopaAsync(
+                _ligaAtual!.LigaId, new LigaCopaPotesRequest(new Dictionary<Guid, int>(_potePorTime)), CancellationToken.None);
+            AplicarSorteio();
+            _ok = _sorteio.Impedimento is null ? "Potes salvos. Pode sortear." : $"Potes salvos. {_sorteio.Impedimento}";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task SortearCopa()
+    {
+        if (_sorteio?.JaSorteada == true &&
+            !await JS.InvokeAsync<bool>("confirm", "Já existe um sorteio. Refazer e trocar os grupos?")) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            // Os grupos são gravados agora; a revelação ao vivo só controla o que já apareceu na tela.
+            await AdminSvc.SortearCopaAsync(_ligaAtual!.LigaId, CancellationToken.None);
+            var sorteio = await AdminSvc.GetSorteioCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+            SorteioAoVivo.Iniciar(_ligaAtual.LigaId, _ligaAtual.Nome, sorteio!, TimeSpan.FromSeconds(10));
+            _ok = "Sorteio começou! Um time a cada 10 segundos na tela do sorteio.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void AplicarSorteio()
+    {
+        _potePorTime.Clear();
+        foreach (var t in _sorteio?.Times ?? Array.Empty<LigaCopaPoteTimeDto>())
+            _potePorTime[t.TimeId] = t.Pote;
+    }
+
     private async Task SalvarGrupos()
     {
-        var a = _grupoA.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
-        var b = _grupoB.Where(x => Guid.TryParse(x, out _)).Select(x => Guid.Parse(x)).ToList();
-        if (a.Count != 6 || b.Count != 6) { _erro = "Selecione exatamente 6 times em cada grupo."; return; }
+        var a = _grupoPorTime.Where(x => x.Value == GrupoCopa.A).Select(x => x.Key).ToList();
+        var b = _grupoPorTime.Where(x => x.Value == GrupoCopa.B).Select(x => x.Key).ToList();
+        if (a.Count < 2 || b.Count < 2) { _erro = "Cada grupo precisa de pelo menos 2 times."; return; }
         _saving = true;
         try
         {
             await AdminSvc.ConfigurarGruposCopaAsync(_ligaAtual!.LigaId, new LigaConfigurarGruposRequest(a, b), CancellationToken.None);
-            _ok = "Grupos configurados.";
+            _ok = $"Grupos configurados: {a.Count} x {b.Count} times, {Math.Max(a.Count, b.Count)} rodadas.";
             await CarregarDados();
         }
         catch (Exception ex) { _erro = ex.Message; }

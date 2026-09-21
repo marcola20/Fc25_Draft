@@ -1,0 +1,410 @@
+@page "/admin/draft-expansao"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Hubs
+@using Fc25Draft.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.SignalR
+@attribute [Authorize(Roles = "Admin")]
+@inject DraftExpansaoService ExpansaoService
+@inject IHubContext<DraftHub> DraftHub
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Draft de Expansão</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        @if (_resumo is not null)
+        {
+            var r = _resumo;
+            <div class="card mb-3">
+                <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                    <div class="flex-grow-1">
+                        <h2 class="h5 mb-1">@r.Nome</h2>
+                        <div class="small text-muted">
+                            Protegem @r.ProtegidosPorTime · perdem até @r.MaxPerdasPorTime · compensação = valor de mercado × @r.FatorCompensacao.ToString("0.##", Br)
+                        </div>
+                    </div>
+                    @if (r.Concluido)
+                    {
+                        <span class="badge bg-success">Concluído</span>
+                    }
+                    else if (!r.ProtecaoEncerrada)
+                    {
+                        <span class="badge bg-warning text-dark">Listas de protegidos abertas</span>
+                        <button class="btn btn-sm btn-warning" @onclick="EncerrarProtecaoAsync" disabled="@_salvando">Encerrar listas e liberar escolhas</button>
+                    }
+                    else
+                    {
+                        <span class="badge bg-primary">Escolhas: @r.EscolhasFeitas/@r.TotalEscolhas</span>
+                        @if (r.EscolhasFeitas == 0)
+                        {
+                            <button class="btn btn-sm btn-outline-warning" @onclick="ReabrirProtecaoAsync" disabled="@_salvando">↩ Reabrir listas</button>
+                        }
+                        <a class="btn btn-sm btn-primary" href="/draft/controle">Ir para o draft</a>
+                    }
+                    <a class="btn btn-sm btn-outline-secondary" href="/draft/protecao">Listas de protegidos</a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-xl-8">
+                    <div class="card">
+                        <div class="card-header fw-bold">Times existentes</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th class="text-end">Elenco</th>
+                                        <th class="text-center">Protegidos</th>
+                                        <th class="text-center">Perdas</th>
+                                        <th class="text-end">Compensação</th>
+                                        <th class="text-center">Mínimo temp.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var t in r.TimesExistentes)
+                                    {
+                                        var exigidos = Math.Min(r.ProtegidosPorTime, t.Elenco + t.Perdas);
+                                        <tr>
+                                            <td>@t.TeamName <span class="text-muted small">@t.OwnerName</span></td>
+                                            <td class="text-end">@t.Elenco</td>
+                                            <td class="text-center">
+                                                @if (t.Protegidos == 0)
+                                                {
+                                                    <span class="badge bg-secondary">pendente</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge @(t.Protegidos >= exigidos ? "bg-success" : "bg-warning text-dark")">@t.Protegidos/@exigidos</span>
+                                                    @if (t.ProtecaoAutomatica)
+                                                    {
+                                                        <span class="badge bg-warning text-dark ms-1" title="Completado automaticamente">auto</span>
+                                                    }
+                                                }
+                                            </td>
+                                            <td class="text-center">@t.Perdas/@r.MaxPerdasPorTime</td>
+                                            <td class="text-end">@(t.CompensacaoTotal > 0 ? Dinheiro(t.CompensacaoTotal) : "—")</td>
+                                            <td class="text-center">@(t.MinimoTemporario?.ToString() ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer small text-muted">
+                            O mínimo temporário de quem ficar abaixo do mínimo de elenco é definido em
+                            <a href="/admin/configuracoes">Configurações → Transferências</a>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div class="card">
+                        <div class="card-header fw-bold">Times novos</div>
+                        <ul class="list-group list-group-flush">
+                            @foreach (var t in r.TimesNovos)
+                            {
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>@t.TeamName <span class="text-muted small">@t.OwnerName</span></span>
+                                    <span class="text-muted small">@t.Escolhas escolhas · elenco @t.Elenco · caixa @Dinheiro(t.Caixa)</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            @if (r.EscolhasFeitas > 0)
+            {
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Escolhas</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr><th>#</th><th>Rodada</th><th>Time novo</th><th>Jogador</th><th class="text-end">Overall</th><th>Saiu do</th><th class="text-end">Compensação</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var e in r.Escolhas.Where(e => e.Jogador is not null))
+                                {
+                                    <tr>
+                                        <td>@e.OverallPick</td>
+                                        <td>@e.Rodada</td>
+                                        <td>@e.TimeNovo</td>
+                                        <td>@e.Jogador</td>
+                                        <td class="text-end">@e.Overall</td>
+                                        <td>@e.TimeOrigem</td>
+                                        <td class="text-end">@(e.Compensacao is decimal c ? Dinheiro(c) : "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            @if (r.Concluido)
+            {
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Caixa dos times novos</div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">
+                            Caixa médio dos times existentes (já com a compensação): <strong>@Dinheiro(r.CaixaMedioExistentes)</strong>.
+                            Cada time novo abaixo do valor recebe só a diferença, com lançamento no caixa; repetir não credita de novo.
+                        </p>
+                        <div class="d-flex flex-wrap align-items-end gap-2">
+                            <div>
+                                <label class="form-label">Caixa inicial</label>
+                                <input type="number" min="0" step="500000" class="form-control" @bind="_caixaInicial" />
+                            </div>
+                            <button class="btn btn-outline-primary" @onclick="() => _caixaInicial = r.CaixaMedioExistentes" disabled="@_salvando">Usar a média</button>
+                            <button class="btn btn-success" @onclick="IgualarCaixaAsync" disabled="@(_salvando || _caixaInicial is null or <= 0)">Creditar nos times novos</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Draft complementar (jogadores livres, só times novos)</div>
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Nome</label>
+                                <input class="form-control" @bind="_compNome" placeholder="@($"{r.Nome} — Complementar")" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label">Rodadas</label>
+                                <input type="number" min="1" class="form-control" @bind="_compRodadas" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label">Overall mín.</label>
+                                <input type="number" class="form-control" @bind="_compOverallMin" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label">Overall máx.</label>
+                                <input type="number" class="form-control" @bind="_compOverallMax" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="form-check"><input class="form-check-input" type="checkbox" id="compSerp" @bind="_compSerpentina" /><label class="form-check-label" for="compSerp">Serpentina</label></div>
+                                <div class="form-check"><input class="form-check-input" type="checkbox" id="compSort" @bind="_compSortear" /><label class="form-check-label" for="compSort">Sortear ordem</label></div>
+                            </div>
+                        </div>
+                        <p class="small text-muted mt-2 mb-2">
+                            Sem sorteio, usa a mesma ordem da 1ª rodada da expansão. Para faixas diferentes por rodada, crie com
+                            <strong>pelo menos 2 rodadas</strong> e adicione as demais em Informações do Draft; com 1 rodada só, as próximas
+                            perdem a serpentina.
+                        </p>
+                        <button class="btn btn-primary" @onclick="CriarComplementarAsync" disabled="@_salvando">Criar draft complementar</button>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_resumo is null || _resumo.Concluido)
+        {
+            <div class="card">
+                <div class="card-header fw-bold">Novo draft de expansão</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label">Times novos <span class="text-muted small">(ordem = ordem em que você marcar)</span></label>
+                            <div class="border rounded p-2" style="max-height: 22rem; overflow-y: auto">
+                                @foreach (var t in _times)
+                                {
+                                    var posicao = _novos.IndexOf(t.TeamId);
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="novo-@t.TeamId" checked="@(posicao >= 0)" @onchange="() => AlternarNovo(t.TeamId)" />
+                                        <label class="form-check-label" for="novo-@t.TeamId">
+                                            @t.TeamName
+                                            @if (posicao >= 0)
+                                            {
+                                                <span class="badge bg-primary ms-1">@(posicao + 1)º</span>
+                                            }
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-7">
+                            <div class="row g-2">
+                                <div class="col-12">
+                                    <label class="form-label">Nome</label>
+                                    <input class="form-control" @bind="_nome" placeholder="Draft de Expansão 2010" />
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Rodadas</label>
+                                    <input type="number" min="1" class="form-control" @bind="_rodadas" />
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Protegidos</label>
+                                    <input type="number" min="0" class="form-control" @bind="_protegidos" />
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Máx. perdas</label>
+                                    <input type="number" min="1" class="form-control" @bind="_maxPerdas" />
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Fator compensação</label>
+                                    <input type="number" min="0" step="0.05" class="form-control" @bind="_fator" />
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="serp" @bind="_serpentina" /><label class="form-check-label" for="serp">Serpentina</label></div>
+                                    <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="sort" @bind="_sortear" /><label class="form-check-label" for="sort">Sortear ordem</label></div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="alert alert-light border mb-0 small">
+                                        @if (_novos.Count == 0)
+                                        {
+                                            <span>Marque os times novos.</span>
+                                        }
+                                        else
+                                        {
+                                            <span><strong>@(_novos.Count * _rodadas)</strong> escolhas (@_novos.Count times × @_rodadas rodadas).</span>
+                                            <span> Os outros times podem ceder até <strong>@(( _times.Count - _novos.Count) * _maxPerdas)</strong> jogadores.</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-success mt-3" @onclick="CriarAsync" disabled="@(_salvando || _novos.Count == 0)">Criar draft de expansão</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+    private DraftExpansaoResumoDto? _resumo;
+    private List<(Guid TeamId, string TeamName)> _times = new();
+
+    // Novo draft
+    private readonly List<Guid> _novos = new();
+    private string _nome = "";
+    private int _rodadas = 6;
+    private int _protegidos = 11;
+    private int _maxPerdas = 2;
+    private decimal _fator = 1.2m;
+    private bool _serpentina = true;
+    private bool _sortear = true;
+
+    private decimal? _caixaInicial;
+
+    // Draft complementar (padrão: 2 primeiras rodadas do esquema equilibrado, 85–86)
+    private string _compNome = "";
+    private int _compRodadas = 2;
+    private int? _compOverallMin = 85, _compOverallMax = 86;
+    private bool _compSerpentina = true;
+    private bool _compSortear;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/draft-expansao"));
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _resumo = await ExpansaoService.GetResumoAsync(CancellationToken.None);
+            _times = await ExpansaoService.ListarTimesAsync(CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private void AlternarNovo(Guid teamId)
+    {
+        if (!_novos.Remove(teamId))
+            _novos.Add(teamId);
+    }
+
+    private Task CriarAsync() => ExecutarAsync(async () =>
+    {
+        var nome = string.IsNullOrWhiteSpace(_nome) ? "Draft de Expansão" : _nome;
+        await ExpansaoService.CriarAsync(
+            new DraftExpansaoCriarRequest(nome, _novos.ToList(), _rodadas, _serpentina, _sortear, _protegidos, _maxPerdas, _fator),
+            CancellationToken.None);
+        _novos.Clear();
+        return "Draft de expansão criado. Os times existentes já podem montar as listas de protegidos.";
+    });
+
+    private async Task EncerrarProtecaoAsync()
+    {
+        var pendentes = _resumo?.TimesExistentes.Count(t => t.Protegidos == 0) ?? 0;
+        var aviso = pendentes > 0
+            ? $"{pendentes} time(s) não enviaram a lista e terão os maiores overalls protegidos automaticamente. Encerrar e liberar as escolhas?"
+            : "Encerrar as listas de protegidos e liberar as escolhas?";
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", aviso)) return;
+
+        await ExecutarAsync(async () =>
+        {
+            await ExpansaoService.EncerrarProtecaoAsync(CancellationToken.None);
+            return "Listas encerradas. As escolhas estão liberadas.";
+        });
+    }
+
+    private Task ReabrirProtecaoAsync() => ExecutarAsync(async () =>
+    {
+        await ExpansaoService.ReabrirProtecaoAsync(CancellationToken.None);
+        return "Listas reabertas. As proteções automáticas foram removidas.";
+    });
+
+    private async Task IgualarCaixaAsync()
+    {
+        if (_caixaInicial is not decimal valor) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Completar o caixa de cada time novo até {Dinheiro(valor)}?")) return;
+
+        await ExecutarAsync(async () =>
+        {
+            var total = await ExpansaoService.IgualarCaixaTimesNovosAsync(valor, CancellationToken.None);
+            return total > 0
+                ? $"{Dinheiro(total)} creditados nos times novos."
+                : "Todos os times novos já tinham pelo menos esse caixa.";
+        });
+    }
+
+    private Task CriarComplementarAsync() => ExecutarAsync(async () =>
+    {
+        await ExpansaoService.CriarDraftComplementarAsync(
+            new DraftComplementarRequest(_compNome, _compRodadas, _compSerpentina, _compSortear, _compOverallMin, _compOverallMax),
+            CancellationToken.None);
+        return "Draft complementar criado. Ele já aparece no Controle do Draft.";
+    });
+
+    private async Task ExecutarAsync(Func<Task<string>> acao)
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            _ok = await acao();
+            await DraftHub.Clients.All.SendAsync("DraftAtualizado");
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private static string Dinheiro(decimal valor) => valor.ToString("C0", Br);
+}
