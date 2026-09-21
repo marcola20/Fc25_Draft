@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921224252_SeedPremiacoes")]
+    partial class SeedPremiacoes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1329,38 +1332,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("PricingConfigs");
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.Regulamento", b =>
-                {
-                    b.Property<Guid>("RegulamentoId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AtualizadoEm")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Conteudo")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("Temporada")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Titulo")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.HasKey("RegulamentoId");
-
-                    b.HasIndex("Temporada")
-                        .IsUnique();
-
-                    b.ToTable("Regulamentos", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Team", b =>

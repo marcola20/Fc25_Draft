@@ -27,4 +27,7 @@
   <ItemGroup>
     <Folder Include="Migrations\" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Regulamentos\*.html" />
+  </ItemGroup>
 </Project>

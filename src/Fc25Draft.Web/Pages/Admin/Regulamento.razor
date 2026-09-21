@@ -1,0 +1,237 @@
+@page "/admin/regulamento"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IRegulamentoService RegulamentoSvc
+@inject ILigaTemporadaService TemporadaSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Regulamento — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <label class="form-label mb-0">Regulamento</label>
+            <select class="form-select w-auto" @onchange="OnRegulamentoChanged">
+                @if (_regulamentos.Count == 0)
+                {
+                    <option>Nenhum cadastrado</option>
+                }
+                @foreach (var r in _regulamentos)
+                {
+                    <option value="@r.RegulamentoId" selected="@(r.RegulamentoId == _atual?.RegulamentoId)">@r.Titulo</option>
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="() => _mostrarNovo = !_mostrarNovo">➕ Nova temporada</button>
+            <a href="/regulamento" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
+        </div>
+
+        @if (_mostrarNovo)
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Novo regulamento</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-2">
+                            <label class="form-label">Temporada</label>
+                            <input type="number" class="form-control" @bind="_novaTemporada" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Título</label>
+                            <input class="form-control" @bind="_novoTitulo" placeholder="Regulamento @_novaTemporada" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Copiar texto de</label>
+                            <select class="form-select" @bind="_copiarDe">
+                                <option value="">Começar em branco</option>
+                                @foreach (var r in _regulamentos)
+                                {
+                                    <option value="@r.RegulamentoId">@r.Titulo</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button class="btn btn-success w-100" @onclick="CriarAsync" disabled="@_salvando">Criar</button>
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-0 mt-2">
+                        Copiando, o regulamento novo nasce com o texto da temporada anterior — depois é só mudar o que valer.
+                    </p>
+                </div>
+            </div>
+        }
+
+        @if (_atual is null)
+        {
+            <div class="alert alert-info">Crie o regulamento de uma temporada para começar.</div>
+        }
+        else
+        {
+            <div class="row g-2 mb-2">
+                <div class="col-12 col-md-6">
+                    <label class="form-label">Título (aparece na página e no seletor)</label>
+                    <input class="form-control" @bind="_titulo" />
+                </div>
+                <div class="col-12 col-md-6 d-flex align-items-end">
+                    <span class="text-muted small">
+                        Temporada <strong>@_atual.Temporada</strong> · atualizado em @_atual.AtualizadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                    </span>
+                </div>
+            </div>
+
+            <ul class="nav nav-tabs mb-2">
+                <li class="nav-item"><button class="nav-link @(_aba == "editar" ? "active" : "")" @onclick='() => _aba = "editar"'>Editar</button></li>
+                <li class="nav-item"><button class="nav-link @(_aba == "previa" ? "active" : "")" @onclick='() => _aba = "previa"'>Prévia</button></li>
+            </ul>
+
+            @if (_aba == "editar")
+            {
+                <textarea class="form-control font-monospace" style="min-height:60vh;" spellcheck="false" @bind="_conteudo"></textarea>
+                <p class="text-muted small mt-1">
+                    O texto é HTML — o jeito seguro de mudar é copiar um bloco existente e trocar as palavras.
+                </p>
+            }
+            else
+            {
+                <div class="border rounded p-3 regulamento-page">
+                    @((MarkupString)_conteudo)
+                </div>
+            }
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">💾 Salvar</button>
+                <button class="btn btn-outline-secondary" @onclick="RecarregarAsync" disabled="@_salvando">Desfazer alterações</button>
+                <button class="btn btn-outline-danger ms-auto" @onclick="ExcluirAsync" disabled="@_salvando">Excluir regulamento</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+    private string _aba = "editar";
+
+    private IReadOnlyList<RegulamentoDto> _regulamentos = Array.Empty<RegulamentoDto>();
+    private RegulamentoDto? _atual;
+    private string _titulo = "";
+    private string _conteudo = "";
+
+    private bool _mostrarNovo;
+    private int _novaTemporada = DateTime.Today.Year;
+    private string _novoTitulo = "";
+    private string _copiarDe = "";
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/regulamento"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        _carregando = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _regulamentos = await RegulamentoSvc.ListAsync(CancellationToken.None);
+            _atual = _regulamentos.FirstOrDefault(r => r.RegulamentoId == _atual?.RegulamentoId) ?? _regulamentos.FirstOrDefault();
+            _titulo = _atual?.Titulo ?? "";
+            _conteudo = _atual?.Conteudo ?? "";
+
+            var temporadas = await TemporadaSvc.ListTemporadasAsync(CancellationToken.None);
+            _novaTemporada = temporadas.Count > 0 ? temporadas.Max() + 1 : DateTime.Today.Year;
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private void OnRegulamentoChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+
+        _atual = _regulamentos.FirstOrDefault(r => r.RegulamentoId == id);
+        _titulo = _atual?.Titulo ?? "";
+        _conteudo = _atual?.Conteudo ?? "";
+    }
+
+    private async Task CriarAsync()
+    {
+        _salvando = true;
+        try
+        {
+            Guid? copiarDe = Guid.TryParse(_copiarDe, out var id) ? id : null;
+            var novo = await RegulamentoSvc.CriarAsync(new RegulamentoCriarRequest(_novaTemporada, _novoTitulo, copiarDe), CancellationToken.None);
+
+            _atual = novo;
+            _mostrarNovo = false;
+            _novoTitulo = "";
+            _copiarDe = "";
+            await CarregarAsync();
+            _ok = $"{novo.Titulo} criado.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (_atual is null) return;
+        _salvando = true;
+        try
+        {
+            _atual = await RegulamentoSvc.SalvarAsync(_atual.RegulamentoId, _titulo, _conteudo, CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Regulamento salvo.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RecarregarAsync()
+    {
+        await CarregarAsync();
+        _ok = "Alterações desfeitas.";
+    }
+
+    private async Task ExcluirAsync()
+    {
+        if (_atual is null) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Excluir {_atual.Titulo}?")) return;
+
+        _salvando = true;
+        try
+        {
+            await RegulamentoSvc.ExcluirAsync(_atual.RegulamentoId, CancellationToken.None);
+            _atual = null;
+            await CarregarAsync();
+            _ok = "Regulamento excluído.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

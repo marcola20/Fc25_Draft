@@ -51,6 +51,8 @@ public class LayoutNavigationService
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
+            new("Premiação", "/admin/premiacao", "oi oi-dollar", RequiredRole: "Admin"),
+            new("Regulamento", "/admin/regulamento", "oi oi-document", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
@@ -107,7 +109,7 @@ public class LayoutNavigationService
         {
             Route = "/premiacao",
             Title = "Premiação",
-            Subtitle = "Liga CBFV Retro 2008/09",
+            Subtitle = "Prêmios de cada temporada",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
@@ -165,7 +167,7 @@ public class LayoutNavigationService
         {
             Route = "/regulamento",
             Title = "Regulamento Oficial",
-            Subtitle = "Liga CBFV Retro 2008/09",
+            Subtitle = "As regras de cada temporada",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
@@ -192,6 +194,30 @@ public class LayoutNavigationService
             {
                 new("Início", "/home"),
                 new("Liga")
+            }
+        },
+        ["/admin/regulamento"] = new PageDefinition
+        {
+            Route = "/admin/regulamento",
+            Title = "Regulamento",
+            Subtitle = "Texto por temporada — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Regulamento")
+            }
+        },
+        ["/admin/premiacao"] = new PageDefinition
+        {
+            Route = "/admin/premiacao",
+            Title = "Premiação",
+            Subtitle = "Valores por temporada e pagamento no caixa — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Premiação")
             }
         },
         ["/liga/edicoes"] = new PageDefinition

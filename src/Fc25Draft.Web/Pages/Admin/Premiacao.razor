@@ -1,0 +1,479 @@
+@page "/admin/premiacao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IPremiacaoService PremiacaoSvc
+@inject ILigaTemporadaService TemporadaSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Premiação — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <label class="form-label mb-0">Premiação</label>
+            <select class="form-select w-auto" @onchange="OnPremiacaoChanged">
+                @if (_premiacoes.Count == 0)
+                {
+                    <option>Nenhuma cadastrada</option>
+                }
+                @foreach (var p in _premiacoes)
+                {
+                    <option value="@p.PremiacaoId" selected="@(p.PremiacaoId == _atual?.PremiacaoId)">@p.Nome</option>
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="() => _mostrarNova = !_mostrarNova">➕ Nova temporada</button>
+            <a href="/premiacao" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
+        </div>
+
+        @if (_mostrarNova)
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Nova premiação</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-2">
+                            <label class="form-label">Temporada</label>
+                            <input type="number" class="form-control" @bind="_novaTemporada" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Nome</label>
+                            <input class="form-control" @bind="_novoNome" placeholder="Premiação @_novaTemporada" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Copiar valores de</label>
+                            <select class="form-select" @bind="_copiarDe">
+                                <option value="">Começar vazia</option>
+                                @foreach (var p in _premiacoes)
+                                {
+                                    <option value="@p.PremiacaoId">@p.Nome</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button class="btn btn-success w-100" @onclick="CriarAsync" disabled="@_salvando">Criar</button>
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-0 mt-2">
+                        Copiando, a premiação nasce com os mesmos valores da outra temporada — depois é só ajustar o que mudou.
+                    </p>
+                </div>
+            </div>
+        }
+
+        @if (_atual is null)
+        {
+            <div class="alert alert-info">Crie a premiação de uma temporada para começar.</div>
+        }
+        else
+        {
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item"><button class="nav-link @(_aba == "valores" ? "active" : "")" @onclick='() => _aba = "valores"'>Valores</button></li>
+                <li class="nav-item"><button class="nav-link @(_aba == "pagar" ? "active" : "")" @onclick='async () => await AbrirPagamentosAsync()'>Pagar premiação</button></li>
+            </ul>
+
+            @if (_aba == "valores")
+            {
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <input class="form-control w-auto" @bind="_nomeEdicao" />
+                    <button class="btn btn-outline-secondary" @onclick="RenomearAsync" disabled="@_salvando">Renomear</button>
+                    <span class="text-muted small ms-auto">Total dos prêmios: <strong>@Moeda(_linhas.Sum(l => l.Valor))</strong></span>
+                </div>
+
+                @foreach (var bloco in _blocos)
+                {
+                    var linhasDoBloco = _linhas.Where(l => l.Tipo == bloco.Tipo && l.Divisao == bloco.Divisao).OrderBy(l => l.Ordem).ToList();
+
+                    <div class="card mb-3">
+                        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                            <span class="fw-bold">@bloco.Titulo</span>
+                            <span class="text-muted small">@bloco.Ajuda</span>
+                            <div class="ms-auto d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarLinha(bloco)">➕ Linha</button>
+                            </div>
+                        </div>
+                        @if (linhasDoBloco.Count == 0)
+                        {
+                            <div class="card-body text-muted small">Sem prêmio nessa competição nesta temporada.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:220px;">@(bloco.PorPosicao ? "Posição" : "Fase")</th>
+                                            <th style="width:200px;">Prêmio (Mi)</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var linha in linhasDoBloco)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    @if (bloco.PorPosicao)
+                                                    {
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <input type="number" min="1" class="form-control form-control-sm" style="width:80px;" @bind="linha.PosicaoDe" />
+                                                            <span class="text-muted small">até</span>
+                                                            <input type="number" min="1" class="form-control form-control-sm" style="width:80px;" @bind="linha.PosicaoAte" />
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <select class="form-select form-select-sm" @bind="linha.Fase">
+                                                            @foreach (var fase in FasesDoBloco(bloco))
+                                                            {
+                                                                <option value="@fase">@PremiacaoLabels.Fase(fase)</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.5" min="0" class="form-control form-control-sm" style="width:140px;" @bind="linha.ValorEmMilhoes" />
+                                                </td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => _linhas.Remove(linha)">Remover</button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">💾 Salvar valores</button>
+                    <button class="btn btn-outline-secondary" @onclick="RecarregarAtualAsync" disabled="@_salvando">Desfazer alterações</button>
+                    <button class="btn btn-outline-danger ms-auto" @onclick="ExcluirAsync" disabled="@_salvando">Excluir premiação</button>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted small">
+                    Cada competição encerrada paga uma vez só. Confira a prévia e confirme: os valores entram no caixa dos times na hora.
+                </p>
+
+                @if (_previas.Count == 0)
+                {
+                    <div class="alert alert-info">Nenhuma competição na temporada @_atual.Temporada.</div>
+                }
+
+                @foreach (var previa in _previas)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-dark">@LigaLabels.Competicao(previa.Tipo, previa.Divisao)</span>
+                            <span class="fw-bold">@previa.LigaNome</span>
+                            @if (previa.JaPago)
+                            {
+                                <span class="badge bg-success">Pago em @previa.PagoEm!.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                            }
+                            else if (!previa.Encerrada)
+                            {
+                                <span class="badge bg-secondary">Ainda não encerrada</span>
+                            }
+                            <span class="ms-auto fw-bold">@Moeda(previa.Total)</span>
+                        </div>
+
+                        @if (previa.Impedimento is not null)
+                        {
+                            <div class="card-body text-muted small">@previa.Impedimento</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr><th>Time</th><th>Prêmio</th><th class="text-end">Valor</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var linha in previa.Linhas)
+                                        {
+                                            <tr>
+                                                <td>@linha.TimeNome</td>
+                                                <td class="text-muted small">@linha.Motivo</td>
+                                                <td class="text-end">@Moeda(linha.Valor)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer d-flex gap-2">
+                                @if (previa.JaPago)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => EstornarAsync(previa)" disabled="@_salvando">Estornar pagamento</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-success btn-sm" @onclick="() => PagarAsync(previa)" disabled="@(_salvando || !previa.PodePagar)">
+                                        💰 Pagar @Moeda(previa.Total)
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+    private string _aba = "valores";
+
+    private IReadOnlyList<PremiacaoDto> _premiacoes = Array.Empty<PremiacaoDto>();
+    private PremiacaoDto? _atual;
+    private IReadOnlyList<PremiacaoPreviaDto> _previas = Array.Empty<PremiacaoPreviaDto>();
+
+    private readonly List<Linha> _linhas = new();
+    private string _nomeEdicao = "";
+
+    private bool _mostrarNova;
+    private int _novaTemporada = DateTime.Today.Year;
+    private string _novoNome = "";
+    private string _copiarDe = "";
+
+    /// <summary>Linha editável da tela (valor em milhões, como o pessoal fala).</summary>
+    private sealed class Linha
+    {
+        public TipoCompetition Tipo { get; init; }
+        public Divisao? Divisao { get; init; }
+        public int? PosicaoDe { get; set; }
+        public int? PosicaoAte { get; set; }
+        public FasePremiacao? Fase { get; set; }
+        public decimal ValorEmMilhoes { get; set; }
+        public int Ordem => Fase is FasePremiacao f ? (int)f : PosicaoDe ?? 0;
+        public decimal Valor => ValorEmMilhoes * 1_000_000m;
+    }
+
+    private sealed record Bloco(string Titulo, string Ajuda, TipoCompetition Tipo, Divisao? Divisao, bool PorPosicao);
+
+    private static readonly IReadOnlyList<Bloco> _blocos = new List<Bloco>
+    {
+        new("Série A", "prêmio por posição final", TipoCompetition.Liga, Divisao.SerieA, true),
+        new("Série B", "prêmio por posição final", TipoCompetition.Liga, Divisao.SerieB, true),
+        new("Copa", "prêmio pela fase alcançada", TipoCompetition.Copa, null, false),
+        new("Supercopa", "prêmio pela fase alcançada", TipoCompetition.Supercopa, null, false)
+    };
+
+    private static IEnumerable<FasePremiacao> FasesDoBloco(Bloco bloco) =>
+        bloco.Tipo == TipoCompetition.Supercopa
+            ? new[] { FasePremiacao.Campeao, FasePremiacao.Vice }
+            : Enum.GetValues<FasePremiacao>();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/premiacao"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        _carregando = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _premiacoes = await PremiacaoSvc.ListAsync(CancellationToken.None);
+            _atual = _premiacoes.FirstOrDefault(p => p.PremiacaoId == _atual?.PremiacaoId) ?? _premiacoes.FirstOrDefault();
+            CarregarLinhas();
+
+            var temporadas = await TemporadaSvc.ListTemporadasAsync(CancellationToken.None);
+            _novaTemporada = temporadas.Count > 0 ? temporadas.Max() + 1 : DateTime.Today.Year;
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private void CarregarLinhas()
+    {
+        _linhas.Clear();
+        _nomeEdicao = _atual?.Nome ?? "";
+        if (_atual is null) return;
+
+        foreach (var item in _atual.Itens)
+            _linhas.Add(new Linha
+            {
+                Tipo = item.Tipo,
+                Divisao = item.Divisao,
+                PosicaoDe = item.PosicaoDe,
+                PosicaoAte = item.PosicaoAte,
+                Fase = item.Fase,
+                ValorEmMilhoes = item.Valor / 1_000_000m
+            });
+    }
+
+    private async Task OnPremiacaoChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+
+        _atual = _premiacoes.FirstOrDefault(p => p.PremiacaoId == id);
+        CarregarLinhas();
+        if (_aba == "pagar") await AbrirPagamentosAsync();
+    }
+
+    private void AdicionarLinha(Bloco bloco)
+    {
+        var doBloco = _linhas.Where(l => l.Tipo == bloco.Tipo && l.Divisao == bloco.Divisao).ToList();
+
+        if (bloco.PorPosicao)
+        {
+            var proxima = doBloco.Count == 0 ? 1 : doBloco.Max(l => l.PosicaoAte ?? l.PosicaoDe ?? 0) + 1;
+            _linhas.Add(new Linha { Tipo = bloco.Tipo, Divisao = bloco.Divisao, PosicaoDe = proxima, PosicaoAte = proxima });
+        }
+        else
+        {
+            var faseLivre = FasesDoBloco(bloco).FirstOrDefault(f => doBloco.All(l => l.Fase != f));
+            _linhas.Add(new Linha { Tipo = bloco.Tipo, Divisao = bloco.Divisao, Fase = faseLivre == 0 ? FasePremiacao.Campeao : faseLivre });
+        }
+    }
+
+    private async Task CriarAsync()
+    {
+        _salvando = true;
+        try
+        {
+            Guid? copiarDe = Guid.TryParse(_copiarDe, out var id) ? id : null;
+            var nova = await PremiacaoSvc.CriarAsync(new PremiacaoCriarRequest(_novaTemporada, _novoNome, copiarDe), CancellationToken.None);
+
+            _atual = nova;
+            _mostrarNova = false;
+            _novoNome = "";
+            _copiarDe = "";
+            await CarregarAsync();
+            _ok = $"{nova.Nome} criada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (_atual is null) return;
+        _salvando = true;
+        try
+        {
+            var itens = _linhas
+                .Select(l => new PremiacaoItemInput(l.Tipo, l.Divisao, l.PosicaoDe, l.PosicaoAte, l.Fase, l.Valor))
+                .ToArray();
+
+            _atual = await PremiacaoSvc.SalvarItensAsync(_atual.PremiacaoId, itens, CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Valores salvos.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RenomearAsync()
+    {
+        if (_atual is null) return;
+        _salvando = true;
+        try
+        {
+            await PremiacaoSvc.RenomearAsync(_atual.PremiacaoId, _nomeEdicao, CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Nome atualizado.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RecarregarAtualAsync()
+    {
+        await CarregarAsync();
+        _ok = "Alterações desfeitas.";
+    }
+
+    private async Task ExcluirAsync()
+    {
+        if (_atual is null) return;
+        if (!await Confirmar($"Excluir {_atual.Nome}?")) return;
+
+        _salvando = true;
+        try
+        {
+            await PremiacaoSvc.ExcluirAsync(_atual.PremiacaoId, CancellationToken.None);
+            _atual = null;
+            await CarregarAsync();
+            _ok = "Premiação excluída.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task AbrirPagamentosAsync()
+    {
+        _aba = "pagar";
+        if (_atual is null) return;
+
+        try { _previas = await PremiacaoSvc.ListPreviasAsync(_atual.Temporada, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task PagarAsync(PremiacaoPreviaDto previa)
+    {
+        if (!await Confirmar($"Creditar {Moeda(previa.Total)} no caixa de {previa.Linhas.Count} time(s) por {previa.LigaNome}?")) return;
+
+        _salvando = true;
+        try
+        {
+            await PremiacaoSvc.PagarAsync(previa.LigaId, CancellationToken.None);
+            await AbrirPagamentosAsync();
+            _ok = $"Premiação de {previa.LigaNome} paga.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task EstornarAsync(PremiacaoPreviaDto previa)
+    {
+        if (!await Confirmar($"Estornar a premiação de {previa.LigaNome}? O valor sai do caixa dos times.")) return;
+
+        _salvando = true;
+        try
+        {
+            await PremiacaoSvc.EstornarAsync(previa.LigaId, CancellationToken.None);
+            await AbrirPagamentosAsync();
+            _ok = $"Premiação de {previa.LigaNome} estornada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task<bool> Confirmar(string mensagem) =>
+        await JSRuntime.InvokeAsync<bool>("confirm", mensagem);
+
+    private static string Moeda(decimal valor) => $"{valor / 1_000_000m:0.##} Mi";
+}
