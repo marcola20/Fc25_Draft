@@ -392,6 +392,46 @@ public class DraftService
         });
     }
 
+    /// <summary>Troca a faixa de overall de uma rodada já criada (ex.: as faixas do draft complementar).</summary>
+    public async Task UpdateRoundLimitsAsync(
+        Guid draftId,
+        int roundNumber,
+        int? overallMin,
+        int? overallMax,
+        CancellationToken ct = default)
+    {
+        if (roundNumber < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(roundNumber));
+        }
+
+        if (overallMin is < 0 or > 150)
+        {
+            throw new ArgumentOutOfRangeException(nameof(overallMin), overallMin, "Overall mínimo deve estar entre 0 e 150.");
+        }
+
+        if (overallMax is < 0 or > 150)
+        {
+            throw new ArgumentOutOfRangeException(nameof(overallMax), overallMax, "Overall máximo deve estar entre 0 e 150.");
+        }
+
+        if (overallMin is int minValue && overallMax is int maxValue && minValue > maxValue)
+        {
+            throw new ArgumentException(
+                $"O overall mínimo ({minValue}) não pode ser maior que o máximo ({maxValue}).",
+                nameof(overallMin));
+        }
+
+        var round = await _db.DraftRounds
+            .FirstOrDefaultAsync(r => r.DraftId == draftId && r.RoundNumber == roundNumber, ct)
+            ?? throw new KeyNotFoundException("Rodada não encontrada.");
+
+        // Escolhas já feitas continuam valendo; a faixa nova vale para as próximas.
+        round.OverallMin = overallMin;
+        round.OverallMax = overallMax;
+        await _db.SaveChangesAsync(ct);
+    }
+
     public async Task RemoveRoundAsync(Guid draftId, int roundNumber, CancellationToken ct = default)
     {
         if (roundNumber < 1)

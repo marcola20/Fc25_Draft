@@ -209,6 +209,41 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            adminDraftProtectedApi.MapPut("/{id:guid}/rounds/{roundNumber:int}", async (
+                DraftService draftService,
+                DraftStateService draftStateService,
+                IHubContext<DraftHub> hubContext,
+                Guid id,
+                int roundNumber,
+                DraftRoundCreateDto? request,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    request ??= new DraftRoundCreateDto(null, null);
+                    await draftService.UpdateRoundLimitsAsync(id, roundNumber, request.OverallMin, request.OverallMax, ct);
+                    await draftStateService.GetStateAsync(ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (ArgumentOutOfRangeException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
             adminDraftProtectedApi.MapPost("/{id:guid}/rounds", async (
                 DraftService draftService,
                 DraftStateService draftStateService,

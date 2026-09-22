@@ -121,19 +121,35 @@ else
             @if (RoundToDisplay is not null)
             {
                 <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
                             <strong>Rodada @RoundToDisplay.RoundNumber</strong>
                             <span class="ms-2 text-muted">@FormatOverallRange(RoundToDisplay)</span>
                         </div>
-                        @if (AdminAuth.IsAdmin && CanRemoveRound(RoundToDisplay))
-                        {
-                            <button class="btn btn-outline-danger btn-sm"
-                                    @onclick="() => ConfirmRemoveRoundAsync(RoundToDisplay.RoundNumber)"
-                                    disabled="@isProcessing">
-                                Remover rodada
-                            </button>
-                        }
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            @if (AdminAuth.IsAdmin)
+                            {
+                                <span class="text-muted small">Overall</span>
+                                <InputNumber TValue="int?" class="form-control form-control-sm" style="width: 5.5rem;"
+                                             placeholder="mín." @bind-Value="editRoundOverallMin" Min="0" Max="150" disabled="@isProcessing" />
+                                <span class="text-muted small">a</span>
+                                <InputNumber TValue="int?" class="form-control form-control-sm" style="width: 5.5rem;"
+                                             placeholder="máx." @bind-Value="editRoundOverallMax" Min="0" Max="150" disabled="@isProcessing" />
+                                <button class="btn btn-primary btn-sm"
+                                        @onclick="() => UpdateRoundLimitsAsync(RoundToDisplay.RoundNumber)"
+                                        disabled="@isProcessing">
+                                    Salvar faixa
+                                </button>
+                            }
+                            @if (AdminAuth.IsAdmin && CanRemoveRound(RoundToDisplay))
+                            {
+                                <button class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => ConfirmRemoveRoundAsync(RoundToDisplay.RoundNumber)"
+                                        disabled="@isProcessing">
+                                    Remover rodada
+                                </button>
+                            }
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -305,6 +321,8 @@ else
     private string? successMessage;
     private int? newRoundOverallMin;
     private int? newRoundOverallMax;
+    private int? editRoundOverallMin;
+    private int? editRoundOverallMax;
     private int? selectedRoundNumber;
 
     private List<DraftRoundDetailsDto> OrderedRounds = new();
@@ -473,6 +491,10 @@ else
                                  r.RoundNumber == selectedRoundNumber.Value)
             ?? OrderedRounds.FirstOrDefault();
 
+        // Os campos da faixa sempre abrem com o que está valendo na rodada exibida.
+        editRoundOverallMin = RoundToDisplay?.OverallMin;
+        editRoundOverallMax = RoundToDisplay?.OverallMax;
+
         RecomputePickOrder();
     }
 
@@ -518,6 +540,44 @@ else
         {
             errorMessage = ex.Message;
             Logger.LogError(ex, "LayoutNav:Erro ao carregar times");
+        }
+    }
+
+    /// <summary>Troca a faixa de overall de uma rodada que já existe (as escolhas feitas continuam valendo).</summary>
+    private async Task UpdateRoundLimitsAsync(int roundNumber)
+    {
+        if (!selectedDraftId.HasValue || isProcessing) return;
+
+        if (!AdminAuth.IsAdmin)
+        {
+            errorMessage = "Somente administradores podem alterar a faixa de overall.";
+            successMessage = null;
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var request = new DraftRoundCreateDto(editRoundOverallMin, editRoundOverallMax);
+            await DraftAdminApiClient.UpdateRoundAsync(selectedDraftId.Value, roundNumber, request);
+
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+
+            successMessage = editRoundOverallMin is null && editRoundOverallMax is null
+                ? $"Rodada {roundNumber} ficou sem limite de overall."
+                : $"Rodada {roundNumber} agora é overall {editRoundOverallMin?.ToString() ?? "livre"} a {editRoundOverallMax?.ToString() ?? "livre"}.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao alterar a faixa de overall da rodada {Round} do draft {DraftId}", roundNumber, selectedDraftId);
+        }
+        finally
+        {
+            isProcessing = false;
         }
     }
 

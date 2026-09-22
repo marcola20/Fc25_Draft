@@ -60,6 +60,22 @@ public class DraftAdminApiClient
         return round;
     }
 
+    /// <summary>Muda a faixa de overall de uma rodada que já existe.</summary>
+    public async Task UpdateRoundAsync(Guid draftId, int roundNumber, DraftRoundCreateDto? request, CancellationToken ct = default)
+    {
+        request ??= new DraftRoundCreateDto(null, null);
+
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PutAsJsonAsync($"api/admin/draft/{draftId}/rounds/{roundNumber}", request, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new KeyNotFoundException("Rodada não encontrada.");
+        }
+
+        await EnsureSuccessAsync(response);
+    }
+
     public async Task DeleteRoundAsync(Guid draftId, int roundNumber, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);
