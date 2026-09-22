@@ -155,6 +155,13 @@ else
     <section class="mt-4">
         <h4>Elenco</h4>
 
+        @if (_canQuickSell && _quickSellBloqueado)
+        {
+            <div class="alert alert-secondary py-2 small" role="status">
+                As <strong>vendas rápidas estão bloqueadas</strong> no momento. A organização libera quando a janela abrir.
+            </div>
+        }
+
         @if (roster is null)
         {
             <p class="text-muted">Não foi possível carregar o elenco da equipe.</p>
@@ -235,7 +242,7 @@ else
                                 <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
                                 @if (_canQuickSell)
                                 {
-                                    <td class="text-center pe-0">
+                                    <td class="text-center pe-0" title="@(_quickSellBloqueado ? "Vendas rápidas bloqueadas no momento" : null)">
                                         <button type="button" 
                                                 class="btn btn-outline-danger btn-sm btn-icon"
                                                 style="border-width: 2px;
@@ -244,7 +251,8 @@ else
                                                        padding: 2px 4px;
                                                        line-height: 1;
                                                        transition: background-color 0.2s ease;"
-                                                title="Quicksell"
+                                                title="@(_quickSellBloqueado ? "Vendas rápidas bloqueadas no momento" : "Quicksell")"
+                                                disabled="@_quickSellBloqueado"
                                                 aria-label="Vender rapidamente @player.Name"
                                                 onmouseover="this.style.backgroundColor='rgba(255, 0, 0, 0.1)';"
                                                 onmouseout="this.style.backgroundColor='transparent';"
@@ -337,6 +345,7 @@ else
 
     private TeamDetailsDto? team;
     private int _maxQuickSell = 5;
+    private bool _quickSellBloqueado = true;
     private decimal? teamAmount;
     private TeamRosterDto? roster;
     private string? errorMessage;
@@ -367,7 +376,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        try { _maxQuickSell = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxQuickSellPerWindow; }
+        try
+        {
+            var cfg = await TransferConfigSvc.GetAsync(CancellationToken.None);
+            _maxQuickSell = cfg.MaxQuickSellPerWindow;
+            _quickSellBloqueado = cfg.QuickSellBloqueado;
+        }
         catch { /* mantém o padrão se a config não carregar */ }
         await LoadTeamAsync();
         await LoadTrajetoriaAsync();

@@ -16,6 +16,9 @@ public class TransferConfig
     /// <summary>Quantidade mínima de jogadores que um elenco deve manter.</summary>
     public int MinRosterSize { get; set; }
 
+    /// <summary>Quando true, ninguém pode fazer venda rápida (o admin libera em /admin/configuracoes).</summary>
+    public bool QuickSellBloqueado { get; set; } = true;
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>
@@ -30,6 +33,7 @@ public class TransferConfig
         Id = 1,
         MaxQuickSellPerWindow = 5,
         MaxTransfers = 5,
-        MinRosterSize = 14
+        MinRosterSize = 14,
+        QuickSellBloqueado = true
     };
 }

@@ -163,6 +163,25 @@
                                     <div class="form-text">Um time não pode ficar abaixo disto.</div>
                                 </div>
                             </div>
+
+                            <hr />
+
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="qsLiberado"
+                                           checked="@(!_quickSellBloqueado)"
+                                           @onchange="e => _quickSellBloqueado = !(bool)(e.Value ?? false)" />
+                                    <label class="form-check-label" for="qsLiberado">Vendas rápidas liberadas</label>
+                                </div>
+                                <span class="badge @(_quickSellBloqueadoSalvo ? "bg-danger" : "bg-success")">
+                                    @(_quickSellBloqueadoSalvo ? "Bloqueadas agora" : "Liberadas agora")
+                                </span>
+                            </div>
+                            <div class="form-text">
+                                Bloqueado, ninguém consegue fazer venda rápida — nem quem ainda tem vendas sobrando.
+                                O padrão do sistema é bloqueado; libere só quando a janela abrir.
+                            </div>
+
                             <div class="mt-3">
                                 <button class="btn btn-primary" @onclick="SalvarTransf" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar")</button>
                                 <button class="btn btn-outline-secondary ms-2" @onclick="RestaurarTransf" disabled="@_saving">Restaurar padrões</button>
@@ -302,6 +321,7 @@
     // Transferências
     private int _maxQuickSell, _maxTransfers, _minRoster;
     private int _maxQuickSellSalvo, _minRosterSalvo;
+    private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
     private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
     private IReadOnlyList<TeamElencoMinimoDto> _elencos = Array.Empty<TeamElencoMinimoDto>();
     private readonly Dictionary<Guid, string?> _minimosEditados = new();
@@ -341,6 +361,8 @@
         _maxTransfers = t.MaxTransfers;
         _minRoster = t.MinRosterSize;
         _minRosterSalvo = t.MinRosterSize;
+        _quickSellBloqueado = t.QuickSellBloqueado;
+        _quickSellBloqueadoSalvo = t.QuickSellBloqueado;
     }
 
     private async Task CarregarQuickSells()
@@ -431,7 +453,7 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster), CancellationToken.None);
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado), CancellationToken.None);
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();
@@ -468,6 +490,7 @@
         _maxQuickSell = d.MaxQuickSellPerWindow;
         _maxTransfers = d.MaxTransfers;
         _minRoster = d.MinRosterSize;
+        _quickSellBloqueado = d.QuickSellBloqueado;
         _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";
     }
 

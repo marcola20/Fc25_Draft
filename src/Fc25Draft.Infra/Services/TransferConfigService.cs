@@ -43,6 +43,7 @@ public class TransferConfigService : ITransferConfigService
         cfg.MaxQuickSellPerWindow = dto.MaxQuickSellPerWindow;
         cfg.MaxTransfers = dto.MaxTransfers;
         cfg.MinRosterSize = dto.MinRosterSize;
+        cfg.QuickSellBloqueado = dto.QuickSellBloqueado;
         cfg.AtualizadoEm = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -115,5 +116,5 @@ public class TransferConfigService : ITransferConfigService
     }
 
     private static TransferConfigDto ToDto(TransferConfig c) =>
-        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize);
+        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado);
 }

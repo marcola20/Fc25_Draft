@@ -10,5 +10,8 @@ public class TransferConfigConfiguration : IEntityTypeConfiguration<TransferConf
     {
         e.HasKey(x => x.Id);
         e.Property(x => x.Id).ValueGeneratedNever();
+
+        // O padrão é bloqueado: a venda rápida só vale quando o admin libera.
+        e.Property(x => x.QuickSellBloqueado).HasDefaultValue(true);
     }
 }

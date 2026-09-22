@@ -3,7 +3,8 @@ namespace Fc25Draft.Core.DTOs;
 public record TransferConfigDto(
     int MaxQuickSellPerWindow,
     int MaxTransfers,
-    int MinRosterSize);
+    int MinRosterSize,
+    bool QuickSellBloqueado = true);
 
 /// <summary>Contador de vendas rápidas (quick sell) de um time na janela atual.</summary>
 /// <param name="LimiteIndividual">Limite só deste time; nulo usa o limite geral da janela.</param>
