@@ -20,6 +20,12 @@ public class Team
     /// </summary>
     public int? MinRosterSizeOverride { get; set; }
 
+    /// <summary>
+    /// Limite de vendas rápidas só deste time (ex.: time novo que entra com menos).
+    /// Nulo usa <see cref="TransferConfig.MaxQuickSellPerWindow"/>.
+    /// </summary>
+    public int? QuickSellLimitOverride { get; set; }
+
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();
     public ICollection<MarketBid> MarketBids { get; set; } = new List<MarketBid>();

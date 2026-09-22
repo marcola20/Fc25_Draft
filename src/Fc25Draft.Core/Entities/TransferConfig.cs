@@ -21,6 +21,9 @@ public class TransferConfig
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>
     public int MinRosterSizeFor(Team team) => team.MinRosterSizeOverride ?? MinRosterSize;
 
+    /// <summary>Limite de vendas rápidas que vale para o time: o individual dele, se houver, senão o geral.</summary>
+    public int MaxQuickSellFor(Team team) => team.QuickSellLimitOverride ?? MaxQuickSellPerWindow;
+
     /// <summary>Valores padrão (equivalentes ao comportamento anterior, hardcoded).</summary>
     public static TransferConfig Default() => new()
     {

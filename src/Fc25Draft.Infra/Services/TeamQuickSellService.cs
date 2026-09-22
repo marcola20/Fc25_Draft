@@ -90,8 +90,9 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (rosterCount <= minRoster)
                     throw new QuickSellException($"Você não pode realizar esta ação. O time ficaria com menos de {minRoster} jogadores.", StatusCodes.Status409Conflict);
 
-                if (team.QuickSellCount >= cfg.MaxQuickSellPerWindow)
-                    throw new QuickSellException($"Limite de vendas rápidas da janela atingido ({team.QuickSellCount}/{cfg.MaxQuickSellPerWindow}).", StatusCodes.Status429TooManyRequests);
+                var maxQuickSell = cfg.MaxQuickSellFor(team);
+                if (team.QuickSellCount >= maxQuickSell)
+                    throw new QuickSellException($"Limite de vendas rápidas da janela atingido ({team.QuickSellCount}/{maxQuickSell}).", StatusCodes.Status429TooManyRequests);
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 

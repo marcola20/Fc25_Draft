@@ -19,6 +19,9 @@ public interface ITransferConfigService
     /// <summary>Ajusta quantas vendas rápidas um time já usou na janela (o que sobra é o limite menos isso).</summary>
     Task SetQuickSellCountAsync(Guid teamId, int usados, CancellationToken ct);
 
+    /// <summary>Define (ou remove, com nulo) o limite de vendas rápidas só de um time.</summary>
+    Task SetQuickSellLimitAsync(Guid teamId, int? limite, CancellationToken ct);
+
     /// <summary>Lista o tamanho do elenco e o mínimo temporário de cada time, ordenado por nome.</summary>
     Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct);
 

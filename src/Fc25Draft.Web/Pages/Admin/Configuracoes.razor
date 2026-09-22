@@ -186,16 +186,23 @@
                         <div class="table-responsive">
                             <table class="table table-sm mb-0">
                                 <thead>
-                                    <tr><th>Time</th><th class="text-end">Usados</th><th style="width: 7rem">Restantes</th><th></th></tr>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th class="text-end">Usados</th>
+                                        <th style="width: 6.5rem">Limite</th>
+                                        <th style="width: 6.5rem">Restantes</th>
+                                        <th></th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     @if (_quickSells.Count == 0)
                                     {
-                                        <tr><td colspan="4" class="text-muted text-center">Nenhum time cadastrado.</td></tr>
+                                        <tr><td colspan="5" class="text-muted text-center">Nenhum time cadastrado.</td></tr>
                                     }
                                     @foreach (var t in _quickSells)
                                     {
-                                        var restantes = Math.Max(0, _maxQuickSellSalvo - t.QuickSellCount);
+                                        var limite = t.LimiteIndividual ?? _maxQuickSellSalvo;
+                                        var restantes = Math.Max(0, limite - t.QuickSellCount);
                                         <tr>
                                             <td>
                                                 @t.TeamName
@@ -203,15 +210,24 @@
                                                 {
                                                     <span class="text-muted small"> · @t.OwnerName</span>
                                                 }
+                                                @if (t.LimiteIndividual is not null)
+                                                {
+                                                    <span class="badge bg-info text-dark ms-1">individual</span>
+                                                }
                                             </td>
                                             <td class="text-end @(restantes == 0 ? "text-danger fw-bold" : "")">@t.QuickSellCount</td>
                                             <td>
-                                                <input type="number" min="0" max="@_maxQuickSellSalvo" class="form-control form-control-sm"
+                                                <input type="number" min="0" class="form-control form-control-sm" placeholder="@_maxQuickSellSalvo"
+                                                       value="@_limitesEditados.GetValueOrDefault(t.TeamId, t.LimiteIndividual?.ToString())"
+                                                       @onchange="e => _limitesEditados[t.TeamId] = e.Value?.ToString()" />
+                                            </td>
+                                            <td>
+                                                <input type="number" min="0" max="@limite" class="form-control form-control-sm"
                                                        value="@_restantesEditados.GetValueOrDefault(t.TeamId, restantes.ToString())"
                                                        @onchange="e => _restantesEditados[t.TeamId] = e.Value?.ToString()" />
                                             </td>
                                             <td class="text-end">
-                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SalvarRestantes(t)" disabled="@_saving">Salvar</button>
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SalvarQuickSellDoTime(t)" disabled="@_saving">Salvar</button>
                                             </td>
                                         </tr>
                                     }
@@ -219,8 +235,9 @@
                             </table>
                         </div>
                         <div class="card-footer small text-muted">
-                            Restantes = limite salvo (@_maxQuickSellSalvo) menos as vendas rápidas já feitas na janela.
-                            Dá para acertar o número de um time só — por exemplo, deixar os times novos com menos vendas nesta janela.
+                            <strong>Limite</strong>: em branco usa o limite geral da janela (@_maxQuickSellSalvo); preenchido vale só para aquele time —
+                            é assim que um time novo entra com menos vendas rápidas que os outros.
+                            <strong>Restantes</strong>: quantas ele ainda pode fazer agora (limite menos as já feitas).
                         </div>
                     </div>
                 </div>
@@ -289,6 +306,7 @@
     private IReadOnlyList<TeamElencoMinimoDto> _elencos = Array.Empty<TeamElencoMinimoDto>();
     private readonly Dictionary<Guid, string?> _minimosEditados = new();
     private readonly Dictionary<Guid, string?> _restantesEditados = new();
+    private readonly Dictionary<Guid, string?> _limitesEditados = new();
 
     private record Exemplo(string Label, short PositionId, int Overall, int Age);
     private static readonly Exemplo[] _exemplos =
@@ -336,23 +354,48 @@
             _minimosEditados[t.TeamId] = t.MinimoTemporario?.ToString();
     }
 
-    /// <summary>Acerta o contador de um time só: o admin digita quantas vendas ainda sobram.</summary>
-    private async Task SalvarRestantes(TeamQuickSellStatusDto time)
+    /// <summary>
+    /// Salva o limite individual do time (vazio = usa o geral) e quantas vendas ainda sobram para ele.
+    /// </summary>
+    private async Task SalvarQuickSellDoTime(TeamQuickSellStatusDto time)
     {
         _erro = null; _ok = null;
 
-        var texto = _restantesEditados.GetValueOrDefault(time.TeamId);
-        if (string.IsNullOrWhiteSpace(texto)) { _erro = "Informe quantas vendas rápidas o time ainda tem."; return; }
-        if (!int.TryParse(texto, out var restantes) || restantes < 0) { _erro = "Informe um número inteiro a partir de zero."; return; }
-        if (restantes > _maxQuickSellSalvo) { _erro = $"O limite da janela é {_maxQuickSellSalvo}: salve um limite maior antes."; return; }
+        var textoLimite = _limitesEditados.GetValueOrDefault(time.TeamId, time.LimiteIndividual?.ToString());
+        int? limiteIndividual = null;
+        if (!string.IsNullOrWhiteSpace(textoLimite))
+        {
+            if (!int.TryParse(textoLimite, out var valor) || valor < 0) { _erro = "O limite precisa ser um número inteiro a partir de zero."; return; }
+            limiteIndividual = valor;
+        }
+
+        var limite = limiteIndividual ?? _maxQuickSellSalvo;
+
+        var textoRestantes = _restantesEditados.GetValueOrDefault(time.TeamId);
+        int restantes;
+        if (string.IsNullOrWhiteSpace(textoRestantes))
+            restantes = Math.Max(0, limite - time.QuickSellCount);
+        else if (!int.TryParse(textoRestantes, out restantes) || restantes < 0)
+        {
+            _erro = "As vendas restantes precisam ser um número inteiro a partir de zero.";
+            return;
+        }
+
+        if (restantes > limite) { _erro = $"{time.TeamName} tem limite {limite}: não dá para sobrar {restantes}."; return; }
 
         _saving = true;
         try
         {
-            await TransferCfg.SetQuickSellCountAsync(time.TeamId, _maxQuickSellSalvo - restantes, CancellationToken.None);
+            await TransferCfg.SetQuickSellLimitAsync(time.TeamId, limiteIndividual, CancellationToken.None);
+            await TransferCfg.SetQuickSellCountAsync(time.TeamId, limite - restantes, CancellationToken.None);
+
+            _limitesEditados.Remove(time.TeamId);
             _restantesEditados.Remove(time.TeamId);
             await CarregarQuickSells();
-            _ok = $"{time.TeamName} ficou com {restantes} venda(s) rápida(s) nesta janela.";
+
+            _ok = limiteIndividual is null
+                ? $"{time.TeamName} usa o limite geral ({_maxQuickSellSalvo}) e ficou com {restantes} venda(s) rápida(s)."
+                : $"{time.TeamName} agora tem limite próprio de {limiteIndividual} e ficou com {restantes} venda(s) rápida(s).";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
@@ -392,6 +435,7 @@
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();
+            _limitesEditados.Clear();
             _ok = "Limites de transferências salvos.";
         }
         catch (Exception ex) { _erro = ex.Message; }
@@ -408,6 +452,7 @@
         {
             var afetados = await TransferCfg.ResetQuickSellCountsAsync(CancellationToken.None);
             _restantesEditados.Clear();
+            _limitesEditados.Clear();
             await CarregarQuickSells();
             _ok = afetados == 0
                 ? "Nenhum time tinha vendas rápidas para zerar."

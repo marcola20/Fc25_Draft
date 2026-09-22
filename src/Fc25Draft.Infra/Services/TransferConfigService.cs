@@ -54,7 +54,7 @@ public class TransferConfigService : ITransferConfigService
         return await _db.Teams
             .AsNoTracking()
             .OrderBy(t => t.TeamName)
-            .Select(t => new TeamQuickSellStatusDto(t.TeamId, t.TeamName, t.OwnerName, t.QuickSellCount))
+            .Select(t => new TeamQuickSellStatusDto(t.TeamId, t.TeamName, t.OwnerName, t.QuickSellCount, t.QuickSellLimitOverride))
             .ToListAsync(ct);
     }
 
@@ -63,6 +63,17 @@ public class TransferConfigService : ITransferConfigService
         return await _db.Teams
             .Where(t => t.QuickSellCount != 0)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.QuickSellCount, 0), ct);
+    }
+
+    public async Task SetQuickSellLimitAsync(Guid teamId, int? limite, CancellationToken ct)
+    {
+        if (limite < 0) throw new InvalidOperationException("O limite de vendas rápidas não pode ser negativo.");
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+            ?? throw new InvalidOperationException("Time não encontrado.");
+
+        team.QuickSellLimitOverride = limite;
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task SetQuickSellCountAsync(Guid teamId, int usados, CancellationToken ct)
