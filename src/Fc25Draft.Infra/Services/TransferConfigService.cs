@@ -65,6 +65,17 @@ public class TransferConfigService : ITransferConfigService
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.QuickSellCount, 0), ct);
     }
 
+    public async Task SetQuickSellCountAsync(Guid teamId, int usados, CancellationToken ct)
+    {
+        if (usados < 0) throw new InvalidOperationException("O contador de vendas rápidas não pode ser negativo.");
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+            ?? throw new InvalidOperationException("Time não encontrado.");
+
+        team.QuickSellCount = usados;
+        await _db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct)
     {
         return await _db.Teams
