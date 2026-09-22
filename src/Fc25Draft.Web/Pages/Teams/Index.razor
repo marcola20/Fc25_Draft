@@ -8,7 +8,13 @@
 
 @implements IDisposable
 
-<h3>Equipes</h3>
+<h3>
+    Equipes
+    @if (!isLoading && teams.Count > 0)
+    {
+        <span class="text-muted fs-6">(@teams.Count)</span>
+    }
+</h3>
 
 <div class="row mb-3 g-2 align-items-end">
     <div class="col-md-6">
@@ -75,10 +81,9 @@ else
 }
 
 @code {
-    private const int PageSize = 14;
+    // A liga toda cabe numa página só (a tela nunca teve paginação: com 14 os times novos sumiam).
+    private const int PageSize = 100;
     private readonly List<TeamListItemDto> teams = new();
-    private int currentPage = 1;
-    private int totalPages = 1;
     private string? search;
     private string? errorMessage;
     private bool isLoading;
@@ -108,7 +113,6 @@ else
 
     private async Task OnSearchAsync()
     {
-        currentPage = 1;
         await LoadTeamsAsync();
     }
 
@@ -120,15 +124,8 @@ else
 
         try
         {
-            var result = await TeamsApiClient.GetAsync(search, currentPage, PageSize);
+            var result = await TeamsApiClient.GetAsync(search, 1, PageSize);
             teams.AddRange(result.Items);
-            totalPages = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
-            if (currentPage > totalPages)
-            {
-                currentPage = totalPages;
-                await LoadTeamsAsync();
-                return;
-            }
         }
         catch (Exception ex)
         {
@@ -138,17 +135,6 @@ else
         {
             isLoading = false;
         }
-    }
-
-    private async Task ChangePage(int page)
-    {
-        if (page < 1 || page == currentPage || page > totalPages)
-        {
-            return;
-        }
-
-        currentPage = page;
-        await LoadTeamsAsync();
     }
 
     private void CreateTeam()
