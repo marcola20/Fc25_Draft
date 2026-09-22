@@ -9,7 +9,7 @@ public record DraftExpansaoCriarRequest(
     bool SortearOrdem,
     int ProtegidosPorTime = 11,
     int MaxPerdasPorTime = 2,
-    decimal FatorCompensacao = 1.2m);
+    decimal FatorCompensacao = 1.1m);
 
 /// <summary>Draft de jogadores livres só para os times novos, depois da expansão.</summary>
 public record DraftComplementarRequest(
