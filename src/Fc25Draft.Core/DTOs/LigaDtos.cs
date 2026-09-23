@@ -366,3 +366,31 @@ public record TimeTemporadaDto(
     int GolsContra,
     int JogosEncerrados,
     int CleanSheets);
+
+/// <summary>Linha do Ranking de Clubes: soma de todas as competições e temporadas.</summary>
+public record RankingClubeDto(
+    int Posicao,
+    Guid TimeId,
+    string TimeNome,
+    int Pontos,
+    int Jogos,
+    int Vitorias,
+    int Empates,
+    int Derrotas,
+    int GolsPro,
+    int GolsContra,
+    int TitulosSerieA,
+    int TitulosSerieB,
+    int TitulosCopa,
+    int TitulosSupercopa,
+    int Finais,
+    int Semifinais,
+    int? MelhorPosicaoSerieA,
+    int PontosJogos,
+    int PontosTitulos,
+    int PontosFases,
+    int PontosPosicao)
+{
+    public int Titulos => TitulosSerieA + TitulosSerieB + TitulosCopa + TitulosSupercopa;
+    public int SaldoGols => GolsPro - GolsContra;
+}

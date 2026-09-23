@@ -40,6 +40,7 @@ public class LayoutNavigationService
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
+            new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
             new("Regulamento", "/regulamento", "oi oi-document")
@@ -351,6 +352,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Hall of Fame")
+            }
+        },
+        ["/ranking-clubes"] = new PageDefinition
+        {
+            Route = "/ranking-clubes",
+            Title = "Ranking de Clubes",
+            Subtitle = "Todas as temporadas, atualizado a cada jogo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Ranking de Clubes")
             }
         },
         ["/admin/hall-of-fame"] = new PageDefinition

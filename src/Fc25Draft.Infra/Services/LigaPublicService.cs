@@ -215,6 +215,61 @@ public class LigaPublicService : ILigaPublicService
         return trajetoria;
     }
 
+    public async Task<IReadOnlyList<RankingClubeDto>> GetRankingClubesAsync(CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        // Todo jogo encerrado conta: rodadas, mata-mata, jogo decisivo, mini liga e playoff de acesso.
+        var partidas = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada)
+            .Select(p => new RankingPartidaInput(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora))
+            .ToListAsync(ct);
+
+        // Mesmo critério de campeão da página de Edições (inclui as edições antigas sem campeão gravado).
+        var titulos = (await ListEdicoesAsync(ct))
+            .Where(e => e.CampeaoTimeId is not null)
+            .Select(e => new RankingTituloInput(e.CampeaoTimeId!.Value, e.Tipo, e.Divisao))
+            .ToList();
+
+        var chaves = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.Fase == FaseKnockout.Semi1 || k.Fase == FaseKnockout.Semi2 || k.Fase == FaseKnockout.Final)
+            .Select(k => new { k.Fase, k.TimeCasaId, k.TimeForaId })
+            .ToListAsync(ct);
+
+        // A Supercopa é um jogo único: quem entra em campo disputou uma final.
+        var supercopas = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Rodada.Liga.Tipo == TipoCompetition.Supercopa)
+            .Select(p => new { p.TimeCasaId, p.TimeForaId })
+            .ToListAsync(ct);
+
+        var fases = chaves
+            .SelectMany(k => new[] { k.TimeCasaId, k.TimeForaId }
+                .Where(id => id is not null)
+                .Select(id => new RankingFaseInput(id!.Value, k.Fase == FaseKnockout.Final)))
+            .Concat(supercopas.SelectMany(p => new[]
+            {
+                new RankingFaseInput(p.TimeCasaId, true),
+                new RankingFaseInput(p.TimeForaId, true)
+            }))
+            .ToList();
+
+        // Posição só vale quando a liga acaba; durante a temporada contam os jogos.
+        var tabelas = await _db.LigaClassificacoes.AsNoTracking()
+            .Where(c => c.Liga.Tipo == TipoCompetition.Liga
+                        && c.Liga.Status == LigaStatus.Encerrada
+                        && c.Grupo == null)
+            .Select(c => new { c.LigaId, c.Liga.Divisao, c.TimeId, c.Posicao })
+            .ToListAsync(ct);
+
+        var posicoes = tabelas
+            .GroupBy(c => c.LigaId)
+            .SelectMany(g => g.Select(c => new RankingPosicaoInput(c.TimeId, c.Divisao, c.Posicao, g.Count())))
+            .ToList();
+
+        return RankingClubes.Calcular(nomes, partidas, titulos, fases, posicoes);
+    }
+
     private const string SemTimeLabel = "Sem time";
 
     /// <summary>

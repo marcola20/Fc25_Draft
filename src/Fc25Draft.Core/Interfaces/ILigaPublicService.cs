@@ -29,4 +29,10 @@ public interface ILigaPublicService
 
     /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
     Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);
+
+    /// <summary>
+    /// Ranking de Clubes de todas as temporadas, calculado na hora a partir dos jogos já
+    /// encerrados (inclusive os da temporada em andamento), títulos, finais, semis e posições.
+    /// </summary>
+    Task<IReadOnlyList<RankingClubeDto>> GetRankingClubesAsync(CancellationToken ct);
 }

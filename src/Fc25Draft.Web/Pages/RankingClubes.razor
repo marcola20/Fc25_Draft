@@ -1,0 +1,156 @@
+@page "/ranking-clubes"
+@using Fc25Draft.Core.Utilities
+@inject ILigaPublicService LigaService
+@inject EscudoService EscudoService
+
+<PageTitle>Ranking de Clubes</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar o ranking:</strong> @_erro</div>
+    }
+    else if (_ranking.Count == 0)
+    {
+        <div class="alert alert-info">Nenhum jogo disputado ainda.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+            <h1 class="h3 mb-0">Ranking de Clubes</h1>
+            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary">Edições</a>
+            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary">🏆 Hall of Fame</a>
+        </div>
+        <p class="text-muted small mb-3">
+            Soma de todas as temporadas e competições (Série A, Série B, Copa, Supercopa e playoff de acesso).
+            A temporada atual entra a cada jogo encerrado.
+        </p>
+
+        <div class="table-responsive mb-4">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center">#</th>
+                        <th>Clube</th>
+                        <th class="text-center" title="Pontos do ranking">Pts</th>
+                        <th class="text-center" title="Jogos">J</th>
+                        <th class="text-center" title="Vitórias">V</th>
+                        <th class="text-center" title="Empates">E</th>
+                        <th class="text-center" title="Derrotas">D</th>
+                        <th class="text-center d-none d-md-table-cell" title="Saldo de gols">SG</th>
+                        <th class="text-center" title="Títulos">🏆</th>
+                        <th class="text-center d-none d-md-table-cell" title="Finais disputadas">Finais</th>
+                        <th class="text-center d-none d-md-table-cell" title="Semifinais disputadas">Semis</th>
+                        <th class="text-center d-none d-lg-table-cell" title="Melhor posição na Série A">Melhor A</th>
+                        <th class="text-center d-none d-lg-table-cell" title="Aproveitamento nos jogos">%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _ranking)
+                    {
+                        <tr>
+                            <td class="text-center">
+                                <span class="badge @(r.Posicao <= 3 ? "bg-warning text-dark" : "bg-secondary")">@r.Posicao</span>
+                            </td>
+                            <td>
+                                <a href="@($"/teams/details/{r.TimeId}")" class="d-flex align-items-center gap-2 text-decoration-none text-reset">
+                                    <img src="@EscudoService.GetEscudo(r.TimeNome)" alt="Escudo @r.TimeNome"
+                                         style="width:24px;height:24px;object-fit:contain;" />
+                                    <span class="fw-semibold">@r.TimeNome</span>
+                                </a>
+                            </td>
+                            <td class="text-center fw-bold" title="@Composicao(r)">@r.Pontos</td>
+                            <td class="text-center">@r.Jogos</td>
+                            <td class="text-center">@r.Vitorias</td>
+                            <td class="text-center">@r.Empates</td>
+                            <td class="text-center">@r.Derrotas</td>
+                            <td class="text-center d-none d-md-table-cell">@r.SaldoGols.ToString("+0;-0;0")</td>
+                            <td class="text-center" title="@DetalheTitulos(r)">@(r.Titulos > 0 ? r.Titulos : "–")</td>
+                            <td class="text-center d-none d-md-table-cell">@r.Finais</td>
+                            <td class="text-center d-none d-md-table-cell">@r.Semifinais</td>
+                            <td class="text-center d-none d-lg-table-cell">@(r.MelhorPosicaoSerieA is int p ? $"{p}º" : "–")</td>
+                            <td class="text-center d-none d-lg-table-cell">@Aproveitamento(r)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <div class="card-body small">
+                <h2 class="h6">Critérios</h2>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <strong>Jogos</strong>
+                        <ul class="mb-0 ps-3">
+                            <li>Vitória: @RankingClubesCriterios.Vitoria pts</li>
+                            <li>Empate: @RankingClubesCriterios.Empate pt</li>
+                            <li class="text-muted">Jogo decidido nos pênaltis conta como empate.</li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <strong>Títulos e fases</strong>
+                        <ul class="mb-0 ps-3">
+                            <li>Série A: @RankingClubesCriterios.TituloSerieA pts</li>
+                            <li>Copa: @RankingClubesCriterios.TituloCopa pts</li>
+                            <li>Série B: @RankingClubesCriterios.TituloSerieB pts</li>
+                            <li>Supercopa: @RankingClubesCriterios.TituloSupercopa pts</li>
+                            <li>Final disputada: +@RankingClubesCriterios.Final pts (a Supercopa conta como final)</li>
+                            <li>Semifinal disputada: +@RankingClubesCriterios.Semifinal pts</li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <strong>Posição na tabela</strong> (liga encerrada)
+                        <ul class="mb-0 ps-3">
+                            <li>Série A: @RankingClubesCriterios.PosicaoSerieA pts por posição a partir do último (1º de 10 = 20, 10º = 2)</li>
+                            <li>Série B: @RankingClubesCriterios.PosicaoSerieB pt por posição (1º de 8 = 8)</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-muted mb-0 mt-2">Desempate: títulos, vitórias, saldo de gols.</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _erro;
+    private IReadOnlyList<RankingClubeDto> _ranking = Array.Empty<RankingClubeDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _ranking = await LigaService.GetRankingClubesAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Composicao(RankingClubeDto r) =>
+        $"Jogos {r.PontosJogos} + Títulos {r.PontosTitulos} + Finais/semis {r.PontosFases} + Posição {r.PontosPosicao}";
+
+    private static string DetalheTitulos(RankingClubeDto r)
+    {
+        var partes = new List<string>();
+        if (r.TitulosSerieA > 0) partes.Add($"Série A {r.TitulosSerieA}");
+        if (r.TitulosSerieB > 0) partes.Add($"Série B {r.TitulosSerieB}");
+        if (r.TitulosCopa > 0) partes.Add($"Copa {r.TitulosCopa}");
+        if (r.TitulosSupercopa > 0) partes.Add($"Supercopa {r.TitulosSupercopa}");
+        return partes.Count == 0 ? "Sem títulos" : string.Join(" · ", partes);
+    }
+
+    private static string Aproveitamento(RankingClubeDto r) =>
+        r.Jogos == 0 ? "–" : $"{(r.Vitorias * 3 + r.Empates) * 100.0 / (r.Jogos * 3):0}%";
+}
