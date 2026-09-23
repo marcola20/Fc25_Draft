@@ -245,9 +245,12 @@ public class DraftStateService
                 || (currentPick.Team.AuxToken is not null && string.Equals(normalizedToken, currentPick.Team.AuxToken, StringComparison.OrdinalIgnoreCase));
             if (!isTeamToken)
             {
-                var isAdmin = await _db.Teams
+                var isAdmin = await _db.AdminTokens
                     .AsNoTracking()
-                    .AnyAsync(t => t.Token == normalizedToken && t.IsAdmin, ct);
+                    .AnyAsync(t => t.Token == normalizedToken && t.IsActive, ct)
+                    || await _db.Teams
+                        .AsNoTracking()
+                        .AnyAsync(t => (t.Token == normalizedToken || t.AuxToken == normalizedToken) && t.IsAdmin, ct);
 
                 if (!isAdmin)
                     throw new InvalidOperationException("⚠️ Token inválido para este time.");
