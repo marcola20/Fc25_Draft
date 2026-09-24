@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -151,6 +153,27 @@ public static class LigaEndpoints
         {
             try { await svc.DeleteEventoAsync(eventoId, ct); return Results.NoContent(); }
             catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+
+        // Resultado simulado no PES 2021 (JSON do Auto_PES21). ?simular=true confere sem gravar.
+        admin.MapPost("/resultados-pes", async (JsonElement corpo, bool? simular, IResultadoPesService svc, CancellationToken ct) =>
+        {
+            ResultadoPesRequest? request;
+            try { request = corpo.Deserialize<ResultadoPesRequest>(); }
+            catch (JsonException ex) { return Results.BadRequest(new { message = $"JSON inválido: {ex.Message}" }); }
+            if (request is null) return Results.BadRequest(new { message = "JSON vazio." });
+
+            try { return Results.Ok(await svc.ImportarAsync(request, corpo.GetRawText(), simular ?? false, ct)); }
+            catch (ResultadoPesException ex)
+            {
+                var body = new { message = ex.Message, candidatos = ex.Candidatos };
+                return ex.Erro switch
+                {
+                    ResultadoPesErro.NaoEncontrado => Results.NotFound(body),
+                    ResultadoPesErro.Ambiguo => Results.Conflict(body),
+                    _ => Results.UnprocessableEntity(body)
+                };
+            }
         });
 
         // Punições

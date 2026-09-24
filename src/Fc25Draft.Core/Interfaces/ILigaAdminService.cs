@@ -39,6 +39,9 @@ public interface ILigaAdminService
     Task DeleteEventoAsync(Guid eventoId, CancellationToken ct);
     Task<IReadOnlyList<LigaEventoDto>> ListEventosAsync(Guid partidaId, CancellationToken ct);
 
+    /// <summary>Recalcula pontos, cartões e posições da competição a que a rodada pertence.</summary>
+    Task RecalcularClassificacaoAsync(Guid rodadaId, CancellationToken ct);
+
     // Punições
     Task<LigaPunicaoDto> AplicarPunicaoAsync(Guid ligaId, LigaPunicaoRequest request, CancellationToken ct);
     Task<IReadOnlyList<LigaPunicaoDto>> ListPunicoesAsync(Guid ligaId, CancellationToken ct);

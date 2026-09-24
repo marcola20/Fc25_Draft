@@ -52,6 +52,8 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITeamLineupService, TeamLineupService>();
             services.AddScoped<ITransferOfferService, TransferOfferService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
+            // Divide o DbContext (e a transação) com o LigaAdminService para recalcular a classificação.
+            services.AddScoped<IResultadoPesService, ResultadoPesService>();
             services.AddComConexaoPropria<ILigaPublicService, LigaPublicService>();
             services.AddComConexaoPropria<ITermometroMercadoService, TermometroMercadoService>();
             services.AddComConexaoPropria<IMinhaAreaService, MinhaAreaService>();

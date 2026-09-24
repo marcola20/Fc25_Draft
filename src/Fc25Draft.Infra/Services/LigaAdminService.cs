@@ -2074,7 +2074,7 @@ public class LigaAdminService : ILigaAdminService
 
     // ── Classificação (recálculo) ─────────────────────────────────────────────
 
-    private async Task RecalcularClassificacaoAsync(Guid rodadaId, CancellationToken ct)
+    public async Task RecalcularClassificacaoAsync(Guid rodadaId, CancellationToken ct)
     {
         var rodada = await _db.LigaRodadas.AsNoTracking().FirstOrDefaultAsync(x => x.RodadaId == rodadaId, ct);
         if (rodada is null) return;
