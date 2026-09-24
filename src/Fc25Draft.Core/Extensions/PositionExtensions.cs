@@ -69,6 +69,28 @@ namespace Fc25Draft.Core.Extensions
             };
         }
 
+        /// <summary>Sigla curta em português (GOL, ZAG, LE…), para listas apertadas.</summary>
+        public static string ToPositionSigla(this int positionId)
+        {
+            return positionId switch
+            {
+                (int)PositionType.Goleiro         => "GOL",
+                (int)PositionType.Zagueiro        => "ZAG",
+                (int)PositionType.LateralEsquerdo => "LE",
+                (int)PositionType.LateralDireito  => "LD",
+                (int)PositionType.Volante         => "VOL",
+                (int)PositionType.MeiaLigacao     => "MC",
+                (int)PositionType.MeiaAtacante    => "MEI",
+                (int)PositionType.MeiaEsquerda    => "ME",
+                (int)PositionType.PontaEsquerda   => "PE",
+                (int)PositionType.MeiaDireita     => "MD",
+                (int)PositionType.PontaDireita    => "PD",
+                (int)PositionType.Centroavante    => "CA",
+                (int)PositionType.SegundoAtacante => "SA",
+                _ => "?"
+            };
+        }
+
         public static string ToPositionCode(this int positionId)
         {
             return positionId switch

@@ -609,6 +609,7 @@ public class LigaAdminService : ILigaAdminService
 
         partida.Status = PartidaStatus.Encerrada;
         partida.EncerradaEm = _time.GetUtcNow().UtcDateTime;
+        await RegistrarEscalacoesAsync(partida, ct);
         await _db.SaveChangesAsync(ct);
 
         await RecalcularClassificacaoAsync(partida.RodadaId, ct);
@@ -633,6 +634,7 @@ public class LigaAdminService : ILigaAdminService
         partida.PenaltisVencedorId = vencedorId;
         partida.Status = PartidaStatus.Encerrada;
         partida.EncerradaEm = _time.GetUtcNow().UtcDateTime;
+        await RegistrarEscalacoesAsync(partida, ct);
         await _db.SaveChangesAsync(ct);
 
         await RecalcularClassificacaoAsync(partida.RodadaId, ct);
@@ -768,6 +770,97 @@ public class LigaAdminService : ILigaAdminService
         return await GetEventoDtoAsync(evento.EventoId, ct);
     }
 
+    public async Task<LigaEventoDto> AddSubstituicaoAsync(Guid partidaId, LigaSubstituicaoRequest request, CancellationToken ct)
+    {
+        var partida = await _db.LigaPartidas.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)
+            ?? throw new InvalidOperationException("Partida não encontrada.");
+
+        if (partida.Status == PartidaStatus.Agendada)
+            throw new InvalidOperationException("Inicie a partida antes de registrar eventos.");
+
+        if (partida.TimeCasaId != request.TimeId && partida.TimeForaId != request.TimeId)
+            throw new InvalidOperationException("Time não participa desta partida.");
+
+        if (!await _db.Players.AnyAsync(p => p.PlayerId == request.JogadorId, ct))
+            throw new InvalidOperationException("Jogador não encontrado.");
+
+        if (request.JogadorSaiuId == request.JogadorId)
+            throw new InvalidOperationException("Quem entra e quem sai precisam ser jogadores diferentes.");
+
+        if (request.JogadorSaiuId.HasValue && !await _db.Players.AnyAsync(p => p.PlayerId == request.JogadorSaiuId.Value, ct))
+            throw new InvalidOperationException("Jogador que saiu não encontrado.");
+
+        // Quem está em campo agora = titulares + quem já entrou − quem já saiu.
+        var escalacao = (await EscalacaoPartidaLoader.CarregarAsync(_db, partida, ct))
+            .Where(l => l.TimeId == request.TimeId)
+            .ToList();
+        var subs = await _db.LigaEventos
+            .AsNoTracking()
+            .Where(e => e.PartidaId == partidaId && e.TimeId == request.TimeId && e.Tipo == TipoEvento.Substituicao)
+            .Select(e => new { e.JogadorId, e.JogadorSaiuId })
+            .ToListAsync(ct);
+        var entraram = subs.Select(s => s.JogadorId).ToHashSet();
+        var sairam = subs.Where(s => s.JogadorSaiuId.HasValue).Select(s => s.JogadorSaiuId!.Value).ToHashSet();
+        var emCampo = escalacao.Where(l => l.Titular).Select(l => l.JogadorId)
+            .Concat(entraram)
+            .Where(id => !sairam.Contains(id))
+            .ToHashSet();
+
+        if (sairam.Contains(request.JogadorId))
+            throw new InvalidOperationException("Este jogador já foi substituído e não pode voltar.");
+        if (emCampo.Contains(request.JogadorId))
+            throw new InvalidOperationException("Este jogador já está em campo.");
+        if (request.JogadorSaiuId is int saiuId)
+        {
+            if (sairam.Contains(saiuId))
+                throw new InvalidOperationException("Este jogador já saiu de campo.");
+            // Sem escalação registrada não dá para conferir quem estava em campo.
+            if (escalacao.Count > 0 && !emCampo.Contains(saiuId))
+                throw new InvalidOperationException("O jogador que saiu não está em campo.");
+        }
+
+        var evento = new LigaEventoPartida
+        {
+            EventoId = Guid.NewGuid(),
+            PartidaId = partidaId,
+            Tipo = TipoEvento.Substituicao,
+            TimeId = request.TimeId,
+            JogadorId = request.JogadorId,
+            JogadorSaiuId = request.JogadorSaiuId,
+            Minuto = request.Minuto,
+            CriadoEm = _time.GetUtcNow().UtcDateTime
+        };
+
+        _db.LigaEventos.Add(evento);
+        await _db.SaveChangesAsync(ct);
+
+        return await GetEventoDtoAsync(evento.EventoId, ct);
+    }
+
+    /// <summary>
+    /// Tira o retrato da escalação ativa (titulares e banco) de cada time ao
+    /// encerrar a partida — os titulares ganham +1 jogo. Só grava na primeira
+    /// vez: reencerrar não sobrescreve o retrato original.
+    /// </summary>
+    private async Task RegistrarEscalacoesAsync(LigaPartida partida, CancellationToken ct)
+    {
+        if (partida.IsWO) return;
+        if (await _db.LigaEscalacoes.AnyAsync(x => x.PartidaId == partida.PartidaId, ct)) return;
+
+        var linhas = await EscalacaoPartidaLoader.EscalacaoAtivaAsync(
+            _db, new[] { partida.TimeCasaId, partida.TimeForaId }, ct);
+
+        _db.LigaEscalacoes.AddRange(linhas.Select(l => new LigaEscalacaoPartida
+        {
+            Id = Guid.NewGuid(),
+            PartidaId = partida.PartidaId,
+            TimeId = l.TimeId,
+            JogadorId = l.JogadorId,
+            Titular = l.Titular,
+            Ordem = l.Ordem
+        }));
+    }
+
     public async Task DeleteEventoAsync(Guid eventoId, CancellationToken ct)
     {
         var evento = await _db.LigaEventos
@@ -798,6 +891,7 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.Time)
             .Include(x => x.Jogador)
             .Include(x => x.Assistente)
+            .Include(x => x.JogadorSaiu)
             .OrderBy(x => x.Minuto)
             .ThenBy(x => x.CriadoEm)
             .ToListAsync(ct);
@@ -1032,6 +1126,7 @@ public class LigaAdminService : ILigaAdminService
         {
             jogo.Partida.Status = PartidaStatus.Encerrada;
             jogo.Partida.EncerradaEm = _time.GetUtcNow().UtcDateTime;
+            await RegistrarEscalacoesAsync(jogo.Partida, ct);
         }
 
         await _db.SaveChangesAsync(ct);
@@ -2227,6 +2322,7 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.Time)
             .Include(x => x.Jogador)
             .Include(x => x.Assistente)
+            .Include(x => x.JogadorSaiu)
             .FirstAsync(x => x.EventoId == eventoId, ct);
 
         return ToEventoDto(ev);
@@ -2270,7 +2366,7 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaEventoDto ToEventoDto(LigaEventoPartida ev) =>
         new(ev.EventoId, ev.PartidaId, ev.Tipo, ev.TimeId, ev.Time?.TeamName ?? "?", ev.JogadorId, ev.Jogador?.Name ?? "?",
-            ev.AssistenteId, ev.Assistente?.Name, ev.Minuto, ev.CriadoEm);
+            ev.AssistenteId, ev.Assistente?.Name, ev.Minuto, ev.CriadoEm, ev.JogadorSaiuId, ev.JogadorSaiu?.Name);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase], j.TimeCasaId, j.TimeCasa?.TeamName,

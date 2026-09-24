@@ -128,7 +128,7 @@ public static class LigaEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
         });
 
-        // Eventos (gols e cartões)
+        // Eventos (gols, cartões e substituições)
         var eventos = admin.MapGroup("/partidas/{partidaId:guid}/eventos");
         eventos.MapGet("", async (Guid partidaId, ILigaAdminService svc, CancellationToken ct) =>
             Results.Ok(await svc.ListEventosAsync(partidaId, ct)));
@@ -140,6 +140,11 @@ public static class LigaEndpoints
         eventos.MapPost("/cartao", async (Guid partidaId, LigaCartaoRequest request, ILigaAdminService svc, CancellationToken ct) =>
         {
             try { return Results.Ok(await svc.AddCartaoAsync(partidaId, request, ct)); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+        eventos.MapPost("/substituicao", async (Guid partidaId, LigaSubstituicaoRequest request, ILigaAdminService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.AddSubstituicaoAsync(partidaId, request, ct)); }
             catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
         });
         eventos.MapDelete("/{eventoId:guid}", async (Guid partidaId, Guid eventoId, ILigaAdminService svc, CancellationToken ct) =>

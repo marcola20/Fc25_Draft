@@ -31,5 +31,10 @@ public class LigaEventoPartidaConfiguration : IEntityTypeConfiguration<LigaEvent
             .WithMany()
             .HasForeignKey(x => x.AssistenteId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        e.HasOne(x => x.JogadorSaiu)
+            .WithMany()
+            .HasForeignKey(x => x.JogadorSaiuId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -115,7 +115,10 @@ public record LigaEventoDto(
     int? AssistenteId,
     string? AssistenteNome,
     int? Minuto,
-    DateTime CriadoEm);
+    DateTime CriadoEm,
+    // Só em substituições: quem saiu (JogadorId/JogadorNome é quem entrou).
+    int? JogadorSaiuId = null,
+    string? JogadorSaiuNome = null);
 
 public record LigaGolRequest(
     [Required] Guid TimeId,
@@ -123,6 +126,36 @@ public record LigaGolRequest(
     int? AssistenteId,
     [Range(1, 120)] int? Minuto,
     bool GolContra = false);
+
+public record LigaSubstituicaoRequest(
+    [Required] Guid TimeId,
+    [Required] int JogadorId,
+    int? JogadorSaiuId,
+    [Range(1, 120)] int? Minuto);
+
+public record PartidaEscalacaoJogadorDto(
+    int JogadorId,
+    string JogadorNome,
+    string Posicao,
+    bool Titular,
+    int Ordem);
+
+public record PartidaEscalacaoTimeDto(
+    Guid TimeId,
+    string TimeNome,
+    // Sem escalação registrada (partida antiga ou time sem escalação ativa).
+    bool Vazia,
+    IReadOnlyList<PartidaEscalacaoJogadorDto> Jogadores);
+
+/// <summary>
+/// Escalações dos dois times numa partida. Encerrada: o retrato gravado no
+/// encerramento; ainda em jogo: a escalação ativa atual de cada time.
+/// </summary>
+public record PartidaEscalacoesDto(
+    Guid PartidaId,
+    PartidaEscalacaoTimeDto Casa,
+    PartidaEscalacaoTimeDto Fora,
+    IReadOnlyList<LigaEventoDto> Eventos);
 
 public record LigaCartaoRequest(
     [Required] Guid TimeId,
@@ -276,7 +309,9 @@ public record ArtilheiroCompetitionDetalheDto(
     string NomeCompeticion,
     TipoCompetition TipoCompeticion,
     int Gols,
-    int Assistencias);
+    int Assistencias,
+    // Null quando a competição é anterior ao contador de jogos.
+    int? Jogos = null);
 
 public record HistoricoAssistenciaDto(
     int JogadorId,
@@ -346,8 +381,11 @@ public record TimeTemporadaJogadorDto(
     string JogadorNome,
     short PositionId,
     string Posicao,
-    // CleanSheets só é preenchido para goleiros, zagueiros e laterais.
+    // CleanSheets só é preenchido para goleiros, zagueiros e laterais, e conta
+    // apenas as partidas sem sofrer gol em que o jogador esteve em campo.
     int? CleanSheets,
+    // Null quando nenhuma competição ativa tem contador de jogos.
+    int? Jogos,
     int Gols,
     int Assistencias,
     int CartoesAmarelos,

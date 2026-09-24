@@ -1,0 +1,135 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@inject EscudoService Escudos
+
+@* Abas "Estatísticas | Escalação" do jogo. Sem Estatisticas, mostra só a escalação. *@
+@if (Dados is null)
+{
+    @Estatisticas
+    return;
+}
+
+@if (Estatisticas is not null)
+{
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_aba == Aba.Estatisticas ? "active" : "")" @onclick="() => _aba = Aba.Estatisticas">Estatísticas</button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_aba == Aba.Escalacao ? "active" : "")" @onclick="() => _aba = Aba.Escalacao">Escalação</button>
+        </li>
+    </ul>
+}
+
+@if (Estatisticas is not null && _aba == Aba.Estatisticas)
+{
+    @Estatisticas
+}
+else
+{
+    <div class="row g-3 escalacoes">
+        @foreach (var time in new[] { Dados.Casa, Dados.Fora })
+        {
+            <div class="col-6">
+                <div class="d-flex align-items-center gap-1 fw-bold mb-2 text-truncate">
+                    <img src="@Escudos.GetEscudo(time.TimeNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" />
+                    <span class="text-truncate">@time.TimeNome</span>
+                </div>
+                @if (time.Vazia)
+                {
+                    <div class="text-muted small">Escalação não registrada.</div>
+                }
+                else
+                {
+                    @Lista("Titulares", time.Jogadores.Where(j => j.Titular))
+                    @Lista("Reservas", time.Jogadores.Where(j => !j.Titular))
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    // Null enquanto carrega: mostra só as estatísticas, sem abas.
+    [Parameter] public PartidaEscalacoesDto? Dados { get; set; }
+
+    /// <summary>Conteúdo da aba "Estatísticas" (gols, cartões…).</summary>
+    [Parameter] public RenderFragment? Estatisticas { get; set; }
+
+    private enum Aba { Estatisticas, Escalacao }
+    private Aba _aba = Aba.Estatisticas;
+
+    private static string Min(int? minuto) => minuto.HasValue ? $" {minuto}'" : "";
+
+    private RenderFragment Lista(string titulo, IEnumerable<PartidaEscalacaoJogadorDto> jogadores) => __builder =>
+    {
+        var lista = jogadores.ToList();
+        if (lista.Count == 0) return;
+
+        <div class="fw-bold mt-2 mb-1">@titulo</div>
+        <ul class="list-unstyled mb-0">
+            @foreach (var j in lista)
+            {
+                <li class="jogador">
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="nome text-truncate">@j.JogadorNome</span>
+                        <span class="lances">@Lances(j.JogadorId)</span>
+                    </div>
+                    @foreach (var sub in Subs(j.JogadorId))
+                    {
+                        <div class="sub small text-muted">@sub</div>
+                    }
+                </li>
+            }
+        </ul>
+    };
+
+    private RenderFragment Lances(int jogadorId) => __builder =>
+    {
+        foreach (var ev in Dados!.Eventos)
+        {
+            if (ev.Tipo == TipoEvento.Gol && ev.JogadorId == jogadorId)
+            {
+                <span title="Gol@(Min(ev.Minuto))">⚽</span>
+            }
+            else if (ev.Tipo == TipoEvento.GolContra && ev.JogadorId == jogadorId)
+            {
+                <span title="Gol contra@(Min(ev.Minuto))">⚽<sup class="text-danger fw-bold">GC</sup></span>
+            }
+            if (ev.Tipo == TipoEvento.Gol && ev.AssistenteId == jogadorId)
+            {
+                <span title="Assistência@(Min(ev.Minuto))">🎯</span>
+            }
+            if (ev.Tipo == TipoEvento.CartaoAmarelo && ev.JogadorId == jogadorId)
+            {
+                <span class="cartao amarelo" title="Cartão amarelo@(Min(ev.Minuto))"></span>
+            }
+            if (ev.Tipo == TipoEvento.CartaoVermelho && ev.JogadorId == jogadorId)
+            {
+                <span class="cartao vermelho" title="Cartão vermelho@(Min(ev.Minuto))"></span>
+            }
+            if (ev.Tipo == TipoEvento.Substituicao && ev.JogadorSaiuId == jogadorId)
+            {
+                <span class="seta-sai" title="Saiu@(Min(ev.Minuto))">▼</span>
+            }
+            if (ev.Tipo == TipoEvento.Substituicao && ev.JogadorId == jogadorId)
+            {
+                <span class="seta-entra" title="Entrou@(Min(ev.Minuto))">▲</span>
+            }
+        }
+    };
+
+    // Linha de apoio "quem entrou / quem saiu" embaixo do nome.
+    private IEnumerable<string> Subs(int jogadorId)
+    {
+        foreach (var ev in Dados!.Eventos.Where(e => e.Tipo == TipoEvento.Substituicao))
+        {
+            if (ev.JogadorSaiuId == jogadorId)
+                yield return $"▼{Min(ev.Minuto)} entrou {ev.JogadorNome}";
+            else if (ev.JogadorId == jogadorId)
+                yield return ev.JogadorSaiuNome is null
+                    ? $"▲{Min(ev.Minuto)} entrou"
+                    : $"▲{Min(ev.Minuto)} no lugar de {ev.JogadorSaiuNome}";
+        }
+    }
+}

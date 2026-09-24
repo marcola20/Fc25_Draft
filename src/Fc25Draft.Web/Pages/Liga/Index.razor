@@ -7,6 +7,7 @@
 @using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
 @inject AdminAuthService AdminAuth
+@inject ILigaAdminService AdminSvc
 @implements IDisposable
 
 <PageTitle>Liga</PageTitle>
@@ -569,11 +570,19 @@
                     <button type="button" class="btn-close" @onclick="FecharDetalhesPartida"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_erroPartida))
+                    {
+                        <div class="alert alert-danger alert-dismissible">@_erroPartida <button class="btn-close" @onclick="() => _erroPartida = null"></button></div>
+                    }
                     @if (_showEditor)
                     {
                         <PartidaStatsEditor PartidaId="_partidaDetalhes.PartidaId" OnChanged="AtualizarAoVivo" />
                     }
-                    else if (_eventoPartida.Any())
+                    else
+                    {
+                    <PartidaEscalacoes Dados="_escalacoesPartida">
+                    <Estatisticas>
+                    @if (_eventoPartida.Any())
                     {
                         var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
                         if (gols.Any())
@@ -584,7 +593,7 @@
                                 {
                                     <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
                                         <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="badge bg-primary">@gol.Minuto'</span>
+                                        @if (gol.Minuto.HasValue) { <span class="badge bg-primary">@gol.Minuto'</span> }
                                         <strong>@gol.JogadorNome</strong>
                                         @if (gol.Tipo == TipoEvento.GolContra)
                                         {
@@ -609,7 +618,7 @@
                                 {
                                     <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
                                         <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span>
+                                        @if (cartao.Minuto.HasValue) { <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span> }
                                         <strong>@cartao.JogadorNome</strong>
                                         <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
                                     </li>
@@ -621,6 +630,9 @@
                     {
                         <div class="text-muted">Nenhum evento registrado.</div>
                     }
+                    </Estatisticas>
+                    </PartidaEscalacoes>
+                    }
                 </div>
                 <div class="modal-footer">
                     @if (_showEditor)
@@ -629,7 +641,23 @@
                     }
                     else if (AdminAuth.IsAdmin)
                     {
-                        <button type="button" class="btn btn-primary me-auto" @onclick="EditarStats">✏️ Editar stats</button>
+                        <div class="me-auto d-flex gap-2 flex-wrap align-items-center">
+                            <button type="button" class="btn btn-primary" @onclick="EditarStats">✏️ Editar stats</button>
+                            @if (_partidaDetalhes.Status == PartidaStatus.Agendada)
+                            {
+                                <button type="button" class="btn btn-success" @onclick="IniciarPartida" disabled="@_salvandoPartida">▶️ Iniciar partida</button>
+                            }
+                            else if (_partidaDetalhes.Status == PartidaStatus.EmAndamento && !_confirmandoEncerrar)
+                            {
+                                <button type="button" class="btn btn-warning" @onclick="() => _confirmandoEncerrar = true">⏹️ Encerrar partida</button>
+                            }
+                            else if (_partidaDetalhes.Status == PartidaStatus.EmAndamento)
+                            {
+                                <span class="small text-muted">Encerrar @_partidaDetalhes.GolsCasa – @_partidaDetalhes.GolsFora?</span>
+                                <button type="button" class="btn btn-warning" @onclick="EncerrarPartida" disabled="@_salvandoPartida">Confirmar</button>
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => _confirmandoEncerrar = false">Cancelar</button>
+                            }
+                        </div>
                     }
                     <button type="button" class="btn btn-secondary" @onclick="FecharDetalhesPartida">Fechar</button>
                 </div>
@@ -689,6 +717,7 @@
     private LigaPartidaDto? _partidaDetalhes;
     private LigaKnockoutJogoDto? _jogoKnockoutAberto;
     private IReadOnlyList<LigaEventoDto> _eventoPartida = Array.Empty<LigaEventoDto>();
+    private PartidaEscalacoesDto? _escalacoesPartida;
 
     private string? _erro;
 
@@ -718,6 +747,37 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private bool _salvandoPartida;
+    private bool _confirmandoEncerrar;
+    private string? _erroPartida;
+
+    private async Task IniciarPartida()
+    {
+        if (_partidaDetalhes is null) return;
+        await AlterarStatusPartida(() => AdminSvc.IniciarPartidaAsync(_partidaDetalhes.PartidaId, CancellationToken.None));
+    }
+
+    private async Task EncerrarPartida()
+    {
+        if (_partidaDetalhes is null) return;
+        // Encerrar grava a escalação de cada time e conta +1 jogo para os titulares.
+        await AlterarStatusPartida(() => AdminSvc.EncerrarPartidaAsync(_partidaDetalhes.PartidaId, CancellationToken.None));
+    }
+
+    private async Task AlterarStatusPartida(Func<Task> acao)
+    {
+        if (!AdminAuth.IsAdmin) return;
+        _salvandoPartida = true; _erroPartida = null;
+        try
+        {
+            await acao();
+            _confirmandoEncerrar = false;
+            await AtualizarAoVivo();
+        }
+        catch (Exception ex) { _erroPartida = ex.Message; }
+        finally { _salvandoPartida = false; }
+    }
+
     private void EditarStats()
     {
         if (_partidaDetalhes is null) return;
@@ -729,6 +789,7 @@
         if (_partidaDetalhes is null) return;
 
         _eventoPartida = await LigaService.GetEventosPartidaAsync(_partidaDetalhes.PartidaId, CancellationToken.None);
+        _escalacoesPartida = await LigaService.GetEscalacoesPartidaAsync(_partidaDetalhes.PartidaId, CancellationToken.None);
 
         // Gols/cartões podem alterar o placar e a classificação: recarrega mantendo a rodada visível.
         var idxAtual = _rodadaIdx;
@@ -832,6 +893,7 @@
         _partidaDetalhes = partida;
         _mostraDetalhesPartida = true;
         _eventoPartida = await LigaService.GetEventosPartidaAsync(partida.PartidaId, CancellationToken.None);
+        _escalacoesPartida = await LigaService.GetEscalacoesPartidaAsync(partida.PartidaId, CancellationToken.None);
         StateHasChanged();
     }
 
@@ -851,9 +913,12 @@
     private void FecharDetalhesPartida()
     {
         _mostraDetalhesPartida = false;
+        _confirmandoEncerrar = false;
+        _erroPartida = null;
         _showEditor = false;
         _partidaDetalhes = null;
         _eventoPartida = Array.Empty<LigaEventoDto>();
+        _escalacoesPartida = null;
     }
 
     // Edições antigas decidiam o título no mata-mata: lá o 1º da fase de pontos é só o líder,

@@ -4,6 +4,7 @@
 @using Fc25Draft.Infra.Data
 @using Microsoft.EntityFrameworkCore
 @inject ILigaAdminService AdminSvc
+@inject ILigaPublicService PublicSvc
 @inject DraftDbContext Db
 
 @if (_partida is null)
@@ -32,8 +33,8 @@ else
 
     <div class="row g-3 mb-4">
         <!-- Registrar Gol -->
-        <div class="col-12 col-md-6">
-            <div class="card">
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card h-100">
                 <div class="card-header fw-bold">⚽ Registrar Gol</div>
                 <div class="card-body">
                     <div class="mb-2">
@@ -81,8 +82,8 @@ else
         </div>
 
         <!-- Registrar Cartão -->
-        <div class="col-12 col-md-6">
-            <div class="card">
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card h-100">
                 <div class="card-header fw-bold">🟨 Registrar Cartão</div>
                 <div class="card-body">
                     <div class="mb-2">
@@ -118,7 +119,74 @@ else
                 </div>
             </div>
         </div>
+
+        <!-- Registrar Substituição -->
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card h-100">
+                <div class="card-header fw-bold">🔁 Registrar Substituição</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-2">
+                        Os titulares da escalação ativa ganham +1 jogo ao encerrar a partida,
+                        e quem entrar por aqui também.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label small">Time</label>
+                        <select class="form-select" @bind="_subTimeId" @bind:after="OnSubTimeChanged">
+                            <option value="">Selecione...</option>
+                            <option value="@_partida.TimeCasaId">@_partida.TimeCasaNome</option>
+                            <option value="@_partida.TimeForaId">@_partida.TimeForaNome</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">▼ Saiu</label>
+                        <select class="form-select" @bind="_subSaiuId">
+                            <option value="">@(_subEmCampo.Count == 0 ? "Sem escalação registrada" : "Selecione...")</option>
+                            @foreach (var j in _subEmCampo)
+                            {
+                                <option value="@j.Id">@j.Nome</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">▲ Entrou</label>
+                        <select class="form-select" @bind="_subJogadorId">
+                            <option value="">Selecione...</option>
+                            @if (_subBanco.Count > 0)
+                            {
+                                <optgroup label="Banco">
+                                    @foreach (var j in _subBanco)
+                                    {
+                                        <option value="@j.Id">@j.Nome</option>
+                                    }
+                                </optgroup>
+                            }
+                            @if (_subOutros.Count > 0)
+                            {
+                                <optgroup label="@(_subBanco.Count > 0 ? "Outros do elenco" : "Elenco")">
+                                    @foreach (var j in _subOutros)
+                                    {
+                                        <option value="@j.Id">@j.Nome</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Minuto (opcional)</label>
+                        <input type="number" class="form-control" min="1" max="120" @bind="_subMinuto" />
+                    </div>
+                    <button class="btn btn-success btn-sm" @onclick="RegistrarSubstituicao" disabled="@_saving">Registrar Substituição</button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    @if (_escalacoes is not null)
+    {
+        <div class="mb-4">
+            <PartidaEscalacoes Dados="_escalacoes" />
+        </div>
+    }
 
     <!-- Lista de Eventos -->
     <h6 class="mb-2">Eventos da Partida</h6>
@@ -135,7 +203,16 @@ else
                     <span>@EventoIcon(ev.Tipo)</span>
                     @if (ev.Minuto.HasValue) { <span class="badge bg-secondary">@ev.Minuto'</span> }
                     <span class="fw-semibold">@ev.JogadorNome</span>
-                    @if (ev.Tipo == TipoEvento.GolContra)
+                    @if (ev.Tipo == TipoEvento.Substituicao)
+                    {
+                        <span class="badge bg-success">entrou</span>
+                        @if (ev.JogadorSaiuNome is not null)
+                        {
+                            <span class="small">no lugar de <strong>@ev.JogadorSaiuNome</strong></span>
+                        }
+                        <span class="text-muted small">(@ev.TimeNome)</span>
+                    }
+                    else if (ev.Tipo == TipoEvento.GolContra)
                     {
                         <span class="badge bg-danger">contra</span>
                         <span class="text-muted small">(gol para @ev.TimeNome)</span>
@@ -183,6 +260,17 @@ else
     private string? _cartaoJogadorId;
     private int? _cartaoMinuto;
 
+    // Substituição form
+    private string? _subTimeId;
+    private string? _subJogadorId;
+    private string? _subSaiuId;
+    private int? _subMinuto;
+    private List<(int Id, string Nome)> _subEmCampo = new();
+    private List<(int Id, string Nome)> _subBanco = new();
+    private List<(int Id, string Nome)> _subOutros = new();
+
+    private PartidaEscalacoesDto? _escalacoes;
+
     protected override async Task OnParametersSetAsync()
     {
         if (_partida is null || _partidaIdCarregada != PartidaId)
@@ -197,6 +285,7 @@ else
     {
         _partida = await AdminSvc.GetPartidaByIdAsync(PartidaId, CancellationToken.None);
         _eventos = await AdminSvc.ListEventosAsync(PartidaId, CancellationToken.None);
+        _escalacoes = await PublicSvc.GetEscalacoesPartidaAsync(PartidaId, CancellationToken.None);
     }
 
     private async Task OnGolTimeChanged()
@@ -230,6 +319,47 @@ else
             _jogadoresDoTimeCartao = await GetJogadoresDoTime(tid);
         else
             _jogadoresDoTimeCartao = new();
+    }
+
+    private async Task OnSubTimeChanged()
+    {
+        _subJogadorId = null; _subSaiuId = null;
+        await AtualizarListasSub();
+    }
+
+    // Em campo = titulares + quem já entrou − quem já saiu. Só pode sair quem está
+    // em campo; pode entrar quem nunca esteve (banco primeiro, depois o resto do elenco).
+    private async Task AtualizarListasSub()
+    {
+        _subEmCampo = new(); _subBanco = new(); _subOutros = new();
+        if (!Guid.TryParse(_subTimeId, out var tid) || _escalacoes is null) return;
+
+        var escalacao = tid == _escalacoes.Casa.TimeId ? _escalacoes.Casa : _escalacoes.Fora;
+        var subs = _escalacoes.Eventos.Where(e => e.Tipo == TipoEvento.Substituicao && e.TimeId == tid).ToList();
+        var sairam = subs.Where(s => s.JogadorSaiuId.HasValue).Select(s => s.JogadorSaiuId!.Value).ToHashSet();
+
+        var nomes = escalacao.Jogadores.ToDictionary(j => j.JogadorId, j => j.JogadorNome);
+        foreach (var s in subs) nomes[s.JogadorId] = s.JogadorNome;
+
+        var emCampoIds = escalacao.Jogadores.Where(j => j.Titular).Select(j => j.JogadorId)
+            .Concat(subs.Select(s => s.JogadorId))
+            .Where(id => !sairam.Contains(id))
+            .Distinct()
+            .ToList();
+        _subEmCampo = emCampoIds.Select(id => (id, nomes[id])).ToList();
+
+        var jaJogaram = emCampoIds.Concat(sairam).ToHashSet();
+        _subBanco = escalacao.Jogadores
+            .Where(j => !j.Titular && !jaJogaram.Contains(j.JogadorId))
+            .Select(j => (j.JogadorId, j.JogadorNome))
+            .ToList();
+
+        var noBanco = _subBanco.Select(j => j.Id).ToHashSet();
+        _subOutros = (await GetJogadoresDoTime(tid))
+            .Where(p => !jaJogaram.Contains(p.PlayerId) && !noBanco.Contains(p.PlayerId)
+                        && !escalacao.Jogadores.Any(j => j.JogadorId == p.PlayerId))
+            .Select(p => (p.PlayerId, p.Name))
+            .ToList();
     }
 
     private async Task<List<PlayerListItemDto>> GetJogadoresDoTime(Guid teamId)
@@ -282,6 +412,26 @@ else
         finally { _saving = false; }
     }
 
+    private async Task RegistrarSubstituicao()
+    {
+        if (!Guid.TryParse(_subTimeId, out var timeId)) { _erro = "Selecione o time."; return; }
+        if (!int.TryParse(_subJogadorId, out var jogId)) { _erro = "Selecione o jogador que entrou."; return; }
+        int? saiuId = int.TryParse(_subSaiuId, out var s) ? s : null;
+        if (saiuId is null && _subEmCampo.Count > 0) { _erro = "Selecione o jogador que saiu."; return; }
+        _saving = true;
+        try
+        {
+            await AdminSvc.AddSubstituicaoAsync(PartidaId, new LigaSubstituicaoRequest(timeId, jogId, saiuId, _subMinuto), CancellationToken.None);
+            // Mantém o time selecionado: é comum lançar várias trocas do mesmo lado.
+            _ok = "Substituição registrada!"; _subJogadorId = null; _subSaiuId = null; _subMinuto = null;
+            await CarregarPartida();
+            await AtualizarListasSub();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
     private async Task DeletarEvento(Guid eventoId)
     {
         _saving = true;
@@ -302,6 +452,7 @@ else
         TipoEvento.GolContra => "⚽",
         TipoEvento.CartaoAmarelo => "🟨",
         TipoEvento.CartaoVermelho => "🟥",
+        TipoEvento.Substituicao => "🔁",
         _ => "•"
     };
 }

@@ -50,7 +50,11 @@
                 {
                     <div class="text-muted">Partida ainda não iniciada.</div>
                 }
-                else if (_eventos.Any())
+                else
+                {
+                <PartidaEscalacoes Dados="_escalacoes">
+                <Estatisticas>
+                @if (_eventos.Any())
                 {
                     var gols = _eventos.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
                     if (gols.Any())
@@ -61,7 +65,7 @@
                             {
                                 <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
                                     <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                    <span class="badge bg-primary">@gol.Minuto'</span>
+                                    @if (gol.Minuto.HasValue) { <span class="badge bg-primary">@gol.Minuto'</span> }
                                     <strong>@gol.JogadorNome</strong>
                                     @if (gol.Tipo == TipoEvento.GolContra)
                                     {
@@ -86,7 +90,7 @@
                             {
                                 <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
                                     <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                    <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span>
+                                    @if (cartao.Minuto.HasValue) { <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span> }
                                     <strong>@cartao.JogadorNome</strong>
                                     <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
                                 </li>
@@ -97,6 +101,9 @@
                 else
                 {
                     <div class="text-muted">Nenhum evento registrado.</div>
+                }
+                </Estatisticas>
+                </PartidaEscalacoes>
                 }
             </div>
             <div class="modal-footer">
@@ -141,6 +148,7 @@
 
     private LigaKnockoutJogoDto? _jogoCarregado;
     private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();
+    private PartidaEscalacoesDto? _escalacoes;
     private bool _showEditor;
     private bool _encerrando;
     private bool _temPenaltis;
@@ -162,6 +170,9 @@
         _eventos = Jogo.PartidaId is Guid pid
             ? await LigaService.GetEventosPartidaAsync(pid, CancellationToken.None)
             : Array.Empty<LigaEventoDto>();
+        _escalacoes = Jogo.PartidaId is Guid id
+            ? await LigaService.GetEscalacoesPartidaAsync(id, CancellationToken.None)
+            : null;
     }
 
     private async Task CriarPartida()

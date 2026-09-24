@@ -22,4 +22,5 @@ public class LigaPartida
     public Team TimeFora { get; set; } = null!;
     public Team? PenaltisVencedor { get; set; }
     public ICollection<LigaEventoPartida> Eventos { get; set; } = new List<LigaEventoPartida>();
+    public ICollection<LigaEscalacaoPartida> Escalacoes { get; set; } = new List<LigaEscalacaoPartida>();
 }

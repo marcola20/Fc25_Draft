@@ -123,8 +123,9 @@ else
     <h4 class="mb-1">Elenco atual na temporada</h4>
     <p class="text-muted small">
         Números somados das competições ativas, contando só o que foi feito por este time.
-        Clean sheets são as @_dados.CleanSheets partidas sem sofrer gol
-        (de @_dados.JogosEncerrados encerradas) e aparecem para goleiros, zagueiros e laterais.
+        O time ficou @_dados.CleanSheets partidas sem sofrer gol (de @_dados.JogosEncerrados encerradas);
+        o clean sheet aparece para goleiros, zagueiros e laterais e só conta para quem esteve em campo.
+        Jogos (J) contam os titulares da escalação ativa ao encerrar cada partida e quem entrou por substituição.
     </p>
 
     @if (_dados.Jogadores.Count == 0)
@@ -146,6 +147,9 @@ else
                         <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" title="Clean sheets" @onclick='() => SetSort("cs")'>
                             🧤 CS @SortIcon("cs")
                         </th>
+                        <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" title="Jogos" @onclick='() => SetSort("jogos")'>
+                            J @SortIcon("jogos")
+                        </th>
                         <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
                             ⚽ Gols @SortIcon("gols")
                         </th>
@@ -166,6 +170,7 @@ else
                             <td>@j.JogadorNome</td>
                             <td class="text-muted small">@j.Posicao</td>
                             <td class="text-center">@(j.CleanSheets?.ToString() ?? "—")</td>
+                            <td class="text-center">@(j.Jogos?.ToString() ?? "-")</td>
                             <td class="text-center fw-bold">@(j.Gols > 0 ? j.Gols.ToString() : "—")</td>
                             <td class="text-center">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "—")</td>
                             <td class="text-center fw-bold">@(j.Gols + j.Assistencias)</td>
@@ -196,6 +201,7 @@ else
     {
         "nome" => Ordenar(j => j.JogadorNome),
         "cs" => Ordenar(j => j.CleanSheets ?? -1),
+        "jogos" => Ordenar(j => j.Jogos ?? -1),
         "gols" => Ordenar(j => j.Gols),
         "assistencias" => Ordenar(j => j.Assistencias),
         "ga" => Ordenar(j => j.Gols + j.Assistencias),

@@ -88,6 +88,7 @@
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Competição</th>
+                                                            <th class="text-center" style="width:70px;" title="Jogos">J</th>
                                                             <th class="text-center" style="width:70px;">⚽</th>
                                                             <th class="text-center" style="width:70px;">Assist.</th>
                                                             <th class="text-center" style="width:70px;">G/A</th>
@@ -102,6 +103,7 @@
                                                                     <br />
                                                                     <small class="text-muted">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
                                                                 </td>
+                                                                <td class="text-center">@(comp.Jogos?.ToString() ?? "-")</td>
                                                                 <td class="text-center fw-bold">@comp.Gols</td>
                                                                 <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
                                                                 <td class="text-center fw-bold">@(comp.Gols + comp.Assistencias)</td>

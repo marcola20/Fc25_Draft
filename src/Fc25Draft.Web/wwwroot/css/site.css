@@ -251,3 +251,58 @@ a, .btn-link {
         color: #0D1B2A;
     }
 
+
+
+/* Escalação da partida (Components/Liga/PartidaEscalacoes.razor) */
+.escalacoes {
+    font-size: 0.875rem;
+}
+
+.escalacoes .jogador {
+    padding: 0.2rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.escalacoes .nome {
+    min-width: 0;
+}
+
+.escalacoes .lances {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    white-space: nowrap;
+}
+
+.escalacoes .cartao {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.85rem;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.escalacoes .cartao.amarelo {
+    background: #f7c600;
+}
+
+.escalacoes .cartao.vermelho {
+    background: #d62828;
+}
+
+.escalacoes .seta-sai {
+    color: #d62828;
+    font-size: 0.75rem;
+}
+
+.escalacoes .seta-entra {
+    color: #198754;
+    font-size: 0.75rem;
+}
+
+.escalacoes .sub {
+    padding-left: 0;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}

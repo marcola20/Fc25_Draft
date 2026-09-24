@@ -35,6 +35,7 @@ public interface ILigaAdminService
     // Eventos
     Task<LigaEventoDto> AddGolAsync(Guid partidaId, LigaGolRequest request, CancellationToken ct);
     Task<LigaEventoDto> AddCartaoAsync(Guid partidaId, LigaCartaoRequest request, CancellationToken ct);
+    Task<LigaEventoDto> AddSubstituicaoAsync(Guid partidaId, LigaSubstituicaoRequest request, CancellationToken ct);
     Task DeleteEventoAsync(Guid eventoId, CancellationToken ct);
     Task<IReadOnlyList<LigaEventoDto>> ListEventosAsync(Guid partidaId, CancellationToken ct);
 
