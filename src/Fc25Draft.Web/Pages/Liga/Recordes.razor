@@ -1,0 +1,287 @@
+@page "/liga/recordes"
+@using Fc25Draft.Core.Utilities
+@inject ILigaPublicService LigaService
+@inject EscudoService EscudoService
+
+<PageTitle>Recordes</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar os recordes:</strong> @_erro</div>
+    }
+    else if (_r is not null)
+    {
+        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+            <h1 class="h3 mb-0">📜 Recordes</h1>
+            <a href="/ranking-clubes" class="btn btn-sm btn-outline-secondary">📊 Ranking de Clubes</a>
+            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary">🏆 Hall of Fame</a>
+        </div>
+        <p class="text-muted small mb-4">
+            Todas as temporadas e competições, atualizado a cada jogo encerrado. Campanhas, ataques e defesas
+            contam só a fase de pontos das ligas já encerradas, em média por jogo (edições têm tamanhos diferentes).
+        </p>
+
+        <div class="row g-4">
+            <div class="col-12 col-xl-6">
+                <h5>💥 Maiores goleadas</h5>
+                @Jogos(_r.MaioresGoleadas, "Nenhum jogo com 3 ou mais gols de diferença.")
+            </div>
+            <div class="col-12 col-xl-6">
+                <h5>🎆 Jogos com mais gols</h5>
+                @Jogos(_r.JogosComMaisGols, "Nenhum gol ainda.")
+            </div>
+
+            <div class="col-12 col-md-6">
+                <h5>🔥 Mais vitórias seguidas</h5>
+                @Sequencias(_r.SequenciasDeVitorias)
+            </div>
+            <div class="col-12 col-md-6">
+                <h5>🛡️ Maior invencibilidade</h5>
+                @Sequencias(_r.Invencibilidades)
+            </div>
+
+            <div class="col-12">
+                <h5>🏅 Melhores campanhas</h5>
+                @if (_r.MelhoresCampanhas.Count == 0)
+                {
+                    <p class="text-muted">Nenhuma liga encerrada ainda.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle text-center" style="font-size: 0.875rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th class="text-start">Time</th>
+                                    <th class="text-start">Competição</th>
+                                    <th title="Aproveitamento">%</th>
+                                    <th>Pts</th>
+                                    <th>J</th>
+                                    <th>V</th>
+                                    <th>E</th>
+                                    <th>D</th>
+                                    <th>GP</th>
+                                    <th>GC</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ var i = 0; }
+                                @foreach (var c in _r.MelhoresCampanhas)
+                                {
+                                    i++;
+                                    <tr>
+                                        <td class="fw-bold">@i</td>
+                                        <td class="text-start">@Time(c.TimeId, c.TimeNome)</td>
+                                        <td class="text-start text-muted">@c.Competicao</td>
+                                        <td class="fw-bold">@c.Aproveitamento.ToString("0")%</td>
+                                        <td>@c.Pontos</td>
+                                        <td>@c.Jogos</td>
+                                        <td>@c.Vitorias</td>
+                                        <td>@c.Empates</td>
+                                        <td>@c.Derrotas</td>
+                                        <td>@c.GolsPro</td>
+                                        <td>@c.GolsContra</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="col-12 col-md-6">
+                <h5>⚔️ Melhores ataques</h5>
+                @Campanhas(_r.MelhoresAtaques, c => $"{c.GolsPro} gols em {c.Jogos} jogos", c => c.GolsProPorJogo)
+            </div>
+            <div class="col-12 col-md-6">
+                <h5>🧱 Melhores defesas</h5>
+                @Campanhas(_r.MelhoresDefesas, c => $"{c.GolsContra} sofridos em {c.Jogos} jogos", c => c.GolsContraPorJogo)
+            </div>
+
+            <div class="col-12 col-md-6 col-xl-4">
+                <h5>⚽ Artilheiros históricos</h5>
+                @Jogadores(_r.Artilheiros, "gols")
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
+                <h5>🅰️ Garçons históricos</h5>
+                @Jogadores(_r.Garcons, "assist.")
+            </div>
+            <div class="col-12 col-xl-4">
+                <h5>🎯 Mais gols numa edição</h5>
+                @if (_r.MaisGolsNumaEdicao.Count == 0)
+                {
+                    <p class="text-muted">Nenhum gol ainda.</p>
+                }
+                else
+                {
+                    <ol class="list-group list-group-numbered">
+                        @foreach (var j in _r.MaisGolsNumaEdicao)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <a href="/players/details/@j.JogadorId" class="fw-semibold text-primary">@j.Nome</a>
+                                    <div class="small text-muted">@j.TimeNome · @j.Competicao</div>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">@j.Gols</span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
+
+            <div class="col-12">
+                <h5>🎩 Hat-tricks <span class="badge bg-secondary">@_r.Hattricks.Count</span></h5>
+                @if (_r.Hattricks.Count == 0)
+                {
+                    <p class="text-muted">Ninguém fez 3 gols num jogo ainda.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle" style="font-size: 0.875rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Jogador</th>
+                                    <th class="text-center">Gols</th>
+                                    <th>Jogo</th>
+                                    <th>Competição</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in _r.Hattricks)
+                                {
+                                    <tr>
+                                        <td>
+                                            <a href="/players/details/@h.JogadorId" class="fw-semibold text-primary">@h.Nome</a>
+                                            <span class="text-muted small">(@h.TimeNome)</span>
+                                        </td>
+                                        <td class="text-center fw-bold">@h.Gols</td>
+                                        <td>@h.GolsPro x @h.GolsContra vs @h.AdversarioNome</td>
+                                        <td class="text-muted">@h.Competicao · @h.Etapa</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _erro;
+    private RecordesLigaDto? _r;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _r = await LigaService.GetRecordesAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RenderFragment Time(Guid id, string nome) => __builder =>
+    {
+        <img src="@EscudoService.GetEscudo(nome)" alt="" width="20" height="20" class="me-1" style="object-fit: contain;" />
+        <a href="/teams/details/@id" class="text-primary">@nome</a>
+    };
+
+    private RenderFragment Jogos(IReadOnlyList<RecordeJogoDto> jogos, string vazio) => __builder =>
+    {
+        if (jogos.Count == 0)
+        {
+            <p class="text-muted">@vazio</p>
+            return;
+        }
+
+        <ul class="list-group">
+            @foreach (var j in jogos)
+            {
+                <li class="list-group-item">
+                    <div class="d-flex align-items-center">
+                        <div class="text-end" style="flex: 1;">@Time(j.CasaId, j.CasaNome)</div>
+                        <div class="fw-bold fs-5 mx-3 text-nowrap">@j.GolsCasa x @j.GolsFora</div>
+                        <div style="flex: 1;">@Time(j.ForaId, j.ForaNome)</div>
+                    </div>
+                    <div class="small text-muted text-center">@j.Competicao · @j.Etapa</div>
+                </li>
+            }
+        </ul>
+    };
+
+    private RenderFragment Sequencias(IReadOnlyList<RecordeSequenciaDto> itens) => __builder =>
+    {
+        if (itens.Count == 0)
+        {
+            <p class="text-muted">Nenhuma sequência ainda.</p>
+            return;
+        }
+
+        <ol class="list-group list-group-numbered">
+            @foreach (var s in itens)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="ms-2 me-auto">@Time(s.TimeId, s.TimeNome)</div>
+                    <span class="badge bg-success rounded-pill">@s.Jogos jogos</span>
+                </li>
+            }
+        </ol>
+    };
+
+    private RenderFragment Campanhas(IReadOnlyList<RecordeCampanhaDto> itens, Func<RecordeCampanhaDto, string> detalhe, Func<RecordeCampanhaDto, double> media) => __builder =>
+    {
+        if (itens.Count == 0)
+        {
+            <p class="text-muted">Nenhuma liga encerrada ainda.</p>
+            return;
+        }
+
+        <ol class="list-group list-group-numbered">
+            @foreach (var c in itens)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div class="ms-2 me-auto">
+                        @Time(c.TimeId, c.TimeNome)
+                        <div class="small text-muted">@c.Competicao · @detalhe(c)</div>
+                    </div>
+                    <span class="badge bg-primary rounded-pill" title="Por jogo">@media(c).ToString("0.00")/jogo</span>
+                </li>
+            }
+        </ol>
+    };
+
+    private RenderFragment Jogadores(IReadOnlyList<RecordeJogadorDto> itens, string unidade) => __builder =>
+    {
+        if (itens.Count == 0)
+        {
+            <p class="text-muted">Nada registrado ainda.</p>
+            return;
+        }
+
+        <ol class="list-group list-group-numbered">
+            @foreach (var j in itens)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="/players/details/@j.JogadorId" class="ms-2 me-auto text-primary">@j.Nome</a>
+                    <span class="badge bg-primary rounded-pill">@j.Valor @unidade</span>
+                </li>
+            }
+        </ol>
+    };
+}

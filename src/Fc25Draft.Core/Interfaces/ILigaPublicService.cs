@@ -1,4 +1,5 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Core.Interfaces;
 
@@ -36,6 +37,9 @@ public interface ILigaPublicService
 
     /// <summary>Jogos do time em todas as competições: forma, sequências, recordes, próximos jogos e confrontos.</summary>
     Task<TimePerfilDto> GetPerfilTimeAsync(Guid timeId, CancellationToken ct);
+
+    /// <summary>Recordes de todas as temporadas: jogos, sequências, campanhas e jogadores.</summary>
+    Task<RecordesLigaDto> GetRecordesAsync(CancellationToken ct);
 
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);

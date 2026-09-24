@@ -1028,8 +1028,44 @@ public class LigaPublicService : ILigaPublicService
         var nomes = await _db.Teams.AsNoTracking()
             .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
 
-        var partidas = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.TimeCasaId == timeId || p.TimeForaId == timeId)
+        return TimePerfil.Calcular(timeId, await CarregarPartidasPerfilAsync(timeId, ct), nomes);
+    }
+
+    public async Task<RecordesLigaDto> GetRecordesAsync(CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var partidas = await CarregarPartidasPerfilAsync(null, ct);
+
+        var gols = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Tipo == TipoEvento.Gol)
+            .Select(e => new RecordeGolInput(
+                e.PartidaId, e.Partida.Rodada.LigaId, e.Partida.Rodada.Liga.Nome, e.TimeId,
+                e.JogadorId, e.Jogador.Name, e.AssistenteId, e.Assistente != null ? e.Assistente.Name : null))
+            .ToListAsync(ct);
+
+        // Campanha = tabela final da fase de pontos das ligas já encerradas.
+        var campanhas = await _db.LigaClassificacoes.AsNoTracking()
+            .Where(c => c.Liga.Tipo == TipoCompetition.Liga && c.Liga.Status == LigaStatus.Encerrada && c.Grupo == null)
+            .Select(c => new RecordeCampanhaInput(
+                c.TimeId, c.Liga.Nome, c.Pontos, c.Jogos, c.Vitorias, c.Empates, c.Derrotas, c.GolsPro, c.GolsContra))
+            .ToListAsync(ct);
+
+        return RecordesLiga.Calcular(partidas, gols, campanhas, nomes);
+    }
+
+    /// <summary>
+    /// Partidas no formato do perfil (com competição e etapa já rotuladas). Com <paramref name="timeId"/>,
+    /// só as daquele time; sem, todas.
+    /// </summary>
+    private async Task<List<TimePerfilPartidaInput>> CarregarPartidasPerfilAsync(Guid? timeId, CancellationToken ct)
+    {
+        var query = _db.LigaPartidas.AsNoTracking();
+        if (timeId is Guid id)
+            query = query.Where(p => p.TimeCasaId == id || p.TimeForaId == id);
+
+        var partidas = await query
             .Select(p => new
             {
                 p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.Status,
@@ -1040,10 +1076,13 @@ public class LigaPublicService : ILigaPublicService
             })
             .ToListAsync(ct);
 
-        var partidaIds = partidas.Select(p => p.PartidaId).ToList();
-        var fases = await _db.LigaKnockoutJogos.AsNoTracking()
-            .Where(k => k.PartidaId != null && partidaIds.Contains(k.PartidaId.Value))
-            .ToDictionaryAsync(k => k.PartidaId!.Value, k => k.Fase, ct);
+        var partidaIds = partidas.Select(p => p.PartidaId).ToHashSet();
+        var fases = (await _db.LigaKnockoutJogos.AsNoTracking()
+                .Where(k => k.PartidaId != null)
+                .Select(k => new { PartidaId = k.PartidaId!.Value, k.Fase })
+                .ToListAsync(ct))
+            .Where(k => partidaIds.Contains(k.PartidaId))
+            .ToDictionary(k => k.PartidaId, k => k.Fase);
 
         // Agenda: competição criada antes vem primeiro; dentro dela, a ordem das rodadas.
         var ordemLiga = partidas
@@ -1053,7 +1092,7 @@ public class LigaPublicService : ILigaPublicService
             .Select((l, i) => (l.LigaId, Indice: i))
             .ToDictionary(l => l.LigaId, l => l.Indice);
 
-        var inputs = partidas
+        return partidas
             // Jogo pendente de competição já encerrada não vai acontecer.
             .Where(p => p.Status == PartidaStatus.Encerrada || p.LigaStatus != LigaStatus.Encerrada)
             .Select(p => new TimePerfilPartidaInput(
@@ -1069,9 +1108,8 @@ public class LigaPublicService : ILigaPublicService
                 p.TemPenaltis,
                 p.PenaltisVencedorId,
                 p.EncerradaEm,
-                ordemLiga[p.LigaId] * 10_000L + p.Numero));
-
-        return TimePerfil.Calcular(timeId, inputs, nomes);
+                ordemLiga[p.LigaId] * 10_000L + p.Numero))
+            .ToList();
     }
 
     private static string EtapaLabel(TipoCompetition tipo, int rodada, bool desempate, FaseKnockout? fase) => fase switch
