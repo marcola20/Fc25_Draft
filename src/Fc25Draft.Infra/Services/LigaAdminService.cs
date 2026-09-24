@@ -1187,25 +1187,30 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.Criada)
             throw new InvalidOperationException("Grupos só podem ser configurados antes de iniciar a copa.");
 
-        if (request.TimesGrupoA.Count < 2 || request.TimesGrupoB.Count < 2)
-            throw new InvalidOperationException("Cada grupo precisa de pelo menos 2 times (os 2 primeiros vão ao mata-mata).");
+        var porGrupo = request.GrupoPorTime
+            .GroupBy(x => x.Value)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Key).ToList());
 
-        var todos = request.TimesGrupoA.Concat(request.TimesGrupoB).ToList();
-        if (todos.Distinct().Count() != todos.Count)
-            throw new InvalidOperationException("Times repetidos entre os grupos.");
+        // O mata-mata só existe com 2 grupos (semis) ou 4 (quartas).
+        if (porGrupo.Count is not (2 or 4))
+            throw new InvalidOperationException("A Copa precisa de 2 grupos (A e B) ou 4 (A, B, C e D).");
+
+        if (porGrupo.Count == 2 && !(porGrupo.ContainsKey(GrupoCopa.A) && porGrupo.ContainsKey(GrupoCopa.B)))
+            throw new InvalidOperationException("Com 2 grupos, use os grupos A e B.");
+
+        if (porGrupo.Values.Any(t => t.Count < 2))
+            throw new InvalidOperationException("Cada grupo precisa de pelo menos 2 times (os 2 primeiros vão ao mata-mata).");
 
         // Remove grupos anteriores
         var existentes = await _db.LigaGruposTimes.Where(x => x.LigaId == ligaId).ToListAsync(ct);
         _db.LigaGruposTimes.RemoveRange(existentes);
 
-        foreach (var timeId in request.TimesGrupoA)
-            _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.A });
+        foreach (var (timeId, grupo) in request.GrupoPorTime)
+            _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = grupo });
 
-        foreach (var timeId in request.TimesGrupoB)
-            _db.LigaGruposTimes.Add(new LigaGrupoTime { Id = Guid.NewGuid(), LigaId = ligaId, TimeId = timeId, Grupo = GrupoCopa.B });
-
-        // Round-robin dentro do grupo: rodadas = tamanho do maior grupo - 1.
-        liga.TotalRodadas = Math.Max(request.TimesGrupoA.Count, request.TimesGrupoB.Count) - 1;
+        // Round-robin do maior grupo, igual ao sorteio (grupo ímpar tem folga).
+        var maior = porGrupo.Values.Max(t => t.Count);
+        liga.TotalRodadas = maior % 2 == 0 ? maior - 1 : maior;
         liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
 
         await _db.SaveChangesAsync(ct);

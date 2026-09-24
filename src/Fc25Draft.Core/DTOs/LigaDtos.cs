@@ -211,9 +211,8 @@ public record LigaCopaSorteioDto(
 
 public record LigaCopaPotesRequest(IReadOnlyDictionary<Guid, int> PotePorTime);
 
-public record LigaConfigurarGruposRequest(
-    IReadOnlyList<Guid> TimesGrupoA,
-    IReadOnlyList<Guid> TimesGrupoB);
+/// <summary>Grupo de cada time inscrito na Copa (quem não aparece fica fora).</summary>
+public record LigaConfigurarGruposRequest(IReadOnlyDictionary<Guid, GrupoCopa> GrupoPorTime);
 
 public record LigaPunicaoDto(
     Guid PunicaoId,

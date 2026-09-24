@@ -86,7 +86,7 @@
                             <label class="form-label">Tipo</label>
                             <select class="form-select" @bind="_formTipo" disabled="@_editandoLigaId.HasValue">
                                 <option value="@TipoCompetition.Liga">Liga (pontos corridos)</option>
-                                <option value="@TipoCompetition.Copa">Copa (grupos A e B)</option>
+                                <option value="@TipoCompetition.Copa">Copa (grupos + mata-mata)</option>
                             </select>
                         </div>
                         <div class="row g-2 mb-2">
@@ -385,15 +385,18 @@
     @if (_tab == "grupos" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
     {
         <div class="alert alert-secondary py-2 small">
+            Use <strong>2 grupos</strong> (A e B, mata-mata a partir da semi) ou <strong>4</strong> (A a D, a partir das quartas).
             Os grupos podem ter <strong>qualquer tamanho</strong> (mínimo 2 em cada, porque os 2 primeiros de cada grupo vão ao mata-mata).
-            Cada time enfrenta <strong>todos os do outro grupo</strong>: o número de rodadas é o tamanho do maior grupo, e quem sobrar folga na rodada.
+            Os jogos são <strong>dentro do grupo</strong>, todos contra todos; grupo com número ímpar de times tem uma folga por rodada.
         </div>
 
         <div class="card">
             <div class="card-header d-flex flex-wrap align-items-center gap-2">
                 <span class="fw-bold">Times da Copa</span>
-                <span class="badge bg-primary">Grupo A: @_grupoPorTime.Count(x => x.Value == GrupoCopa.A)</span>
-                <span class="badge bg-info text-dark">Grupo B: @_grupoPorTime.Count(x => x.Value == GrupoCopa.B)</span>
+                @foreach (var grupo in Enum.GetValues<GrupoCopa>())
+                {
+                    <span class="badge bg-primary">Grupo @grupo: @_grupoPorTime.Count(x => x.Value == grupo)</span>
+                }
                 <span class="badge bg-light text-dark border">Rodadas: @RodadasDaCopa</span>
             </div>
             <div class="table-responsive">
@@ -409,8 +412,10 @@
                                             value="@(_grupoPorTime.TryGetValue(timeId, out var g) && g is not null ? g.ToString() : "")"
                                             @onchange="e => DefinirGrupo(timeId, e.Value?.ToString())">
                                         <option value="">Fora da Copa</option>
-                                        <option value="@GrupoCopa.A">Grupo A</option>
-                                        <option value="@GrupoCopa.B">Grupo B</option>
+                                        @foreach (var grupo in Enum.GetValues<GrupoCopa>())
+                                        {
+                                            <option value="@grupo">Grupo @grupo</option>
+                                        }
                                     </select>
                                 </td>
                             </tr>
@@ -426,9 +431,9 @@
         @if (_grupos.Any())
         {
             <div class="row g-3 mt-3">
-                @foreach (var grupo in new[] { GrupoCopa.A, GrupoCopa.B })
+                @foreach (var grupo in _grupos.Select(x => x.Grupo).Distinct().OrderBy(g => g))
                 {
-                    <div class="col-12 col-md-6">
+                    <div class="col-12 col-md-6 col-xl-3">
                         <div class="card">
                             <div class="card-header fw-bold">Grupo @grupo configurado</div>
                             <ul class="list-group list-group-flush">
@@ -992,9 +997,15 @@
     private void DefinirPote(Guid timeId, string? valor) =>
         _potePorTime[timeId] = int.TryParse(valor, out var pote) ? pote : 0;
 
-    private int RodadasDaCopa => Math.Max(
-        _grupoPorTime.Count(x => x.Value == GrupoCopa.A),
-        _grupoPorTime.Count(x => x.Value == GrupoCopa.B));
+    // Round-robin do maior grupo (grupo ímpar tem folga), igual ao backend.
+    private int RodadasDaCopa
+    {
+        get
+        {
+            var maior = _grupoPorTime.Values.Where(g => g is not null).GroupBy(g => g).Select(g => g.Count()).DefaultIfEmpty(0).Max();
+            return maior < 2 ? 0 : maior % 2 == 0 ? maior - 1 : maior;
+        }
+    }
 
     private void DefinirGrupo(Guid timeId, string? valor) =>
         _grupoPorTime[timeId] = Enum.TryParse<GrupoCopa>(valor, out var grupo) ? grupo : null;
@@ -1505,14 +1516,15 @@
 
     private async Task SalvarGrupos()
     {
-        var a = _grupoPorTime.Where(x => x.Value == GrupoCopa.A).Select(x => x.Key).ToList();
-        var b = _grupoPorTime.Where(x => x.Value == GrupoCopa.B).Select(x => x.Key).ToList();
-        if (a.Count < 2 || b.Count < 2) { _erro = "Cada grupo precisa de pelo menos 2 times."; return; }
+        var grupoPorTime = _grupoPorTime
+            .Where(x => x.Value is not null)
+            .ToDictionary(x => x.Key, x => x.Value!.Value);
         _saving = true;
         try
         {
-            await AdminSvc.ConfigurarGruposCopaAsync(_ligaAtual!.LigaId, new LigaConfigurarGruposRequest(a, b), CancellationToken.None);
-            _ok = $"Grupos configurados: {a.Count} x {b.Count} times, {Math.Max(a.Count, b.Count)} rodadas.";
+            await AdminSvc.ConfigurarGruposCopaAsync(_ligaAtual!.LigaId, new LigaConfigurarGruposRequest(grupoPorTime), CancellationToken.None);
+            var tamanhos = grupoPorTime.GroupBy(x => x.Value).OrderBy(g => g.Key).Select(g => $"{g.Key}: {g.Count()}");
+            _ok = $"Grupos configurados ({string.Join(", ", tamanhos)}), {RodadasDaCopa} rodadas.";
             await CarregarDados();
         }
         catch (Exception ex) { _erro = ex.Message; }
