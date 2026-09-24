@@ -29,6 +29,23 @@ namespace Fc25Draft.Web.Extensions.DI
             return services;
         }
 
+        /// <summary>
+        /// Registra um serviço que usa o banco com uma conexão (DbContext) só dele, criada pela fábrica.
+        /// </summary>
+        /// <remarks>
+        /// No Blazor Server o <see cref="DraftDbContext"/> scoped é um só para a sessão inteira do navegador:
+        /// dois componentes consultando ao mesmo tempo quebravam ("A second operation was started on this
+        /// context") e dados rastreados ficavam velhos. Transient: cada componente que injeta o serviço ganha
+        /// a sua instância, com a sua conexão. O contexto não é descartado pelo container, mas o EF abre e
+        /// fecha a conexão a cada operação, então nada fica preso; ele vai embora junto com o componente.
+        /// Só para serviços que não precisam dividir transação com outro serviço.
+        /// </remarks>
+        public static IServiceCollection AddComConexaoPropria<TService, TImpl>(this IServiceCollection services)
+            where TService : class
+            where TImpl : class, TService
+            => services.AddTransient<TService>(sp => ActivatorUtilities.CreateInstance<TImpl>(
+                sp, sp.GetRequiredService<IDbContextFactory<DraftDbContext>>().CreateDbContext()));
+
         private static string ResolveConnectionStringFrom(IConfiguration cfg, IHostEnvironment env)
         {
             var raw = Environment.GetEnvironmentVariable("DATABASE_URL")

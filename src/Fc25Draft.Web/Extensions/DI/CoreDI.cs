@@ -20,17 +20,19 @@ namespace Fc25Draft.Web.Extensions.DI
             services.Configure<EconomiaOptions>(cfg.GetSection(EconomiaOptions.SectionName));
 
             // Core/Infra
+            // AddComConexaoPropria: serviços usados direto pelas páginas, cada um com a sua conexão
+            // (ver InfraDI). Os que dividem transação com outro serviço continuam AddScoped.
             services.AddScoped<DraftService>();
             services.AddScoped<DraftStateService>();
             services.AddScoped<DraftExpansaoService>();
             services.AddScoped<DraftAutoPickService>();
             services.AddScoped<DraftAdminService>();
-            services.AddScoped<ITeamService, TeamService>();
+            services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
-            services.AddScoped<IPositionService, PositionService>();
+            services.AddComConexaoPropria<IPositionService, PositionService>();
             services.AddScoped<IPricingService, PricingService>();
-            services.AddScoped<IPricingConfigService, PricingConfigService>();
-            services.AddScoped<ITransferConfigService, TransferConfigService>();
+            services.AddComConexaoPropria<IPricingConfigService, PricingConfigService>();
+            services.AddComConexaoPropria<ITransferConfigService, TransferConfigService>();
             services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
             services.AddScoped<IMarketCycleAdminService, MarketCycleAdminService>();
             services.AddScoped<IMarketCycleService, MarketCycleService>();
@@ -48,12 +50,12 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITeamLineupService, TeamLineupService>();
             services.AddScoped<ITransferOfferService, TransferOfferService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
-            services.AddScoped<ILigaPublicService, LigaPublicService>();
-            services.AddScoped<ITermometroMercadoService, TermometroMercadoService>();
+            services.AddComConexaoPropria<ILigaPublicService, LigaPublicService>();
+            services.AddComConexaoPropria<ITermometroMercadoService, TermometroMercadoService>();
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
-            services.AddScoped<IPremiacaoService, PremiacaoService>();
-            services.AddScoped<IRegulamentoService, RegulamentoService>();
-            services.AddScoped<IHallOfFameService, HallOfFameService>();
+            services.AddComConexaoPropria<IPremiacaoService, PremiacaoService>();
+            services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();
+            services.AddComConexaoPropria<IHallOfFameService, HallOfFameService>();
             services.AddScoped<IDraftWishlistService, DraftWishlistService>();
             services.AddSingleton<LotteryStateService>();
             services.AddSingleton<CopaSorteioAoVivoService>();
