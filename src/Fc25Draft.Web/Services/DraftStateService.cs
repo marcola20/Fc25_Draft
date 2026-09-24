@@ -154,7 +154,47 @@ public class DraftStateService
         }
 
         var query = await ConsultaDisponiveisAsync(draft, limitarARodadaAtual ? currentRoundNumber : null, ct);
+        return await FiltrarEListarAsync(query, positionIds, searchTerm, overallMinFilter, overallMaxFilter, ct);
+    }
 
+    /// <summary>
+    /// Jogadores livres (sem time), para as listas do próximo draft: ele ainda não existe, então vale
+    /// o pool de um draft normal, não o do draft em andamento (que pode ser de expansão).
+    /// </summary>
+    public async Task<IReadOnlyList<AvailablePlayerDto>> BuscarLivresAsync(
+        IReadOnlyCollection<short>? positionIds,
+        string? searchTerm,
+        int? overallMinFilter,
+        int? overallMaxFilter,
+        CancellationToken ct = default)
+        => await FiltrarEListarAsync(Livres(), positionIds, searchTerm, overallMinFilter, overallMaxFilter, ct);
+
+    /// <summary>Dos jogadores informados, os que continuam sem time.</summary>
+    public async Task<HashSet<int>> FiltrarLivresAsync(IReadOnlyCollection<int> playerIds, CancellationToken ct = default)
+    {
+        if (playerIds.Count == 0)
+        {
+            return new HashSet<int>();
+        }
+
+        var ids = await Livres()
+            .Where(p => playerIds.Contains(p.PlayerId))
+            .Select(p => p.PlayerId)
+            .ToListAsync(ct);
+
+        return ids.ToHashSet();
+    }
+
+    private IQueryable<Player> Livres() => _db.Players.AsNoTracking().Where(p => !p.TeamRosters.Any());
+
+    private static async Task<IReadOnlyList<AvailablePlayerDto>> FiltrarEListarAsync(
+        IQueryable<Player> query,
+        IReadOnlyCollection<short>? positionIds,
+        string? searchTerm,
+        int? overallMinFilter,
+        int? overallMaxFilter,
+        CancellationToken ct)
+    {
         if (positionIds is { Count: > 0 })
         {
             // List, não array: com C# 14 o array.Contains vira o overload de Span, que o EF 8 não traduz.
@@ -205,10 +245,9 @@ public class DraftStateService
     /// <summary>Jogadores escolhíveis no draft; com <paramref name="roundNumber"/>, só os do overall permitido na rodada.</summary>
     private async Task<IQueryable<Player>> ConsultaDisponiveisAsync(Draft draft, int? roundNumber, CancellationToken ct)
     {
-        var query = _db.Players.AsNoTracking();
-        query = draft.Tipo == DraftTipo.Expansao
-            ? await _expansao.FiltrarDisponiveisAsync(query, draft, ct)
-            : query.Where(p => !p.TeamRosters.Any());
+        var query = draft.Tipo == DraftTipo.Expansao
+            ? await _expansao.FiltrarDisponiveisAsync(_db.Players.AsNoTracking(), draft, ct)
+            : Livres();
 
         if (roundNumber is null)
         {

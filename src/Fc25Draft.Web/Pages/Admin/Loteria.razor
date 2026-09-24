@@ -11,6 +11,10 @@
 @inject IDbContextFactory<DraftDbContext> DbFactory
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject DraftService DraftSvc
+@inject DraftStateService DraftStateSvc
+@inject DraftAutoPickService AutoPickSvc
+@inject IJSRuntime JS
 
 <PageTitle>Loteria do Draft — Admin</PageTitle>
 
@@ -30,6 +34,14 @@
         <div class="alert alert-success alert-dismissible">
             @_ok
             <button type="button" class="btn-close" @onclick='() => _ok = null'></button>
+        </div>
+    }
+    @if (_escolhasIniciais?.Selection is { } selecao)
+    {
+        <div class="alert alert-info">
+            <div class="fw-semibold mb-1">🤖 Escolhas automáticas feitas na abertura do draft</div>
+            <div style="white-space: pre-line;">@selecao.Mensagem</div>
+            <button type="button" class="btn btn-success btn-sm mt-2" @onclick="CompartilharEscolhasAsync">Compartilhar no WhatsApp</button>
         </div>
     }
 
@@ -292,6 +304,7 @@
     private int? _r1OverallMax;
     private int? _r2OverallMin;
     private int? _r2OverallMax;
+    private DraftPickResultDto? _escolhasIniciais;
 
     protected override async Task OnInitializedAsync()
     {
@@ -299,6 +312,33 @@
         LotteryService.OnChange += HandleChange;
         try { _ligas = await AdminSvc.ListAsync(CancellationToken.None); }
         catch (Exception ex) { _erro = ex.Message; }
+
+        await PreencherComPlanoAsync();
+    }
+
+    // O overall de cada round vem do planejamento do próximo draft (o mesmo que os times usaram
+    // para montar a escolha automática). Dá para mudar antes de gerar.
+    private async Task PreencherComPlanoAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var plano = await db.DraftPlanejadoRodadas.AsNoTracking().ToDictionaryAsync(r => r.RoundNumber);
+            if (plano.TryGetValue(1, out var r1))
+            {
+                _r1OverallMin ??= r1.OverallMin;
+                _r1OverallMax ??= r1.OverallMax;
+            }
+            if (plano.TryGetValue(2, out var r2))
+            {
+                _r2OverallMin ??= r2.OverallMin;
+                _r2OverallMax ??= r2.OverallMax;
+            }
+        }
+        catch
+        {
+            // Sem planejamento os campos só ficam vazios.
+        }
     }
 
     private async void HandleChange() => await InvokeAsync(StateHasChanged);
@@ -569,9 +609,12 @@
 
         if (r1.Count == 0) { _erro = "Nenhuma pick do Round 1 encontrada."; return; }
 
-        _carregando = true; _erro = null; _ok = null;
+        _carregando = true; _erro = null; _ok = null; _escolhasIniciais = null;
         try
         {
+            // Só um draft por vez: o atual (ex.: o complementar da expansão) precisa terminar antes.
+            await DraftSvc.EnsureNoDraftInProgressAsync();
+
             await using var Db = await DbFactory.CreateDbContextAsync();
 
             int totalTeams = r1.Count;
@@ -628,9 +671,26 @@
             await Db.SaveChangesAsync(CancellationToken.None);
 
             _ok = $"Draft \"{draft.Name}\" criado com sucesso! {draft.Picks.Count} picks geradas.";
+
+            // Listas montadas para o próximo draft entram agora e já escolhem por quem abre o draft.
+            await AutoPickSvc.AplicarPreviasAsync(draft.DraftId);
+            _escolhasIniciais = await DraftStateSvc.ProcessarAutomaticasAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
+    }
+
+    private async Task CompartilharEscolhasAsync()
+    {
+        if (_escolhasIniciais?.Selection is not { } selecao) return;
+        try
+        {
+            await JS.InvokeAsync<string>("fc25Share.openWhatsapp", selecao.ShareUrl, selecao.WhatsappGroupLink, selecao.Mensagem);
+        }
+        catch (JSException ex)
+        {
+            _erro = $"Não foi possível abrir o WhatsApp: {ex.Message}";
+        }
     }
 
     private static string EscudoUrl(string teamName)

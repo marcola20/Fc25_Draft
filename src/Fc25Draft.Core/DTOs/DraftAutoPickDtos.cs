@@ -7,6 +7,7 @@ namespace Fc25Draft.Core.DTOs;
 /// <summary>Uma rodada em que o time ainda vai escolher, com a posição marcada (modo posição).</summary>
 public record DraftAutoPickRodadaStatusDto(
     int Round,
+    // Zero no próximo draft: a ordem só existe quando o draft é gerado.
     int OverallPick,
     int? OverallMin,
     int? OverallMax,
@@ -31,7 +32,9 @@ public record DraftAutoPickDto(
     bool Ativo,
     DateTime? AtualizadoEm,
     IReadOnlyList<DraftAutoPickRodadaStatusDto> MinhasRodadas,
-    IReadOnlyList<DraftAutoPickJogadorDto> Jogadores);
+    IReadOnlyList<DraftAutoPickJogadorDto> Jogadores,
+    // true = lista para o próximo draft (ainda não criado); as rodadas vêm do planejamento do admin.
+    bool ProximoDraft = false);
 
 public record DraftAutoPickRodadaDto(int Round, short PositionId);
 
@@ -46,3 +49,9 @@ public record DraftAutoPickSaveRequestDto(
 
 /// <summary>Resultado de salvar: se já era a vez do time, as escolhas automáticas feitas em seguida.</summary>
 public record DraftAutoPickSaveResultDto(DraftAutoPickDto Config, DraftPickResultDto? Escolhas);
+
+/// <summary>Rodada do próximo draft, planejada pelo admin.</summary>
+public record DraftPlanoRodadaDto(int Round, int? OverallMin, int? OverallMax);
+
+/// <summary>Draft gerado e, se já começou com escolhas automáticas, a sequência feita.</summary>
+public record GenerateDraftResultDto(DraftStateDto State, DraftPickResultDto? Escolhas);

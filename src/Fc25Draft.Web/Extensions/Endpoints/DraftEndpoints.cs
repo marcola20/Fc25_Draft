@@ -167,6 +167,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             adminDraftProtectedApi.MapPost("/generate", async (
                 DraftService draftService,
                 DraftStateService draftStateService,
+                DraftAutoPickService autoPickService,
                 IHubContext<DraftHub> hubContext,
                 GenerateDraftRequestDto request,
                 CancellationToken ct) =>
@@ -195,10 +196,15 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         roundRules = rules;
                     }
 
-                    await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct);
-                    var state = await draftStateService.GetStateAsync(ct);
+                    var draft = await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct);
+
+                    // Listas montadas antes do draft existir: entram agora e já escolhem por quem abre o draft.
+                    await autoPickService.AplicarPreviasAsync(draft.DraftId, ct);
+                    var escolhas = await draftStateService.ProcessarAutomaticasAsync(ct);
+
+                    var state = escolhas?.State ?? await draftStateService.GetStateAsync(ct);
                     await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
-                    return Results.Ok(state);
+                    return Results.Ok(new GenerateDraftResultDto(state, escolhas));
                 }
                 catch (ArgumentException ex)
                 {

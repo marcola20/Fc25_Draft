@@ -8,6 +8,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.JSInterop
 @inject DraftStateService DraftStateService
+@inject DraftAutoPickService AutoPickService
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
 @inject ILogger<Fc25Draft.Web.Pages.Draft> Logger
@@ -319,11 +320,23 @@
             return;
         }
 
+        // Se o próximo draft foi planejado (para as listas da escolha automática), ele já vem preenchido.
+        IReadOnlyList<DraftPlanoRodadaDto> plano;
+        try
+        {
+            plano = await AutoPickService.GetPlanoAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Não foi possível carregar o planejamento do próximo draft.");
+            plano = Array.Empty<DraftPlanoRodadaDto>();
+        }
+
         string? roundsInput;
 
         try
         {
-            roundsInput = await JSRuntime.InvokeAsync<string?>("prompt", "Quantas rodadas o draft deve ter?", "19");
+            roundsInput = await JSRuntime.InvokeAsync<string?>("prompt", "Quantas rodadas o draft deve ter?", plano.Count > 0 ? plano.Count.ToString() : "19");
         }
         catch (JSException ex)
         {
@@ -358,10 +371,11 @@
         {
             string? minInput;
             string? maxInput;
+            var planejada = plano.FirstOrDefault(r => r.Round == round);
 
             try
             {
-                minInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall mínimo para a rodada {round}:");
+                minInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall mínimo para a rodada {round}:", planejada is null ? "" : (planejada.OverallMin ?? 0).ToString());
             }
             catch (JSException ex)
             {
@@ -385,7 +399,7 @@
 
             try
             {
-                maxInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall máximo para a rodada {round}:");
+                maxInput = await JSRuntime.InvokeAsync<string?>("prompt", $"Informe o overall máximo para a rodada {round}:", planejada is null ? "" : (planejada.OverallMax ?? 150).ToString());
             }
             catch (JSException ex)
             {
@@ -429,9 +443,12 @@
             if (response.IsSuccessStatusCode)
             {
                 DraftStateDto? updatedState = null;
+                DraftPickResultDto? escolhasIniciais = null;
                 try
                 {
-                    updatedState = await response.Content.ReadFromJsonAsync<DraftStateDto>();
+                    var resultado = await response.Content.ReadFromJsonAsync<GenerateDraftResultDto>();
+                    updatedState = resultado?.State;
+                    escolhasIniciais = resultado?.Escolhas;
                 }
                 catch (Exception ex)
                 {
@@ -444,6 +461,15 @@
                     statusCss = "alert-success";
                     var responseName = string.IsNullOrWhiteSpace(updatedState.DraftName) ? draftName : updatedState.DraftName;
                     statusMessage = $"{responseName} gerado com {updatedState.TotalRounds} rodadas!";
+                }
+
+                // Times com lista para o próximo draft já escolheram: a mensagem vai para o WhatsApp.
+                if (escolhasIniciais?.Selection is { } selecao)
+                {
+                    state = escolhasIniciais.State;
+                    lastSelection = selecao;
+                    shareFeedback = null;
+                    statusMessage += $"\n\n🤖 Escolhas automáticas feitas na abertura:\n{selecao.Mensagem}";
                 }
                 else
                 {

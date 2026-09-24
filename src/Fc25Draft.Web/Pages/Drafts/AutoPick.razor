@@ -49,6 +49,23 @@
     </div>
 }
 
+@if (authInitialized && AdminAuth.IsAdmin)
+{
+    <AutoPickPlanoAdmin OnSalvo="RecarregarDepoisDoPlanoAsync" />
+}
+
+@if (config is { ProximoDraft: true })
+{
+    <div class="alert alert-primary">
+        <div class="fw-semibold mb-1">📅 Lista para o próximo draft</div>
+        <div class="small">
+            Seu time não está no draft em andamento, então esta lista vale para o próximo.
+            Rodadas planejadas: <strong>@string.Join(" · ", config.MinhasRodadas.Select(r => $"Rodada {r.Round}: {FaixaOverall(r.OverallMin, r.OverallMax)}"))</strong>.
+            Quando o draft for gerado, a lista entra em ação na hora: se for a sua vez, o site já escolhe por você.
+        </div>
+    </div>
+}
+
 <div class="row g-4">
     <div class="col-lg-4 order-lg-2">
         <div class="card shadow-sm sticky-lg-top" style="top: 1rem;">
@@ -126,6 +143,10 @@
                         <p class="small text-muted">
                             Uma lista só, em ordem de prioridade. Ela vale para todas as suas próximas escolhas até acabar.
                         </p>
+                        @if (RegraPorRodada is { } regra)
+                        {
+                            <p class="small alert alert-warning py-2 px-2">@regra</p>
+                        }
                         <AutoPickLista Itens="@listaJogadores" Editavel="@(!isSaving)" OnSubir="i => Mover(listaJogadores, i, -1)" OnDescer="i => Mover(listaJogadores, i, 1)" OnRemover="id => Remover(listaJogadores, id)" />
                     }
                     else if (listaAtiva is short posAtiva)
@@ -173,7 +194,10 @@
                             <thead>
                                 <tr>
                                     <th class="ps-3">Rodada</th>
-                                    <th>Escolha geral</th>
+                                    @if (!config.ProximoDraft)
+                                    {
+                                        <th>Escolha geral</th>
+                                    }
                                     <th>Overall permitido</th>
                                     <th class="pe-3">Posição</th>
                                 </tr>
@@ -185,7 +209,10 @@
                                     posicaoPorRodada.TryGetValue(round, out var posSelecionada);
                                     <tr>
                                         <td class="ps-3">@round</td>
-                                        <td>@rodada.OverallPick</td>
+                                        @if (!config.ProximoDraft)
+                                        {
+                                            <td>@rodada.OverallPick</td>
+                                        }
                                         <td>@FaixaOverall(rodada.OverallMin, rodada.OverallMax)</td>
                                         <td class="pe-3">
                                             <select class="form-select form-select-sm" value="@(posSelecionada?.ToString() ?? "")" disabled="@isSaving"
@@ -383,6 +410,35 @@
         }
     }
 
+    /// <summary>
+    /// Modo jogador com rodadas de overall diferentes: explica que em cada rodada vale o primeiro da
+    /// lista dentro do limite dela (ex.: na rodada 2, até 84, o primeiro livre com overall até 84).
+    /// </summary>
+    private string? RegraPorRodada
+    {
+        get
+        {
+            if (config is null || config.MinhasRodadas.Count < 2)
+                return null;
+
+            var faixas = config.MinhasRodadas.Select(r => (r.OverallMin, r.OverallMax)).Distinct().ToList();
+            if (faixas.Count < 2)
+                return null;
+
+            var detalhes = config.MinhasRodadas
+                .Select(r => $"rodada {r.Round}: o primeiro da lista ainda livre com overall {FaixaOverall(r.OverallMin, r.OverallMax)}");
+            return $"As rodadas têm overall diferente. Em cada uma vale o primeiro da lista dentro do limite dela, pulando quem não cabe: {string.Join("; ", detalhes)}.";
+        }
+    }
+
+    private async Task RecarregarDepoisDoPlanoAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(EffectiveToken))
+        {
+            await LoadConfigAsync();
+        }
+    }
+
     private static int? MaiorOuNulo(int? a, int? b) => a is null ? b : b is null ? a : Math.Max(a.Value, b.Value);
 
     private static int? MenorOuNulo(int? a, int? b) => a is null ? b : b is null ? a : Math.Min(a.Value, b.Value);
@@ -404,7 +460,7 @@
     {
         try
         {
-            positions.AddRange(await PositionService.GetAllAsync());
+            await UmPorVezAsync(async () => positions.AddRange(await PositionService.GetAllAsync()));
         }
         catch (Exception ex)
         {
@@ -431,7 +487,30 @@
         StateHasChanged();
     }
 
-    private async Task LoadConfigAsync()
+    // No Blazor Server a página toda divide a mesma conexão com o banco: duas cargas ao mesmo tempo
+    // (ex.: a página abrindo e o time entrando pelo cabeçalho) quebram. Aqui elas entram na fila.
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
+    private async Task UmPorVezAsync(Func<Task> acao)
+    {
+        await _umaPorVez.WaitAsync();
+        try
+        {
+            await acao();
+        }
+        finally
+        {
+            _umaPorVez.Release();
+        }
+    }
+
+    private Task LoadConfigAsync() => UmPorVezAsync(CarregarConfigAsync);
+
+    private Task LoadPlayersAsync() => UmPorVezAsync(CarregarJogadoresAsync);
+
+    private Task SalvarAsync() => UmPorVezAsync(SalvarSemTravaAsync);
+
+    private async Task CarregarConfigAsync()
     {
         var token = EffectiveToken;
         if (string.IsNullOrWhiteSpace(token))
@@ -446,7 +525,7 @@
         try
         {
             Aplicar(await AutoPickService.GetAsync(token));
-            await LoadPlayersAsync();
+            await CarregarJogadoresAsync();
         }
         catch (InvalidOperationException ex)
         {
@@ -546,7 +625,7 @@
         await LoadPlayersAsync();
     }
 
-    private async Task LoadPlayersAsync()
+    private async Task CarregarJogadoresAsync()
     {
         players.Clear();
 
@@ -568,12 +647,13 @@
                 ? new[] { pos }
                 : currentFilter.PositionIds;
 
-            players.AddRange(await DraftStateService.BuscarDisponiveisAsync(
-                posicoes,
-                currentFilter.SearchTerm,
-                MaiorOuNulo(currentFilter.OverallMin, FaixaPermitida.Min),
-                MenorOuNulo(currentFilter.OverallMax, FaixaPermitida.Max),
-                limitarARodadaAtual: false));
+            var min = MaiorOuNulo(currentFilter.OverallMin, FaixaPermitida.Min);
+            var max = MenorOuNulo(currentFilter.OverallMax, FaixaPermitida.Max);
+
+            // Próximo draft: ele ainda não existe, o pool é o de jogadores livres.
+            players.AddRange(config.ProximoDraft
+                ? await DraftStateService.BuscarLivresAsync(posicoes, currentFilter.SearchTerm, min, max)
+                : await DraftStateService.BuscarDisponiveisAsync(posicoes, currentFilter.SearchTerm, min, max, limitarARodadaAtual: false));
         }
         catch (Exception ex)
         {
@@ -615,7 +695,7 @@
         (lista[index], lista[target]) = (lista[target], lista[index]);
     }
 
-    private async Task SalvarAsync()
+    private async Task SalvarSemTravaAsync()
     {
         var token = EffectiveToken;
         if (string.IsNullOrWhiteSpace(token))
@@ -650,7 +730,7 @@
             successMessage = ativo
                 ? "✅ Escolha automática salva e ligada."
                 : "✅ Lista salva. A escolha automática está desligada.";
-            await LoadPlayersAsync();
+            await CarregarJogadoresAsync();
         }
         catch (InvalidOperationException ex)
         {
@@ -723,5 +803,6 @@
     public void Dispose()
     {
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+        _umaPorVez.Dispose();
     }
 }

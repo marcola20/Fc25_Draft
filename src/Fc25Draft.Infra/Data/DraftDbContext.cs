@@ -19,6 +19,10 @@ public class DraftDbContext : DbContext
     public DbSet<DraftAutoPick> DraftAutoPicks => Set<DraftAutoPick>();
     public DbSet<DraftAutoPickRodada> DraftAutoPickRodadas => Set<DraftAutoPickRodada>();
     public DbSet<DraftAutoPickItem> DraftAutoPickItens => Set<DraftAutoPickItem>();
+    public DbSet<DraftPlanejadoRodada> DraftPlanejadoRodadas => Set<DraftPlanejadoRodada>();
+    public DbSet<DraftAutoPickPrevia> DraftAutoPickPrevias => Set<DraftAutoPickPrevia>();
+    public DbSet<DraftAutoPickPreviaRodada> DraftAutoPickPreviaRodadas => Set<DraftAutoPickPreviaRodada>();
+    public DbSet<DraftAutoPickPreviaItem> DraftAutoPickPreviaItens => Set<DraftAutoPickPreviaItem>();
     public DbSet<LigaCopaPote> LigaCopaPotes => Set<LigaCopaPote>();
     public DbSet<Premiacao> Premiacoes => Set<Premiacao>();
     public DbSet<Regulamento> Regulamentos => Set<Regulamento>();
