@@ -4,6 +4,7 @@
 @inject PlayersApiClient PlayersApiClient
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
+@inject IMinhaAreaService MinhaArea
 
 @implements IDisposable
 
@@ -63,6 +64,14 @@ else
 
     <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-outline-primary">⚖️ Comparar com outro jogador</a>
 
+    @if (_podeObservar)
+    {
+        <button type="button" class="btn @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
+                title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
+            @(_observando ? "★ Observando" : "☆ Observar")
+        </button>
+    }
+
     <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
 }
 
@@ -81,6 +90,29 @@ else
     }
 
     private int? _carregadoId;
+    private bool _podeObservar;
+    private bool _observando;
+
+    // Observar é do time: só aparece para quem entrou com o token de um time.
+    private async Task CarregarObservacaoAsync()
+    {
+        await AdminAuth.EnsureInitializedAsync();
+        var token = AdminAuth.IsAuthenticated ? AdminAuth.Token : null;
+        _podeObservar = await MinhaArea.ResolverTimeAsync(token, CancellationToken.None) is not null;
+        _observando = _podeObservar && await MinhaArea.EstaObservandoAsync(token, Id, CancellationToken.None);
+    }
+
+    private async Task AlternarObservacaoAsync()
+    {
+        try
+        {
+            _observando = await MinhaArea.AlternarObservacaoAsync(AdminAuth.Token, Id, CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
 
     // Recarrega quando o Id muda (o Blazor reaproveita a página ao navegar entre jogadores).
     protected override async Task OnParametersSetAsync()
@@ -92,6 +124,7 @@ else
 
         _carregadoId = Id;
         await LoadPlayerAsync();
+        await CarregarObservacaoAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -136,7 +169,12 @@ else
             return;
         }
 
-        InvokeAsync(StateHasChanged);
+        // Entrou ou saiu um time: o botão de observar depende de quem está logado.
+        _ = InvokeAsync(async () =>
+        {
+            await CarregarObservacaoAsync();
+            StateHasChanged();
+        });
     }
 
     public void Dispose()

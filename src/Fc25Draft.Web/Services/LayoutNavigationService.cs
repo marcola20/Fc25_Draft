@@ -12,7 +12,8 @@ public class LayoutNavigationService
         new("Início", new List<MenuItem>
         {
             new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true),
-            new("Plantão CBFV", "/plantao", "oi oi-bullhorn")
+            new("Plantão CBFV", "/plantao", "oi oi-bullhorn"),
+            new("Minha Área", "/minha-area", "oi oi-person")
         }),
         new("Times", new List<MenuItem>
         {
@@ -372,6 +373,17 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Recordes")
+            }
+        },
+        ["/minha-area"] = new PageDefinition
+        {
+            Route = "/minha-area",
+            Title = "Minha Área",
+            Subtitle = "Tudo do seu time num lugar só",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Minha Área")
             }
         },
         ["/plantao"] = new PageDefinition

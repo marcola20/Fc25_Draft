@@ -1,0 +1,340 @@
+@page "/minha-area"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Web.Utilities
+@inject IMinhaAreaService MinhaAreaSvc
+@inject ILigaPublicService LigaService
+@inject AdminAuthService AdminAuth
+@inject EscudoService Escudos
+@implements IDisposable
+
+<PageTitle>Minha Área</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1200px;">
+    @if (!_authPronto)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_dados is null)
+    {
+        <div class="card mx-auto" style="max-width: 520px;">
+            <div class="card-body">
+                <h1 class="h4 mb-2">👤 Minha Área</h1>
+                <p class="text-muted small">
+                    Tudo do seu time num lugar só: leilões, propostas, draft, escolha automática e jogadores que você observa.
+                    Entre com o token do time (pelo botão Login no topo) ou cole aqui:
+                </p>
+                <div class="input-group">
+                    <input type="password" class="form-control" placeholder="Token do time" value="@_tokenDigitado"
+                           @oninput="e => _tokenDigitado = e.Value?.ToString() ?? string.Empty" autocomplete="one-time-code" />
+                    <button class="btn btn-primary" disabled="@(_carregando || string.IsNullOrWhiteSpace(_tokenDigitado))" @onclick="CarregarAsync">Entrar</button>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_erro))
+                {
+                    <div class="small text-danger mt-2">@_erro</div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        var d = _dados;
+
+        <div class="card mb-3">
+            <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                <img src="@Escudos.GetEscudo(d.TeamName)" alt="" width="64" height="64" style="object-fit: contain;" />
+                <div class="me-auto">
+                    <h1 class="h3 mb-0">@d.TeamName</h1>
+                    <div class="text-muted small">👤 Minha Área@(string.IsNullOrWhiteSpace(d.OwnerName) ? "" : $" · técnico {d.OwnerName}")</div>
+                </div>
+                <div class="text-center px-3">
+                    <div class="small text-muted">Caixa livre</div>
+                    <div class="fs-5 fw-bold text-success">@Dinheiro.Curto(d.CaixaLivre)</div>
+                    @if (d.CaixaBloqueado > 0)
+                    {
+                        <div class="small text-muted">@Dinheiro.Curto(d.CaixaBloqueado) presos em lances</div>
+                    }
+                </div>
+                <div class="text-center px-3">
+                    <div class="small text-muted">Elenco</div>
+                    <div class="fs-5 fw-bold">@d.Elenco</div>
+                    <div class="small text-muted">jogadores</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="/teams/details/@d.TeamId" class="btn btn-sm btn-outline-primary">Página do time</a>
+                    <a href="/teams/@d.TeamId/lineups" class="btn btn-sm btn-outline-primary">Escalações</a>
+                    <a href="/mercado" class="btn btn-sm btn-outline-primary">Mercado</a>
+                </div>
+            </div>
+        </div>
+
+        <TimeResumoFaixa Perfil="@_perfil" />
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>🔨 Meus leilões</strong>
+                        <a href="/mercado" class="small text-primary">Ir ao mercado →</a>
+                    </div>
+                    @if (d.Leiloes.Count == 0)
+                    {
+                        <div class="card-body text-muted small">Nenhum lance em leilão aberto.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var l in d.Leiloes)
+                            {
+                                <li class="list-group-item @(l.EstouGanhando ? "" : "list-group-item-warning")">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <a href="/players/details/@l.PlayerId" class="fw-semibold text-primary">@l.JogadorNome</a>
+                                            <span class="small text-muted">· @l.Posicao · @l.Overall</span>
+                                            <div class="small">
+                                                Lance atual <strong>@Dinheiro.Curto(l.LanceAtual)</strong>
+                                                @if (!l.EstouGanhando)
+                                                {
+                                                    <span class="text-muted">· seu lance @Dinheiro.Curto(l.MeuMaiorLance) · líder @l.LiderNome</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">@Dinheiro.Prazo(l.TerminaEm)</div>
+                                        </div>
+                                        <span class="badge @(l.EstouGanhando ? "bg-success" : "bg-danger") text-nowrap">@(l.EstouGanhando ? "✅ Ganhando" : "⚠️ Superado")</span>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>🤝 Propostas pendentes</strong>
+                        <a href="/teams/details/@d.TeamId" class="small text-primary">Negociações →</a>
+                    </div>
+                    @if (d.Propostas.Count == 0)
+                    {
+                        <div class="card-body text-muted small">Nenhuma proposta esperando resposta.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var p in d.Propostas)
+                            {
+                                <li class="list-group-item @(p.Recebida ? "list-group-item-info" : "")">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <span class="fw-semibold">@(p.Recebida ? $"De {p.OutroTimeNome}" : $"Para {p.OutroTimeNome}")</span>
+                                            <span class="small text-muted">· @TipoProposta(p.Tipo)@(p.Dinheiro > 0 ? $" · {Dinheiro.Curto(p.Dinheiro)}" : "")</span>
+                                            @if (p.Jogadores.Count > 0)
+                                            {
+                                                <div class="small">@string.Join(", ", p.Jogadores)</div>
+                                            }
+                                            <div class="small text-muted">@p.CriadaEm.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                        </div>
+                                        <span class="badge @(p.Recebida ? "bg-primary" : "bg-secondary") text-nowrap">@(p.Recebida ? "Responder" : "Aguardando")</span>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header"><strong>🏈 Draft</strong></div>
+                    <div class="card-body">
+                        @if (d.Draft is null)
+                        {
+                            <p class="text-muted small mb-2">Nenhum draft em andamento.</p>
+                        }
+                        else if (d.Draft.ProximaRodada is null)
+                        {
+                            <p class="small mb-2">Seu time não tem escolhas no <strong>@d.Draft.DraftNome</strong>.</p>
+                        }
+                        else if (d.Draft.EscolhasAteMinhaVez == 0)
+                        {
+                            <div class="alert alert-success py-2 mb-2">
+                                ⏰ <strong>É a sua vez!</strong> Rodada @d.Draft.ProximaRodada, escolha geral @d.Draft.ProximaEscolhaGeral.
+                                <a href="/draft" class="alert-link ms-1">Escolher agora →</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="small mb-2">
+                                <strong>@d.Draft.DraftNome</strong>: sua próxima escolha é na rodada @d.Draft.ProximaRodada
+                                (geral @d.Draft.ProximaEscolhaGeral). Faltam <strong>@d.Draft.EscolhasAteMinhaVez</strong> escolha(s) até a sua vez.
+                                Você ainda tem @d.Draft.EscolhasRestantes escolha(s) neste draft.
+                            </p>
+                        }
+
+                        @if (d.EscolhaAutomatica is { } a)
+                        {
+                            <div class="small">
+                                🤖 Escolha automática@(a.ProximoDraft ? " (próximo draft)" : ""):
+                                @if (!a.Configurada)
+                                {
+                                    <span class="text-danger">não configurada.</span>
+                                }
+                                else if (!a.Ativa)
+                                {
+                                    <span class="text-muted">desligada.</span>
+                                }
+                                else
+                                {
+                                    <span class="text-success fw-semibold">ligada</span>
+                                    <span>· @(a.Modo == DraftAutoPickModo.Jogador ? "por jogador" : "por posição") · @a.Jogadores jogador(es) na lista.</span>
+                                }
+                                <a href="/draft/automatico" class="text-primary ms-1">@(a.Configurada ? "Editar" : "Montar lista") →</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header"><strong>⭐ Jogadores que observo</strong></div>
+                    <div class="card-body pb-2">
+                        <JogadorBusca Placeholder="Adicionar jogador para observar" OnEscolhido="p => AlternarObservadoAsync(p.PlayerId)" />
+                        <div class="small text-muted mt-1">Quem entrar num leilão aparece no topo, com o lance atual.</div>
+                    </div>
+                    @if (d.Observados.Count > 0)
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var o in d.Observados)
+                            {
+                                var emLeilao = o.LeilaoLanceAtual is not null;
+                                <li class="list-group-item @(emLeilao ? "list-group-item-warning" : "")">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <a href="/players/details/@o.PlayerId" class="fw-semibold text-primary">@o.Nome</a>
+                                            <span class="small text-muted">· @o.Posicao · @o.Overall@(o.Idade is int idade ? $" · {idade} anos" : "")</span>
+                                            @if (emLeilao)
+                                            {
+                                                <div class="small">
+                                                    🔨 <strong>Em leilão agora</strong>: @Dinheiro.Curto(o.LeilaoLanceAtual!.Value)
+                                                    @(o.LeilaoEuLidero ? "· você lidera ✅" : o.LeilaoLiderNome is null ? "· sem lances" : $"· líder {o.LeilaoLiderNome}")
+                                                    · @Dinheiro.Prazo(o.LeilaoTerminaEm!.Value)
+                                                    <a href="/mercado" class="text-primary ms-1">Dar lance →</a>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="small text-muted">@(o.TimeNome is null ? "Livre (sem time)" : $"No {o.TimeNome}")</div>
+                                            }
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Parar de observar" @onclick="() => AlternarObservadoAsync(o.PlayerId)">✕</button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private MinhaAreaDto? _dados;
+    private TimePerfilDto? _perfil;
+    private bool _authPronto;
+    private bool _carregando;
+    private string _tokenDigitado = string.Empty;
+    private string? _erro;
+
+    private string? Token => AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token)
+        ? AdminAuth.Token
+        : string.IsNullOrWhiteSpace(_tokenDigitado) ? null : _tokenDigitado.Trim();
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await AdminAuth.EnsureInitializedAsync();
+        _authPronto = true;
+        if (AdminAuth.IsAuthenticated)
+        {
+            await CarregarAsync();
+        }
+        StateHasChanged();
+    }
+
+    private async Task CarregarAsync()
+    {
+        if (_carregando || Token is null) return;
+
+        _carregando = true;
+        _erro = null;
+        try
+        {
+            _dados = await MinhaAreaSvc.GetAsync(Token, CancellationToken.None);
+            try
+            {
+                _perfil = await LigaService.GetPerfilTimeAsync(_dados.TeamId, CancellationToken.None);
+            }
+            catch
+            {
+                // Forma e próximo jogo são complementares.
+                _perfil = null;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            _dados = null;
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task AlternarObservadoAsync(int playerId)
+    {
+        try
+        {
+            await MinhaAreaSvc.AlternarObservacaoAsync(Token, playerId, CancellationToken.None);
+            _dados = await MinhaAreaSvc.GetAsync(Token, CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private static string TipoProposta(OfferType tipo) => tipo switch
+    {
+        OfferType.Sale => "compra",
+        OfferType.Loan => "empréstimo",
+        OfferType.Swap => "troca",
+        _ => "proposta"
+    };
+
+    private void OnAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            _dados = null;
+            _perfil = null;
+            if (AdminAuth.IsAuthenticated)
+            {
+                await CarregarAsync();
+            }
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= OnAuthChanged;
+}
