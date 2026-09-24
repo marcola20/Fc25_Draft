@@ -1,0 +1,285 @@
+@page "/mercado/termometro"
+@using System.Globalization
+@using Fc25Draft.Core.Extensions
+@using Fc25Draft.Core.Utilities
+@inject ITermometroMercadoService TermometroSvc
+@inject EscudoService Escudos
+
+<PageTitle>Termômetro do Mercado</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <h1 class="h3 mb-0">🌡️ Termômetro do Mercado</h1>
+        @if (_janelas.Count > 0)
+        {
+            <select class="form-select form-select-sm w-auto" value="@(_janela?.ToString() ?? "")" @onchange="TrocarJanelaAsync" disabled="@_loading">
+                @foreach (var j in _janelas)
+                {
+                    <option value="@j.Numero">@j.Nome (@j.Ciclos ciclo@(j.Ciclos == 1 ? "" : "s"))</option>
+                }
+                <option value="">Todas as janelas</option>
+            </select>
+        }
+        <a href="/market/transfers" class="btn btn-sm btn-outline-secondary">📜 Histórico de transferências</a>
+    </div>
+    <p class="text-muted small mb-3">
+        Leilões do mercado e vendas entre times. Uma janela junta os ciclos abertos na mesma época.
+    </p>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar o termômetro:</strong> @_erro</div>
+    }
+    else if (_t is not null && _t.ItensLeiloados == 0 && _t.Transferencias == 0)
+    {
+        <div class="alert alert-info">Nenhuma movimentação neste período.</div>
+    }
+    else if (_t is not null)
+    {
+        <div class="row g-2 mb-4">
+            @Numero("💰 Movimentado", Moeda(_t.Movimentado), $"{_t.Transferencias} contratações")
+            @Numero("🔨 Leilões vendidos", $"{_t.LeiloesVendidos} de {_t.ItensLeiloados}", _t.ItensLeiloados == 0 ? "" : $"{_t.LeiloesVendidos * 100 / _t.ItensLeiloados}% dos jogadores")
+            @Numero("🙋 Lances", _t.Lances.ToString(), _t.ItensLeiloados == 0 ? "" : $"{(double)_t.Lances / _t.ItensLeiloados:0.0} por jogador")
+            @Numero("⚡ Compra imediata", _t.ComprasImediatas.ToString(), "pagaram o valor cheio")
+            @Numero("📈 Ágio médio", _t.AgioMedio is double a ? Agio(a) : "—", "acima do preço base")
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-xl-6">
+                <h5>🔥 Mais disputados</h5>
+                @if (_t.MaisDisputados.Count == 0)
+                {
+                    <p class="text-muted">Nenhum lance no período.</p>
+                }
+                else
+                {
+                    <ul class="list-group">
+                        @foreach (var d in _t.MaisDisputados)
+                        {
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <a href="/players/details/@d.PlayerId" class="fw-semibold text-primary">@d.JogadorNome</a>
+                                        <span class="small text-muted">· @d.Posicao · @d.Overall</span>
+                                        <div class="small text-muted">
+                                            @d.Times time@(d.Times == 1 ? "" : "s") na disputa ·
+                                            @Moeda(d.PrecoBase)
+                                            @if (d.PrecoFinal is decimal final)
+                                            {
+                                                <span class="ms-1">→ <strong class="text-body">@Moeda(final)</strong> (@Agio(d.Agio!.Value))</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="ms-1">· não foi vendido</span>
+                                            }
+                                        </div>
+                                        @if (d.VencedorNome is not null)
+                                        {
+                                            <div class="small">🏆 @d.VencedorNome @(d.CompraImediata ? "· ⚡ compra imediata" : "")</div>
+                                        }
+                                    </div>
+                                    <span class="badge bg-danger rounded-pill text-nowrap">@d.Lances lance@(d.Lances == 1 ? "" : "s")</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            <div class="col-12 col-xl-6">
+                <h5>💸 Maiores contratações</h5>
+                @if (_t.MaioresContratacoes.Count == 0)
+                {
+                    <p class="text-muted">Nenhuma contratação no período.</p>
+                }
+                else
+                {
+                    <ol class="list-group list-group-numbered">
+                        @foreach (var c in _t.MaioresContratacoes)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+                                <div class="ms-2 me-auto">
+                                    <a href="/players/details/@c.PlayerId" class="fw-semibold text-primary">@c.JogadorNome</a>
+                                    <span class="small text-muted">· @c.Posicao</span>
+                                    <div class="small text-muted">
+                                        @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<strong class="text-body">@c.ParaTime</strong> · @c.Data.ToLocalTime().ToString("dd/MM")
+                                    </div>
+                                </div>
+                                <span class="fw-bold text-nowrap">@Moeda(c.Valor)</span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
+        </div>
+
+        <h5>🏦 Times no mercado</h5>
+        <div class="table-responsive mb-4">
+            <table class="table table-sm table-hover align-middle text-center" style="font-size: 0.875rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start">Time</th>
+                        <th title="Contratações pagas (leilão e compra de outro time)">Compras</th>
+                        <th>Gastou</th>
+                        <th title="Vendas para outros times e vendas rápidas">Vendas</th>
+                        <th>Recebeu</th>
+                        <th>Saldo</th>
+                        <th>Lances</th>
+                        <th title="Leilões vencidos">Leilões</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in _t.Times)
+                    {
+                        <tr>
+                            <td class="text-start text-nowrap">
+                                <img src="@Escudos.GetEscudo(t.TimeNome)" alt="" width="20" height="20" class="me-1" style="object-fit: contain;" />
+                                <a href="/teams/details/@t.TimeId" class="text-primary">@t.TimeNome</a>
+                            </td>
+                            <td>@t.Compras</td>
+                            <td class="text-nowrap text-danger">@Moeda(t.Gasto)</td>
+                            <td>@t.Vendas</td>
+                            <td class="text-nowrap text-success">@Moeda(t.Recebido)</td>
+                            <td class="text-nowrap fw-semibold @(t.Saldo >= 0 ? "text-success" : "text-danger")">@(t.Saldo > 0 ? "+" : "")@Moeda(t.Saldo)</td>
+                            <td>@t.Lances</td>
+                            <td>@t.LeiloesVencidos</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-12 col-lg-6">
+                <h5>🤑 Pechinchas</h5>
+                <p class="text-muted small mb-2">Leilões que saíram mais perto do preço base.</p>
+                @if (_t.Pechinchas.Count == 0)
+                {
+                    <p class="text-muted">Nenhum leilão vendido no período.</p>
+                }
+                else
+                {
+                    <ul class="list-group">
+                        @foreach (var p in _t.Pechinchas)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+                                <div>
+                                    <a href="/players/details/@p.PlayerId" class="fw-semibold text-primary">@p.JogadorNome</a>
+                                    <span class="small text-muted">· @p.Posicao · @p.Overall</span>
+                                    <div class="small text-muted">@Moeda(p.PrecoFinal!.Value) · @p.VencedorNome</div>
+                                </div>
+                                <span class="badge bg-success rounded-pill text-nowrap">@Agio(p.Agio!.Value)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <h5>📊 Gasto por posição</h5>
+                @if (_t.Posicoes.Count == 0)
+                {
+                    <p class="text-muted">Nenhuma contratação no período.</p>
+                }
+                else
+                {
+                    var maior = _t.Posicoes.Max(p => p.Gasto);
+                    @foreach (var p in _t.Posicoes)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>@p.Posicao <span class="text-muted">· @p.Contratacoes</span></span>
+                                <span class="fw-semibold">@Moeda(p.Gasto)</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar" style="width: @((maior == 0 ? 0 : p.Gasto / maior * 100).ToString("0", CultureInfo.InvariantCulture))%;"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<TermometroJanelaDto> _janelas = Array.Empty<TermometroJanelaDto>();
+    private int? _janela;
+    private TermometroMercadoDto? _t;
+    private bool _loading = true;
+    private string? _erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _janelas = await TermometroSvc.ListarJanelasAsync(CancellationToken.None);
+            // Começa pela janela mais recente.
+            _janela = _janelas.Count > 0 ? _janelas[0].Numero : null;
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+            _loading = false;
+        }
+    }
+
+    private async Task TrocarJanelaAsync(ChangeEventArgs e)
+    {
+        _janela = int.TryParse(e.Value?.ToString(), out var n) ? n : null;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _loading = true;
+        _erro = null;
+        try
+        {
+            _t = await TermometroSvc.CalcularAsync(_janela, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Valores do mercado são altos: "R$ 51,3 mi" e "R$ 3,2 bi" leem melhor que o número inteiro.
+    private static string Moeda(decimal valor)
+    {
+        var sinal = valor < 0 ? "-" : "";
+        var abs = Math.Abs(valor);
+        return abs switch
+        {
+            >= 1_000_000_000 => $"{sinal}R$ {(abs / 1_000_000_000).ToString("0.0", Brasil)} bi",
+            >= 1_000_000 => $"{sinal}R$ {(abs / 1_000_000).ToString("0.0", Brasil)} mi",
+            _ => sinal + abs.ToString("C0", Brasil)
+        };
+    }
+
+    private static string Agio(double razao) => $"{(razao - 1) * 100:+0;-0;0}%";
+
+    private static RenderFragment Numero(string rotulo, string valor, string detalhe) => __builder =>
+    {
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">@rotulo</div>
+                    <div class="fs-5 fw-bold">@valor</div>
+                    <div class="small text-muted">@detalhe</div>
+                </div>
+            </div>
+        </div>
+    };
+}

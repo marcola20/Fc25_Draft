@@ -49,6 +49,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITransferOfferService, TransferOfferService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
             services.AddScoped<ILigaPublicService, LigaPublicService>();
+            services.AddScoped<ITermometroMercadoService, TermometroMercadoService>();
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
             services.AddScoped<IPremiacaoService, PremiacaoService>();
             services.AddScoped<IRegulamentoService, RegulamentoService>();
