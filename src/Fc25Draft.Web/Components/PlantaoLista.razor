@@ -1,0 +1,42 @@
+@using Fc25Draft.Core.Utilities
+@inject EscudoService Escudos
+
+@* Lista de notícias do Plantão CBFV: escudo do time, manchete, linha fina e quando aconteceu. *@
+
+<div class="list-group">
+    @foreach (var n in Noticias)
+    {
+        <a href="@n.Link" class="list-group-item list-group-item-action d-flex gap-3 align-items-start py-2">
+            <div class="position-relative flex-shrink-0" style="width: 36px; height: 36px;">
+                <img src="@Escudos.GetEscudo(n.TimeNome)" alt="" width="36" height="36" style="object-fit: contain;" />
+                <span class="position-absolute" style="right: -6px; bottom: -6px; font-size: 15px;">@n.Emoji</span>
+            </div>
+            <div class="flex-grow-1" style="min-width: 0;">
+                <div class="fw-semibold text-body">@n.Manchete</div>
+                @if (!string.IsNullOrWhiteSpace(n.Detalhe))
+                {
+                    <div class="small text-muted text-truncate" title="@n.Detalhe">@n.Detalhe</div>
+                }
+            </div>
+            <div class="small text-muted text-nowrap flex-shrink-0">@Quando(n.Data)</div>
+        </a>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<PlantaoNoticiaDto> Noticias { get; set; } = Array.Empty<PlantaoNoticiaDto>();
+
+    // "hoje", "ontem", "há 3 dias"; depois de uma semana, a data.
+    private static string Quando(DateTime utc)
+    {
+        var local = utc.ToLocalTime();
+        var dias = (DateTime.Now.Date - local.Date).Days;
+        return dias switch
+        {
+            <= 0 => $"hoje, {local:HH:mm}",
+            1 => "ontem",
+            < 7 => $"há {dias} dias",
+            _ => local.ToString("dd/MM/yyyy")
+        };
+    }
+}

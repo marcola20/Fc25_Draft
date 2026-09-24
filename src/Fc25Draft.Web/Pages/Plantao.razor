@@ -1,0 +1,78 @@
+@page "/plantao"
+@using Fc25Draft.Core.Utilities
+@inject ILigaPublicService LigaService
+
+<PageTitle>Plantão CBFV</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 900px;">
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <h1 class="h3 mb-0">📰 Plantão CBFV</h1>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Filtro">
+            <button type="button" class="btn @(_filtro is null ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(null)">Tudo</button>
+            <button type="button" class="btn @(_filtro == PlantaoCategoria.Jogo ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">⚽ Jogos</button>
+            <button type="button" class="btn @(_filtro == PlantaoCategoria.Mercado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">💸 Mercado</button>
+        </div>
+    </div>
+    <p class="text-muted small mb-3">
+        Notícias geradas sozinhas a partir dos jogos, gols, títulos e transferências. Clique para ver o time ou o jogador.
+    </p>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar o Plantão:</strong> @_erro</div>
+    }
+    else if (!Filtradas.Any())
+    {
+        <div class="alert alert-info">Nenhuma notícia ainda.</div>
+    }
+    else
+    {
+        <PlantaoLista Noticias="@Filtradas.Take(_limite)" />
+
+        @if (Filtradas.Count() > _limite)
+        {
+            <div class="text-center mt-3">
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => _limite += PorPagina">Ver mais notícias</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private const int PorPagina = 30;
+
+    private IReadOnlyList<PlantaoNoticiaDto> _noticias = Array.Empty<PlantaoNoticiaDto>();
+    private PlantaoCategoria? _filtro;
+    private int _limite = PorPagina;
+    private bool _loading = true;
+    private string? _erro;
+
+    private IEnumerable<PlantaoNoticiaDto> Filtradas =>
+        _filtro is null ? _noticias : _noticias.Where(n => n.Categoria == _filtro);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _noticias = await LigaService.GetPlantaoAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Filtrar(PlantaoCategoria? categoria)
+    {
+        _filtro = categoria;
+        _limite = PorPagina;
+    }
+}

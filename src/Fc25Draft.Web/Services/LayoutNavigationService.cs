@@ -11,7 +11,8 @@ public class LayoutNavigationService
     {
         new("Início", new List<MenuItem>
         {
-            new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true)
+            new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true),
+            new("Plantão CBFV", "/plantao", "oi oi-bullhorn")
         }),
         new("Times", new List<MenuItem>
         {
@@ -371,6 +372,17 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Recordes")
+            }
+        },
+        ["/plantao"] = new PageDefinition
+        {
+            Route = "/plantao",
+            Title = "Plantão CBFV",
+            Subtitle = "Tudo o que acontece na liga, atualizado sozinho",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Plantão CBFV")
             }
         },
         ["/ranking-clubes"] = new PageDefinition

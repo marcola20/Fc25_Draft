@@ -44,6 +44,9 @@ public interface ILigaPublicService
     /// <summary>Destaques do momento para a página inicial: líderes, melhor fase, artilheiro e maior transferência.</summary>
     Task<DestaquesDto> GetDestaquesAsync(CancellationToken ct);
 
+    /// <summary>Plantão CBFV: notícias geradas de jogos, gols, títulos e transferências, da mais recente para a mais antiga.</summary>
+    Task<IReadOnlyList<PlantaoNoticiaDto>> GetPlantaoAsync(CancellationToken ct);
+
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
 

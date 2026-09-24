@@ -1140,6 +1140,67 @@ public class LigaPublicService : ILigaPublicService
         return new DestaquesDto(lideres, melhorFase, artilheiros, maiorTransferencia);
     }
 
+    public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetPlantaoAsync(CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var partidas = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null)
+            .Select(p => new
+            {
+                p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora,
+                p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, EncerradaEm = p.EncerradaEm!.Value,
+                p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.LigaId,
+                LigaNome = p.Rodada.Liga.Nome, LigaTipo = p.Rodada.Liga.Tipo
+            })
+            .ToListAsync(ct);
+
+        var fases = (await _db.LigaKnockoutJogos.AsNoTracking()
+                .Where(k => k.PartidaId != null)
+                .Select(k => new { PartidaId = k.PartidaId!.Value, k.Fase })
+                .ToListAsync(ct))
+            .ToDictionary(k => k.PartidaId, k => k.Fase);
+
+        var inputs = partidas
+            .Select(p =>
+            {
+                var etapa = EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var f) ? f : null);
+                return new PlantaoPartidaInput(p.PartidaId, p.LigaId, p.LigaNome, etapa, etapa == "Final",
+                    p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.EncerradaEm);
+            })
+            .ToList();
+
+        var gols = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra)
+            .Select(e => new PlantaoGolInput(e.PartidaId, e.TimeId, e.JogadorId, e.Jogador.Name, e.Minuto, e.Tipo == TipoEvento.GolContra))
+            .ToListAsync(ct);
+
+        // Mesmo critério de campeão da página de Edições.
+        var edicoes = await ListEdicoesAsync(ct);
+        var campeaoPorLiga = edicoes.ToDictionary(e => e.LigaId, e => e.CampeaoTimeId);
+
+        // Liga decidida na tabela (sem final): o título sai no último jogo dela.
+        var ligasComFinal = inputs.Where(i => i.Final).Select(i => i.LigaId).ToHashSet();
+        var titulosNaTabela = edicoes
+            .Where(e => e.CampeaoTimeId is not null && !ligasComFinal.Contains(e.LigaId))
+            .Select(e => new
+            {
+                Edicao = e,
+                Ultimo = inputs.Where(i => i.LigaId == e.LigaId).Select(i => (DateTime?)i.EncerradaEm).Max()
+            })
+            .Where(x => x.Ultimo is not null)
+            .Select(x => new PlantaoTituloInput(x.Edicao.LigaId, x.Edicao.Nome, x.Edicao.CampeaoTimeId!.Value, x.Ultimo!.Value))
+            .ToList();
+
+        var transferencias = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.Type == TransferType.MarketAuction || t.Type == TransferType.TeamSale || t.Type == TransferType.TeamTrade)
+            .Select(t => new PlantaoTransferenciaInput(t.PerformedAtUtc, t.Type, t.PlayerId, t.Player.Name, t.FromTeamId, t.ToTeamId, t.Amount))
+            .ToListAsync(ct);
+
+        return PlantaoCbfv.Gerar(inputs, gols, transferencias, titulosNaTabela, campeaoPorLiga, nomes);
+    }
+
     /// <summary>
     /// Partidas no formato do perfil (com competição e etapa já rotuladas). Com <paramref name="timeId"/>,
     /// só as daquele time; sem, todas.

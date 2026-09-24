@@ -3,13 +3,16 @@
 @inject AdminAuthService AdminAuth
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
+@inject ILigaPublicService LigaService
 
 @implements IDisposable
 
 <PageHeader Title="Central CBFV"
             Subtitle="Escolha uma das áreas para navegar pela plataforma." />
 
-<DestaquesInicio />
+<DestaquesInicio Dados="@_destaques" />
+
+<PlantaoInicio Noticias="@_noticias" />
 
 @if (!authReady)
 {
@@ -65,6 +68,18 @@ else
 
 @code {
     private bool authReady;
+    private const int NoticiasNaPaginaInicial = 6;
+
+    private DestaquesDto? _destaques;
+    private IReadOnlyList<Fc25Draft.Core.Utilities.PlantaoNoticiaDto> _noticias = Array.Empty<Fc25Draft.Core.Utilities.PlantaoNoticiaDto>();
+
+    // Uma consulta de cada vez: no Blazor Server a página toda divide a mesma conexão com o banco.
+    // Destaques e Plantão são complementares: se um falhar, a página segue com o resto.
+    protected override async Task OnInitializedAsync()
+    {
+        try { _destaques = await LigaService.GetDestaquesAsync(CancellationToken.None); } catch { _destaques = null; }
+        try { _noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).Take(NoticiasNaPaginaInicial).ToList(); } catch { }
+    }
 
     protected override void OnInitialized()
     {

@@ -1,0 +1,19 @@
+@using Fc25Draft.Core.Utilities
+
+@* As notícias mais recentes do Plantão, no topo da Central CBFV. *@
+
+@if (Noticias.Count > 0)
+{
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h5 class="text-uppercase text-muted small fw-bold mb-0">📰 Plantão CBFV</h5>
+        <a href="/plantao" class="small text-primary">Ver todas as notícias →</a>
+    </div>
+    <div class="mb-4">
+        <PlantaoLista Noticias="@Noticias" />
+    </div>
+}
+
+@code {
+    // Carregadas pela página inicial (em sequência com os Destaques: as duas consultas usam a mesma conexão).
+    [Parameter] public IReadOnlyList<PlantaoNoticiaDto> Noticias { get; set; } = Array.Empty<PlantaoNoticiaDto>();
+}

@@ -1,6 +1,5 @@
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
-@inject ILigaPublicService LigaService
 @inject EscudoService Escudos
 
 @* O que está acontecendo agora na liga: aparece no topo da Central CBFV. *@
@@ -85,21 +84,11 @@
 @code {
     private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
 
-    private DestaquesDto? _dados;
+    // Carregado pela página inicial (em sequência com o Plantão: as duas consultas usam a mesma conexão).
+    [Parameter] public DestaquesDto? Dados { get; set; }
+
+    private DestaquesDto? _dados => Dados;
 
     private bool TemAlgo => _dados is not null
         && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.Artilheiros.Count > 0 || _dados.MaiorTransferencia is not null);
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            _dados = await LigaService.GetDestaquesAsync(CancellationToken.None);
-        }
-        catch
-        {
-            // Destaques são complementares: se falharem, a página inicial continua com os atalhos.
-            _dados = null;
-        }
-    }
 }
