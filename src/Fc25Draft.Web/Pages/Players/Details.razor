@@ -41,7 +41,16 @@ else
         <dd class="col-sm-9">@player.Status</dd>
 
         <dt class="col-sm-3">Time</dt>
-        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(player.TeamName) ? "-" : player.TeamName)</dd>
+        <dd class="col-sm-9">
+            @if (player.TeamId is Guid teamId && !string.IsNullOrWhiteSpace(player.TeamName))
+            {
+                <a href="/teams/details/@teamId" class="text-primary">@player.TeamName</a>
+            }
+            else
+            {
+                <span>-</span>
+            }
+        </dd>
     </dl>
 
     <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
@@ -51,6 +60,8 @@ else
     <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
         Voltar
     </button>
+
+    <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
 }
 
 @code {
@@ -67,8 +78,17 @@ else
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
 
-    protected override async Task OnInitializedAsync()
+    private int? _carregadoId;
+
+    // Recarrega quando o Id muda (o Blazor reaproveita a página ao navegar entre jogadores).
+    protected override async Task OnParametersSetAsync()
     {
+        if (_carregadoId == Id)
+        {
+            return;
+        }
+
+        _carregadoId = Id;
         await LoadPlayerAsync();
     }
 

@@ -1100,6 +1100,122 @@ public class LigaPublicService : ILigaPublicService
             movimentacoes);
     }
 
+    public async Task<JogadorCarreiraDto?> GetCarreiraJogadorAsync(int jogadorId, CancellationToken ct)
+    {
+        var jogador = await _db.Players.AsNoTracking()
+            .Where(p => p.PlayerId == jogadorId)
+            .Select(p => new
+            {
+                p.PlayerId, p.Name, p.PositionId, PositionName = p.Position.Name, p.Overall, p.Age,
+                Time = p.TeamRosters.Select(r => new { r.TeamId, r.Team.TeamName }).FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (jogador is null) return null;
+
+        var nomesTimes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var eventos = await _db.LigaEventos.AsNoTracking()
+            .Where(e => (e.JogadorId == jogadorId || e.AssistenteId == jogadorId)
+                        && (e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho))
+            .Select(e => new CarreiraEventoInput(e.Tipo, e.JogadorId, e.AssistenteId, e.TimeId, e.PartidaId, e.Partida.Rodada.LigaId))
+            .ToListAsync(ct);
+
+        // Mesmo critério do contador de jogos: titular no encerramento ou entrou por substituição.
+        var titular = await _db.LigaEscalacoes.AsNoTracking()
+            .Where(t => t.JogadorId == jogadorId && t.Titular)
+            .Select(t => new
+            {
+                t.TimeId, t.PartidaId, t.Partida.Rodada.LigaId,
+                GolsSofridos = t.TimeId == t.Partida.TimeCasaId ? t.Partida.GolsFora : t.Partida.GolsCasa
+            })
+            .ToListAsync(ct);
+        var entrou = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.JogadorId == jogadorId && e.Tipo == TipoEvento.Substituicao)
+            .Select(e => new
+            {
+                e.TimeId, e.PartidaId, e.Partida.Rodada.LigaId,
+                GolsSofridos = e.TimeId == e.Partida.TimeCasaId ? e.Partida.GolsFora : e.Partida.GolsCasa
+            })
+            .ToListAsync(ct);
+        var participacoes = titular.Concat(entrou)
+            .Select(p => new CarreiraParticipacaoInput(p.TimeId, p.PartidaId, p.LigaId, p.GolsSofridos == 0))
+            .ToList();
+
+        var ligaIds = eventos.Select(e => e.LigaId).Concat(participacoes.Select(p => p.LigaId)).Distinct().ToList();
+        var ligasComContagem = (await _db.LigaEscalacoes.AsNoTracking()
+                .Where(t => ligaIds.Contains(t.Partida.Rodada.LigaId))
+                .Select(t => t.Partida.Rodada.LigaId)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        // Campeão pelo mesmo critério da página de Edições (inclui as antigas sem campeão gravado).
+        var campeoes = (await ListEdicoesAsync(ct)).ToDictionary(e => e.LigaId, e => e.CampeaoTimeId);
+
+        var ligas = (await _db.Ligas.AsNoTracking()
+                .Where(l => ligaIds.Contains(l.LigaId))
+                .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Temporada, l.CriadoEm })
+                .ToListAsync(ct))
+            .ToDictionary(l => l.LigaId, l => new CarreiraLigaInput(
+                l.LigaId, l.Nome, l.Tipo, l.Temporada, l.CriadoEm,
+                campeoes.GetValueOrDefault(l.LigaId),
+                ligasComContagem.Contains(l.LigaId)));
+
+        var estatisticas = CarreiraJogador.Calcular(
+            jogadorId, PosicoesDefensivas.Contains(jogador.PositionId), ligas, eventos, participacoes, nomesTimes);
+
+        var picks = await _db.DraftPicks.AsNoTracking()
+            .Where(p => p.PlayerId == jogadorId)
+            .Select(p => new
+            {
+                p.PickedAtUtc, DraftCriadoEm = p.Draft.CreatedAtUtc, DraftNome = p.Draft.Name, p.Draft.Tipo, p.RoundNumber, p.PickInRound,
+                p.TeamId, p.FromTeamId, p.Compensacao, p.Automatica
+            })
+            .ToListAsync(ct);
+
+        // A escolha do draft de expansão também vira transferência: aparece só como escolha.
+        var transferencias = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.PlayerId == jogadorId && t.Type != TransferType.ExpansionDraft)
+            .Select(t => new { t.PerformedAtUtc, t.Type, t.FromTeamId, t.ToTeamId, t.Amount, t.OldOverall, t.NewOverall })
+            .ToListAsync(ct);
+
+        string? Nome(Guid? id) => id is Guid g && nomesTimes.TryGetValue(g, out var n) ? n : null;
+
+        var trajetoria = picks
+            .Select(p => new JogadorMovimentoDto(
+                p.PickedAtUtc ?? p.DraftCriadoEm,
+                p.Tipo == DraftTipo.Expansao ? "Draft de expansão" : "Draft",
+                Nome(p.FromTeamId),
+                Nome(p.TeamId),
+                p.Compensacao,
+                $"{p.DraftNome} · rodada {p.RoundNumber}, escolha {p.PickInRound}{(p.Automatica ? " · 🤖 automática" : "")}"))
+            .Concat(transferencias.Select(t => new JogadorMovimentoDto(
+                t.PerformedAtUtc,
+                t.Type.ToDisplayName(),
+                Nome(t.FromTeamId),
+                Nome(t.ToTeamId),
+                t.Amount,
+                t.OldOverall is int antes && t.NewOverall is int depois && antes != depois
+                    ? $"overall {antes} → {depois}"
+                    : null)))
+            .OrderByDescending(m => m.Data)
+            .ToList();
+
+        return new JogadorCarreiraDto(
+            jogador.PlayerId,
+            jogador.Name,
+            jogador.PositionId,
+            jogador.PositionName,
+            jogador.Overall,
+            jogador.Age,
+            jogador.Time?.TeamId,
+            jogador.Time?.TeamName,
+            estatisticas,
+            trajetoria);
+    }
+
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
             l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);

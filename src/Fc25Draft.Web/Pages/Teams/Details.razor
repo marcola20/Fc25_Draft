@@ -257,7 +257,7 @@ else
                         @foreach (var player in _sortedRosterPlayers)
                         {
                             <tr class="align-middle text-center">
-                                <td class="text-start text-nowrap">@player.Name</td>
+                                <td class="text-start text-nowrap"><a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a></td>
                                 <td class="text-center text-nowrap">@player.Position</td>
                                 <td>@player.Overall</td>
                                 <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>

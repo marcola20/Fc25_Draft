@@ -37,6 +37,9 @@ public interface ILigaPublicService
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Carreira do jogador: números por competição e time, títulos e trajetória (draft e transferências).</summary>
+    Task<JogadorCarreiraDto?> GetCarreiraJogadorAsync(int jogadorId, CancellationToken ct);
+
     /// <summary>
     /// Ranking de Clubes de todas as temporadas, calculado na hora a partir dos jogos já
     /// encerrados (inclusive os da temporada em andamento), títulos, finais, semis e posições.

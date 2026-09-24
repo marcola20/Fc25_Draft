@@ -1,0 +1,190 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_erro is not null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar a carreira:</strong> @_erro</div>
+}
+else if (_dados is not null)
+{
+    var e = _dados.Estatisticas;
+
+    <h4 class="mt-4 mb-3">Carreira</h4>
+
+    @if (e.Competicoes.Count == 0)
+    {
+        <div class="alert alert-info">Este jogador ainda não entrou em campo nem marcou em nenhuma competição.</div>
+    }
+    else
+    {
+        <div class="row g-2 mb-3">
+            @Numero("Jogos", e.Competicoes.All(c => c.Jogos is null) ? "—" : $"{e.Jogos}{(e.JogosParcial ? "*" : "")}", "")
+            @Numero("⚽ Gols", e.Gols.ToString(), "")
+            @Numero("🅰️ Assist.", e.Assistencias.ToString(), "")
+            @Numero("G/A", (e.Gols + e.Assistencias).ToString(), "fw-bold")
+            @if (e.CleanSheets is int cs)
+            {
+                @Numero("🧤 Clean sheets", cs.ToString(), "")
+            }
+            @Numero("🟨 / 🟥", $"{e.Amarelos} / {e.Vermelhos}", "")
+        </div>
+
+        @if (e.JogosParcial)
+        {
+            <p class="text-muted small">Competições anteriores ao contador de jogos aparecem com “—” e não entram no total de jogos.</p>
+        }
+
+        @if (e.Titulos.Count > 0 || e.Hattricks > 0 || e.MaisGolsNumJogo >= 2)
+        {
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                @foreach (var t in e.Titulos)
+                {
+                    <span class="badge bg-warning text-dark fs-6 fw-normal">🏆 @t.Competicao <span class="small">(@t.TimeNome)</span></span>
+                }
+                @if (e.Hattricks > 0)
+                {
+                    <span class="badge bg-dark fs-6 fw-normal">🎩 @e.Hattricks hat-trick@(e.Hattricks > 1 ? "s" : "")</span>
+                }
+                @if (e.MaisGolsNumJogo >= 2)
+                {
+                    <span class="badge bg-light text-dark border fs-6 fw-normal">Recorde: @e.MaisGolsNumJogo gols num jogo</span>
+                }
+            </div>
+        }
+
+        <h5 class="mb-2">Por competição</h5>
+        <div class="table-responsive mb-4">
+            <table class="table table-hover table-sm align-middle text-center" style="font-size: 0.875rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start">Competição</th>
+                        <th class="text-start">Time</th>
+                        <th title="Jogos">J</th>
+                        <th title="Gols">⚽</th>
+                        <th title="Assistências">🅰️</th>
+                        @if (e.CleanSheets is not null)
+                        {
+                            <th title="Clean sheets">🧤</th>
+                        }
+                        <th title="Cartões amarelos">🟨</th>
+                        <th title="Cartões vermelhos">🟥</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in e.Competicoes)
+                    {
+                        <tr class="@(c.Campeao ? "table-warning" : "")">
+                            <td class="text-start">
+                                @c.Competicao
+                                @if (c.Campeao) { <span title="Campeão">🏆</span> }
+                            </td>
+                            <td class="text-start"><a href="/teams/details/@c.TimeId" class="text-primary">@c.TimeNome</a></td>
+                            <td>@(c.Jogos?.ToString() ?? "—")</td>
+                            <td class="fw-semibold">@c.Gols</td>
+                            <td>@c.Assistencias</td>
+                            @if (e.CleanSheets is not null)
+                            {
+                                <td>@(c.CleanSheets?.ToString() ?? "—")</td>
+                            }
+                            <td>@c.Amarelos</td>
+                            <td>@c.Vermelhos</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <h5 class="mb-2">Trajetória</h5>
+    @if (_dados.Trajetoria.Count == 0)
+    {
+        <p class="text-muted">Nenhuma escolha de draft ou transferência registrada.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-3">
+            @foreach (var m in _dados.Trajetoria)
+            {
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <div>
+                            <span class="badge bg-secondary me-1">@m.Tipo</span>
+                            @if (m.DeTime is not null)
+                            {
+                                <span>@m.DeTime</span>
+                            }
+                            @if (m.DeTime is not null && m.ParaTime is not null)
+                            {
+                                <span class="text-muted mx-1">→</span>
+                            }
+                            @if (m.ParaTime is not null)
+                            {
+                                <strong>@m.ParaTime</strong>
+                            }
+                            @if (m.DeTime is not null && m.ParaTime is null)
+                            {
+                                <span class="text-muted ms-1">(saiu do time)</span>
+                            }
+                        </div>
+                        <div class="text-muted small text-nowrap">
+                            @if (m.Valor is decimal v && v > 0)
+                            {
+                                <span class="me-2">@v.ToString("C0", Brasil)</span>
+                            }
+                            @m.Data.ToLocalTime().ToString("dd/MM/yyyy")
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(m.Detalhe))
+                    {
+                        <div class="small text-muted">@m.Detalhe</div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _loading = true;
+    private string? _erro;
+    private JogadorCarreiraDto? _dados;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _dados = await LigaService.GetCarreiraJogadorAsync(PlayerId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static RenderFragment Numero(string rotulo, string valor, string classe) => __builder =>
+    {
+        <div class="col-4 col-md-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">@rotulo</div>
+                    <h4 class="mb-0 @classe">@valor</h4>
+                </div>
+            </div>
+        </div>
+    };
+}
