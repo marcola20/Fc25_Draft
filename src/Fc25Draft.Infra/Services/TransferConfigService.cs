@@ -88,6 +88,55 @@ public class TransferConfigService : ITransferConfigService
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task<IReadOnlyList<TeamTransferStatusDto>> GetTransferStatusAsync(CancellationToken ct)
+    {
+        return await _db.Teams
+            .AsNoTracking()
+            .OrderBy(t => t.TeamName)
+            .Select(t => new TeamTransferStatusDto(t.TeamId, t.TeamName, t.OwnerName, t.TransferCount, t.TransferLimitOverride))
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> ResetTransferCountsAsync(CancellationToken ct)
+    {
+        return await _db.Teams
+            .Where(t => t.TransferCount != 0)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.TransferCount, 0), ct);
+    }
+
+    public async Task SetTransferLimitAsync(Guid teamId, int? limite, CancellationToken ct)
+    {
+        if (limite < 0) throw new InvalidOperationException("O limite de transferências não pode ser negativo.");
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+            ?? throw new InvalidOperationException("Time não encontrado.");
+
+        team.TransferLimitOverride = limite;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetTransferCountAsync(Guid teamId, int usadas, CancellationToken ct)
+    {
+        if (usadas < 0) throw new InvalidOperationException("O contador de transferências não pode ser negativo.");
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == teamId, ct)
+            ?? throw new InvalidOperationException("Time não encontrado.");
+
+        team.TransferCount = usadas;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<int> GetMaxTransfersForAsync(Guid teamId, CancellationToken ct)
+    {
+        var individual = await _db.Teams
+            .AsNoTracking()
+            .Where(t => t.TeamId == teamId)
+            .Select(t => t.TransferLimitOverride)
+            .FirstOrDefaultAsync(ct);
+
+        return individual ?? (await GetAsync(ct)).MaxTransfers;
+    }
+
     public async Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct)
     {
         return await _db.Teams

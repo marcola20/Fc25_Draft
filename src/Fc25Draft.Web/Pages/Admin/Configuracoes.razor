@@ -262,6 +262,76 @@
                 </div>
 
                 <div class="col-12 col-lg-7">
+                    <div class="card border-danger">
+                        <div class="card-header fw-bold text-danger">Transferências por janela dos times</div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Zera o contador de transferências de <strong>todos os times</strong> (use na virada de janela/temporada).
+                                Não desfaz transferências já feitas. Depois ajuste na tabela quem precisa de valor personalizado.
+                            </p>
+                            <button class="btn btn-outline-danger" @onclick="ZerarTransferencias" disabled="@_saving">
+                                @(_saving ? "Zerando..." : "Zerar transferências de todos os times")
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th class="text-end">Usadas</th>
+                                        <th style="width: 6.5rem">Limite</th>
+                                        <th style="width: 6.5rem">Restantes</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (_transferencias.Count == 0)
+                                    {
+                                        <tr><td colspan="5" class="text-muted text-center">Nenhum time cadastrado.</td></tr>
+                                    }
+                                    @foreach (var t in _transferencias)
+                                    {
+                                        var limite = t.LimiteIndividual ?? _maxTransfersSalvo;
+                                        var restantes = Math.Max(0, limite - t.TransferCount);
+                                        <tr>
+                                            <td>
+                                                @t.TeamName
+                                                @if (!string.IsNullOrWhiteSpace(t.OwnerName))
+                                                {
+                                                    <span class="text-muted small"> · @t.OwnerName</span>
+                                                }
+                                                @if (t.LimiteIndividual is not null)
+                                                {
+                                                    <span class="badge bg-info text-dark ms-1">individual</span>
+                                                }
+                                            </td>
+                                            <td class="text-end @(restantes == 0 ? "text-danger fw-bold" : "")">@t.TransferCount</td>
+                                            <td>
+                                                <input type="number" min="0" class="form-control form-control-sm" placeholder="@_maxTransfersSalvo"
+                                                       value="@_transfLimitesEditados.GetValueOrDefault(t.TeamId, t.LimiteIndividual?.ToString())"
+                                                       @onchange="e => _transfLimitesEditados[t.TeamId] = e.Value?.ToString()" />
+                                            </td>
+                                            <td>
+                                                <input type="number" min="0" max="@limite" class="form-control form-control-sm"
+                                                       value="@_transfRestantesEditados.GetValueOrDefault(t.TeamId, restantes.ToString())"
+                                                       @onchange="e => _transfRestantesEditados[t.TeamId] = e.Value?.ToString()" />
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SalvarTransferenciasDoTime(t)" disabled="@_saving">Salvar</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer small text-muted">
+                            <strong>Limite</strong>: em branco usa o limite geral da janela (@_maxTransfersSalvo); preenchido vale só para aquele time.
+                            <strong>Restantes</strong>: quantas ele ainda pode fazer agora (limite menos as já feitas).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-7">
                     <div class="card">
                         <div class="card-header fw-bold">Mínimo de elenco temporário</div>
                         <div class="card-body pb-0">
@@ -320,13 +390,16 @@
 
     // Transferências
     private int _maxQuickSell, _maxTransfers, _minRoster;
-    private int _maxQuickSellSalvo, _minRosterSalvo;
+    private int _maxQuickSellSalvo, _maxTransfersSalvo, _minRosterSalvo;
     private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
     private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
     private IReadOnlyList<TeamElencoMinimoDto> _elencos = Array.Empty<TeamElencoMinimoDto>();
     private readonly Dictionary<Guid, string?> _minimosEditados = new();
     private readonly Dictionary<Guid, string?> _restantesEditados = new();
     private readonly Dictionary<Guid, string?> _limitesEditados = new();
+    private IReadOnlyList<TeamTransferStatusDto> _transferencias = Array.Empty<TeamTransferStatusDto>();
+    private readonly Dictionary<Guid, string?> _transfRestantesEditados = new();
+    private readonly Dictionary<Guid, string?> _transfLimitesEditados = new();
 
     private record Exemplo(string Label, short PositionId, int Overall, int Age);
     private static readonly Exemplo[] _exemplos =
@@ -348,6 +421,7 @@
             var tcfg = await TransferCfg.GetAsync(CancellationToken.None);
             AplicarTransf(tcfg);
             await CarregarQuickSells();
+            await CarregarTransferencias();
             await CarregarElencos();
         }
         catch (Exception ex) { _erro = ex.Message; }
@@ -359,6 +433,7 @@
         _maxQuickSell = t.MaxQuickSellPerWindow;
         _maxQuickSellSalvo = t.MaxQuickSellPerWindow;
         _maxTransfers = t.MaxTransfers;
+        _maxTransfersSalvo = t.MaxTransfers;
         _minRoster = t.MinRosterSize;
         _minRosterSalvo = t.MinRosterSize;
         _quickSellBloqueado = t.QuickSellBloqueado;
@@ -367,6 +442,76 @@
 
     private async Task CarregarQuickSells()
         => _quickSells = await TransferCfg.GetQuickSellStatusAsync(CancellationToken.None);
+
+    private async Task CarregarTransferencias()
+        => _transferencias = await TransferCfg.GetTransferStatusAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Salva o limite individual de transferências do time (vazio = usa o geral) e quantas ainda sobram para ele.
+    /// </summary>
+    private async Task SalvarTransferenciasDoTime(TeamTransferStatusDto time)
+    {
+        _erro = null; _ok = null;
+
+        var textoLimite = _transfLimitesEditados.GetValueOrDefault(time.TeamId, time.LimiteIndividual?.ToString());
+        int? limiteIndividual = null;
+        if (!string.IsNullOrWhiteSpace(textoLimite))
+        {
+            if (!int.TryParse(textoLimite, out var valor) || valor < 0) { _erro = "O limite precisa ser um número inteiro a partir de zero."; return; }
+            limiteIndividual = valor;
+        }
+
+        var limite = limiteIndividual ?? _maxTransfersSalvo;
+
+        var textoRestantes = _transfRestantesEditados.GetValueOrDefault(time.TeamId);
+        int restantes;
+        if (string.IsNullOrWhiteSpace(textoRestantes))
+            restantes = Math.Max(0, limite - time.TransferCount);
+        else if (!int.TryParse(textoRestantes, out restantes) || restantes < 0)
+        {
+            _erro = "As transferências restantes precisam ser um número inteiro a partir de zero.";
+            return;
+        }
+
+        if (restantes > limite) { _erro = $"{time.TeamName} tem limite {limite}: não dá para sobrar {restantes}."; return; }
+
+        _saving = true;
+        try
+        {
+            await TransferCfg.SetTransferLimitAsync(time.TeamId, limiteIndividual, CancellationToken.None);
+            await TransferCfg.SetTransferCountAsync(time.TeamId, limite - restantes, CancellationToken.None);
+
+            _transfLimitesEditados.Remove(time.TeamId);
+            _transfRestantesEditados.Remove(time.TeamId);
+            await CarregarTransferencias();
+
+            _ok = limiteIndividual is null
+                ? $"{time.TeamName} usa o limite geral ({_maxTransfersSalvo}) e ficou com {restantes} transferência(s)."
+                : $"{time.TeamName} agora tem limite próprio de {limiteIndividual} e ficou com {restantes} transferência(s).";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task ZerarTransferencias()
+    {
+        var confirmado = await JSRuntime.InvokeAsync<bool>("confirm", "Zerar o contador de transferências de TODOS os times? Esta ação não pode ser desfeita.");
+        if (!confirmado) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var afetados = await TransferCfg.ResetTransferCountsAsync(CancellationToken.None);
+            _transfRestantesEditados.Clear();
+            _transfLimitesEditados.Clear();
+            await CarregarTransferencias();
+            _ok = afetados == 0
+                ? "Nenhum time tinha transferências para zerar."
+                : $"Transferências zeradas em {afetados} time(s).";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
 
     private async Task CarregarElencos()
     {
@@ -458,6 +603,8 @@
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();
             _limitesEditados.Clear();
+            _transfRestantesEditados.Clear();
+            _transfLimitesEditados.Clear();
             _ok = "Limites de transferências salvos.";
         }
         catch (Exception ex) { _erro = ex.Message; }

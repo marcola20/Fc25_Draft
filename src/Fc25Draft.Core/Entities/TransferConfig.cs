@@ -27,6 +27,9 @@ public class TransferConfig
     /// <summary>Limite de vendas rápidas que vale para o time: o individual dele, se houver, senão o geral.</summary>
     public int MaxQuickSellFor(Team team) => team.QuickSellLimitOverride ?? MaxQuickSellPerWindow;
 
+    /// <summary>Limite de transferências que vale para o time: o individual dele, se houver, senão o geral.</summary>
+    public int MaxTransfersFor(Team team) => team.TransferLimitOverride ?? MaxTransfers;
+
     /// <summary>Valores padrão (equivalentes ao comportamento anterior, hardcoded).</summary>
     public static TransferConfig Default() => new()
     {

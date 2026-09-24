@@ -26,6 +26,12 @@ public class Team
     /// </summary>
     public int? QuickSellLimitOverride { get; set; }
 
+    /// <summary>
+    /// Limite de transferências só deste time.
+    /// Nulo usa <see cref="TransferConfig.MaxTransfers"/>.
+    /// </summary>
+    public int? TransferLimitOverride { get; set; }
+
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();
     public ICollection<MarketBid> MarketBids { get; set; } = new List<MarketBid>();

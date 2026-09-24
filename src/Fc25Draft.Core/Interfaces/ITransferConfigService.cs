@@ -22,6 +22,21 @@ public interface ITransferConfigService
     /// <summary>Define (ou remove, com nulo) o limite de vendas rápidas só de um time.</summary>
     Task SetQuickSellLimitAsync(Guid teamId, int? limite, CancellationToken ct);
 
+    /// <summary>Lista o contador de transferências de cada time, ordenado por nome.</summary>
+    Task<IReadOnlyList<TeamTransferStatusDto>> GetTransferStatusAsync(CancellationToken ct);
+
+    /// <summary>Zera o contador de transferências de todos os times. Retorna a quantidade de times afetados.</summary>
+    Task<int> ResetTransferCountsAsync(CancellationToken ct);
+
+    /// <summary>Ajusta quantas transferências um time já usou na janela (o que sobra é o limite menos isso).</summary>
+    Task SetTransferCountAsync(Guid teamId, int usadas, CancellationToken ct);
+
+    /// <summary>Define (ou remove, com nulo) o limite de transferências só de um time.</summary>
+    Task SetTransferLimitAsync(Guid teamId, int? limite, CancellationToken ct);
+
+    /// <summary>Limite de transferências que vale para o time (o individual dele ou o geral).</summary>
+    Task<int> GetMaxTransfersForAsync(Guid teamId, CancellationToken ct);
+
     /// <summary>Lista o tamanho do elenco e o mínimo temporário de cada time, ordenado por nome.</summary>
     Task<IReadOnlyList<TeamElencoMinimoDto>> ListElencoMinimoAsync(CancellationToken ct);
 

@@ -476,7 +476,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _maxTransfers = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxTransfers; }
+        try { _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(TeamId, CancellationToken.None); }
         catch { /* mantém o padrão se a config não carregar */ }
         await LoadDataAsync();
     }

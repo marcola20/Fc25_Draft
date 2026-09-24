@@ -55,15 +55,12 @@ public class TransferOfferService : ITransferOfferService
 
         if (dto.Type == OfferType.Swap)
         {
-            if (fromTeam.TransferCount >= cfg.MaxTransfers)
-                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela ({fromTeam.TransferCount}/{cfg.MaxTransfers}).");
-            if (toTeam.TransferCount >= cfg.MaxTransfers)
-                throw new InvalidOperationException($"O time {toTeam.TeamName} já atingiu o limite de transferências da janela ({toTeam.TransferCount}/{cfg.MaxTransfers}).");
+            EnsureTransferLimit(cfg, fromTeam);
+            EnsureTransferLimit(cfg, toTeam);
         }
         else
         {
-            if (fromTeam.TransferCount >= cfg.MaxTransfers)
-                throw new InvalidOperationException($"O time {fromTeam.TeamName} já atingiu o limite de transferências da janela ({fromTeam.TransferCount}/{cfg.MaxTransfers}).");
+            EnsureTransferLimit(cfg, fromTeam);
         }
 
         var targetPlayers = await _db.Players
@@ -175,15 +172,12 @@ public class TransferOfferService : ITransferOfferService
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
             if (offer.Type == OfferType.Swap)
             {
-                if (offer.FromTeam.TransferCount >= cfg.MaxTransfers)
-                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela ({offer.FromTeam.TransferCount}/{cfg.MaxTransfers}).");
-                if (offer.ToTeam.TransferCount >= cfg.MaxTransfers)
-                    throw new InvalidOperationException($"O time {offer.ToTeam.TeamName} já atingiu o limite de transferências da janela ({offer.ToTeam.TransferCount}/{cfg.MaxTransfers}).");
+                EnsureTransferLimit(cfg, offer.FromTeam);
+                EnsureTransferLimit(cfg, offer.ToTeam);
             }
             else
             {
-                if (offer.FromTeam.TransferCount >= cfg.MaxTransfers)
-                    throw new InvalidOperationException($"O time {offer.FromTeam.TeamName} já atingiu o limite de transferências da janela ({offer.FromTeam.TransferCount}/{cfg.MaxTransfers}).");
+                EnsureTransferLimit(cfg, offer.FromTeam);
             }
         }
 
@@ -466,8 +460,8 @@ public class TransferOfferService : ITransferOfferService
             toTeam.TransferCount++;
 
         var teamsAtLimit = new List<Guid>();
-        if (fromTeam.TransferCount >= cfg.MaxTransfers) teamsAtLimit.Add(fromTeam.TeamId);
-        if (offer.Type == OfferType.Swap && toTeam.TransferCount >= cfg.MaxTransfers) teamsAtLimit.Add(toTeam.TeamId);
+        if (fromTeam.TransferCount >= cfg.MaxTransfersFor(fromTeam)) teamsAtLimit.Add(fromTeam.TeamId);
+        if (offer.Type == OfferType.Swap && toTeam.TransferCount >= cfg.MaxTransfersFor(toTeam)) teamsAtLimit.Add(toTeam.TeamId);
 
         if (teamsAtLimit.Count > 0)
         {
@@ -484,6 +478,13 @@ public class TransferOfferService : ITransferOfferService
                 o.UpdatedAtUtc = now2;
             }
         }
+    }
+
+    private static void EnsureTransferLimit(TransferConfig cfg, Team team)
+    {
+        var limite = cfg.MaxTransfersFor(team);
+        if (team.TransferCount >= limite)
+            throw new InvalidOperationException($"O time {team.TeamName} já atingiu o limite de transferências da janela ({team.TransferCount}/{limite}).");
     }
 
     private static string FormatPlayerList(IReadOnlyCollection<Player> players)
