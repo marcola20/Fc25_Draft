@@ -74,9 +74,11 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <ul class="nav nav-tabs mb-0">
                 <li class="nav-item">
-                    <button class="nav-link @(_tab == "classif" ? "active" : "")" @onclick='() => _tab = "classif"'>Classificação</button>
+                    <button class="nav-link @(_tab == "classif" ? "active" : "")" @onclick='() => _tab = "classif"'>
+                        @(EhSupercopa ? "O jogo" : "Classificação")
+                    </button>
                 </li>
-                @if (_liga.Status != LigaStatus.PrimeiraFase && _liga.Status != LigaStatus.Criada)
+                @if (!EhSupercopa && _liga.Status != LigaStatus.PrimeiraFase && _liga.Status != LigaStatus.Criada)
                 {
                     <li class="nav-item">
                         <button class="nav-link @(_tab == "knockout" ? "active" : "")" @onclick='() => _tab = "knockout"'>Mata-Mata</button>
@@ -87,7 +89,7 @@
                 </li>
             </ul>
 
-            @if (_tab == "classif" && _classif.Any())
+            @if (_tab == "classif" && _classif.Any() && !EhSupercopa)
             {
                 <button type="button" class="btn btn-sm btn-success" @onclick="CompartilharClassificacao" disabled="@_sharingClassif">
                     @if (_sharingClassif)
@@ -106,7 +108,15 @@
         <!-- ── Classificação ── -->
         @if (_tab == "classif")
         {
-            @if (!_classif.Any())
+            @if (EhSupercopa)
+            {
+                <!-- Supercopa é jogo único: não tem tabela nem rodadas. -->
+                <div class="alert alert-secondary">
+                    <strong>Jogo único</strong> entre o campeão da Série A e o campeão da Copa.
+                    Quem vencer leva a Supercopa; empate vai para os pênaltis.
+                </div>
+            }
+            else if (!_classif.Any())
             {
                 <div class="alert alert-info">Classificação ainda não disponível.</div>
             }
@@ -257,19 +267,26 @@
             @if (_rodadas.Any())
             {
                 <hr class="my-4" />
-                <h5 class="text-uppercase text-muted small fw-bold mb-3">Partidas</h5>
+                <h5 class="text-uppercase text-muted small fw-bold mb-3">@(EhSupercopa ? "A decisão" : "Partidas")</h5>
 
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
-                        <span class="fw-bold px-2">
-                            Rodada @(_rodadaAtual?.Numero)
-                            @if (_rodadaAtual?.Desempate == true)
-                            {
-                                <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
-                            }
-                        </span>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                        @if (EhSupercopa)
+                        {
+                            <span class="fw-bold">Jogo único</span>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
+                            <span class="fw-bold px-2">
+                                Rodada @(_rodadaAtual?.Numero)
+                                @if (_rodadaAtual?.Desempate == true)
+                                {
+                                    <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
+                                }
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                        }
                     </div>
 
                     @if (_rodadaAtual is not null)
@@ -292,8 +309,8 @@
                 {
                     <ShareableCard Id="cap-rodada"
                                    Titulo="@LigaNome"
-                                   Subtitulo='@($"Rodada {_rodadaAtual.Numero}")'
-                                   Arquivo='@($"cbfv-rodada-{_rodadaAtual.Numero}.png")'
+                                   Subtitulo='@(EhSupercopa ? "Jogo único" : $"Rodada {_rodadaAtual.Numero}")'
+                                   Arquivo='@(EhSupercopa ? "cbfv-supercopa.png" : $"cbfv-rodada-{_rodadaAtual.Numero}.png")'
                                    MostrarBotao="false"
                                    @ref="_rodadaCardRef">
                         <div class="list-group">
@@ -724,6 +741,9 @@
     private bool _authInitialized;
 
     private string LigaNome => _liga?.Nome ?? "CBFV";
+
+    /// <summary>Supercopa é jogo único: sem tabela, sem rodadas e sem chaveamento.</summary>
+    private bool EhSupercopa => _liga?.Tipo == TipoCompetition.Supercopa;
 
     private LigaRodadaComPartidasDto? _rodadaAtual =>
         _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;

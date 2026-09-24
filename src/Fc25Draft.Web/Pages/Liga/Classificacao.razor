@@ -34,6 +34,14 @@
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
     }
+    else if (_liga?.Tipo == TipoCompetition.Supercopa)
+    {
+        <!-- Supercopa é jogo único: não tem tabela. -->
+        <div class="alert alert-secondary">
+            <strong>Jogo único</strong> entre o campeão da Série A e o campeão da Copa — sem tabela de classificação.
+            <a href="@($"/liga?liga={_liga.LigaId}")" class="alert-link">Ver o jogo</a>.
+        </div>
+    }
     else if (_classif is null || _classif.Count == 0)
     {
         <div class="alert alert-info">Classificação ainda não disponível.</div>
