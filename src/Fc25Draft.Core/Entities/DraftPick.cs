@@ -21,6 +21,9 @@ namespace Fc25Draft.Core.Entities
         /// <summary>Feita pela escolha automática (lista de prioridade do time).</summary>
         public bool Automatica { get; set; }
 
+        /// <summary>O tempo do time acabou e o site escolheu (pela lista ou pelo melhor overall).</summary>
+        public bool TempoEsgotado { get; set; }
+
         public Draft Draft { get; set; } = null!;
         public DraftRound Round { get; set; } = null!;
         public Team Team { get; set; } = null!;

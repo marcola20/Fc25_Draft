@@ -196,7 +196,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         roundRules = rules;
                     }
 
-                    var draft = await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct);
+                    if (request.TempoPorEscolhaMinutos is <= 0)
+                    {
+                        return Results.BadRequest(new { message = "O tempo por escolha precisa ser maior que zero (ou vazio para sem limite)." });
+                    }
+
+                    var draft = await draftService.GenerateDraftAsync(request.TotalRounds, request.Snake, roundRules, request.Name, ct,
+                        request.TempoPorEscolhaMinutos);
 
                     // Listas montadas antes do draft existir: entram agora e já escolhem por quem abre o draft.
                     await autoPickService.AplicarPreviasAsync(draft.DraftId, ct);

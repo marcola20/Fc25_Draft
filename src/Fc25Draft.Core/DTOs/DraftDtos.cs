@@ -21,7 +21,13 @@ public record DraftStateDto(
     string? NextTeamOwner,
     bool DraftCompleted,
     bool IsExpansao = false,
-    bool AguardandoProtecao = false)
+    bool AguardandoProtecao = false,
+    int? TempoPorEscolhaMinutos = null,
+    // Quando acaba o tempo da vez atual (nulo = sem limite ou relógio ainda não começou).
+    DateTime? PrazoUtc = null,
+    bool Pausado = false,
+    // Pausado: o tempo que falta, congelado (a tela não desconta nada enquanto isso).
+    TimeSpan? RestanteNaPausa = null)
 {
     public static DraftStateDto Empty { get; } = new(
         null,
@@ -61,7 +67,8 @@ public record GenerateDraftRequestDto(
     int TotalRounds,
     bool Snake = false,
     IReadOnlyList<DraftRoundRuleDto>? RoundRules = null,
-    string? Name = null);
+    string? Name = null,
+    int? TempoPorEscolhaMinutos = null);
 
 /// <summary>
 /// <see cref="Selection"/> é a primeira escolha da sequência; a mensagem dela já junta as
@@ -79,7 +86,8 @@ public record DraftEscolhaResumoDto(
     string TeamName,
     string PlayerName,
     string PositionName,
-    bool Automatica);
+    bool Automatica,
+    bool TempoEsgotado = false);
 
 public record DraftPickSelectionDto(
     Guid DraftId,
@@ -160,3 +168,25 @@ public record DraftPickOwnerUpdateDto(Guid OwnerTeamId);
 public record DraftPickSwapRequestDto(int DraftPickIdA, int DraftPickIdB);
 
 public record DraftPickMoveRequestDto(int DraftPickId, int TargetOverall);
+
+/// <summary>O que o telão do draft mostra.</summary>
+public record DraftTelaoDto(
+    DraftStateDto State,
+    IReadOnlyList<DraftTelaoPickDto> Proximos,
+    IReadOnlyList<DraftTelaoPickDto> Ultimas,
+    IReadOnlyList<DraftTelaoPickDto> RodadaAtual);
+
+public record DraftTelaoPickDto(
+    int Round,
+    int PickInRound,
+    int OverallPick,
+    Guid TeamId,
+    string TeamName,
+    string? TeamOwner,
+    int? PlayerId,
+    string? PlayerName,
+    string? PositionName,
+    int? Overall,
+    bool Automatica,
+    bool TempoEsgotado,
+    DateTime? PickedAtUtc);

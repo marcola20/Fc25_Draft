@@ -1,0 +1,247 @@
+@page "/draft/telao"
+@layout TelaoLayout
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Utilities
+@using Microsoft.AspNetCore.SignalR.Client
+@inject DraftStateService DraftState
+@inject EscudoService Escudos
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<Telao> Logger
+@implements IAsyncDisposable
+
+<PageTitle>Telão do Draft</PageTitle>
+
+<div class="telao">
+    @if (_dados is null)
+    {
+        <div class="vazio">Carregando o draft...</div>
+    }
+    else if (!_dados.State.HasDraft)
+    {
+        <div class="vazio">Nenhum draft em andamento.</div>
+    }
+    else
+    {
+        var s = _dados.State;
+
+        <header class="topo">
+            <img src="/images/logobranca.png" alt="CBFV" class="logo" />
+            <div class="titulo">
+                <div class="nome">@s.DraftName</div>
+                <div class="sub">
+                    @if (s.DraftCompleted)
+                    {
+                        <span>Draft encerrado</span>
+                    }
+                    else
+                    {
+                        <span>Rodada @s.CurrentRound · escolha @s.CurrentPickInRound · geral @s.CurrentOverallPick de @s.TotalPicks</span>
+                    }
+                </div>
+            </div>
+            <div class="progresso" title="@s.CompletedPicks de @s.TotalPicks escolhas">
+                <div style="width: @(s.TotalPicks == 0 ? 0 : s.CompletedPicks * 100 / s.TotalPicks)%;"></div>
+            </div>
+            <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia">⛶</button>
+        </header>
+
+        <main class="corpo">
+            <section class="vez @(Estourando ? "estourando" : "")">
+                @if (s.DraftCompleted)
+                {
+                    <div class="rotulo">🏁 Fim do draft</div>
+                    <div class="time-nome">Obrigado, técnicos!</div>
+                }
+                else if (s.AguardandoProtecao)
+                {
+                    <div class="rotulo">🛡️ Aguardando as listas de protegidos</div>
+                }
+                else
+                {
+                    <div class="rotulo">Na vez</div>
+                    <img src="@Escudos.GetEscudo(s.CurrentTeamName)" alt="" class="escudo-grande" />
+                    <div class="time-nome">@s.CurrentTeamName</div>
+                    @if (!string.IsNullOrWhiteSpace(s.CurrentTeamOwner))
+                    {
+                        <div class="tecnico">@s.CurrentTeamOwner</div>
+                    }
+
+                    @if (s.TempoPorEscolhaMinutos is not null)
+                    {
+                        <div class="relogio">
+                            @if (s.Pausado)
+                            {
+                                <span>⏸️ @Relogio.Formatar(Restante)</span>
+                            }
+                            else if (s.PrazoUtc is null)
+                            {
+                                <span class="espera">⏱️ @s.TempoPorEscolhaMinutos:00</span>
+                            }
+                            else
+                            {
+                                <span>@Relogio.Formatar(Restante)</span>
+                            }
+                        </div>
+                    }
+                }
+
+                @if (_dados.Proximos.Count > 0)
+                {
+                    <div class="proximos">
+                        <div class="rotulo-pequeno">Próximos</div>
+                        <div class="lista-proximos">
+                            @foreach (var p in _dados.Proximos)
+                            {
+                                <div class="proximo">
+                                    <img src="@Escudos.GetEscudo(p.TeamName)" alt="" />
+                                    <span>@p.TeamName</span>
+                                    <small>#@p.OverallPick</small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </section>
+
+            <section class="ultimas">
+                <div class="rotulo-pequeno">Últimas escolhas</div>
+                @if (_dados.Ultimas.Count == 0)
+                {
+                    <div class="sem-escolhas">Ninguém escolheu ainda.</div>
+                }
+                @foreach (var p in _dados.Ultimas)
+                {
+                    <div class="escolha @(p == _dados.Ultimas[0] ? "nova" : "")" @key="p.OverallPick">
+                        <img src="@Escudos.GetEscudo(p.TeamName)" alt="" />
+                        <div class="escolha-texto">
+                            <div class="jogador">
+                                @p.PlayerName
+                                @if (p.TempoEsgotado)
+                                {
+                                    <span class="selo" title="Tempo esgotado: o site escolheu">⏱️</span>
+                                }
+                                else if (p.Automatica)
+                                {
+                                    <span class="selo" title="Escolha automática">🤖</span>
+                                }
+                            </div>
+                            <div class="detalhe">@p.PositionName · @p.Overall · @p.TeamName</div>
+                        </div>
+                        <div class="numero">#@p.OverallPick</div>
+                    </div>
+                }
+            </section>
+        </main>
+
+        <footer class="rodada">
+            <div class="rotulo-pequeno">Rodada @(s.CurrentRound ?? _dados.RodadaAtual.FirstOrDefault()?.Round)</div>
+            <div class="grade">
+                @foreach (var p in _dados.RodadaAtual)
+                {
+                    <div class="celula @(p.OverallPick == s.CurrentOverallPick ? "atual" : p.PlayerId is null ? "pendente" : "feita")">
+                        <img src="@Escudos.GetEscudo(p.TeamName)" alt="" />
+                        <div class="celula-texto">
+                            <div class="celula-time">@p.PickInRound. @p.TeamName</div>
+                            <div class="celula-jogador">@(p.PlayerName ?? (p.OverallPick == s.CurrentOverallPick ? "escolhendo..." : "—"))</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </footer>
+    }
+</div>
+
+@code {
+    // Rede de segurança caso a conexão em tempo real caia: recarrega de tempos em tempos.
+    private static readonly TimeSpan Recarga = TimeSpan.FromSeconds(30);
+
+    private DraftTelaoDto? _dados;
+    private HubConnection? _hub;
+    private Timer? _tique;
+    private Timer? _recarga;
+    private readonly SemaphoreSlim _umaCarga = new(1, 1);
+
+    private TimeSpan Restante => _dados?.State.RestanteNaPausa is TimeSpan congelado ? congelado
+        : _dados?.State.PrazoUtc is DateTime prazo ? prazo - DateTime.UtcNow : TimeSpan.Zero;
+
+    private bool Estourando => _dados?.State is { Pausado: false, PrazoUtc: not null } && Restante.TotalSeconds < 60;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+
+        _hub = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/draft"))
+            .WithAutomaticReconnect()
+            .Build();
+        _hub.On("DraftAtualizado", () => InvokeAsync(async () =>
+        {
+            await CarregarAsync();
+            StateHasChanged();
+        }));
+
+        // Conecta logo depois de criar (no primeiro render a carga inicial ainda pode estar rodando).
+        try
+        {
+            await _hub.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Telão sem tempo real: segue recarregando a cada {Segundos}s.", Recarga.TotalSeconds);
+        }
+
+        _tique = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        _recarga = new Timer(_ => InvokeAsync(async () =>
+        {
+            await CarregarAsync();
+            StateHasChanged();
+        }), null, Recarga, Recarga);
+    }
+
+    // Uma carga por vez: aviso em tempo real e recarga periódica podem chegar juntos.
+    private async Task CarregarAsync()
+    {
+        if (!await _umaCarga.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            _dados = await DraftState.GetTelaoAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar o telão do draft.");
+        }
+        finally
+        {
+            _umaCarga.Release();
+        }
+    }
+
+    private async Task TelaCheiaAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("fc25Telao.telaCheia");
+        }
+        catch (JSException)
+        {
+            // Navegador sem suporte a tela cheia: segue normal.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _tique?.Dispose();
+        _recarga?.Dispose();
+        if (_hub is not null)
+        {
+            await _hub.DisposeAsync();
+        }
+        _umaCarga.Dispose();
+    }
+}

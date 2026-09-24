@@ -253,3 +253,12 @@ window.fc25ShareImage = (function () {
 
     return { capture: capture };
 })();
+
+// Telão do draft: tela cheia (precisa de um clique do usuário, regra do navegador).
+window.fc25Telao = {
+    telaCheia: function () {
+        const el = document.documentElement;
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        if (el.requestFullscreen) { el.requestFullscreen(); }
+    }
+};

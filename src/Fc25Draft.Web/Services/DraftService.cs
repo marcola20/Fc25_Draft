@@ -190,7 +190,8 @@ public class DraftService
         bool snake = false,
         IReadOnlyDictionary<int, (int? OverallMin, int? OverallMax)>? roundRules = null,
         string? name = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int? tempoPorEscolhaMinutos = null)
     {
         if (totalRounds <= 0)
         {
@@ -213,7 +214,8 @@ public class DraftService
             ? $"DRAFT - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
 
-        return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct);
+        return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct,
+            configure: d => d.TempoPorEscolhaMinutos = tempoPorEscolhaMinutos);
     }
 
     /// <summary>Só existe um draft ativo (o mais recente); um novo não pode começar antes de ele terminar.</summary>

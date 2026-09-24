@@ -1,0 +1,229 @@
+/* Telão do draft: pensado para TV/projetor (16:9), fundo escuro e letras grandes. */
+.telao {
+    --fundo: #0b1622;
+    --painel: #13243a;
+    --borda: #1f3a5c;
+    --texto: #f1f5f9;
+    --suave: #94a3b8;
+    --destaque: #f4d35e;
+    --perigo: #ef4444;
+    /* Altura travada na tela: no telão nada pode ficar para baixo (sem rolagem). */
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(circle at top, #16304f 0%, var(--fundo) 60%);
+    color: var(--texto);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5vh 2vw;
+    gap: 1.5vh;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.vazio {
+    margin: auto;
+    font-size: 3vh;
+    color: var(--suave);
+}
+
+.rotulo, .rotulo-pequeno {
+    text-transform: uppercase;
+    letter-spacing: .15em;
+    color: var(--destaque);
+    font-weight: 700;
+}
+
+.rotulo { font-size: 2.4vh; }
+.rotulo-pequeno { font-size: 1.6vh; margin-bottom: 1vh; }
+
+/* ── Topo ── */
+.topo {
+    display: flex;
+    align-items: center;
+    gap: 1.5vw;
+}
+
+.logo { height: 7vh; }
+
+.titulo .nome { font-size: 3.2vh; font-weight: 800; }
+.titulo .sub { font-size: 2vh; color: var(--suave); }
+
+.progresso {
+    flex: 1;
+    height: 1vh;
+    background: var(--painel);
+    border-radius: 1vh;
+    overflow: hidden;
+}
+
+    .progresso > div {
+        height: 100%;
+        background: var(--destaque);
+        transition: width .6s ease;
+    }
+
+.tela-cheia {
+    background: transparent;
+    border: 1px solid var(--borda);
+    color: var(--suave);
+    border-radius: .6vh;
+    font-size: 2.4vh;
+    padding: .2vh 1vw;
+}
+
+/* ── Corpo ── */
+.corpo {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1.5vw;
+    min-height: 0;
+}
+
+.vez, .ultimas, .rodada {
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 1.5vh;
+    padding: 2vh 1.5vw;
+}
+
+.vez {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1vh;
+    overflow: hidden;
+    transition: border-color .3s, box-shadow .3s;
+}
+
+    .vez.estourando {
+        border-color: var(--perigo);
+        box-shadow: 0 0 4vh rgba(239, 68, 68, .35);
+    }
+
+.escudo-grande {
+    height: 18vh;
+    width: 18vh;
+    object-fit: contain;
+    filter: drop-shadow(0 1vh 2vh rgba(0, 0, 0, .5));
+}
+
+.time-nome { font-size: 6vh; font-weight: 900; line-height: 1.05; }
+.tecnico { font-size: 2.4vh; color: var(--suave); }
+
+.relogio {
+    font-size: 10vh;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-top: 1vh;
+}
+
+.vez.estourando .relogio {
+    color: var(--perigo);
+    animation: pulsar 1s ease-in-out infinite;
+}
+
+.relogio .espera { color: var(--suave); }
+
+@keyframes pulsar {
+    50% { opacity: .55; }
+}
+
+.proximos {
+    width: 100%;
+    margin-top: auto;
+}
+
+.lista-proximos {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1vw;
+}
+
+.proximo {
+    display: flex;
+    align-items: center;
+    gap: .6vw;
+    background: rgba(255, 255, 255, .05);
+    border-radius: 1vh;
+    padding: .8vh .8vw;
+    font-size: 2vh;
+}
+
+    .proximo img { height: 3.6vh; width: 3.6vh; object-fit: contain; }
+    .proximo small { color: var(--suave); }
+
+/* ── Últimas escolhas ── */
+.ultimas {
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+    overflow: hidden;
+}
+
+.sem-escolhas { color: var(--suave); font-size: 2vh; }
+
+.escolha {
+    display: flex;
+    align-items: center;
+    gap: 1vw;
+    background: rgba(255, 255, 255, .04);
+    border-radius: 1vh;
+    padding: 1vh 1vw;
+}
+
+    .escolha img { height: 5vh; width: 5vh; object-fit: contain; }
+
+    /* A escolha mais recente entra deslizando e fica destacada. */
+    .escolha.nova {
+        background: rgba(244, 211, 94, .14);
+        border: 1px solid var(--destaque);
+        animation: entrar .7s ease-out;
+    }
+
+@keyframes entrar {
+    from { transform: translateX(-4vw); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
+.escolha-texto { flex: 1; min-width: 0; }
+.jogador { font-size: 2.6vh; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detalhe { font-size: 1.8vh; color: var(--suave); }
+.selo { font-size: 2vh; }
+.numero { font-size: 2vh; color: var(--suave); font-weight: 700; }
+
+/* ── Rodada atual ── */
+.grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11vw, 1fr));
+    gap: .8vh .6vw;
+}
+
+.celula {
+    display: flex;
+    align-items: center;
+    gap: .5vw;
+    border-radius: .8vh;
+    padding: .6vh .5vw;
+    background: rgba(255, 255, 255, .04);
+    min-width: 0;
+}
+
+    .celula img { height: 3.4vh; width: 3.4vh; object-fit: contain; }
+    .celula.pendente { opacity: .55; }
+    .celula.atual { outline: 2px solid var(--destaque); background: rgba(244, 211, 94, .1); }
+
+.celula-texto { min-width: 0; }
+.celula-time { font-size: 1.4vh; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.celula-jogador { font-size: 1.7vh; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Tela estreita (celular/tablet em pé): uma coluna. */
+@media (max-width: 900px) {
+    .telao { height: auto; min-height: 100vh; overflow: visible; }
+    .corpo { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .grade { grid-template-columns: repeat(auto-fill, minmax(40vw, 1fr)); }
+}

@@ -9,6 +9,7 @@
 @using Microsoft.JSInterop
 @inject DraftStateService DraftStateService
 @inject DraftAutoPickService AutoPickService
+@inject DraftAvisoTempoEsgotado AvisoTempo
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
 @inject ILogger<Fc25Draft.Web.Pages.Draft> Logger
@@ -52,6 +53,18 @@
 }
 
 <DraftStateCard IsLoading="@isLoadingState" State="@state" />
+
+<DraftRelogio State="@state" IsAdmin="@AdminAuth.IsAdmin" />
+
+@if (AvisoTempo.Ultimo is { } aviso && DateTime.UtcNow - aviso.Em < TimeSpan.FromHours(3) && !_avisoTempoFechado)
+{
+    <div class="alert alert-warning alert-dismissible" role="status">
+        <div class="fw-semibold mb-1">⏱️ Tempo esgotado: o site escolheu (@aviso.Em.ToLocalTime().ToString("HH:mm"))</div>
+        <div style="white-space: pre-line;">@aviso.Selecao.Mensagem</div>
+        <button type="button" class="btn btn-success btn-sm mt-2" @onclick="() => CompartilharAsync(aviso.Selecao)">Compartilhar no WhatsApp</button>
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => _avisoTempoFechado = true"></button>
+    </div>
+}
 
 @if (state is { HasDraft: true, DraftCompleted: false })
 {
@@ -206,6 +219,18 @@
             });
             return Task.CompletedTask;
         };
+
+        // Conecta aqui, logo depois de criar. Antes a conexão só começava no primeiro render, que o Blazor
+        // faz enquanto a carga inicial ainda roda: nesse momento ela não existia e a página nunca se conectava.
+        try
+        {
+            await hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            connectionError = "Não foi possível conectar às atualizações automáticas do draft.";
+            Logger.LogError(ex, "Erro ao iniciar conexão com o hub de draft.");
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -215,22 +240,6 @@
             await AdminAuth.EnsureInitializedAsync();
             authInitialized = true;
             RefreshDraftHeader();
-        }
-
-        if (!firstRender || hubConnection is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await hubConnection.StartAsync();
-        }
-        catch (Exception ex)
-        {
-            connectionError = "Não foi possível conectar às atualizações automáticas do draft.";
-            Logger.LogError(ex, "Erro ao iniciar conexão com o hub de draft.");
-            StateHasChanged();
         }
     }
 
@@ -249,11 +258,37 @@
         }
     }
 
-    private async Task RefreshAsync()
+    // No Blazor Server a página divide a mesma conexão com o banco. Com o tempo real funcionando, um aviso
+    // do draft pode chegar enquanto a página já carrega algo (ex.: logo depois de confirmar uma escolha):
+    // as cargas entram numa fila, uma por vez.
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
+    private async Task UmPorVezAsync(Func<Task> acao)
+    {
+        await _umaPorVez.WaitAsync();
+        try
+        {
+            await acao();
+        }
+        finally
+        {
+            _umaPorVez.Release();
+        }
+    }
+
+    private Task RefreshAsync() => UmPorVezAsync(RefreshSemTravaAsync);
+
+    private Task LoadStateAsync() => UmPorVezAsync(CarregarEstadoAsync);
+
+    private Task LoadPlayersAsync() => UmPorVezAsync(CarregarJogadoresAsync);
+
+    private Task ConfirmPickAsync() => UmPorVezAsync(ConfirmarSemTravaAsync);
+
+    private async Task RefreshSemTravaAsync()
     {
         errorMessage = null;
-        await LoadStateAsync();
-        await LoadPlayersAsync();
+        await CarregarEstadoAsync();
+        await CarregarJogadoresAsync();
     }
 
     private async Task OnFilterChangedAsync(DraftPlayerFilters.PlayerFilterState filter)
@@ -365,6 +400,37 @@
             return;
         }
 
+        string? tempoInput;
+        try
+        {
+            tempoInput = await JSRuntime.InvokeAsync<string?>("prompt",
+                "Tempo por escolha, em minutos (ex.: 3 ao vivo, 240 pelo WhatsApp). Deixe vazio para sem limite.", "");
+        }
+        catch (JSException ex)
+        {
+            statusCss = "alert-danger";
+            statusMessage = $"Não foi possível solicitar o tempo por escolha: {ex.Message}";
+            return;
+        }
+
+        if (tempoInput is null)
+        {
+            return;
+        }
+
+        int? tempoPorEscolha = null;
+        if (!string.IsNullOrWhiteSpace(tempoInput))
+        {
+            if (!int.TryParse(tempoInput, out var minutos) || minutos <= 0)
+            {
+                statusCss = "alert-warning";
+                statusMessage = "Informe o tempo por escolha em minutos (maior que zero) ou deixe vazio.";
+                return;
+            }
+
+            tempoPorEscolha = minutos;
+        }
+
         var roundRules = new List<DraftRoundRuleDto>(totalRounds);
 
         for (var round = 1; round <= totalRounds; round++)
@@ -438,7 +504,7 @@
         {
             var client = await ApiClientFactory.CreateAsync(includeAdminToken: true);
             var uri = new Uri(new Uri(Navigation.BaseUri), "api/admin/draft/generate");
-            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, false, roundRules, draftName));
+            var response = await client.PostAsJsonAsync(uri, new GenerateDraftRequestDto(totalRounds, false, roundRules, draftName, tempoPorEscolha));
 
             if (response.IsSuccessStatusCode)
             {
@@ -508,7 +574,7 @@
         }
     }
 
-    private async Task LoadStateAsync()
+    private async Task CarregarEstadoAsync()
     {
         isLoadingState = true;
         try
@@ -527,7 +593,7 @@
         }
     }
 
-    private async Task LoadPlayersAsync()
+    private async Task CarregarJogadoresAsync()
     {
         if (currentFilter.OverallMin.HasValue && currentFilter.OverallMax.HasValue && currentFilter.OverallMin > currentFilter.OverallMax)
         {
@@ -577,7 +643,7 @@
         modalError = null;
     }
 
-    private async Task ConfirmPickAsync()
+    private async Task ConfirmarSemTravaAsync()
     {
         if (selectedPlayer is null)
         {
@@ -595,7 +661,7 @@
             shareFeedback = null;
             statusMessage = result.Selection?.Mensagem ?? "✅ Jogador selecionado com sucesso!";
             statusCss = "alert-success";
-            await LoadPlayersAsync();
+            await CarregarJogadoresAsync();
             CloseModal();
         }
         catch (InvalidOperationException ex)
@@ -623,6 +689,20 @@
         {
             statusMessage = null;
             lastSelection = null;
+        }
+    }
+
+    private bool _avisoTempoFechado;
+
+    private async Task CompartilharAsync(DraftPickSelectionDto selecao)
+    {
+        try
+        {
+            await JSRuntime.InvokeAsync<string>("fc25Share.openWhatsapp", selecao.ShareUrl, selecao.WhatsappGroupLink, selecao.Mensagem);
+        }
+        catch (JSException ex)
+        {
+            Logger.LogError(ex, "Erro ao compartilhar no WhatsApp.");
         }
     }
 

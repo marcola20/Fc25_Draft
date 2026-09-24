@@ -1,0 +1,121 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Utilities
+@inject IServiceScopeFactory Scopes
+@implements IDisposable
+
+@* Contagem regressiva da vez atual e, para o admin, os controles do relógio. *@
+
+@if (State is { HasDraft: true, DraftCompleted: false })
+{
+    <div class="card mb-3 @(Estourando ? "border-danger" : "")">
+        <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+            @if (State.TempoPorEscolhaMinutos is null)
+            {
+                <span class="text-muted small">⏱️ Sem limite de tempo por escolha.</span>
+            }
+            else if (State.Pausado)
+            {
+                <span class="fw-semibold">⏸️ Relógio pausado</span>
+                <span class="text-muted small">(@Relogio.Formatar(Restante) restantes para @State.CurrentTeamName)</span>
+            }
+            else if (State.PrazoUtc is null)
+            {
+                <span class="text-muted small">⏱️ @State.TempoPorEscolhaMinutos min por escolha: o relógio começa em instantes.</span>
+            }
+            else
+            {
+                <span class="fs-4 fw-bold font-monospace @(Estourando ? "text-danger" : "")">⏱️ @Relogio.Formatar(Restante)</span>
+                <span class="small">para <strong>@State.CurrentTeamName</strong> escolher · @State.TempoPorEscolhaMinutos min por escolha</span>
+                <span class="small text-muted">Estourou: usa a escolha automática; sem lista, o melhor overall disponível.</span>
+            }
+
+            @if (IsAdmin)
+            {
+                <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+                    <div class="input-group input-group-sm" style="width: 190px;">
+                        <input type="number" min="1" class="form-control" placeholder="sem limite" title="Minutos por escolha"
+                               value="@_minutos" @onchange="e => _minutos = int.TryParse(e.Value?.ToString(), out var m) ? m : null" />
+                        <button type="button" class="btn btn-outline-primary" disabled="@_salvando" @onclick="DefinirTempoAsync"
+                                title="A vez atual recomeça do zero">min ✓</button>
+                    </div>
+                    @if (State.TempoPorEscolhaMinutos is not null)
+                    {
+                        @if (State.Pausado)
+                        {
+                            <button type="button" class="btn btn-sm btn-success" disabled="@_salvando" @onclick="RetomarAsync">▶️ Retomar</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-warning" disabled="@_salvando" @onclick="PausarAsync">⏸️ Pausar</button>
+                        }
+                    }
+                    <a href="/draft/telao" target="_blank" class="btn btn-sm btn-dark">📺 Telão</a>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_erro))
+                {
+                    <div class="w-100 small text-danger">@_erro</div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public DraftStateDto? State { get; set; }
+    [Parameter] public bool IsAdmin { get; set; }
+
+    private Timer? _tique;
+    private int? _minutos;
+    private int? _minutosDoDraft;
+    private bool _salvando;
+    private string? _erro;
+
+    private TimeSpan Restante => State?.RestanteNaPausa is TimeSpan congelado ? congelado
+        : State?.PrazoUtc is DateTime prazo ? prazo - DateTime.UtcNow : TimeSpan.Zero;
+
+    // Último minuto em vermelho.
+    private bool Estourando => State is { Pausado: false, PrazoUtc: not null } && Restante.TotalSeconds < 60;
+
+    protected override void OnInitialized()
+    {
+        // Atualiza a contagem a cada segundo (o prazo vem do servidor; aqui só se desconta o tempo).
+        _tique = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    protected override void OnParametersSet()
+    {
+        // O campo acompanha o tempo do draft, sem apagar o que o admin está digitando.
+        if (State?.TempoPorEscolhaMinutos != _minutosDoDraft)
+        {
+            _minutosDoDraft = State?.TempoPorEscolhaMinutos;
+            _minutos = _minutosDoDraft;
+        }
+    }
+
+    // Cada ação usa um escopo próprio: a página pode estar recarregando o estado na mesma hora.
+    private async Task ExecutarAsync(Func<DraftStateService, Task> acao)
+    {
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await using var scope = Scopes.CreateAsyncScope();
+            await acao(scope.ServiceProvider.GetRequiredService<DraftStateService>());
+        }
+        catch (InvalidOperationException ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private Task DefinirTempoAsync() => ExecutarAsync(s => s.DefinirTempoAsync(_minutos));
+    private Task PausarAsync() => ExecutarAsync(s => s.PausarAsync());
+    private Task RetomarAsync() => ExecutarAsync(s => s.RetomarAsync());
+
+    public void Dispose() => _tique?.Dispose();
+}

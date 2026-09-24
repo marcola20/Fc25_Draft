@@ -37,7 +37,9 @@ public class DraftStateService
 
     public async Task<DraftStateDto> GetStateAsync(CancellationToken ct = default)
     {
+        // Sem rastrear: o relógio (VezIniciadaEm, PausadoEm) é atualizado por outro contexto.
         var draft = await _db.Drafts
+            .AsNoTracking()
             .OrderByDescending(d => d.CreatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
@@ -92,6 +94,26 @@ public class DraftStateService
             }
         }
 
+        var aguardandoProtecao = draft.Tipo == DraftTipo.Expansao && draft.ProtecaoEncerradaEm is null && currentPick is not null;
+
+        // Prazo da vez; pausado, o tempo que falta fica congelado.
+        DateTime? prazo = null;
+        TimeSpan? restanteNaPausa = null;
+        if (draft.TempoPorEscolhaMinutos is int minutos && currentPick is not null && !aguardandoProtecao
+            && draft.VezIniciadaEm is DateTime inicio)
+        {
+            var fim = DateTime.SpecifyKind(inicio, DateTimeKind.Utc).AddMinutes(minutos);
+            if (draft.PausadoEm is DateTime pausa)
+            {
+                restanteNaPausa = fim - DateTime.SpecifyKind(pausa, DateTimeKind.Utc);
+                prazo = DateTime.UtcNow + restanteNaPausa.Value;
+            }
+            else
+            {
+                prazo = fim;
+            }
+        }
+
         return new DraftStateDto(
             draft.DraftId,
             draft.Name,
@@ -110,7 +132,11 @@ public class DraftStateService
             nextTeamOwner,
             currentPick is null && totalPicks > 0 && completedPicks == totalPicks,
             draft.Tipo == DraftTipo.Expansao,
-            draft.Tipo == DraftTipo.Expansao && draft.ProtecaoEncerradaEm is null && currentPick is not null);
+            aguardandoProtecao,
+            draft.TempoPorEscolhaMinutos,
+            prazo,
+            draft.PausadoEm is not null,
+            restanteNaPausa);
     }
 
     public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(
@@ -305,7 +331,7 @@ public class DraftStateService
     /// <summary>Limite de segurança da sequência automática (bem acima de qualquer draft real).</summary>
     private const int MaxEscolhasAutomaticasSeguidas = 1000;
 
-    private sealed record EscolhaRegistrada(DraftPick Pick, Player Player, string? FromTeam, bool Automatica);
+    private sealed record EscolhaRegistrada(DraftPick Pick, Player Player, string? FromTeam, bool Automatica, bool TempoEsgotado = false);
 
     public async Task<DraftPickResultDto> MakePickAsync(int playerId, string token, CancellationToken ct = default)
     {
@@ -438,6 +464,9 @@ public class DraftStateService
 
         currentPick.PlayerId = player.PlayerId;
         currentPick.PickedAtUtc = DateTime.UtcNow;
+
+        // A vez passa para o próximo: o relógio dele começa agora.
+        draft.VezIniciadaEm = DateTime.UtcNow;
         return fromTeam;
     }
 
@@ -472,7 +501,10 @@ public class DraftStateService
         return feitas;
     }
 
-    private async Task<EscolhaRegistrada?> TentarEscolhaAutomaticaAsync(CancellationToken ct)
+    /// <param name="tempoEsgotado">
+    /// Chamado pelo relógio: sem lista (ou com a lista esgotada), escolhe o melhor overall disponível na rodada.
+    /// </param>
+    private async Task<EscolhaRegistrada?> TentarEscolhaAutomaticaAsync(CancellationToken ct, bool tempoEsgotado = false)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
 
@@ -500,54 +532,26 @@ public class DraftStateService
                 return null;
             }
 
-            var config = await _db.DraftAutoPicks
-                .AsNoTracking()
-                .Where(c => c.DraftId == draft.DraftId && c.TeamId == currentPick.TeamId && c.Ativo)
-                .Select(c => new { c.Modo })
-                .FirstOrDefaultAsync(ct);
-
-            if (config is null)
-            {
-                return null;
-            }
-
-            short? listaPositionId = null;
-            if (config.Modo == DraftAutoPickModo.Posicao)
-            {
-                listaPositionId = await _db.DraftAutoPickRodadas
-                    .AsNoTracking()
-                    .Where(r => r.DraftId == draft.DraftId && r.TeamId == currentPick.TeamId && r.RoundNumber == currentPick.RoundNumber)
-                    .Select(r => (short?)r.PositionId)
-                    .FirstOrDefaultAsync(ct);
-
-                if (listaPositionId is null)
-                {
-                    return null;
-                }
-            }
-
-            var candidatos = await _db.DraftAutoPickItens
-                .AsNoTracking()
-                .Where(i => i.DraftId == draft.DraftId && i.TeamId == currentPick.TeamId && i.PositionId == listaPositionId)
-                .OrderBy(i => i.Ordem)
-                .Select(i => i.PlayerId)
-                .ToListAsync(ct);
-
-            if (candidatos.Count == 0)
-            {
-                return null;
-            }
-
-            var disponiveis = await (await ConsultaDisponiveisAsync(draft, currentPick.RoundNumber, ct))
-                .Where(p => candidatos.Contains(p.PlayerId))
-                .Select(p => p.PlayerId)
-                .ToListAsync(ct);
-
-            var escolhidoId = candidatos.FirstOrDefault(disponiveis.Contains);
+            var escolhidoId = await CandidatoDaListaAsync(draft, currentPick, ct);
             if (escolhidoId == 0)
             {
-                // Lista esgotada: o time escolhe manualmente.
-                return null;
+                if (!tempoEsgotado)
+                {
+                    // Sem lista ou lista esgotada: o time escolhe manualmente.
+                    return null;
+                }
+
+                escolhidoId = await (await ConsultaDisponiveisAsync(draft, currentPick.RoundNumber, ct))
+                    .OrderByDescending(p => p.Overall)
+                    .ThenBy(p => p.Name)
+                    .Select(p => p.PlayerId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (escolhidoId == 0)
+                {
+                    _logger.LogWarning("Tempo esgotado sem nenhum jogador disponível na rodada {Rodada}.", currentPick.RoundNumber);
+                    return null;
+                }
             }
 
             var player = await _db.Players
@@ -556,12 +560,230 @@ public class DraftStateService
 
             var fromTeam = await AplicarEscolhaAsync(draft, currentPick, player, ct);
             currentPick.Automatica = true;
+            currentPick.TempoEsgotado = tempoEsgotado;
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            return new EscolhaRegistrada(currentPick, player, fromTeam?.TeamName, true);
+            return new EscolhaRegistrada(currentPick, player, fromTeam?.TeamName, true, tempoEsgotado);
         });
+    }
+
+    /// <summary>Primeiro jogador da lista ativa do time da vez ainda disponível na rodada; 0 se não houver.</summary>
+    private async Task<int> CandidatoDaListaAsync(Draft draft, DraftPick currentPick, CancellationToken ct)
+    {
+        var config = await _db.DraftAutoPicks
+            .AsNoTracking()
+            .Where(c => c.DraftId == draft.DraftId && c.TeamId == currentPick.TeamId && c.Ativo)
+            .Select(c => new { c.Modo })
+            .FirstOrDefaultAsync(ct);
+
+        if (config is null)
+        {
+            return 0;
+        }
+
+        short? listaPositionId = null;
+        if (config.Modo == DraftAutoPickModo.Posicao)
+        {
+            listaPositionId = await _db.DraftAutoPickRodadas
+                .AsNoTracking()
+                .Where(r => r.DraftId == draft.DraftId && r.TeamId == currentPick.TeamId && r.RoundNumber == currentPick.RoundNumber)
+                .Select(r => (short?)r.PositionId)
+                .FirstOrDefaultAsync(ct);
+
+            if (listaPositionId is null)
+            {
+                return 0;
+            }
+        }
+
+        var candidatos = await _db.DraftAutoPickItens
+            .AsNoTracking()
+            .Where(i => i.DraftId == draft.DraftId && i.TeamId == currentPick.TeamId && i.PositionId == listaPositionId)
+            .OrderBy(i => i.Ordem)
+            .Select(i => i.PlayerId)
+            .ToListAsync(ct);
+
+        if (candidatos.Count == 0)
+        {
+            return 0;
+        }
+
+        var disponiveis = await (await ConsultaDisponiveisAsync(draft, currentPick.RoundNumber, ct))
+            .Where(p => candidatos.Contains(p.PlayerId))
+            .Select(p => p.PlayerId)
+            .ToListAsync(ct);
+
+        return candidatos.FirstOrDefault(disponiveis.Contains);
+    }
+
+    // ── Relógio ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Chamado pelo relógio (a cada poucos segundos): se o tempo da vez acabou, escolhe pelo time
+    /// (lista dele ou melhor overall) e segue a sequência de escolhas automáticas. Nulo se nada mudou.
+    /// </summary>
+    public async Task<DraftPickResultDto?> ProcessarTempoEsgotadoAsync(CancellationToken ct = default)
+    {
+        await PickLock.WaitAsync(ct);
+        try
+        {
+            var draft = await _db.Drafts
+                .AsNoTracking()
+                .OrderByDescending(d => d.CreatedAtUtc)
+                .FirstOrDefaultAsync(ct);
+
+            if (draft?.TempoPorEscolhaMinutos is not int minutos || draft.PausadoEm is not null
+                || (draft.Tipo == DraftTipo.Expansao && draft.ProtecaoEncerradaEm is null))
+            {
+                return null;
+            }
+
+            if (!await _db.DraftPicks.AnyAsync(p => p.DraftId == draft.DraftId && p.PlayerId == null, ct))
+            {
+                return null;
+            }
+
+            var agora = DateTime.UtcNow;
+
+            // Relógio ainda parado (draft novo, tempo recém-definido, proteção recém-encerrada): começa agora.
+            var inicio = draft.VezIniciadaEm;
+            if (inicio is null || (draft.ProtecaoEncerradaEm is DateTime encerrada && inicio < encerrada))
+            {
+                await _db.Drafts
+                    .Where(d => d.DraftId == draft.DraftId)
+                    .ExecuteUpdateAsync(set => set.SetProperty(d => d.VezIniciadaEm, agora), ct);
+                return null;
+            }
+
+            if (inicio.Value.AddMinutes(minutos) > agora)
+            {
+                return null;
+            }
+
+            var escolha = await TentarEscolhaAutomaticaAsync(ct, tempoEsgotado: true);
+            if (escolha is null)
+            {
+                return null;
+            }
+
+            var escolhas = new List<EscolhaRegistrada> { escolha };
+            escolhas.AddRange(await ExecutarAutomaticasAsync(ct));
+            return await FinalizarSequenciaAsync(escolhas, ct);
+        }
+        finally
+        {
+            PickLock.Release();
+        }
+    }
+
+    /// <summary>Define o tempo por escolha do draft em andamento (nulo = sem limite). A vez atual recomeça do zero.</summary>
+    public async Task DefinirTempoAsync(int? minutos, CancellationToken ct = default)
+    {
+        if (minutos is <= 0)
+        {
+            throw new InvalidOperationException("O tempo por escolha precisa ser maior que zero (ou vazio para sem limite).");
+        }
+
+        var draftId = await DraftAtualIdAsync(ct);
+        var agora = DateTime.UtcNow;
+        await _db.Drafts
+            .Where(d => d.DraftId == draftId)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(d => d.TempoPorEscolhaMinutos, minutos)
+                .SetProperty(d => d.VezIniciadaEm, agora), ct);
+        await AvisarAtualizacaoAsync(ct);
+    }
+
+    public async Task PausarAsync(CancellationToken ct = default)
+    {
+        var draftId = await DraftAtualIdAsync(ct);
+        var agora = DateTime.UtcNow;
+        await _db.Drafts
+            .Where(d => d.DraftId == draftId && d.PausadoEm == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(d => d.PausadoEm, agora), ct);
+        await AvisarAtualizacaoAsync(ct);
+    }
+
+    /// <summary>Retoma o relógio: o tempo que ficou parado é devolvido à vez atual.</summary>
+    public async Task RetomarAsync(CancellationToken ct = default)
+    {
+        var draft = await _db.Drafts
+            .AsNoTracking()
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Select(d => new { d.DraftId, d.VezIniciadaEm, d.PausadoEm })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("Nenhum draft encontrado.");
+
+        if (draft.PausadoEm is not DateTime pausa)
+        {
+            return;
+        }
+
+        DateTime? novoInicio = draft.VezIniciadaEm is DateTime inicio ? inicio + (DateTime.UtcNow - pausa) : null;
+        await _db.Drafts
+            .Where(d => d.DraftId == draft.DraftId)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(d => d.VezIniciadaEm, novoInicio)
+                .SetProperty(d => d.PausadoEm, (DateTime?)null), ct);
+        await AvisarAtualizacaoAsync(ct);
+    }
+
+    private async Task<Guid> DraftAtualIdAsync(CancellationToken ct) =>
+        await _db.Drafts
+            .AsNoTracking()
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Select(d => (Guid?)d.DraftId)
+            .FirstOrDefaultAsync(ct)
+        ?? throw new InvalidOperationException("Nenhum draft encontrado.");
+
+    private async Task AvisarAtualizacaoAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Falha ao enviar notificação de atualização do draft.");
+        }
+    }
+
+    // ── Telão ────────────────────────────────────────────────────────────────
+
+    private const int ProximosNoTelao = 6;
+    private const int UltimasNoTelao = 8;
+
+    /// <summary>Tudo o que o telão do draft mostra: a vez, os próximos, as últimas escolhas e a rodada atual.</summary>
+    public async Task<DraftTelaoDto> GetTelaoAsync(CancellationToken ct = default)
+    {
+        var state = await GetStateAsync(ct);
+        if (state.DraftId is not Guid draftId)
+        {
+            return new DraftTelaoDto(state, Array.Empty<DraftTelaoPickDto>(), Array.Empty<DraftTelaoPickDto>(), Array.Empty<DraftTelaoPickDto>());
+        }
+
+        var picks = await _db.DraftPicks
+            .AsNoTracking()
+            .Where(p => p.DraftId == draftId)
+            .OrderBy(p => p.OverallPick)
+            .Select(p => new DraftTelaoPickDto(
+                p.RoundNumber, p.PickInRound, p.OverallPick, p.TeamId, p.Team.TeamName, p.Team.OwnerName,
+                p.PlayerId,
+                p.Player != null ? p.Player.Name : null,
+                p.Player != null ? p.Player.Position.Name : null,
+                p.Player != null ? p.Player.Overall : null,
+                p.Automatica, p.TempoEsgotado, p.PickedAtUtc))
+            .ToListAsync(ct);
+
+        var rodada = state.CurrentRound ?? picks.Select(p => (int?)p.Round).Max() ?? 1;
+
+        return new DraftTelaoDto(
+            state,
+            picks.Where(p => p.PlayerId is null && p.OverallPick != state.CurrentOverallPick).Take(ProximosNoTelao).ToList(),
+            picks.Where(p => p.PlayerId is not null).OrderByDescending(p => p.PickedAtUtc).ThenByDescending(p => p.OverallPick).Take(UltimasNoTelao).ToList(),
+            picks.Where(p => p.Round == rodada).ToList());
     }
 
     private async Task<DraftPickResultDto> FinalizarSequenciaAsync(IReadOnlyList<EscolhaRegistrada> escolhas, CancellationToken ct)
@@ -586,7 +808,8 @@ public class DraftStateService
                 e.Pick.Team.TeamName,
                 PlayerLabel(e),
                 e.Player.Position.Name,
-                e.Automatica))
+                e.Automatica,
+                e.TempoEsgotado))
             .ToList();
 
         return new DraftPickResultDto(state, selection, resumo);
@@ -641,9 +864,10 @@ public class DraftStateService
             return BuildWhatsappMessage(e.Pick.Team.TeamName, PlayerLabel(e), e.Pick.PickInRound, e.Pick.RoundNumber, nextTeam);
         }
 
-        var linhas = escolhas.Select(e =>
-            $"{(e.Automatica ? "🤖 " : "")}{e.Pick.Team.TeamName} escolheu {PlayerLabel(e)}"
-            + $"{(e.Automatica ? " (automática)" : "")} com a escolha {e.Pick.PickInRound} da rodada {e.Pick.RoundNumber}!");
+        var linhas = escolhas.Select(e => e.TempoEsgotado
+            ? $"⏱️ {e.Pick.Team.TeamName} estourou o tempo e ficou com {PlayerLabel(e)} na escolha {e.Pick.PickInRound} da rodada {e.Pick.RoundNumber}!"
+            : $"{(e.Automatica ? "🤖 " : "")}{e.Pick.Team.TeamName} escolheu {PlayerLabel(e)}"
+              + $"{(e.Automatica ? " (automática)" : "")} com a escolha {e.Pick.PickInRound} da rodada {e.Pick.RoundNumber}!");
 
         return string.Join("\n", linhas) + $"\nPróximo a escolher: {nextTeam}.";
     }

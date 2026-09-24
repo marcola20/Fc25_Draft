@@ -26,6 +26,8 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<DraftStateService>();
             services.AddScoped<DraftExpansaoService>();
             services.AddScoped<DraftAutoPickService>();
+            services.AddSingleton<DraftAvisoTempoEsgotado>();
+            services.AddHostedService<DraftRelogioService>();
             services.AddScoped<DraftAdminService>();
             services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();

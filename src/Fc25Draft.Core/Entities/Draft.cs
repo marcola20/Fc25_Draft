@@ -25,6 +25,16 @@ namespace Fc25Draft.Core.Entities
         /// <summary>Quando as listas de protegidos foram fechadas; as escolhas só começam depois disso.</summary>
         public DateTime? ProtecaoEncerradaEm { get; set; }
 
+        // ── Relógio ──
+        /// <summary>Minutos que cada time tem para escolher; nulo = sem limite.</summary>
+        public int? TempoPorEscolhaMinutos { get; set; }
+
+        /// <summary>Quando começou a vez atual (zera a cada escolha). Nulo = o relógio começa na próxima checagem.</summary>
+        public DateTime? VezIniciadaEm { get; set; }
+
+        /// <summary>Relógio parado pelo admin desde este momento.</summary>
+        public DateTime? PausadoEm { get; set; }
+
         public ICollection<DraftRound> Rounds { get; set; } = new List<DraftRound>();
         public ICollection<DraftPick> Picks { get; set; } = new List<DraftPick>();
         public ICollection<DraftProtecao> Protecoes { get; set; } = new List<DraftProtecao>();
