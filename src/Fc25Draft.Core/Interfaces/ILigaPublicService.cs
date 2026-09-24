@@ -41,6 +41,9 @@ public interface ILigaPublicService
     /// <summary>Recordes de todas as temporadas: jogos, sequências, campanhas e jogadores.</summary>
     Task<RecordesLigaDto> GetRecordesAsync(CancellationToken ct);
 
+    /// <summary>Destaques do momento para a página inicial: líderes, melhor fase, artilheiro e maior transferência.</summary>
+    Task<DestaquesDto> GetDestaquesAsync(CancellationToken ct);
+
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
 

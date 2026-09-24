@@ -1055,6 +1055,91 @@ public class LigaPublicService : ILigaPublicService
         return RecordesLiga.Calcular(partidas, gols, campanhas, nomes);
     }
 
+    private const int DiasMaiorTransferencia = 7;
+
+    public async Task<DestaquesDto> GetDestaquesAsync(CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var ativas = await _db.Ligas.AsNoTracking()
+            .Where(l => l.Status != LigaStatus.Encerrada)
+            .OrderBy(l => l.Divisao)
+            .ThenByDescending(l => l.CriadoEm)
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo })
+            .ToListAsync(ct);
+        var ativaIds = ativas.Select(l => l.LigaId).ToList();
+
+        // Líder de cada liga (na Copa a tabela é por grupo; na Supercopa não há tabela).
+        var lideres = new List<DestaqueLiderDto>();
+        foreach (var liga in ativas.Where(l => l.Tipo == TipoCompetition.Liga))
+        {
+            var lider = (await GetClassificacaoAsync(liga.LigaId, ct)).FirstOrDefault();
+            if (lider is not null && lider.Jogos > 0)
+                lideres.Add(new DestaqueLiderDto(liga.LigaId, liga.Nome, lider.TimeId, lider.TimeNome, lider.Pontos, lider.Jogos));
+        }
+
+        // Melhor fase: maior invencibilidade atual (vitórias seguidas desempatam).
+        var timesAtivos = await _db.LigaClassificacoes.AsNoTracking()
+            .Where(c => ativaIds.Contains(c.LigaId))
+            .Select(c => c.TimeId)
+            .Distinct()
+            .ToListAsync(ct);
+        var partidas = await CarregarPartidasPerfilAsync(null, ct);
+        var fases = timesAtivos
+            .Select(t => TimePerfil.Calcular(t, partidas, nomes))
+            .Where(p => p.UltimosJogos.Count > 0)
+            .Select(p => new
+            {
+                Perfil = p,
+                Vitorias = p.UltimosJogos.TakeWhile(j => j.Resultado == "V").Count(),
+                Invicto = p.UltimosJogos.TakeWhile(j => j.Resultado != "D").Count()
+            })
+            .ToList();
+        var melhor = fases
+            .Where(f => f.Invicto >= 2)
+            .OrderByDescending(f => f.Invicto)
+            .ThenByDescending(f => f.Vitorias)
+            .FirstOrDefault();
+        var melhorFase = melhor is null
+            ? null
+            : new DestaqueFaseDto(melhor.Perfil.TimeId, nomes.GetValueOrDefault(melhor.Perfil.TimeId, "?"),
+                melhor.Perfil.SequenciaAtual!, melhor.Perfil.SequenciaTipo!);
+
+        // Artilheiro da temporada = gols nas competições em andamento.
+        var golsTemporada = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Tipo == TipoEvento.Gol && ativaIds.Contains(e.Partida.Rodada.LigaId))
+            .Select(e => new { e.JogadorId, e.Jogador.Name, e.TimeId })
+            .ToListAsync(ct);
+        var porJogador = golsTemporada
+            .GroupBy(g => g.JogadorId)
+            .Select(g => new DestaqueArtilheiroDto(g.Key, g.First().Name,
+                nomes.GetValueOrDefault(g.GroupBy(x => x.TimeId).OrderByDescending(x => x.Count()).First().Key, "?"),
+                g.Count()))
+            .ToList();
+        var maxGols = porJogador.Count == 0 ? 0 : porJogador.Max(a => a.Gols);
+        var artilheiros = porJogador
+            .Where(a => a.Gols == maxGols && maxGols > 0)
+            .OrderBy(a => a.Nome, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var desde = DateTime.UtcNow.AddDays(-DiasMaiorTransferencia);
+        var maior = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.PerformedAtUtc >= desde && t.Amount != null
+                        && (t.Type == TransferType.MarketAuction || t.Type == TransferType.TeamSale))
+            .OrderByDescending(t => t.Amount)
+            .Select(t => new { t.PlayerId, t.Player.Name, t.FromTeamId, t.ToTeamId, t.Amount, t.PerformedAtUtc })
+            .FirstOrDefaultAsync(ct);
+        var maiorTransferencia = maior is null
+            ? null
+            : new DestaqueTransferenciaDto(maior.PlayerId, maior.Name,
+                maior.FromTeamId is Guid de ? nomes.GetValueOrDefault(de) : null,
+                maior.ToTeamId is Guid para ? nomes.GetValueOrDefault(para) : null,
+                maior.Amount!.Value, maior.PerformedAtUtc);
+
+        return new DestaquesDto(lideres, melhorFase, artilheiros, maiorTransferencia);
+    }
+
     /// <summary>
     /// Partidas no formato do perfil (com competição e etapa já rotuladas). Com <paramref name="timeId"/>,
     /// só as daquele time; sem, todas.

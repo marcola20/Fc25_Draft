@@ -1,0 +1,105 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@inject ILigaPublicService LigaService
+@inject EscudoService Escudos
+
+@* O que está acontecendo agora na liga: aparece no topo da Central CBFV. *@
+
+@if (_dados is not null && TemAlgo)
+{
+    <h5 class="text-uppercase text-muted small fw-bold mb-2">Destaques</h5>
+    <div class="row g-3 mb-4">
+        @foreach (var lider in _dados.Lideres)
+        {
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="/liga?liga=@lider.LigaId" class="card h-100 text-decoration-none text-body border-warning">
+                    <div class="card-body">
+                        <div class="small text-muted">🏆 Líder · @lider.LigaNome</div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" width="32" height="32" style="object-fit: contain;" />
+                            <span class="fs-5 fw-bold">@lider.TimeNome</span>
+                        </div>
+                        <div class="small text-muted mt-1">@lider.Pontos pontos em @lider.Jogos jogos</div>
+                    </div>
+                </a>
+            </div>
+        }
+
+        @if (_dados.MelhorFase is { } fase)
+        {
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="/teams/details/@fase.TimeId" class="card h-100 text-decoration-none text-body border-success">
+                    <div class="card-body">
+                        <div class="small text-muted">🔥 Em melhor fase</div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <img src="@Escudos.GetEscudo(fase.TimeNome)" alt="" width="32" height="32" style="object-fit: contain;" />
+                            <span class="fs-5 fw-bold">@fase.TimeNome</span>
+                        </div>
+                        <div class="small text-success fw-semibold mt-1">@fase.Sequencia</div>
+                    </div>
+                </a>
+            </div>
+        }
+
+        @if (_dados.Artilheiros.Count > 0)
+        {
+            var a = _dados.Artilheiros[0];
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="/players/details/@a.JogadorId" class="card h-100 text-decoration-none text-body border-primary">
+                    <div class="card-body">
+                        <div class="small text-muted">⚽ Artilheiro da temporada</div>
+                        <div class="fs-5 fw-bold mt-1">
+                            @a.Nome
+                            @if (_dados.Artilheiros.Count > 1)
+                            {
+                                <span class="fs-6 fw-normal text-muted">e mais @(_dados.Artilheiros.Count - 1)</span>
+                            }
+                        </div>
+                        <div class="small text-muted mt-1">@a.Gols gols · @a.TimeNome</div>
+                    </div>
+                </a>
+            </div>
+        }
+
+        @if (_dados.MaiorTransferencia is { } t)
+        {
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="/players/details/@t.JogadorId" class="card h-100 text-decoration-none text-body border-dark">
+                    <div class="card-body">
+                        <div class="small text-muted">💸 Maior transferência da semana</div>
+                        <div class="fs-5 fw-bold mt-1">@t.JogadorNome</div>
+                        <div class="small text-muted mt-1">
+                            @t.Valor.ToString("C0", Brasil)
+                            @if (t.ParaTime is not null)
+                            {
+                                <span class="ms-1">· @(t.DeTime is null ? "" : $"{t.DeTime} → ")@t.ParaTime</span>
+                            }
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private DestaquesDto? _dados;
+
+    private bool TemAlgo => _dados is not null
+        && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.Artilheiros.Count > 0 || _dados.MaiorTransferencia is not null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _dados = await LigaService.GetDestaquesAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Destaques são complementares: se falharem, a página inicial continua com os atalhos.
+            _dados = null;
+        }
+    }
+}
