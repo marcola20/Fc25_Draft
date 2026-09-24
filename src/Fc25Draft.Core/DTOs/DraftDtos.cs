@@ -63,9 +63,23 @@ public record GenerateDraftRequestDto(
     IReadOnlyList<DraftRoundRuleDto>? RoundRules = null,
     string? Name = null);
 
+/// <summary>
+/// <see cref="Selection"/> é a primeira escolha da sequência; a mensagem dela já junta as
+/// escolhas automáticas que vieram em seguida (todas em <see cref="Escolhas"/>).
+/// </summary>
 public record DraftPickResultDto(
     DraftStateDto State,
-    DraftPickSelectionDto? Selection);
+    DraftPickSelectionDto? Selection,
+    IReadOnlyList<DraftEscolhaResumoDto>? Escolhas = null);
+
+public record DraftEscolhaResumoDto(
+    int Round,
+    int PickInRound,
+    int OverallPick,
+    string TeamName,
+    string PlayerName,
+    string PositionName,
+    bool Automatica);
 
 public record DraftPickSelectionDto(
     Guid DraftId,
@@ -96,7 +110,8 @@ public record DraftBoardEntryDto(
     string? PlayerName,
     short? PositionId,
     string? PositionName,
-    DateTime? PickedAtUtc);
+    DateTime? PickedAtUtc,
+    bool Automatica = false);
 
 public record DraftBoardExportDto(
     int Rodada,

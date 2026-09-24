@@ -1,4 +1,4 @@
-﻿namespace Fc25Draft.Core.Entities
+namespace Fc25Draft.Core.Entities
 {
     public class DraftPick
     {
@@ -17,6 +17,9 @@
 
         /// <summary>Draft de expansão: valor creditado ao time que perdeu o jogador.</summary>
         public decimal? Compensacao { get; set; }
+
+        /// <summary>Feita pela escolha automática (lista de prioridade do time).</summary>
+        public bool Automatica { get; set; }
 
         public Draft Draft { get; set; } = null!;
         public DraftRound Round { get; set; } = null!;

@@ -1,0 +1,44 @@
+@using Fc25Draft.Web.Pages.Drafts
+
+@if (Itens.Count == 0)
+{
+    <p class="text-muted small">Lista vazia. Use o botão <strong>Adicionar</strong> na lista de jogadores.</p>
+}
+else
+{
+    <ol class="list-group list-group-numbered mb-2">
+        @for (var i = 0; i < Itens.Count; i++)
+        {
+            var index = i;
+            var item = Itens[i];
+            <li class="list-group-item d-flex align-items-center gap-2 @(item.Disponivel ? string.Empty : "list-group-item-warning")">
+                <div class="flex-grow-1 ms-1">
+                    <div class="fw-semibold">@item.Name</div>
+                    <small class="text-muted">
+                        @item.PositionName · Overall @item.Overall
+                        @if (!item.Disponivel)
+                        {
+                            <span class="ms-1">· já escolhido (será pulado)</span>
+                        }
+                    </small>
+                </div>
+                @if (Editavel)
+                {
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
+                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0)" @onclick="() => OnSubir.InvokeAsync(index)">↑</button>
+                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == Itens.Count - 1)" @onclick="() => OnDescer.InvokeAsync(index)">↓</button>
+                        <button type="button" class="btn btn-outline-danger" title="Remover" @onclick="() => OnRemover.InvokeAsync(item.PlayerId)">✕</button>
+                    </div>
+                }
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<AutoPick.ItemLista> Itens { get; set; } = new();
+    [Parameter] public bool Editavel { get; set; } = true;
+    [Parameter] public EventCallback<int> OnSubir { get; set; }
+    [Parameter] public EventCallback<int> OnDescer { get; set; }
+    [Parameter] public EventCallback<int> OnRemover { get; set; }
+}

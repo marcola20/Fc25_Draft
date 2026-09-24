@@ -51,7 +51,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Player != null ? p.Player.Name : null,
                         p.Player != null ? p.Player.PositionId : null,
                         p.Player != null ? p.Player.Position.Name : null,
-                        p.PickedAtUtc))
+                        p.PickedAtUtc,
+                        p.Automatica))
                     .ToListAsync(ct);
 
                 return Results.Ok(board);

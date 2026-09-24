@@ -23,6 +23,7 @@ public class LayoutNavigationService
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document"),
             new("Jogadores Protegidos", "/draft/protecao", "oi oi-shield"),
+            new("Escolha Automática", "/draft/automatico", "oi oi-list-rich"),
             new("Picks do Draft", "/picks", "oi oi-tag"),
             new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
@@ -294,6 +295,7 @@ public class LayoutNavigationService
             }
         },
         ["/draft/protecao"] = CreateDefinition("Jogadores Protegidos", "Draft", "/draft/protecao"),
+        ["/draft/automatico"] = CreateDefinition("Escolha Automática", "Draft", "/draft/automatico"),
         ["/copa/sorteio"] = new PageDefinition
         {
             Route = "/copa/sorteio",

@@ -19,6 +19,10 @@
                                autocomplete="one-time-code" />
                     </div>
                 }
+                @if (IsSubmitting)
+                {
+                    <p class="small text-muted mb-2">Aguarde: se os próximos times tiverem escolha automática, elas entram na mesma mensagem.</p>
+                }
                 @if (!string.IsNullOrEmpty(Error))
                 {
                     <div class="alert alert-danger" role="alert">@Error</div>
@@ -26,7 +30,17 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" @onclick="OnClose" disabled="@IsSubmitting">Cancelar</button>
-                <button class="btn btn-success" @onclick="OnConfirm" disabled="@IsSubmitting">Confirmar escolha</button>
+                <button class="btn btn-success" @onclick="OnConfirm" disabled="@IsSubmitting">
+                    @if (IsSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Registrando escolha...</span>
+                    }
+                    else
+                    {
+                        <span>Confirmar escolha</span>
+                    }
+                </button>
             </div>
         </div>
     </div>

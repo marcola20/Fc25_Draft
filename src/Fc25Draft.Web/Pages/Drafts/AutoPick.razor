@@ -1,0 +1,727 @@
+@page "/draft/automatico"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Web.Components.Common
+@using Fc25Draft.Web.Components.Draft
+@using Fc25Draft.Web.Services
+@using Microsoft.JSInterop
+@inject DraftAutoPickService AutoPickService
+@inject DraftStateService DraftStateService
+@inject IPositionService PositionService
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
+@inject ILogger<Fc25Draft.Web.Pages.Drafts.AutoPick> Logger
+
+@implements IDisposable
+
+<PageHeader Title="🤖 Escolha automática"
+            Subtitle="Monte sua lista de prioridades: quando chegar a sua vez, o site escolhe o primeiro jogador ainda disponível." />
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="status">
+        @successMessage
+        <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+@if (escolhasFeitas is { Selection: not null })
+{
+    <div class="alert alert-info" role="status">
+        <div class="fw-semibold mb-1">Já era a sua vez: estas escolhas foram feitas agora.</div>
+        <div style="white-space: pre-line;">@escolhasFeitas.Selection.Mensagem</div>
+        <div class="mt-2">
+            <button class="btn btn-success btn-sm" @onclick="CompartilharWhatsappAsync">Compartilhar no WhatsApp</button>
+            @if (!string.IsNullOrEmpty(shareFeedback))
+            {
+                <span class="ms-2 small text-muted">@shareFeedback</span>
+            }
+        </div>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4 order-lg-2">
+        <div class="card shadow-sm sticky-lg-top" style="top: 1rem;">
+            <div class="card-body">
+                @if (!authInitialized)
+                {
+                    <p class="text-muted small mb-3"><em>Verificando token...</em></p>
+                }
+                else if (!AdminAuth.IsAuthenticated)
+                {
+                    <div class="mb-3">
+                        <label for="autoPickToken" class="form-label">Token do time</label>
+                        <div class="input-group">
+                            <input id="autoPickToken"
+                                   type="password"
+                                   class="form-control"
+                                   value="@tokenInput"
+                                   @oninput="e => tokenInput = e.Value?.ToString() ?? string.Empty"
+                                   autocomplete="one-time-code"
+                                   placeholder="Cole o token do time" />
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    disabled="@(isLoading || string.IsNullOrWhiteSpace(tokenInput))"
+                                    @onclick="LoadConfigAsync">
+                                Carregar
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(tokenNotice))
+                {
+                    <p class="small text-warning mb-3">@tokenNotice</p>
+                }
+
+                @if (isLoading)
+                {
+                    <p class="text-muted"><em>Carregando...</em></p>
+                }
+                else if (config is not null)
+                {
+                    <p class="small mb-2">Time: <strong>@config.TeamName</strong></p>
+                    <p class="small text-muted mb-3">
+                        @if (config.AtualizadoEm is DateTime atualizado)
+                        {
+                            <span>Salvo em @atualizado.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</span>
+                        }
+                        else
+                        {
+                            <span>Nada configurado ainda.</span>
+                        }
+                    </p>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="autoPickAtivo"
+                               checked="@ativo" disabled="@isSaving" @onchange="e => ativo = e.Value is true" />
+                        <label class="form-check-label" for="autoPickAtivo">
+                            @(ativo ? "Ligada: escolhe por mim na minha vez" : "Desligada: eu escolho na mão")
+                        </label>
+                    </div>
+
+                    <div class="btn-group w-100 mb-3" role="group" aria-label="Modo">
+                        <button type="button" class="btn @(modo == DraftAutoPickModo.Jogador ? "btn-primary" : "btn-outline-primary")"
+                                disabled="@isSaving" @onclick="() => TrocarModoAsync(DraftAutoPickModo.Jogador)">
+                            Por jogador
+                        </button>
+                        <button type="button" class="btn @(modo == DraftAutoPickModo.Posicao ? "btn-primary" : "btn-outline-primary")"
+                                disabled="@isSaving" @onclick="() => TrocarModoAsync(DraftAutoPickModo.Posicao)">
+                            Por posição
+                        </button>
+                    </div>
+
+                    @if (modo == DraftAutoPickModo.Jogador)
+                    {
+                        <p class="small text-muted">
+                            Uma lista só, em ordem de prioridade. Ela vale para todas as suas próximas escolhas até acabar.
+                        </p>
+                        <AutoPickLista Itens="@listaJogadores" Editavel="@(!isSaving)" OnSubir="i => Mover(listaJogadores, i, -1)" OnDescer="i => Mover(listaJogadores, i, 1)" OnRemover="id => Remover(listaJogadores, id)" />
+                    }
+                    else if (listaAtiva is short posAtiva)
+                    {
+                        <p class="small mb-2">Lista de <strong>@NomePosicao(posAtiva)</strong> (@RodadasDaPosicao(posAtiva))</p>
+                        <AutoPickLista Itens="@ListaDaPosicao(posAtiva)" Editavel="@(!isSaving)" OnSubir="i => Mover(ListaDaPosicao(posAtiva), i, -1)" OnDescer="i => Mover(ListaDaPosicao(posAtiva), i, 1)" OnRemover="id => Remover(ListaDaPosicao(posAtiva), id)" />
+                    }
+                    else
+                    {
+                        <p class="small text-muted">Escolha a posição de cada rodada ao lado. Depois monte a lista de cada posição.</p>
+                    }
+
+                    <button type="button" class="btn btn-success w-100 mt-2" disabled="@(isSaving || config is null)" @onclick="SalvarAsync">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Salvando e processando escolhas...</span>
+                        }
+                        else
+                        {
+                            <span>Salvar</span>
+                        }
+                    </button>
+                    <div class="form-text">
+                        Se já for a sua vez, a escolha acontece na hora. Se a lista acabar (todos já escolhidos), o draft espera você escolher na mão.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8 order-lg-1">
+        @if (config is not null && modo == DraftAutoPickModo.Posicao)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header"><strong>Minhas rodadas</strong></div>
+                <div class="card-body p-0">
+                    @if (config.MinhasRodadas.Count == 0)
+                    {
+                        <p class="text-muted m-3">Seu time não tem mais escolhas neste draft.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-3">Rodada</th>
+                                    <th>Escolha geral</th>
+                                    <th>Overall permitido</th>
+                                    <th class="pe-3">Posição</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rodada in config.MinhasRodadas)
+                                {
+                                    var round = rodada.Round;
+                                    posicaoPorRodada.TryGetValue(round, out var posSelecionada);
+                                    <tr>
+                                        <td class="ps-3">@round</td>
+                                        <td>@rodada.OverallPick</td>
+                                        <td>@FaixaOverall(rodada.OverallMin, rodada.OverallMax)</td>
+                                        <td class="pe-3">
+                                            <select class="form-select form-select-sm" value="@(posSelecionada?.ToString() ?? "")" disabled="@isSaving"
+                                                    @onchange="e => DefinirPosicaoAsync(round, e.Value?.ToString())">
+                                                <option value="">— escolho na mão —</option>
+                                                @foreach (var pos in positions)
+                                                {
+                                                    <option value="@pos.PositionId">@pos.Name</option>
+                                                }
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+
+            @if (PosicoesEscolhidas.Count > 0)
+            {
+                <div class="mb-3">
+                    <span class="small text-muted me-2">Editar lista de:</span>
+                    @foreach (var pos in PosicoesEscolhidas)
+                    {
+                        var posId = pos;
+                        var qtd = ListaDaPosicao(posId).Count;
+                        <button type="button" class="btn btn-sm me-1 mb-1 @(listaAtiva == posId ? "btn-primary" : "btn-outline-primary")"
+                                @onclick="() => SelecionarListaAsync(posId)">
+                            @NomePosicao(posId) <span class="badge @(qtd == 0 ? "bg-danger" : "bg-light text-dark") ms-1">@qtd</span>
+                        </button>
+                    }
+                </div>
+            }
+        }
+
+        @if (config is not null && (modo == DraftAutoPickModo.Jogador || listaAtiva is not null))
+        {
+            <DraftPlayerFilters @key="@FiltroKey"
+                                Positions="@PosicoesDoFiltro"
+                                OverallMinLimit="@(FaixaPermitida.Min ?? 0)"
+                                OverallMaxLimit="@(FaixaPermitida.Max ?? 99)"
+                                IsLoading="@isLoadingPlayers"
+                                OnFilterChanged="@OnFilterChangedAsync" />
+
+            @if (isLoadingPlayers)
+            {
+                <p><em>Carregando jogadores disponíveis...</em></p>
+            }
+            else if (players.Count == 0)
+            {
+                <p>Nenhum jogador disponível com esses filtros.</p>
+            }
+            else
+            {
+                <p class="text-muted small">
+                    @(players.Count > MaxLinhas ? $"Mostrando os {MaxLinhas} melhores de {players.Count}. Use os filtros para achar outros." : $"{players.Count} jogadores disponíveis.")
+                    Overall permitido @(modo == DraftAutoPickModo.Posicao ? "nas rodadas desta posição" : "nas suas rodadas"): <strong>@FaixaOverall(FaixaPermitida.Min, FaixaPermitida.Max)</strong>.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Jogador</th>
+                                <th>Posição</th>
+                                <th>Overall</th>
+                                <th>Idade</th>
+                                <th class="text-end">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var player in players.Take(MaxLinhas))
+                            {
+                                var naLista = ListaEmEdicao?.Any(x => x.PlayerId == player.PlayerId) == true;
+                                <tr class="@(naLista ? "table-success" : string.Empty)">
+                                    <td>@player.Name</td>
+                                    <td>@player.PositionName</td>
+                                    <td>@player.Overall</td>
+                                    <td>@(player.Age?.ToString() ?? "-")</td>
+                                    <td class="text-end">
+                                        @if (naLista)
+                                        {
+                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@isSaving" @onclick="() => Remover(ListaEmEdicao!, player.PlayerId)">Remover</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-primary btn-sm" disabled="@isSaving" @onclick="() => Adicionar(player)">Adicionar</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (config is null && authInitialized && !isLoading)
+        {
+            <p class="text-muted">Informe o token do time para montar a lista.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private const int MaxLinhas = 100;
+
+    private readonly List<Position> positions = new();
+    private readonly List<AvailablePlayerDto> players = new();
+    private readonly List<ItemLista> listaJogadores = new();
+    private readonly Dictionary<short, List<ItemLista>> listasPorPosicao = new();
+    private readonly Dictionary<int, short?> posicaoPorRodada = new();
+
+    private DraftAutoPickDto? config;
+    private DraftAutoPickModo modo = DraftAutoPickModo.Jogador;
+    private bool ativo = true;
+    private short? listaAtiva;
+    private DraftPlayerFilters.PlayerFilterState currentFilter = new(null, new HashSet<short>(), null, null);
+
+    private bool authInitialized;
+    private bool isLoading;
+    private bool isLoadingPlayers;
+    private bool isSaving;
+    private string tokenInput = string.Empty;
+    private string? tokenNotice;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? shareFeedback;
+    private DraftPickResultDto? escolhasFeitas;
+
+    public sealed record ItemLista(int PlayerId, string Name, short PositionId, string PositionName, int Overall, bool Disponivel);
+
+    private string? EffectiveToken => AdminAuth.IsAuthenticated
+        ? AdminAuth.Token
+        : (string.IsNullOrWhiteSpace(tokenInput) ? null : tokenInput.Trim());
+
+    private List<short> PosicoesEscolhidas => posicaoPorRodada.Values
+        .Where(v => v.HasValue)
+        .Select(v => v!.Value)
+        .Distinct()
+        .OrderBy(v => positions.FindIndex(p => p.PositionId == v))
+        .ToList();
+
+    private List<ItemLista>? ListaEmEdicao => modo == DraftAutoPickModo.Jogador
+        ? listaJogadores
+        : listaAtiva is short pos ? ListaDaPosicao(pos) : null;
+
+    // No modo posição a busca fica presa à posição da lista em edição.
+    private List<Position> PosicoesDoFiltro => modo == DraftAutoPickModo.Posicao && listaAtiva is short pos
+        ? positions.Where(p => p.PositionId == pos).ToList()
+        : positions;
+
+    private string FiltroKey => $"{modo}-{listaAtiva}";
+
+    private List<ItemLista> ListaDaPosicao(short positionId)
+    {
+        if (!listasPorPosicao.TryGetValue(positionId, out var lista))
+        {
+            lista = new List<ItemLista>();
+            listasPorPosicao[positionId] = lista;
+        }
+
+        return lista;
+    }
+
+    private string NomePosicao(short positionId) =>
+        positions.FirstOrDefault(p => p.PositionId == positionId)?.Name ?? positionId.ToString();
+
+    private string RodadasDaPosicao(short positionId)
+    {
+        var rodadas = posicaoPorRodada.Where(kv => kv.Value == positionId).Select(kv => kv.Key).OrderBy(r => r).ToList();
+        return rodadas.Count == 1 ? $"rodada {rodadas[0]}" : $"rodadas {string.Join(", ", rodadas)}";
+    }
+
+    /// <summary>
+    /// Faixa de overall que o time ainda pode escolher: a das rodadas da posição em edição
+    /// (modo posição) ou a de todas as rodadas que faltam (modo jogador). Nulo = sem limite.
+    /// </summary>
+    private (int? Min, int? Max) FaixaPermitida
+    {
+        get
+        {
+            var rodadas = config?.MinhasRodadas
+                .Where(r => modo == DraftAutoPickModo.Jogador
+                         || (listaAtiva is short pos && posicaoPorRodada.TryGetValue(r.Round, out var p) && p == pos))
+                .ToList();
+
+            if (rodadas is null || rodadas.Count == 0)
+            {
+                return (null, null);
+            }
+
+            var min = rodadas.Any(r => r.OverallMin is null) ? null : rodadas.Min(r => r.OverallMin);
+            var max = rodadas.Any(r => r.OverallMax is null) ? null : rodadas.Max(r => r.OverallMax);
+            return (min, max);
+        }
+    }
+
+    private static int? MaiorOuNulo(int? a, int? b) => a is null ? b : b is null ? a : Math.Max(a.Value, b.Value);
+
+    private static int? MenorOuNulo(int? a, int? b) => a is null ? b : b is null ? a : Math.Min(a.Value, b.Value);
+
+    private static string FaixaOverall(int? min, int? max) => (min, max) switch
+    {
+        (null, null) => "livre",
+        (int a, null) => $"{a}+",
+        (null, int b) => $"até {b}",
+        (int a, int b) => $"{a} a {b}"
+    };
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            positions.AddRange(await PositionService.GetAllAsync());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar posições.");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AdminAuth.EnsureInitializedAsync();
+        authInitialized = true;
+
+        if (AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token))
+        {
+            await LoadConfigAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadConfigAsync()
+    {
+        var token = EffectiveToken;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        isLoading = true;
+        tokenNotice = null;
+        errorMessage = null;
+
+        try
+        {
+            Aplicar(await AutoPickService.GetAsync(token));
+            await LoadPlayersAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            config = null;
+            tokenNotice = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Não foi possível carregar a escolha automática.";
+            Logger.LogError(ex, "Erro ao carregar escolha automática do draft.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Aplicar(DraftAutoPickDto dto)
+    {
+        config = dto;
+        modo = dto.Modo;
+        ativo = dto.Configurado ? dto.Ativo : true;
+
+        static ItemLista Item(DraftAutoPickJogadorDto j) =>
+            new(j.PlayerId, j.Name, j.PositionId, j.PositionName, j.Overall, j.Disponivel);
+
+        listaJogadores.Clear();
+        listaJogadores.AddRange(dto.Jogadores.Where(j => j.ListaPositionId is null).OrderBy(j => j.Ordem).Select(Item));
+
+        listasPorPosicao.Clear();
+        foreach (var grupo in dto.Jogadores.Where(j => j.ListaPositionId is not null).GroupBy(j => j.ListaPositionId!.Value))
+        {
+            listasPorPosicao[grupo.Key] = grupo.OrderBy(j => j.Ordem).Select(Item).ToList();
+        }
+
+        posicaoPorRodada.Clear();
+        foreach (var rodada in dto.MinhasRodadas)
+        {
+            posicaoPorRodada[rodada.Round] = rodada.PositionId;
+        }
+
+        if (listaAtiva is not short atual || !PosicoesEscolhidas.Contains(atual))
+        {
+            listaAtiva = PosicoesEscolhidas.Count > 0 ? PosicoesEscolhidas[0] : null;
+        }
+    }
+
+    private async Task TrocarModoAsync(DraftAutoPickModo novo)
+    {
+        if (modo == novo)
+        {
+            return;
+        }
+
+        modo = novo;
+        currentFilter = new(null, new HashSet<short>(), null, null);
+        await LoadPlayersAsync();
+    }
+
+    private async Task DefinirPosicaoAsync(int round, string? value)
+    {
+        posicaoPorRodada[round] = short.TryParse(value, out var pos) ? pos : null;
+
+        if (posicaoPorRodada[round] is short nova)
+        {
+            if (listaAtiva != nova)
+            {
+                currentFilter = new(null, new HashSet<short>(), null, null);
+            }
+
+            listaAtiva = nova;
+        }
+        else if (listaAtiva is short atual && !PosicoesEscolhidas.Contains(atual))
+        {
+            listaAtiva = PosicoesEscolhidas.Count > 0 ? PosicoesEscolhidas[0] : null;
+        }
+
+        // A faixa de overall permitida depende das rodadas da posição: recarrega sempre.
+        await LoadPlayersAsync();
+    }
+
+    private async Task SelecionarListaAsync(short positionId)
+    {
+        if (listaAtiva == positionId)
+        {
+            return;
+        }
+
+        listaAtiva = positionId;
+        currentFilter = new(null, new HashSet<short>(), null, null);
+        await LoadPlayersAsync();
+    }
+
+    private async Task OnFilterChangedAsync(DraftPlayerFilters.PlayerFilterState filter)
+    {
+        currentFilter = filter;
+        await LoadPlayersAsync();
+    }
+
+    private async Task LoadPlayersAsync()
+    {
+        players.Clear();
+
+        if (config is null || (modo == DraftAutoPickModo.Posicao && listaAtiva is null))
+        {
+            return;
+        }
+
+        if (currentFilter.OverallMin.HasValue && currentFilter.OverallMax.HasValue && currentFilter.OverallMin > currentFilter.OverallMax)
+        {
+            errorMessage = "Overall mínimo não pode ser maior que o máximo.";
+            return;
+        }
+
+        isLoadingPlayers = true;
+        try
+        {
+            IReadOnlyCollection<short> posicoes = modo == DraftAutoPickModo.Posicao && listaAtiva is short pos
+                ? new[] { pos }
+                : currentFilter.PositionIds;
+
+            players.AddRange(await DraftStateService.BuscarDisponiveisAsync(
+                posicoes,
+                currentFilter.SearchTerm,
+                MaiorOuNulo(currentFilter.OverallMin, FaixaPermitida.Min),
+                MenorOuNulo(currentFilter.OverallMax, FaixaPermitida.Max),
+                limitarARodadaAtual: false));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao carregar jogadores para a escolha automática.");
+        }
+        finally
+        {
+            isLoadingPlayers = false;
+        }
+    }
+
+    private void Adicionar(AvailablePlayerDto player)
+    {
+        var lista = ListaEmEdicao;
+        if (lista is null || lista.Any(x => x.PlayerId == player.PlayerId))
+        {
+            return;
+        }
+
+        successMessage = null;
+        lista.Add(new ItemLista(player.PlayerId, player.Name, player.PositionId, player.PositionName, player.Overall, true));
+    }
+
+    private void Remover(List<ItemLista> lista, int playerId)
+    {
+        successMessage = null;
+        lista.RemoveAll(x => x.PlayerId == playerId);
+    }
+
+    private static void Mover(List<ItemLista> lista, int index, int delta)
+    {
+        var target = index + delta;
+        if (index < 0 || index >= lista.Count || target < 0 || target >= lista.Count)
+        {
+            return;
+        }
+
+        (lista[index], lista[target]) = (lista[target], lista[index]);
+    }
+
+    private async Task SalvarAsync()
+    {
+        var token = EffectiveToken;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            errorMessage = "Informe o token do time.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+        escolhasFeitas = null;
+        shareFeedback = null;
+
+        try
+        {
+            var request = new DraftAutoPickSaveRequestDto(
+                modo,
+                ativo,
+                listaJogadores.Select(x => x.PlayerId).ToList(),
+                posicaoPorRodada
+                    .Where(kv => kv.Value.HasValue)
+                    .Select(kv => new DraftAutoPickRodadaDto(kv.Key, kv.Value!.Value))
+                    .ToList(),
+                PosicoesEscolhidas
+                    .Select(pos => new DraftAutoPickListaPosicaoDto(pos, ListaDaPosicao(pos).Select(x => x.PlayerId).ToList()))
+                    .ToList());
+
+            var result = await AutoPickService.SalvarAsync(token, request);
+            Aplicar(result.Config);
+            escolhasFeitas = result.Escolhas;
+            successMessage = ativo
+                ? "✅ Escolha automática salva e ligada."
+                : "✅ Lista salva. A escolha automática está desligada.";
+            await LoadPlayersAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Não foi possível salvar. Tente novamente.";
+            Logger.LogError(ex, "Erro ao salvar escolha automática do draft.");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CompartilharWhatsappAsync()
+    {
+        var selection = escolhasFeitas?.Selection;
+        if (selection is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var outcome = await JSRuntime.InvokeAsync<string>(
+                "fc25Share.openWhatsapp",
+                selection.ShareUrl,
+                selection.WhatsappGroupLink,
+                selection.Mensagem);
+
+            shareFeedback = outcome switch
+            {
+                "share" => "Mensagem aberta no WhatsApp! Envie para concluir.",
+                "fallback" => "WhatsApp aberto. Caso a mensagem não apareça automaticamente, cole o texto copiado.",
+                _ => "Não foi possível abrir o WhatsApp automaticamente."
+            };
+        }
+        catch (JSException ex)
+        {
+            shareFeedback = "Não foi possível abrir o WhatsApp automaticamente.";
+            Logger.LogError(ex, "Erro ao compartilhar no WhatsApp.");
+        }
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!authInitialized)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            if (AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token))
+            {
+                await LoadConfigAsync();
+            }
+            else
+            {
+                config = null;
+                tokenNotice = null;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

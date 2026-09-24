@@ -24,7 +24,7 @@
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert @statusCss alert-dismissible fade show" role="alert">
+    <div class="alert @statusCss alert-dismissible fade show" role="alert" style="white-space: pre-line;">
         @statusMessage
         <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => statusMessage = null"></button>
     </div>
@@ -51,6 +51,13 @@
 }
 
 <DraftStateCard IsLoading="@isLoadingState" State="@state" />
+
+@if (state is { HasDraft: true, DraftCompleted: false })
+{
+    <p class="small mb-3">
+        🤖 Não vai estar online na sua vez? <a href="/draft/automatico">Configure a escolha automática</a>.
+    </p>
+}
 
 @if (state is { IsExpansao: true, DraftCompleted: false })
 {
