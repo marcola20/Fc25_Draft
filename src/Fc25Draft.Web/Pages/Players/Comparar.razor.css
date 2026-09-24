@@ -1,0 +1,116 @@
+/* Cores dos dois lados do duelo (card do jogador, barra e valor vencedor). */
+.comparar {
+    --cor-a: #0d6efd;
+    --cor-b: #fd7e14;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.jogador-card.lado-a {
+    border-top: 4px solid var(--cor-a);
+}
+
+.jogador-card.lado-b {
+    border-top: 4px solid var(--cor-b);
+}
+
+.jogador-card .nome {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0D1B2A;
+}
+
+.min-w-0 {
+    min-width: 0;
+}
+
+/* Linha: valor A | barra A | rótulo | barra B | valor B */
+.duelo {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 11rem 1fr 5.5rem;
+    align-items: center;
+    gap: .75rem;
+    padding: .55rem 0;
+    border-bottom: 1px solid #eef0f3;
+}
+
+    .duelo:last-child {
+        border-bottom: 0;
+    }
+
+    .duelo .valor {
+        font-size: 1.15rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .duelo .rotulo {
+        text-align: center;
+        font-size: .85rem;
+        color: #6c757d;
+    }
+
+    .duelo .barra {
+        height: 10px;
+        background: #f1f3f5;
+        border-radius: 5px;
+        overflow: hidden;
+        display: flex;
+    }
+
+    /* A barra de A cresce da direita para a esquerda (encosta no rótulo). */
+    .duelo .barra-a {
+        justify-content: flex-end;
+    }
+
+    .duelo .barra > div {
+        height: 100%;
+        border-radius: 5px;
+    }
+
+.cor-a {
+    background: var(--cor-a);
+}
+
+.cor-b {
+    background: var(--cor-b);
+}
+
+.cor-neutra {
+    background: #ced4da;
+}
+
+.vence-a {
+    color: var(--cor-a);
+    font-weight: 700;
+}
+
+.vence-b {
+    color: var(--cor-b);
+    font-weight: 700;
+}
+
+/* No celular as barras somem: fica valor | rótulo | valor. */
+@media (max-width: 576px) {
+    .duelo {
+        grid-template-columns: 1fr auto 1fr;
+        gap: .5rem;
+    }
+
+        .duelo .barra {
+            display: none;
+        }
+
+        .duelo .valor {
+            font-size: 1rem;
+        }
+
+        /* Números nas bordas, alinhados em coluna; o rótulo fica no meio. */
+        .duelo .valor:first-child {
+            justify-self: start;
+        }
+
+        .duelo .valor:last-child {
+            justify-self: end;
+        }
+}

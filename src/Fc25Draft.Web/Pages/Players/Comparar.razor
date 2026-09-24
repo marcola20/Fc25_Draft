@@ -1,0 +1,196 @@
+@page "/jogadores/comparar"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@inject ILigaPublicService LigaService
+@inject IPricingService Pricing
+@inject EscudoService Escudos
+@inject NavigationManager Navigation
+
+<PageTitle>Comparar jogadores</PageTitle>
+
+<div class="comparar py-3">
+    <p class="text-muted small text-center mb-3">
+        Carreira de todas as temporadas e competições. O link desta página guarda os dois jogadores: dá para mandar no grupo.
+    </p>
+
+    <div class="row g-3 mb-4">
+        @foreach (var lado in new[] { 0, 1 })
+        {
+            var l = lado;
+            var jogador = _jogadores[l];
+            <div class="col-12 col-md-6">
+                <div class="card h-100 jogador-card @(l == 0 ? "lado-a" : "lado-b")">
+                    <div class="card-body">
+                        <JogadorBusca Placeholder="@(jogador is null ? (l == 0 ? "Buscar o primeiro jogador" : "Buscar o segundo jogador") : "Trocar jogador")"
+                                      OnEscolhido="j => Escolher(l, j.PlayerId)" />
+
+                        @if (_carregando[l])
+                        {
+                            <div class="text-center py-4"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+                        }
+                        else if (jogador is not null)
+                        {
+                            <div class="d-flex align-items-center gap-3 mt-3">
+                                <img src="@Escudos.GetEscudo(jogador.TimeAtualNome)" alt="" width="52" height="52" style="object-fit: contain;" />
+                                <div class="min-w-0">
+                                    <a href="/players/details/@jogador.PlayerId" class="nome text-decoration-none">@jogador.Nome</a>
+                                    <div class="text-muted small">
+                                        @jogador.PositionName · Overall <strong>@jogador.Overall</strong>@(jogador.Idade is int idade ? $" · {idade} anos" : "")
+                                    </div>
+                                    <div class="small">
+                                        @if (jogador.TimeAtualId is Guid timeId)
+                                        {
+                                            <a href="/teams/details/@timeId" class="text-primary">@jogador.TimeAtualNome</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Sem time</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            @if (jogador.Estatisticas.Titulos.Count > 0)
+                            {
+                                <div class="d-flex flex-wrap gap-1 mt-3">
+                                    @foreach (var t in jogador.Estatisticas.Titulos)
+                                    {
+                                        <span class="badge bg-warning text-dark fw-normal">🏆 @t.Competicao</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_jogadores[0] is { } a && _jogadores[1] is { } b)
+    {
+        <div class="card">
+            <div class="card-body py-2">
+                @Linha("Overall", a.Overall, b.Overall)
+                @Linha("Valor de mercado", (double)_valores[0], (double)_valores[1], Milhoes)
+                @if (TemContador(a) || TemContador(b))
+                {
+                    @Linha("Jogos", a.Estatisticas.Jogos, b.Estatisticas.Jogos, rodape: a.Estatisticas.JogosParcial || b.Estatisticas.JogosParcial ? "*" : null)
+                }
+                @Linha("⚽ Gols", a.Estatisticas.Gols, b.Estatisticas.Gols)
+                @Linha("🅰️ Assistências", a.Estatisticas.Assistencias, b.Estatisticas.Assistencias)
+                @Linha("G/A", a.Estatisticas.Gols + a.Estatisticas.Assistencias, b.Estatisticas.Gols + b.Estatisticas.Assistencias)
+                @if (GolsPorJogo(a) is double ga && GolsPorJogo(b) is double gb)
+                {
+                    @Linha("Gols por jogo", ga, gb, v => v.ToString("0.00"))
+                }
+                @if (a.Estatisticas.CleanSheets is int csa && b.Estatisticas.CleanSheets is int csb)
+                {
+                    @Linha("🧤 Clean sheets", csa, csb)
+                }
+                @Linha("🏆 Títulos", a.Estatisticas.Titulos.Count, b.Estatisticas.Titulos.Count)
+                @Linha("🎩 Hat-tricks", a.Estatisticas.Hattricks, b.Estatisticas.Hattricks)
+                @Linha("Recorde de gols num jogo", a.Estatisticas.MaisGolsNumJogo, b.Estatisticas.MaisGolsNumJogo)
+                @Linha("🟨 Amarelos", a.Estatisticas.Amarelos, b.Estatisticas.Amarelos, menorMelhor: true)
+                @Linha("🟥 Vermelhos", a.Estatisticas.Vermelhos, b.Estatisticas.Vermelhos, menorMelhor: true)
+                @Linha("Competições", Competicoes(a), Competicoes(b))
+                @Linha("Clubes na carreira", Clubes(a), Clubes(b), destacar: false)
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-muted">
+            <span>Barra colorida: quem leva vantagem. Nos cartões, ganha quem tem menos.</span>
+            @if ((TemContador(a) || TemContador(b)) && (a.Estatisticas.JogosParcial || b.Estatisticas.JogosParcial))
+            {
+                <span>* Competições anteriores ao contador de jogos não entram nos jogos.</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "a")] public int? A { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "b")] public int? B { get; set; }
+
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private readonly JogadorCarreiraDto?[] _jogadores = new JogadorCarreiraDto?[2];
+    private readonly decimal[] _valores = new decimal[2];
+    private readonly bool[] _carregando = new bool[2];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await CarregarSeMudouAsync(0, A);
+        await CarregarSeMudouAsync(1, B);
+    }
+
+    private async Task CarregarSeMudouAsync(int lado, int? id)
+    {
+        if (id is null || _jogadores[lado]?.PlayerId == id)
+            return;
+
+        _carregando[lado] = true;
+        try
+        {
+            _jogadores[lado] = await LigaService.GetCarreiraJogadorAsync(id.Value, CancellationToken.None);
+            _valores[lado] = _jogadores[lado] is null
+                ? 0m
+                : (await Pricing.CalculateForPlayerAsync(id.Value, CancellationToken.None)).BasePrice;
+        }
+        catch
+        {
+            _jogadores[lado] = null;
+        }
+        finally
+        {
+            _carregando[lado] = false;
+        }
+    }
+
+    // O link carrega os dois jogadores: trocar um atualiza a URL e recarrega aquele lado.
+    private void Escolher(int lado, int playerId)
+    {
+        var a = lado == 0 ? playerId : _jogadores[0]?.PlayerId ?? A;
+        var b = lado == 1 ? playerId : _jogadores[1]?.PlayerId ?? B;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["a"] = a, ["b"] = b }));
+    }
+
+    // Alguma competição do jogador já tinha o contador de jogos.
+    private static bool TemContador(JogadorCarreiraDto j) => j.Estatisticas.Competicoes.Any(c => c.Jogos is not null);
+
+    private static int Competicoes(JogadorCarreiraDto j) => j.Estatisticas.Competicoes.Select(c => c.LigaId).Distinct().Count();
+
+    private static int Clubes(JogadorCarreiraDto j) => j.Estatisticas.Competicoes.Select(c => c.TimeId).Distinct().Count();
+
+    // Só nas competições com contador: gols dessas competições / jogos.
+    private static double? GolsPorJogo(JogadorCarreiraDto j)
+    {
+        var comContador = j.Estatisticas.Competicoes.Where(c => c.Jogos is > 0).ToList();
+        var jogos = comContador.Sum(c => c.Jogos!.Value);
+        return jogos == 0 ? null : (double)comContador.Sum(c => c.Gols) / jogos;
+    }
+
+    private static string Milhoes(double valor) =>
+        valor >= 1_000_000 ? $"R$ {(valor / 1_000_000).ToString("0.0", Brasil)} mi" : valor.ToString("C0", Brasil);
+
+    /// <summary>
+    /// Uma linha do duelo: valor e barra de cada lado, com o nome da estatística no meio.
+    /// A barra é proporcional ao maior dos dois; quem leva vantagem fica com a cor do seu lado.
+    /// </summary>
+    private RenderFragment Linha(string rotulo, double va, double vb, Func<double, string>? formato = null,
+        bool menorMelhor = false, bool destacar = true, string? rodape = null) => __builder =>
+    {
+        formato ??= v => v.ToString("0");
+        var aMelhor = destacar && (menorMelhor ? va < vb : va > vb);
+        var bMelhor = destacar && (menorMelhor ? vb < va : vb > va);
+        var maximo = Math.Max(va, vb);
+        var pa = maximo <= 0 ? 0 : va / maximo * 100;
+        var pb = maximo <= 0 ? 0 : vb / maximo * 100;
+
+        <div class="duelo">
+            <div class="valor text-end @(aMelhor ? "vence-a" : "")">@formato(va)@rodape</div>
+            <div class="barra barra-a"><div class="@(aMelhor ? "cor-a" : "cor-neutra")" style="width: @pa.ToString("0", CultureInfo.InvariantCulture)%;"></div></div>
+            <div class="rotulo">@rotulo</div>
+            <div class="barra barra-b"><div class="@(bMelhor ? "cor-b" : "cor-neutra")" style="width: @pb.ToString("0", CultureInfo.InvariantCulture)%;"></div></div>
+            <div class="valor @(bMelhor ? "vence-b" : "")">@formato(vb)@rodape</div>
+        </div>
+    };
+}

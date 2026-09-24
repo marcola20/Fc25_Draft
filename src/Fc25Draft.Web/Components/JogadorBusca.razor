@@ -1,0 +1,78 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Services
+@inject PlayersApiClient PlayersApi
+
+@* Campo de busca de jogador pelo nome: mostra até 8 resultados e devolve o escolhido. *@
+
+<div class="position-relative">
+    <input class="form-control"
+           placeholder="@Placeholder"
+           value="@_termo"
+           @oninput="OnInputAsync"
+           autocomplete="off" />
+
+    @if (_resultados.Count > 0)
+    {
+        <div class="list-group position-absolute w-100 shadow" style="z-index: 1050;">
+            @foreach (var p in _resultados)
+            {
+                <button type="button" class="list-group-item list-group-item-action" @onclick="() => EscolherAsync(p)">
+                    <span class="fw-semibold">@p.Name</span>
+                    <span class="small text-muted">· @p.PositionName · @p.Overall@(string.IsNullOrWhiteSpace(p.TeamName) ? "" : $" · {p.TeamName}")</span>
+                </button>
+            }
+        </div>
+    }
+    else if (_semResultado)
+    {
+        <div class="form-text">Nenhum jogador encontrado.</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Buscar jogador pelo nome";
+    [Parameter] public EventCallback<PlayerListItemDto> OnEscolhido { get; set; }
+
+    private const int MaxResultados = 8;
+
+    private string _termo = string.Empty;
+    private List<PlayerListItemDto> _resultados = new();
+    private bool _semResultado;
+    private CancellationTokenSource? _busca;
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        _termo = e.Value?.ToString() ?? string.Empty;
+        _semResultado = false;
+
+        _busca?.Cancel();
+        if (_termo.Trim().Length < 2)
+        {
+            _resultados.Clear();
+            return;
+        }
+
+        // Espera a pessoa parar de digitar antes de buscar.
+        var cts = _busca = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            var pagina = await PlayersApi.GetAsync(_termo.Trim(), null, onlyAvailable: false, null, null,
+                "overall", "desc", 1, MaxResultados, cts.Token);
+            if (cts.IsCancellationRequested) return;
+
+            _resultados = pagina.Items.ToList();
+            _semResultado = _resultados.Count == 0;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task EscolherAsync(PlayerListItemDto jogador)
+    {
+        _termo = string.Empty;
+        _resultados.Clear();
+        await OnEscolhido.InvokeAsync(jogador);
+    }
+}
