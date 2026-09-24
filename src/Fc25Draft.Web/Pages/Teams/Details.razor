@@ -96,6 +96,8 @@ else
         </div>
     }
 
+    <TimeResumoFaixa Perfil="@_perfil" />
+
     <div class="d-flex flex-wrap gap-2 mb-4">
         <button type="button"
                 class="btn btn-outline-primary"
@@ -118,9 +120,21 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Jogos ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Jogos">
+                Jogos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Historico ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Historico">
                 Histórico
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Transferencias ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Transferencias">
+                Transferências
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -134,15 +148,23 @@ else
 
     @if (_activeMainTab == MainTab.Negotiations)
     {
-        <Negotiations TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)" />
+        <Negotiations @key="Id" TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)" />
     }
     else if (_activeMainTab == MainTab.Temporada)
     {
-        <TimeTemporadaTab TeamId="@Id" />
+        <TimeTemporadaTab @key="Id" TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Jogos)
+    {
+        <TimeJogosTab Perfil="@_perfil" />
     }
     else if (_activeMainTab == MainTab.Historico)
     {
-        <TimeHistoricoTab TeamId="@Id" />
+        <TimeHistoricoTab @key="Id" TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Transferencias)
+    {
+        <TimeTransferenciasTab @key="Id" TeamId="@Id" />
     }
     else
     {
@@ -352,6 +374,8 @@ else
     private bool isLoading = true;
     private IReadOnlyList<TimeTrajetoriaDto> _trajetoria = Array.Empty<TimeTrajetoriaDto>();
     private int _titulos;
+    private TimePerfilDto? _perfil;
+    private Guid? _carregadoId;
     private bool authInitialized;
     private readonly List<RosterPlayerViewModel> _rosterPlayers = new();
     private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
@@ -383,9 +407,39 @@ else
             _quickSellBloqueado = cfg.QuickSellBloqueado;
         }
         catch { /* mantém o padrão se a config não carregar */ }
+    }
+
+    // Os links para adversários levam a esta mesma página com outro Id: o Blazor reaproveita o
+    // componente, então os dados são recarregados aqui sempre que o time muda.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregadoId == Id)
+        {
+            return;
+        }
+
+        _carregadoId = Id;
+        _activeMainTab = MainTab.Info;
+        _quickSellSuccessMessage = null;
+        _perfil = null;
+
         await LoadTeamAsync();
         await LoadTrajetoriaAsync();
+        await LoadPerfilAsync();
         await RefreshTeamTokenStateAsync();
+    }
+
+    private async Task LoadPerfilAsync()
+    {
+        try
+        {
+            _perfil = await LigaService.GetPerfilTimeAsync(Id, CancellationToken.None);
+        }
+        catch
+        {
+            // Forma e jogos são complementares: se falhar, a página do time continua útil.
+            _perfil = null;
+        }
     }
 
     private async Task LoadTrajetoriaAsync()
@@ -761,7 +815,9 @@ else
     {
         Info,
         Temporada,
+        Jogos,
         Historico,
+        Transferencias,
         Negotiations
     }
 

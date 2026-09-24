@@ -1,0 +1,121 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Extensions
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_erro is not null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar as transferências:</strong> @_erro</div>
+}
+else if (_dados is null || _dados.Movimentacoes.Count == 0)
+{
+    <div class="alert alert-info mb-0">Nenhuma transferência registrada para este time.</div>
+}
+else
+{
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Chegadas</div><h4 class="mb-0">@_dados.Chegadas</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Saídas</div><h4 class="mb-0">@_dados.Saidas</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Gastou</div><h5 class="mb-0 text-danger">@Moeda(_dados.Gasto)</h5>
+            </div></div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Recebeu</div><h5 class="mb-0 text-success">@Moeda(_dados.Recebido)</h5>
+            </div></div>
+        </div>
+        <div class="col-12 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Saldo</div>
+                <h5 class="mb-0 @(_dados.Saldo >= 0 ? "text-success" : "text-danger")">@(_dados.Saldo > 0 ? "+" : "")@Moeda(_dados.Saldo)</h5>
+            </div></div>
+        </div>
+    </div>
+    <p class="text-muted small">
+        Gastou: leilões do mercado e compras de outros times. Recebeu: vendas, vendas rápidas e compensações do draft de expansão.
+        Trocas entre times não entram no dinheiro (o valor delas é a avaliação dos jogadores).
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle" style="font-size: 0.875rem;">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data</th>
+                    <th></th>
+                    <th>Jogador</th>
+                    <th>Tipo</th>
+                    <th>@("De / Para")</th>
+                    <th class="text-end">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Visiveis)
+                {
+                    <tr>
+                        <td class="text-nowrap">@m.Data.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <span class="badge @(m.Entrada ? "bg-success" : "bg-danger")">@(m.Entrada ? "Chegou" : "Saiu")</span>
+                        </td>
+                        <td>@m.JogadorNome</td>
+                        <td class="text-nowrap">@m.Tipo.ToDisplayName()</td>
+                        <td>@(m.OutroTimeNome is null ? "—" : $"{(m.Entrada ? "de" : "para")} {m.OutroTimeNome}")</td>
+                        <td class="text-end text-nowrap">@(m.Valor is decimal v ? Moeda(v) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_dados.Movimentacoes.Count > _limite)
+    {
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => _limite = int.MaxValue">
+            Ver todas (@_dados.Movimentacoes.Count)
+        </button>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _loading = true;
+    private string? _erro;
+    private TimeTransferenciasDto? _dados;
+    private int _limite = 20;
+
+    private IEnumerable<TimeTransferenciaDto> Visiveis => _dados?.Movimentacoes.Take(_limite) ?? Enumerable.Empty<TimeTransferenciaDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _dados = await LigaService.GetTransferenciasTimeAsync(TeamId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Moeda(decimal valor) => valor.ToString("C0", Brasil);
+}

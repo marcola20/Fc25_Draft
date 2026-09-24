@@ -1,0 +1,51 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Utilities
+
+@* Forma, sequência atual e próximo jogo: o "como o time está" logo no topo da página. *@
+@if (Perfil is not null && (Perfil.Jogos > 0 || Perfil.ProximoJogo is not null))
+{
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row g-3 align-items-center">
+                @if (Perfil.Forma.Count > 0)
+                {
+                    <div class="col-12 col-md-auto">
+                        <div class="text-uppercase text-muted small fw-bold mb-1">Forma</div>
+                        <div class="d-flex gap-1" aria-label="Últimos jogos, do mais recente para o mais antigo">
+                            @foreach (var jogo in Perfil.Forma)
+                            {
+                                <span class="badge rounded-pill @TimeJogoEstilo.Badge(jogo.Resultado)"
+                                      style="width: 1.9rem;"
+                                      title="@TimeJogoEstilo.Descricao(jogo)">@jogo.Resultado</span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Perfil.SequenciaAtual))
+                {
+                    <div class="col-12 col-md-auto">
+                        <div class="text-uppercase text-muted small fw-bold mb-1">Momento</div>
+                        <span class="fw-semibold @TimeJogoEstilo.Texto(Perfil.SequenciaTipo)">@TimeJogoEstilo.Emoji(Perfil.SequenciaTipo) @Perfil.SequenciaAtual</span>
+                    </div>
+                }
+
+                @if (Perfil.ProximoJogo is { } proximo)
+                {
+                    <div class="col-12 col-md">
+                        <div class="text-uppercase text-muted small fw-bold mb-1">Próximo jogo</div>
+                        <span>
+                            @(proximo.EmCasa ? "vs" : "@")
+                            <a href="/teams/details/@proximo.AdversarioId" class="fw-semibold text-primary">@proximo.AdversarioNome</a>
+                            <span class="text-muted small">· @proximo.Competicao · @proximo.Etapa · @(proximo.EmCasa ? "em casa" : "fora")</span>
+                        </span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public TimePerfilDto? Perfil { get; set; }
+}

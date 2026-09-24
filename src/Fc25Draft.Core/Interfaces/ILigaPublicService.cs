@@ -31,6 +31,12 @@ public interface ILigaPublicService
     /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
     Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Jogos do time em todas as competições: forma, sequências, recordes, próximos jogos e confrontos.</summary>
+    Task<TimePerfilDto> GetPerfilTimeAsync(Guid timeId, CancellationToken ct);
+
+    /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
+    Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
+
     /// <summary>
     /// Ranking de Clubes de todas as temporadas, calculado na hora a partir dos jogos já
     /// encerrados (inclusive os da temporada em andamento), títulos, finais, semis e posições.

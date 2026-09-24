@@ -998,6 +998,108 @@ public class LigaPublicService : ILigaPublicService
             : $"Eliminado — {label}";
     }
 
+    public async Task<TimePerfilDto> GetPerfilTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var partidas = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.TimeCasaId == timeId || p.TimeForaId == timeId)
+            .Select(p => new
+            {
+                p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.Status,
+                p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.EncerradaEm,
+                p.Rodada.Numero, p.Rodada.Desempate,
+                p.Rodada.LigaId, LigaNome = p.Rodada.Liga.Nome, LigaTipo = p.Rodada.Liga.Tipo,
+                LigaStatus = p.Rodada.Liga.Status, LigaCriadaEm = p.Rodada.Liga.CriadoEm
+            })
+            .ToListAsync(ct);
+
+        var partidaIds = partidas.Select(p => p.PartidaId).ToList();
+        var fases = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.PartidaId != null && partidaIds.Contains(k.PartidaId.Value))
+            .ToDictionaryAsync(k => k.PartidaId!.Value, k => k.Fase, ct);
+
+        // Agenda: competição criada antes vem primeiro; dentro dela, a ordem das rodadas.
+        var ordemLiga = partidas
+            .Select(p => (p.LigaId, p.LigaCriadaEm))
+            .Distinct()
+            .OrderBy(l => l.LigaCriadaEm)
+            .Select((l, i) => (l.LigaId, Indice: i))
+            .ToDictionary(l => l.LigaId, l => l.Indice);
+
+        var inputs = partidas
+            // Jogo pendente de competição já encerrada não vai acontecer.
+            .Where(p => p.Status == PartidaStatus.Encerrada || p.LigaStatus != LigaStatus.Encerrada)
+            .Select(p => new TimePerfilPartidaInput(
+                p.PartidaId,
+                p.LigaNome,
+                EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var fase) ? fase : null),
+                p.TimeCasaId,
+                p.TimeForaId,
+                p.GolsCasa,
+                p.GolsFora,
+                p.Status,
+                p.IsWO,
+                p.TemPenaltis,
+                p.PenaltisVencedorId,
+                p.EncerradaEm,
+                ordemLiga[p.LigaId] * 10_000L + p.Numero));
+
+        return TimePerfil.Calcular(timeId, inputs, nomes);
+    }
+
+    private static string EtapaLabel(TipoCompetition tipo, int rodada, bool desempate, FaseKnockout? fase) => fase switch
+    {
+        FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C => "Play-In",
+        FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas de final",
+        FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
+        FaseKnockout.Final => "Final",
+        _ when tipo == TipoCompetition.Supercopa => "Final",
+        _ when desempate => "Jogo decisivo",
+        _ => $"Rodada {rodada}"
+    };
+
+    public async Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var historico = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.FromTeamId == timeId || t.ToTeamId == timeId)
+            .OrderByDescending(t => t.PerformedAtUtc)
+            .Select(t => new
+            {
+                t.PerformedAtUtc, t.Type, t.PlayerId, JogadorNome = t.Player.Name,
+                t.FromTeamId, FromNome = t.FromTeam != null ? t.FromTeam.TeamName : null,
+                ToNome = t.ToTeam != null ? t.ToTeam.TeamName : null,
+                t.Amount
+            })
+            .ToListAsync(ct);
+
+        var movimentacoes = historico
+            .Select(t =>
+            {
+                var entrada = t.FromTeamId != timeId;
+                return new TimeTransferenciaDto(
+                    t.PerformedAtUtc, t.Type, t.PlayerId, t.JogadorNome, entrada,
+                    entrada ? t.FromNome : t.ToNome, t.Amount);
+            })
+            .ToList();
+
+        // Na troca o valor é a avaliação dos jogadores, não dinheiro: fica fora do gasto e do recebido.
+        var gasto = movimentacoes
+            .Where(m => m.Entrada && m.Tipo is TransferType.MarketAuction or TransferType.TeamSale)
+            .Sum(m => m.Valor ?? 0m);
+        var recebido = movimentacoes
+            .Where(m => !m.Entrada && m.Tipo is TransferType.TeamSale or TransferType.QuickSell or TransferType.ExpansionDraft)
+            .Sum(m => m.Valor ?? 0m);
+
+        return new TimeTransferenciasDto(
+            movimentacoes.Count(m => m.Entrada),
+            movimentacoes.Count(m => !m.Entrada),
+            gasto,
+            recebido,
+            movimentacoes);
+    }
+
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
             l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);

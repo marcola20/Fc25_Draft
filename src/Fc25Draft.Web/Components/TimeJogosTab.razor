@@ -1,0 +1,193 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Web.Utilities
+
+@if (Perfil is null)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (Perfil.Jogos == 0 && Perfil.ProximosJogos.Count == 0)
+{
+    <div class="alert alert-info mb-0">Este time ainda não tem jogos.</div>
+}
+else
+{
+    <p class="text-muted small">
+        Todas as competições e temporadas. Jogo decidido nos pênaltis conta como empate (vale o placar do tempo normal),
+        o mesmo critério do Ranking de Clubes.
+    </p>
+
+    <div class="row g-2 mb-4">
+        @Numero("Jogos", Perfil.Jogos.ToString(), "")
+        @Numero("Vitórias", Perfil.Vitorias.ToString(), "text-success")
+        @Numero("Empates", Perfil.Empates.ToString(), "")
+        @Numero("Derrotas", Perfil.Derrotas.ToString(), "text-danger")
+        @Numero("Gols", $"{Perfil.GolsPro} : {Perfil.GolsContra}", "")
+        @Numero("Aproveitamento", Aproveitamento, "")
+    </div>
+
+    <h5 class="mb-2">Recordes</h5>
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 border-success">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Maior vitória</div>
+                    @if (Perfil.MaiorVitoria is { } v)
+                    {
+                        <div class="fs-5 fw-bold">@v.GolsPro x @v.GolsContra</div>
+                        <div class="small">vs <a href="/teams/details/@v.AdversarioId" class="text-primary">@v.AdversarioNome</a></div>
+                        <div class="small text-muted">@v.Competicao · @v.Etapa</div>
+                    }
+                    else
+                    {
+                        <div class="fs-5">—</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 border-danger">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Maior derrota</div>
+                    @if (Perfil.MaiorDerrota is { } d)
+                    {
+                        <div class="fs-5 fw-bold">@d.GolsPro x @d.GolsContra</div>
+                        <div class="small">vs <a href="/teams/details/@d.AdversarioId" class="text-primary">@d.AdversarioNome</a></div>
+                        <div class="small text-muted">@d.Competicao · @d.Etapa</div>
+                    }
+                    else
+                    {
+                        <div class="fs-5">—</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Mais vitórias seguidas</div>
+                    <div class="fs-5 fw-bold">@Perfil.MaiorSequenciaVitorias</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Maior invencibilidade</div>
+                    <div class="fs-5 fw-bold">@Perfil.MaiorInvencibilidade <span class="fs-6 fw-normal">jogo@(Perfil.MaiorInvencibilidade == 1 ? "" : "s")</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-7">
+            <h5 class="mb-2">Últimos jogos</h5>
+            @if (Perfil.UltimosJogos.Count == 0)
+            {
+                <p class="text-muted">Nenhum jogo disputado ainda.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                            @foreach (var jogo in Perfil.UltimosJogos)
+                            {
+                                <tr>
+                                    <td style="width: 2.4rem;"><span class="badge @TimeJogoEstilo.Badge(jogo.Resultado)">@jogo.Resultado</span></td>
+                                    <td class="text-nowrap fw-semibold">@TimeJogoEstilo.Placar(jogo)</td>
+                                    <td>
+                                        @(jogo.EmCasa ? "vs" : "@") <a href="/teams/details/@jogo.AdversarioId" class="text-primary">@jogo.AdversarioNome</a>
+                                        <div class="small text-muted">@jogo.Competicao · @jogo.Etapa</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+        <div class="col-12 col-lg-5">
+            <h5 class="mb-2">Próximos jogos</h5>
+            @if (Perfil.ProximosJogos.Count == 0)
+            {
+                <p class="text-muted">Nenhum jogo marcado.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var jogo in Perfil.ProximosJogos)
+                    {
+                        <li class="list-group-item">
+                            @(jogo.EmCasa ? "vs" : "@") <a href="/teams/details/@jogo.AdversarioId" class="fw-semibold text-primary">@jogo.AdversarioNome</a>
+                            <span class="badge bg-light text-dark ms-1">@(jogo.EmCasa ? "casa" : "fora")</span>
+                            <div class="small text-muted">@jogo.Competicao · @jogo.Etapa</div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <h5 class="mb-2">Confrontos</h5>
+    @if (Perfil.Confrontos.Count == 0)
+    {
+        <p class="text-muted mb-0">Nenhum confronto ainda.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle text-center" style="font-size: 0.875rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start">Adversário</th>
+                        <th title="Jogos">J</th>
+                        <th title="Vitórias">V</th>
+                        <th title="Empates">E</th>
+                        <th title="Derrotas">D</th>
+                        <th title="Gols feitos">GF</th>
+                        <th title="Gols sofridos">GS</th>
+                        <th title="Saldo de gols">SG</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Perfil.Confrontos)
+                    {
+                        <tr class="@(c.Vitorias > c.Derrotas ? "table-success" : c.Derrotas > c.Vitorias ? "table-danger" : "")">
+                            <td class="text-start"><a href="/teams/details/@c.AdversarioId" class="text-primary">@c.AdversarioNome</a></td>
+                            <td>@c.Jogos</td>
+                            <td>@c.Vitorias</td>
+                            <td>@c.Empates</td>
+                            <td>@c.Derrotas</td>
+                            <td>@c.GolsPro</td>
+                            <td>@c.GolsContra</td>
+                            <td class="fw-semibold">@(c.SaldoGols > 0 ? "+" : "")@c.SaldoGols</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small mb-0">Verde: leva vantagem no confronto. Vermelho: está em desvantagem.</p>
+    }
+}
+
+@code {
+    [Parameter] public TimePerfilDto? Perfil { get; set; }
+
+    // Pontos conquistados sobre os possíveis (3 por jogo).
+    private string Aproveitamento => Perfil is null || Perfil.Jogos == 0
+        ? "—"
+        : $"{(Perfil.Vitorias * 3 + Perfil.Empates) * 100.0 / (Perfil.Jogos * 3):0}%";
+
+    private static RenderFragment Numero(string rotulo, string valor, string cor) => __builder =>
+    {
+        <div class="col-4 col-md-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">@rotulo</div>
+                    <h4 class="mb-0 @cor">@valor</h4>
+                </div>
+            </div>
+        </div>
+    };
+}
