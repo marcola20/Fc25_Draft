@@ -224,12 +224,26 @@ public class LigaAdminService : ILigaAdminService
     /// <summary>
     /// Rodadas da fase de grupos: round-robin dentro de cada grupo, com os jogos de todos os
     /// grupos acontecendo na mesma rodada. Grupos menores simplesmente acabam antes.
+    /// A fase dura o tanto de jogos que cada time faz (num grupo de N, N-1 rodadas): no grupo
+    /// ímpar os jogos que sobrariam numa rodada extra entram na última, e ali alguns times jogam
+    /// duas vezes — assim a Copa não ganha datas só para um grupo ou outro.
     /// </summary>
     private static List<List<(Guid, Guid)>> GerarRodadasDosGrupos(List<List<Guid>> grupos)
     {
-        // Grupo ímpar precisa de uma rodada a mais: em cada rodada um time folga.
         var porGrupo = grupos
-            .Select(times => GerarRoundRobinParcial(times, times.Count % 2 == 0 ? times.Count - 1 : times.Count))
+            .Select(times =>
+            {
+                // Grupo ímpar sai do sorteio com uma rodada a mais (um time folga por rodada).
+                var doGrupo = GerarRoundRobinParcial(times, times.Count % 2 == 0 ? times.Count - 1 : times.Count);
+
+                if (times.Count % 2 != 0 && doGrupo.Count > 1)
+                {
+                    doGrupo[^2].AddRange(doGrupo[^1]);
+                    doGrupo.RemoveAt(doGrupo.Count - 1);
+                }
+
+                return doGrupo;
+            })
             .ToList();
 
         var totalRodadas = porGrupo.Max(g => g.Count);

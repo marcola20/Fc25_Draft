@@ -24,7 +24,7 @@
     {
         const int rodadasSerieA = 9;
         const int rodadasSerieB = 7;
-        const int rodadasGrupoCopa = 5; // grupos de 5 precisam de 5 rodadas (um time folga por rodada)
+        const int rodadasGrupoCopa = 4; // cada time joga N-1 jogos; o grupo de 5 junta a sobra na última
 
         // Blocos de liga: a Série B sempre colada na Série A. Quando uma das séries acaba
         // antes da outra, o que sobra vira bloco de uma data só.
@@ -265,10 +265,11 @@
                 Todos os times da temporada entram na Copa, divididos em <strong>4 grupos</strong> por <strong>sorteio em potes</strong>.
                 Com <strong>18 times</strong> ficam <strong>2 grupos de 4 (A e B) e 2 de 5 (C e D)</strong>; os times do último pote é que completam os grupos maiores.
                 Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>. A fase de grupos tem
-                <strong>5 rodadas</strong>: nos grupos de 4, os times folgam em duas delas.
+                <strong>4 rodadas</strong>, o mesmo tanto de jogos que cada time faz: nos grupos de 5, a última rodada
+                junta os jogos que sobrariam e alguns times jogam duas vezes nela; nos grupos de 4, os times folgam numa delas.
             </p>
 
-            <div class="fmt-groups-grid">
+            <div class="fmt-groups-grid fmt-groups-grid-2">
                 @foreach (var (grupo, times) in new[] { ("A", 4), ("B", 4), ("C", 5), ("D", 5) })
                 {
                     <div class="fmt-group-card">
@@ -318,10 +319,6 @@
                                     <span class="fmt-ko-seed fmt-seed-b">@(fora)2°</span>
                                     <span class="fmt-ko-name">2º do Grupo @fora</span>
                                 </div>
-                            </div>
-                            <div class="fmt-ko-result">
-                                <span class="fmt-result-win">Vencedor → Semifinal</span>
-                                <span class="fmt-result-lose">Perdedor → Eliminado</span>
                             </div>
                         </div>
                     }
@@ -620,8 +617,15 @@
         gap: 1rem;
     }
 
+    /* Grupos em duas colunas: A e B na primeira linha, C e D na segunda. */
+    .fmt-groups-grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+    }
+
     @@media (max-width: 700px) {
         .fmt-groups-grid      { grid-template-columns: 1fr; }
+        .fmt-groups-grid-2    { grid-template-columns: 1fr; }
         .fmt-groups-vs        { justify-content: center; }
     }
 
@@ -704,7 +708,7 @@
         .fmt-knockout-arrow   { text-align: center; }
     }
 
-    .fmt-knockout-col       { display: flex; flex-direction: column; }
+    .fmt-knockout-col       { display: flex; flex-direction: column; gap: 0.75rem; justify-content: center; }
     .fmt-knockout-col-final { flex: 1.1; }
 
     .fmt-knockout-arrow {
