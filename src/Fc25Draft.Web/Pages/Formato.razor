@@ -26,29 +26,52 @@
         const int rodadasSerieB = 7;
         const int rodadasGrupoCopa = 5; // grupos de 5 precisam de 5 rodadas (um time folga por rodada)
 
-        var datas = new List<DataCalendario>();
-        void Add(string competicao, string? detalhe, string classe) =>
-            datas.Add(new DataCalendario(datas.Count + 1, competicao, detalhe, classe));
-
-        Add("Supercopa", "abre a temporada", "fmt-cal-final");
-
-        int serieA = 1, serieB = 1, copa = 1;
-
-        // A cada duas duplas de liga entra uma rodada de grupo da Copa.
-        while (serieA <= rodadasSerieA || serieB <= rodadasSerieB || copa <= rodadasGrupoCopa)
+        // Blocos de liga: a Série B sempre colada na Série A. Quando uma das séries acaba
+        // antes da outra, o que sobra vira bloco de uma data só.
+        var blocosDeLiga = new List<List<DataCalendario>>();
+        int serieA = 1, serieB = 1;
+        while (serieA <= rodadasSerieA || serieB <= rodadasSerieB)
         {
-            for (int dupla = 0; dupla < 2; dupla++)
-            {
-                if (serieB <= rodadasSerieB) Add("Série B", $"Rodada {serieB++}", "fmt-cal-special");
-                if (serieA <= rodadasSerieA) Add("Série A", $"Rodada {serieA++}", "fmt-cal-liga");
-            }
-
-            if (copa <= rodadasGrupoCopa) Add("Copa", $"Rodada {copa++} · grupos", "fmt-cal-copa");
+            var bloco = new List<DataCalendario>();
+            if (serieB <= rodadasSerieB) bloco.Add(new DataCalendario(0, "Série B", $"Rodada {serieB++}", "fmt-cal-special"));
+            if (serieA <= rodadasSerieA) bloco.Add(new DataCalendario(0, "Série A", $"Rodada {serieA++}", "fmt-cal-liga"));
+            blocosDeLiga.Add(bloco);
         }
 
-        Add("Copa", "Quartas de final", "fmt-cal-semi");
-        Add("Copa", "Semifinais", "fmt-cal-semi");
-        Add("Copa", "Final", "fmt-cal-final");
+        // Datas da Copa na ordem em que acontecem; a final fica fora porque fecha a temporada.
+        var datasDaCopa = new List<DataCalendario>();
+        for (int copa = 1; copa <= rodadasGrupoCopa; copa++)
+            datasDaCopa.Add(new DataCalendario(0, "Copa", $"Rodada {copa} · grupos", "fmt-cal-copa"));
+        datasDaCopa.Add(new DataCalendario(0, "Copa", "Quartas de final", "fmt-cal-semi"));
+        datasDaCopa.Add(new DataCalendario(0, "Copa", "Semifinais", "fmt-cal-semi"));
+
+        var totalDeDatas = 1 + blocosDeLiga.Sum(b => b.Count) + datasDaCopa.Count + 1;
+
+        // Em vez de amontoar a Copa no fim, cada data dela tem um lugar-alvo espalhado por igual
+        // entre a Supercopa e a final; ela entra no primeiro intervalo entre blocos que alcança o alvo.
+        int Alvo(int i) => 1 + (int)Math.Round(
+            (double)i * (totalDeDatas - 1) / (datasDaCopa.Count + 1), MidpointRounding.AwayFromZero);
+
+        var datas = new List<DataCalendario>();
+        void Add(DataCalendario data) =>
+            datas.Add(data with { Numero = datas.Count + 1 });
+
+        Add(new DataCalendario(0, "Supercopa", "abre a temporada", "fmt-cal-final"));
+
+        var proximaDaCopa = 1;
+        foreach (var bloco in blocosDeLiga)
+        {
+            foreach (var data in bloco) Add(data);
+
+            while (proximaDaCopa <= datasDaCopa.Count && datas.Count + 1 >= Alvo(proximaDaCopa))
+                Add(datasDaCopa[proximaDaCopa++ - 1]);
+        }
+
+        // Sobra quando a liga acaba antes (ex.: poucas rodadas de liga e muitas de Copa).
+        while (proximaDaCopa <= datasDaCopa.Count)
+            Add(datasDaCopa[proximaDaCopa++ - 1]);
+
+        Add(new DataCalendario(0, "Copa", "Final", "fmt-cal-final"));
 
         return datas;
     }
