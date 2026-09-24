@@ -3,7 +3,10 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<LangVersion>latest</LangVersion>
+		<!-- Mesma versão que a imagem de produção (sdk:8.0) usa. Com "latest", um SDK mais novo
+		     na máquina compila C# 14, e o array.Contains nas consultas vira o overload de Span,
+		     que o EF 8 não traduz: quebrava só localmente. -->
+		<LangVersion>12</LangVersion>
 		<UserSecretsId>fc25draft-dev-secrets</UserSecretsId>
 	</PropertyGroup>
         <ItemGroup>
