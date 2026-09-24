@@ -307,6 +307,13 @@
 
                 @if (_rodadaAtual is not null)
                 {
+                    <RodadaResumoCard @ref="_rodadaResumoRef"
+                                      LigaNome="@LigaNome"
+                                      Rodada="@_rodadaAtual"
+                                      ProximaRodada="@_proximaRodada"
+                                      Classificacao="@(_liga?.Tipo == TipoCompetition.Liga ? _classif : Array.Empty<LigaClassificacaoItemDto>())"
+                                      JogoUnico="@EhSupercopa" />
+
                     <ShareableCard Id="cap-rodada"
                                    Titulo="@LigaNome"
                                    Subtitulo='@(EhSupercopa ? "Jogo único" : $"Rodada {_rodadaAtual.Numero}")'
@@ -696,6 +703,7 @@
 
     private ShareableCard? _classifCardRef;
     private ShareableCard? _rodadaCardRef;
+    private RodadaResumoCard? _rodadaResumoRef;
     private bool _sharingClassif;
     private bool _sharingRodada;
 
@@ -710,10 +718,10 @@
 
     private async Task CompartilharRodada()
     {
-        if (_sharingRodada || _rodadaCardRef is null) return;
+        if (_sharingRodada || _rodadaResumoRef is null) return;
         _sharingRodada = true;
         StateHasChanged();
-        try { await _rodadaCardRef.Share(); }
+        try { await _rodadaResumoRef.CompartilharAsync(); }
         finally { _sharingRodada = false; StateHasChanged(); }
     }
     private Guid _ligaId = Guid.Empty;
@@ -747,6 +755,12 @@
 
     private LigaRodadaComPartidasDto? _rodadaAtual =>
         _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;
+
+    // A rodada seguinte, se ainda tiver jogo por disputar: entra no card como "próxima rodada".
+    private LigaRodadaComPartidasDto? _proximaRodada =>
+        _rodadaIdx + 1 < _rodadas.Count && _rodadas[_rodadaIdx + 1].Partidas.Any(p => p.Status != PartidaStatus.Encerrada)
+            ? _rodadas[_rodadaIdx + 1]
+            : null;
 
     protected override void OnInitialized()
     {

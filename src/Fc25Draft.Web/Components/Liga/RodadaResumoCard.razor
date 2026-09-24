@@ -1,0 +1,207 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject ILigaPublicService LigaService
+@inject EscudoService Escudos
+
+@* Resumo da rodada para compartilhar no WhatsApp: resultados com quem marcou, destaques,
+   classificação e próximos jogos. Não aparece na página: fica fora da tela e só vira imagem. *@
+
+@if (_resumo is not null && Rodada is not null)
+{
+    <div style="position: absolute; left: -10000px; top: 0; width: 700px;" aria-hidden="true">
+        <ShareableCard @ref="_card"
+                       Id="@CardId"
+                       Titulo="@LigaNome"
+                       Subtitulo="@Subtitulo"
+                       Arquivo="@Arquivo"
+                       MostrarBotao="false">
+            <div style="font-size: 14px;">
+                @if (_resumo.JogosEncerrados > 0)
+                {
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge rounded-pill bg-light text-dark border" style="font-size: 13px;">
+                            ⚽ @_resumo.TotalGols gol@(_resumo.TotalGols == 1 ? "" : "s") em @_resumo.JogosEncerrados jogo@(_resumo.JogosEncerrados == 1 ? "" : "s")
+                        </span>
+                        @if (_resumo.Artilheiros.Count > 0)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark" style="font-size: 13px;">
+                                🎯 @string.Join(", ", _resumo.Artilheiros.Select(a => a.Nome)) · @_resumo.Artilheiros[0].Gols gols
+                            </span>
+                        }
+                        @if (_resumo.MaiorGoleada is { } g)
+                        {
+                            <span class="badge rounded-pill bg-dark" style="font-size: 13px;">
+                                💥 @g.TimeCasaNome @g.GolsCasa x @g.GolsFora @g.TimeForaNome
+                            </span>
+                        }
+                    </div>
+                }
+
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 11px; letter-spacing: .5px;">Resultados</div>
+                <div class="border rounded mb-3">
+                    @foreach (var jogo in _resumo.Jogos)
+                    {
+                        var p = jogo.Partida;
+                        <div class="px-3 py-2 @(jogo == _resumo.Jogos[^1] ? "" : "border-bottom")">
+                            <div class="d-flex align-items-center">
+                                <div class="d-flex align-items-center justify-content-end gap-2 fw-semibold text-end" style="flex: 1; min-width: 0;">
+                                    <span>@p.TimeCasaNome</span>
+                                    <img src="@Escudos.GetEscudo(p.TimeCasaNome)" alt="" width="24" height="24" style="object-fit: contain;" />
+                                </div>
+                                <div class="text-center fw-bold mx-3" style="min-width: 64px; font-size: 18px;">
+                                    @if (p.Status == PartidaStatus.Agendada)
+                                    {
+                                        <span class="text-muted fw-normal" style="font-size: 14px;">vs</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@p.GolsCasa <span class="text-muted fw-normal">x</span> @p.GolsFora</span>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center gap-2 fw-semibold" style="flex: 1; min-width: 0;">
+                                    <img src="@Escudos.GetEscudo(p.TimeForaNome)" alt="" width="24" height="24" style="object-fit: contain;" />
+                                    <span>@p.TimeForaNome</span>
+                                </div>
+                            </div>
+
+                            @if (jogo.GolsCasa.Count > 0 || jogo.GolsFora.Count > 0)
+                            {
+                                <div class="d-flex text-muted" style="font-size: 12px;">
+                                    <div class="text-end" style="flex: 1;">@string.Join(" · ", jogo.GolsCasa)</div>
+                                    <div style="min-width: 88px;"></div>
+                                    <div style="flex: 1;">@string.Join(" · ", jogo.GolsFora)</div>
+                                </div>
+                            }
+
+                            @if (p.TemPenaltis || p.IsWO || p.Status == PartidaStatus.EmAndamento)
+                            {
+                                <div class="text-center" style="font-size: 11px;">
+                                    @if (p.Status == PartidaStatus.EmAndamento)
+                                    {
+                                        <span class="badge bg-danger">em andamento</span>
+                                    }
+                                    @if (p.IsWO)
+                                    {
+                                        <span class="badge bg-secondary">W.O.</span>
+                                    }
+                                    @if (p.TemPenaltis && p.PenaltisVencedorId is Guid venc)
+                                    {
+                                        <span class="badge bg-info text-dark">
+                                            @(venc == p.TimeCasaId ? p.TimeCasaNome : p.TimeForaNome) venceu nos pênaltis
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (Tabela.Count > 0)
+                {
+                    <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 11px; letter-spacing: .5px;">Classificação atual</div>
+                    <table class="table table-sm mb-3 align-middle text-center" style="font-size: 13px;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 32px;">#</th>
+                                <th class="text-start">Time</th>
+                                <th>Pts</th>
+                                <th>J</th>
+                                <th>V</th>
+                                <th>E</th>
+                                <th>D</th>
+                                <th>SG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Tabela)
+                            {
+                                <tr>
+                                    <td class="fw-bold">@t.Posicao</td>
+                                    <td class="text-start">
+                                        <img src="@Escudos.GetEscudo(t.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit: contain;" />
+                                        @t.TimeNome
+                                    </td>
+                                    <td class="fw-bold">@t.Pontos</td>
+                                    <td>@t.Jogos</td>
+                                    <td>@t.Vitorias</td>
+                                    <td>@t.Empates</td>
+                                    <td>@t.Derrotas</td>
+                                    <td>@(t.SaldoGols > 0 ? "+" : "")@t.SaldoGols</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (Classificacao.Count > Tabela.Count)
+                    {
+                        <div class="text-muted mb-3" style="font-size: 11px; margin-top: -10px;">Top @Tabela.Count de @Classificacao.Count. Tabela completa no site.</div>
+                    }
+                }
+
+                @if (ProximaRodada is { Partidas.Count: > 0 } proxima)
+                {
+                    <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 11px; letter-spacing: .5px;">
+                        Próxima rodada · Rodada @proxima.Numero
+                    </div>
+                    <div class="d-flex flex-wrap" style="font-size: 13px;">
+                        @foreach (var p in proxima.Partidas)
+                        {
+                            <div class="py-1" style="width: 50%;">@p.TimeCasaNome <span class="text-muted">x</span> @p.TimeForaNome</div>
+                        }
+                    </div>
+                }
+            </div>
+        </ShareableCard>
+    </div>
+}
+
+@code {
+    private const int MaxLinhasTabela = 12;
+
+    [Parameter, EditorRequired] public string LigaNome { get; set; } = "CBFV";
+    [Parameter, EditorRequired] public LigaRodadaComPartidasDto? Rodada { get; set; }
+    [Parameter] public LigaRodadaComPartidasDto? ProximaRodada { get; set; }
+    // Só para ligas (na Copa a tabela é por grupo; na Supercopa não existe).
+    [Parameter] public IReadOnlyList<LigaClassificacaoItemDto> Classificacao { get; set; } = Array.Empty<LigaClassificacaoItemDto>();
+    [Parameter] public bool JogoUnico { get; set; }
+
+    private const string CardId = "cap-rodada-resumo";
+
+    private ShareableCard? _card;
+    private RodadaResumoDto? _resumo;
+    private bool _pronto;
+
+    private string Subtitulo => JogoUnico
+        ? "A decisão"
+        : $"Rodada {Rodada?.Numero}{(Rodada?.Desempate == true ? " · Jogo decisivo" : "")}";
+
+    private string Arquivo => JogoUnico ? "cbfv-supercopa.png" : $"cbfv-rodada-{Rodada?.Numero}.png";
+
+    private IReadOnlyList<LigaClassificacaoItemDto> Tabela =>
+        Classificacao.OrderBy(c => c.Posicao).Take(MaxLinhasTabela).ToList();
+
+    /// <summary>Busca os gols da rodada, monta o card fora da tela e gera a imagem.</summary>
+    public async Task CompartilharAsync()
+    {
+        if (Rodada is null) return;
+
+        var gols = await LigaService.GetGolsRodadaAsync(Rodada.RodadaId, CancellationToken.None);
+        _resumo = ResumoRodada.Calcular(Rodada.Partidas, gols);
+        _pronto = false;
+        StateHasChanged();
+
+        // Espera o card aparecer no DOM (OnAfterRenderAsync) antes de capturar.
+        for (var i = 0; i < 50 && (!_pronto || _card is null); i++)
+            await Task.Delay(20);
+
+        if (_card is not null)
+            await _card.Share();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_resumo is not null)
+            _pronto = true;
+    }
+}

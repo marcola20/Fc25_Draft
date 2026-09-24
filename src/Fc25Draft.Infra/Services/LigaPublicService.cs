@@ -499,6 +499,31 @@ public class LigaPublicService : ILigaPublicService
         )).ToArray();
     }
 
+    public async Task<IReadOnlyList<LigaEventoDto>> GetGolsRodadaAsync(Guid rodadaId, CancellationToken ct)
+    {
+        return await _db.LigaEventos
+            .AsNoTracking()
+            .Where(x => x.Partida.RodadaId == rodadaId
+                        && (x.Tipo == TipoEvento.Gol || x.Tipo == TipoEvento.GolContra))
+            .OrderBy(x => x.Minuto)
+            .ThenBy(x => x.CriadoEm)
+            .Select(e => new LigaEventoDto(
+                e.EventoId,
+                e.PartidaId,
+                e.Tipo,
+                e.TimeId,
+                e.Time.TeamName,
+                e.JogadorId,
+                e.Jogador.Name,
+                e.AssistenteId,
+                e.Assistente != null ? e.Assistente.Name : null,
+                e.Minuto,
+                e.CriadoEm,
+                null,
+                null))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct)
     {
         var eventos = await _db.LigaEventos

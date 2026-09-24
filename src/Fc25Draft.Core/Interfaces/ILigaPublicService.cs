@@ -18,6 +18,9 @@ public interface ILigaPublicService
     Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetRodadasComPartidasAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaGrupoTimeDto>> GetGruposAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct);
+
+    /// <summary>Gols (inclusive contra) de todas as partidas de uma rodada, em ordem de minuto.</summary>
+    Task<IReadOnlyList<LigaEventoDto>> GetGolsRodadaAsync(Guid rodadaId, CancellationToken ct);
     Task<PartidaEscalacoesDto?> GetEscalacoesPartidaAsync(Guid partidaId, CancellationToken ct);
     Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct);
     Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct);
