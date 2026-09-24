@@ -126,8 +126,10 @@ public static class TermometroMercado
                 .Select(c => new TermometroContratacaoDto(c.Data, c.Tipo, c.PlayerId, c.JogadorNome, c.Posicao,
                     Nome(c.DeTimeId), Nome(c.ParaTimeId), c.Valor))
                 .ToList(),
-            // Pechincha: saiu mais perto do preço base, com mais overall desempatando.
+            // Pechincha: saiu no lance mais perto do preço base, com mais overall desempatando.
+            // Compra imediata fica de fora: é o preço cheio, o máximo que o jogador custa.
             vendidas
+                .Where(d => !d.CompraImediata)
                 .OrderBy(d => d.Agio)
                 .ThenByDescending(d => d.Overall)
                 .Take(TopPechinchas)

@@ -15,9 +15,21 @@
 
 <div class="picks-page">
 
+    <div class="picks-tabs" role="tablist">
+        @foreach (var regra in Regras)
+        {
+            var r = regra;
+            <button type="button" role="tab" aria-selected="@(r == _regra)"
+                    class="picks-tab @(r == _regra ? "active" : "")" @onclick="() => _regra = r">
+                <span class="picks-tab-title">@r.Aba</span>
+                <span class="picks-tab-sub">@r.AbaSub</span>
+            </button>
+        }
+    </div>
+
     <section class="picks-section">
         <div class="picks-card picks-card-info">
-            <p>O draft tem <strong>dois rounds</strong>: o Round 1 é baseado na classificação final da <strong>Liga</strong>, e o Round 2 é baseado no desempenho na <strong>Copa</strong>. Em ambos, times com pior desempenho têm acesso a picks mais cedo.</p>
+            <p>@_regra.Intro</p>
         </div>
     </section>
 
@@ -29,82 +41,11 @@
             <span class="picks-section-icon">🏆</span>
             <h3>Round 1 — Liga</h3>
         </div>
-        <p class="picks-section-desc">Baseado na classificação final da fase de Liga (pontos corridos). Pior time da Liga tem maior chance de conseguir a pick #1.</p>
-
-        <div class="picks-table-wrap">
-            <table class="picks-table">
-                <thead>
-                    <tr>
-                        <th>Resultado na Liga</th>
-                        <th>Times</th>
-                        <th>Picks Disponíveis</th>
-                        <th class="picks-th-range">Faixa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in R1Data)
-                    {
-                        <tr class="picks-row @row.RowClass">
-                            <td>
-                                <div class="picks-stage-cell">
-                                    <span class="picks-stage-icon">@row.Icon</span>
-                                    <span class="picks-stage-name">@row.Stage</span>
-                                </div>
-                            </td>
-                            <td class="picks-td-count">
-                                <span class="picks-count-badge @row.CountBadgeClass">@row.TeamCount</span>
-                            </td>
-                            <td>
-                                <div class="picks-chips">
-                                    @foreach (var pick in row.Picks)
-                                    {
-                                        <span class="picks-chip @GetPickClass(pick)">@pick</span>
-                                    }
-                                </div>
-                            </td>
-                            <td class="picks-td-range">
-                                <span class="picks-range-badge @row.RangeBadgeClass">@row.RangeLabel</span>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <p class="picks-section-desc">@_regra.R1Desc</p>
+        @TabelaPicks(("Resultado na Liga", _regra.R1))
     </section>
 
-    <section class="picks-section picks-section-sub">
-        <div class="picks-section-header">
-            <span class="picks-section-icon">🎰</span>
-            <h3>Loteria R1 — Pick #1</h3>
-        </div>
-        <p class="picks-section-desc">Os 4 piores times da Liga (9° ao 12°) disputam a pick #1 por loteria ponderada.</p>
-
-        <div class="picks-lottery-grid">
-            @foreach (var entry in R1LotteryOdds)
-            {
-                <div class="picks-lottery-card @entry.CardClass">
-                    <div class="picks-lottery-team">
-                        <span class="picks-lottery-icon">@entry.Icon</span>
-                        <div>
-                            <div class="picks-lottery-stage">@entry.Stage</div>
-                            <div class="picks-lottery-detail">@entry.Detail</div>
-                        </div>
-                    </div>
-                    <div class="picks-lottery-odds-wrap">
-                        <div class="picks-lottery-pct">@entry.Pct%</div>
-                        <div class="picks-lottery-bar-bg">
-                            <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-
-        <div class="picks-lottery-note">
-            <span class="picks-lottery-note-icon">ℹ️</span>
-            <span>O 11° e 12° têm juntos <strong>70%</strong> de chance de pegar a pick #1. Os picks 2, 3 e 4 são sorteados sequencialmente do mesmo pool (sem reposição). O 9° e o 10° ficam com os <strong>30%</strong> restantes.</span>
-        </div>
-    </section>
+    @LoteriaSecao(_regra.R1Loteria)
 
     <hr class="picks-divider" />
 
@@ -114,131 +55,20 @@
             <span class="picks-section-icon">🥇</span>
             <h3>Round 2 — Copa</h3>
         </div>
-        <p class="picks-section-desc">Baseado no desempenho na Copa. Times eliminados na fase de grupos têm mais chances nas melhores picks. Campeão da Copa recebe a pick #12.</p>
-
-        <div class="picks-table-wrap">
-            <table class="picks-table">
-                <thead>
-                    <tr>
-                        <th>Resultado na Copa</th>
-                        <th>Times</th>
-                        <th>Picks Disponíveis</th>
-                        <th class="picks-th-range">Faixa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in R2Data)
-                    {
-                        <tr class="picks-row @row.RowClass">
-                            <td>
-                                <div class="picks-stage-cell">
-                                    <span class="picks-stage-icon">@row.Icon</span>
-                                    <span class="picks-stage-name">@row.Stage</span>
-                                </div>
-                            </td>
-                            <td class="picks-td-count">
-                                <span class="picks-count-badge @row.CountBadgeClass">@row.TeamCount</span>
-                            </td>
-                            <td>
-                                <div class="picks-chips">
-                                    @foreach (var pick in row.Picks)
-                                    {
-                                        <span class="picks-chip @GetPickClass(pick)">@pick</span>
-                                    }
-                                </div>
-                            </td>
-                            <td class="picks-td-range">
-                                <span class="picks-range-badge @row.RangeBadgeClass">@row.RangeLabel</span>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <p class="picks-section-desc">@_regra.R2Desc</p>
+        @TabelaPicks(("Resultado na Copa", _regra.R2))
     </section>
 
-    <section class="picks-section picks-section-sub">
-        <div class="picks-section-header">
-            <span class="picks-section-icon">🎰</span>
-            <h3>Loteria R2 — Picks #1–8</h3>
-        </div>
-        <p class="picks-section-desc">Os 8 eliminados na fase de grupos disputam picks 1–8 em dois blocos: o pior quarteto briga pelas picks 1–4, o melhor quarteto pelas picks 5–8.</p>
-
-        <div class="picks-r2-blocks">
-            <div class="picks-r2-block">
-                <div class="picks-r2-block-title">Bloco A — Picks 1–4</div>
-                <div class="picks-r2-block-sub">4 piores eliminados (Copa posição 9°–12°)</div>
-                <div class="picks-lottery-grid picks-lottery-grid-2">
-                    @foreach (var entry in R2LotteryBlock1)
-                    {
-                        <div class="picks-lottery-card @entry.CardClass">
-                            <div class="picks-lottery-team">
-                                <span class="picks-lottery-icon">@entry.Icon</span>
-                                <div>
-                                    <div class="picks-lottery-stage">@entry.Stage</div>
-                                    <div class="picks-lottery-detail">@entry.Detail</div>
-                                </div>
-                            </div>
-                            <div class="picks-lottery-odds-wrap">
-                                <div class="picks-lottery-pct">@entry.Pct%</div>
-                                <div class="picks-lottery-bar-bg">
-                                    <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-            <div class="picks-r2-block">
-                <div class="picks-r2-block-title">Bloco B — Picks 5–8</div>
-                <div class="picks-r2-block-sub">4 próximos eliminados (Copa posição 5°–8°)</div>
-                <div class="picks-lottery-grid picks-lottery-grid-2">
-                    @foreach (var entry in R2LotteryBlock2)
-                    {
-                        <div class="picks-lottery-card @entry.CardClass">
-                            <div class="picks-lottery-team">
-                                <span class="picks-lottery-icon">@entry.Icon</span>
-                                <div>
-                                    <div class="picks-lottery-stage">@entry.Stage</div>
-                                    <div class="picks-lottery-detail">@entry.Detail</div>
-                                </div>
-                            </div>
-                            <div class="picks-lottery-odds-wrap">
-                                <div class="picks-lottery-pct">@entry.Pct%</div>
-                                <div class="picks-lottery-bar-bg">
-                                    <div class="picks-lottery-bar @entry.BarClass" style="width: @(entry.Pct * 100 / 35)%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <div class="picks-lottery-note">
-            <span class="picks-lottery-note-icon">ℹ️</span>
-            <span>Dentro de cada bloco, os picks são sorteados sequencialmente sem reposição. Pior posição Copa = maior chance de pick antecipada.</span>
-        </div>
-    </section>
+    @LoteriaSecao(_regra.R2Loteria)
 
     <hr class="picks-divider" />
 
-    <!-- Mapa de picks R1 -->
     <section class="picks-section">
         <div class="picks-section-header">
             <span class="picks-section-icon">🗺️</span>
             <h3>Mapa de Picks — Round 1</h3>
         </div>
-        <div class="picks-map">
-            @for (int pick = 1; pick <= 12; pick++)
-            {
-                var p = pick;
-                <div class="picks-map-col">
-                    <div class="picks-map-num @GetR1MapClass(p)">#@p</div>
-                    <div class="picks-map-label">@GetR1MapLabel(p)</div>
-                </div>
-            }
-        </div>
+        @MapaPicks(_regra.R1)
     </section>
 
     <section class="picks-section picks-section-sub">
@@ -246,127 +76,270 @@
             <span class="picks-section-icon">🗺️</span>
             <h3>Mapa de Picks — Round 2</h3>
         </div>
-        <div class="picks-map">
-            @for (int pick = 1; pick <= 12; pick++)
-            {
-                var p = pick;
-                <div class="picks-map-col">
-                    <div class="picks-map-num @GetR2MapClass(p)">#@p</div>
-                    <div class="picks-map-label">@GetR2MapLabel(p)</div>
-                </div>
-            }
-        </div>
+        @MapaPicks(_regra.R2)
     </section>
 
 </div>
 
 @code {
+    // Tom = red | orange | blue | green | silver | gold: cor da linha, das picks e do mapa.
     private sealed record PickRow(
         string Icon,
         string Stage,
-        string TeamCount,
         int[] Picks,
         string RangeLabel,
-        string RowClass,
-        string CountBadgeClass,
-        string RangeBadgeClass);
+        string Tom,
+        string MapLabel);
 
-    private sealed record LotteryEntry(
-        string Icon,
-        string Stage,
-        string Detail,
-        int Pct,
-        string CardClass,
-        string BarClass);
+    private sealed record LotteryEntry(string Icon, string Stage, string Detail, int Pct, string Tom);
 
-    // ── Round 1 ──────────────────────────────────────────────────────────────
-    private static readonly IReadOnlyList<PickRow> R1Data = new List<PickRow>
+    private sealed record LotteryBlock(string? Title, string? Sub, IReadOnlyList<LotteryEntry> Entries);
+
+    private sealed record LotterySection(string Title, string Desc, IReadOnlyList<LotteryBlock> Blocks, MarkupString Note);
+
+    private sealed record RegraPicks(
+        string Aba,
+        string AbaSub,
+        string Intro,
+        string R1Desc,
+        IReadOnlyList<PickRow> R1,
+        LotterySection R1Loteria,
+        string R2Desc,
+        IReadOnlyList<PickRow> R2,
+        LotterySection R2Loteria);
+
+    // ── Regra atual: 12 times, uma divisão ──────────────────────────────────
+    private static readonly RegraPicks RegraAtual = new(
+        Aba: "Próximo draft",
+        AbaSub: "12 times · regra atual",
+        Intro: "O draft tem dois rounds: o Round 1 segue a classificação final da Liga e o Round 2 segue o desempenho na Copa. Nos dois, quem foi pior escolhe antes.",
+        R1Desc: "Baseado na classificação final da fase de Liga (pontos corridos). O pior time da Liga tem a maior chance de ficar com a pick #1.",
+        R1: new List<PickRow>
+        {
+            new("🎰", "9° ao 12° da Liga", [1, 2, 3, 4], "Loteria 1–4",  "red",    "Loteria"),
+            new("⚖️", "7° e 8° da Liga",   [5, 6],       "50/50 5–6",    "orange", "50/50 7°/8°"),
+            new("⚖️", "5° e 6° da Liga",   [7, 8],       "50/50 7–8",    "orange", "50/50 5°/6°"),
+            new("⚖️", "3° e 4° da Liga",   [9, 10],      "50/50 9–10",   "blue",   "50/50 3°/4°"),
+            new("⚖️", "1° e 2° da Liga",   [11, 12],     "50/50 11–12",  "green",  "50/50 1°/2°"),
+        },
+        R1Loteria: new(
+            "Loteria R1 — Pick #1",
+            "Os 4 piores times da Liga (9° ao 12°) disputam a pick #1 por loteria ponderada.",
+            [
+                new(null, null,
+                [
+                    new("🔴", "12° da Liga", "Pior classificado",    35, "red"),
+                    new("🔴", "11° da Liga", "2° pior classificado", 35, "red"),
+                    new("🟠", "10° da Liga", "3° pior classificado", 15, "orange"),
+                    new("🟠", "9° da Liga",  "4° pior classificado", 15, "orange"),
+                ]),
+            ],
+            new("O 11° e o 12° têm juntos <strong>70%</strong> de chance de pegar a pick #1. As picks 2, 3 e 4 são sorteadas em sequência do mesmo pool (sem reposição). O 9° e o 10° ficam com os <strong>30%</strong> restantes.")),
+        R2Desc: "Baseado no desempenho na Copa. Times eliminados na fase de grupos têm mais chances nas melhores picks. O campeão da Copa fica com a pick #12.",
+        R2: new List<PickRow>
+        {
+            new("🎰", "Elim. Grupos — 4 piores (Copa)",    [1, 2, 3, 4], "Loteria 1–4", "red",    "Lot. Grupos A"),
+            new("🎰", "Elim. Grupos — 4 seguintes (Copa)", [5, 6, 7, 8], "Loteria 5–8", "orange", "Lot. Grupos B"),
+            new("🎖️", "Eliminados nas Semis",             [9, 10],      "9–10",        "blue",   "Semis"),
+            new("🥈", "Vice-Campeão Copa",                 [11],         "11",          "silver", "Vice Copa"),
+            new("🏆", "Campeão Copa",                      [12],         "12",          "gold",   "Campeão Copa"),
+        },
+        R2Loteria: new(
+            "Loteria R2 — Picks #1–8",
+            "Os 8 eliminados na fase de grupos disputam as picks 1–8 em dois blocos: o pior quarteto briga pelas picks 1–4 e o melhor quarteto pelas picks 5–8.",
+            [
+                new("Bloco A — Picks 1–4", "4 piores eliminados (Copa posição 9°–12°)",
+                [
+                    new("🔴", "Pior eliminado", "12° Copa", 35, "red"),
+                    new("🔴", "2° eliminado",   "11° Copa", 35, "red"),
+                    new("🟠", "3° eliminado",   "10° Copa", 15, "orange"),
+                    new("🟠", "4° eliminado",   "9° Copa",  15, "orange"),
+                ]),
+                new("Bloco B — Picks 5–8", "4 próximos eliminados (Copa posição 5°–8°)",
+                [
+                    new("🔵", "5° eliminado", "8° Copa", 35, "blue"),
+                    new("🔵", "6° eliminado", "7° Copa", 35, "blue"),
+                    new("🟣", "7° eliminado", "6° Copa", 15, "purple"),
+                    new("🟣", "8° eliminado", "5° Copa", 15, "purple"),
+                ]),
+            ],
+            new("Dentro de cada bloco as picks são sorteadas em sequência, sem reposição. Pior posição na Copa = maior chance de pick antecipada.")));
+
+    // ── Com Série A e Série B: 18 times ─────────────────────────────────────
+    private static readonly RegraPicks RegraSerieB = new(
+        Aba: "Com Série B",
+        AbaSub: "18 times · a partir do draft seguinte",
+        Intro: "Com Série A (10 times) e Série B (8 times), cada round tem 18 picks. No Round 1 a Série B escolhe antes da Série A. No Round 2 vale só a campanha na Copa, sem separar divisão. Conta a divisão em que o time jogou a temporada, e o playoff de acesso não muda as picks.",
+        R1Desc: "Classificação única: os 8 da Série B vêm todos antes dos 10 da Série A. O pior da Série B tem a maior chance de ficar com a pick #1.",
+        R1: new List<PickRow>
+        {
+            new("🎰", "3° ao 8° da Série B", [1, 2, 3, 4, 5, 6], "Loteria 1–6",  "red",    "Loteria B"),
+            new("⚖️", "1° e 2° da Série B",  [7, 8],             "50/50 7–8",    "orange", "50/50 1°/2° B"),
+            new("⚖️", "9° e 10° da Série A", [9, 10],            "50/50 9–10",   "blue",   "50/50 9°/10° A"),
+            new("⚖️", "7° e 8° da Série A",  [11, 12],           "50/50 11–12",  "blue",   "50/50 7°/8° A"),
+            new("⚖️", "5° e 6° da Série A",  [13, 14],           "50/50 13–14",  "blue",   "50/50 5°/6° A"),
+            new("⚖️", "3° e 4° da Série A",  [15, 16],           "50/50 15–16",  "green",  "50/50 3°/4° A"),
+            new("⚖️", "1° e 2° da Série A",  [17, 18],           "50/50 17–18",  "green",  "50/50 1°/2° A"),
+        },
+        R1Loteria: new(
+            "Loteria R1 — Picks #1–6",
+            "Os 6 piores da Série B (3° ao 8°) disputam as picks 1–6 por loteria ponderada. Quanto pior a campanha, maior a chance.",
+            [
+                new(null, null,
+                [
+                    new("🔴", "8° da Série B", "Lanterna da B",   25, "red"),
+                    new("🔴", "7° da Série B", "2° pior da B",    20, "red"),
+                    new("🟠", "6° da Série B", "3° pior da B",    17, "orange"),
+                    new("🟠", "5° da Série B", "4° pior da B",    15, "orange"),
+                    new("🔵", "4° da Série B", "5° pior da B",    13, "blue"),
+                    new("🔵", "3° da Série B", "6° pior da B",    10, "blue"),
+                ]),
+            ],
+            new("As chances acima são as da pick #1. As picks 2 a 6 saem em sequência do mesmo pool (sem reposição), então os seis ficam com as seis primeiras picks, só muda a ordem. O rebaixado da Série A <strong>não</strong> entra na loteria: ele desce com elenco melhor que o dos times da B.")),
+        R2Desc: "Baseado só na campanha na Copa, com os 18 times juntos. Como há grupos de 4 e de 5 times, os eliminados nos grupos são ordenados primeiro pela posição no grupo (5°s, depois 4°s, depois 3°s) e depois pelo aproveitamento. Nas quartas e nas semis, quem teve pior aproveitamento na Copa escolhe antes.",
+        R2: new List<PickRow>
+        {
+            new("🎰", "Elim. Grupos — 5 piores",    [1, 2, 3, 4, 5],    "Loteria 1–5", "red",    "Lot. Grupos A"),
+            new("🎰", "Elim. Grupos — 5 seguintes", [6, 7, 8, 9, 10],   "Loteria 6–10", "orange", "Lot. Grupos B"),
+            new("🎖️", "Eliminados nas Quartas",    [11, 12, 13, 14],   "11–14",       "blue",   "Quartas"),
+            new("🎖️", "Eliminados nas Semis",      [15, 16],           "15–16",       "green",  "Semis"),
+            new("🥈", "Vice-Campeão Copa",          [17],               "17",          "silver", "Vice Copa"),
+            new("🏆", "Campeão Copa",               [18],               "18",          "gold",   "Campeão Copa"),
+        },
+        R2Loteria: new(
+            "Loteria R2 — Picks #1–10",
+            "Os 10 eliminados na fase de grupos disputam as picks 1–10 em dois blocos de 5: os 5 piores brigam pelas picks 1–5 e os 5 seguintes pelas picks 6–10.",
+            [
+                new("Bloco A — Picks 1–5", "5 piores eliminados nos grupos",
+                [
+                    new("🔴", "Pior eliminado", "10° entre os eliminados", 30, "red"),
+                    new("🔴", "2° pior",        "9° entre os eliminados",  30, "red"),
+                    new("🟠", "3° pior",        "8° entre os eliminados",  15, "orange"),
+                    new("🟠", "4° pior",        "7° entre os eliminados",  15, "orange"),
+                    new("🟠", "5° pior",        "6° entre os eliminados",  10, "orange"),
+                ]),
+                new("Bloco B — Picks 6–10", "5 melhores eliminados nos grupos",
+                [
+                    new("🔵", "6° pior",  "5° entre os eliminados", 30, "blue"),
+                    new("🔵", "7° pior",  "4° entre os eliminados", 30, "blue"),
+                    new("🟣", "8° pior",  "3° entre os eliminados", 15, "purple"),
+                    new("🟣", "9° pior",  "2° entre os eliminados", 15, "purple"),
+                    new("🟣", "10° pior", "Melhor eliminado",       10, "purple"),
+                ]),
+            ],
+            new("Dentro de cada bloco as picks são sorteadas em sequência, sem reposição. Aqui a divisão não conta: time da Série A e da Série B concorrem igual.")));
+
+    private static readonly IReadOnlyList<RegraPicks> Regras = [RegraAtual, RegraSerieB];
+
+    private RegraPicks _regra = RegraAtual;
+
+    private static RenderFragment TabelaPicks((string Cabecalho, IReadOnlyList<PickRow> Rows) t) => __builder =>
     {
-        new("🎰", "9° ao 12° da Liga",  "4", new[] {1,2,3,4},      "Loteria 1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
-        new("⚖️", "7° e 8° da Liga",    "2", new[] {5,6},           "50/50  5–6",   "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
-        new("⚖️", "5° e 6° da Liga",    "2", new[] {7,8},           "50/50  7–8",   "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
-        new("⚖️", "3° e 4° da Liga",    "2", new[] {9,10},          "50/50  9–10",  "picks-row-blue",   "picks-cnt-blue",   "picks-rng-mid"),
-        new("⚖️", "1° e 2° da Liga",    "2", new[] {11,12},         "50/50  11–12", "picks-row-green",  "picks-cnt-green",  "picks-rng-late"),
+        <div class="picks-table-wrap">
+            <table class="picks-table">
+                <thead>
+                    <tr>
+                        <th>@t.Cabecalho</th>
+                        <th>Times</th>
+                        <th>Picks Disponíveis</th>
+                        <th class="picks-th-range">Faixa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in t.Rows)
+                    {
+                        <tr class="picks-row picks-row-@row.Tom">
+                            <td>
+                                <div class="picks-stage-cell">
+                                    <span class="picks-stage-icon">@row.Icon</span>
+                                    <span class="picks-stage-name">@row.Stage</span>
+                                </div>
+                            </td>
+                            <td class="picks-td-count">
+                                <span class="picks-count-badge picks-cnt-@row.Tom">@row.Picks.Length</span>
+                            </td>
+                            <td>
+                                <div class="picks-chips">
+                                    @foreach (var pick in row.Picks)
+                                    {
+                                        <span class="picks-chip picks-chip-@row.Tom">@pick</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="picks-td-range">
+                                <span class="picks-range-badge picks-rng-@row.Tom">@row.RangeLabel</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     };
 
-    private static readonly IReadOnlyList<LotteryEntry> R1LotteryOdds = new List<LotteryEntry>
+    private static RenderFragment LoteriaSecao(LotterySection sec) => __builder =>
     {
-        new("🔴", "12° da Liga", "Pior classificado",     35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("🔴", "11° da Liga", "2° pior classificado",  35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("🟠", "10° da Liga", "3° pior classificado",  15, "picks-lot-orange", "picks-lot-bar-orange"),
-        new("🟠",  "9° da Liga", "4° pior classificado",  15, "picks-lot-orange", "picks-lot-bar-orange"),
+        <section class="picks-section picks-section-sub">
+            <div class="picks-section-header">
+                <span class="picks-section-icon">🎰</span>
+                <h3>@sec.Title</h3>
+            </div>
+            <p class="picks-section-desc">@sec.Desc</p>
+
+            <div class="@(sec.Blocks.Count > 1 ? "picks-r2-blocks" : "")">
+                @foreach (var block in sec.Blocks)
+                {
+                    var maxPct = block.Entries.Max(e => e.Pct);
+                    <div class="@(block.Title is null ? "" : "picks-r2-block")">
+                        @if (block.Title is not null)
+                        {
+                            <div class="picks-r2-block-title">@block.Title</div>
+                            <div class="picks-r2-block-sub">@block.Sub</div>
+                        }
+                        <div class="picks-lottery-grid @(block.Title is null ? "" : "picks-lottery-grid-2")">
+                            @foreach (var entry in block.Entries)
+                            {
+                                <div class="picks-lottery-card picks-lot-@entry.Tom">
+                                    <div class="picks-lottery-team">
+                                        <span class="picks-lottery-icon">@entry.Icon</span>
+                                        <div>
+                                            <div class="picks-lottery-stage">@entry.Stage</div>
+                                            <div class="picks-lottery-detail">@entry.Detail</div>
+                                        </div>
+                                    </div>
+                                    <div class="picks-lottery-odds-wrap">
+                                        <div class="picks-lottery-pct">@entry.Pct%</div>
+                                        <div class="picks-lottery-bar-bg">
+                                            <div class="picks-lottery-bar picks-lot-bar-@entry.Tom" style="width: @(entry.Pct * 100 / maxPct)%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="picks-lottery-note">
+                <span class="picks-lottery-note-icon">ℹ️</span>
+                <span>@sec.Note</span>
+            </div>
+        </section>
     };
 
-    // ── Round 2 ──────────────────────────────────────────────────────────────
-    private static readonly IReadOnlyList<PickRow> R2Data = new List<PickRow>
+    private static RenderFragment MapaPicks(IReadOnlyList<PickRow> rows) => __builder =>
     {
-        new("🎰", "Elim. Grupos — 4 piores (Copa)",   "4", new[] {1,2,3,4},   "Loteria 1–4",  "picks-row-red",    "picks-cnt-red",    "picks-rng-lottery"),
-        new("🎰", "Elim. Grupos — 4 seguintes (Copa)","4", new[] {5,6,7,8},   "Loteria 5–8",  "picks-row-orange", "picks-cnt-orange", "picks-rng-half"),
-        new("🎖️", "Eliminados nas Semis",             "2", new[] {9,10},       "9–10",         "picks-row-blue",   "picks-cnt-blue",   "picks-rng-mid"),
-        new("🥈", "Vice-Campeão Copa",                "1", new[] {11},          "11",           "picks-row-silver", "picks-cnt-silver", "picks-rng-late"),
-        new("🏆", "Campeão Copa",                     "1", new[] {12},          "12",           "picks-row-gold",   "picks-cnt-gold",   "picks-rng-last"),
-    };
-
-    private static readonly IReadOnlyList<LotteryEntry> R2LotteryBlock1 = new List<LotteryEntry>
-    {
-        new("🔴", "Pior eliminado", "12° Copa",              35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("🔴", "2° eliminado",   "11° Copa",              35, "picks-lot-red",    "picks-lot-bar-red"),
-        new("🟠", "3° eliminado",   "10° Copa",              15, "picks-lot-orange", "picks-lot-bar-orange"),
-        new("🟠", "4° eliminado",    "9° Copa",              15, "picks-lot-orange", "picks-lot-bar-orange"),
-    };
-
-    private static readonly IReadOnlyList<LotteryEntry> R2LotteryBlock2 = new List<LotteryEntry>
-    {
-        new("🔵", "5° eliminado",   "8° Copa",              35, "picks-lot-blue",   "picks-lot-bar-blue"),
-        new("🔵", "6° eliminado",   "7° Copa",              35, "picks-lot-blue",   "picks-lot-bar-blue"),
-        new("🟣", "7° eliminado",   "6° Copa",              15, "picks-lot-purple", "picks-lot-bar-purple"),
-        new("🟣", "8° eliminado",   "5° Copa",              15, "picks-lot-purple", "picks-lot-bar-purple"),
-    };
-
-    private static string GetPickClass(int pick) => pick switch
-    {
-        <= 4  => "picks-chip-lottery",
-        <= 8  => "picks-chip-mid",
-        <= 10 => "picks-chip-late",
-        11    => "picks-chip-silver",
-        _     => "picks-chip-last"
-    };
-
-    private static string GetR1MapClass(int pick) => pick switch
-    {
-        <= 4  => "picks-map-lottery",
-        <= 8  => "picks-map-half",
-        <= 10 => "picks-map-mid",
-        11    => "picks-map-late",
-        _     => "picks-map-top"
-    };
-
-    private static string GetR1MapLabel(int pick) => pick switch
-    {
-        1 or 2 or 3 or 4 => "Loteria",
-        5 or 6           => "50/50 7°/8°",
-        7 or 8           => "50/50 5°/6°",
-        9 or 10          => "50/50 3°/4°",
-        11               => "50/50 1°/2°",
-        _                => "50/50 1°/2°"
-    };
-
-    private static string GetR2MapClass(int pick) => pick switch
-    {
-        <= 4  => "picks-map-lottery",
-        <= 8  => "picks-map-half",
-        <= 10 => "picks-map-mid",
-        11    => "picks-map-silver",
-        _     => "picks-map-gold"
-    };
-
-    private static string GetR2MapLabel(int pick) => pick switch
-    {
-        1 or 2 or 3 or 4 => "Lot. Grupos A",
-        5 or 6 or 7 or 8 => "Lot. Grupos B",
-        9 or 10          => "Semis",
-        11               => "Vice Copa",
-        _                => "Campeão Copa"
+        <div class="picks-map">
+            @foreach (var row in rows)
+            {
+                foreach (var pick in row.Picks)
+                {
+                    <div class="picks-map-col">
+                        <div class="picks-map-num picks-chip-@row.Tom">#@pick</div>
+                        <div class="picks-map-label">@row.MapLabel</div>
+                    </div>
+                }
+            }
+        </div>
     };
 }
 
@@ -376,6 +349,39 @@
         margin: 0 auto;
         padding-bottom: 3rem;
     }
+
+    /* Abas de regra */
+    .picks-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .picks-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
+        padding: 0.65rem 0.9rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.55rem;
+        background: var(--bs-body-bg, #fff);
+        color: var(--bs-body-color, #212529);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .picks-tab:hover { border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 45%, transparent); }
+
+    .picks-tab.active {
+        border-color: var(--bs-primary, #0d6efd);
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, var(--bs-body-bg, #fff));
+        box-shadow: inset 0 -3px 0 var(--bs-primary, #0d6efd);
+    }
+
+    .picks-tab-title { font-weight: 700; font-size: 0.95rem; color: var(--bs-emphasis-color, #212529); }
+    .picks-tab-sub   { font-size: 0.75rem; color: var(--bs-secondary-color, #6c757d); }
 
     .picks-divider {
         border-color: var(--bs-border-color, #dee2e6);
@@ -428,7 +434,7 @@
     .picks-table-wrap {
         border: 1px solid var(--bs-border-color, #dee2e6);
         border-radius: 0.6rem;
-        overflow: hidden;
+        overflow-x: auto;
     }
 
     .picks-table {
@@ -505,11 +511,12 @@
         font-weight: 700;
     }
 
-    .picks-chip-lottery { background: linear-gradient(135deg, #a01020, #dc3545); color: #fff; }
-    .picks-chip-mid     { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
-    .picks-chip-late    { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
-    .picks-chip-silver  { background: linear-gradient(135deg, #5a6370, #8d959e); color: #fff; }
-    .picks-chip-last    { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
+    .picks-chip-red    { background: linear-gradient(135deg, #a01020, #dc3545); color: #fff; }
+    .picks-chip-orange { background: linear-gradient(135deg, #a05000, #e07b00); color: #fff; }
+    .picks-chip-blue   { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
+    .picks-chip-green  { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
+    .picks-chip-silver { background: linear-gradient(135deg, #5a6370, #8d959e); color: #fff; }
+    .picks-chip-gold   { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
 
     .picks-td-range { text-align: right; }
 
@@ -524,11 +531,12 @@
         white-space: nowrap;
     }
 
-    .picks-rng-lottery { background: rgba(220,53,69,0.14);  color: var(--bs-danger, #dc3545); }
-    .picks-rng-half    { background: rgba(224,123,0,0.14);  color: #c06800; }
-    .picks-rng-mid     { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
-    .picks-rng-late    { background: rgba(25,135,84,0.12);  color: #198754; }
-    .picks-rng-last    { background: rgba(160,120,0,0.18);  color: #8a6400; }
+    .picks-rng-red    { background: rgba(220,53,69,0.14);   color: var(--bs-danger, #dc3545); }
+    .picks-rng-orange { background: rgba(224,123,0,0.14);   color: #c06800; }
+    .picks-rng-blue   { background: rgba(13,110,253,0.12);  color: var(--bs-primary, #0d6efd); }
+    .picks-rng-green  { background: rgba(25,135,84,0.12);   color: #198754; }
+    .picks-rng-silver { background: rgba(108,117,125,0.14); color: #6c757d; }
+    .picks-rng-gold   { background: rgba(160,120,0,0.18);   color: #8a6400; }
 
     /* Lottery cards */
     .picks-lottery-grid {
@@ -602,7 +610,7 @@
 
     .picks-lottery-note-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
 
-    /* R2 two-block layout */
+    /* Loteria em dois blocos */
     .picks-r2-blocks {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -634,15 +642,17 @@
     }
 
     /* Pick map */
-    .picks-map { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .picks-map {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+        gap: 0.4rem;
+    }
 
     .picks-map-col {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 0.3rem;
-        flex: 1;
-        min-width: 56px;
     }
 
     .picks-map-num {
@@ -652,16 +662,7 @@
         border-radius: 0.45rem;
         font-size: 0.85rem;
         font-weight: 800;
-        color: #fff;
     }
-
-    .picks-map-lottery { background: linear-gradient(135deg, #a01020, #dc3545); }
-    .picks-map-half    { background: linear-gradient(135deg, #a05000, #e07b00); }
-    .picks-map-mid     { background: linear-gradient(135deg, #1a5fb4, #3584e4); }
-    .picks-map-late    { background: linear-gradient(135deg, #1c5829, #2ec27e); }
-    .picks-map-top     { background: linear-gradient(135deg, #1c5829, #2ec27e); }
-    .picks-map-silver  { background: linear-gradient(135deg, #5a6370, #8d959e); }
-    .picks-map-gold    { background: linear-gradient(135deg, #a07800, #e5a000); }
 
     .picks-map-label {
         font-size: 0.62rem;
