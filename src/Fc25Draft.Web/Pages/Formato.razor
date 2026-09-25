@@ -21,16 +21,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // O calendário sai da temporada cadastrada: a abertura é o dia da Supercopa e o número de
-        // rodadas vem de quantos times cada divisão tem.
+        // A abertura é a data combinada da temporada; o número de rodadas vem de quantos times
+        // cada divisão tem.
         var edicoes = await LigaService.ListEdicoesAsync(CancellationToken.None);
         var temporada = edicoes.Select(e => e.Temporada).Where(t => t is not null).DefaultIfEmpty(null).Max();
         var daTemporada = edicoes.Where(e => e.Temporada == temporada).ToList();
-
-        var supercopa = daTemporada.FirstOrDefault(e => e.Tipo == TipoCompetition.Supercopa);
-        var abertura = supercopa?.DataInicio
-            ?? daTemporada.Select(e => (DateTime?)e.DataInicio).Min()
-            ?? DateTime.Today;
 
         int RodadasDa(Divisao divisao)
         {
@@ -41,7 +36,7 @@
         var copa = daTemporada.FirstOrDefault(e => e.Tipo == TipoCompetition.Copa);
 
         _calendario = CalendarioTemporada.Montar(
-            abertura,
+            CalendarioTemporada.Abertura,
             RodadasDa(Divisao.SerieA) is var a && a > 0 ? a : 9,
             RodadasDa(Divisao.SerieB) is var b && b > 0 ? b : 7,
             copa is { Rodadas: > 0 } ? copa.Rodadas : 4);

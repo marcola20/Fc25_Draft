@@ -516,19 +516,13 @@ public class LigaAdminService : ILigaAdminService
     {
         if (liga.Temporada is not int temporada) return Array.Empty<DateTime>();
 
-        // A abertura é o domingo da Supercopa; sem ela, a data de início da própria competição.
-        var abertura = await _db.Ligas.AsNoTracking()
-            .Where(l => l.Temporada == temporada && l.Tipo == TipoCompetition.Supercopa)
-            .Select(l => (DateTime?)l.DataInicio)
-            .FirstOrDefaultAsync(ct) ?? liga.DataInicio;
-
         var rodadasSerieA = await ContarTimesDaDivisaoAsync(temporada, Divisao.SerieA, ct);
         var rodadasSerieB = await ContarTimesDaDivisaoAsync(temporada, Divisao.SerieB, ct);
         var rodadasGrupoCopa = await _db.LigaRodadas
             .CountAsync(r => r.Liga.Temporada == temporada && r.Liga.Tipo == TipoCompetition.Copa && r.Numero > 0 && !r.Desempate, ct);
 
         var calendario = CalendarioTemporada.Montar(
-            abertura,
+            CalendarioTemporada.Abertura,
             rodadasSerieA > 0 ? rodadasSerieA : 9,
             rodadasSerieB,
             rodadasGrupoCopa > 0 ? rodadasGrupoCopa : 4);

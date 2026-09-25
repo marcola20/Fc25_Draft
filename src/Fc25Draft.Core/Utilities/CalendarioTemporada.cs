@@ -28,6 +28,12 @@ public static class CalendarioTemporada
     /// <summary>Horário dos jogos.</summary>
     public static readonly TimeSpan Horario = new(21, 0, 0);
 
+    /// <summary>
+    /// Abertura combinada da temporada: domingo 27/09, com a final da Supercopa. É daqui que sai
+    /// todo o resto do calendário — para mudar de temporada, basta trocar esta data.
+    /// </summary>
+    public static readonly DateTime Abertura = new(2026, 9, 27);
+
     public static IReadOnlyList<DataDaTemporada> Montar(
         DateTime abertura,
         int rodadasSerieA = 9,
@@ -38,10 +44,13 @@ public static class CalendarioTemporada
         void Add(DateTime dia, TipoCompetition? tipo, Divisao? divisao, int? rodada, string titulo, string detalhe, bool ehJogo = true) =>
             datas.Add(new DataDaTemporada(datas.Count + 1, dia.Date + Horario, tipo, divisao, rodada, titulo, detalhe, ehJogo));
 
-        // Domingo de abertura e, no dia seguinte, o fim da janela.
-        var domingo = abertura.Date;
-        Add(domingo, TipoCompetition.Supercopa, null, null, "Supercopa", "abre a temporada");
-        Add(domingo.AddDays(1), null, null, null, "Mercado", "fecha a janela", ehJogo: false);
+        // A temporada abre na data da Supercopa, seja ela qual for; a primeira rodada é na terça
+        // seguinte e a janela fecha na véspera.
+        var diaDaAbertura = abertura.Date;
+        var primeiraTerca = ProximoDia(diaDaAbertura, DayOfWeek.Tuesday);
+
+        Add(diaDaAbertura, TipoCompetition.Supercopa, null, null, "Supercopa", "abre a temporada");
+        Add(primeiraTerca.AddDays(-1), null, null, null, "Mercado", "fecha a janela", ehJogo: false);
 
         var extrasDaSerieA = Math.Max(0, rodadasSerieA - rodadasSerieB);
         var semanas = rodadasSerieB + (extrasDaSerieA > 0 ? 1 : 0);
@@ -55,7 +64,6 @@ public static class CalendarioTemporada
         daCopa.Enqueue(("Copa", "Final", null));
 
         int serieA = 1, serieB = 1;
-        var primeiraTerca = domingo.AddDays(2);
 
         for (int semana = 1; semana <= semanas; semana++)
         {
@@ -121,9 +129,12 @@ public static class CalendarioTemporada
             .Select(d => d.Quando)
             .ToList();
 
-    private static DateTime ProximaSexta(DateTime depoisDe)
+    /// <summary>Primeiro dia da semana pedido depois da data (nunca a própria data).</summary>
+    private static DateTime ProximoDia(DateTime depoisDe, DayOfWeek dia)
     {
-        var dias = ((int)DayOfWeek.Friday - (int)depoisDe.DayOfWeek + 7) % 7;
+        var dias = ((int)dia - (int)depoisDe.DayOfWeek + 7) % 7;
         return depoisDe.AddDays(dias == 0 ? 7 : dias);
     }
+
+    private static DateTime ProximaSexta(DateTime depoisDe) => ProximoDia(depoisDe, DayOfWeek.Friday);
 }
