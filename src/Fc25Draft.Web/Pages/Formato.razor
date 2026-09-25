@@ -433,8 +433,17 @@
                     <span class="fmt-cal-num">@data.Numero</span>
                     <span class="fmt-cal-comp">
                         @data.Titulo
-                        <small>@data.Detalhe</small>
-                        <small class="fmt-cal-data">@data.Quando.ToString("ddd dd/MM · HH'h'", Br)</small>
+                        @if (!string.IsNullOrWhiteSpace(data.Detalhe))
+                        {
+                            <small>@data.Detalhe</small>
+                        }
+                        @if (data.Abre is DateTime abre)
+                        {
+                            <small class="fmt-cal-data">@abre.ToString("ddd dd/MM · HH'h'", Br) abre</small>
+                        }
+                        <small class="fmt-cal-data">
+                            @data.Quando.ToString("ddd dd/MM · HH'h'", Br)@(data.Abre is null ? "" : " fecha")
+                        </small>
                     </span>
                 </div>
             }

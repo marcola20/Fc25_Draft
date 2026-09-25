@@ -14,7 +14,8 @@ public record DataDaTemporada(
     int? Rodada,
     string Titulo,
     string Detalhe,
-    bool EhJogo);
+    bool EhJogo,
+    DateTime? Abre = null);
 
 /// <summary>
 /// Calendário real da temporada, montado a partir do domingo de abertura (Supercopa).
@@ -27,6 +28,9 @@ public static class CalendarioTemporada
 {
     /// <summary>Horário dos jogos.</summary>
     public static readonly TimeSpan Horario = new(18, 0, 0);
+
+    /// <summary>Horário em que a janela de transferências abre, depois dos jogos.</summary>
+    public static readonly TimeSpan HorarioDaJanela = new(20, 0, 0);
 
     /// <summary>
     /// Abertura combinada da temporada: domingo 27/09, com a final da Supercopa. É daqui que sai
@@ -41,8 +45,9 @@ public static class CalendarioTemporada
         int rodadasGrupoCopa = 4)
     {
         var datas = new List<DataDaTemporada>();
-        void Add(DateTime dia, TipoCompetition? tipo, Divisao? divisao, int? rodada, string titulo, string detalhe, bool ehJogo = true) =>
-            datas.Add(new DataDaTemporada(datas.Count + 1, dia.Date + Horario, tipo, divisao, rodada, titulo, detalhe, ehJogo));
+        void Add(DateTime dia, TipoCompetition? tipo, Divisao? divisao, int? rodada, string titulo, string detalhe,
+                 bool ehJogo = true, DateTime? abre = null) =>
+            datas.Add(new DataDaTemporada(datas.Count + 1, dia.Date + Horario, tipo, divisao, rodada, titulo, detalhe, ehJogo, abre));
 
         // A temporada abre na data da Supercopa, seja ela qual for; a primeira rodada é na terça
         // seguinte e a janela fecha na véspera.
@@ -73,8 +78,10 @@ public static class CalendarioTemporada
 
             if (semana == semanaDoMercado)
             {
-                // Janela do meio na segunda; a Série B folga e a Série A joga as rodadas que sobram.
-                Add(terca.AddDays(-1), null, null, null, "Mercado", "fecha a janela do meio", ehJogo: false);
+                // Janela do meio: abre depois dos jogos da sexta anterior e fecha na segunda.
+                // A Série B folga a semana e a Série A joga as rodadas que sobram.
+                Add(terca.AddDays(-1), null, null, null, "Mercado", "", ehJogo: false,
+                    abre: terca.AddDays(-4) + HorarioDaJanela);
 
                 for (int i = 0; i < extrasDaSerieA && serieA <= rodadasSerieA; i++)
                     Add(terca.AddDays(i), TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
@@ -115,7 +122,7 @@ public static class CalendarioTemporada
         // Fecha a temporada com o playoff, na sexta seguinte à última rodada de liga.
         var ultimoJogo = datas.Where(d => d.EhJogo).Max(d => d.Quando);
         var sextaFinal = ProximaSexta(ultimoJogo.Date);
-        Add(sextaFinal, TipoCompetition.Liga, null, null, "Playoff de acesso", "9º da Série A x 2º da Série B");
+        Add(sextaFinal, TipoCompetition.Liga, null, null, "Playoff de acesso", "");
 
         return datas;
     }
