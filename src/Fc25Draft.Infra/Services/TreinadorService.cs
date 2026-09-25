@@ -194,7 +194,7 @@ public class TreinadorService : ITreinadorService
         // Uma temporada entra na carreira quando a passagem cobre a competição.
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => l.Temporada != null)
-            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.Temporada, l.DataInicio, l.CampeaoTimeId, l.VagasDiretas, l.VagasPlayoff })
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.Temporada, l.DataInicio, l.DataFim, l.CampeaoTimeId, l.VagasDiretas, l.VagasPlayoff })
             .ToListAsync(ct);
 
         var classificacoes = await _db.LigaClassificacoes.AsNoTracking()
@@ -202,6 +202,14 @@ public class TreinadorService : ITreinadorService
             .ToListAsync(ct);
 
         var totalPorLiga = classificacoes.GroupBy(c => c.LigaId).ToDictionary(g => g.Key, g => g.Count());
+
+        // Quando a competição acabou de verdade: o último jogo encerrado. A DataFim é só o
+        // que estava previsto, e quase nunca bate com o que aconteceu.
+        var ultimoJogo = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.EncerradaEm != null)
+            .GroupBy(p => p.Rodada.LigaId)
+            .Select(g => new { LigaId = g.Key, Fim = g.Max(p => p.EncerradaEm) })
+            .ToDictionaryAsync(x => x.LigaId, x => x.Fim!.Value, ct);
 
         // A galeria sai do Hall of Fame, que é onde os títulos ficam registrados de verdade
         // (inclusive os das temporadas antigas). O troféu na tabela de temporadas continua
@@ -222,9 +230,14 @@ public class TreinadorService : ITreinadorService
         {
             foreach (var liga in ligas.Where(l => l.Temporada is not null))
             {
-                var dentro = liga.DataInicio.Date >= passagem.Desde.Date
-                             && (passagem.Ate is null || liga.DataInicio.Date <= passagem.Ate.Value.Date);
-                if (!dentro) continue;
+                // Vale quem estava no comando em algum momento da competição, não só quem
+                // começou com ela: quem assume no meio da temporada também a disputou.
+                var comecou = liga.DataInicio.Date;
+                var acabou = (ultimoJogo.TryGetValue(liga.LigaId, out var fim) ? fim : liga.DataFim).Date;
+
+                var pegou = passagem.Desde.Date < (acabou > comecou ? acabou : DateTime.MaxValue)
+                            && comecou < (passagem.Ate?.Date ?? DateTime.MaxValue);
+                if (!pegou) continue;
 
                 var naLiga = classificacoes.FirstOrDefault(c => c.LigaId == liga.LigaId && c.TimeId == passagem.TimeId);
                 var jogouSupercopa = liga.Tipo == TipoCompetition.Supercopa
@@ -248,7 +261,7 @@ public class TreinadorService : ITreinadorService
                     encerrada && naLiga is { Posicao: > 0 } ? naLiga.Posicao : null,
                     totalPorLiga.GetValueOrDefault(liga.LigaId),
                     campeao,
-                    encerrada ? null : "Em andamento"));
+                    Movimento(passagem, comecou, acabou, encerrada)));
             }
         }
 
@@ -283,8 +296,24 @@ public class TreinadorService : ITreinadorService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Se a pessoa pegou a temporada começada ou saiu antes do fim.</summary>
+    private static string? Movimento(TreinadorPassagemDto passagem, DateTime comecou, DateTime acabou, bool encerrada)
+    {
+        var assumiuNoMeio = passagem.Desde.Date > comecou;
+        var saiuNoMeio = passagem.Ate is DateTime saida && encerrada && saida.Date < acabou;
+
+        if (assumiuNoMeio && saiuNoMeio) return "Assumiu e saiu no meio";
+        if (assumiuNoMeio) return "Assumiu com a temporada em andamento";
+        if (saiuNoMeio) return "Saiu no meio da temporada";
+        return encerrada ? null : "Em andamento";
+    }
+
+    /// <summary>
+    /// Os períodos se cruzam quando um começa antes do outro acabar. A data de saída é o dia
+    /// em que a pessoa deixa o clube, então o substituto pode entrar nesse mesmo dia.
+    /// </summary>
     private static bool SePisam(DateTime desdeA, DateTime? ateA, DateTime desdeB, DateTime? ateB) =>
-        desdeA.Date <= (ateB?.Date ?? DateTime.MaxValue) && desdeB.Date <= (ateA?.Date ?? DateTime.MaxValue);
+        desdeA.Date < (ateB?.Date ?? DateTime.MaxValue) && desdeB.Date < (ateA?.Date ?? DateTime.MaxValue);
 
     private static string Rotulo(PapelTreinador papel) => papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador";
 
