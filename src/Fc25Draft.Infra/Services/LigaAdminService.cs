@@ -199,13 +199,18 @@ public class LigaAdminService : ILigaAdminService
         // Fase de grupos: cada time enfrenta os do próprio grupo (grupo de 4 = 3 rodadas).
         var jogos = GerarRodadasDosGrupos(porGrupo.Values.ToList());
         liga.TotalRodadas = jogos.Count;
+
+        // As sextas do calendário da temporada.
+        var datasDaCopa = await DatasDoCalendarioAsync(liga, ct);
+
         for (int r = 0; r < jogos.Count; r++)
         {
             var rodada = new LigaRodada
             {
                 RodadaId = Guid.NewGuid(),
                 LigaId = liga.LigaId,
-                Numero = r + 1
+                Numero = r + 1,
+                DataHora = r < datasDaCopa.Count ? datasDaCopa[r] : null
             };
             foreach (var (casa, fora) in jogos[r])
             {
@@ -467,10 +472,81 @@ public class LigaAdminService : ILigaAdminService
             .AsNoTracking()
             .Where(x => x.LigaId == ligaId)
             .OrderBy(x => x.Numero)
-            .Select(x => new { x.RodadaId, x.LigaId, x.Numero, x.Desempate, Total = x.Partidas.Count })
+            .Select(x => new { x.RodadaId, x.LigaId, x.Numero, x.Desempate, x.DataHora, Total = x.Partidas.Count })
             .ToListAsync(ct);
 
-        return rodadas.Select(r => new LigaRodadaDto(r.RodadaId, r.LigaId, r.Numero, r.Total, r.Desempate)).ToArray();
+        return rodadas.Select(r => new LigaRodadaDto(r.RodadaId, r.LigaId, r.Numero, r.Total, r.Desempate, r.DataHora)).ToArray();
+    }
+
+    /// <summary>
+    /// Marca as rodadas com as datas do calendário da temporada (domingo da Supercopa, terça da
+    /// Série B, quarta da Série A e sexta da Copa). A Supercopa, que é jogo único, fica na abertura.
+    /// Retorna quantas rodadas foram marcadas.
+    /// </summary>
+    public async Task<int> AplicarCalendarioAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        var rodadas = await _db.LigaRodadas
+            .Where(r => r.LigaId == ligaId && r.Numero > 0 && !r.Desempate)
+            .OrderBy(r => r.Numero)
+            .ToListAsync(ct);
+
+        if (rodadas.Count == 0)
+            throw new InvalidOperationException("Gere as rodadas antes de aplicar o calendário.");
+
+        var datas = await DatasDoCalendarioAsync(liga, ct);
+        if (datas.Count == 0)
+            throw new InvalidOperationException("O calendário da temporada não tem datas para esta competição.");
+
+        var marcadas = 0;
+        for (int i = 0; i < rodadas.Count && i < datas.Count; i++)
+        {
+            rodadas[i].DataHora = datas[i];
+            marcadas++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return marcadas;
+    }
+
+    /// <summary>Datas do calendário para esta competição, na ordem das rodadas.</summary>
+    private async Task<IReadOnlyList<DateTime>> DatasDoCalendarioAsync(Liga liga, CancellationToken ct)
+    {
+        if (liga.Temporada is not int temporada) return Array.Empty<DateTime>();
+
+        // A abertura é o domingo da Supercopa; sem ela, a data de início da própria competição.
+        var abertura = await _db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada == temporada && l.Tipo == TipoCompetition.Supercopa)
+            .Select(l => (DateTime?)l.DataInicio)
+            .FirstOrDefaultAsync(ct) ?? liga.DataInicio;
+
+        var rodadasSerieA = await ContarTimesDaDivisaoAsync(temporada, Divisao.SerieA, ct);
+        var rodadasSerieB = await ContarTimesDaDivisaoAsync(temporada, Divisao.SerieB, ct);
+        var rodadasGrupoCopa = await _db.LigaRodadas
+            .CountAsync(r => r.Liga.Temporada == temporada && r.Liga.Tipo == TipoCompetition.Copa && r.Numero > 0 && !r.Desempate, ct);
+
+        var calendario = CalendarioTemporada.Montar(
+            abertura,
+            rodadasSerieA > 0 ? rodadasSerieA : 9,
+            rodadasSerieB,
+            rodadasGrupoCopa > 0 ? rodadasGrupoCopa : 4);
+
+        // Supercopa é jogo único: fica na abertura.
+        if (liga.Tipo == TipoCompetition.Supercopa)
+            return new[] { calendario[0].Quando };
+
+        return CalendarioTemporada.DatasDasRodadas(calendario, liga.Tipo, liga.Divisao);
+    }
+
+    /// <summary>Rodadas de uma divisão = times - 1 (turno único).</summary>
+    private async Task<int> ContarTimesDaDivisaoAsync(int temporada, Divisao divisao, CancellationToken ct)
+    {
+        var times = await _db.LigaTimes
+            .CountAsync(t => t.Liga.Temporada == temporada && t.Liga.Tipo == TipoCompetition.Liga && t.Liga.Divisao == divisao, ct);
+
+        return times > 1 ? times - 1 : 0;
     }
 
     public async Task<IReadOnlyList<LigaRodadaDto>> GerarRodadasAutoAsync(Guid ligaId, CancellationToken ct)
@@ -530,9 +606,14 @@ public class LigaAdminService : ILigaAdminService
             rodadasCriadas.Add(rodada);
         }
 
+        // Já nascem marcadas com a data do calendário da temporada.
+        var datasDoCalendario = await DatasDoCalendarioAsync(liga, ct);
+        for (int i = 0; i < rodadasCriadas.Count && i < datasDoCalendario.Count; i++)
+            rodadasCriadas[i].DataHora = datasDoCalendario[i];
+
         await _db.SaveChangesAsync(ct);
 
-        return rodadasCriadas.Select(r => new LigaRodadaDto(r.RodadaId, r.LigaId, r.Numero, r.Partidas.Count)).ToArray();
+        return rodadasCriadas.Select(r => new LigaRodadaDto(r.RodadaId, r.LigaId, r.Numero, r.Partidas.Count, false, r.DataHora)).ToArray();
     }
 
     public async Task DeleteRodadaAsync(Guid rodadaId, CancellationToken ct)

@@ -12,6 +12,9 @@ public class LigaRodada
     /// </summary>
     public bool Desempate { get; set; }
 
+    /// <summary>Data e hora marcadas para a rodada, vindas do calendário da temporada.</summary>
+    public DateTime? DataHora { get; set; }
+
     public Liga Liga { get; set; } = null!;
     public ICollection<LigaPartida> Partidas { get; set; } = new List<LigaPartida>();
 }

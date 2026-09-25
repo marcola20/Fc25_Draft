@@ -1,6 +1,7 @@
 @page "/admin/liga"
 @page "/admin/liga/{LigaId:guid}"
 @page "/admin/liga/{LigaId:guid}/rodada/{RodadaId:guid}"
+@using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
@@ -627,9 +628,12 @@
     <!-- ─ Tab: Rodadas ─ -->
     @if (_tab == "rodadas" && _ligaAtual is not null)
     {
-        <div class="d-flex gap-2 mb-3">
+        <div class="d-flex gap-2 mb-3 flex-wrap">
             <button class="btn btn-primary btn-sm" @onclick="CriarRodada" disabled="@_saving">+ Criar Rodada</button>
             <button class="btn btn-outline-secondary btn-sm" @onclick="GerarRodadasAuto" disabled="@_saving">Gerar Automático (todas)</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="AplicarCalendario" disabled="@_saving" title="Marca as rodadas com as datas do calendário da temporada">
+                📅 Aplicar datas do calendário
+            </button>
         </div>
 
         @if (_ligaAtual.Tipo == TipoCompetition.Liga)
@@ -677,6 +681,10 @@
                             @if (r.Desempate)
                             {
                                 <span class="badge bg-primary" title="Não vale pontos na classificação">Jogo Decisivo</span>
+                            }
+                            @if (r.DataHora is DateTime quando)
+                            {
+                                <div class="small text-muted">@quando.ToString("ddd dd/MM · HH:mm", Br)</div>
                             }
                             <div class="small text-muted">@r.TotalPartidas partidas</div>
                             <div class="d-flex gap-1 justify-content-center mt-1">
@@ -1472,6 +1480,22 @@
         finally { _saving = false; }
     }
 
+    /// <summary>Marca as rodadas já criadas com as datas do calendário da temporada.</summary>
+    private async Task AplicarCalendario()
+    {
+        if (_ligaAtual is null) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var marcadas = await AdminSvc.AplicarCalendarioAsync(_ligaAtual.LigaId, CancellationToken.None);
+            await CarregarDados();
+            _ok = $"{marcadas} rodada(s) marcada(s) pelo calendário da temporada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
     private async Task GerarRodadasAuto()
     {
         _erro = null; _saving = true;
@@ -1693,6 +1717,8 @@
         LigaStatus.Encerrada => "bg-secondary",
         _ => "bg-light text-dark"
     };
+
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
     private static string RodadaLabel(int numero) => numero switch
     {

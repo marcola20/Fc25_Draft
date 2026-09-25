@@ -495,7 +495,7 @@ public class LigaPublicService : ILigaPublicService
                 p.TimeForaId, p.TimeFora?.TeamName ?? "?",
                 p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
                 p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm)).ToArray(),
-            r.Desempate
+            r.Desempate, r.DataHora
         )).ToArray();
     }
 

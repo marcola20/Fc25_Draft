@@ -1,4 +1,5 @@
 @page "/liga"
+@using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
@@ -280,6 +281,10 @@
                             <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
                             <span class="fw-bold px-2">
                                 Rodada @(_rodadaAtual?.Numero)
+                                @if (_rodadaAtual?.DataHora is DateTime quando)
+                                {
+                                    <span class="text-muted fw-normal ms-1">· @quando.ToString("ddd dd/MM · HH'h'", Br)</span>
+                                }
                                 @if (_rodadaAtual?.Desempate == true)
                                 {
                                     <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
@@ -752,6 +757,8 @@
 
     /// <summary>Supercopa é jogo único: sem tabela, sem rodadas e sem chaveamento.</summary>
     private bool EhSupercopa => _liga?.Tipo == TipoCompetition.Supercopa;
+
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
     private LigaRodadaComPartidasDto? _rodadaAtual =>
         _rodadas.Count > 0 && _rodadaIdx < _rodadas.Count ? _rodadas[_rodadaIdx] : null;

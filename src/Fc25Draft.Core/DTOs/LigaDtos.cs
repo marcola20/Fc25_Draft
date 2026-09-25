@@ -76,14 +76,16 @@ public record LigaRodadaDto(
     Guid LigaId,
     int Numero,
     int TotalPartidas,
-    bool Desempate = false);
+    bool Desempate = false,
+    DateTime? DataHora = null);
 
 public record LigaRodadaComPartidasDto(
     Guid RodadaId,
     Guid LigaId,
     int Numero,
     IReadOnlyList<LigaPartidaDto> Partidas,
-    bool Desempate = false);
+    bool Desempate = false,
+    DateTime? DataHora = null);
 
 public record LigaPartidaDto(
     Guid PartidaId,
