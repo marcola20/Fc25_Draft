@@ -84,6 +84,9 @@ public interface ILigaAdminService
     Task<IReadOnlyList<Guid>> ListTimesLigaAsync(Guid ligaId, CancellationToken ct);
     Task ConfigurarTimesLigaAsync(Guid ligaId, IReadOnlyList<Guid> teamIds, CancellationToken ct);
 
+    /// <summary>Define (ou limpa, com nulos) o confronto que deve fechar a temporada na última rodada.</summary>
+    Task<LigaDto> DefinirConfrontoFinalAsync(Guid ligaId, Guid? timeAId, Guid? timeBId, CancellationToken ct);
+
     // Tiebreaker (Liga)
     Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct);
     Task<LigaDto> IniciarMiniLigaAsync(Guid ligaId, CancellationToken ct);

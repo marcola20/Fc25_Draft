@@ -1427,7 +1427,8 @@ public class LigaPublicService : ILigaPublicService
 
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
-            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);
+            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff,
+            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase],

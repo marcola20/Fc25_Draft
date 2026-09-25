@@ -632,6 +632,41 @@
             <button class="btn btn-outline-secondary btn-sm" @onclick="GerarRodadasAuto" disabled="@_saving">Gerar Automático (todas)</button>
         </div>
 
+        @if (_ligaAtual.Tipo == TipoCompetition.Liga)
+        {
+            <div class="card mb-3">
+                <div class="card-body py-2">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div>
+                            <label class="form-label mb-0 small">Jogo da última rodada</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <select class="form-select form-select-sm w-auto" @bind="_confrontoFinalA">
+                                    <option value="">— time —</option>
+                                    @foreach (var t in _timesDaLiga)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                </select>
+                                <span class="text-muted small">x</span>
+                                <select class="form-select form-select-sm w-auto" @bind="_confrontoFinalB">
+                                    <option value="">— time —</option>
+                                    @foreach (var t in _timesDaLiga)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="SalvarConfrontoFinal" disabled="@_saving">Salvar</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LimparConfrontoFinal" disabled="@_saving">Tirar</button>
+                        <span class="text-muted small ms-auto">
+                            Ao gerar as rodadas automaticamente, esse confronto é levado para a última — o resto da tabela não muda.
+                        </span>
+                    </div>
+                </div>
+            </div>
+        }
+
         <div class="row g-2">
             @foreach (var r in _rodadas)
             {
@@ -1012,9 +1047,15 @@
 
     // Times
     private IReadOnlyList<TeamListItemDto> _times = Array.Empty<TeamListItemDto>();
-
     // Times inscritos (Liga)
     private HashSet<Guid> _timesLigaSel = new();
+
+    /// <summary>Times inscritos na liga aberta, para escolher o confronto da última rodada.</summary>
+    private IReadOnlyList<TeamListItemDto> _timesDaLiga =>
+        _times.Where(t => _timesLigaSel.Contains(t.TeamId)).OrderBy(t => t.TeamName).ToList();
+
+    private string _confrontoFinalA = "";
+    private string _confrontoFinalB = "";
 
     // Rodadas
     private IReadOnlyList<LigaRodadaDto> _rodadas = Array.Empty<LigaRodadaDto>();
@@ -1106,6 +1147,8 @@
                 _timesLigaSel = (await AdminSvc.ListTimesLigaAsync(_ligaAtual.LigaId, CancellationToken.None)).ToHashSet();
                 _empatesZona = await AdminSvc.ListEmpatesZonaAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
+                _confrontoFinalA = _ligaAtual.ConfrontoFinalTimeAId?.ToString() ?? "";
+                _confrontoFinalB = _ligaAtual.ConfrontoFinalTimeBId?.ToString() ?? "";
             }
 
             _tab = RodadaId.HasValue ? "partidas" : (string.IsNullOrEmpty(TabQuery) ? "rodadas" : TabQuery);
@@ -1388,6 +1431,43 @@
     {
         _erro = null; _saving = true;
         try { await AdminSvc.CreateRodadaAsync(_ligaAtual!.LigaId, CancellationToken.None); await CarregarDados(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    /// <summary>Guarda o jogo que deve fechar a temporada; vale na próxima geração automática.</summary>
+    private async Task SalvarConfrontoFinal()
+    {
+        if (_ligaAtual is null) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            if (!Guid.TryParse(_confrontoFinalA, out var timeA) || !Guid.TryParse(_confrontoFinalB, out var timeB))
+                throw new InvalidOperationException("Escolha os dois times do confronto.");
+
+            _ligaAtual = await AdminSvc.DefinirConfrontoFinalAsync(_ligaAtual.LigaId, timeA, timeB, CancellationToken.None);
+
+            var nomeA = _times.FirstOrDefault(t => t.TeamId == timeA)?.TeamName ?? "Time A";
+            var nomeB = _times.FirstOrDefault(t => t.TeamId == timeB)?.TeamName ?? "Time B";
+            _ok = $"{nomeA} x {nomeB} vai fechar a temporada. Gere as rodadas de novo para valer.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task LimparConfrontoFinal()
+    {
+        if (_ligaAtual is null) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            _ligaAtual = await AdminSvc.DefinirConfrontoFinalAsync(_ligaAtual.LigaId, null, null, CancellationToken.None);
+            _confrontoFinalA = "";
+            _confrontoFinalB = "";
+            _ok = "A última rodada volta a sair do sorteio normal.";
+        }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }

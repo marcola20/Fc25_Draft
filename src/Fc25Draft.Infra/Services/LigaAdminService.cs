@@ -503,6 +503,8 @@ public class LigaAdminService : ILigaAdminService
         var totalRodadas = liga.Tipo == TipoCompetition.Liga ? times.Count - 1 : liga.TotalRodadas;
         var jogos = GerarRoundRobinParcial(times, totalRodadas);
 
+        PorConfrontoFinal(jogos, liga.ConfrontoFinalTimeAId, liga.ConfrontoFinalTimeBId);
+
         var rodadasCriadas = new List<LigaRodada>();
         for (int r = 0; r < totalRodadas; r++)
         {
@@ -1330,6 +1332,38 @@ public class LigaAdminService : ILigaAdminService
             .Where(x => x.LigaId == ligaId)
             .Select(x => x.TimeId)
             .ToListAsync(ct);
+
+    public async Task<LigaDto> DefinirConfrontoFinalAsync(Guid ligaId, Guid? timeAId, Guid? timeBId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        if (timeAId is null || timeBId is null)
+        {
+            liga.ConfrontoFinalTimeAId = null;
+            liga.ConfrontoFinalTimeBId = null;
+        }
+        else
+        {
+            if (timeAId == timeBId)
+                throw new InvalidOperationException("Escolha dois times diferentes.");
+
+            var inscritos = await _db.LigaTimes
+                .Where(x => x.LigaId == ligaId && (x.TimeId == timeAId || x.TimeId == timeBId))
+                .CountAsync(ct);
+
+            if (inscritos < 2)
+                throw new InvalidOperationException("Os dois times precisam estar inscritos nesta liga.");
+
+            liga.ConfrontoFinalTimeAId = timeAId;
+            liga.ConfrontoFinalTimeBId = timeBId;
+        }
+
+        liga.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+
+        return ToDto(liga);
+    }
 
     public async Task ConfigurarTimesLigaAsync(Guid ligaId, IReadOnlyList<Guid> teamIds, CancellationToken ct)
     {
@@ -2270,6 +2304,22 @@ public class LigaAdminService : ILigaAdminService
     }
 
 
+    /// <summary>
+    /// Leva o confronto escolhido para a última rodada trocando a rodada dele de lugar com a
+    /// última. Como cada rodada é um conjunto completo de jogos, a troca mantém a tabela válida.
+    /// </summary>
+    private static void PorConfrontoFinal(List<List<(Guid Casa, Guid Fora)>> jogos, Guid? timeA, Guid? timeB)
+    {
+        if (timeA is not Guid a || timeB is not Guid b || a == b || jogos.Count < 2) return;
+
+        var atual = jogos.FindIndex(rodada => rodada.Any(j =>
+            (j.Casa == a && j.Fora == b) || (j.Casa == b && j.Fora == a)));
+
+        if (atual < 0 || atual == jogos.Count - 1) return;
+
+        (jogos[atual], jogos[^1]) = (jogos[^1], jogos[atual]);
+    }
+
     private static List<List<(Guid, Guid)>> GerarRoundRobinParcial(List<Guid> times, int totalRodadas)
     {
         var n = times.Count;
@@ -2358,7 +2408,8 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
-            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff);
+            l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff,
+            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",

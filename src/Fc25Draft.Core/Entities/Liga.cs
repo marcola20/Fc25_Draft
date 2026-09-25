@@ -24,6 +24,10 @@ public class Liga
     /// <summary>Série A: quem vem logo acima dos rebaixados e joga o playoff. Série B: quem vem logo abaixo dos promovidos.</summary>
     public int? VagasPlayoff { get; set; }
 
+    /// <summary>Jogo que deve fechar a temporada (ex.: um clássico na última rodada). Nulo = sem exigência.</summary>
+    public Guid? ConfrontoFinalTimeAId { get; set; }
+    public Guid? ConfrontoFinalTimeBId { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 

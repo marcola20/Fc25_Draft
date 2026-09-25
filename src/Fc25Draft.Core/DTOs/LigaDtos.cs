@@ -19,7 +19,9 @@ public record LigaDto(
     int? Temporada = null,
     Divisao? Divisao = null,
     int? VagasDiretas = null,
-    int? VagasPlayoff = null);
+    int? VagasPlayoff = null,
+    Guid? ConfrontoFinalTimeAId = null,
+    Guid? ConfrontoFinalTimeBId = null);
 
 /// <summary>
 /// Uma edição de competição (atual ou já encerrada) com o resumo do que ela teve —
