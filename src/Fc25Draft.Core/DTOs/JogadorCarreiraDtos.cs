@@ -20,7 +20,9 @@ public record JogadorCarreiraCompeticaoDto(
     int Vermelhos,
     // Só para goleiros, zagueiros e laterais, e só onde há contador de jogos.
     int? CleanSheets,
-    bool Campeao);
+    bool Campeao,
+    // Sem registro em campo (gol, cartão, escalação): o jogador estava no elenco do time durante a competição.
+    bool SoElenco = false);
 
 public record JogadorTituloDto(Guid LigaId, string Competicao, TipoCompetition Tipo, int? Temporada, string TimeNome);
 
@@ -36,7 +38,9 @@ public record JogadorCarreiraEstatisticasDto(
     int MaisGolsNumJogo,
     int Hattricks,
     IReadOnlyList<JogadorCarreiraCompeticaoDto> Competicoes,
-    IReadOnlyList<JogadorTituloDto> Titulos);
+    IReadOnlyList<JogadorTituloDto> Titulos,
+    // Clubes por onde passou (elenco), mesmo sem competição registrada.
+    int Clubes = 0);
 
 /// <summary>Uma passagem na trajetória: escolha de draft ou transferência.</summary>
 public record JogadorMovimentoDto(

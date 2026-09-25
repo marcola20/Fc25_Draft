@@ -158,7 +158,7 @@
 
     private static int Competicoes(JogadorCarreiraDto j) => j.Estatisticas.Competicoes.Select(c => c.LigaId).Distinct().Count();
 
-    private static int Clubes(JogadorCarreiraDto j) => j.Estatisticas.Competicoes.Select(c => c.TimeId).Distinct().Count();
+    private static int Clubes(JogadorCarreiraDto j) => Math.Max(j.Estatisticas.Clubes, j.Estatisticas.Competicoes.Select(c => c.TimeId).Distinct().Count());
 
     // Só nas competições com contador: gols dessas competições / jogos.
     private static double? GolsPorJogo(JogadorCarreiraDto j)

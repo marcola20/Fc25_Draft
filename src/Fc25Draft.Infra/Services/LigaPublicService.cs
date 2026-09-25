@@ -1353,7 +1353,41 @@ public class LigaPublicService : ILigaPublicService
             .Select(p => new CarreiraParticipacaoInput(p.TimeId, p.PartidaId, p.LigaId, p.GolsSofridos == 0))
             .ToList();
 
-        var ligaIds = eventos.Select(e => e.LigaId).Concat(participacoes.Select(p => p.LigaId)).Distinct().ToList();
+        var picks = await _db.DraftPicks.AsNoTracking()
+            .Where(p => p.PlayerId == jogadorId)
+            .Select(p => new
+            {
+                p.PickedAtUtc, DraftCriadoEm = p.Draft.CreatedAtUtc, DraftNome = p.Draft.Name, p.Draft.Tipo, p.RoundNumber, p.PickInRound,
+                p.TeamId, p.FromTeamId, p.Compensacao, p.Automatica
+            })
+            .ToListAsync(ct);
+
+        var todasTransferencias = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.PlayerId == jogadorId)
+            .Select(t => new { t.PerformedAtUtc, t.Type, t.FromTeamId, t.ToTeamId, t.Amount, t.OldOverall, t.NewOverall })
+            .ToListAsync(ct);
+
+        // Em que time ele estava em cada período. A escolha do draft de expansão já é uma transferência.
+        var vinculos = CarreiraJogador.Vinculos(
+            todasTransferencias.Select(t => new CarreiraMovimentoInput(t.PerformedAtUtc, t.FromTeamId, t.ToTeamId))
+                .Concat(picks.Where(p => p.Tipo != DraftTipo.Expansao)
+                    .Select(p => new CarreiraMovimentoInput(p.PickedAtUtc ?? p.DraftCriadoEm, p.FromTeamId, p.TeamId))),
+            jogador.Time?.TeamId);
+        var timesDoJogador = vinculos.Select(v => v.TimeId).Distinct().ToList();
+
+        // Período e participantes de cada competição, pelos jogos encerrados dos times por onde ele passou.
+        var jogosDosTimes = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null
+                        && (timesDoJogador.Contains(p.TimeCasaId) || timesDoJogador.Contains(p.TimeForaId)))
+            .Select(p => new { p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, EncerradaEm = p.EncerradaEm!.Value })
+            .ToListAsync(ct);
+        var periodoLiga = jogosDosTimes.GroupBy(p => p.LigaId).ToDictionary(g => g.Key, g => (
+            Inicio: g.Min(p => p.EncerradaEm),
+            Fim: g.Max(p => p.EncerradaEm),
+            Participantes: (IReadOnlyCollection<Guid>)g.SelectMany(p => new[] { p.TimeCasaId, p.TimeForaId }).ToHashSet()));
+
+        var ligaIds = eventos.Select(e => e.LigaId).Concat(participacoes.Select(p => p.LigaId))
+            .Concat(periodoLiga.Keys).Distinct().ToList();
         var ligasComContagem = (await _db.LigaEscalacoes.AsNoTracking()
                 .Where(t => ligaIds.Contains(t.Partida.Rodada.LigaId))
                 .Select(t => t.Partida.Rodada.LigaId)
@@ -1371,25 +1405,16 @@ public class LigaPublicService : ILigaPublicService
             .ToDictionary(l => l.LigaId, l => new CarreiraLigaInput(
                 l.LigaId, l.Nome, l.Tipo, l.Temporada, l.CriadoEm,
                 campeoes.GetValueOrDefault(l.LigaId),
-                ligasComContagem.Contains(l.LigaId)));
+                ligasComContagem.Contains(l.LigaId),
+                periodoLiga.TryGetValue(l.LigaId, out var per) ? per.Inicio : null,
+                per.Participantes is null ? null : per.Fim,
+                per.Participantes));
 
         var estatisticas = CarreiraJogador.Calcular(
-            jogadorId, PosicoesDefensivas.Contains(jogador.PositionId), ligas, eventos, participacoes, nomesTimes);
-
-        var picks = await _db.DraftPicks.AsNoTracking()
-            .Where(p => p.PlayerId == jogadorId)
-            .Select(p => new
-            {
-                p.PickedAtUtc, DraftCriadoEm = p.Draft.CreatedAtUtc, DraftNome = p.Draft.Name, p.Draft.Tipo, p.RoundNumber, p.PickInRound,
-                p.TeamId, p.FromTeamId, p.Compensacao, p.Automatica
-            })
-            .ToListAsync(ct);
+            jogadorId, PosicoesDefensivas.Contains(jogador.PositionId), ligas, eventos, participacoes, nomesTimes, vinculos);
 
         // A escolha do draft de expansão também vira transferência: aparece só como escolha.
-        var transferencias = await _db.TransferHistories.AsNoTracking()
-            .Where(t => t.PlayerId == jogadorId && t.Type != TransferType.ExpansionDraft)
-            .Select(t => new { t.PerformedAtUtc, t.Type, t.FromTeamId, t.ToTeamId, t.Amount, t.OldOverall, t.NewOverall })
-            .ToListAsync(ct);
+        var transferencias = todasTransferencias.Where(t => t.Type != TransferType.ExpansionDraft).ToList();
 
         string? Nome(Guid? id) => id is Guid g && nomesTimes.TryGetValue(g, out var n) ? n : null;
 

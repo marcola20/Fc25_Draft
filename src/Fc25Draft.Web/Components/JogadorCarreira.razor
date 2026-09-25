@@ -41,6 +41,11 @@ else if (_dados is not null)
             <p class="text-muted small">Competições anteriores ao contador de jogos aparecem com “—” e não entram no total de jogos.</p>
         }
 
+        @if (e.Competicoes.Any(c => c.SoElenco))
+        {
+            <p class="text-muted small">“elenco”: sem gol, cartão ou escalação registrada, mas estava no time durante a competição.</p>
+        }
+
         @if (e.Titulos.Count > 0 || e.Hattricks > 0 || e.MaisGolsNumJogo >= 2)
         {
             <div class="d-flex flex-wrap gap-2 mb-4">
@@ -84,6 +89,7 @@ else if (_dados is not null)
                             <td class="text-start">
                                 @c.Competicao
                                 @if (c.Campeao) { <span title="Campeão">🏆</span> }
+                                @if (c.SoElenco) { <span class="badge bg-light text-muted border fw-normal ms-1" title="Sem registro em campo: estava no elenco do time durante a competição">elenco</span> }
                             </td>
                             <td class="text-start"><a href="/teams/details/@c.TimeId" class="text-primary">@c.TimeNome</a></td>
                             <td>@(c.Jogos?.ToString() ?? "—")</td>
