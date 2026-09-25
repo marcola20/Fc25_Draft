@@ -260,8 +260,29 @@ public class TreinadorService : ITreinadorService
 
         // Na Copa e na Supercopa não existe posição na tabela: o que conta é onde ele parou.
         var mataMata = await _db.LigaKnockoutJogos.AsNoTracking()
-            .Select(k => new { k.LigaId, k.Fase, k.TimeCasaId, k.TimeForaId })
+            .Select(k => new { k.LigaId, k.Fase, k.TimeCasaId, k.TimeForaId, k.VencedorId })
             .ToListAsync(ct);
+
+        // Nas temporadas decididas no mata-mata, a tabela é só a fase regular: quem perdeu a
+        // final é vice, não o quinto colocado. Mesma conta da trajetória do time e do ranking.
+        var posicoesFinais = new Dictionary<Guid, IReadOnlyDictionary<Guid, int>>();
+
+        IReadOnlyDictionary<Guid, int> PosicaoFinalDa(Guid ligaId)
+        {
+            if (posicoesFinais.TryGetValue(ligaId, out var pronta)) return pronta;
+
+            var tabela = classificacoes
+                .Where(c => c.LigaId == ligaId && c.Posicao > 0)
+                .ToDictionary(c => c.TimeId, c => c.Posicao);
+
+            var doMataMata = mataMata
+                .Where(k => k.LigaId == ligaId)
+                .Select(k => new JogoKnockoutInput(k.Fase, k.TimeCasaId, k.TimeForaId, k.VencedorId));
+
+            var mapa = PosicaoFinalLiga.Calcular(tabela, doMataMata);
+            posicoesFinais[ligaId] = mapa;
+            return mapa;
+        }
 
         string? FaseDoTime(Guid ligaId, Guid timeId, bool campeao)
         {
@@ -284,7 +305,8 @@ public class TreinadorService : ITreinadorService
             };
         }
 
-        var temporadas = new List<TreinadorTemporadaDto>();
+        // Guarda a data da passagem para a carreira sair na ordem em que ele viveu.
+        var temporadas = new List<(DateTime Desde, TipoCompetition Tipo, TreinadorTemporadaDto Linha)>();
 
         foreach (var passagem in treinador.Passagens)
         {
@@ -317,18 +339,22 @@ public class TreinadorService : ITreinadorService
                 // (o período só encostou nela).
                 if (encerrada && campanha.Jogos == 0) continue;
 
-                temporadas.Add(new TreinadorTemporadaDto(
+                var posicaoFinal = naTabela && encerrada && PosicaoFinalDa(liga.LigaId).TryGetValue(passagem.TimeId, out var lugar)
+                    ? lugar
+                    : (int?)null;
+
+                temporadas.Add((passagem.Desde, liga.Tipo, new TreinadorTemporadaDto(
                     liga.Temporada!.Value,
                     passagem.TimeId,
                     passagem.TimeNome,
                     passagem.Papel,
                     LigaLabels.Competicao(liga.Tipo, liga.Divisao),
-                    naTabela && encerrada && naLiga is { Posicao: > 0 } ? naLiga.Posicao : null,
+                    posicaoFinal,
                     naTabela ? totalPorLiga.GetValueOrDefault(liga.LigaId) : null,
                     campeao,
                     Movimento(passagem, comecou, acabou, encerrada),
                     campanha,
-                    naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao)));
+                    naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao))));
             }
         }
 
@@ -337,7 +363,12 @@ public class TreinadorService : ITreinadorService
             treinador.Nome,
             treinador.Ativo,
             passagensComRetrospecto,
-            temporadas.OrderByDescending(t => t.Temporada).ThenBy(t => t.Competicao).ToArray(),
+            temporadas
+                .OrderByDescending(t => t.Linha.Temporada)
+                .ThenByDescending(t => t.Desde)
+                .ThenBy(t => t.Tipo)
+                .Select(t => t.Linha)
+                .ToArray(),
             titulos,
             Somar(passagensComRetrospecto.Select(p => p.Retrospecto!)));
     }
