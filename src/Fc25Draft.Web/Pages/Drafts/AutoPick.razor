@@ -77,7 +77,7 @@
                 else if (!AdminAuth.IsAuthenticated)
                 {
                     <div class="mb-3">
-                        <label for="autoPickToken" class="form-label">Token do time</label>
+                        <label for="autoPickToken" class="form-label">Seu token</label>
                         <div class="input-group">
                             <input id="autoPickToken"
                                    type="password"
@@ -85,7 +85,7 @@
                                    value="@tokenInput"
                                    @oninput="e => tokenInput = e.Value?.ToString() ?? string.Empty"
                                    autocomplete="one-time-code"
-                                   placeholder="Cole o token do time" />
+                                   placeholder="Cole o seu token" />
                             <button type="button"
                                     class="btn btn-outline-secondary"
                                     disabled="@(isLoading || string.IsNullOrWhiteSpace(tokenInput))"
@@ -311,7 +311,7 @@
         }
         else if (config is null && authInitialized && !isLoading)
         {
-            <p class="text-muted">Informe o token do time para montar a lista.</p>
+            <p class="text-muted">Informe o seu token para montar a lista.</p>
         }
     </div>
 </div>
@@ -700,7 +700,7 @@
         var token = EffectiveToken;
         if (string.IsNullOrWhiteSpace(token))
         {
-            errorMessage = "Informe o token do time.";
+            errorMessage = "Informe o seu token.";
             return;
         }
 

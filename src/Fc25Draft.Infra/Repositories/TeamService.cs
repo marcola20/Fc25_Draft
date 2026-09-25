@@ -65,9 +65,7 @@ public class TeamService : ITeamService
             TeamId = Guid.NewGuid(),
             TeamName = normalizedName,
             OwnerName = NormalizeOwner(dto.OwnerName),
-            Token = GenerateToken(),
-            AuxiliarName = auxiliarName,
-            AuxToken = auxiliarName is null ? null : GenerateToken()
+            AuxiliarName = auxiliarName
         };
 
         _db.Teams.Add(entity);
@@ -94,18 +92,7 @@ public class TeamService : ITeamService
         entity.TeamName = normalizedName;
         entity.OwnerName = NormalizeOwner(dto.OwnerName);
 
-        var auxiliarName = NormalizeOwner(dto.AuxiliarName);
-        entity.AuxiliarName = auxiliarName;
-        if (auxiliarName is null)
-        {
-            // Sem auxiliar: revoga o token para que ele deixe de autenticar.
-            entity.AuxToken = null;
-        }
-        else if (entity.AuxToken is null)
-        {
-            // Auxiliar recém-definido: gera o token dele automaticamente.
-            entity.AuxToken = GenerateToken();
-        }
+        entity.AuxiliarName = NormalizeOwner(dto.AuxiliarName);
 
         await _db.SaveChangesAsync();
     }
@@ -150,35 +137,6 @@ public class TeamService : ITeamService
             throw new ArgumentException("O nome do auxiliar deve ter no máximo 80 caracteres.", nameof(auxiliarName));
         }
     }
-
-    public async Task<string> RegenerateTokenAsync(Guid id)
-    {
-        var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
-                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
-
-        entity.Token = GenerateToken();
-        await _db.SaveChangesAsync();
-
-        return entity.Token;
-    }
-
-    public async Task<string> RegenerateAuxTokenAsync(Guid id)
-    {
-        var entity = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id)
-                     ?? throw new KeyNotFoundException("Equipe não encontrada.");
-
-        if (string.IsNullOrWhiteSpace(entity.AuxiliarName))
-        {
-            throw new InvalidOperationException("Este time não tem auxiliar cadastrado.");
-        }
-
-        entity.AuxToken = GenerateToken();
-        await _db.SaveChangesAsync();
-
-        return entity.AuxToken;
-    }
-
-    private static string GenerateToken() => Guid.NewGuid().ToString().ToUpperInvariant();
 
     private static string? NormalizeOwner(string? ownerName)
     {

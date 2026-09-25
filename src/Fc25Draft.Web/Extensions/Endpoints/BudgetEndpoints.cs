@@ -20,12 +20,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     if (string.IsNullOrWhiteSpace(token))
                         return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
 
-                    var normalizedToken = token.Trim();
-                    var teamId = await db.Teams
-                        .AsNoTracking()
-                        .Where(t => t.Token == normalizedToken || t.AuxToken == normalizedToken)
-                        .Select(t => (Guid?)t.TeamId)
-                        .FirstOrDefaultAsync(ct);
+                    var teamId = await db.TimeIdPorTokenAsync(token, ct);
 
                     if (!teamId.HasValue)
                         return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status401Unauthorized);

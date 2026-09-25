@@ -6,6 +6,17 @@
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "src/Fc25Draft.Web"],
       "port": 5001
+    },
+    {
+      "name": "teste",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run", "-c", "Release", "--project", "src/Fc25Draft.Web", "--",
+        "--urls=http://localhost:5199",
+        "--ConnectionStrings:DefaultConnection=Host=localhost;Port=5432;Database=cbfv_teste;Username=postgres;Password=1909"
+      ],
+      "port": 5199,
+      "url": "http://localhost:5199"
     }
   ]
 }

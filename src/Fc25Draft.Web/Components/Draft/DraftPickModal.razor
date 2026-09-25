@@ -12,7 +12,7 @@
                 @if (!IsAuthenticated)
                 {
                     <div class="mb-3">
-                        <label for="tokenInput" class="form-label">Token do time</label>
+                        <label for="tokenInput" class="form-label">Seu token</label>
                         <input id="tokenInput" type="password" class="form-control"
                                value="@TokenInput"
                                @oninput="e => TokenInputChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)"

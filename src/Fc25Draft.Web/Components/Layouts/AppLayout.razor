@@ -1,8 +1,10 @@
 @using System
 @using System.Linq
+@using Fc25Draft.Core.DTOs
 @using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Components.Routing
 @inject AdminAuthService AdminAuth
+@inject TeamsApiClient TeamsApiClient
 @inject LayoutNavigationService NavigationService
 @inject LayoutState LayoutState
 @inject NavigationManager Navigation
@@ -65,9 +67,9 @@
                     <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseAdminModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Informe o token do seu time para entrar.</p>
+                    <p>Informe o seu token para entrar. Ele é seu, não do time — se você trocar de clube, ele vai junto.</p>
                     <div class="mb-3">
-                        <label class="form-label" for="adminTokenInput">Token do time</label>
+                        <label class="form-label" for="adminTokenInput">Seu token</label>
                         <input id="adminTokenInput"
                                class="form-control"
                                type="password"
@@ -134,6 +136,7 @@
         {
             await AdminAuth.EnsureInitializedAsync();
             authReady = true;
+            await AtualizarQuemEntrouAsync();
             await RebuildMenuAsync();
             await UpdatePageDefinitionAsync(Navigation.Uri);
         }
@@ -275,10 +278,36 @@
         }
     }
 
+    private TeamIdentityDto? quemEntrou;
+
     private string GetAccessLabel()
     {
         if (!AdminAuth.IsAuthenticated) return "Modo somente leitura";
-        return AdminAuth.IsAdmin ? "Administrador" : "Time autenticado";
+        if (AdminAuth.IsAdmin) return "Administrador";
+
+        // Quem entrou é a pessoa; o clube vem da passagem em aberto dela.
+        return quemEntrou is null
+            ? "Sem clube"
+            : $"{quemEntrou.Treinador} · {quemEntrou.TeamName}";
+    }
+
+    private async Task AtualizarQuemEntrouAsync()
+    {
+        quemEntrou = null;
+
+        if (!AdminAuth.IsAuthenticated || AdminAuth.IsAdmin) return;
+
+        try
+        {
+            var token = await AdminAuth.GetTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token))
+                quemEntrou = await TeamsApiClient.ResolveIdentityAsync(token);
+        }
+        catch (Exception ex)
+        {
+            // Sem clube o /me devolve 403; o rótulo já cobre esse caso.
+            Logger.LogDebug(ex, "LayoutNavV2:Não foi possível identificar quem entrou");
+        }
     }
 
     private void ToggleSidebar()
@@ -309,7 +338,12 @@
             var success = await AdminAuth.SignInAsync(adminTokenInput);
             if (success)
             {
-                adminBannerMessage = AdminAuth.IsAdmin ? "Modo administrador ativado." : "Time autenticado com sucesso.";
+                await AtualizarQuemEntrouAsync();
+                adminBannerMessage = AdminAuth.IsAdmin
+                    ? "Modo administrador ativado."
+                    : quemEntrou is null
+                        ? "Você entrou, mas não está em nenhum clube no momento."
+                        : $"{quemEntrou.Treinador}, {quemEntrou.Papel} do {quemEntrou.TeamName}.";
                 adminBannerCss = "alert-success";
                 CloseAdminModal();
                 await RebuildMenuAsync();

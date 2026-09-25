@@ -32,14 +32,34 @@ public static class SeedData
         {
             foreach (var (ownerName, teamName, token) in DefaultTeams)
             {
-                context.Teams.Add(new Team
+                var team = new Team
                 {
                     TeamId = Guid.NewGuid(),
                     TeamName = teamName,
                     OwnerName = ownerName,
-                    Token = token,
                     Budget = 50_000_000m,
                     BudgetBlocked = 0m
+                };
+
+                context.Teams.Add(team);
+
+                // O token é da pessoa: o treinador nasce junto com o clube dele.
+                var treinador = new Treinador
+                {
+                    TreinadorId = Guid.NewGuid(),
+                    Nome = ownerName,
+                    Token = token,
+                    CriadoEm = DateTime.UtcNow
+                };
+
+                context.Treinadores.Add(treinador);
+                context.TreinadorPassagens.Add(new TreinadorPassagem
+                {
+                    PassagemId = Guid.NewGuid(),
+                    TreinadorId = treinador.TreinadorId,
+                    TimeId = team.TeamId,
+                    Papel = PapelTreinador.Treinador,
+                    Desde = DateTime.UtcNow
                 });
             }
 

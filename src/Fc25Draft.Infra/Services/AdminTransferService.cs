@@ -628,10 +628,11 @@ public partial class AdminTransferService
         if (dedicated is not null)
             return dedicated.AdminTokenId;
 
-        // Compatibilidade: token de time com flag de administrador.
+        // Compatibilidade: treinador de um time marcado como administrador.
+        var timeDoToken = await _dbContext.TimeIdPorTokenAsync(normalized, ct).ConfigureAwait(false);
         var team = await _dbContext.Teams
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == normalized && t.IsAdmin, ct)
+            .FirstOrDefaultAsync(t => t.TeamId == timeDoToken && t.IsAdmin, ct)
             .ConfigureAwait(false);
 
         if (team is null)

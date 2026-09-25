@@ -398,16 +398,16 @@ public class DraftStateService
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Não foi possível localizar as regras da rodada atual.");
 
-            var isTeamToken = string.Equals(normalizedToken, currentPick.Team.Token, StringComparison.OrdinalIgnoreCase)
-                || (currentPick.Team.AuxToken is not null && string.Equals(normalizedToken, currentPick.Team.AuxToken, StringComparison.OrdinalIgnoreCase));
+            var isTeamToken = await _db.TokenComandaAsync(normalizedToken, currentPick.TeamId, ct);
             if (!isTeamToken)
             {
+                var timeDoToken = await _db.TimeIdPorTokenAsync(normalizedToken, ct);
                 var isAdmin = await _db.AdminTokens
                     .AsNoTracking()
                     .AnyAsync(t => t.Token == normalizedToken && t.IsActive, ct)
                     || await _db.Teams
                         .AsNoTracking()
-                        .AnyAsync(t => (t.Token == normalizedToken || t.AuxToken == normalizedToken) && t.IsAdmin, ct);
+                        .AnyAsync(t => t.TeamId == timeDoToken && t.IsAdmin, ct);
 
                 if (!isAdmin)
                     throw new InvalidOperationException("⚠️ Token inválido para este time.");

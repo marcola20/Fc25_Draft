@@ -40,7 +40,7 @@ else if (!hasAccess)
         }
         else
         {
-            <span>Informe o token do seu time para gerenciar as escalações.</span>
+            <span>Informe o seu token para gerenciar as escalações.</span>
         }
     </div>
 }
@@ -940,7 +940,7 @@ else
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Lineups:Error retrieving team token");
-                accessMessage = "Não foi possível verificar o token do time.";
+                accessMessage = "Não foi possível verificar o token.";
                 currentTeamToken = null;
                 ClearLocalState();
                 return;
@@ -948,7 +948,7 @@ else
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                accessMessage = "Informe o token do seu time para gerenciar as escalações.";
+                accessMessage = "Informe o seu token para gerenciar as escalações.";
                 currentTeamToken = null;
                 ClearLocalState();
                 return;
@@ -969,7 +969,7 @@ else
 
             if (identity is null)
             {
-                accessMessage = "Token do time inválido.";
+                accessMessage = "Token inválido.";
                 currentTeamToken = null;
                 ClearLocalState();
                 return;
@@ -1267,7 +1267,7 @@ else
         if (currentEditor is null) return;
         if (!hasAccess)
         {
-            Toasts.ShowError("Informe o token do seu time para salvar a escalação.");
+            Toasts.ShowError("Informe o seu token para salvar a escalação.");
             return;
         }
 
@@ -1331,7 +1331,7 @@ else
         }
         if (!hasAccess)
         {
-            Toasts.ShowError("Informe o token do seu time para duplicar a escalação.");
+            Toasts.ShowError("Informe o seu token para duplicar a escalação.");
             return;
         }
 
@@ -1379,7 +1379,7 @@ else
 
         if (!hasAccess)
         {
-            Toasts.ShowError("Informe o token do seu time para excluir a escalação.");
+            Toasts.ShowError("Informe o seu token para excluir a escalação.");
             return;
         }
 

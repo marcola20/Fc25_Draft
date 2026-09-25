@@ -57,6 +57,7 @@
                 </div>
                 <p class="text-muted small mb-0 mt-2">
                     O token é da pessoa, não do time: quem troca de clube leva o acesso junto, e o auxiliar entra com o dele.
+                    Quem está sem passagem em aberto consegue entrar, mas não mexe em time nenhum.
                 </p>
             </div>
         </div>
@@ -107,7 +108,11 @@
                                         <span class="text-muted">sem time</span>
                                     }
                                 </td>
-                                <td><code class="small">@t.Token</code></td>
+                                <td>
+                                    <code class="small">@t.Token</code>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" title="Gerar um token novo"
+                                            @onclick="() => RegerarToken(t)" disabled="@_salvando">regerar</button>
+                                </td>
                                 <td class="small text-muted">
                                     @string.Join(" · ", t.Passagens.Select(p => $"{p.TimeNome} {p.Desde:MM/yyyy}–{(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MM/yyyy"))}"))
                                 </td>
@@ -308,6 +313,22 @@
             await TreinadorSvc.RemoverPassagemAsync(passagem.PassagemId, CancellationToken.None);
             await Carregar();
             _ok = "Passagem removida.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RegerarToken(TreinadorDto t)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Gerar um token novo para {t.Nome}? O token atual para de funcionar na hora.")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var novo = await TreinadorSvc.RegerarTokenAsync(t.TreinadorId, CancellationToken.None);
+            await Carregar();
+            _ok = $"Token novo de {novo.Nome}: {novo.Token}";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

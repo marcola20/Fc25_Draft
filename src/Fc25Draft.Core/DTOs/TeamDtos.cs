@@ -28,7 +28,9 @@ public record TeamDetailsDto(
 
 public record TeamIdentityDto(
     Guid TeamId,
-    string TeamName);
+    string TeamName,
+    string? Treinador = null,
+    string? Papel = null);
 
 public record TeamRosterDto(
     Guid TeamId,

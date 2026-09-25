@@ -169,9 +169,9 @@ public class MarketService : IMarketService
             if (expiresUtc <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
+            var timeDoToken = await _dbContext.TimeIdPorTokenAsync(normalizedToken, ct2);
             var team = await _dbContext.Teams
-                .FirstOrDefaultAsync(t => (t.Token != null && t.Token.ToUpper() == normalizedToken)
-                                        || (t.AuxToken != null && t.AuxToken.ToUpper() == normalizedToken), ct2)
+                .FirstOrDefaultAsync(t => t.TeamId == timeDoToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
 
             if (item.CurrentLeaderTeamId == team.TeamId)
@@ -306,8 +306,9 @@ public class MarketService : IMarketService
             if (item.ExpiresAtUtc.AddHours(3) <= nowUtc)
                 throw new MarketConflictException("O item já expirou. Atualize a página e tente novamente.");
 
+            var timeDoToken = await _dbContext.TimeIdPorTokenAsync(normalizedToken, ct2);
             var team = await _dbContext.Teams
-                .FirstOrDefaultAsync(t => t.Token == normalizedToken || t.AuxToken == normalizedToken, ct2)
+                .FirstOrDefaultAsync(t => t.TeamId == timeDoToken, ct2)
                 ?? throw new MarketForbiddenException("Token de time inválido.");
 
             await EnsureSquadLimitAsync(team.TeamId, item.ItemId, null, ct2, includeCurrentItem: true);

@@ -291,10 +291,10 @@ public class DraftWishlistService : IDraftWishlistService
         if (string.IsNullOrWhiteSpace(token))
             throw new UnauthorizedAccessException("Token do time obrigatório.");
 
-        var normalized = token.Trim();
-        var team = await _db.Teams
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == normalized || t.AuxToken == normalized, ct);
+        var timeId = await _db.TimeIdPorTokenAsync(token, ct);
+        var team = timeId is null
+            ? null
+            : await _db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.TeamId == timeId, ct);
 
         return team ?? throw new UnauthorizedAccessException("Token do time inválido.");
     }

@@ -88,6 +88,18 @@ public class TreinadorService : ITreinadorService
         return (await GetAsync(treinador.TreinadorId, ct))!;
     }
 
+    public async Task<TreinadorDto> RegerarTokenAsync(Guid treinadorId, CancellationToken ct)
+    {
+        var treinador = await _db.Treinadores
+            .FirstOrDefaultAsync(t => t.TreinadorId == treinadorId, ct)
+            ?? throw new InvalidOperationException("Treinador não encontrado.");
+
+        treinador.Token = GerarToken(treinador.Nome);
+        await _db.SaveChangesAsync(ct);
+
+        return (await GetAsync(treinadorId, ct))!;
+    }
+
     public async Task ExcluirAsync(Guid treinadorId, CancellationToken ct)
     {
         var treinador = await _db.Treinadores.Include(t => t.Passagens)

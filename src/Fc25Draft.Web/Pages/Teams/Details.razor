@@ -63,14 +63,23 @@ else
 
         @if (AdminAuth.IsAdmin)
         {
-            <dt class="col-sm-3">Token do Time</dt>
-            <dd class="col-sm-9"><code>@team.Token</code></dd>
+            @if (!string.IsNullOrWhiteSpace(team.Token))
+            {
+                <dt class="col-sm-3">Token do treinador</dt>
+                <dd class="col-sm-9"><code>@team.Token</code></dd>
+            }
 
             @if (!string.IsNullOrWhiteSpace(team.AuxToken))
             {
-                <dt class="col-sm-3">Token do Auxiliar</dt>
+                <dt class="col-sm-3">Token do auxiliar</dt>
                 <dd class="col-sm-9"><code>@team.AuxToken</code></dd>
             }
+
+            <dt class="col-sm-3">Acesso</dt>
+            <dd class="col-sm-9">
+                <a href="/admin/treinadores">Cadastro de treinadores</a>
+                <span class="text-muted small">— o token é da pessoa, não do time</span>
+            </dd>
         }
     </dl>
 
@@ -576,7 +585,7 @@ else
         }
         catch
         {
-            _teamTokenErrorMessage = "Não foi possível verificar o token do time.";
+            _teamTokenErrorMessage = "Não foi possível verificar o token.";
             return;
         }
 
@@ -605,7 +614,7 @@ else
             else
             {
                 if (!AdminAuth.IsAdmin)
-                    _teamTokenErrorMessage = "Token do time inválido.";
+                    _teamTokenErrorMessage = "Token inválido.";
             }
         }
         catch (InvalidOperationException ex)
@@ -616,7 +625,7 @@ else
         catch
         {
             if (!AdminAuth.IsAdmin)
-                _teamTokenErrorMessage = "Não foi possível validar o token do time.";
+                _teamTokenErrorMessage = "Não foi possível validar o token.";
         }
 
         var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
@@ -717,7 +726,7 @@ else
 
         if (string.IsNullOrWhiteSpace(_currentTeamToken))
         {
-            _quickSellErrorMessage = "Token do time não configurado.";
+            _quickSellErrorMessage = "Token não configurado.";
             return;
         }
 

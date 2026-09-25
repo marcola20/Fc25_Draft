@@ -499,14 +499,9 @@ public class DraftAutoPickService
         if (string.IsNullOrWhiteSpace(token))
             throw new InvalidOperationException("Informe o token do time.");
 
-        var normalizado = token.Trim();
-        var time = await _db.Teams
-            .AsNoTracking()
-            .Where(t => t.Token == normalizado || t.AuxToken == normalizado)
-            .Select(t => new { t.TeamId, t.TeamName })
-            .FirstOrDefaultAsync(ct)
-            ?? throw new InvalidOperationException("Token não pertence a nenhum time. A escolha automática é configurada com o token do time.");
+        var acesso = await _db.AcessoPorTokenAsync(token, ct)
+            ?? throw new InvalidOperationException("Token não pertence a nenhum time. A escolha automática é configurada com o token do treinador.");
 
-        return (time.TeamId, time.TeamName);
+        return (acesso.TimeId, acesso.TimeNome);
     }
 }

@@ -17,6 +17,9 @@ public interface ITreinadorService
 
     Task ExcluirAsync(Guid treinadorId, CancellationToken ct);
 
+    /// <summary>Sorteia um token novo. O antigo para de funcionar na hora.</summary>
+    Task<TreinadorDto> RegerarTokenAsync(Guid treinadorId, CancellationToken ct);
+
     /// <summary>Registra uma passagem por um clube. Recusa se a pessoa já estiver em outro time no período.</summary>
     Task<TreinadorDto> RegistrarPassagemAsync(TreinadorPassagemRequest request, CancellationToken ct);
 

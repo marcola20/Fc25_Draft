@@ -192,7 +192,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Token do time</h5>
+                    <h5 class="modal-title">Seu token</h5>
                     <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseTeamTokenModal"></button>
                 </div>
                 <div class="modal-body">
@@ -304,7 +304,7 @@ else
         builder.AddAttribute(seq++, "type", "button");
         builder.AddAttribute(seq++, "class", "btn btn-outline-primary btn-sm");
         builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, OpenTeamTokenModal));
-        builder.AddContent(seq++, "Token do time");
+        builder.AddContent(seq++, "Seu token");
         var badgeClass = _teamTokenConfigured ? "bg-success" : "bg-warning text-dark";
         builder.OpenElement(seq++, "span");
         builder.AddAttribute(seq++, "class", $"badge {badgeClass} ms-2");
@@ -1366,7 +1366,7 @@ else
 
         var invalidMessage = TeamAccess.ConsumeInvalidTokenMessage();
         _teamTokenError = string.IsNullOrWhiteSpace(invalidMessage)
-            ? "Informe o token do seu time para registrar lances."
+            ? "Informe o seu token para registrar lances."
             : invalidMessage;
         _teamTokenModalOpen = true;
         RefreshLayoutHeader();

@@ -1,4 +1,5 @@
 ﻿using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -82,9 +83,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.TeamId,
                         t.TeamName,
                         t.OwnerName,
-                        t.Token,
                         t.AuxiliarName,
-                        t.AuxToken,
                         Jogadores = t.Roster.Count,
                         t.Budget,
                         t.QuickSellCount,
@@ -94,9 +93,17 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 if (team is null) return Results.NotFound();
 
+                // O time não tem token: o que aparece é o token de quem está no comando hoje.
                 var includeToken = httpContext.User.IsInRole("Admin");
-                var teamToken = includeToken ? team.Token : string.Empty;
-                var auxToken = includeToken ? team.AuxToken : null;
+                var noComando = includeToken
+                    ? await db.TreinadorPassagens.AsNoTracking()
+                        .Where(p => p.TimeId == id && p.Ate == null)
+                        .Select(p => new { p.Papel, p.Treinador.Token })
+                        .ToListAsync(ct)
+                    : new();
+
+                var teamToken = noComando.FirstOrDefault(p => p.Papel == PapelTreinador.Treinador)?.Token ?? string.Empty;
+                var auxToken = noComando.FirstOrDefault(p => p.Papel == PapelTreinador.Auxiliar)?.Token;
                 var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
 
                 var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken);
@@ -109,13 +116,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 if (string.IsNullOrWhiteSpace(token))
                     return Results.Json(new { message = "Token obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
 
-                var normalized = token.Trim();
-
-                var identity = await db.Teams
-                    .AsNoTracking()
-                    .Where(t => t.Token == normalized || t.AuxToken == normalized)
-                    .Select(t => new TeamIdentityDto(t.TeamId, t.TeamName))
-                    .FirstOrDefaultAsync(ct);
+                var acesso = await db.AcessoPorTokenAsync(token, ct);
+                var identity = acesso is null
+                    ? null
+                    : new TeamIdentityDto(acesso.TimeId, acesso.TimeNome, acesso.Nome,
+                        acesso.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador");
 
                 if (identity is null)
                     return Results.Json(new { message = "Token inválido." }, statusCode: StatusCodes.Status403Forbidden);
@@ -518,27 +523,6 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
             });
 
-            adminTeamsApi.MapPost("/{id:guid}/regenerate-token", async (ITeamService teamService, Guid id) =>
-            {
-                try
-                {
-                    var token = await teamService.RegenerateTokenAsync(id);
-                    return Results.Ok(new { token });
-                }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
-            });
-
-            adminTeamsApi.MapPost("/{id:guid}/regenerate-aux-token", async (ITeamService teamService, Guid id) =>
-            {
-                try
-                {
-                    var token = await teamService.RegenerateAuxTokenAsync(id);
-                    return Results.Ok(new { token });
-                }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
-                catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
-            });
-
             adminTeamsApi.MapPost("/adjust-budget", async (
                 HttpContext httpContext,
                 AdminAdjustBudgetRequestDto request,
@@ -587,23 +571,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             return Results.Json(new { message = "Token do time obrigatório." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var normalized = token.Trim();
-
-        var teamTokens = await db.Teams
-            .AsNoTracking()
-            .Where(t => t.TeamId == teamId)
-            .Select(t => new { t.Token, t.AuxToken })
-            .FirstOrDefaultAsync(ct);
-
-        if (teamTokens is null)
+        var existe = await db.Teams.AsNoTracking().AnyAsync(t => t.TeamId == teamId, ct);
+        if (!existe)
         {
             return Results.Json(new { message = "Time não encontrado." }, statusCode: StatusCodes.Status404NotFound);
         }
 
-        var matches = string.Equals(teamTokens.Token, normalized, StringComparison.OrdinalIgnoreCase)
-            || (teamTokens.AuxToken is not null && string.Equals(teamTokens.AuxToken, normalized, StringComparison.OrdinalIgnoreCase));
-
-        if (!matches)
+        if (!await db.TokenComandaAsync(token, teamId, ct))
         {
             return Results.Json(new { message = "Token do time inválido." }, statusCode: StatusCodes.Status403Forbidden);
         }

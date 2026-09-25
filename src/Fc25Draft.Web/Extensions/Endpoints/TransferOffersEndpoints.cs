@@ -172,10 +172,6 @@ public static class TransferOffersEndpoints
         if (string.IsNullOrWhiteSpace(tokenHeader))
             return null;
 
-        var normalized = tokenHeader.Trim();
-        var team = await db.Teams.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == normalized || t.AuxToken == normalized, ct);
-
-        return team?.TeamId;
+        return await db.TimeIdPorTokenAsync(tokenHeader, ct);
     }
 }

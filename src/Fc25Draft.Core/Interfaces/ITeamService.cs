@@ -10,6 +10,4 @@ public interface ITeamService
     Task<Guid> CreateAsync(TeamCreateDto dto);
     Task UpdateAsync(Guid id, TeamUpdateDto dto);
     Task DeleteAsync(Guid id);
-    Task<string> RegenerateTokenAsync(Guid id);
-    Task<string> RegenerateAuxTokenAsync(Guid id);
 }

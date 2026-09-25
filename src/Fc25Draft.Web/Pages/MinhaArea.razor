@@ -23,10 +23,10 @@
                 <h1 class="h4 mb-2">👤 Minha Área</h1>
                 <p class="text-muted small">
                     Tudo do seu time num lugar só: leilões, propostas, draft, escolha automática e jogadores que você observa.
-                    Entre com o token do time (pelo botão Login no topo) ou cole aqui:
+                    Entre com o seu token (pelo botão Login no topo) ou cole aqui:
                 </p>
                 <div class="input-group">
-                    <input type="password" class="form-control" placeholder="Token do time" value="@_tokenDigitado"
+                    <input type="password" class="form-control" placeholder="Seu token" value="@_tokenDigitado"
                            @oninput="e => _tokenDigitado = e.Value?.ToString() ?? string.Empty" autocomplete="one-time-code" />
                     <button class="btn btn-primary" disabled="@(_carregando || string.IsNullOrWhiteSpace(_tokenDigitado))" @onclick="CarregarAsync">Entrar</button>
                 </div>

@@ -487,14 +487,9 @@ public class DraftExpansaoService
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
 
-        var normalizado = token.Trim();
-        var time = await _db.Teams
-            .AsNoTracking()
-            .Where(t => t.Token == normalizado || t.AuxToken == normalizado)
-            .Select(t => new { t.TeamId, t.TeamName })
-            .FirstOrDefaultAsync(ct);
+        var acesso = await _db.AcessoPorTokenAsync(token, ct);
 
-        return time is null ? null : (time.TeamId, time.TeamName);
+        return acesso is null ? null : (acesso.TimeId, acesso.TimeNome);
     }
 
     public async Task<List<(Guid TeamId, string TeamName)>> ListarTimesAsync(CancellationToken ct)

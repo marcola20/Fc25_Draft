@@ -5,9 +5,7 @@ public class Team
     public Guid TeamId { get; set; }
     public string TeamName { get; set; } = null!;
     public string? OwnerName { get; set; }
-    public string Token { get; set; } = null!;
     public string? AuxiliarName { get; set; }
-    public string? AuxToken { get; set; }
     public decimal Budget { get; set; }
     public decimal BudgetBlocked { get; set; }
     public int QuickSellCount { get; set; }

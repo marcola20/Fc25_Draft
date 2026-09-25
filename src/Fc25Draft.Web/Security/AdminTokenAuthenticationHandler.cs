@@ -90,18 +90,43 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
             return AuthenticateResult.Success(ticket);
         }
 
-        // Fallback to Teams with IsAdmin flag (for backward compatibility)
+        // O token é da pessoa: o clube sai da passagem que está em aberto.
+        var acesso = await _db.AcessoPorTokenAsync(providedToken, Context.RequestAborted);
+
+        if (acesso is null)
+        {
+            // Sem clube a pessoa ainda entra — só não manda em time nenhum.
+            var semClube = await _db.Treinadores
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Ativo && t.Token.ToUpper() == providedToken.ToUpper(), Context.RequestAborted);
+
+            if (semClube is null)
+                return AuthenticateResult.Fail("Token inválido.");
+
+            var visitante = new ClaimsIdentity(new List<Claim>
+            {
+                new(ClaimTypes.Name, semClube.Nome),
+                new("TreinadorId", semClube.TreinadorId.ToString()),
+            }, Scheme.Name);
+
+            return AuthenticateResult.Success(
+                new AuthenticationTicket(new ClaimsPrincipal(visitante), Scheme.Name));
+        }
+
         var team = await _db.Teams
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == providedToken || t.AuxToken == providedToken, Context.RequestAborted);
+            .FirstOrDefaultAsync(t => t.TeamId == acesso.TimeId, Context.RequestAborted);
 
         if (team is null)
             return AuthenticateResult.Fail("Token inválido.");
 
         var teamClaims = new List<Claim>
         {
-            new(ClaimTypes.Name, team.TeamName),
+            new(ClaimTypes.Name, acesso.Nome),
             new("TeamId", team.TeamId.ToString()),
+            new("TeamName", team.TeamName),
+            new("TreinadorId", acesso.TreinadorId.ToString()),
+            new("Papel", acesso.Papel.ToString()),
         };
 
         if (team.IsAdmin)
