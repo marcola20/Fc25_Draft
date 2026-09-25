@@ -145,7 +145,15 @@
                                         {
                                             <span class="badge bg-warning text-dark">🏆 Campeão</span>
                                         }
-                                        else if (t.Movimento is { Length: > 0 } mov)
+                                        @if (t.Desfecho == "Rebaixado")
+                                        {
+                                            <span class="badge bg-danger">Rebaixado</span>
+                                        }
+                                        else if (t.Desfecho == "Acesso")
+                                        {
+                                            <span class="badge bg-success">Acesso</span>
+                                        }
+                                        @if (!t.Campeao && t.Movimento is { Length: > 0 } mov)
                                         {
                                             <span class="text-muted">@mov</span>
                                         }

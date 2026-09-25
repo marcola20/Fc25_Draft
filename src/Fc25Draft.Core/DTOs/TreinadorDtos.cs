@@ -58,7 +58,9 @@ public record TreinadorTemporadaDto(
     string? Movimento,
     TreinadorRetrospectoDto? Retrospecto = null,
     /// <summary>Onde parou no mata-mata. Vale para Copa e Supercopa, onde não existe posição na tabela.</summary>
-    string? Fase = null);
+    string? Fase = null,
+    /// <summary>"Rebaixado" ou "Acesso", conforme a divisão em que o clube apareceu na temporada seguinte.</summary>
+    string? Desfecho = null);
 
 /// <summary>A carreira inteira: passagens, temporadas e o que ganhou.</summary>
 public record TreinadorCarreiraDto(

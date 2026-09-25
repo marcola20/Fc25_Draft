@@ -235,24 +235,14 @@ public class TreinadorService : ITreinadorService
                 (p.EncerradaEm ?? p.IniciadaEm)!.Value))
             .ToListAsync(ct);
 
-        // No dia em que o comando troca, o jogo daquele dia é de quem estava saindo.
-        var entradasNoDiaDaSaida = await _db.TreinadorPassagens.AsNoTracking()
-            .Where(p => timeIds.Contains(p.TimeId) && p.Ate != null)
-            .Select(p => new { p.TimeId, Dia = p.Ate!.Value })
-            .ToListAsync(ct);
-
-        List<Jogo> JogosDa(TreinadorPassagemDto passagem, Guid? ligaId = null)
-        {
-            var herdouODia = passagem.Ate is null
-                             || entradasNoDiaDaSaida.Any(e => e.TimeId == passagem.TimeId && e.Dia.Date == passagem.Desde.Date);
-
-            return jogos.Where(j =>
+        // Quem chega assume depois do jogo do dia; quem sai leva o jogo do dia da saída.
+        // Assim cada partida tem um dono só, e a soma dos treinadores fecha com o clube.
+        List<Jogo> JogosDa(TreinadorPassagemDto passagem, Guid? ligaId = null) =>
+            jogos.Where(j =>
                 (j.CasaId == passagem.TimeId || j.ForaId == passagem.TimeId)
                 && (ligaId is null || j.LigaId == ligaId)
-                && j.Quando.Date >= passagem.Desde.Date
-                && (!herdouODia || j.Quando.Date > passagem.Desde.Date)
+                && j.Quando.Date > passagem.Desde.Date
                 && (passagem.Ate is null || j.Quando.Date <= passagem.Ate.Value.Date)).ToList();
-        }
 
         var passagensComRetrospecto = treinador.Passagens
             .Select(p => p with { Retrospecto = Retrospecto(JogosDa(p), p.TimeId) })
@@ -306,6 +296,25 @@ public class TreinadorService : ITreinadorService
         }
 
         // Guarda a data da passagem para a carreira sair na ordem em que ele viveu.
+        // Subiu ou caiu? Quem responde é a divisão em que o clube apareceu na temporada seguinte.
+        var divisoesPorTemporada = ligas
+            .Where(l => l.Tipo == TipoCompetition.Liga && l.Divisao != null)
+            .SelectMany(l => classificacoes.Where(c => c.LigaId == l.LigaId)
+                .Select(c => new { c.TimeId, Temporada = l.Temporada!.Value, Divisao = l.Divisao!.Value }))
+            .ToLookup(x => (x.TimeId, x.Temporada), x => x.Divisao);
+
+        string? DesfechoDaTemporada(Guid timeId, int temporada, Divisao? divisao)
+        {
+            if (divisao is null) return null;
+
+            var seguinte = divisoesPorTemporada[(timeId, temporada + 1)].ToList();
+            if (seguinte.Count == 0) return null;
+
+            if (divisao == Divisao.SerieA && seguinte.All(d => d == Divisao.SerieB)) return "Rebaixado";
+            if (divisao == Divisao.SerieB && seguinte.Any(d => d == Divisao.SerieA)) return "Acesso";
+            return null;
+        }
+
         var temporadas = new List<(DateTime Desde, TipoCompetition Tipo, TreinadorTemporadaDto Linha)>();
 
         foreach (var passagem in treinador.Passagens)
@@ -354,7 +363,8 @@ public class TreinadorService : ITreinadorService
                     campeao,
                     Movimento(passagem, comecou, acabou, encerrada),
                     campanha,
-                    naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao))));
+                    naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao),
+                    naTabela && encerrada ? DesfechoDaTemporada(passagem.TimeId, liga.Temporada!.Value, liga.Divisao) : null)));
             }
         }
 
