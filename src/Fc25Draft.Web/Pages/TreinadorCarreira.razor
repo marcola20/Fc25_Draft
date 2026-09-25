@@ -141,22 +141,24 @@
                                         }
                                     </td>
                                     <td class="small">
-                                        @if (t.Campeao)
-                                        {
-                                            <span class="badge bg-warning text-dark">🏆 Campeão</span>
-                                        }
-                                        @if (t.Desfecho == "Rebaixado")
-                                        {
-                                            <span class="badge bg-danger">Rebaixado</span>
-                                        }
-                                        else if (t.Desfecho == "Acesso")
-                                        {
-                                            <span class="badge bg-success">Acesso</span>
-                                        }
-                                        @if (!t.Campeao && t.Movimento is { Length: > 0 } mov)
-                                        {
-                                            <span class="text-muted">@mov</span>
-                                        }
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            @if (t.Campeao)
+                                            {
+                                                <span class="badge bg-warning text-dark">🏆 Campeão</span>
+                                            }
+                                            @if (t.Desfecho == "Rebaixado")
+                                            {
+                                                <span class="badge bg-danger">Rebaixado</span>
+                                            }
+                                            else if (t.Desfecho == "Acesso")
+                                            {
+                                                <span class="badge bg-success">Acesso</span>
+                                            }
+                                            @if (!t.Campeao && t.Movimento is { Length: > 0 } mov)
+                                            {
+                                                <span class="text-muted">@mov</span>
+                                            }
+                                        </div>
                                     </td>
                                 </tr>
                             }
