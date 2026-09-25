@@ -14,6 +14,7 @@
 @inject IPricingService PricingService
 @inject ITransferConfigService TransferConfigSvc
 @inject TeamAccessService TeamAccess
+@inject TransferOffersApiClient OffersApi
 
 @implements IDisposable
 
@@ -157,7 +158,8 @@ else
 
     @if (_activeMainTab == MainTab.Negotiations)
     {
-        <Negotiations @key="Id" TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)" />
+        <Negotiations @key="Id" TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)"
+                      PropostaPorJogador="@_propostaPorJogador" />
     }
     else if (_activeMainTab == MainTab.Temporada)
     {
@@ -266,14 +268,30 @@ else
                         @foreach (var player in _sortedRosterPlayers)
                         {
                             <tr class="align-middle text-center">
-                                <td class="text-start text-nowrap"><a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a></td>
+                                <td class="text-start text-nowrap">
+                                    <a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a>
+                                    @if (player.AskingPrice is decimal preco)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="Negociável: qualquer time pode comprar direto por este valor">
+                                            À venda · @FormatCurrency(preco)
+                                        </span>
+                                    }
+                                </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
                                 <td>@player.Overall</td>
                                 <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
                                 <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
                                 @if (_canQuickSell)
                                 {
-                                    <td class="text-center pe-0" title="@(_quickSellBloqueado ? "Vendas rápidas bloqueadas no momento" : null)">
+                                    <td class="text-center text-nowrap pe-0">
+                                        <button type="button"
+                                                class="btn btn-sm me-1 @(player.AskingPrice is null ? "btn-outline-warning" : "btn-warning")"
+                                                style="padding: 2px 6px; line-height: 1;"
+                                                title="@(player.AskingPrice is null ? "Colocar como negociável" : "Alterar preço ou tirar da lista")"
+                                                aria-label="Negociável: @player.Name"
+                                                @onclick="() => OpenListingModal(player)">
+                                            🏷️
+                                        </button>
                                         <button type="button" 
                                                 class="btn btn-outline-danger btn-sm btn-icon"
                                                 style="border-width: 2px;
@@ -370,9 +388,69 @@ else
     <div class="modal-backdrop fade show"></div>
 }
 
+@if (_listingTarget is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Negociável: @_listingTarget.Name</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="CloseListingModal" disabled="@_listingProcessing"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        O jogador entra na <a href="/mercado/lista">lista de transferência</a>. Qualquer time pode comprar direto
+                        por este valor, na hora, ou mandar uma proposta pelas negociações.
+                    </p>
+                    <label class="form-label" for="askingPriceInput">Preço pedido</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input id="askingPriceInput" type="text" class="form-control" inputmode="decimal"
+                               value="@(_listingPrice == 0m ? string.Empty : _listingPrice.ToString("N2", BrazilCulture))"
+                               @onchange="OnListingPriceChanged"
+                               placeholder="0,00" />
+                    </div>
+                    <div class="form-text">Preço base: @FormatCurrency(_listingTarget.BasePrice)</div>
+                    @if (!string.IsNullOrEmpty(_listingErrorMessage))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">@_listingErrorMessage</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    @if (_listingTarget.AskingPrice is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger me-auto" @onclick="() => SaveListingAsync(null)" disabled="@_listingProcessing">
+                            Tirar da lista
+                        </button>
+                    }
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseListingModal" disabled="@_listingProcessing">Cancelar</button>
+                    <button type="button" class="btn btn-warning" @onclick="() => SaveListingAsync(_listingPrice)" disabled="@(_listingProcessing || _listingPrice <= 0m)">
+                        @if (_listingProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        @(_listingTarget.AskingPrice is null ? "Colocar à venda" : "Salvar preço")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
+
+    /// <summary>Jogador da lista de transferência para abrir já na proposta (vem do Mercado).</summary>
+    [Parameter, SupplyParameterFromQuery(Name = "negociar")]
+    public Guid? NegociarJogador { get; set; }
+
+    private Guid? _propostaPorJogador;
+    private RosterPlayerViewModel? _listingTarget;
+    private decimal _listingPrice;
+    private bool _listingProcessing;
+    private string? _listingErrorMessage;
 
     private TeamDetailsDto? team;
     private int _maxQuickSell = 5;
@@ -436,6 +514,12 @@ else
         await LoadTrajetoriaAsync();
         await LoadPerfilAsync();
         await RefreshTeamTokenStateAsync();
+
+        if (NegociarJogador is Guid jogador && _canQuickSell)
+        {
+            _propostaPorJogador = jogador;
+            _activeMainTab = MainTab.Negotiations;
+        }
     }
 
     private async Task LoadPerfilAsync()
@@ -561,7 +645,8 @@ else
                 positionId,
                 player.Overall,
                 player.Idade,
-                basePrice));
+                basePrice,
+                player.PrecoPedido));
         }
 
         teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
@@ -774,6 +859,68 @@ else
         }
     }
 
+    private void OpenListingModal(RosterPlayerViewModel player)
+    {
+        if (!_canQuickSell)
+            return;
+
+        _listingTarget = player;
+        _listingPrice = player.AskingPrice ?? 0m;
+        _listingErrorMessage = null;
+    }
+
+    private void CloseListingModal()
+    {
+        if (_listingProcessing)
+            return;
+
+        _listingTarget = null;
+        _listingErrorMessage = null;
+    }
+
+    private void OnListingPriceChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        // Tira os pontos de milhar e mantém só dígitos e a vírgula decimal.
+        var cleaned = new string(raw.Where(c => char.IsDigit(c) || c == ',').ToArray());
+
+        _listingPrice = decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var parsed)
+            ? Math.Max(0m, decimal.Round(parsed, 2, MidpointRounding.AwayFromZero))
+            : 0m;
+    }
+
+    private async Task SaveListingAsync(decimal? price)
+    {
+        if (_listingTarget is null || string.IsNullOrWhiteSpace(_currentTeamToken))
+            return;
+
+        _listingProcessing = true;
+        _listingErrorMessage = null;
+
+        try
+        {
+            await OffersApi.SetAskingPriceAsync(_listingTarget.PlayerGuid, price, _currentTeamToken);
+
+            var index = _rosterPlayers.FindIndex(p => p.PlayerGuid == _listingTarget.PlayerGuid);
+            if (index >= 0)
+                _rosterPlayers[index] = _rosterPlayers[index] with { AskingPrice = price };
+            ApplyRosterSort();
+
+            _quickSellSuccessMessage = price is decimal valor
+                ? $"{_listingTarget.Name} está na lista de transferência por {FormatCurrency(valor)}."
+                : $"{_listingTarget.Name} saiu da lista de transferência.";
+            _listingTarget = null;
+        }
+        catch (Exception ex)
+        {
+            _listingErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _listingProcessing = false;
+        }
+    }
+
     private string GetSortButtonClass(RosterSortColumn column)
     {
         var classes = "btn btn-link btn-sm p-0 text-decoration-none text-body";
@@ -846,5 +993,6 @@ else
         int PositionId,
         int Overall,
         int? Age,
-        decimal BasePrice);
+        decimal BasePrice,
+        decimal? AskingPrice);
 }

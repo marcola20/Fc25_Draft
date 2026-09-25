@@ -20,7 +20,68 @@ public static class TransferOffersEndpoints
         offersApi.MapGet("/finished", HandleGetFinishedAsync);
         offersApi.MapGet("/{offerId:guid}", HandleGetByIdAsync);
 
+        var listApi = api.MapGroup("/transfer-list");
+
+        listApi.MapGet("/", async (ITransferOfferService service, CancellationToken ct) =>
+            Results.Ok(await service.GetTransferListAsync(ct)));
+        listApi.MapPut("/{playerGuid:guid}", HandleSetAskingPriceAsync);
+        listApi.MapPost("/{playerGuid:guid}/buy", HandleBuyListedAsync);
+
         return api;
+    }
+
+    private static async Task<IResult> HandleSetAskingPriceAsync(
+        Guid playerGuid,
+        SetAskingPriceDto dto,
+        ITransferOfferService service,
+        DraftDbContext db,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var teamId = await ResolveTeamIdAsync(httpContext, db, ct);
+        if (teamId is null)
+            return Results.Unauthorized();
+
+        try
+        {
+            await service.SetAskingPriceAsync(teamId.Value, playerGuid, dto.AskingPrice, ct);
+            return Results.NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> HandleBuyListedAsync(
+        Guid playerGuid,
+        BuyListedPlayerDto dto,
+        ITransferOfferService service,
+        DraftDbContext db,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var teamId = await ResolveTeamIdAsync(httpContext, db, ct);
+        if (teamId is null)
+            return Results.Unauthorized();
+
+        try
+        {
+            var result = await service.BuyListedPlayerAsync(teamId.Value, playerGuid, dto.ExpectedPrice, ct);
+            return Results.Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
     }
 
     private static async Task<IResult> HandleCreateAsync(

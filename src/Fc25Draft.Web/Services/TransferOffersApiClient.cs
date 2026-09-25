@@ -96,6 +96,42 @@ public class TransferOffersApiClient
         return await response.Content.ReadFromJsonAsync<TransferOfferListItemDto>(cancellationToken: ct);
     }
 
+    public async Task<IReadOnlyList<ListaTransferenciaItemDto>> GetTransferListAsync(CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var response = await client.GetAsync("api/transfer-list", ct);
+        await EnsureSuccessAsync(response, ct);
+
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<ListaTransferenciaItemDto>>(cancellationToken: ct)
+            ?? Array.Empty<ListaTransferenciaItemDto>();
+    }
+
+    /// <summary>Coloca o jogador como negociável pelo preço informado; nulo tira da lista.</summary>
+    public async Task SetAskingPriceAsync(Guid playerGuid, decimal? askingPrice, string teamToken, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/transfer-list/{playerGuid}");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+        request.Content = JsonContent.Create(new SetAskingPriceDto(askingPrice));
+
+        using var response = await client.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
+    public async Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid playerGuid, decimal expectedPrice, string teamToken, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/transfer-list/{playerGuid}/buy");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+        request.Content = JsonContent.Create(new BuyListedPlayerDto(expectedPrice));
+
+        using var response = await client.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+
+        return await response.Content.ReadFromJsonAsync<TransferOfferListItemDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("Resposta inválida do servidor.");
+    }
+
     private async Task<T?> GetWithTokenAsync<T>(string url, string teamToken, CancellationToken ct)
     {
         var client = await _clientFactory.CreateAsync();

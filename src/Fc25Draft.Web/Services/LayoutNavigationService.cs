@@ -32,6 +32,7 @@ public class LayoutNavigationService
         new("Mercado de Transferências", new List<MenuItem>
         {
             new("Mercado", "/mercado", "oi oi-cart", MatchPrefix: true),
+            new("Lista de Transferências", "/mercado/lista", "oi oi-tag"),
             new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
             new("Jogadores", "/players", "oi oi-person"),
             new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
@@ -100,6 +101,7 @@ public class LayoutNavigationService
         ["/draft/info"] = CreateDefinition("Informações do Draft", "Draft", "/draft/info"),
         ["/drafts/manage"] = CreateDefinition("Informações do Draft", "Draft", "/draft/info"),
         ["/mercado"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
+        ["/mercado/lista"] = CreateDefinition("Lista de Transferências", "Mercado", "/mercado/lista"),
         ["/mercado/termometro"] = CreateDefinition("Termômetro do Mercado", "Mercado", "/mercado/termometro"),
         ["/market"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
         ["/players"] = CreateDefinition("Jogadores", "Mercado", "/players"),

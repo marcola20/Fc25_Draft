@@ -1,0 +1,340 @@
+@page "/mercado/lista"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Services
+@using Fc25Draft.Web.Utilities
+@inject TransferOffersApiClient OffersApi
+@inject TeamsApiClient TeamsApi
+@inject TeamAccessService TeamAccess
+@inject ITransferConfigService TransferConfigSvc
+@inject NavigationManager Navigation
+@inject EscudoService Escudos
+@implements IDisposable
+
+<PageTitle>Lista de Transferências</PageTitle>
+
+<PageHeader Title="Lista de Transferências"
+            Subtitle="Jogadores que os times colocaram como negociáveis. Compre direto pelo preço pedido ou mande uma proposta." />
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+
+@if (!string.IsNullOrEmpty(_success))
+{
+    <div class="alert alert-success" role="status">@_success</div>
+}
+
+@if (_myTeam is null && !_loading)
+{
+    <div class="alert alert-secondary py-2 small" role="status">
+        Entre com o seu token para comprar ou fazer propostas. Para colocar um jogador seu à venda, use o botão 🏷️ no elenco do seu time.
+    </div>
+}
+else if (_myTeam is not null)
+{
+    <div class="d-flex flex-wrap gap-3 small text-muted mb-3">
+        <span><strong>@_myTeam.TeamName</strong></span>
+        <span>Caixa: <strong>@_myTeam.Caixa</strong></span>
+        <span>Transferências: <strong>@_myTeam.TransferCount / @_maxTransfers</strong></span>
+        <a href="/teams/details/@_myTeam.TeamId" class="text-primary">Colocar jogador à venda (🏷️ no elenco)</a>
+    </div>
+}
+
+<div class="row g-2 mb-3">
+    <div class="col-12 col-md-4">
+        <input class="form-control" placeholder="Buscar jogador..." @bind="_busca" @bind:event="oninput" />
+    </div>
+    <div class="col-6 col-md-2">
+        <select class="form-select" @bind="_posicao">
+            <option value="">Todas as posições</option>
+            @foreach (var pos in _itens.OrderBy(i => i.PositionId).Select(i => i.Position).Distinct())
+            {
+                <option value="@pos">@pos</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <select class="form-select" @bind="_time">
+            <option value="">Todos os times</option>
+            @foreach (var nome in _itens.Select(i => i.TeamName).Distinct().OrderBy(n => n))
+            {
+                <option value="@nome">@nome</option>
+            }
+        </select>
+    </div>
+    <div class="col-12 col-md-3">
+        <select class="form-select" @bind="_ordem">
+            <option value="recentes">Mais recentes</option>
+            <option value="preco">Menor preço</option>
+            <option value="-preco">Maior preço</option>
+            <option value="-overall">Maior overall</option>
+        </select>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <p><em>Carregando...</em></p>
+}
+else if (_itens.Count == 0)
+{
+    <p class="text-muted">Nenhum jogador na lista de transferência no momento.</p>
+}
+else if (Filtrados.Count == 0)
+{
+    <p class="text-muted">Nenhum jogador com esses filtros.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Jogador</th>
+                    <th class="text-center">Pos</th>
+                    <th class="text-center">OVR</th>
+                    <th class="text-center">Idade</th>
+                    <th>Time</th>
+                    <th class="text-end">Preço pedido</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Filtrados)
+                {
+                    <tr>
+                        <td class="text-nowrap"><a href="/players/details/@item.PlayerId" class="text-primary">@item.Name</a></td>
+                        <td class="text-center">@item.Position</td>
+                        <td class="text-center">@item.Overall</td>
+                        <td class="text-center">@(item.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                        <td class="text-nowrap">
+                            <img src="@Escudos.GetEscudo(item.TeamName)" alt="" width="20" height="20" class="me-1" style="object-fit: contain;" />
+                            <a href="/teams/details/@item.TeamId" class="text-primary">@item.TeamName</a>
+                        </td>
+                        <td class="text-end text-nowrap fw-semibold">@FormatCurrency(item.AskingPrice)</td>
+                        <td class="text-end text-nowrap">
+                            @if (_myTeam is null)
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                            else if (item.TeamId == _myTeam.TeamId)
+                            {
+                                <span class="badge bg-secondary">Seu jogador</span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-success btn-sm me-1" disabled="@_processing" @onclick="() => _comprar = item">
+                                    Comprar
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" disabled="@_processing" @onclick="() => FazerProposta(item)">
+                                    Proposta
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (_comprar is not null && _myTeam is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar compra</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => _comprar = null" disabled="@_processing"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Comprar <strong>@_comprar.Name</strong> (@_comprar.Position, @_comprar.Overall) do
+                        <strong>@_comprar.TeamName</strong> por <strong>@FormatCurrency(_comprar.AskingPrice)</strong>?
+                    </p>
+                    <ul class="list-unstyled small mb-0">
+                        <li><strong>Seu caixa:</strong> @_myTeam.Caixa</li>
+                        <li><strong>Transferências restantes após a compra:</strong> @(Math.Max(0, _maxTransfers - _myTeam.TransferCount - 1)) / @_maxTransfers</li>
+                    </ul>
+                    <p class="small text-muted mt-2 mb-0">A compra é na hora: o dinheiro sai do seu caixa e o jogador entra no seu elenco.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => _comprar = null" disabled="@_processing">Cancelar</button>
+                    <button type="button" class="btn btn-success" @onclick="ConfirmarCompraAsync" disabled="@_processing">
+                        @if (_processing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Comprar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private static readonly CultureInfo BrazilCulture = CultureInfo.GetCultureInfo("pt-BR");
+
+    private List<ListaTransferenciaItemDto> _itens = new();
+    private TeamDetailsDto? _myTeam;
+    private string? _token;
+    private int _maxTransfers = 5;
+    private bool _loading = true;
+    private bool _processing;
+    private string? _error;
+    private string? _success;
+    private ListaTransferenciaItemDto? _comprar;
+
+    private string _busca = string.Empty;
+    private string _posicao = string.Empty;
+    private string _time = string.Empty;
+    private string _ordem = "recentes";
+
+    private List<ListaTransferenciaItemDto> Filtrados
+    {
+        get
+        {
+            IEnumerable<ListaTransferenciaItemDto> q = _itens;
+            if (!string.IsNullOrWhiteSpace(_busca))
+                q = q.Where(i => i.Name.Contains(_busca.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(_posicao))
+                q = q.Where(i => i.Position == _posicao);
+            if (!string.IsNullOrEmpty(_time))
+                q = q.Where(i => i.TeamName == _time);
+
+            q = _ordem switch
+            {
+                "preco" => q.OrderBy(i => i.AskingPrice),
+                "-preco" => q.OrderByDescending(i => i.AskingPrice),
+                "-overall" => q.OrderByDescending(i => i.Overall).ThenBy(i => i.AskingPrice),
+                _ => q.OrderByDescending(i => i.ListedAtUtc)
+            };
+            return q.ToList();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        TeamAccess.TokenChanged += OnTokenChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // O token fica no navegador: só dá para ler depois do primeiro render.
+        if (!firstRender)
+            return;
+
+        await CarregarAsync();
+        StateHasChanged();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _loading = true;
+        try
+        {
+            _itens = (await OffersApi.GetTransferListAsync()).ToList();
+            await CarregarMeuTimeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CarregarMeuTimeAsync()
+    {
+        _myTeam = null;
+        _token = null;
+
+        string? token;
+        try
+        {
+            token = await TeamAccess.GetTokenAsync();
+        }
+        catch
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+            return;
+
+        try
+        {
+            var identity = await TeamsApi.ResolveIdentityAsync(token.Trim());
+            if (identity is null)
+                return;
+
+            _token = token.Trim();
+            _myTeam = await TeamsApi.GetByIdAsync(identity.TeamId);
+            _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(identity.TeamId, CancellationToken.None);
+        }
+        catch
+        {
+            // Sem time identificado a lista continua visível, só sem os botões de compra.
+            _myTeam = null;
+        }
+    }
+
+    private void FazerProposta(ListaTransferenciaItemDto item)
+    {
+        if (_myTeam is null)
+            return;
+
+        Navigation.NavigateTo($"/teams/details/{_myTeam.TeamId}?negociar={item.PlayerGuid}");
+    }
+
+    private async Task ConfirmarCompraAsync()
+    {
+        if (_comprar is null || _token is null)
+            return;
+
+        var item = _comprar;
+        _processing = true;
+        _error = null;
+        _success = null;
+
+        try
+        {
+            await OffersApi.BuyListedPlayerAsync(item.PlayerGuid, item.AskingPrice, _token);
+            _success = $"{item.Name} é do seu time! Pago {FormatCurrency(item.AskingPrice)} ao {item.TeamName}.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _comprar = null;
+            _processing = false;
+        }
+
+        await CarregarAsync();
+    }
+
+    private void OnTokenChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await CarregarMeuTimeAsync();
+            StateHasChanged();
+        });
+    }
+
+    private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+
+    public void Dispose()
+    {
+        TeamAccess.TokenChanged -= OnTokenChanged;
+    }
+}

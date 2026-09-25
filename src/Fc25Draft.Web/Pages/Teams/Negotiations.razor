@@ -428,6 +428,9 @@
     [Parameter] public string? TeamToken { get; set; }
     [Parameter] public int TransferCount { get; set; }
 
+    /// <summary>Jogador da lista de transferência: abre a nova proposta já com ele e o preço pedido.</summary>
+    [Parameter] public Guid? PropostaPorJogador { get; set; }
+
     private SubTab ActiveSubTab = SubTab.Received;
     private bool _loading;
     private bool _processing;
@@ -479,6 +482,38 @@
         try { _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(TeamId, CancellationToken.None); }
         catch { /* mantém o padrão se a config não carregar */ }
         await LoadDataAsync();
+
+        if (PropostaPorJogador is Guid jogador)
+            await StartOfferForListedPlayerAsync(jogador);
+    }
+
+    private async Task StartOfferForListedPlayerAsync(Guid playerGuid)
+    {
+        try
+        {
+            var lista = await OffersApi.GetTransferListAsync();
+            var item = lista.FirstOrDefault(i => i.PlayerGuid == playerGuid);
+            if (item is null)
+            {
+                _error = "Este jogador não está mais na lista de transferência.";
+                return;
+            }
+
+            ResetNewOfferForm();
+            _selectedTargetTeamId = item.TeamId.ToString();
+            var roster = await TeamsApi.GetRosterByIdAsync(item.TeamId);
+            _targetRoster = roster?.Jogadores?.ToList() ?? new();
+            _selectedTargetPlayerIds.Add(playerGuid);
+            _newOfferType = OfferType.Sale;
+            _newOfferMoney = item.AskingPrice;
+            _selectedPayerTeamId = TeamId.ToString();
+            ActiveSubTab = SubTab.NewOffer;
+            _success = $"{item.Name} está à venda por {FormatCurrency(item.AskingPrice)}. Ajuste o valor e envie sua proposta.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
     }
 
     private int _maxTransfers = 5;

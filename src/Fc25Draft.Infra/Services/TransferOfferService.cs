@@ -275,6 +275,114 @@ public class TransferOfferService : ITransferOfferService
         return MapToDto(offer, offer.FromTeam, offer.ToTeam, targetPlayers, offeredPlayers);
     }
 
+    public async Task<IReadOnlyList<ListaTransferenciaItemDto>> GetTransferListAsync(CancellationToken ct)
+    {
+        return await _db.TeamRosters.AsNoTracking()
+            .Where(r => r.AskingPrice != null)
+            .OrderByDescending(r => r.ListedAtUtc)
+            .Select(r => new ListaTransferenciaItemDto(
+                r.PlayerId,
+                r.Player.PlayerGuid,
+                r.Player.Name,
+                r.Player.Position.Name,
+                r.Player.PositionId,
+                r.Player.Overall,
+                r.Player.Age,
+                r.TeamId,
+                r.Team.TeamName,
+                r.AskingPrice!.Value,
+                r.ListedAtUtc ?? DateTime.MinValue))
+            .ToListAsync(ct);
+    }
+
+    public async Task SetAskingPriceAsync(Guid teamId, Guid playerGuid, decimal? askingPrice, CancellationToken ct)
+    {
+        if (askingPrice is <= 0)
+            throw new ArgumentException("Informe um preço maior que zero.");
+
+        var roster = await _db.TeamRosters
+            .FirstOrDefaultAsync(r => r.TeamId == teamId && r.Player.PlayerGuid == playerGuid, ct)
+            ?? throw new KeyNotFoundException("Jogador não encontrado no seu elenco.");
+
+        if (askingPrice is null)
+        {
+            roster.AskingPrice = null;
+            roster.ListedAtUtc = null;
+        }
+        else
+        {
+            // Mudar só o preço mantém a data em que ele entrou na lista.
+            roster.ListedAtUtc ??= _timeProvider.GetUtcNow().UtcDateTime;
+            roster.AskingPrice = decimal.Round(askingPrice.Value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid buyerTeamId, Guid playerGuid, decimal expectedPrice, CancellationToken ct)
+    {
+        var roster = await _db.TeamRosters
+            .Include(r => r.Player).ThenInclude(p => p.Position)
+            .FirstOrDefaultAsync(r => r.Player.PlayerGuid == playerGuid, ct)
+            ?? throw new KeyNotFoundException("Jogador não encontrado.");
+
+        if (roster.AskingPrice is not decimal price)
+            throw new InvalidOperationException("Este jogador não está mais à venda.");
+
+        if (roster.TeamId == buyerTeamId)
+            throw new InvalidOperationException("O jogador já é do seu time.");
+
+        if (price != decimal.Round(expectedPrice, 2, MidpointRounding.AwayFromZero))
+            throw new InvalidOperationException($"O preço mudou para {price.ToString("C", BrCulture)}. Confira antes de comprar.");
+
+        var buyer = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == buyerTeamId, ct)
+            ?? throw new KeyNotFoundException("Time comprador não encontrado.");
+        var seller = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == roster.TeamId, ct)
+            ?? throw new KeyNotFoundException("Time vendedor não encontrado.");
+
+        var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        EnsureTransferLimit(cfg, buyer);
+
+        // Mesma venda de uma proposta aceita: o comprador propõe o preço pedido e o vendedor já aceitou ao listar.
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var offer = new TransferOffer
+        {
+            OfferId = Guid.NewGuid(),
+            FromTeamId = buyer.TeamId,
+            ToTeamId = seller.TeamId,
+            Type = OfferType.Sale,
+            Status = OfferStatus.Accepted,
+            Money = price,
+            MoneyPayerTeamId = buyer.TeamId,
+            Notes = "Compra direta pela lista de transferência.",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        offer.Players.Add(new TransferOfferPlayer
+        {
+            OfferId = offer.OfferId,
+            PlayerId = roster.PlayerId,
+            IsTarget = true,
+            Player = roster.Player
+        });
+
+        await _db.TransferOffers.AddAsync(offer, ct);
+        await ExecuteTransferAsync(offer, ct);
+        await CancelConflictingOffersAsync(offer, ct);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Outro time comprou no mesmo instante: o vínculo com o vendedor já tinha sumido.
+            throw new InvalidOperationException("Este jogador acabou de ser negociado com outro time.");
+        }
+
+        return MapToDto(offer, buyer, seller, new[] { roster.Player }, Array.Empty<Player>());
+    }
+
     private async Task CancelConflictingOffersAsync(TransferOffer acceptedOffer, CancellationToken ct)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;

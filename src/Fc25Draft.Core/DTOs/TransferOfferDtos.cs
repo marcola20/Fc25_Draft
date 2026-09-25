@@ -45,3 +45,23 @@ public record TransferOfferPlayerDto(
     string Position,
     int Overall,
     int? Age);
+
+/// <summary>Jogador colocado como negociável pelo dono, com o preço pedido.</summary>
+public record ListaTransferenciaItemDto(
+    int PlayerId,
+    Guid PlayerGuid,
+    string Name,
+    string Position,
+    short PositionId,
+    int Overall,
+    int? Age,
+    Guid TeamId,
+    string TeamName,
+    decimal AskingPrice,
+    DateTime ListedAtUtc);
+
+/// <summary>Preço pedido; nulo tira o jogador da lista de transferência.</summary>
+public record SetAskingPriceDto(decimal? AskingPrice);
+
+/// <summary>Compra direta pelo preço pedido. O preço vai junto para não pagar um valor que mudou no meio do caminho.</summary>
+public record BuyListedPlayerDto(decimal ExpectedPrice);

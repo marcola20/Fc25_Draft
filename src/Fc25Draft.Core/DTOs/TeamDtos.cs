@@ -49,7 +49,8 @@ public record TeamRosterPlayerDto(
     int? Idade,
     DateTime? EscolhidoEm,
     int? Rodada,
-    int? Escolha);
+    int? Escolha,
+    decimal? PrecoPedido = null);
 
 public record TeamExportDto(
     string Time,

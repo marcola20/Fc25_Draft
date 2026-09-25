@@ -11,6 +11,8 @@ public class TeamRosterConfiguration : IEntityTypeConfiguration<TeamRoster>
         e.HasKey(x => new { x.TeamId, x.PlayerId });
         e.HasIndex(x => x.PlayerId).IsUnique();
 
+        e.Property(x => x.AskingPrice).HasColumnType("numeric(18,2)");
+
         e.HasOne(x => x.Team)
          .WithMany(t => t.Roster)
          .HasForeignKey(x => x.TeamId);

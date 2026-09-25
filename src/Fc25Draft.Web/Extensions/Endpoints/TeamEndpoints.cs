@@ -149,7 +149,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 r.Player.Age,
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
-                                db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault()))
+                                db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault(),
+                                r.AskingPrice))
                             .ToList(),
                         t.AuxiliarName))
                     .ToListAsync(ct);
@@ -178,7 +179,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 r.Player.Age,
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
-                                db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault()))
+                                db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault(),
+                                r.AskingPrice))
                             .ToList(),
                         t.AuxiliarName))
                     .FirstOrDefaultAsync(ct);
