@@ -203,12 +203,13 @@ public class TreinadorService : ITreinadorService
 
         var totalPorLiga = classificacoes.GroupBy(c => c.LigaId).ToDictionary(g => g.Key, g => g.Count());
 
-        // Quando a competição acabou de verdade: o último jogo encerrado. A DataFim é só o
-        // que estava previsto, e quase nunca bate com o que aconteceu.
+        // Quando a competição acabou de verdade: o último jogo disputado. A DataFim é só o
+        // que estava previsto, e quase nunca bate com o que aconteceu. Jogos de mata-mata
+        // antigos ficaram sem data de encerramento, então a de início também serve.
         var ultimoJogo = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.EncerradaEm != null)
+            .Where(p => p.EncerradaEm != null || p.IniciadaEm != null)
             .GroupBy(p => p.Rodada.LigaId)
-            .Select(g => new { LigaId = g.Key, Fim = g.Max(p => p.EncerradaEm) })
+            .Select(g => new { LigaId = g.Key, Fim = g.Max(p => p.EncerradaEm ?? p.IniciadaEm) })
             .ToDictionaryAsync(x => x.LigaId, x => x.Fim!.Value, ct);
 
         // A galeria sai do Hall of Fame, que é onde os títulos ficam registrados de verdade
@@ -228,9 +229,10 @@ public class TreinadorService : ITreinadorService
         var timeIds = treinador.Passagens.Select(p => p.TimeId).Distinct().ToList();
 
         var jogos = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.EncerradaEm != null
+            .Where(p => (p.EncerradaEm != null || p.IniciadaEm != null)
                         && (timeIds.Contains(p.TimeCasaId) || timeIds.Contains(p.TimeForaId)))
-            .Select(p => new Jogo(p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.EncerradaEm!.Value))
+            .Select(p => new Jogo(p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora,
+                (p.EncerradaEm ?? p.IniciadaEm)!.Value))
             .ToListAsync(ct);
 
         // No dia em que o comando troca, o jogo daquele dia é de quem estava saindo.
@@ -309,6 +311,12 @@ public class TreinadorService : ITreinadorService
                 // A posição só vale quando a competição acabou (durante a temporada ela ainda muda).
                 var encerrada = liga.Status == LigaStatus.Encerrada;
 
+                var campanha = Retrospecto(JogosDa(passagem, liga.LigaId), passagem.TimeId);
+
+                // Competição que já acabou e ele não comandou nenhum jogo não é carreira dele
+                // (o período só encostou nela).
+                if (encerrada && campanha.Jogos == 0) continue;
+
                 temporadas.Add(new TreinadorTemporadaDto(
                     liga.Temporada!.Value,
                     passagem.TimeId,
@@ -319,7 +327,7 @@ public class TreinadorService : ITreinadorService
                     naTabela ? totalPorLiga.GetValueOrDefault(liga.LigaId) : null,
                     campeao,
                     Movimento(passagem, comecou, acabou, encerrada),
-                    Retrospecto(JogosDa(passagem, liga.LigaId), passagem.TimeId),
+                    campanha,
                     naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao)));
             }
         }
