@@ -26,7 +26,7 @@ public record DataDaTemporada(
 public static class CalendarioTemporada
 {
     /// <summary>Horário dos jogos.</summary>
-    public static readonly TimeSpan Horario = new(21, 0, 0);
+    public static readonly TimeSpan Horario = new(18, 0, 0);
 
     /// <summary>
     /// Abertura combinada da temporada: domingo 27/09, com a final da Supercopa. É daqui que sai
