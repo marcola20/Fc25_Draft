@@ -1151,7 +1151,7 @@ public class LigaPublicService : ILigaPublicService
             {
                 p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora,
                 p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, EncerradaEm = p.EncerradaEm!.Value,
-                p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.LigaId,
+                p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.DataHora, p.Rodada.LigaId,
                 LigaNome = p.Rodada.Liga.Nome, LigaTipo = p.Rodada.Liga.Tipo
             })
             .ToListAsync(ct);
@@ -1216,7 +1216,7 @@ public class LigaPublicService : ILigaPublicService
             {
                 p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.Status,
                 p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.EncerradaEm,
-                p.Rodada.Numero, p.Rodada.Desempate,
+                p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.DataHora,
                 p.Rodada.LigaId, LigaNome = p.Rodada.Liga.Nome, LigaTipo = p.Rodada.Liga.Tipo,
                 LigaStatus = p.Rodada.Liga.Status, LigaCriadaEm = p.Rodada.Liga.CriadoEm
             })
@@ -1254,7 +1254,8 @@ public class LigaPublicService : ILigaPublicService
                 p.TemPenaltis,
                 p.PenaltisVencedorId,
                 p.EncerradaEm,
-                ordemLiga[p.LigaId] * 10_000L + p.Numero))
+                ordemLiga[p.LigaId] * 10_000L + p.Numero,
+                p.DataHora))
             .ToList();
     }
 

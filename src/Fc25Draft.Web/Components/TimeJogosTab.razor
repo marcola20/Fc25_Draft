@@ -121,7 +121,13 @@ else
                         <li class="list-group-item">
                             @(jogo.EmCasa ? "vs" : "@") <a href="/teams/details/@jogo.AdversarioId" class="fw-semibold text-primary">@jogo.AdversarioNome</a>
                             <span class="badge bg-light text-dark ms-1">@(jogo.EmCasa ? "casa" : "fora")</span>
-                            <div class="small text-muted">@jogo.Competicao · @jogo.Etapa</div>
+                            <div class="small text-muted">
+                                @jogo.Competicao · @jogo.Etapa
+                                @if (jogo.Data is DateTime quando)
+                                {
+                                    <span class="fw-semibold"> · @quando.ToString("ddd dd/MM · HH'h'", Br)</span>
+                                }
+                            </div>
                         </li>
                     }
                 </ul>
@@ -173,6 +179,8 @@ else
 
 @code {
     [Parameter] public TimePerfilDto? Perfil { get; set; }
+
+    private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
     // Pontos conquistados sobre os possíveis (3 por jogo).
     private string Aproveitamento => Perfil is null || Perfil.Jogos == 0

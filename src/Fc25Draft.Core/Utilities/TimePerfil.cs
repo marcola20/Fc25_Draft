@@ -18,7 +18,9 @@ public record TimePerfilPartidaInput(
     Guid? PenaltisVencedorId,
     DateTime? EncerradaEm,
     // Ordem dos jogos ainda não disputados (competição mais antiga primeiro, depois a rodada).
-    long OrdemAgenda);
+    long OrdemAgenda,
+    // Data marcada da rodada, quando o calendário já foi aplicado.
+    DateTime? Quando = null);
 
 /// <summary>
 /// Forma, sequências, recordes e confrontos de um time a partir das partidas dele.
@@ -45,9 +47,11 @@ public static class TimePerfil
             .Select(p => Jogo(timeId, p, nomes))
             .ToList();
 
+        // Os próximos jogos saem na ordem do calendário; sem data marcada, cai na ordem da agenda.
         var proximos = lista
             .Where(p => p.Status != PartidaStatus.Encerrada)
-            .OrderBy(p => p.OrdemAgenda)
+            .OrderBy(p => p.Quando ?? DateTime.MaxValue)
+            .ThenBy(p => p.OrdemAgenda)
             .Take(ProximosJogosListados)
             .Select(p => Jogo(timeId, p, nomes))
             .ToList();
@@ -112,8 +116,9 @@ public static class TimePerfil
 
         if (p.Status != PartidaStatus.Encerrada)
         {
+            // Jogo por vir: a data é a marcada no calendário.
             return new TimePerfilJogoDto(p.PartidaId, p.Competicao, p.Etapa, adversarioId, adversario, emCasa,
-                null, null, null, null, p.IsWO, null);
+                null, null, null, null, p.IsWO, p.Quando);
         }
 
         var pro = emCasa ? p.GolsCasa : p.GolsFora;
