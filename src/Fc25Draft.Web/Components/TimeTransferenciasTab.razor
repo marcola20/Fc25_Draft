@@ -67,7 +67,7 @@ else
                 @foreach (var m in Visiveis)
                 {
                     <tr>
-                        <td class="text-nowrap">@m.Data.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td class="text-nowrap">@BrazilTime.ConvertFromUtc(m.Data).ToString("dd/MM/yyyy")</td>
                         <td>
                             <span class="badge @(m.Entrada ? "bg-success" : "bg-danger")">@(m.Entrada ? "Chegou" : "Saiu")</span>
                         </td>

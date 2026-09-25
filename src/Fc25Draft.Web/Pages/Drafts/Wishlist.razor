@@ -120,7 +120,7 @@
                     @if (enviadoEm.HasValue)
                     {
                         <p class="small text-success mb-3">
-                            Lista da @VersaoSelecionadaNome enviada em @enviadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm").
+                            Lista da @VersaoSelecionadaNome enviada em @BrazilTime.ConvertFromUtc(enviadoEm.Value).ToString("dd/MM/yyyy HH:mm").
                             @if (PodeEditar)
                             {
                                 <span>Enviar de novo substitui a anterior.</span>

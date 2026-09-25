@@ -741,7 +741,7 @@ public class TeamLineupService : ITeamLineupService
                     ?? throw new KeyNotFoundException("Escalação não encontrada.");
 
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
-                var localNow = now.ToLocalTime();
+                var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(now, DateTimeKind.Utc), TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
                 var newName = $"{sourceLineup.Name} - {localNow:dd/MM/yyyy HH:mm}";
 
                 if (newName.Length > 80)

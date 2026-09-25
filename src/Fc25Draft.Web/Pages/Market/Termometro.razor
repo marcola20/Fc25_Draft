@@ -106,7 +106,7 @@
                                     <a href="/players/details/@c.PlayerId" class="fw-semibold text-primary">@c.JogadorNome</a>
                                     <span class="small text-muted">· @c.Posicao</span>
                                     <div class="small text-muted">
-                                        @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<strong class="text-body">@c.ParaTime</strong> · @c.Data.ToLocalTime().ToString("dd/MM")
+                                        @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<strong class="text-body">@c.ParaTime</strong> · @BrazilTime.ConvertFromUtc(c.Data).ToString("dd/MM")
                                     </div>
                                 </div>
                                 <span class="fw-bold text-nowrap">@Moeda(c.Valor)</span>

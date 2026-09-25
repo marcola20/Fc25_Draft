@@ -91,7 +91,7 @@
                 </div>
                 <div class="col-12 col-md-6 d-flex align-items-end">
                     <span class="text-muted small">
-                        Temporada <strong>@_atual.Temporada</strong> · atualizado em @_atual.AtualizadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        Temporada <strong>@_atual.Temporada</strong> · atualizado em @BrazilTime.ConvertFromUtc(_atual.AtualizadoEm).ToString("dd/MM/yyyy HH:mm")
                     </span>
                 </div>
             </div>

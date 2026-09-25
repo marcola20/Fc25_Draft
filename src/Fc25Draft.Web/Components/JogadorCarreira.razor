@@ -138,7 +138,7 @@ else if (_dados is not null)
                             {
                                 <span class="me-2">@v.ToString("C0", Brasil)</span>
                             }
-                            @m.Data.ToLocalTime().ToString("dd/MM/yyyy")
+                            @BrazilTime.ConvertFromUtc(m.Data).ToString("dd/MM/yyyy")
                         </div>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(m.Detalhe))

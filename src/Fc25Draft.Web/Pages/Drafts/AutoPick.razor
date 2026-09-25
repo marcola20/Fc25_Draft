@@ -111,7 +111,7 @@
                     <p class="small text-muted mb-3">
                         @if (config.AtualizadoEm is DateTime atualizado)
                         {
-                            <span>Salvo em @atualizado.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</span>
+                            <span>Salvo em @BrazilTime.ConvertFromUtc(atualizado).ToString("dd/MM/yyyy HH:mm").</span>
                         }
                         else
                         {

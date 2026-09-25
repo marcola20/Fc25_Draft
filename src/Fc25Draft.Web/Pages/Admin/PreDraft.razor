@@ -61,7 +61,7 @@ else
                     @if (EdicaoSelecionada is not null)
                     {
                         <div class="form-text">
-                            Criada em @EdicaoSelecionada.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@(EdicaoSelecionada.EncerradoEm.HasValue ? $" · encerrada em {EdicaoSelecionada.EncerradoEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}" : string.Empty)
+                            Criada em @BrazilTime.ConvertFromUtc(EdicaoSelecionada.CriadoEm).ToString("dd/MM/yyyy HH:mm")@(EdicaoSelecionada.EncerradoEm.HasValue ? $" · encerrada em {BrazilTime.ConvertFromUtc(EdicaoSelecionada.EncerradoEm.Value):dd/MM/yyyy HH:mm}" : string.Empty)
                         </div>
                     }
                 </div>
@@ -257,7 +257,7 @@ else
                         {
                             <tr>
                                 <td class="fw-semibold">@list.TeamName</td>
-                                <td class="text-nowrap">@(list.EnviadoEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                <td class="text-nowrap">@((list.EnviadoEm is DateTime enviado ? BrazilTime.ConvertFromUtc(enviado).ToString("dd/MM/yyyy HH:mm") : null) ?? "-")</td>
                                 <td>
                                     <ol class="mb-0 ps-3">
                                         @foreach (var j in list.Jogadores)

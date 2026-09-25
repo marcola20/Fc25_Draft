@@ -134,7 +134,7 @@
                                             {
                                                 <div class="small">@string.Join(", ", p.Jogadores)</div>
                                             }
-                                            <div class="small text-muted">@p.CriadaEm.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                            <div class="small text-muted">@BrazilTime.ConvertFromUtc(p.CriadaEm).ToString("dd/MM HH:mm")</div>
                                         </div>
                                         <span class="badge @(p.Recebida ? "bg-primary" : "bg-secondary") text-nowrap">@(p.Recebida ? "Responder" : "Aguardando")</span>
                                     </div>

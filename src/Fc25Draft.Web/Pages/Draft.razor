@@ -59,7 +59,7 @@
 @if (AvisoTempo.Ultimo is { } aviso && DateTime.UtcNow - aviso.Em < TimeSpan.FromHours(3) && !_avisoTempoFechado)
 {
     <div class="alert alert-warning alert-dismissible" role="status">
-        <div class="fw-semibold mb-1">⏱️ Tempo esgotado: o site escolheu (@aviso.Em.ToLocalTime().ToString("HH:mm"))</div>
+        <div class="fw-semibold mb-1">⏱️ Tempo esgotado: o site escolheu (@BrazilTime.ConvertFromUtc(aviso.Em).ToString("HH:mm"))</div>
         <div style="white-space: pre-line;">@aviso.Selecao.Mensagem</div>
         <button type="button" class="btn btn-success btn-sm mt-2" @onclick="() => CompartilharAsync(aviso.Selecao)">Compartilhar no WhatsApp</button>
         <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => _avisoTempoFechado = true"></button>

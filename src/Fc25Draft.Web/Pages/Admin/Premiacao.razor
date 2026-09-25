@@ -189,7 +189,7 @@
                             <span class="fw-bold">@previa.LigaNome</span>
                             @if (previa.JaPago)
                             {
-                                <span class="badge bg-success">Pago em @previa.PagoEm!.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="badge bg-success">Pago em @BrazilTime.ConvertFromUtc(previa.PagoEm!.Value).ToString("dd/MM/yyyy HH:mm")</span>
                             }
                             else if (!previa.Encerrada)
                             {

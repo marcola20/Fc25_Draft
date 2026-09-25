@@ -29,8 +29,8 @@
     // "hoje", "ontem", "há 3 dias"; depois de uma semana, a data.
     private static string Quando(DateTime utc)
     {
-        var local = utc.ToLocalTime();
-        var dias = (DateTime.Now.Date - local.Date).Days;
+        var local = BrazilTime.ConvertFromUtc(utc);
+        var dias = (BrazilTime.ConvertFromUtc(DateTime.UtcNow).Date - local.Date).Days;
         return dias switch
         {
             <= 0 => $"hoje, {local:HH:mm}",
