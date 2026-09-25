@@ -1,0 +1,331 @@
+@page "/admin/treinadores"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ITreinadorService TreinadorSvc
+@inject ITeamService TeamSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Treinadores — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-header fw-bold">@(_editando is null ? "Novo treinador" : $"Editando {_editando.Nome}")</div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">Nome</label>
+                        <input class="form-control" @bind="_nome" placeholder="Como aparece na liga" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">Token de acesso</label>
+                        <input class="form-control font-monospace" @bind="_token" placeholder="deixe vazio para gerar" />
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="form-check form-switch mt-4">
+                            <input class="form-check-input" type="checkbox" role="switch" id="ativo" @bind="_ativo" />
+                            <label class="form-check-label" for="ativo">Na liga</label>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2 d-flex gap-2">
+                        <button class="btn btn-success" @onclick="Salvar" disabled="@_salvando">Salvar</button>
+                        @if (_editando is not null)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="LimparFormulario" disabled="@_salvando">Novo</button>
+                        }
+                    </div>
+                </div>
+                <p class="text-muted small mb-0 mt-2">
+                    O token é da pessoa, não do time: quem troca de clube leva o acesso junto, e o auxiliar entra com o dele.
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold">Pessoas da liga</span>
+                <span class="badge bg-secondary">@_treinadores.Count</span>
+                <div class="form-check form-switch ms-auto mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="verInativos" checked="@_verInativos"
+                           @onchange="async e => { _verInativos = (bool)(e.Value ?? false); await Carregar(); }" />
+                    <label class="form-check-label" for="verInativos">Mostrar quem saiu da liga</label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Hoje</th>
+                            <th>Token</th>
+                            <th>Passagens</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in _treinadores)
+                        {
+                            <tr class="@(t.Ativo ? "" : "text-muted")">
+                                <td>
+                                    <a href="/treinadores/@t.TreinadorId" class="fw-semibold">@t.Nome</a>
+                                    @if (!t.Ativo)
+                                    {
+                                        <span class="badge bg-secondary ms-1">fora da liga</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (t.Hoje is { } hoje)
+                                    {
+                                        <span class="badge @(hoje.Papel == PapelTreinador.Auxiliar ? "bg-info text-dark" : "bg-primary")">
+                                            @(hoje.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador")
+                                        </span>
+                                        <span class="ms-1">@hoje.TimeNome</span>
+                                        <span class="text-muted small">desde @hoje.Desde.ToString("dd/MM/yyyy", Br)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">sem time</span>
+                                    }
+                                </td>
+                                <td><code class="small">@t.Token</code></td>
+                                <td class="small text-muted">
+                                    @string.Join(" · ", t.Passagens.Select(p => $"{p.TimeNome} {p.Desde:MM/yyyy}–{(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MM/yyyy"))}"))
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(t)" disabled="@_salvando">Editar</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AbrirPassagem(t)" disabled="@_salvando">Passagem</button>
+                                    @if (t.Hoje is { } atual)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => Encerrar(t, atual)" disabled="@_salvando">Encerrar</button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(t)" disabled="@_salvando">Excluir</button>
+                                </td>
+                            </tr>
+
+                            @if (_passagemDe == t.TreinadorId)
+                            {
+                                <tr class="table-light">
+                                    <td colspan="5">
+                                        <div class="d-flex align-items-end gap-2 flex-wrap">
+                                            <div>
+                                                <label class="form-label mb-0 small">Time</label>
+                                                <select class="form-select form-select-sm w-auto" @bind="_timeSel">
+                                                    <option value="">— time —</option>
+                                                    @foreach (var time in _times)
+                                                    {
+                                                        <option value="@time.TeamId">@time.TeamName</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label mb-0 small">Papel</label>
+                                                <select class="form-select form-select-sm w-auto" @bind="_papelSel">
+                                                    <option value="@PapelTreinador.Treinador">Treinador</option>
+                                                    <option value="@PapelTreinador.Auxiliar">Auxiliar</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label mb-0 small">Entrou</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="_desde" />
+                                            </div>
+                                            <div>
+                                                <label class="form-label mb-0 small">Saiu (opcional)</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="_ate" />
+                                            </div>
+                                            <button class="btn btn-sm btn-success" @onclick="() => SalvarPassagem(t)" disabled="@_salvando">Registrar</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _passagemDe = null" disabled="@_salvando">Cancelar</button>
+                                        </div>
+
+                                        @if (t.Passagens.Count > 0)
+                                        {
+                                            <div class="mt-2 small">
+                                                @foreach (var p in t.Passagens)
+                                                {
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span>@p.TimeNome · @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador") · @p.Desde.ToString("dd/MM/yyyy", Br) – @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("dd/MM/yyyy", Br))</span>
+                                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoverPassagem(p)" disabled="@_salvando">remover</button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+    private bool _verInativos;
+
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
+    private IReadOnlyList<Team> _times = Array.Empty<Team>();
+
+    private TreinadorDto? _editando;
+    private string _nome = "";
+    private string _token = "";
+    private bool _ativo = true;
+
+    private Guid? _passagemDe;
+    private string _timeSel = "";
+    private PapelTreinador _papelSel = PapelTreinador.Treinador;
+    private DateTime? _desde = DateTime.Today;
+    private DateTime? _ate;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/treinadores"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Carregar();
+        _carregando = false;
+    }
+
+    private async Task Carregar()
+    {
+        try
+        {
+            _treinadores = await TreinadorSvc.ListAsync(_verInativos, CancellationToken.None);
+            var (times, _) = await TeamSvc.SearchAsync(null, 1, 200);
+            _times = times.OrderBy(t => t.TeamName).ToList();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void Editar(TreinadorDto t)
+    {
+        _editando = t;
+        _nome = t.Nome;
+        _token = t.Token;
+        _ativo = t.Ativo;
+    }
+
+    private void LimparFormulario()
+    {
+        _editando = null;
+        _nome = "";
+        _token = "";
+        _ativo = true;
+    }
+
+    private async Task Salvar()
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var salvo = await TreinadorSvc.SalvarAsync(
+                new TreinadorSalvarRequest(_editando?.TreinadorId, _nome, _token, _ativo), CancellationToken.None);
+
+            LimparFormulario();
+            await Carregar();
+            _ok = $"{salvo.Nome} salvo. Token: {salvo.Token}";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private void AbrirPassagem(TreinadorDto t)
+    {
+        _passagemDe = _passagemDe == t.TreinadorId ? null : t.TreinadorId;
+        _timeSel = "";
+        _papelSel = PapelTreinador.Treinador;
+        _desde = DateTime.Today;
+        _ate = null;
+    }
+
+    private async Task SalvarPassagem(TreinadorDto t)
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            if (!Guid.TryParse(_timeSel, out var timeId)) throw new InvalidOperationException("Escolha o time.");
+            if (_desde is not DateTime desde) throw new InvalidOperationException("Informe quando ele entrou.");
+
+            await TreinadorSvc.RegistrarPassagemAsync(
+                new TreinadorPassagemRequest(t.TreinadorId, timeId, _papelSel, desde, _ate), CancellationToken.None);
+
+            _passagemDe = null;
+            await Carregar();
+            _ok = $"Passagem de {t.Nome} registrada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task Encerrar(TreinadorDto t, TreinadorPassagemDto passagem)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Encerrar hoje a passagem de {t.Nome} pelo {passagem.TimeNome}?")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await TreinadorSvc.EncerrarPassagemAsync(passagem.PassagemId, DateTime.Today, CancellationToken.None);
+            await Carregar();
+            _ok = $"{t.Nome} saiu do {passagem.TimeNome}.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RemoverPassagem(TreinadorPassagemDto passagem)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Remover a passagem pelo {passagem.TimeNome}?")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await TreinadorSvc.RemoverPassagemAsync(passagem.PassagemId, CancellationToken.None);
+            await Carregar();
+            _ok = "Passagem removida.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task Excluir(TreinadorDto t)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Excluir {t.Nome} e todas as passagens dele?")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await TreinadorSvc.ExcluirAsync(t.TreinadorId, CancellationToken.None);
+            if (_editando?.TreinadorId == t.TreinadorId) LimparFormulario();
+            await Carregar();
+            _ok = $"{t.Nome} excluído.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

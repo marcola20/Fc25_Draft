@@ -1,0 +1,101 @@
+@page "/treinadores"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@inject ITreinadorService TreinadorSvc
+@inject EscudoService EscudoService
+
+<PageTitle>Treinadores</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar os treinadores:</strong> @_erro</div>
+    }
+    else if (_treinadores.Count == 0)
+    {
+        <div class="alert alert-info">Nenhum treinador cadastrado ainda.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+            <h1 class="h3 mb-0">👔 Treinadores</h1>
+            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary">🏆 Hall of Fame</a>
+        </div>
+        <p class="text-muted small mb-4">Quem comanda cada clube da CBFV — clique no nome para ver a carreira.</p>
+
+        @if (_noComando.Count > 0)
+        {
+            <h2 class="h5 border-bottom pb-2 mb-3">No comando</h2>
+            <div class="row g-3 mb-4">
+                @foreach (var t in _noComando)
+                {
+                    <div class="col-12 col-md-6 col-xl-4">@Card(t)</div>
+                }
+            </div>
+        }
+
+        @if (_semTime.Count > 0)
+        {
+            <h2 class="h5 border-bottom pb-2 mb-3">Sem clube</h2>
+            <div class="row g-3">
+                @foreach (var t in _semTime)
+                {
+                    <div class="col-12 col-md-6 col-xl-4">@Card(t)</div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private string? _erro;
+
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
+    private List<TreinadorDto> _noComando = new();
+    private List<TreinadorDto> _semTime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _treinadores = await TreinadorSvc.ListAsync(false, CancellationToken.None);
+            _noComando = _treinadores.Where(t => t.Hoje is not null)
+                .OrderBy(t => t.Hoje!.TimeNome).ThenBy(t => t.Hoje!.Papel).ToList();
+            _semTime = _treinadores.Where(t => t.Hoje is null).OrderBy(t => t.Nome).ToList();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private RenderFragment Card(TreinadorDto t) => @<div class="card h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+            @if (t.Hoje is { } hoje)
+            {
+                <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:44px;height:44px;object-fit:contain;" />
+            }
+            <div class="flex-grow-1">
+                <a href="/treinadores/@t.TreinadorId" class="fw-semibold text-decoration-none">@t.Nome</a>
+                <div class="small text-muted">
+                    @if (t.Hoje is { } atual)
+                    {
+                        <span>@(atual.Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Treinador") do @atual.TimeNome</span>
+                    }
+                    else
+                    {
+                        <span>Sem clube no momento</span>
+                    }
+                </div>
+            </div>
+            @if (t.Passagens.Count > 1)
+            {
+                <span class="badge bg-light text-dark border">@t.Passagens.Count clubes</span>
+            }
+        </div>
+    </div>;
+}

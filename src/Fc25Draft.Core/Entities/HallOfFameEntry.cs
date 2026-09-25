@@ -12,6 +12,9 @@ public class HallOfFameEntry
     public Divisao? Divisao { get; set; }
     public string TimeCampeao { get; set; } = null!;
     public string? Tecnico { get; set; }
+
+    /// <summary>Treinador cadastrado, quando o campeão foi dirigido por alguém da liga. Nulo para nomes soltos.</summary>
+    public Guid? TreinadorId { get; set; }
     public int? Ano { get; set; }
     public string? Temporada { get; set; }
     public DateTime CriadoEm { get; set; }

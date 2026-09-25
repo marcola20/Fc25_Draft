@@ -51,7 +51,17 @@
                                         <h3 class="h6 mb-1">@entrada.TimeCampeao</h3>
                                         @if (!string.IsNullOrWhiteSpace(entrada.Tecnico))
                                         {
-                                            <p class="small mb-1">👤 @entrada.Tecnico</p>
+                                            <p class="small mb-1">
+                                                👤
+                                                @if (entrada.TreinadorId is { } treinadorId)
+                                                {
+                                                    <a href="/treinadores/@treinadorId" class="text-decoration-none">@entrada.Tecnico</a>
+                                                }
+                                                else
+                                                {
+                                                    @entrada.Tecnico
+                                                }
+                                            </p>
                                         }
                                         <p class="text-muted small mb-2">@entrada.Descricao</p>
                                         <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">

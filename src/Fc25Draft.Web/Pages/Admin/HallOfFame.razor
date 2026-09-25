@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IHallOfFameService HallOfFameService
+@inject ITreinadorService TreinadorSvc
 @inject EscudoService EscudoService
 
 <PageTitle>Administração do Hall of Fame</PageTitle>
@@ -73,8 +74,20 @@
 
                     <div class="mb-3">
                         <label class="form-label">Técnico</label>
+                        <select class="form-select mb-2" value="@_formTreinadorId?.ToString()"
+                                @onchange="EscolherTreinador">
+                            <option value="">Nome solto (digitar abaixo)</option>
+                            @foreach (var t in _treinadores)
+                            {
+                                <option value="@t.TreinadorId">@t.Nome</option>
+                            }
+                        </select>
                         <input class="form-control" @bind="_formTecnico" maxlength="120"
-                               placeholder="Ex.: nome do técnico" />
+                               placeholder="Ex.: nome do técnico"
+                               disabled="@(_formTreinadorId is not null)" />
+                        <div class="form-text">
+                            Escolha um treinador cadastrado para o título entrar na carreira dele, ou digite o nome de quem não está mais na liga.
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -138,7 +151,16 @@
                                 <tr>
                                     <td><img src="@EscudoService.GetEscudo(entrada.TimeCampeao)" alt="Escudo @entrada.TimeCampeao" style="width:32px;height:32px;object-fit:contain;" /></td>
                                     <td class="fw-bold">@entrada.TimeCampeao</td>
-                                    <td class="text-muted">@(entrada.Tecnico ?? "—")</td>
+                                    <td class="text-muted">
+                                        @if (entrada.TreinadorId is { } tid)
+                                        {
+                                            <a href="/treinadores/@tid">@entrada.Tecnico</a>
+                                        }
+                                        else
+                                        {
+                                            @(entrada.Tecnico ?? "—")
+                                        }
+                                    </td>
                                     <td>@entrada.Descricao</td>
                                     <td class="text-center"><span class="badge bg-dark">@RotuloCompeticao(entrada)</span></td>
                                     <td class="text-center text-muted">@(entrada.Temporada is not null ? TemporadaLabel(entrada.Temporada) : (entrada.Ano?.ToString() ?? "—"))</td>
@@ -183,10 +205,12 @@
     private string? _erro;
     private string? _ok;
     private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
 
     private Guid? _editandoId;
     private string _formTime = string.Empty;
     private string _formTecnico = string.Empty;
+    private Guid? _formTreinadorId;
     private string _formDescricao = string.Empty;
     private TipoCompetition _formTipo = TipoCompetition.Liga;
     private Divisao? _formDivisao;
@@ -203,6 +227,7 @@
         try
         {
             _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
+            _treinadores = await TreinadorSvc.ListAsync(true, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -222,14 +247,14 @@
             if (_editandoId.HasValue)
             {
                 await HallOfFameService.UpdateAsync(_editandoId.Value,
-                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada, _formDivisao),
+                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao),
                     CancellationToken.None);
                 _ok = "Campeão atualizado.";
             }
             else
             {
                 await HallOfFameService.CreateAsync(
-                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formAno, _formTemporada, _formDivisao),
+                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao),
                     CancellationToken.None);
                 _ok = "Campeão adicionado.";
             }
@@ -251,12 +276,27 @@
         _editandoId = entrada.Id;
         _formTime = entrada.TimeCampeao;
         _formTecnico = entrada.Tecnico ?? string.Empty;
+        _formTreinadorId = entrada.TreinadorId;
         _formDescricao = entrada.Descricao;
         _formTipo = entrada.Tipo;
         _formDivisao = entrada.Divisao;
         _formAno = entrada.Ano;
         _formTemporada = entrada.Temporada ?? string.Empty;
         _erro = null; _ok = null;
+    }
+
+    /// <summary>Treinador cadastrado preenche o nome sozinho; "nome solto" devolve o campo livre.</summary>
+    private void EscolherTreinador(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _formTreinadorId = id;
+            _formTecnico = _treinadores.FirstOrDefault(t => t.TreinadorId == id)?.Nome ?? _formTecnico;
+        }
+        else
+        {
+            _formTreinadorId = null;
+        }
     }
 
     private void CancelarEdicao() => LimparFormulario();
@@ -266,6 +306,7 @@
         _editandoId = null;
         _formTime = string.Empty;
         _formTecnico = string.Empty;
+        _formTreinadorId = null;
         _formDescricao = string.Empty;
         _formTipo = TipoCompetition.Liga;
         _formDivisao = null;

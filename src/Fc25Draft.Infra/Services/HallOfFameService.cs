@@ -39,6 +39,7 @@ public class HallOfFameService : IHallOfFameService
             Divisao = request.Tipo == TipoCompetition.Liga ? request.Divisao : null,
             TimeCampeao = NormalizarTime(request.TimeCampeao),
             Tecnico = NormalizarOpcional(request.Tecnico),
+            TreinadorId = request.TreinadorId,
             Ano = request.Ano,
             Temporada = NormalizarOpcional(request.Temporada),
             CriadoEm = now,
@@ -60,6 +61,7 @@ public class HallOfFameService : IHallOfFameService
         entry.Divisao = request.Tipo == TipoCompetition.Liga ? request.Divisao : null;
         entry.TimeCampeao = NormalizarTime(request.TimeCampeao);
         entry.Tecnico = NormalizarOpcional(request.Tecnico);
+        entry.TreinadorId = request.TreinadorId;
         entry.Ano = request.Ano;
         entry.Temporada = NormalizarOpcional(request.Temporada);
         entry.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
@@ -100,5 +102,5 @@ public class HallOfFameService : IHallOfFameService
     }
 
     private static HallOfFameEntryDto ToDto(HallOfFameEntry e) =>
-        new(e.HallOfFameId, e.Descricao, e.Tipo, e.Divisao, e.TimeCampeao, e.Tecnico, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
+        new(e.HallOfFameId, e.Descricao, e.Tipo, e.Divisao, e.TimeCampeao, e.Tecnico, e.TreinadorId, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
 }

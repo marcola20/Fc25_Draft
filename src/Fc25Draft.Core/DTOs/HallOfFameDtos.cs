@@ -10,6 +10,7 @@ public record HallOfFameEntryDto(
     Divisao? Divisao,
     string TimeCampeao,
     string? Tecnico,
+    Guid? TreinadorId,
     int? Ano,
     string? Temporada,
     DateTime CriadoEm,
@@ -20,6 +21,7 @@ public record HallOfFameCreateRequest(
     TipoCompetition Tipo,
     [Required, MaxLength(120)] string TimeCampeao,
     [MaxLength(120)] string? Tecnico = null,
+    Guid? TreinadorId = null,
     int? Ano = null,
     [MaxLength(60)] string? Temporada = null,
     Divisao? Divisao = null);
@@ -29,6 +31,7 @@ public record HallOfFameUpdateRequest(
     TipoCompetition Tipo,
     [Required, MaxLength(120)] string TimeCampeao,
     [MaxLength(120)] string? Tecnico = null,
+    Guid? TreinadorId = null,
     int? Ano = null,
     [MaxLength(60)] string? Temporada = null,
     Divisao? Divisao = null);

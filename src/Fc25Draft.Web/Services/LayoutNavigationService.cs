@@ -45,6 +45,7 @@ public class LayoutNavigationService
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
+            new("Treinadores", "/treinadores", "oi oi-person"),
             new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart"),
             new("Recordes", "/liga/recordes", "oi oi-star"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
@@ -58,6 +59,7 @@ public class LayoutNavigationService
             new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
+            new("Treinadores", "/admin/treinadores", "oi oi-person", RequiredRole: "Admin"),
             new("Premiação", "/admin/premiacao", "oi oi-dollar", RequiredRole: "Admin"),
             new("Regulamento", "/admin/regulamento", "oi oi-document", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
@@ -349,6 +351,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Configurações")
+            }
+        },
+        ["/treinadores"] = new PageDefinition
+        {
+            Route = "/treinadores",
+            Title = "Treinadores",
+            Subtitle = "Quem comanda cada clube da liga",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Treinadores")
+            }
+        },
+        ["/admin/treinadores"] = new PageDefinition
+        {
+            Route = "/admin/treinadores",
+            Title = "Treinadores",
+            Subtitle = "Cadastro das pessoas da liga e das passagens pelos clubes",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Treinadores")
             }
         },
         ["/hall-of-fame"] = new PageDefinition

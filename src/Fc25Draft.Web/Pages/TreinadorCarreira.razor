@@ -1,0 +1,199 @@
+@page "/treinadores/{TreinadorId:guid}"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Models.Navigation
+@inject ITreinadorService TreinadorSvc
+@inject EscudoService EscudoService
+@inject LayoutState LayoutState
+
+<PageTitle>@(_carreira?.Nome ?? "Treinador")</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar a carreira:</strong> @_erro</div>
+    }
+    else if (_carreira is null)
+    {
+        <div class="alert alert-info">Treinador não encontrado. <a href="/treinadores">Ver todos</a></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
+            {
+                <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:56px;height:56px;object-fit:contain;" />
+            }
+            <div>
+                <h1 class="h3 mb-0">@_carreira.Nome</h1>
+                <div class="text-muted small">@Situacao()</div>
+            </div>
+            <a href="/treinadores" class="btn btn-sm btn-outline-secondary ms-auto">👔 Todos os treinadores</a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            @Numero("Temporadas", _carreira.Temporadas.Select(t => t.Temporada).Distinct().Count().ToString())
+            @Numero("Clubes", _carreira.Clubes.Count.ToString())
+            @Numero("Títulos", _carreira.TotalDeTitulos.ToString())
+        </div>
+
+        @if (_carreira.Titulos.Count > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-header fw-bold">🏆 Galeria</div>
+                <div class="card-body d-flex flex-wrap gap-2">
+                    @foreach (var titulo in _carreira.Titulos)
+                    {
+                        <span class="badge bg-warning text-dark fs-6">@titulo</span>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="card mb-4">
+            <div class="card-header fw-bold">Carreira</div>
+            @if (_carreira.Temporadas.Count == 0)
+            {
+                <div class="card-body text-muted">Ainda não disputou nenhuma competição.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Temporada</th>
+                                <th>Clube</th>
+                                <th>Competição</th>
+                                <th class="text-center">Posição</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in _carreira.Temporadas)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@t.Temporada</td>
+                                    <td>
+                                        <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain;" class="me-1" />
+                                        @t.TimeNome
+                                        @if (t.Papel == PapelTreinador.Auxiliar)
+                                        {
+                                            <span class="badge bg-info text-dark ms-1">auxiliar</span>
+                                        }
+                                    </td>
+                                    <td>@t.Competicao</td>
+                                    <td class="text-center">
+                                        @if (t.Posicao is { } pos)
+                                        {
+                                            <span>@pos<span class="text-muted small">º de @t.TotalTimes</span></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                    <td class="small">
+                                        @if (t.Campeao)
+                                        {
+                                            <span class="badge bg-warning text-dark">🏆 Campeão</span>
+                                        }
+                                        else if (t.Movimento is { Length: > 0 } mov)
+                                        {
+                                            <span class="text-muted">@mov</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-header fw-bold">Passagens</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var p in _carreira.Passagens)
+                {
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <img src="@EscudoService.GetEscudo(p.TimeNome)" alt="" style="width:26px;height:26px;object-fit:contain;" />
+                        <span class="fw-semibold">@p.TimeNome</span>
+                        <span class="badge @(p.Papel == PapelTreinador.Auxiliar ? "bg-info text-dark" : "bg-primary")">
+                            @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador")
+                        </span>
+                        <span class="text-muted small ms-auto">
+                            @p.Desde.ToString("MMM/yyyy", Br) — @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MMM/yyyy", Br))
+                        </span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter] public Guid TreinadorId { get; set; }
+
+    private bool _carregando = true;
+    private string? _erro;
+    private TreinadorCarreiraDto? _carreira;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _carregando = true;
+        _erro = null;
+        try
+        {
+            _carreira = await TreinadorSvc.GetCarreiraAsync(TreinadorId, CancellationToken.None);
+            AtualizarCabecalho();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    /// <summary>O cabeçalho da página vira o nome do treinador, com a migalha voltando para a lista.</summary>
+    private void AtualizarCabecalho()
+    {
+        if (_carreira is null) return;
+
+        LayoutState.SetPage(
+            new PageDefinition { Route = "/treinadores", Title = _carreira.Nome },
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Treinadores", "/treinadores"),
+                new(_carreira.Nome)
+            },
+            subtitle: Situacao());
+    }
+
+    private string Situacao()
+    {
+        if (_carreira!.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
+        {
+            var papel = hoje.Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Treinador";
+            return $"{papel} do {hoje.TimeNome} desde {hoje.Desde.ToString("MMMM 'de' yyyy", Br)}";
+        }
+
+        var ultima = _carreira.Passagens.FirstOrDefault();
+        return ultima is null ? "Sem passagens registradas" : $"Sem clube — último foi o {ultima.TimeNome}";
+    }
+
+    private RenderFragment Numero(string rotulo, string valor) => @<div class="col-4 col-md-2">
+        <div class="card text-center h-100">
+            <div class="card-body py-2">
+                <div class="h4 mb-0">@valor</div>
+                <div class="small text-muted">@rotulo</div>
+            </div>
+        </div>
+    </div>;
+}
