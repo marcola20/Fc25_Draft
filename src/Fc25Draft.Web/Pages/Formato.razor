@@ -26,31 +26,53 @@
         const int rodadasSerieB = 7;
         const int rodadasGrupoCopa = 4; // cada time joga N-1 jogos; o grupo de 5 junta a sobra na última
 
-        // Blocos de liga: a Série B sempre colada na Série A. Quando uma das séries acaba
-        // antes da outra, o que sobra vira bloco de uma data só.
+        // Blocos de liga: a Série B sempre colada na Série A, e as duas séries fecham na mesma
+        // data. Como a Série A tem mais rodadas, as que sobram viram datas só dela no meio do
+        // caminho — assim as últimas rodadas da B ficam coladas nas últimas da A.
+        var totalDeBlocos = Math.Max(rodadasSerieA, rodadasSerieB);
+        var blocosSozinhos = Math.Abs(rodadasSerieA - rodadasSerieB);
+
+        var sozinhos = Enumerable.Range(1, blocosSozinhos)
+            .Select(i => (int)Math.Round((double)i * totalDeBlocos / (blocosSozinhos + 1), MidpointRounding.AwayFromZero))
+            .ToHashSet();
+
         var blocosDeLiga = new List<List<DataCalendario>>();
         int serieA = 1, serieB = 1;
-        while (serieA <= rodadasSerieA || serieB <= rodadasSerieB)
+        for (int i = 1; i <= totalDeBlocos; i++)
         {
             var bloco = new List<DataCalendario>();
-            if (serieB <= rodadasSerieB) bloco.Add(new DataCalendario(0, "Série B", $"Rodada {serieB++}", "fmt-cal-special"));
-            if (serieA <= rodadasSerieA) bloco.Add(new DataCalendario(0, "Série A", $"Rodada {serieA++}", "fmt-cal-liga"));
-            blocosDeLiga.Add(bloco);
+            var sozinho = sozinhos.Contains(i);
+
+            if (!sozinho && serieB <= rodadasSerieB)
+                bloco.Add(new DataCalendario(0, "Série B", $"Rodada {serieB++}", "fmt-cal-special"));
+            if (serieA <= rodadasSerieA)
+                bloco.Add(new DataCalendario(0, "Série A", $"Rodada {serieA++}", "fmt-cal-liga"));
+
+            if (bloco.Count > 0) blocosDeLiga.Add(bloco);
         }
 
-        // Datas da Copa na ordem em que acontecem; a final fica fora porque fecha a temporada.
+        // Datas que entram entre os blocos: a Copa (grupos, quartas e semis) e o mercado no meio.
         var datasDaCopa = new List<DataCalendario>();
         for (int copa = 1; copa <= rodadasGrupoCopa; copa++)
             datasDaCopa.Add(new DataCalendario(0, "Copa", $"Rodada {copa} · grupos", "fmt-cal-copa"));
         datasDaCopa.Add(new DataCalendario(0, "Copa", "Quartas de final", "fmt-cal-semi"));
         datasDaCopa.Add(new DataCalendario(0, "Copa", "Semifinais", "fmt-cal-semi"));
 
-        var totalDeDatas = 1 + blocosDeLiga.Sum(b => b.Count) + datasDaCopa.Count + 1;
+        // Supercopa + liga + Copa + mercado + final da Copa + playoff de acesso.
+        var totalDeDatas = 1 + blocosDeLiga.Sum(b => b.Count) + datasDaCopa.Count + 1 + 2;
+        var ultimaAntesDasDecisoes = totalDeDatas - 2;
 
-        // Em vez de amontoar a Copa no fim, cada data dela tem um lugar-alvo espalhado por igual
-        // entre a Supercopa e a final; ela entra no primeiro intervalo entre blocos que alcança o alvo.
-        int Alvo(int i) => 1 + (int)Math.Round(
-            (double)i * (totalDeDatas - 1) / (datasDaCopa.Count + 1), MidpointRounding.AwayFromZero);
+        // Cada data da Copa tem um lugar-alvo espalhado por igual até as decisões, e o mercado
+        // fica no meio da temporada; entram no primeiro intervalo entre blocos que alcança o alvo.
+        var entreBlocos = datasDaCopa
+            .Select((data, i) => (
+                Alvo: 1 + (int)Math.Round((double)(i + 1) * (ultimaAntesDasDecisoes - 1) / (datasDaCopa.Count + 1), MidpointRounding.AwayFromZero),
+                Data: data))
+            .Append((
+                Alvo: (int)Math.Round(totalDeDatas / 2.0, MidpointRounding.AwayFromZero),
+                Data: new DataCalendario(0, "Mercado", "janela de transferências", "fmt-cal-mercado")))
+            .OrderBy(x => x.Alvo)
+            .ToList();
 
         var datas = new List<DataCalendario>();
         void Add(DataCalendario data) =>
@@ -58,20 +80,21 @@
 
         Add(new DataCalendario(0, "Supercopa", "abre a temporada", "fmt-cal-final"));
 
-        var proximaDaCopa = 1;
+        var proxima = 0;
         foreach (var bloco in blocosDeLiga)
         {
             foreach (var data in bloco) Add(data);
 
-            while (proximaDaCopa <= datasDaCopa.Count && datas.Count + 1 >= Alvo(proximaDaCopa))
-                Add(datasDaCopa[proximaDaCopa++ - 1]);
+            while (proxima < entreBlocos.Count && datas.Count + 1 >= entreBlocos[proxima].Alvo)
+                Add(entreBlocos[proxima++].Data);
         }
 
         // Sobra quando a liga acaba antes (ex.: poucas rodadas de liga e muitas de Copa).
-        while (proximaDaCopa <= datasDaCopa.Count)
-            Add(datasDaCopa[proximaDaCopa++ - 1]);
+        while (proxima < entreBlocos.Count)
+            Add(entreBlocos[proxima++].Data);
 
         Add(new DataCalendario(0, "Copa", "Final", "fmt-cal-final"));
+        Add(new DataCalendario(0, "Playoff de acesso", "9º da Série A x 2º da Série B", "fmt-cal-final"));
 
         return datas;
     }
@@ -427,14 +450,16 @@
                 <div class="fmt-stat-label">Rodadas da Série B</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">8</div>
+                <div class="fmt-stat-number">@Calendario.Count(d => d.Competicao == "Copa")</div>
                 <div class="fmt-stat-label">Datas da Copa</div>
             </div>
         </div>
 
         <p class="fmt-desc">
-            A temporada abre com a <strong>Supercopa</strong> e fecha com a <strong>final da Copa</strong>.
-            As rodadas de liga vêm sempre em dupla: primeiro a <strong>Série B</strong>, logo depois a <strong>Série A</strong>.
+            A temporada abre com a <strong>Supercopa</strong> e fecha com o <strong>playoff de acesso</strong>,
+            logo depois da final da Copa. As rodadas de liga vêm sempre em dupla: primeiro a <strong>Série B</strong>,
+            logo depois a <strong>Série A</strong> — e as duas séries terminam na mesma data.
+            No meio do caminho entra a <strong>janela de transferências</strong>.
         </p>
 
         <div class="fmt-cal-legend">
@@ -442,6 +467,7 @@
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-special"></span>Série B</span>
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-copa"></span>Copa — grupos</span>
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-semi"></span>Copa — mata-mata</span>
+            <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-mercado"></span>Mercado</span>
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Decisões</span>
         </div>
 
@@ -829,6 +855,7 @@
     .fmt-dot-liga    { background: #0d6efd; }
     .fmt-dot-copa    { background: #7c3aed; }
     .fmt-dot-special { background: #0d9488; }
+    .fmt-dot-mercado { background: #f97316; }
     .fmt-dot-semi    { background: #d63384; }
     .fmt-dot-final   { background: #a07800; }
 
@@ -889,6 +916,9 @@
 
     .fmt-cal-semi    { border-left-color: #d63384; }
     .fmt-cal-semi    .fmt-cal-num { background: rgba(214,51,132,0.14); color: #d63384; }
+
+    .fmt-cal-mercado { border-left-color: #f97316; }
+    .fmt-cal-mercado .fmt-cal-num { background: rgba(249,115,22,0.14); color: #c2540a; }
 
     .fmt-cal-final   { border-left-color: #a07800; box-shadow: 0 2px 10px rgba(160,120,0,0.16); }
     .fmt-cal-final   .fmt-cal-num { background: rgba(160,120,0,0.15); color: #a07800; }
