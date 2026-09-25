@@ -224,6 +224,64 @@ public class TreinadorService : ITreinadorService
             .Select(e => $"{e.Temporada ?? e.Ano?.ToString() ?? "—"} · {e.Descricao} ({e.TimeCampeao})")
             .ToList();
 
+        // Os jogos que ele comandou: só partida encerrada, e só dentro do período dele.
+        var timeIds = treinador.Passagens.Select(p => p.TimeId).Distinct().ToList();
+
+        var jogos = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.EncerradaEm != null
+                        && (timeIds.Contains(p.TimeCasaId) || timeIds.Contains(p.TimeForaId)))
+            .Select(p => new Jogo(p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.EncerradaEm!.Value))
+            .ToListAsync(ct);
+
+        // No dia em que o comando troca, o jogo daquele dia é de quem estava saindo.
+        var entradasNoDiaDaSaida = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => timeIds.Contains(p.TimeId) && p.Ate != null)
+            .Select(p => new { p.TimeId, Dia = p.Ate!.Value })
+            .ToListAsync(ct);
+
+        List<Jogo> JogosDa(TreinadorPassagemDto passagem, Guid? ligaId = null)
+        {
+            var herdouODia = passagem.Ate is null
+                             || entradasNoDiaDaSaida.Any(e => e.TimeId == passagem.TimeId && e.Dia.Date == passagem.Desde.Date);
+
+            return jogos.Where(j =>
+                (j.CasaId == passagem.TimeId || j.ForaId == passagem.TimeId)
+                && (ligaId is null || j.LigaId == ligaId)
+                && j.Quando.Date >= passagem.Desde.Date
+                && (!herdouODia || j.Quando.Date > passagem.Desde.Date)
+                && (passagem.Ate is null || j.Quando.Date <= passagem.Ate.Value.Date)).ToList();
+        }
+
+        var passagensComRetrospecto = treinador.Passagens
+            .Select(p => p with { Retrospecto = Retrospecto(JogosDa(p), p.TimeId) })
+            .ToArray();
+
+        // Na Copa e na Supercopa não existe posição na tabela: o que conta é onde ele parou.
+        var mataMata = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Select(k => new { k.LigaId, k.Fase, k.TimeCasaId, k.TimeForaId })
+            .ToListAsync(ct);
+
+        string? FaseDoTime(Guid ligaId, Guid timeId, bool campeao)
+        {
+            if (campeao) return "Campeão";
+
+            var doTime = mataMata
+                .Where(k => k.LigaId == ligaId && (k.TimeCasaId == timeId || k.TimeForaId == timeId))
+                .ToList();
+
+            if (doTime.Count == 0)
+                return mataMata.Any(k => k.LigaId == ligaId) ? "Fase de grupos" : null;
+
+            return doTime.Max(k => k.Fase) switch
+            {
+                FaseKnockout.Final => "Vice",
+                FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
+                FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas",
+                FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C => "Repescagem",
+                _ => null
+            };
+        }
+
         var temporadas = new List<TreinadorTemporadaDto>();
 
         foreach (var passagem in treinador.Passagens)
@@ -246,8 +304,7 @@ public class TreinadorService : ITreinadorService
                 if (naLiga is null && !jogouSupercopa) continue;
 
                 var campeao = liga.CampeaoTimeId == passagem.TimeId;
-
-                if (liga.Tipo != TipoCompetition.Liga) continue;
+                var naTabela = liga.Tipo == TipoCompetition.Liga;
 
                 // A posição só vale quando a competição acabou (durante a temporada ela ainda muda).
                 var encerrada = liga.Status == LigaStatus.Encerrada;
@@ -258,10 +315,12 @@ public class TreinadorService : ITreinadorService
                     passagem.TimeNome,
                     passagem.Papel,
                     LigaLabels.Competicao(liga.Tipo, liga.Divisao),
-                    encerrada && naLiga is { Posicao: > 0 } ? naLiga.Posicao : null,
-                    totalPorLiga.GetValueOrDefault(liga.LigaId),
+                    naTabela && encerrada && naLiga is { Posicao: > 0 } ? naLiga.Posicao : null,
+                    naTabela ? totalPorLiga.GetValueOrDefault(liga.LigaId) : null,
                     campeao,
-                    Movimento(passagem, comecou, acabou, encerrada)));
+                    Movimento(passagem, comecou, acabou, encerrada),
+                    Retrospecto(JogosDa(passagem, liga.LigaId), passagem.TimeId),
+                    naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao)));
             }
         }
 
@@ -269,9 +328,10 @@ public class TreinadorService : ITreinadorService
             treinador.TreinadorId,
             treinador.Nome,
             treinador.Ativo,
-            treinador.Passagens,
+            passagensComRetrospecto,
             temporadas.OrderByDescending(t => t.Temporada).ThenBy(t => t.Competicao).ToArray(),
-            titulos);
+            titulos,
+            Somar(passagensComRetrospecto.Select(p => p.Retrospecto!)));
     }
 
     /// <summary>Os nomes que aparecem no cadastro do time saem das passagens que estão valendo.</summary>
@@ -295,6 +355,36 @@ public class TreinadorService : ITreinadorService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    private record Jogo(Guid LigaId, Guid CasaId, Guid ForaId, int GolsCasa, int GolsFora, DateTime Quando);
+
+    /// <summary>Soma os jogos olhando sempre do lado do clube que ele comandava.</summary>
+    private static TreinadorRetrospectoDto Retrospecto(IEnumerable<Jogo> jogos, Guid timeId)
+    {
+        int j = 0, v = 0, e = 0, d = 0, gp = 0, gc = 0;
+
+        foreach (var jogo in jogos)
+        {
+            var emCasa = jogo.CasaId == timeId;
+            var feitos = emCasa ? jogo.GolsCasa : jogo.GolsFora;
+            var sofridos = emCasa ? jogo.GolsFora : jogo.GolsCasa;
+
+            j++;
+            gp += feitos;
+            gc += sofridos;
+
+            if (feitos > sofridos) v++;
+            else if (feitos < sofridos) d++;
+            else e++;
+        }
+
+        return new TreinadorRetrospectoDto(j, v, e, d, gp, gc);
+    }
+
+    private static TreinadorRetrospectoDto Somar(IEnumerable<TreinadorRetrospectoDto> partes) =>
+        partes.Aggregate(TreinadorRetrospectoDto.Vazio, (a, b) => new TreinadorRetrospectoDto(
+            a.Jogos + b.Jogos, a.Vitorias + b.Vitorias, a.Empates + b.Empates,
+            a.Derrotas + b.Derrotas, a.GolsPro + b.GolsPro, a.GolsContra + b.GolsContra));
 
     /// <summary>Se a pessoa pegou a temporada começada ou saiu antes do fim.</summary>
     private static string? Movimento(TreinadorPassagemDto passagem, DateTime comecou, DateTime acabou, bool encerrada)

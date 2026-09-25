@@ -41,7 +41,32 @@
             @Numero("Temporadas", _carreira.Temporadas.Select(t => t.Temporada).Distinct().Count().ToString())
             @Numero("Clubes", _carreira.Clubes.Count.ToString())
             @Numero("Títulos", _carreira.TotalDeTitulos.ToString())
+            @if (_carreira.Retrospecto is { Jogos: > 0 } geral)
+            {
+                @Numero("Jogos", geral.Jogos.ToString())
+                @Numero("Aproveitamento", $"{geral.Aproveitamento.ToString("0.#", Br)}%")
+            }
         </div>
+
+        @if (_carreira.Retrospecto is { Jogos: > 0 } retro)
+        {
+            <div class="card mb-4">
+                <div class="card-header fw-bold">Retrospecto</div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-4">
+                        <div><span class="h5 text-success">@retro.Vitorias</span> <span class="text-muted small">vitórias</span></div>
+                        <div><span class="h5 text-secondary">@retro.Empates</span> <span class="text-muted small">empates</span></div>
+                        <div><span class="h5 text-danger">@retro.Derrotas</span> <span class="text-muted small">derrotas</span></div>
+                        <div><span class="h5">@retro.GolsPro<span class="text-muted">:</span>@retro.GolsContra</span> <span class="text-muted small">gols</span></div>
+                        <div><span class="h5">@(retro.Saldo > 0 ? "+" : "")@retro.Saldo</span> <span class="text-muted small">saldo</span></div>
+                        <div><span class="h5">@retro.Pontos</span> <span class="text-muted small">pontos somados</span></div>
+                    </div>
+                    <p class="text-muted small mb-0 mt-2">
+                        Contam só os jogos encerrados dentro do período em que ele estava no comando, em qualquer competição.
+                    </p>
+                </div>
+            </div>
+        }
 
         @if (_carreira.Titulos.Count > 0)
         {
@@ -71,6 +96,7 @@
                                 <th>Temporada</th>
                                 <th>Clube</th>
                                 <th>Competição</th>
+                                <th class="text-center">Campanha</th>
                                 <th class="text-center">Posição</th>
                                 <th></th>
                             </tr>
@@ -89,10 +115,25 @@
                                         }
                                     </td>
                                     <td>@t.Competicao</td>
+                                    <td class="text-center text-nowrap">
+                                        @if (t.Retrospecto is { Jogos: > 0 } campanha)
+                                        {
+                                            <span title="@campanha.Jogos jogos">@campanha.Vitorias<span class="text-muted">-</span>@campanha.Empates<span class="text-muted">-</span>@campanha.Derrotas</span>
+                                            <span class="text-muted small">@campanha.Aproveitamento.ToString("0.#", Br)%</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
                                     <td class="text-center">
                                         @if (t.Posicao is { } pos)
                                         {
                                             <span>@pos<span class="text-muted small">º de @t.TotalTimes</span></span>
+                                        }
+                                        else if (t.Fase is { Length: > 0 } fase)
+                                        {
+                                            <span>@fase</span>
                                         }
                                         else
                                         {
@@ -128,6 +169,12 @@
                         <span class="badge @(p.Papel == PapelTreinador.Auxiliar ? "bg-info text-dark" : "bg-primary")">
                             @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador")
                         </span>
+                        @if (p.Retrospecto is { Jogos: > 0 } campanha)
+                        {
+                            <span class="text-muted small">
+                                @campanha.Jogos jogos · @campanha.Vitorias<span class="text-muted">-</span>@campanha.Empates<span class="text-muted">-</span>@campanha.Derrotas · @campanha.Aproveitamento.ToString("0.#", Br)%
+                            </span>
+                        }
                         <span class="text-muted small ms-auto">
                             @p.Desde.ToString("MMM/yyyy", Br) — @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MMM/yyyy", Br))
                         </span>

@@ -2,6 +2,24 @@ using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.DTOs;
 
+/// <summary>Jogos e campanha de um treinador num recorte (um clube, uma temporada ou a carreira toda).</summary>
+public record TreinadorRetrospectoDto(
+    int Jogos,
+    int Vitorias,
+    int Empates,
+    int Derrotas,
+    int GolsPro,
+    int GolsContra)
+{
+    public int Pontos => Vitorias * 3 + Empates;
+    public int Saldo => GolsPro - GolsContra;
+
+    /// <summary>Pontos ganhos sobre os disputados, como a imprensa mede técnico.</summary>
+    public decimal Aproveitamento => Jogos == 0 ? 0m : Math.Round(Pontos * 100m / (Jogos * 3), 1);
+
+    public static readonly TreinadorRetrospectoDto Vazio = new(0, 0, 0, 0, 0, 0);
+}
+
 /// <summary>Uma passagem do treinador por um clube.</summary>
 public record TreinadorPassagemDto(
     Guid PassagemId,
@@ -9,7 +27,8 @@ public record TreinadorPassagemDto(
     string TimeNome,
     PapelTreinador Papel,
     DateTime Desde,
-    DateTime? Ate)
+    DateTime? Ate,
+    TreinadorRetrospectoDto? Retrospecto = null)
 {
     public bool Atual => Ate is null;
 }
@@ -36,7 +55,10 @@ public record TreinadorTemporadaDto(
     int? Posicao,
     int? TotalTimes,
     bool Campeao,
-    string? Movimento);
+    string? Movimento,
+    TreinadorRetrospectoDto? Retrospecto = null,
+    /// <summary>Onde parou no mata-mata. Vale para Copa e Supercopa, onde não existe posição na tabela.</summary>
+    string? Fase = null);
 
 /// <summary>A carreira inteira: passagens, temporadas e o que ganhou.</summary>
 public record TreinadorCarreiraDto(
@@ -45,7 +67,8 @@ public record TreinadorCarreiraDto(
     bool Ativo,
     IReadOnlyList<TreinadorPassagemDto> Passagens,
     IReadOnlyList<TreinadorTemporadaDto> Temporadas,
-    IReadOnlyList<string> Titulos)
+    IReadOnlyList<string> Titulos,
+    TreinadorRetrospectoDto? Retrospecto = null)
 {
     public int TotalDeTitulos => Titulos.Count;
     public IReadOnlyList<string> Clubes => Passagens.Select(p => p.TimeNome).Distinct().ToArray();

@@ -64,10 +64,12 @@
     {
         try
         {
-            _treinadores = await TreinadorSvc.ListAsync(false, CancellationToken.None);
+            // Quem saiu continua na lista: a carreira dele é parte da história da liga.
+            _treinadores = await TreinadorSvc.ListAsync(true, CancellationToken.None);
             _noComando = _treinadores.Where(t => t.Hoje is not null)
                 .OrderBy(t => t.Hoje!.TimeNome).ThenBy(t => t.Hoje!.Papel).ToList();
-            _semTime = _treinadores.Where(t => t.Hoje is null).OrderBy(t => t.Nome).ToList();
+            _semTime = _treinadores.Where(t => t.Hoje is null)
+                .OrderByDescending(t => t.Ativo).ThenBy(t => t.Nome).ToList();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
@@ -85,6 +87,10 @@
                     @if (t.Hoje is { } atual)
                     {
                         <span>@(atual.Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Treinador") do @atual.TimeNome</span>
+                    }
+                    else if (!t.Ativo)
+                    {
+                        <span>Fora da liga — último clube: @(t.Passagens.FirstOrDefault()?.TimeNome ?? "—")</span>
                     }
                     else
                     {
