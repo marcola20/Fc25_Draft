@@ -37,7 +37,7 @@ public class LayoutNavigationService
             new("Jogadores", "/players", "oi oi-person"),
             new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
             new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
-            new("Caixa dos Times", "/times/caixa", "oi oi-dollar")
+            new("Valor de Elenco", "/times/caixa", "oi oi-dollar")
         }),
         new("Liga", new List<MenuItem>
         {
@@ -113,7 +113,7 @@ public class LayoutNavigationService
         ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/mercado/historico", true),
         ["/market/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/market/historico", true),
         ["/market/transfers"] = CreateDefinition("Histórico de Transferências", "Mercado", "/market/transfers"),
-        ["/times/caixa"] = CreateDefinition("Caixa dos Times", "Times", "/times/caixa"),
+        ["/times/caixa"] = CreateDefinition("Valor de Elenco", "Times", "/times/caixa"),
         ["/admin/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/ciclos", true),
         ["/admin/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/admin/mercado/ciclos", true),
         ["/mercado/ciclos"] = CreateDefinition("Gerenciar Ciclos", "Admin", "/mercado/ciclos", true),

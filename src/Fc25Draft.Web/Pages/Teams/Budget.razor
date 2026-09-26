@@ -6,10 +6,10 @@
 @inject IPricingService PricingService
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Budget> Logger
 
-<PageTitle>Caixa dos Times</PageTitle>
+<PageTitle>Valor de Elenco</PageTitle>
 
-<PageHeader Title="Caixa dos Times"
-            Subtitle="Saldo e valor de elenco de cada time." />
+<PageHeader Title="Valor de Elenco"
+            Subtitle="Valor de elenco de cada time." />
 
 @if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
@@ -17,7 +17,7 @@
 }
 else if (_isLoading)
 {
-    <div class="alert alert-info" role="status">Carregando caixa dos times...</div>
+    <div class="alert alert-info" role="status">Carregando valor de elenco dos times...</div>
 }
 else if (_rows.Count == 0)
 {
@@ -34,24 +34,10 @@ else
                     <th scope="col">Responsável</th>
                     <th scope="col" class="text-end">
                         <button type="button"
-                                class="@SortButtonClass(SortCol.Budget)"
-                                @onclick="() => ToggleSort(SortCol.Budget)">
-                            Caixa
-                            @if (_sortCol == SortCol.Budget)
-                            {
-                                <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
-                            }
-                        </button>
-                    </th>
-                    <th scope="col" class="text-end">
-                        <button type="button"
-                                class="@SortButtonClass(SortCol.SquadValue)"
-                                @onclick="() => ToggleSort(SortCol.SquadValue)">
+                                class="btn btn-link btn-sm p-0 text-decoration-none text-body fw-semibold"
+                                @onclick="ToggleSort">
                             Valor de Elenco
-                            @if (_sortCol == SortCol.SquadValue)
-                            {
-                                <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
-                            }
+                            <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
                         </button>
                     </th>
                 </tr>
@@ -64,7 +50,6 @@ else
                         <td>@(index + 1)</td>
                         <td class="fw-semibold">@row.TeamName</td>
                         <td>@(string.IsNullOrWhiteSpace(row.OwnerName) ? "-" : row.OwnerName)</td>
-                        <td class="text-end text-nowrap">@FormatCurrency(row.Budget)</td>
                         <td class="text-end text-nowrap">@FormatCurrency(row.SquadValue)</td>
                     </tr>
                 }
@@ -75,11 +60,10 @@ else
 
 @code {
     private static readonly CultureInfo BrazilCulture = new("pt-BR");
-    private readonly List<BudgetRow> _rows = new();
-    private IReadOnlyList<BudgetRow> _sortedRows = Array.Empty<BudgetRow>();
+    private readonly List<SquadValueRow> _rows = new();
+    private IReadOnlyList<SquadValueRow> _sortedRows = Array.Empty<SquadValueRow>();
     private bool _isLoading = true;
     private string? _errorMessage;
-    private SortCol _sortCol = SortCol.Budget;
     private bool _sortDesc = true;
 
     protected override async Task OnInitializedAsync()
@@ -125,15 +109,15 @@ else
                     }
                 }
 
-                _rows.Add(new BudgetRow(team.TeamId, team.TeamName, team.OwnerName, team.Budget, squadValue));
+                _rows.Add(new SquadValueRow(team.TeamId, team.TeamName, team.OwnerName, squadValue));
             }
 
             ApplySort();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Erro ao carregar caixa dos times.");
-            _errorMessage = "Não foi possível carregar o caixa dos times. Tente novamente.";
+            Logger.LogError(ex, "Erro ao carregar valor de elenco dos times.");
+            _errorMessage = "Não foi possível carregar o valor de elenco dos times. Tente novamente.";
         }
         finally
         {
@@ -141,49 +125,21 @@ else
         }
     }
 
-    private void ToggleSort(SortCol col)
+    private void ToggleSort()
     {
-        if (_sortCol == col)
-        {
-            _sortDesc = !_sortDesc;
-        }
-        else
-        {
-            _sortCol = col;
-            _sortDesc = true;
-        }
-
+        _sortDesc = !_sortDesc;
         ApplySort();
     }
 
     private void ApplySort()
     {
-        IEnumerable<BudgetRow> query = _rows;
-
-        query = _sortCol switch
-        {
-            SortCol.Budget => _sortDesc
-                ? query.OrderByDescending(r => r.Budget).ThenBy(r => r.TeamName)
-                : query.OrderBy(r => r.Budget).ThenBy(r => r.TeamName),
-            SortCol.SquadValue => _sortDesc
-                ? query.OrderByDescending(r => r.SquadValue).ThenBy(r => r.TeamName)
-                : query.OrderBy(r => r.SquadValue).ThenBy(r => r.TeamName),
-            _ => query
-        };
-
-        _sortedRows = query.ToList();
-    }
-
-    private string SortButtonClass(SortCol col)
-    {
-        var cls = "btn btn-link btn-sm p-0 text-decoration-none text-body";
-        if (_sortCol == col) cls += " fw-semibold";
-        return cls;
+        _sortedRows = (_sortDesc
+                ? _rows.OrderByDescending(r => r.SquadValue).ThenBy(r => r.TeamName)
+                : _rows.OrderBy(r => r.SquadValue).ThenBy(r => r.TeamName))
+            .ToList();
     }
 
     private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
 
-    private enum SortCol { Budget, SquadValue }
-
-    private sealed record BudgetRow(Guid TeamId, string TeamName, string? OwnerName, decimal Budget, decimal SquadValue);
+    private sealed record SquadValueRow(Guid TeamId, string TeamName, string? OwnerName, decimal SquadValue);
 }
