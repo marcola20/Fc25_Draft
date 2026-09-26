@@ -10,6 +10,10 @@ public class TransferOffer
     public decimal Money { get; set; }
     public Guid? MoneyPayerTeamId { get; set; }
     public decimal SellOnPercentage { get; set; }
+
+    /// <summary>Só no empréstimo: preço para o tomador ficar com o jogador em definitivo.</summary>
+    public decimal? BuyOptionPrice { get; set; }
+
     public string? Clauses { get; set; }
     public string? Notes { get; set; }
     public Guid? ParentOfferId { get; set; }

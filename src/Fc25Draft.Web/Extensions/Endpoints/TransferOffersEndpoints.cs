@@ -55,6 +55,10 @@ public static class TransferOffersEndpoints
         {
             return Results.NotFound(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
     }
 
     private static async Task<IResult> HandleBuyListedAsync(

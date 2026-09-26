@@ -7,5 +7,8 @@ public enum TransferType
     TeamSale = 2,
     TeamTrade = 3,
     QuickSell = 4,
-    ExpansionDraft = 5
+    ExpansionDraft = 5,
+    Loan = 6,
+    LoanReturn = 7,
+    LoanPurchase = 8
 }

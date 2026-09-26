@@ -41,6 +41,15 @@ public class TransferOfferService : ITransferOfferService
             dto.MoneyPayerTeamId.Value != dto.FromTeamId && dto.MoneyPayerTeamId.Value != dto.ToTeamId)
             throw new ArgumentException("O time pagador deve ser um dos times envolvidos.");
 
+        if (dto.Type == OfferType.Loan && distinctTargets.Length > 0 && distinctOffered.Length > 0)
+            throw new ArgumentException("No empréstimo os jogadores vão para um time só: peça ou ofereça, não os dois.");
+
+        if (dto.BuyOptionPrice is < 0)
+            throw new ArgumentException("A opção de compra não pode ser negativa.");
+        var buyOptionPrice = dto.Type == OfferType.Loan && dto.BuyOptionPrice is > 0
+            ? decimal.Round(dto.BuyOptionPrice.Value, 2, MidpointRounding.AwayFromZero)
+            : (decimal?)null;
+
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var fromTeam = await _db.Teams.AsNoTracking()
@@ -53,7 +62,11 @@ public class TransferOfferService : ITransferOfferService
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
 
-        if (dto.Type == OfferType.Swap)
+        if (dto.Type == OfferType.Loan)
+        {
+            EnsureLoanLimit(cfg, distinctTargets.Length > 0 ? fromTeam : toTeam);
+        }
+        else if (dto.Type == OfferType.Swap)
         {
             EnsureTransferLimit(cfg, fromTeam);
             EnsureTransferLimit(cfg, toTeam);
@@ -91,6 +104,8 @@ public class TransferOfferService : ITransferOfferService
                 throw new InvalidOperationException("Todos os jogadores oferecidos devem pertencer ao seu time.");
         }
 
+        await EnsureNotOnLoanAsync(targetPlayers.Concat(offeredPlayers), ct);
+
         if (dto.ParentOfferId.HasValue)
         {
             var parent = await _db.TransferOffers
@@ -114,6 +129,7 @@ public class TransferOfferService : ITransferOfferService
             Money = decimal.Round(dto.Money, 2, MidpointRounding.AwayFromZero),
             MoneyPayerTeamId = dto.Money > 0 ? dto.MoneyPayerTeamId : null,
             SellOnPercentage = decimal.Round(dto.SellOnPercentage, 2, MidpointRounding.AwayFromZero),
+            BuyOptionPrice = buyOptionPrice,
             Clauses = dto.Clauses?.Trim(),
             Notes = dto.Notes?.Trim(),
             ParentOfferId = dto.ParentOfferId,
@@ -170,7 +186,11 @@ public class TransferOfferService : ITransferOfferService
         if (response == OfferStatus.Accepted)
         {
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
-            if (offer.Type == OfferType.Swap)
+            if (offer.Type == OfferType.Loan)
+            {
+                EnsureLoanLimit(cfg, LoanBorrower(offer) == offer.FromTeamId ? offer.FromTeam : offer.ToTeam);
+            }
+            else if (offer.Type == OfferType.Swap)
             {
                 EnsureTransferLimit(cfg, offer.FromTeam);
                 EnsureTransferLimit(cfg, offer.ToTeam);
@@ -179,6 +199,8 @@ public class TransferOfferService : ITransferOfferService
             {
                 EnsureTransferLimit(cfg, offer.FromTeam);
             }
+
+            await EnsureNotOnLoanAsync(offer.Players.Select(p => p.Player), ct);
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -303,6 +325,9 @@ public class TransferOfferService : ITransferOfferService
         var roster = await _db.TeamRosters
             .FirstOrDefaultAsync(r => r.TeamId == teamId && r.Player.PlayerGuid == playerGuid, ct)
             ?? throw new KeyNotFoundException("Jogador não encontrado no seu elenco.");
+
+        if (askingPrice is not null && await _db.Emprestimos.AnyAsync(e => e.PlayerId == roster.PlayerId && e.Status == EmprestimoStatus.Ativo, ct))
+            throw new InvalidOperationException("Jogador emprestado não pode ser colocado à venda.");
 
         if (askingPrice is null)
         {
@@ -459,6 +484,7 @@ public class TransferOfferService : ITransferOfferService
             receiverTeam.Budget = decimal.Round(receiverTeam.Budget + offer.Money, 2, MidpointRounding.AwayFromZero);
         }
 
+        var isLoan = offer.Type == OfferType.Loan;
         var amountCarrierPlayerId = allPlayers.Count > 0
             ? allPlayers.OrderByDescending(p => p.Overall).ThenBy(p => p.PlayerId).First().PlayerId
             : (int?)null;
@@ -474,7 +500,7 @@ public class TransferOfferService : ITransferOfferService
         }
         else
         {
-            var typeLabel = offer.Type == OfferType.Loan ? "Empréstimo" : "Venda";
+            var typeLabel = isLoan ? "Empréstimo" : "Venda";
             if (targetPlayers.Count > 0)
             {
                 noteParts.Add($"{typeLabel} de {FormatPlayerList(targetPlayers)}");
@@ -499,6 +525,11 @@ public class TransferOfferService : ITransferOfferService
         if (offer.SellOnPercentage > 0)
             noteParts.Add($"Revenda futura: {offer.SellOnPercentage:N2}%");
 
+        if (isLoan)
+            noteParts.Add(offer.BuyOptionPrice is decimal opcao
+                ? $"Até o fim da temporada, com opção de compra por {opcao.ToString("C", BrCulture)}"
+                : "Até o fim da temporada");
+
         var historyNotes = string.Join(". ", noteParts);
         if (historyNotes.Length > 400)
             historyNotes = historyNotes[..397] + "...";
@@ -520,7 +551,12 @@ public class TransferOfferService : ITransferOfferService
             await _db.TransferHistories.AddAsync(new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
-                Type = offer.Type == OfferType.Swap ? TransferType.TeamTrade : TransferType.TeamSale,
+                Type = offer.Type switch
+                {
+                    OfferType.Swap => TransferType.TeamTrade,
+                    OfferType.Loan => TransferType.Loan,
+                    _ => TransferType.TeamSale
+                },
                 PlayerId = player.PlayerId,
                 FromTeamId = offer.ToTeamId,
                 ToTeamId = offer.FromTeamId,
@@ -550,7 +586,7 @@ public class TransferOfferService : ITransferOfferService
             await _db.TransferHistories.AddAsync(new TransferHistory
             {
                 TransferId = Guid.NewGuid(),
-                Type = TransferType.TeamTrade,
+                Type = isLoan ? TransferType.Loan : TransferType.TeamTrade,
                 PlayerId = player.PlayerId,
                 FromTeamId = offer.FromTeamId,
                 ToTeamId = offer.ToTeamId,
@@ -563,6 +599,12 @@ public class TransferOfferService : ITransferOfferService
             }, ct);
         }
 
+        if (isLoan)
+        {
+            await RegisterLoansAsync(offer, fromTeam, toTeam, targetPlayers, offeredPlayers, cfg, now, ct);
+            return;
+        }
+
         fromTeam.TransferCount++;
         if (offer.Type == OfferType.Swap)
             toTeam.TransferCount++;
@@ -573,10 +615,12 @@ public class TransferOfferService : ITransferOfferService
 
         if (teamsAtLimit.Count > 0)
         {
+            // Empréstimo tem limite próprio: bater o de transferências não derruba as propostas de empréstimo.
             var now2 = _timeProvider.GetUtcNow().UtcDateTime;
             var offersToCancel = await _db.TransferOffers
                 .Where(o => o.OfferId != offer.OfferId
                     && o.Status == OfferStatus.Pending
+                    && o.Type != OfferType.Loan
                     && (teamsAtLimit.Contains(o.FromTeamId) || teamsAtLimit.Contains(o.ToTeamId)))
                 .ToListAsync(ct);
 
@@ -586,6 +630,79 @@ public class TransferOfferService : ITransferOfferService
                 o.UpdatedAtUtc = now2;
             }
         }
+    }
+
+    /// <summary>
+    /// Registra o empréstimo de cada jogador que mudou de time e conta no limite de quem recebeu.
+    /// Chegando no limite, as outras propostas de empréstimo em que ele receberia jogador caem.
+    /// </summary>
+    private async Task RegisterLoansAsync(
+        TransferOffer offer, Team fromTeam, Team toTeam,
+        IReadOnlyCollection<Player> targetPlayers, IReadOnlyCollection<Player> offeredPlayers,
+        TransferConfig cfg, DateTime now, CancellationToken ct)
+    {
+        var (owner, borrower, players) = targetPlayers.Count > 0
+            ? (toTeam, fromTeam, targetPlayers)
+            : (fromTeam, toTeam, offeredPlayers);
+
+        foreach (var player in players)
+        {
+            await _db.Emprestimos.AddAsync(new Emprestimo
+            {
+                EmprestimoId = Guid.NewGuid(),
+                PlayerId = player.PlayerId,
+                DonoTeamId = owner.TeamId,
+                TomadorTeamId = borrower.TeamId,
+                OfferId = offer.OfferId,
+                ValorOpcaoCompra = offer.BuyOptionPrice,
+                Status = EmprestimoStatus.Ativo,
+                InicioUtc = now
+            }, ct);
+        }
+
+        borrower.LoanCount++;
+        if (borrower.LoanCount < cfg.MaxLoans)
+            return;
+
+        var borrowerId = borrower.TeamId;
+        var offersToCancel = await _db.TransferOffers
+            .Where(o => o.OfferId != offer.OfferId
+                && o.Status == OfferStatus.Pending
+                && o.Type == OfferType.Loan
+                && ((o.FromTeamId == borrowerId && o.Players.Any(p => p.IsTarget))
+                    || (o.ToTeamId == borrowerId && o.Players.Any(p => !p.IsTarget))))
+            .ToListAsync(ct);
+
+        foreach (var o in offersToCancel)
+        {
+            o.Status = OfferStatus.Cancelled;
+            o.UpdatedAtUtc = now;
+        }
+    }
+
+    /// <summary>Quem recebe o jogador no empréstimo: quem pediu (alvos) ou o outro time (oferecidos).</summary>
+    private static Guid LoanBorrower(TransferOffer offer)
+        => offer.Players.Any(p => p.IsTarget) ? offer.FromTeamId : offer.ToTeamId;
+
+    private static void EnsureLoanLimit(TransferConfig cfg, Team borrower)
+    {
+        if (borrower.LoanCount >= cfg.MaxLoans)
+            throw new InvalidOperationException($"O time {borrower.TeamName} já atingiu o limite de empréstimos da janela ({borrower.LoanCount}/{cfg.MaxLoans}).");
+    }
+
+    /// <summary>Jogador emprestado fica parado até voltar: não entra em venda, troca nem outro empréstimo.</summary>
+    private async Task EnsureNotOnLoanAsync(IEnumerable<Player> players, CancellationToken ct)
+    {
+        var ids = players.Select(p => p.PlayerId).Distinct().ToList();
+        if (ids.Count == 0) return;
+
+        var emprestado = await _db.Emprestimos.AsNoTracking()
+            .Where(e => e.Status == EmprestimoStatus.Ativo && ids.Contains(e.PlayerId))
+            .Select(e => e.Player.Name)
+            .FirstOrDefaultAsync(ct);
+
+        if (emprestado is not null)
+            throw new InvalidOperationException($"{emprestado} está emprestado e não pode ser negociado até o empréstimo acabar.");
     }
 
     private static void EnsureTransferLimit(TransferConfig cfg, Team team)
@@ -635,7 +752,8 @@ public class TransferOfferService : ITransferOfferService
             targetPlayers.Select(MapPlayerDto).ToList(),
             offeredPlayers.Select(MapPlayerDto).ToList(),
             offer.CreatedAtUtc,
-            offer.UpdatedAtUtc);
+            offer.UpdatedAtUtc,
+            offer.BuyOptionPrice);
     }
 
     private static TransferOfferPlayerDto MapPlayerDto(Player p)

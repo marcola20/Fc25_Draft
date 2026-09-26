@@ -24,7 +24,8 @@ public record TeamDetailsDto(
     int QuickSellCount,
     int TransferCount,
     string? AuxiliarName = null,
-    string? AuxToken = null);
+    string? AuxToken = null,
+    int LoanCount = 0);
 
 public record TeamIdentityDto(
     Guid TeamId,
@@ -50,7 +51,8 @@ public record TeamRosterPlayerDto(
     DateTime? EscolhidoEm,
     int? Rodada,
     int? Escolha,
-    decimal? PrecoPedido = null);
+    decimal? PrecoPedido = null,
+    string? EmprestadoPor = null);
 
 public record TeamExportDto(
     string Time,

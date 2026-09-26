@@ -159,6 +159,12 @@ public static class PlantaoCbfv
                 TransferType.TeamTrade => new PlantaoNoticiaDto(t.Data, PlantaoCategoria.Mercado, "🔄",
                     $"{t.JogadorNome} vai do {Nome(t.DeTimeId)} para o {Nome(t.ParaTimeId)} em troca", "Troca entre times",
                     $"/players/details/{t.PlayerId}", Nome(t.ParaTimeId)),
+                TransferType.Loan => new PlantaoNoticiaDto(t.Data, PlantaoCategoria.Mercado, "🔁",
+                    $"{t.JogadorNome} é emprestado pelo {Nome(t.DeTimeId)} ao {Nome(t.ParaTimeId)}", "Empréstimo até o fim da temporada",
+                    $"/players/details/{t.PlayerId}", Nome(t.ParaTimeId)),
+                TransferType.LoanPurchase => new PlantaoNoticiaDto(t.Data, PlantaoCategoria.Mercado, "✍️",
+                    $"{Nome(t.ParaTimeId)} compra {t.JogadorNome} em definitivo{valor}", "Opção de compra do empréstimo",
+                    $"/players/details/{t.PlayerId}", Nome(t.ParaTimeId)),
                 _ => null
             };
 

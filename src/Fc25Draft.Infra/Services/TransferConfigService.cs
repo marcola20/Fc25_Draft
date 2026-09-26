@@ -42,6 +42,7 @@ public class TransferConfigService : ITransferConfigService
 
         cfg.MaxQuickSellPerWindow = dto.MaxQuickSellPerWindow;
         cfg.MaxTransfers = dto.MaxTransfers;
+        cfg.MaxLoans = dto.MaxLoans;
         cfg.MinRosterSize = dto.MinRosterSize;
         cfg.QuickSellBloqueado = dto.QuickSellBloqueado;
         cfg.AtualizadoEm = DateTime.UtcNow;
@@ -100,8 +101,10 @@ public class TransferConfigService : ITransferConfigService
     public async Task<int> ResetTransferCountsAsync(CancellationToken ct)
     {
         return await _db.Teams
-            .Where(t => t.TransferCount != 0)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.TransferCount, 0), ct);
+            .Where(t => t.TransferCount != 0 || t.LoanCount != 0)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.TransferCount, 0)
+                .SetProperty(t => t.LoanCount, 0), ct);
     }
 
     public async Task SetTransferLimitAsync(Guid teamId, int? limite, CancellationToken ct)
@@ -161,9 +164,10 @@ public class TransferConfigService : ITransferConfigService
     {
         if (d.MaxQuickSellPerWindow < 0) throw new InvalidOperationException("O limite de vendas rápidas não pode ser negativo.");
         if (d.MaxTransfers < 0) throw new InvalidOperationException("O limite de transferências não pode ser negativo.");
+        if (d.MaxLoans < 0) throw new InvalidOperationException("O limite de empréstimos não pode ser negativo.");
         if (d.MinRosterSize < 0) throw new InvalidOperationException("O mínimo de jogadores não pode ser negativo.");
     }
 
     private static TransferConfigDto ToDto(TransferConfig c) =>
-        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado);
+        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans);
 }

@@ -268,6 +268,10 @@
                         }
                     </div>
 
+                    <p class="small text-muted mb-2">
+                        Ao gerar a próxima temporada, todos os jogadores emprestados voltam para os times donos.
+                    </p>
+
                     <button class="btn btn-success" @onclick="GerarProxima" disabled="@(_salvando || !_resumo.PodeGerarProxima)">
                         Gerar temporada @(_temporada + 1)
                     </button>

@@ -6,6 +6,8 @@
 @inject TransferOffersApiClient OffersApi
 @inject TeamsApiClient TeamsApi
 @inject Fc25Draft.Core.Interfaces.ITransferConfigService TransferConfigSvc
+@inject Fc25Draft.Core.Interfaces.IEmprestimoService EmprestimoSvc
+@inject IJSRuntime JS
 
 <div class="mt-3">
     <ul class="nav nav-pills mb-3" role="tablist">
@@ -29,6 +31,16 @@
             <button class="nav-link @(ActiveSubTab == SubTab.Finished ? "active" : "")"
                     type="button" @onclick="() => SwitchSubTab(SubTab.Finished)">
                 Finalizadas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(ActiveSubTab == SubTab.Loans ? "active" : "")"
+                    type="button" @onclick="() => SwitchSubTab(SubTab.Loans)">
+                Empréstimos
+                @if (_loans.Count > 0)
+                {
+                    <span class="badge bg-secondary ms-1">@_loans.Count</span>
+                }
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -142,6 +154,73 @@
             }
         }
 
+        @* ===== EMPRÉSTIMOS ===== *@
+        @if (ActiveSubTab == SubTab.Loans)
+        {
+            <p class="text-muted small">
+                Empréstimos vão até o fim da temporada: quando a próxima começa, o jogador volta sozinho para o dono.
+                Com opção de compra, quem pegou emprestado pode ficar com ele em definitivo pagando o valor combinado.
+                Limite de empréstimos por janela: <strong>@_loansUsed / @_maxLoans</strong>.
+            </p>
+
+            <h6 class="mt-2">Jogadores que você pegou emprestado</h6>
+            @if (BorrowedLoans.Count == 0)
+            {
+                <p class="text-muted small">Nenhum.</p>
+            }
+            else
+            {
+                <ul class="list-group mb-3">
+                    @foreach (var loan in BorrowedLoans)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <a href="/players/details/@loan.PlayerId">@loan.JogadorNome</a>
+                                <span class="text-muted small">(@loan.Posicao, @loan.Overall)</span>
+                                <div class="small text-muted">Emprestado pelo @loan.DonoTeamNome desde @BrazilTime.FormatDateTime(loan.InicioUtc)</div>
+                            </div>
+                            @if (loan.ValorOpcaoCompra is decimal preco)
+                            {
+                                <button class="btn btn-sm btn-outline-success" disabled="@_processing"
+                                        @onclick="() => ExerciseBuyOptionAsync(loan)">
+                                    Comprar por @FormatCurrency(preco)
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-dark">Sem opção de compra</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+            <h6 class="mt-3">Jogadores seus emprestados</h6>
+            @if (LentLoans.Count == 0)
+            {
+                <p class="text-muted small">Nenhum.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var loan in LentLoans)
+                    {
+                        <li class="list-group-item">
+                            <a href="/players/details/@loan.PlayerId">@loan.JogadorNome</a>
+                            <span class="text-muted small">(@loan.Posicao, @loan.Overall)</span>
+                            <div class="small text-muted">
+                                No @loan.TomadorTeamNome até o fim da temporada
+                                @if (loan.ValorOpcaoCompra is decimal preco)
+                                {
+                                    <text> · opção de compra por @FormatCurrency(preco)</text>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+
         @* ===== NOVA PROPOSTA ===== *@
         @if (ActiveSubTab == SubTab.NewOffer)
         {
@@ -199,7 +278,16 @@
                         </div>
                     }
 
-                    @if ((_newOfferType == OfferType.Swap || _selectedOfferedPlayerIds.Count > 0 || _counterOfferParentId.HasValue) && _myRoster.Count > 0)
+                    @if (_newOfferType == OfferType.Loan)
+                    {
+                        <div class="alert alert-info small mt-3 mb-0">
+                            <strong>Empréstimo até o fim da temporada.</strong>
+                            Escolha jogadores de um lado só: os do adversário para pegar emprestado, ou os seus para emprestar.
+                            O valor em dinheiro é a taxa do empréstimo. Conta no limite de empréstimos de quem recebe o jogador, não no de transferências.
+                        </div>
+                    }
+
+                    @if ((_newOfferType is OfferType.Swap or OfferType.Loan || _selectedOfferedPlayerIds.Count > 0 || _counterOfferParentId.HasValue) && _myRoster.Count > 0)
                     {
                         <div class="mt-3">
                             <label class="form-label">Jogadores oferecidos (do seu time)</label>
@@ -239,7 +327,20 @@
                                 }
                             </select>
                         </div>
-                        @if (_newOfferType != OfferType.Swap)
+                        @if (_newOfferType == OfferType.Loan)
+                        {
+                            <div class="col-md-3">
+                                <label class="form-label">Opção de compra</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="text" class="form-control" inputmode="decimal"
+                                           value="@FormatMoneyInput(_newOfferBuyOption)"
+                                           @onchange="OnBuyOptionChanged"
+                                           placeholder="Sem opção" />
+                                </div>
+                            </div>
+                        }
+                        else if (_newOfferType != OfferType.Swap)
                         {
                             <div class="col-md-3">
                                 <label class="form-label">Revenda futura</label>
@@ -351,6 +452,14 @@
                         </div>
                     }
 
+                    @if (_detailOffer.BuyOptionPrice is decimal opcaoDetalhe)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Opção de compra:</strong></div>
+                            <div class="col-sm-8">@FormatCurrency(opcaoDetalhe)</div>
+                        </div>
+                    }
+
                     @if (_detailOffer.SellOnPercentage > 0)
                     {
                         <div class="row mb-3">
@@ -405,7 +514,17 @@
                 </div>
                 <div class="modal-body">
                     <p>Deseja aceitar a proposta de <strong>@_acceptConfirmOffer.FromTeamName</strong>?</p>
-                    <p class="mb-0"><strong>Transferências restantes após aceite:</strong> @(Math.Max(0, _maxTransfers - TransferCount - 1)) / @_maxTransfers</p>
+                    @if (_acceptConfirmOffer.Type == nameof(OfferType.Loan))
+                    {
+                        <p class="mb-0">
+                            É um <strong>empréstimo até o fim da temporada</strong>@(_acceptConfirmOffer.BuyOptionPrice is decimal opcaoAceite ? $", com opção de compra por {FormatCurrency(opcaoAceite)}" : "").
+                            Conta no limite de empréstimos de quem recebe o jogador, não no de transferências.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="mb-0"><strong>Transferências restantes após aceite:</strong> @(Math.Max(0, _maxTransfers - TransferCount - 1)) / @_maxTransfers</p>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" @onclick="CloseAcceptConfirmModal" disabled="@_processing">Cancelar</button>
@@ -457,9 +576,16 @@
     private decimal _newOfferMoney;
     private string _selectedPayerTeamId = string.Empty;
     private decimal _newOfferSellOn;
+    private decimal _newOfferBuyOption;
     private string? _newOfferClauses;
     private string? _newOfferNotes;
     private Guid? _counterOfferParentId;
+
+    private List<EmprestimoDto> _loans = new();
+    private List<EmprestimoDto> BorrowedLoans => _loans.Where(l => l.TomadorTeamId == TeamId).ToList();
+    private List<EmprestimoDto> LentLoans => _loans.Where(l => l.DonoTeamId == TeamId).ToList();
+    private int _maxLoans = 3;
+    private int _loansUsed;
 
     private TransferOfferListItemDto? _detailOffer;
     private TransferOfferListItemDto? _acceptConfirmOffer;
@@ -479,7 +605,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(TeamId, CancellationToken.None); }
+        try
+        {
+            _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(TeamId, CancellationToken.None);
+            _maxLoans = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxLoans;
+        }
         catch { /* mantém o padrão se a config não carregar */ }
         await LoadDataAsync();
 
@@ -502,7 +632,7 @@
             ResetNewOfferForm();
             _selectedTargetTeamId = item.TeamId.ToString();
             var roster = await TeamsApi.GetRosterByIdAsync(item.TeamId);
-            _targetRoster = roster?.Jogadores?.ToList() ?? new();
+            _targetRoster = Negotiable(roster);
             _selectedTargetPlayerIds.Add(playerGuid);
             _newOfferType = OfferType.Sale;
             _newOfferMoney = item.AskingPrice;
@@ -540,7 +670,10 @@
             _allTeams = (await teamsTask).Items?.ToList() ?? new();
 
             var myRosterDto = await TeamsApi.GetRosterByIdAsync(TeamId);
-            _myRoster = myRosterDto?.Jogadores?.ToList() ?? new();
+            _myRoster = Negotiable(myRosterDto);
+
+            _loans = (await EmprestimoSvc.ListarAtivosAsync(TeamId, CancellationToken.None)).ToList();
+            _loansUsed = (await TeamsApi.GetByIdAsync(TeamId))?.LoanCount ?? 0;
         }
         catch (Exception ex)
         {
@@ -570,7 +703,7 @@
             try
             {
                 var roster = await TeamsApi.GetRosterByIdAsync(targetId);
-                _targetRoster = roster?.Jogadores?.ToList() ?? new();
+                _targetRoster = Negotiable(roster);
             }
             catch (Exception ex)
             {
@@ -648,6 +781,7 @@
         _newOfferType = Enum.TryParse<OfferType>(offer.Type, out var t) ? t : OfferType.Sale;
         _newOfferMoney = offer.Money;
         _newOfferSellOn = offer.SellOnPercentage;
+        _newOfferBuyOption = offer.BuyOptionPrice ?? 0m;
         _newOfferClauses = offer.Clauses;
         _newOfferNotes = offer.Notes;
         _selectedPayerTeamId = offer.MoneyPayerTeamId?.ToString() ?? string.Empty;
@@ -670,7 +804,7 @@
             try
             {
                 var roster = await TeamsApi.GetRosterByIdAsync(offer.FromTeamId);
-                _targetRoster = roster?.Jogadores?.ToList() ?? new();
+                _targetRoster = Negotiable(roster);
 
                 // Remove stale selections: keep only players still in the current rosters
                 var currentTargetGuids = _targetRoster.Select(p => p.PlayerGuid).ToHashSet();
@@ -710,6 +844,9 @@
             if (_selectedTargetPlayerIds.Count == 0 && _selectedOfferedPlayerIds.Count == 0)
                 throw new InvalidOperationException("Selecione ao menos um jogador na negociação.");
 
+            if (_newOfferType == OfferType.Loan && _selectedTargetPlayerIds.Count > 0 && _selectedOfferedPlayerIds.Count > 0)
+                throw new InvalidOperationException("No empréstimo os jogadores vão para um time só: peça ou ofereça, não os dois.");
+
             Guid? payerTeamId = null;
             if (_newOfferMoney > 0)
             {
@@ -726,10 +863,11 @@
                 OfferedPlayerIds: _selectedOfferedPlayerIds.Count > 0 ? _selectedOfferedPlayerIds.ToArray() : null,
                 Money: _newOfferMoney,
                 MoneyPayerTeamId: payerTeamId,
-                SellOnPercentage: _newOfferType == OfferType.Swap ? 0 : _newOfferSellOn,
+                SellOnPercentage: _newOfferType is OfferType.Swap or OfferType.Loan ? 0 : _newOfferSellOn,
                 Clauses: _newOfferClauses,
                 Notes: _newOfferNotes,
-                ParentOfferId: _counterOfferParentId);
+                ParentOfferId: _counterOfferParentId,
+                BuyOptionPrice: _newOfferType == OfferType.Loan && _newOfferBuyOption > 0 ? _newOfferBuyOption : null);
 
             await OffersApi.CreateOfferAsync(dto, TeamToken);
             _success = _counterOfferParentId.HasValue ? "Contraproposta enviada!" : "Proposta enviada!";
@@ -758,6 +896,7 @@
         _newOfferMoney = 0;
         _selectedPayerTeamId = string.Empty;
         _newOfferSellOn = 0;
+        _newOfferBuyOption = 0;
         _newOfferClauses = null;
         _newOfferNotes = null;
     }
@@ -833,6 +972,11 @@
                     </div>
                 }
 
+                @if (offer.BuyOptionPrice is decimal opcaoCard)
+                {
+                    <div class="mt-1"><strong>Opção de compra:</strong> @FormatCurrency(opcaoCard)</div>
+                }
+
                 @if (offer.SellOnPercentage > 0)
                 {
                     <div class="mt-1"><strong>Revenda futura:</strong> @offer.SellOnPercentage.ToString("F2", BrazilCulture)%</div>
@@ -893,6 +1037,49 @@
             _newOfferSellOn = 0m;
     }
 
+    /// <summary>Emprestado não entra em proposta nenhuma até voltar para o dono.</summary>
+    private static List<TeamRosterPlayerDto> Negotiable(TeamRosterDto? roster)
+        => roster?.Jogadores?.Where(p => p.EmprestadoPor is null).ToList() ?? new();
+
+    private void OnBuyOptionChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        var cleaned = new string(raw.Where(c => char.IsDigit(c) || c == ',').ToArray());
+
+        if (decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var parsed))
+            _newOfferBuyOption = Math.Max(0, decimal.Round(parsed, 2, MidpointRounding.AwayFromZero));
+        else
+            _newOfferBuyOption = 0m;
+    }
+
+    private async Task ExerciseBuyOptionAsync(EmprestimoDto loan)
+    {
+        if (string.IsNullOrEmpty(TeamToken) || loan.ValorOpcaoCompra is not decimal preco) return;
+
+        var confirmado = await JS.InvokeAsync<bool>("confirm",
+            $"Comprar {loan.JogadorNome} do {loan.DonoTeamNome} em definitivo por {FormatCurrency(preco)}?");
+        if (!confirmado) return;
+
+        _processing = true;
+        _error = null;
+        _success = null;
+
+        try
+        {
+            await EmprestimoSvc.ExercerOpcaoCompraAsync(loan.EmprestimoId, TeamToken, CancellationToken.None);
+            _success = $"{loan.JogadorNome} agora é seu em definitivo.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
     private void OnMoneyChanged(ChangeEventArgs e)
     {
         var raw = e.Value?.ToString() ?? string.Empty;
@@ -937,6 +1124,7 @@
         Received,
         Sent,
         Finished,
+        Loans,
         NewOffer
     }
 }

@@ -13,6 +13,7 @@
 @inject LayoutNavigationService NavigationService
 @inject ILogger<Fc25Draft.Web.Pages.Admin.Transfers> Logger
 @inject IJSRuntime JSRuntime
+@inject IEmprestimoService EmprestimoSvc
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -77,6 +78,12 @@ else
                 {
                     <span class="badge bg-warning text-dark ms-1">@pendingOffers.Count</span>
                 }
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(selectedTab == "loans" ? "active" : null)"
+                    @onclick='() => SelectTab("loans")'>
+                Empréstimos
             </button>
         </li>
     </ul>
@@ -606,6 +613,11 @@ else
                                             </div>
                                         }
 
+                                        @if (offer.BuyOptionPrice is decimal opcao)
+                                        {
+                                            <div class="mb-1"><strong>Opção de compra:</strong> @FormatCurrency(opcao)</div>
+                                        }
+
                                         @if (offer.SellOnPercentage > 0)
                                         {
                                             <div class="mb-1"><strong>Percentual de revenda:</strong> @offer.SellOnPercentage%</div>
@@ -624,6 +636,68 @@ else
                                 </div>
                             </div>
                         }
+                    </div>
+                }
+            </div>
+            break;
+
+        case "loans":
+            <div>
+                @if (!string.IsNullOrEmpty(loansErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@loansErrorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(loansSuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@loansSuccessMessage</div>
+                }
+
+                <p class="text-muted small">
+                    Empréstimos em andamento. Todos voltam sozinhos quando a próxima temporada é gerada em /admin/temporada;
+                    aqui dá para devolver um antes da hora. Jogador emprestado não pode ser vendido, trocado nem movido até voltar.
+                </p>
+
+                @if (isLoadingLoans)
+                {
+                    <p><em>Carregando empréstimos...</em></p>
+                }
+                else if (activeLoans.Count == 0)
+                {
+                    <p class="text-muted">Nenhum empréstimo em andamento.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Jogador</th>
+                                    <th>Dono</th>
+                                    <th>Com</th>
+                                    <th class="text-end">Opção de compra</th>
+                                    <th>Desde</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var loan in activeLoans)
+                                {
+                                    <tr>
+                                        <td>@loan.JogadorNome <span class="text-muted small">(@loan.Posicao, @loan.Overall)</span></td>
+                                        <td>@loan.DonoTeamNome</td>
+                                        <td>@loan.TomadorTeamNome</td>
+                                        <td class="text-end">@(loan.ValorOpcaoCompra is decimal v ? FormatCurrency(v) : "—")</td>
+                                        <td class="small">@BrazilTime.FormatDateTime(loan.InicioUtc)</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@isLoadingLoans"
+                                                    @onclick="() => DevolverEmprestimoAsync(loan)">
+                                                Devolver agora
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 }
             </div>
@@ -735,6 +809,10 @@ else
         {
             _ = LoadPendingOffersAsync();
         }
+        else if (tab == "loans")
+        {
+            _ = LoadLoansAsync();
+        }
     }
 
     private async Task LoadPendingOffersAsync()
@@ -758,6 +836,53 @@ else
             isLoadingOffers = false;
             StateHasChanged();
         }
+    }
+
+    private readonly List<EmprestimoDto> activeLoans = new();
+    private bool isLoadingLoans;
+    private string? loansErrorMessage;
+    private string? loansSuccessMessage;
+
+    private async Task LoadLoansAsync()
+    {
+        isLoadingLoans = true;
+        loansErrorMessage = null;
+        try
+        {
+            var loans = await EmprestimoSvc.ListarAtivosAsync(null, CancellationToken.None);
+            activeLoans.Clear();
+            activeLoans.AddRange(loans);
+        }
+        catch (Exception ex)
+        {
+            loansErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingLoans = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DevolverEmprestimoAsync(EmprestimoDto loan)
+    {
+        var confirmado = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Devolver {loan.JogadorNome} do {loan.TomadorTeamNome} para o {loan.DonoTeamNome} agora?");
+        if (!confirmado) return;
+
+        loansErrorMessage = null;
+        loansSuccessMessage = null;
+        try
+        {
+            await EmprestimoSvc.DevolverAsync(loan.EmprestimoId, "admin", CancellationToken.None);
+            loansSuccessMessage = $"{loan.JogadorNome} voltou para o {loan.DonoTeamNome}.";
+        }
+        catch (Exception ex)
+        {
+            loansErrorMessage = ex.Message;
+        }
+
+        await LoadLoansAsync();
     }
 
     private static string TranslateOfferType(string type) => type switch

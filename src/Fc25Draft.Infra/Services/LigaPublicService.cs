@@ -1194,7 +1194,8 @@ public class LigaPublicService : ILigaPublicService
             .ToList();
 
         var transferencias = await _db.TransferHistories.AsNoTracking()
-            .Where(t => t.Type == TransferType.MarketAuction || t.Type == TransferType.TeamSale || t.Type == TransferType.TeamTrade)
+            .Where(t => t.Type == TransferType.MarketAuction || t.Type == TransferType.TeamSale || t.Type == TransferType.TeamTrade
+                        || t.Type == TransferType.Loan || t.Type == TransferType.LoanPurchase)
             .Select(t => new PlantaoTransferenciaInput(t.PerformedAtUtc, t.Type, t.PlayerId, t.Player.Name, t.FromTeamId, t.ToTeamId, t.Amount))
             .ToListAsync(ct);
 
@@ -1295,11 +1296,12 @@ public class LigaPublicService : ILigaPublicService
             .ToList();
 
         // Na troca o valor é a avaliação dos jogadores, não dinheiro: fica fora do gasto e do recebido.
+        // No empréstimo quem paga a taxa pode ser qualquer um dos dois lados, então ela também fica de fora.
         var gasto = movimentacoes
-            .Where(m => m.Entrada && m.Tipo is TransferType.MarketAuction or TransferType.TeamSale)
+            .Where(m => m.Entrada && m.Tipo is TransferType.MarketAuction or TransferType.TeamSale or TransferType.LoanPurchase)
             .Sum(m => m.Valor ?? 0m);
         var recebido = movimentacoes
-            .Where(m => !m.Entrada && m.Tipo is TransferType.TeamSale or TransferType.QuickSell or TransferType.ExpansionDraft)
+            .Where(m => !m.Entrada && m.Tipo is TransferType.TeamSale or TransferType.QuickSell or TransferType.ExpansionDraft or TransferType.LoanPurchase)
             .Sum(m => m.Valor ?? 0m);
 
         return new TimeTransferenciasDto(

@@ -219,6 +219,8 @@ public partial class AdminTransferService
             if (players.Any(p => !PlayerBelongsToTeam(p, fromTeamId)))
                 throw new InvalidOperationException("Todos os jogadores devem pertencer ao time de origem.");
 
+            await EnsureNotOnLoanAsync(players.Select(p => p.PlayerId), ctoken).ConfigureAwait(false);
+
             var playerNumericIds = players.Select(p => p.PlayerId).ToArray();
             var hasActiveListings = await _dbContext.MarketItems.AsNoTracking()
                 .AnyAsync(i => playerNumericIds.Contains(i.PlayerId) && i.Status == MarketItemStatus.Active, ctoken)
@@ -357,6 +359,8 @@ public partial class AdminTransferService
                 throw new InvalidOperationException("Jogadores de Time A não encontrados.");
             if (bEntities.Count != playersFromBIds.Length)
                 throw new InvalidOperationException("Jogadores de Time B não encontrados.");
+
+            await EnsureNotOnLoanAsync(players.Select(p => p.PlayerId), ctoken).ConfigureAwait(false);
 
             if (aEntities.Any(p => !PlayerBelongsToTeam(p, teamAId)))
                 throw new InvalidOperationException("Todos os jogadores do Time A devem pertencer ao próprio time.");
@@ -555,6 +559,8 @@ public partial class AdminTransferService
 
             var fromTeamId = player.CurrentTeamId;
 
+            await EnsureNotOnLoanAsync(new[] { player.PlayerId }, ctoken).ConfigureAwait(false);
+
             var toTeamExists = await _dbContext.Teams.AnyAsync(t => t.TeamId == toTeamId, ctoken).ConfigureAwait(false);
             if (!toTeamExists) throw new KeyNotFoundException("Time de destino não encontrado.");
 
@@ -668,5 +674,19 @@ public partial class AdminTransferService
             await work(ct);
             await tx.CommitAsync(ct);
         });
+    }
+
+    /// <summary>Emprestado só se mexe devolvendo o empréstimo primeiro (em /admin/negociacoes).</summary>
+    private async Task EnsureNotOnLoanAsync(IEnumerable<int> playerIds, CancellationToken ct)
+    {
+        var ids = playerIds.Distinct().ToList();
+        var emprestado = await _dbContext.Emprestimos.AsNoTracking()
+            .Where(e => e.Status == EmprestimoStatus.Ativo && ids.Contains(e.PlayerId))
+            .Select(e => e.Player.Name)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        if (emprestado is not null)
+            throw new InvalidOperationException($"{emprestado} está emprestado. Encerre o empréstimo antes de movimentar o jogador.");
     }
 }

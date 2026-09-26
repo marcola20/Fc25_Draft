@@ -15,6 +15,7 @@ public class TransferOfferConfiguration : IEntityTypeConfiguration<TransferOffer
         builder.Property(x => x.Money).HasColumnType("numeric(18,2)");
         builder.Property(x => x.MoneyPayerTeamId).IsRequired(false);
         builder.Property(x => x.SellOnPercentage).HasColumnType("numeric(5,2)");
+        builder.Property(x => x.BuyOptionPrice).HasColumnType("numeric(18,2)");
         builder.Property(x => x.Clauses).HasMaxLength(2000);
         builder.Property(x => x.Notes).HasMaxLength(2000);
         builder.Property(x => x.CreatedAtUtc).IsRequired();

@@ -13,6 +13,9 @@ public class TransferConfig
     /// <summary>Máximo de transferências por janela (por time).</summary>
     public int MaxTransfers { get; set; }
 
+    /// <summary>Máximo de jogadores que um time pode pegar emprestado por janela.</summary>
+    public int MaxLoans { get; set; }
+
     /// <summary>Quantidade mínima de jogadores que um elenco deve manter.</summary>
     public int MinRosterSize { get; set; }
 
@@ -36,6 +39,7 @@ public class TransferConfig
         Id = 1,
         MaxQuickSellPerWindow = 5,
         MaxTransfers = 5,
+        MaxLoans = 3,
         MinRosterSize = 14,
         QuickSellBloqueado = true
     };

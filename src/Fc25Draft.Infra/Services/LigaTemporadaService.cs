@@ -19,11 +19,13 @@ public class LigaTemporadaService : ILigaTemporadaService
 
     private readonly DraftDbContext _db;
     private readonly ILigaAdminService _ligas;
+    private readonly IEmprestimoService _emprestimos;
 
-    public LigaTemporadaService(DraftDbContext db, ILigaAdminService ligas)
+    public LigaTemporadaService(DraftDbContext db, ILigaAdminService ligas, IEmprestimoService emprestimos)
     {
         _db = db;
         _ligas = ligas;
+        _emprestimos = emprestimos;
     }
 
     public async Task<IReadOnlyList<int>> ListTemporadasAsync(CancellationToken ct) =>
@@ -171,6 +173,9 @@ public class LigaTemporadaService : ILigaTemporadaService
             await _ligas.ConfigurarTimesLigaAsync(serieB.LigaId, timesSerieB, ct);
             criadas.Add(serieB);
         }
+
+        // Temporada nova: os emprestados voltam para os donos.
+        await _emprestimos.DevolverTodosAsync("fim-de-temporada", ct);
 
         return criadas;
     }

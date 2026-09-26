@@ -4,7 +4,8 @@ public record TransferConfigDto(
     int MaxQuickSellPerWindow,
     int MaxTransfers,
     int MinRosterSize,
-    bool QuickSellBloqueado = true);
+    bool QuickSellBloqueado = true,
+    int MaxLoans = 3);
 
 /// <summary>Contador de vendas rápidas (quick sell) de um time na janela atual.</summary>
 /// <param name="LimiteIndividual">Limite só deste time; nulo usa o limite geral da janela.</param>

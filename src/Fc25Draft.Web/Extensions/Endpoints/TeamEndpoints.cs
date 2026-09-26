@@ -87,7 +87,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         Jogadores = t.Roster.Count,
                         t.Budget,
                         t.QuickSellCount,
-                        t.TransferCount
+                        t.TransferCount,
+                        t.LoanCount
                     })
                     .FirstOrDefaultAsync(ct);
 
@@ -106,7 +107,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 var auxToken = noComando.FirstOrDefault(p => p.Papel == PapelTreinador.Auxiliar)?.Token;
                 var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
 
-                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken);
+                var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken, team.LoanCount);
                 return Results.Ok(dto);
             });
 
@@ -150,7 +151,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault(),
-                                r.AskingPrice))
+                                r.AskingPrice,
+                                db.Emprestimos
+                                    .Where(e => e.PlayerId == r.PlayerId && e.Status == EmprestimoStatus.Ativo)
+                                    .Select(e => e.DonoTeam.TeamName)
+                                    .FirstOrDefault()))
                             .ToList(),
                         t.AuxiliarName))
                     .ToListAsync(ct);
@@ -180,7 +185,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => p.PickedAtUtc).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.RoundNumber).FirstOrDefault(),
                                 db.DraftPicks.Where(p => p.PlayerId == r.PlayerId).Select(p => (int?)p.PickInRound).FirstOrDefault(),
-                                r.AskingPrice))
+                                r.AskingPrice,
+                                db.Emprestimos
+                                    .Where(e => e.PlayerId == r.PlayerId && e.Status == EmprestimoStatus.Ativo)
+                                    .Select(e => e.DonoTeam.TeamName)
+                                    .FirstOrDefault()))
                             .ToList(),
                         t.AuxiliarName))
                     .FirstOrDefaultAsync(ct);

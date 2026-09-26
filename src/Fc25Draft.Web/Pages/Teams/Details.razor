@@ -15,6 +15,7 @@
 @inject ITransferConfigService TransferConfigSvc
 @inject TeamAccessService TeamAccess
 @inject TransferOffersApiClient OffersApi
+@inject IEmprestimoService EmprestimoSvc
 
 @implements IDisposable
 
@@ -56,8 +57,12 @@ else
         <dt class="col-sm-3">Jogadores</dt>
         <dd class="col-sm-9">@team.Jogadores</dd>
 
-        <dt class="col-sm-3">Caixa</dt>
-        <dd class="col-sm-9">@team.Caixa</dd>
+        @* O caixa é só do próprio time (e da organização): os outros não veem. *@
+        @if (_canQuickSell || AdminAuth.IsAdmin)
+        {
+            <dt class="col-sm-3">Caixa</dt>
+            <dd class="col-sm-9">@team.Caixa</dd>
+        }
 
         <dt class="col-sm-3">Valor do Time</dt>
         <dd class="col-sm-9">@FormatCurrency(teamAmount ?? 0m)</dd>
@@ -276,12 +281,22 @@ else
                                             À venda · @FormatCurrency(preco)
                                         </span>
                                     }
+                                    @if (player.EmprestadoPor is string dono)
+                                    {
+                                        <span class="badge bg-info text-dark ms-1" title="Volta para o dono no fim da temporada">
+                                            Emprestado pelo @dono
+                                        </span>
+                                    }
                                 </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
                                 <td>@player.Overall</td>
                                 <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
                                 <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
-                                @if (_canQuickSell)
+                                @if (_canQuickSell && player.EmprestadoPor is not null)
+                                {
+                                    <td class="text-center text-nowrap pe-0 text-muted small" title="Emprestado não pode ser vendido">—</td>
+                                }
+                                else if (_canQuickSell)
                                 {
                                     <td class="text-center text-nowrap pe-0">
                                         <button type="button"
@@ -319,6 +334,20 @@ else
                     </tbody>
                 </table>
             </div>
+        }
+
+        @if (_emprestadosFora.Count > 0)
+        {
+            <h6 class="mt-4">Emprestados a outros times</h6>
+            <ul class="list-unstyled small mb-0">
+                @foreach (var loan in _emprestadosFora)
+                {
+                    <li>
+                        <a href="/players/details/@loan.PlayerId">@loan.JogadorNome</a>
+                        <span class="text-muted">(@loan.Posicao, @loan.Overall) · no @loan.TomadorTeamNome até o fim da temporada</span>
+                    </li>
+                }
+            </ul>
         }
     </section>
 
@@ -456,6 +485,7 @@ else
     private int _maxQuickSell = 5;
     private bool _quickSellBloqueado = true;
     private decimal? teamAmount;
+    private List<EmprestimoDto> _emprestadosFora = new();
     private TeamRosterDto? roster;
     private string? errorMessage;
     private bool isLoading = true;
@@ -579,6 +609,9 @@ else
             }
 
             roster = await TeamsApiClient.GetRosterByIdAsync(Id);
+            _emprestadosFora = (await EmprestimoSvc.ListarAtivosAsync(Id, CancellationToken.None))
+                .Where(e => e.DonoTeamId == Id)
+                .ToList();
 
             if (roster is not null)
             {
@@ -646,7 +679,8 @@ else
                 player.Overall,
                 player.Idade,
                 basePrice,
-                player.PrecoPedido));
+                player.PrecoPedido,
+                player.EmprestadoPor));
         }
 
         teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
@@ -994,5 +1028,6 @@ else
         int Overall,
         int? Age,
         decimal BasePrice,
-        decimal? AskingPrice);
+        decimal? AskingPrice,
+        string? EmprestadoPor = null);
 }

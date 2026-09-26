@@ -405,9 +405,11 @@ public class DraftExpansaoService
         var bloqueados = await GetTimesNoLimiteDePerdasAsync(draft, ct);
         var draftId = draft.DraftId;
 
+        // Emprestado não entra: o time que está com ele não é o dono.
         return jogadores.Where(p =>
             p.TeamRosters.Any(r => !novos.Contains(r.TeamId) && !bloqueados.Contains(r.TeamId))
-            && !_db.DraftProtecoes.Any(x => x.DraftId == draftId && x.PlayerId == p.PlayerId));
+            && !_db.DraftProtecoes.Any(x => x.DraftId == draftId && x.PlayerId == p.PlayerId)
+            && !_db.Emprestimos.Any(e => e.PlayerId == p.PlayerId && e.Status == EmprestimoStatus.Ativo));
     }
 
     /// <summary>

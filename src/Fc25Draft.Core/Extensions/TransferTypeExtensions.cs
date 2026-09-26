@@ -11,6 +11,9 @@ public static class TransferTypeExtensions
         TransferType.TeamTrade => "Troca entre times",
         TransferType.QuickSell => "Venda rápida",
         TransferType.ExpansionDraft => "Draft de expansão",
+        TransferType.Loan => "Empréstimo",
+        TransferType.LoanReturn => "Fim de empréstimo",
+        TransferType.LoanPurchase => "Compra após empréstimo",
         _ => type.ToString()
     };
 }

@@ -78,6 +78,12 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (player.TeamRosters.All(r => r.TeamId != teamId))
                     throw new QuickSellException("Jogador não pertence ao time informado.", StatusCodes.Status404NotFound);
 
+                var emprestado = await _dbContext.Emprestimos
+                    .AnyAsync(e => e.PlayerId == player.PlayerId && e.Status == EmprestimoStatus.Ativo, ct)
+                    .ConfigureAwait(false);
+                if (emprestado)
+                    throw new QuickSellException("Jogador emprestado não pode ser vendido.", StatusCodes.Status409Conflict);
+
                 var cfg = await _dbContext.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct).ConfigureAwait(false)
                     ?? TransferConfig.Default();
 

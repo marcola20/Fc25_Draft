@@ -13,7 +13,8 @@ public record CreateTransferOfferDto(
     decimal SellOnPercentage,
     string? Clauses,
     string? Notes,
-    Guid? ParentOfferId);
+    Guid? ParentOfferId,
+    decimal? BuyOptionPrice = null);
 
 public record RespondToOfferDto(
     OfferStatus Response);
@@ -36,7 +37,8 @@ public record TransferOfferListItemDto(
     IReadOnlyList<TransferOfferPlayerDto> TargetPlayers,
     IReadOnlyList<TransferOfferPlayerDto> OfferedPlayers,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    decimal? BuyOptionPrice = null);
 
 public record TransferOfferPlayerDto(
     int PlayerId,

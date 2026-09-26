@@ -158,6 +158,11 @@
                                     <div class="form-text">Máximo de transferências por time.</div>
                                 </div>
                                 <div class="col-12 col-md-4">
+                                    <label class="form-label">Empréstimos por janela</label>
+                                    <input type="number" min="0" class="form-control" @bind="_maxLoans" />
+                                    <div class="form-text">Quantos jogadores um time pode pegar emprestado. Separado das transferências.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
                                     <label class="form-label">Mínimo de jogadores no elenco</label>
                                     <input type="number" min="0" class="form-control" @bind="_minRoster" />
                                     <div class="form-text">Um time não pode ficar abaixo disto.</div>
@@ -266,7 +271,7 @@
                         <div class="card-header fw-bold text-danger">Transferências por janela dos times</div>
                         <div class="card-body">
                             <p class="text-muted small mb-3">
-                                Zera o contador de transferências de <strong>todos os times</strong> (use na virada de janela/temporada).
+                                Zera o contador de transferências e o de empréstimos de <strong>todos os times</strong> (use na virada de janela/temporada).
                                 Não desfaz transferências já feitas. Depois ajuste na tabela quem precisa de valor personalizado.
                             </p>
                             <button class="btn btn-outline-danger" @onclick="ZerarTransferencias" disabled="@_saving">
@@ -389,7 +394,7 @@
     private decimal _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35;
 
     // Transferências
-    private int _maxQuickSell, _maxTransfers, _minRoster;
+    private int _maxQuickSell, _maxTransfers, _minRoster, _maxLoans;
     private int _maxQuickSellSalvo, _maxTransfersSalvo, _minRosterSalvo;
     private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
     private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
@@ -436,6 +441,7 @@
         _maxTransfersSalvo = t.MaxTransfers;
         _minRoster = t.MinRosterSize;
         _minRosterSalvo = t.MinRosterSize;
+        _maxLoans = t.MaxLoans;
         _quickSellBloqueado = t.QuickSellBloqueado;
         _quickSellBloqueadoSalvo = t.QuickSellBloqueado;
     }
@@ -598,7 +604,7 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado), CancellationToken.None);
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans), CancellationToken.None);
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();
@@ -637,6 +643,7 @@
         _maxQuickSell = d.MaxQuickSellPerWindow;
         _maxTransfers = d.MaxTransfers;
         _minRoster = d.MinRosterSize;
+        _maxLoans = d.MaxLoans;
         _quickSellBloqueado = d.QuickSellBloqueado;
         _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";
     }

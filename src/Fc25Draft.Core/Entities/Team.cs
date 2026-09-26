@@ -10,6 +10,9 @@ public class Team
     public decimal BudgetBlocked { get; set; }
     public int QuickSellCount { get; set; }
     public int TransferCount { get; set; }
+
+    /// <summary>Empréstimos que o time pegou na janela; tem limite próprio, separado das transferências.</summary>
+    public int LoanCount { get; set; }
     public bool IsAdmin { get; set; }
 
     /// <summary>
