@@ -47,6 +47,7 @@ public class LayoutNavigationService
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
             new("Treinadores", "/treinadores", "oi oi-person"),
+            new("Bolão da rodada", "/bolao", "oi oi-target"),
             new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart"),
             new("Recordes", "/liga/recordes", "oi oi-star"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
@@ -353,6 +354,31 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Configurações")
+            }
+        },
+        ["/bolao"] = new PageDefinition
+        {
+            Route = "/bolao",
+            Title = "Bolão da rodada",
+            Subtitle = "Chute os placares antes da bola rolar",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Bolão")
+            }
+        },
+        ["/bolao/ranking"] = new PageDefinition
+        {
+            Route = "/bolao/ranking",
+            Title = "Ranking do bolão",
+            Subtitle = "Quem chuta melhor a rodada da CBFV",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Bolão", "/bolao"),
+                new("Ranking")
             }
         },
         ["/treinadores"] = new PageDefinition

@@ -50,6 +50,21 @@ public class TreinadorService : ITreinadorService
             .Include(t => t.Passagens).ThenInclude(p => p.Time)
             .FirstOrDefaultAsync(t => t.Token.ToUpper() == limpo.ToUpper(), ct);
 
+        // O administrador entra com o token dele, que não é de treinador. Se esse token
+        // estiver ligado a uma pessoa, é ela que responde — assim o admin também palpita.
+        if (treinador is null)
+        {
+            var doAdmin = await _db.AdminTokens.AsNoTracking()
+                .Where(t => t.IsActive && t.TreinadorId != null && t.Token.ToUpper() == limpo.ToUpper())
+                .Select(t => t.TreinadorId!.Value)
+                .FirstOrDefaultAsync(ct);
+
+            if (doAdmin != Guid.Empty)
+                treinador = await _db.Treinadores.AsNoTracking()
+                    .Include(t => t.Passagens).ThenInclude(p => p.Time)
+                    .FirstOrDefaultAsync(t => t.TreinadorId == doAdmin, ct);
+        }
+
         return treinador is null ? null : ToDto(treinador);
     }
 

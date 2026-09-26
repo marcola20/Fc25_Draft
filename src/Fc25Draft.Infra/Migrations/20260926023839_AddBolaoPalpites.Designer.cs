@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926023839_AddBolaoPalpites")]
+    partial class AddBolaoPalpites
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -81,9 +84,6 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid?>("TreinadorId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("AdminTokenId");
 
                     b.HasIndex("IsActive")
@@ -92,8 +92,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("Token")
                         .IsUnique()
                         .HasDatabaseName("IX_AdminTokens_Token_Unique");
-
-                    b.HasIndex("TreinadorId");
 
                     b.ToTable("AdminTokens");
                 });
@@ -2192,16 +2190,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("TreinadorId", "Desde");
 
                     b.ToTable("TreinadorPassagens", (string)null);
-                });
-
-            modelBuilder.Entity("Fc25Draft.Core.Entities.AdminToken", b =>
-                {
-                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
-                        .WithMany()
-                        .HasForeignKey("TreinadorId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Treinador");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.BolaoPalpite", b =>

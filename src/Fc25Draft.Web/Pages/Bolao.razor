@@ -1,0 +1,281 @@
+@page "/bolao"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IBolaoService BolaoSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject EscudoService EscudoService
+@implements IDisposable
+
+<PageTitle>Bolão da rodada</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <h1 class="h3 mb-0">🎯 Bolão da rodada</h1>
+        <a href="/bolao/ranking" class="btn btn-sm btn-outline-secondary">🏅 Ranking</a>
+    </div>
+    <p class="text-muted small mb-4">
+        Cravou o placar, @BolaoPontuacao.PlacarExato pontos. Acertou o vencedor e o placar de um dos times,
+        @BolaoPontuacao.VencedorEUmPlacar. Acertou só o resultado, @BolaoPontuacao.SoOVencedor.
+        Os palpites fecham quando a bola rola.
+    </p>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_eu is null)
+    {
+        <div class="alert alert-info">
+            Entre com o seu token (botão <strong>Login</strong> no topo) para palpitar. O bolão é por pessoa —
+            treinador e auxiliar jogam separado, e quem está sem clube joga também.
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <div>
+                    <div class="fw-semibold">@_eu.Nome</div>
+                    <div class="text-muted small">@(_eu.Hoje is null ? "Sem clube" : _eu.TimeAtual)</div>
+                </div>
+                @if (_resumo is { Palpites: > 0 } r)
+                {
+                    <div class="ms-auto d-flex gap-4 text-center">
+                        <div><div class="h5 mb-0">@r.Pontos</div><div class="text-muted small">pontos</div></div>
+                        <div><div class="h5 mb-0">@r.Cravadas</div><div class="text-muted small">cravadas</div></div>
+                        <div><div class="h5 mb-0">@r.RodadasVencidas</div><div class="text-muted small">rodadas ganhas</div></div>
+                        @if (r.PosicaoGeral is { } pos)
+                        {
+                            <div><div class="h5 mb-0">@pos<span class="text-muted small">º</span></div><div class="text-muted small">no geral</div></div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_abertas.Count == 0)
+        {
+            <div class="alert alert-secondary">Nenhuma rodada aberta agora. Quando a próxima for marcada, ela aparece aqui.</div>
+        }
+
+        @foreach (var rodada in _abertas)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold">@rodada.Titulo</span>
+                    @if (rodada.Quando is { } quando)
+                    {
+                        <span class="text-muted small">@quando.ToString("ddd dd/MM · HH'h'", Br)</span>
+                    }
+                    @if (rodada.Completa)
+                    {
+                        <span class="badge bg-success">palpites enviados</span>
+                    }
+                    else if (rodada.Palpitados > 0)
+                    {
+                        <span class="badge bg-warning text-dark">@rodada.Palpitados de @rodada.Jogos.Count</span>
+                    }
+                </div>
+                <div class="card-body">
+                    @foreach (var jogo in rodada.Jogos)
+                    {
+                        <div class="d-flex align-items-center justify-content-center gap-2 mb-2 flex-wrap">
+                            <span class="text-end" style="min-width:9rem;">@jogo.TimeCasa</span>
+                            <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" style="width:26px;height:26px;object-fit:contain;" />
+                            <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
+                                   value="@Palpite(rodada.RodadaId, jogo.PartidaId).Casa"
+                                   @onchange="e => AnotarCasa(rodada.RodadaId, jogo.PartidaId, e.Value?.ToString())" />
+                            <span class="text-muted">x</span>
+                            <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
+                                   value="@Palpite(rodada.RodadaId, jogo.PartidaId).Fora"
+                                   @onchange="e => AnotarFora(rodada.RodadaId, jogo.PartidaId, e.Value?.ToString())" />
+                            <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
+                            <span style="min-width:9rem;">@jogo.TimeFora</span>
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button class="btn btn-success" @onclick="() => Salvar(rodada)" disabled="@_salvando">
+                            @(rodada.Palpitados > 0 ? "Atualizar palpites" : "Enviar palpites")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_aindaVem > 0)
+        {
+            <p class="text-muted small">Mais @_aindaVem rodadas no calendário — cada uma abre aqui conforme a anterior sai.</p>
+        }
+
+        @if (_fechadas.Count > 0)
+        {
+            <h2 class="h5 border-bottom pb-2 mb-3 mt-4">Rodadas que já rolaram</h2>
+
+            @foreach (var rodada in _fechadas)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-bold">@rodada.Titulo</span>
+                        @if (rodada.Quando is { } quando)
+                        {
+                            <span class="text-muted small">@quando.ToString("dd/MM", Br)</span>
+                        }
+                        <span class="badge bg-dark ms-auto">@rodada.Pontos pontos seus</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                                @foreach (var jogo in rodada.Jogos)
+                                {
+                                    <tr>
+                                        <td class="text-end">@jogo.TimeCasa</td>
+                                        <td class="text-center fw-bold text-nowrap" style="width:5rem;">
+                                            @if (jogo.Encerrado)
+                                            {
+                                                <span>@jogo.GolsCasa x @jogo.GolsFora</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">x</span>
+                                            }
+                                        </td>
+                                        <td>@jogo.TimeFora</td>
+                                        <td class="text-center text-nowrap" style="width:7rem;">
+                                            @if (jogo.PalpiteCasa is { } casa)
+                                            {
+                                                <span class="text-muted small">você: @casa x @jogo.PalpiteFora</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">sem palpite</span>
+                                            }
+                                        </td>
+                                        <td class="text-center" style="width:6rem;">
+                                            @if (jogo.Pontos is { } pontos)
+                                            {
+                                                <span class="badge @(pontos == BolaoPontuacao.PlacarExato ? "bg-success" : pontos > 0 ? "bg-primary" : "bg-light text-muted border")"
+                                                      title="@BolaoPontuacao.Explicacao(pontos)">
+                                                    @pontos
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <a href="/bolao/ranking?rodada=@rodada.RodadaId" class="small">Ver o que o pessoal chutou nessa rodada →</a>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private const int ProximasNaTela = 3;
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    private TreinadorDto? _eu;
+    private BolaoResumoDoTreinadorDto? _resumo;
+    private IReadOnlyList<BolaoRodadaDto> _abertas = Array.Empty<BolaoRodadaDto>();
+    private int _aindaVem;
+    private IReadOnlyList<BolaoRodadaDto> _fechadas = Array.Empty<BolaoRodadaDto>();
+
+    // O que está digitado na tela, por rodada e jogo, antes de salvar.
+    private readonly Dictionary<(Guid Rodada, Guid Partida), (int? Casa, int? Fora)> _rascunho = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        await Carregar();
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await Carregar(); StateHasChanged(); });
+
+    private async Task Carregar()
+    {
+        _carregando = true;
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await AdminAuth.GetTokenAsync();
+
+            _eu = string.IsNullOrWhiteSpace(token)
+                ? null
+                : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+
+            // O calendário inteiro está aberto, mas palpitar dois meses à frente não faz sentido:
+            // a tela mostra as próximas, e as outras vão chegando.
+            var abertas = await BolaoSvc.RodadasAbertasAsync(_eu?.TreinadorId, CancellationToken.None);
+            _aindaVem = Math.Max(0, abertas.Count - ProximasNaTela);
+            _abertas = abertas.Take(ProximasNaTela).ToList();
+            _fechadas = await BolaoSvc.RodadasFechadasAsync(_eu?.TreinadorId, 3, CancellationToken.None);
+            _resumo = _eu is null ? null : await BolaoSvc.ResumoAsync(_eu.TreinadorId, CancellationToken.None);
+
+            _rascunho.Clear();
+            foreach (var rodada in _abertas)
+                foreach (var jogo in rodada.Jogos)
+                    _rascunho[(rodada.RodadaId, jogo.PartidaId)] = (jogo.PalpiteCasa, jogo.PalpiteFora);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private (int? Casa, int? Fora) Palpite(Guid rodadaId, Guid partidaId) =>
+        _rascunho.TryGetValue((rodadaId, partidaId), out var p) ? p : (null, null);
+
+    private void AnotarCasa(Guid rodadaId, Guid partidaId, string? valor) =>
+        _rascunho[(rodadaId, partidaId)] = (Numero(valor), Palpite(rodadaId, partidaId).Fora);
+
+    private void AnotarFora(Guid rodadaId, Guid partidaId, string? valor) =>
+        _rascunho[(rodadaId, partidaId)] = (Palpite(rodadaId, partidaId).Casa, Numero(valor));
+
+    private static int? Numero(string? valor) =>
+        int.TryParse(valor, out var n) && n >= 0 && n <= 99 ? n : null;
+
+    private async Task Salvar(BolaoRodadaDto rodada)
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var palpites = rodada.Jogos
+                .Select(j => (j.PartidaId, Palpite(rodada.RodadaId, j.PartidaId)))
+                .Where(x => x.Item2.Casa is not null && x.Item2.Fora is not null)
+                .Select(x => new BolaoPalpiteRequest(x.PartidaId, x.Item2.Casa!.Value, x.Item2.Fora!.Value))
+                .ToList();
+
+            if (palpites.Count == 0) throw new InvalidOperationException("Preencha pelo menos um placar.");
+
+            await BolaoSvc.SalvarAsync(_eu!.TreinadorId, rodada.RodadaId, palpites, CancellationToken.None);
+            await Carregar();
+
+            _ok = palpites.Count == rodada.Jogos.Count
+                ? $"Palpites da {rodada.Titulo.ToLower(Br)} registrados. Boa sorte."
+                : $"{palpites.Count} de {rodada.Jogos.Count} jogos palpitados — dá para completar até a bola rolar.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

@@ -1,0 +1,140 @@
+@page "/bolao/ranking"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IBolaoService BolaoSvc
+@inject EscudoService EscudoService
+@inject NavigationManager Navigation
+
+<PageTitle>Ranking do bolão</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <h1 class="h3 mb-0">🏅 Ranking do bolão</h1>
+        <a href="/bolao" class="btn btn-sm btn-outline-secondary">🎯 Palpitar</a>
+    </div>
+    <p class="text-muted small mb-4">Quem chuta melhor a rodada da CBFV.</p>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger">@_erro</div>
+    }
+    else
+    {
+        <ul class="nav nav-pills mb-3 flex-wrap gap-1">
+            <li class="nav-item">
+                <button class="nav-link @(_temporada is null ? "active" : "")" @onclick="() => Trocar(null)">Geral</button>
+            </li>
+            @foreach (var temporada in _temporadas)
+            {
+                <li class="nav-item">
+                    <button class="nav-link @(_temporada == temporada ? "active" : "")" @onclick="() => Trocar(temporada)">@temporada</button>
+                </li>
+            }
+        </ul>
+
+        @if (_daRodada is { } rodada)
+        {
+            <div class="card mb-4">
+                <div class="card-header fw-bold">@rodada.Titulo</div>
+                @Tabela(_rankingDaRodada)
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-header fw-bold">@(_temporada is null ? "Todas as temporadas" : $"Temporada {_temporada}")</div>
+            @Tabela(_ranking)
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private string? _erro;
+
+    private int? _temporada;
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private IReadOnlyList<BolaoRankingLinhaDto> _ranking = Array.Empty<BolaoRankingLinhaDto>();
+    private IReadOnlyList<BolaoRankingLinhaDto> _rankingDaRodada = Array.Empty<BolaoRankingLinhaDto>();
+    private BolaoRodadaDto? _daRodada;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _temporadas = await BolaoSvc.TemporadasAsync(CancellationToken.None);
+            await CarregarRanking();
+
+            var query = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query);
+            if (Guid.TryParse(query["rodada"], out var rodadaId))
+            {
+                _daRodada = await BolaoSvc.RodadaAsync(rodadaId, null, CancellationToken.None);
+                _rankingDaRodada = await BolaoSvc.RankingDaRodadaAsync(rodadaId, CancellationToken.None);
+            }
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task Trocar(int? temporada)
+    {
+        _temporada = temporada;
+        await CarregarRanking();
+    }
+
+    private async Task CarregarRanking() =>
+        _ranking = await BolaoSvc.RankingAsync(_temporada, CancellationToken.None);
+
+    private RenderFragment Tabela(IReadOnlyList<BolaoRankingLinhaDto> linhas) =>@<div>
+        @if (linhas.Count == 0)
+        {
+            <div class="card-body text-muted">Ninguém palpitou ainda.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:3rem;">#</th>
+                            <th>Quem</th>
+                            <th class="text-center">Pontos</th>
+                            <th class="text-center">Cravadas</th>
+                            <th class="text-center">Acertos</th>
+                            <th class="text-center">Palpites</th>
+                            <th class="text-center">Média</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var linha in linhas)
+                        {
+                            <tr>
+                                <td class="fw-bold">@linha.Posicao</td>
+                                <td>
+                                    @if (linha.TimeNome is { Length: > 0 } time)
+                                    {
+                                        <img src="@EscudoService.GetEscudo(time)" alt="" style="width:22px;height:22px;object-fit:contain;" class="me-1" />
+                                    }
+                                    <a href="/treinadores/@linha.TreinadorId">@linha.Nome</a>
+                                    <span class="text-muted small">@(linha.TimeNome ?? "sem clube")</span>
+                                </td>
+                                <td class="text-center fw-bold">@linha.Pontos</td>
+                                <td class="text-center">@linha.Cravadas</td>
+                                <td class="text-center">@linha.Acertos</td>
+                                <td class="text-center text-muted">@linha.Palpites</td>
+                                <td class="text-center text-muted">@linha.Media.ToString("0.#", Br)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>;
+}

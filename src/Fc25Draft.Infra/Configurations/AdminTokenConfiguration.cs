@@ -18,5 +18,10 @@ public class AdminTokenConfiguration : IEntityTypeConfiguration<AdminToken>
 
         e.HasIndex(x => x.Token).IsUnique().HasDatabaseName("IX_AdminTokens_Token_Unique");
         e.HasIndex(x => x.IsActive).HasDatabaseName("IX_AdminTokens_IsActive");
+
+        e.HasOne(x => x.Treinador)
+            .WithMany()
+            .HasForeignKey(x => x.TreinadorId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
