@@ -1,0 +1,159 @@
+@page "/admin/resumo-rodada"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IResumoRodadaService ResumoSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Resumo da rodada</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_rodadas.Count == 0)
+    {
+        <div class="alert alert-info">Nenhuma rodada com resultado ainda.</div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-body d-flex align-items-end gap-3 flex-wrap">
+                <div>
+                    <label class="form-label mb-0 small">Rodada</label>
+                    <select class="form-select" style="min-width:22rem;" value="@_rodadaId" @onchange="Trocar">
+                        @foreach (var opcao in _rodadas)
+                        {
+                            <option value="@opcao.RodadaId">
+                                @opcao.Titulo@(opcao.Quando is { } q ? $" — {q.ToString("dd/MM", Br)}" : "")@(opcao.Completa ? "" : " (incompleta)")
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-success" @onclick="Copiar" disabled="@(_texto.Length == 0)">📋 Copiar para o WhatsApp</button>
+                <button class="btn btn-outline-secondary" @onclick="() => Carregar(_rodadaId)">Recarregar</button>
+            </div>
+        </div>
+
+        @if (_resumo is not null)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-lg-7">
+                    <div class="card h-100">
+                        <div class="card-header d-flex align-items-center gap-2">
+                            <span class="fw-bold">Texto</span>
+                            <span class="text-muted small">dá para editar antes de copiar</span>
+                        </div>
+                        <div class="card-body">
+                            <textarea class="form-control font-monospace" style="min-height:26rem; font-size:.85rem;"
+                                      @bind="_texto" @bind:event="oninput"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-5">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">Como vai chegar</div>
+                        <div class="card-body" style="background:#e5ddd5;">
+                            <div class="p-3 rounded shadow-sm" style="background:#fff; white-space:pre-wrap; font-size:.9rem;">
+                                @((MarkupString)Prever(_texto))
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!_resumo.Completa)
+            {
+                <div class="alert alert-warning mt-3">
+                    Essa rodada ainda tem jogo sem resultado — o texto sai com o que já rolou.
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<ResumoRodadaOpcaoDto> _rodadas = Array.Empty<ResumoRodadaOpcaoDto>();
+    private ResumoDaRodadaDto? _resumo;
+    private Guid _rodadaId;
+    private string _texto = "";
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/resumo-rodada"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _rodadas = await ResumoSvc.RodadasAsync(20, CancellationToken.None);
+            if (_rodadas.Count > 0) await Carregar(_rodadas[0].RodadaId);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task Trocar(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) await Carregar(id);
+    }
+
+    private async Task Carregar(Guid rodadaId)
+    {
+        _erro = null; _ok = null;
+        try
+        {
+            _rodadaId = rodadaId;
+            _resumo = await ResumoSvc.MontarAsync(rodadaId, CancellationToken.None);
+            _texto = _resumo is null ? "" : ResumoRodadaTexto.Montar(_resumo);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task Copiar()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _texto);
+            _ok = "Copiado. É só colar no grupo.";
+        }
+        catch (Exception)
+        {
+            _erro = "O navegador não deixou copiar sozinho — selecione o texto e copie na mão.";
+        }
+    }
+
+    /// <summary>Mostra o negrito e o itálico como o WhatsApp mostra.</summary>
+    private static string Prever(string texto)
+    {
+        var seguro = System.Net.WebUtility.HtmlEncode(texto);
+
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"\*([^*\n]+)\*", "<strong>$1</strong>");
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"_([^_\n]+)_", "<em>$1</em>");
+
+        return seguro;
+    }
+}

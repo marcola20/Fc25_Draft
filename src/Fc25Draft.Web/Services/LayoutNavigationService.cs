@@ -62,6 +62,7 @@ public class LayoutNavigationService
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
             new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
             new("Treinadores", "/admin/treinadores", "oi oi-person", RequiredRole: "Admin"),
+            new("Resumo da rodada", "/admin/resumo-rodada", "oi oi-comment-square", RequiredRole: "Admin"),
             new("Premiação", "/admin/premiacao", "oi oi-dollar", RequiredRole: "Admin"),
             new("Regulamento", "/admin/regulamento", "oi oi-document", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
@@ -354,6 +355,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Configurações")
+            }
+        },
+        ["/admin/resumo-rodada"] = new PageDefinition
+        {
+            Route = "/admin/resumo-rodada",
+            Title = "Resumo da rodada",
+            Subtitle = "O texto pronto para colar no grupo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Resumo da rodada")
             }
         },
         ["/bolao"] = new PageDefinition
