@@ -1,0 +1,350 @@
+@page "/telao/jogo/{PartidaId:guid}"
+@layout TelaoLayout
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject ILigaPublicService LigaService
+@inject IPartidaChatService ChatSvc
+@inject IBolaoService BolaoSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject TelaoJogoAoVivoService AoVivo
+@inject EscudoService Escudos
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@Titulo</PageTitle>
+
+<div class="telao-jogo">
+    @if (_carregando)
+    {
+        <div class="vazio">Carregando o jogo...</div>
+    }
+    else if (_jogo is null)
+    {
+        <div class="vazio">Jogo não encontrado. <a href="/liga">Voltar para a liga</a></div>
+    }
+    else
+    {
+        <header class="topo">
+            <a href="/liga" class="voltar" title="Voltar para a liga">‹</a>
+            <img src="/images/logobranca.png" alt="CBFV" class="logo" />
+            <div class="competicao">
+                <div class="nome">@_jogo.LigaNome</div>
+                <div class="sub">
+                    @_jogo.Rotulo
+                    @if (_jogo.DataHora is DateTime quando)
+                    {
+                        <span> · @quando.ToString("ddd dd/MM · HH'h'mm", Br)</span>
+                    }
+                </div>
+            </div>
+
+            <div class="placar">
+                <div class="time casa">
+                    <span class="time-nome">@_jogo.TimeCasaNome</span>
+                    <img src="@Escudos.GetEscudo(_jogo.TimeCasaNome)" alt="" />
+                </div>
+                <div class="gols">
+                    @if (_jogo.Status == PartidaStatus.Encerrada)
+                    {
+                        <span>@_jogo.GolsCasa</span><span class="x">–</span><span>@_jogo.GolsFora</span>
+                    }
+                    else
+                    {
+                        <span class="x">vs</span>
+                    }
+                </div>
+                <div class="time fora">
+                    <img src="@Escudos.GetEscudo(_jogo.TimeForaNome)" alt="" />
+                    <span class="time-nome">@_jogo.TimeForaNome</span>
+                </div>
+            </div>
+
+            <div class="acoes">
+                <span class="publico" title="Pessoas com o telão aberto agora">👀 @_assistindo</span>
+                <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia">⛶</button>
+            </div>
+        </header>
+
+        <main class="corpo">
+            <section class="video">
+                @if (string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId))
+                {
+                    <div class="sem-video">
+                        <div class="icone">📺</div>
+                        <div>O vídeo deste jogo ainda não foi publicado.</div>
+                        <div class="suave">Deixe a página aberta e recarregue quando a estreia for marcada.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="player">
+                        <iframe src="https://www.youtube.com/embed/@(_jogo.YoutubeVideoId)?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+                                title="@_jogo.TimeCasaNome x @_jogo.TimeForaNome"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen></iframe>
+                    </div>
+                    <a class="abrir-youtube" href="@YoutubeLink.Assistir(_jogo.YoutubeVideoId)" target="_blank" rel="noopener">Abrir no YouTube ↗</a>
+                }
+            </section>
+
+            <aside class="lateral">
+                <nav class="abas">
+                    <button type="button" class="@(_aba == Aba.Chat ? "ativa" : "")" @onclick="() => { _aba = Aba.Chat; _rolarChat = true; }">💬 Chat</button>
+                    <button type="button" class="@(_aba == Aba.Palpites ? "ativa" : "")" @onclick="AbrirPalpites">🎯 Palpites</button>
+                </nav>
+
+                @if (_aba == Aba.Chat)
+                {
+                    <div class="mensagens" @ref="_mensagensRef">
+                        @if (_mensagens.Count == 0)
+                        {
+                            <div class="suave centro">Ninguém falou nada ainda. Começa a resenha!</div>
+                        }
+                        @foreach (var m in _mensagens)
+                        {
+                            <div class="mensagem @(m.TreinadorId == _eu?.TreinadorId ? "minha" : "")">
+                                <div class="cabeca">
+                                    @if (!string.IsNullOrWhiteSpace(m.TimeNome))
+                                    {
+                                        <img src="@Escudos.GetEscudo(m.TimeNome)" alt="" title="@m.TimeNome" />
+                                    }
+                                    <span class="autor">@m.Autor</span>
+                                    <span class="hora">@BrazilTime.FormatDateTime(m.EnviadaEm, "HH:mm")</span>
+                                    @if (AdminAuth.IsAdmin)
+                                    {
+                                        <button type="button" class="apagar" title="Apagar mensagem" @onclick="() => ApagarAsync(m)">✕</button>
+                                    }
+                                </div>
+                                <div class="texto">@m.Texto</div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_eu is null)
+                    {
+                        <div class="entrar">
+                            <a href="/admin/login">Entre com seu token</a> para comentar.
+                        </div>
+                    }
+                    else
+                    {
+                        <form class="escrever" @onsubmit="EnviarAsync">
+                            <input type="text" @bind="_texto" @bind:event="oninput" maxlength="300"
+                                   placeholder="Comente como @_eu.Nome..." disabled="@_enviando" autocomplete="off" />
+                            <button type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">➤</button>
+                        </form>
+                        @if (_erro is not null)
+                        {
+                            <div class="erro">@_erro</div>
+                        }
+                    }
+                }
+                else
+                {
+                    <div class="palpites">
+                        @if (_palpites is null)
+                        {
+                            <div class="suave centro">Carregando...</div>
+                        }
+                        else if (_palpites.Count == 0)
+                        {
+                            <div class="suave centro">
+                                Os palpites aparecem aqui quando o bolão da rodada fechar.
+                                <div><a href="/bolao">Ir para o bolão</a></div>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var p in _palpites)
+                            {
+                                <div class="palpite">
+                                    @if (!string.IsNullOrWhiteSpace(p.TimeNome))
+                                    {
+                                        <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
+                                    }
+                                    <span class="autor">@p.Nome</span>
+                                    <span class="chute">@p.GolsCasa – @p.GolsFora</span>
+                                    @if (p.Pontos is int pts)
+                                    {
+                                        <span class="pontos">+@pts</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </aside>
+        </main>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+    private const int MensagensNaTela = 200;
+    private static readonly TimeSpan IntervaloEntreMensagens = TimeSpan.FromSeconds(2);
+
+    private enum Aba { Chat, Palpites }
+
+    [Parameter] public Guid PartidaId { get; set; }
+
+    private bool _carregando = true;
+    private TelaoJogoDto? _jogo;
+    private TreinadorDto? _eu;
+    private List<PartidaChatMensagemDto> _mensagens = new();
+    private IReadOnlyList<BolaoPalpiteDeAlguemDto>? _palpites;
+    private Aba _aba = Aba.Chat;
+    private int _assistindo;
+
+    private string _texto = "";
+    private bool _enviando;
+    private string? _erro;
+    private DateTime _ultimoEnvio = DateTime.MinValue;
+
+    private ElementReference _mensagensRef;
+    private bool _entrou;
+    private bool _rolarChat;
+
+    private string Titulo => _jogo is null ? "Telão" : $"{_jogo.TimeCasaNome} x {_jogo.TimeForaNome} · Telão";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _jogo = await LigaService.GetTelaoJogoAsync(PartidaId, CancellationToken.None);
+        if (_jogo is not null)
+            _mensagens = (await ChatSvc.ListarAsync(PartidaId, MensagensNaTela, CancellationToken.None)).ToList();
+        _assistindo = AoVivo.Assistindo(PartidaId);
+        _carregando = false;
+        _rolarChat = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Não dá para usar firstRender: a primeira renderização sai antes do jogo carregar.
+        // OnAfterRender não roda no pré-render, então aqui só conta quem abriu de verdade.
+        if (!_entrou && _jogo is not null)
+        {
+            AoVivo.MensagemEnviada += AoReceberMensagem;
+            AoVivo.MensagemApagada += AoApagarMensagem;
+            AoVivo.PublicoMudou += AoMudarPublico;
+            AoVivo.Entrar(PartidaId);
+            _entrou = true;
+
+            // Inicializa antes de assinar: a primeira inicialização dispara AuthenticationChanged,
+            // e duas buscas ao mesmo tempo no mesmo DbContext derrubam o circuito.
+            await AdminAuth.EnsureInitializedAsync();
+            AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+            await CarregarEuAsync();
+            StateHasChanged();
+        }
+
+        if (_rolarChat && _aba == Aba.Chat)
+        {
+            _rolarChat = false;
+            try { await JS.InvokeVoidAsync("fc25Telao.rolarParaFim", _mensagensRef); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    private readonly SemaphoreSlim _buscandoEu = new(1, 1);
+
+    private async Task CarregarEuAsync()
+    {
+        await _buscandoEu.WaitAsync();
+        try
+        {
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+        }
+        finally { _buscandoEu.Release(); }
+    }
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarEuAsync(); StateHasChanged(); });
+
+    private void AoReceberMensagem(PartidaChatMensagemDto m)
+    {
+        if (m.PartidaId != PartidaId) return;
+        _ = InvokeAsync(() =>
+        {
+            if (_mensagens.Any(x => x.MensagemId == m.MensagemId)) return;
+            _mensagens.Add(m);
+            if (_mensagens.Count > MensagensNaTela) _mensagens.RemoveAt(0);
+            _rolarChat = true;
+            StateHasChanged();
+        });
+    }
+
+    private void AoApagarMensagem(Guid partidaId, Guid mensagemId)
+    {
+        if (partidaId != PartidaId) return;
+        _ = InvokeAsync(() =>
+        {
+            _mensagens.RemoveAll(x => x.MensagemId == mensagemId);
+            StateHasChanged();
+        });
+    }
+
+    private void AoMudarPublico(Guid partidaId)
+    {
+        if (partidaId != PartidaId) return;
+        _ = InvokeAsync(() =>
+        {
+            _assistindo = AoVivo.Assistindo(PartidaId);
+            StateHasChanged();
+        });
+    }
+
+    private async Task EnviarAsync()
+    {
+        if (_eu is null || string.IsNullOrWhiteSpace(_texto) || _enviando) return;
+
+        if (DateTime.UtcNow - _ultimoEnvio < IntervaloEntreMensagens)
+        {
+            _erro = "Calma, uma mensagem de cada vez.";
+            return;
+        }
+
+        _enviando = true;
+        _erro = null;
+        try
+        {
+            var mensagem = await ChatSvc.EnviarAsync(PartidaId, _eu.TreinadorId, _texto, CancellationToken.None);
+            _ultimoEnvio = DateTime.UtcNow;
+            _texto = "";
+            AoVivo.Publicar(mensagem);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _enviando = false; }
+    }
+
+    private async Task ApagarAsync(PartidaChatMensagemDto m)
+    {
+        if (!AdminAuth.IsAdmin) return;
+        await ChatSvc.ApagarAsync(m.MensagemId, CancellationToken.None);
+        AoVivo.Apagar(PartidaId, m.MensagemId);
+    }
+
+    private async Task AbrirPalpites()
+    {
+        _aba = Aba.Palpites;
+        _palpites ??= await BolaoSvc.PalpitesDoJogoAsync(PartidaId, CancellationToken.None);
+    }
+
+    private async Task TelaCheiaAsync()
+    {
+        try { await JS.InvokeVoidAsync("fc25Telao.telaCheia"); }
+        catch (JSException) { }
+    }
+
+    public void Dispose()
+    {
+        AoVivo.MensagemEnviada -= AoReceberMensagem;
+        AoVivo.MensagemApagada -= AoApagarMensagem;
+        AoVivo.PublicoMudou -= AoMudarPublico;
+        AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+        if (_entrou) AoVivo.Sair(PartidaId);
+        _buscandoEu.Dispose();
+    }
+}

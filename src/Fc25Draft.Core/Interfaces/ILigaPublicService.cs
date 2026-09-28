@@ -23,6 +23,9 @@ public interface ILigaPublicService
     /// <summary>Gols (inclusive contra) de todas as partidas de uma rodada, em ordem de minuto.</summary>
     Task<IReadOnlyList<LigaEventoDto>> GetGolsRodadaAsync(Guid rodadaId, CancellationToken ct);
     Task<PartidaEscalacoesDto?> GetEscalacoesPartidaAsync(Guid partidaId, CancellationToken ct);
+
+    /// <summary>Dados do telão de um jogo: times, competição e o vídeo do YouTube.</summary>
+    Task<TelaoJogoDto?> GetTelaoJogoAsync(Guid partidaId, CancellationToken ct);
     Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct);
     Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct);
 

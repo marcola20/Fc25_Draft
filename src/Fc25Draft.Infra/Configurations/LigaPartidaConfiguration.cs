@@ -14,6 +14,7 @@ public class LigaPartidaConfiguration : IEntityTypeConfiguration<LigaPartida>
         e.Property(x => x.GolsFora).HasDefaultValue(0);
         e.Property(x => x.IsWO).HasDefaultValue(false);
         e.Property(x => x.TemPenaltis).HasDefaultValue(false);
+        e.Property(x => x.YoutubeVideoId).HasMaxLength(20);
 
         e.HasOne(x => x.Rodada)
             .WithMany(x => x.Partidas)

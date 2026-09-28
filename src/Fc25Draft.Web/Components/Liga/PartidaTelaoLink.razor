@@ -1,0 +1,89 @@
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject ILigaAdminService AdminSvc
+@inject AdminAuthService AdminAuth
+
+@* Faixa do telão no detalhe do jogo: todo mundo vê o botão quando há vídeo; o admin cola o link da estreia. *@
+@if (!string.IsNullOrWhiteSpace(_videoId) || AdminAuth.IsAdmin)
+{
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-3 p-2 rounded" style="background:#0b1622;">
+        @if (!string.IsNullOrWhiteSpace(_videoId))
+        {
+            <a href="/telao/jogo/@PartidaId" class="btn btn-warning btn-sm fw-bold">📺 Ver no telão</a>
+            <span class="small text-white-50">Vídeo, chat e palpites do jogo</span>
+        }
+        else
+        {
+            <span class="small text-white-50">📺 Sem vídeo no telão ainda</span>
+        }
+
+        @if (AdminAuth.IsAdmin)
+        {
+            @if (_editando)
+            {
+                <div class="input-group input-group-sm w-100 mt-1">
+                    <input type="text" class="form-control" placeholder="Link do YouTube (vazio tira o vídeo)" @bind="_link" />
+                    <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">Salvar</button>
+                    <button class="btn btn-outline-light" @onclick="() => _editando = false">Cancelar</button>
+                </div>
+                @if (_erro is not null)
+                {
+                    <div class="small text-danger w-100">@_erro</div>
+                }
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-light btn-sm ms-auto" @onclick="Editar">
+                    @(string.IsNullOrWhiteSpace(_videoId) ? "➕ Link do vídeo" : "✏️ Trocar vídeo")
+                </button>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public string? YoutubeVideoId { get; set; }
+    [Parameter] public EventCallback OnAlterado { get; set; }
+
+    private string? _videoId;
+    private string? _link;
+    private bool _editando, _salvando;
+    private string? _erro;
+    private Guid _partidaCarregada;
+    private string? _parametroAnterior;
+
+    // Só assume o valor de fora quando ele muda (outro jogo ou lista recarregada);
+    // assim o que acabou de ser salvo aqui não volta ao valor antigo num re-render do pai.
+    protected override void OnParametersSet()
+    {
+        if (_partidaCarregada != PartidaId || _parametroAnterior != YoutubeVideoId)
+        {
+            _partidaCarregada = PartidaId;
+            _parametroAnterior = YoutubeVideoId;
+            _videoId = YoutubeVideoId;
+            _editando = false;
+        }
+    }
+
+    private void Editar()
+    {
+        _link = _videoId is null ? "" : YoutubeLink.Assistir(_videoId);
+        _erro = null;
+        _editando = true;
+    }
+
+    private async Task SalvarAsync()
+    {
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            _videoId = await AdminSvc.DefinirVideoPartidaAsync(PartidaId, _link, CancellationToken.None);
+            _editando = false;
+            await OnAlterado.InvokeAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

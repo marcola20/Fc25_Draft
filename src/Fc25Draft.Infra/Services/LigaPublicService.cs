@@ -507,7 +507,7 @@ public class LigaPublicService : ILigaPublicService
                 p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
                 p.TimeForaId, p.TimeFora?.TeamName ?? "?",
                 p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
-                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm)).ToArray(),
+                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId)).ToArray(),
             r.Desempate, r.DataHora
         )).ToArray();
     }
@@ -564,6 +564,36 @@ public class LigaPublicService : ILigaPublicService
             e.CriadoEm,
             e.JogadorSaiuId,
             e.JogadorSaiu?.Name)).ToArray();
+    }
+
+    public async Task<TelaoJogoDto?> GetTelaoJogoAsync(Guid partidaId, CancellationToken ct)
+    {
+        var p = await _db.LigaPartidas
+            .AsNoTracking()
+            .Include(x => x.Rodada).ThenInclude(r => r.Liga)
+            .Include(x => x.TimeCasa)
+            .Include(x => x.TimeFora)
+            .Include(x => x.PenaltisVencedor)
+            .FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct);
+        if (p is null) return null;
+
+        var liga = p.Rodada.Liga;
+        var fase = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.PartidaId == partidaId)
+            .Select(k => (FaseKnockout?)k.Fase)
+            .FirstOrDefaultAsync(ct);
+
+        var rotulo = fase is not null ? FaseLabelMap.GetValueOrDefault(fase.Value, fase.Value.ToString())
+            : liga.Tipo == TipoCompetition.Supercopa ? "Jogo único"
+            : p.Rodada.Desempate ? "Jogo decisivo"
+            : $"Rodada {p.Rodada.Numero}";
+
+        return new TelaoJogoDto(
+            p.PartidaId, liga.LigaId, liga.Nome, liga.Tipo, rotulo,
+            p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
+            p.TimeForaId, p.TimeFora?.TeamName ?? "?",
+            p.Status, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedor?.TeamName,
+            p.Rodada.DataHora, p.YoutubeVideoId);
     }
 
     public async Task<PartidaEscalacoesDto?> GetEscalacoesPartidaAsync(Guid partidaId, CancellationToken ct)
@@ -1478,7 +1508,8 @@ public class LigaPublicService : ILigaPublicService
             j.VencedorId, j.Vencedor?.TeamName,
             j.PartidaId, j.Partida?.GolsCasa, j.Partida?.GolsFora,
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
-            j.Partida?.TemPenaltis ?? false);
+            j.Partida?.TemPenaltis ?? false,
+            j.Partida?.YoutubeVideoId);
 
     private static readonly Dictionary<FaseKnockout, string> FaseLabelMap = new()
     {

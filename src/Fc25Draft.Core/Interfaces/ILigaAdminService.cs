@@ -35,6 +35,9 @@ public interface ILigaAdminService
     Task<LigaPartidaDto> AplicarWOAsync(Guid partidaId, Guid timeWOId, CancellationToken ct);
     Task DeletePartidaAsync(Guid partidaId, CancellationToken ct);
 
+    /// <summary>Grava (ou tira, com link vazio) o vídeo do jogo no YouTube. Devolve o ID do vídeo.</summary>
+    Task<string?> DefinirVideoPartidaAsync(Guid partidaId, string? link, CancellationToken ct);
+
     // Eventos
     Task<LigaEventoDto> AddGolAsync(Guid partidaId, LigaGolRequest request, CancellationToken ct);
     Task<LigaEventoDto> AddCartaoAsync(Guid partidaId, LigaCartaoRequest request, CancellationToken ct);

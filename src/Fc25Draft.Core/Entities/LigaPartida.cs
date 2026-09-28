@@ -17,6 +17,9 @@ public class LigaPartida
     public DateTime? IniciadaEm { get; set; }
     public DateTime? EncerradaEm { get; set; }
 
+    /// <summary>ID do vídeo do jogo no YouTube (a estreia), para passar no telão.</summary>
+    public string? YoutubeVideoId { get; set; }
+
     public LigaRodada Rodada { get; set; } = null!;
     public Team TimeCasa { get; set; } = null!;
     public Team TimeFora { get; set; } = null!;

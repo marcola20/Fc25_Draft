@@ -260,5 +260,9 @@ window.fc25Telao = {
         const el = document.documentElement;
         if (document.fullscreenElement) { document.exitFullscreen(); return; }
         if (el.requestFullscreen) { el.requestFullscreen(); }
+    },
+    // Chat do telão do jogo: mostra sempre a mensagem mais nova.
+    rolarParaFim: function (el) {
+        if (el) el.scrollTop = el.scrollHeight;
     }
 };

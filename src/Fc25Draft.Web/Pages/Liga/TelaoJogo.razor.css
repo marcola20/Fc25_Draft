@@ -1,0 +1,308 @@
+/* Telão do jogo: vídeo grande e o chat ao lado, no mesmo clima do telão do draft. */
+.telao-jogo {
+    --fundo: #0b1622;
+    --painel: #13243a;
+    --borda: #1f3a5c;
+    --texto: #f1f5f9;
+    --suave: #94a3b8;
+    --destaque: #f4d35e;
+    --perigo: #ef4444;
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(circle at top, #16304f 0%, var(--fundo) 60%);
+    color: var(--texto);
+    display: flex;
+    flex-direction: column;
+    padding: 1.2vh 1.5vw;
+    gap: 1.2vh;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.telao-jogo a { color: var(--destaque); }
+
+.vazio {
+    margin: auto;
+    font-size: 2.6vh;
+    color: var(--suave);
+    text-align: center;
+}
+
+.suave { color: var(--suave); }
+.centro { text-align: center; margin: auto 0; padding: 2vh 1vw; }
+
+/* ── Topo ── */
+.topo {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.2vw;
+}
+
+.voltar {
+    font-size: 4vh;
+    line-height: 1;
+    text-decoration: none;
+    color: var(--suave) !important;
+}
+
+.logo { height: 6vh; }
+
+.competicao .nome { font-size: 2.4vh; font-weight: 800; }
+.competicao .sub { font-size: 1.7vh; color: var(--suave); text-transform: capitalize; }
+
+.placar {
+    grid-column: 4;
+    display: flex;
+    align-items: center;
+    gap: 1.2vw;
+}
+
+.time {
+    display: flex;
+    align-items: center;
+    gap: .8vw;
+    font-size: 2.8vh;
+    font-weight: 800;
+}
+
+.time img { height: 6.5vh; width: 6.5vh; object-fit: contain; }
+
+.gols {
+    display: flex;
+    align-items: center;
+    gap: .6vw;
+    font-size: 5vh;
+    font-weight: 900;
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 1vh;
+    padding: .2vh 1.4vw;
+    font-variant-numeric: tabular-nums;
+}
+
+.gols .x { color: var(--suave); font-weight: 600; font-size: 3vh; }
+
+.acoes {
+    grid-column: 6;
+    display: flex;
+    align-items: center;
+    gap: 1vw;
+}
+
+.publico {
+    font-size: 1.9vh;
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 2vh;
+    padding: .4vh .9vw;
+}
+
+.tela-cheia {
+    background: transparent;
+    border: 1px solid var(--borda);
+    color: var(--texto);
+    border-radius: .8vh;
+    font-size: 2.2vh;
+    padding: .2vh .7vw;
+    cursor: pointer;
+}
+
+/* ── Corpo ── */
+.corpo {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 420px);
+    gap: 1.2vw;
+}
+
+.video {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .8vh;
+}
+
+/* Maior 16:9 que cabe no espaço livre. */
+.player {
+    width: min(100%, calc((100vh - 16vh) * 16 / 9));
+    aspect-ratio: 16 / 9;
+    border-radius: 1vh;
+    overflow: hidden;
+    box-shadow: 0 0 4vh rgba(0, 0, 0, .6);
+    background: #000;
+}
+
+.player iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+.abrir-youtube { font-size: 1.5vh; opacity: .8; }
+
+.sem-video {
+    text-align: center;
+    font-size: 2.4vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+}
+
+.sem-video .icone { font-size: 8vh; }
+.sem-video .suave { font-size: 1.8vh; }
+
+/* ── Lateral (chat e palpites) ── */
+.lateral {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 1vh;
+    overflow: hidden;
+}
+
+.abas { display: flex; border-bottom: 1px solid var(--borda); }
+
+.abas button {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--suave);
+    padding: 1vh 0;
+    font-weight: 700;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+}
+
+.abas button.ativa { color: var(--destaque); border-bottom-color: var(--destaque); }
+
+.mensagens, .palpites {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1vh .8vw;
+    display: flex;
+    flex-direction: column;
+    gap: .9vh;
+}
+
+.mensagem .cabeca {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .8rem;
+}
+
+.mensagem .cabeca img, .palpite img { width: 18px; height: 18px; object-fit: contain; }
+.mensagem .autor { font-weight: 700; color: var(--destaque); }
+.mensagem.minha .autor { color: #7dd3fc; }
+.mensagem .hora { color: var(--suave); font-size: .7rem; }
+.mensagem .texto { font-size: .95rem; word-wrap: break-word; overflow-wrap: anywhere; }
+
+.mensagem .apagar {
+    margin-left: auto;
+    background: transparent;
+    border: 0;
+    color: var(--suave);
+    cursor: pointer;
+    font-size: .75rem;
+    opacity: .5;
+}
+
+.mensagem .apagar:hover { color: var(--perigo); opacity: 1; }
+
+.escrever {
+    display: flex;
+    gap: .4rem;
+    padding: .8vh .6vw;
+    border-top: 1px solid var(--borda);
+}
+
+.escrever input {
+    flex: 1;
+    min-width: 0;
+    background: var(--fundo);
+    border: 1px solid var(--borda);
+    color: var(--texto);
+    border-radius: .6rem;
+    padding: .45rem .7rem;
+}
+
+.escrever input:focus { outline: 1px solid var(--destaque); }
+
+.escrever button {
+    background: var(--destaque);
+    color: var(--fundo);
+    border: 0;
+    border-radius: .6rem;
+    padding: 0 .9rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.escrever button:disabled { opacity: .4; cursor: default; }
+
+.entrar, .erro {
+    padding: .8vh .8vw;
+    border-top: 1px solid var(--borda);
+    font-size: .85rem;
+    color: var(--suave);
+}
+
+.erro { color: var(--perigo); border-top: 0; padding-top: 0; }
+
+.palpite {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .9rem;
+}
+
+.palpite .autor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palpite .chute { font-weight: 800; font-variant-numeric: tabular-nums; }
+.palpite .pontos { color: var(--destaque); font-weight: 700; min-width: 2.2rem; text-align: right; }
+
+/* ── Celular: vídeo em cima, chat embaixo, página rola ── */
+@media (max-width: 900px) {
+    .telao-jogo {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+        padding: 12px 16px;
+        gap: 12px;
+    }
+
+    .topo {
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .logo { height: 32px; }
+    .competicao .nome { font-size: 1rem; }
+    .competicao .sub { font-size: .8rem; }
+
+    .placar {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .acoes { grid-column: 4; grid-row: 1; }
+    .tela-cheia { display: none; }
+    .publico { font-size: .8rem; padding: 2px 8px; }
+
+    .time { font-size: 1rem; gap: 6px; }
+    .time img { width: 32px; height: 32px; }
+    .time-nome { max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gols { font-size: 1.6rem; padding: 0 12px; }
+    .gols .x { font-size: 1rem; }
+
+    .corpo { grid-template-columns: 1fr; gap: 12px; }
+    .player { width: 100%; }
+    .sem-video { font-size: 1rem; padding: 24px 0; }
+    .sem-video .icone { font-size: 3rem; }
+    .sem-video .suave { font-size: .85rem; }
+
+    .lateral { height: 60vh; }
+}

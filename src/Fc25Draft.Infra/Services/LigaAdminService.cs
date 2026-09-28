@@ -647,6 +647,21 @@ public class LigaAdminService : ILigaAdminService
         return await GetPartidaDtoAsync(partida.PartidaId, ct);
     }
 
+    public async Task<string?> DefinirVideoPartidaAsync(Guid partidaId, string? link, CancellationToken ct)
+    {
+        var partida = await _db.LigaPartidas.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)
+            ?? throw new InvalidOperationException("Partida não encontrada.");
+
+        string? videoId = null;
+        if (!string.IsNullOrWhiteSpace(link))
+            videoId = YoutubeLink.ExtrairId(link)
+                ?? throw new InvalidOperationException("Não reconheci esse link do YouTube.");
+
+        partida.YoutubeVideoId = videoId;
+        await _db.SaveChangesAsync(ct);
+        return videoId;
+    }
+
     public async Task<IReadOnlyList<LigaPartidaDto>> ListPartidasAsync(Guid rodadaId, CancellationToken ct)
     {
         var partidas = await _db.LigaPartidas
@@ -2488,7 +2503,7 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",
-            p.GolsCasa, p.GolsFora, p.Status, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm);
+            p.GolsCasa, p.GolsFora, p.Status, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId);
 
     private static LigaEventoDto ToEventoDto(LigaEventoPartida ev) =>
         new(ev.EventoId, ev.PartidaId, ev.Tipo, ev.TimeId, ev.Time?.TeamName ?? "?", ev.JogadorId, ev.Jogador?.Name ?? "?",
@@ -2499,7 +2514,8 @@ public class LigaAdminService : ILigaAdminService
             j.TimeForaId, j.TimeFora?.TeamName, j.VencedorId, j.Vencedor?.TeamName,
             j.PartidaId, j.Partida?.GolsCasa, j.Partida?.GolsFora,
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
-            j.Partida?.TemPenaltis ?? false);
+            j.Partida?.TemPenaltis ?? false,
+            j.Partida?.YoutubeVideoId);
 
     private static readonly Dictionary<FaseKnockout, string> FaseLabelMap = new()
     {

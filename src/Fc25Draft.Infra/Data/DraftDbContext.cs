@@ -57,6 +57,7 @@ public class DraftDbContext : DbContext
     public DbSet<LigaEventoPartida> LigaEventos => Set<LigaEventoPartida>();
     public DbSet<LigaEscalacaoPartida> LigaEscalacoes => Set<LigaEscalacaoPartida>();
     public DbSet<LigaPartidaImportacao> LigaPartidaImportacoes => Set<LigaPartidaImportacao>();
+    public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
     public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
     public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();
     public DbSet<LigaKnockoutJogo> LigaKnockoutJogos => Set<LigaKnockoutJogo>();

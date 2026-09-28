@@ -102,7 +102,8 @@ public record LigaPartidaDto(
     bool TemPenaltis,
     Guid? PenaltisVencedorId,
     DateTime? IniciadaEm,
-    DateTime? EncerradaEm);
+    DateTime? EncerradaEm,
+    string? YoutubeVideoId = null);
 
 public record LigaPartidaCreateRequest(
     [Required] Guid TimeCasaId,
@@ -279,7 +280,8 @@ public record LigaKnockoutJogoDto(
     int? GolsCasa,
     int? GolsFora,
     PartidaStatus? PartidaStatus,
-    bool TemPenaltis);
+    bool TemPenaltis,
+    string? YoutubeVideoId = null);
 
 public record LigaEncerrarKnockoutRequest(
     bool TemPenaltis,

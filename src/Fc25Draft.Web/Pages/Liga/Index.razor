@@ -352,6 +352,7 @@
                                 <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
                                     <span class="badge @StatusBadge(p.Status)" style="font-size:0.7rem;">@StatusLabel(p.Status)</span>
                                     @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="font-size:0.7rem;">Pen</span> }
+                                    @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span title="Tem vídeo no telão" style="font-size:0.85rem;">📺</span> }
                                 </div>
                             </div>
                             }
@@ -609,6 +610,7 @@
                     }
                     else
                     {
+                    <PartidaTelaoLink PartidaId="_partidaDetalhes.PartidaId" YoutubeVideoId="@_partidaDetalhes.YoutubeVideoId" OnAlterado="AtualizarAposVideo" />
                     <PartidaEscalacoes Dados="_escalacoesPartida">
                     <Estatisticas>
                     @if (_eventoPartida.Any())
@@ -949,6 +951,14 @@
 
         if (_jogoKnockoutAberto is not null)
             _jogoKnockoutAberto = _knockoutJogos.FirstOrDefault(j => j.KnockoutJogoId == _jogoKnockoutAberto.KnockoutJogoId) ?? _jogoKnockoutAberto;
+    }
+
+    // O link do vídeo mudou: recarrega a rodada para o 📺 aparecer na lista.
+    private async Task AtualizarAposVideo()
+    {
+        var idxAtual = _rodadaIdx;
+        await LoadLigaDataAsync(_ligaId);
+        if (idxAtual < _rodadas.Count) _rodadaIdx = idxAtual;
     }
 
     private void FecharDetalhesPartida()
