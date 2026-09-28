@@ -89,7 +89,7 @@ else
         }
     </dl>
 
-    @if (_trajetoria.Count > 0)
+    @if (_trajetoria.Count > 0 || _titulosCopas.Count > 0)
     {
         <div class="mb-3">
             <div class="text-uppercase text-muted small fw-bold mb-2">Trajetória</div>
@@ -97,6 +97,12 @@ else
                 @if (_titulos > 0)
                 {
                     <span class="badge bg-warning text-dark">🏆 @_titulos título@(_titulos > 1 ? "s" : "")</span>
+                }
+                @foreach (var c in _titulosCopas)
+                {
+                    <span class="badge bg-success" title="@c.LigaNome">
+                        @(c.Temporada is int ano ? $"{ano} · " : "")@LigaLabels.Competicao(c.Tipo, null) · Campeão 🏆
+                    </span>
                 }
                 @foreach (var t in _trajetoria)
                 {
@@ -491,6 +497,7 @@ else
     private bool isLoading = true;
     private IReadOnlyList<TimeTrajetoriaDto> _trajetoria = Array.Empty<TimeTrajetoriaDto>();
     private int _titulos;
+    private IReadOnlyList<TimeTituloCopaDto> _titulosCopas = Array.Empty<TimeTituloCopaDto>();
     private TimePerfilDto? _perfil;
     private Guid? _carregadoId;
     private bool authInitialized;
@@ -570,12 +577,15 @@ else
         try
         {
             _trajetoria = await LigaService.GetTrajetoriaTimeAsync(Id, CancellationToken.None);
-            _titulos = _trajetoria.Count(t => t.Campeao);
+            _titulosCopas = await LigaService.GetTitulosCopasTimeAsync(Id, CancellationToken.None);
+            _titulos = _trajetoria.Count(t => t.Campeao) + _titulosCopas.Count;
         }
         catch
         {
             // Trajetória é complementar: se falhar, a página do time continua útil.
             _trajetoria = Array.Empty<TimeTrajetoriaDto>();
+            _titulosCopas = Array.Empty<TimeTituloCopaDto>();
+            _titulos = 0;
         }
     }
 

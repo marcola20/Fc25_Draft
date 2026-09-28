@@ -224,6 +224,19 @@ public class LigaPublicService : ILigaPublicService
         return trajetoria;
     }
 
+    public async Task<IReadOnlyList<TimeTituloCopaDto>> GetTitulosCopasTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        return await _db.Ligas
+            .AsNoTracking()
+            .Where(l => (l.Tipo == TipoCompetition.Copa || l.Tipo == TipoCompetition.Supercopa)
+                        && l.Status == LigaStatus.Encerrada
+                        && l.CampeaoTimeId == timeId)
+            .OrderByDescending(l => l.Temporada)
+            .ThenByDescending(l => l.Tipo)
+            .Select(l => new TimeTituloCopaDto(l.Temporada, l.Tipo, l.Nome))
+            .ToListAsync(ct);
+    }
+
     /// <summary>
     /// Classificação final de cada liga: igual à tabela quando não houve mata-mata, e saída do
     /// chaveamento quando houve (o campeão é quem venceu a final).

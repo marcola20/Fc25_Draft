@@ -32,6 +32,9 @@ public interface ILigaPublicService
     /// <summary>Trajetória do time por temporada: divisão, posição, títulos, acessos e rebaixamentos.</summary>
     Task<IReadOnlyList<TimeTrajetoriaDto>> GetTrajetoriaTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Copas e Supercopas encerradas que o time venceu, da mais recente para a mais antiga.</summary>
+    Task<IReadOnlyList<TimeTituloCopaDto>> GetTitulosCopasTimeAsync(Guid timeId, CancellationToken ct);
+
     /// <summary>Campanha do time nas competições ativas + números do elenco atual na temporada.</summary>
     Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct);
 

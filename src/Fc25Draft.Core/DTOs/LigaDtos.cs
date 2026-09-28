@@ -356,6 +356,12 @@ public record TimeTrajetoriaDto(
     ZonaClassificacao Zona,
     string? Movimento);
 
+/// <summary>Título de mata-mata (Copa ou Supercopa), que não entra na trajetória por divisão.</summary>
+public record TimeTituloCopaDto(
+    int? Temporada,
+    TipoCompetition Tipo,
+    string LigaNome);
+
 public record TimeHistoricoDto(
     Guid TimeId,
     string TimeNome,
