@@ -68,7 +68,8 @@ public class LayoutNavigationService
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
-            new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin")
+            new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin"),
+            new("Administradores", "/admin/administradores", "oi oi-key", RequiredRole: "AdminPrincipal")
         }, RequiredRole: "Admin")
     };
 
@@ -406,6 +407,18 @@ public class LayoutNavigationService
                 new("Treinadores")
             }
         },
+        ["/admin/administradores"] = new PageDefinition
+        {
+            Route = "/admin/administradores",
+            Title = "Administradores",
+            Subtitle = "Quem manda na liga — só o administrador principal vê esta página",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Administradores")
+            }
+        },
         ["/admin/treinadores"] = new PageDefinition
         {
             Route = "/admin/treinadores",
@@ -490,19 +503,19 @@ public class LayoutNavigationService
         }
     };
 
-    public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin)
+    public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin, bool isPrincipal = false)
     {
         var groups = new List<MenuGroup>();
 
         foreach (var group in MenuDefinition)
         {
-            if (!IsRoleAllowed(group.RequiredRole, isAdmin))
+            if (!IsRoleAllowed(group.RequiredRole, isAdmin, isPrincipal))
             {
                 continue;
             }
 
             var filteredItems = group.Items
-                .Where(item => IsRoleAllowed(item.RequiredRole, isAdmin))
+                .Where(item => IsRoleAllowed(item.RequiredRole, isAdmin, isPrincipal))
                 .ToList();
 
             if (filteredItems.Count == 0)
@@ -551,11 +564,16 @@ public class LayoutNavigationService
         return PageDefinitions.ContainsKey(route);
     }
 
-    private static bool IsRoleAllowed(string? requiredRole, bool isAdmin)
+    private static bool IsRoleAllowed(string? requiredRole, bool isAdmin, bool isPrincipal)
     {
         if (string.IsNullOrWhiteSpace(requiredRole))
         {
             return true;
+        }
+
+        if (requiredRole.Equals("AdminPrincipal", StringComparison.OrdinalIgnoreCase))
+        {
+            return isPrincipal;
         }
 
         return requiredRole.Equals("Admin", StringComparison.OrdinalIgnoreCase) && isAdmin;

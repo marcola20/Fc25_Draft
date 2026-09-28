@@ -62,6 +62,9 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
                 new(ClaimTypes.Role, "Admin"),
             };
 
+            if (adminToken.IsPrincipal)
+                claims.Add(new Claim(ClaimTypes.Role, "AdminPrincipal"));
+
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);

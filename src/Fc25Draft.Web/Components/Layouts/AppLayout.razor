@@ -155,7 +155,7 @@
     {
         try
         {
-            menuGroups = NavigationService.BuildMenu(AdminAuth.IsAdmin);
+            menuGroups = NavigationService.BuildMenu(AdminAuth.IsAdmin, AdminAuth.IsPrincipal);
             await LogMenuBuiltAsync();
         }
         catch (Exception ex)

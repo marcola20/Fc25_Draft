@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928004238_AdministradorPrincipal")]
+    partial class AdministradorPrincipal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1060,6 +1063,10 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid>("TimeForaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("YoutubeVideoId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.HasKey("PartidaId");
 
                     b.HasIndex("PenaltisVencedorId");
@@ -1375,6 +1382,35 @@ namespace Fc25Draft.Infra.Migrations
                         .HasDatabaseName("IX_MarketTransactions_Item_Type_CreatedAt");
 
                     b.ToTable("MarketTransactions");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PartidaChatMensagem", b =>
+                {
+                    b.Property<Guid>("MensagemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EnviadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("PartidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("MensagemId");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.HasIndex("PartidaId", "EnviadaEm");
+
+                    b.ToTable("PartidaChatMensagens", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
@@ -2861,6 +2897,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Player");
 
                     b.Navigation("WinnerTeam");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PartidaChatMensagem", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
+                        .WithMany()
+                        .HasForeignKey("PartidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Partida");
+
+                    b.Navigation("Treinador");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>

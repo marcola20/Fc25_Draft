@@ -11,6 +11,12 @@ public class AdminToken
     public DateTime? DeactivatedAtUtc { get; set; }
 
     /// <summary>
+    /// O dono da liga. Só ele cadastra, edita e exclui os outros administradores,
+    /// e não pode ser desativado nem excluído.
+    /// </summary>
+    public bool IsPrincipal { get; set; }
+
+    /// <summary>
     /// A pessoa por trás do token de administrador. Serve para o admin participar das coisas
     /// que são por pessoa, como o bolão, sem precisar sair e entrar com outro token.
     /// </summary>

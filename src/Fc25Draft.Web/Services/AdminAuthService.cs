@@ -34,6 +34,9 @@ public class AdminAuthService
 
     public bool IsAdmin { get; private set; }
 
+    /// <summary>O dono da liga: só ele gerencia os outros administradores.</summary>
+    public bool IsPrincipal { get; private set; }
+
     public string? Token => _token;
 
     public async Task EnsureInitializedAsync()
@@ -54,10 +57,12 @@ public class AdminAuthService
                     await ClearStoredTokenAsync();
                     _token = null;
                     IsAdmin = false;
+                    IsPrincipal = false;
                 }
                 else
                 {
                     IsAdmin = result.IsAdmin;
+                    IsPrincipal = result.IsPrincipal;
                 }
             }
 
@@ -67,6 +72,7 @@ public class AdminAuthService
         {
             _token = null;
             IsAdmin = false;
+            IsPrincipal = false;
             initializationCompleted = true;
         }
         catch (InvalidOperationException ex) when (IsPrerenderInteropException(ex))
@@ -106,6 +112,7 @@ public class AdminAuthService
 
         _token = normalizedToken;
         IsAdmin = result.IsAdmin;
+        IsPrincipal = result.IsPrincipal;
 
         try
         {
@@ -125,6 +132,7 @@ public class AdminAuthService
     {
         _token = null;
         IsAdmin = false;
+        IsPrincipal = false;
 
         await ClearStoredTokenAsync();
 
@@ -132,7 +140,7 @@ public class AdminAuthService
         AuthenticationChanged?.Invoke();
     }
 
-    private async Task<(bool IsValid, bool IsAdmin)> ValidateTokenAsync(string token)
+    private async Task<(bool IsValid, bool IsAdmin, bool IsPrincipal)> ValidateTokenAsync(string token)
     {
         try
         {
@@ -142,14 +150,14 @@ public class AdminAuthService
 
             using var response = await client.GetAsync("api/auth/me");
             if (!response.IsSuccessStatusCode)
-                return (false, false);
+                return (false, false, false);
 
             var data = await response.Content.ReadFromJsonAsync<AuthMeResponse>();
-            return (true, data?.IsAdmin ?? false);
+            return (true, data?.IsAdmin ?? false, data?.IsPrincipal ?? false);
         }
         catch (Exception)
         {
-            return (false, false);
+            return (false, false, false);
         }
     }
 
@@ -165,5 +173,5 @@ public class AdminAuthService
         }
     }
 
-    private sealed record AuthMeResponse(bool IsAdmin);
+    private sealed record AuthMeResponse(bool IsAdmin, bool IsPrincipal);
 }

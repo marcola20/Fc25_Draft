@@ -1,0 +1,268 @@
+@page "/admin/administradores"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@implements IDisposable
+@inject IAdministradorService AdminSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Administradores — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (!_principal)
+    {
+        <div class="alert alert-warning">Esta página é só do administrador principal.</div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-header fw-bold">@(_editando is null ? "Novo administrador" : $"Editando {_editando.Nome}")</div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Nome</label>
+                        <input class="form-control" @bind="_nome" placeholder="Quem é o administrador" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Token de acesso</label>
+                        <input class="form-control font-monospace" @bind="_token" placeholder="deixe vazio para gerar" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Treinador (para o bolão)</label>
+                        <select class="form-select" @bind="_treinadorSel">
+                            <option value="">— nenhum —</option>
+                            @foreach (var t in _treinadores)
+                            {
+                                <option value="@t.TreinadorId">@t.Nome</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-1">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="ativo" @bind="_ativo"
+                                   disabled="@(_editando?.Principal == true)" />
+                            <label class="form-check-label" for="ativo">Ativo</label>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2 d-flex gap-2">
+                        <button class="btn btn-success" @onclick="Salvar" disabled="@_salvando">Salvar</button>
+                        @if (_editando is not null)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="LimparFormulario" disabled="@_salvando">Novo</button>
+                        }
+                    </div>
+                </div>
+                <p class="text-muted small mb-0 mt-2">
+                    O administrador entra com o token pelo botão de login, como os treinadores.
+                    Ligar a um treinador serve para ele palpitar no bolão sem trocar de login.
+                    O principal não pode ser desativado nem excluído.
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <span class="fw-bold">Administradores</span>
+                <span class="badge bg-secondary">@_admins.Count</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Token</th>
+                            <th>Treinador</th>
+                            <th>Último acesso</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in _admins)
+                        {
+                            <tr class="@(a.Ativo ? "" : "text-muted")">
+                                <td>
+                                    <span class="fw-semibold">@a.Nome</span>
+                                    @if (a.Principal)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1">principal</span>
+                                    }
+                                    @if (!a.Ativo)
+                                    {
+                                        <span class="badge bg-secondary ms-1">desativado</span>
+                                    }
+                                </td>
+                                <td>
+                                    <code class="small">@a.Token</code>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" title="Gerar um token novo"
+                                            @onclick="() => RegerarToken(a)" disabled="@_salvando">regerar</button>
+                                </td>
+                                <td>@(a.TreinadorNome ?? "—")</td>
+                                <td class="small text-muted">
+                                    @(a.UltimoUsoUtc is { } uso ? uso.ToLocalTime().ToString("dd/MM/yyyy HH:mm", Br) : "nunca")
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(a)" disabled="@_salvando">Editar</button>
+                                    @if (!a.Principal)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(a)" disabled="@_salvando">Excluir</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private bool _principal;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<AdministradorDto> _admins = Array.Empty<AdministradorDto>();
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
+
+    private AdministradorDto? _editando;
+    private string _nome = "";
+    private string _token = "";
+    private string _treinadorSel = "";
+    private bool _ativo = true;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/administradores"));
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+    }
+
+    protected override async Task OnInitializedAsync() => await Carregar();
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await Carregar(); StateHasChanged(); });
+
+    private async Task<string> Token() => await AdminAuth.GetTokenAsync() ?? "";
+
+    private async Task Carregar()
+    {
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await Token();
+
+            // Confere no banco, não só no que o login guardou: a página é do principal e de mais ninguém.
+            _principal = await AdminSvc.EhPrincipalAsync(token, CancellationToken.None);
+            if (!_principal)
+            {
+                _admins = Array.Empty<AdministradorDto>();
+                return;
+            }
+
+            _admins = await AdminSvc.ListAsync(token, CancellationToken.None);
+            _treinadores = await TreinadorSvc.ListAsync(false, CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private void Editar(AdministradorDto a)
+    {
+        _editando = a;
+        _nome = a.Nome;
+        _token = a.Token;
+        _treinadorSel = a.TreinadorId?.ToString() ?? "";
+        _ativo = a.Ativo;
+    }
+
+    private void LimparFormulario()
+    {
+        _editando = null;
+        _nome = "";
+        _token = "";
+        _treinadorSel = "";
+        _ativo = true;
+    }
+
+    private async Task Salvar()
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            Guid? treinadorId = Guid.TryParse(_treinadorSel, out var id) ? id : null;
+            var meuToken = await Token();
+            var salvo = await AdminSvc.SalvarAsync(meuToken,
+                new AdministradorSalvarRequest(_editando?.AdminTokenId, _nome, _token, _ativo, treinadorId),
+                CancellationToken.None);
+
+            // Trocou o próprio token na mão: entra com o novo para não cair da página.
+            if (salvo.Principal && salvo.Token != meuToken)
+                await AdminAuth.SignInAsync(salvo.Token);
+
+            LimparFormulario();
+            await Carregar();
+            _ok = $"{salvo.Nome} salvo. Token: {salvo.Token}";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task RegerarToken(AdministradorDto a)
+    {
+        var aviso = a.Principal
+            ? "Gerar um token novo para você? O atual para de funcionar na hora e você vai precisar entrar de novo com o novo."
+            : $"Gerar um token novo para {a.Nome}? O token atual para de funcionar na hora.";
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", aviso)) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var novo = await AdminSvc.RegerarTokenAsync(await Token(), a.AdminTokenId, CancellationToken.None);
+            if (a.Principal)
+            {
+                // O token guardado no navegador morreu; entra com o novo para não cair da página.
+                await AdminAuth.SignInAsync(novo.Token);
+            }
+            await Carregar();
+            _ok = $"Token novo de {novo.Nome}: {novo.Token}";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task Excluir(AdministradorDto a)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Excluir o administrador {a.Nome}? O token dele para de funcionar na hora.")) return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await AdminSvc.ExcluirAsync(await Token(), a.AdminTokenId, CancellationToken.None);
+            if (_editando?.AdminTokenId == a.AdminTokenId) LimparFormulario();
+            await Carregar();
+            _ok = $"{a.Nome} excluído.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

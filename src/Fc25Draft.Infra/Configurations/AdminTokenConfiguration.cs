@@ -12,6 +12,7 @@ public class AdminTokenConfiguration : IEntityTypeConfiguration<AdminToken>
         e.Property(x => x.Token).HasMaxLength(500).IsRequired();
         e.Property(x => x.Description).HasMaxLength(500);
         e.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+        e.Property(x => x.IsPrincipal).IsRequired().HasDefaultValue(false);
         e.Property(x => x.CreatedAtUtc).HasColumnType("timestamp with time zone").IsRequired();
         e.Property(x => x.LastUsedAtUtc).HasColumnType("timestamp with time zone");
         e.Property(x => x.DeactivatedAtUtc).HasColumnType("timestamp with time zone");
