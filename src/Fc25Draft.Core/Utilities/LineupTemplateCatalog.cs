@@ -617,6 +617,24 @@ public static class LineupTemplateCatalog
                     new("ST2",  "Centroavante Direito (CA)",        false, 11, CA)
                 },
                 CreateBenchTemplate()),
+
+            ["4-2-2-2 (P2)"] = new LineupTemplate(
+                "4-2-2-2 (P2)",
+                new List<LineupSlotTemplate>
+                {
+                    new("GK",   "Goleiro (GOL)",                false,  1, GOL),
+                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, LE),
+                    new("LCB",  "Zagueiro (E)",                 false,  3, ZAG),
+                    new("RCB",  "Zagueiro (D)",                 false,  4, ZAG),
+                    new("RB",   "Lateral Direito (LD)",         false,  5, LD),
+                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, VOL),
+                    new("CDM2", "Volante Direito (VOL)",        false,  7, VOL),
+                    new("MAT1", "Meia Atacante (E)",            false,  8, MAT),
+                    new("MAT2", "Meia Atacante (D)",            false,  9, MAT),
+                    new("SA",   "Segundo Atacante (SA)",        false, 10, SA),
+                    new("ST2",  "Centroavante (CA)",            false, 11, CA)
+                },
+                CreateBenchTemplate())
         };
     }
 
