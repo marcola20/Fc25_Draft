@@ -187,6 +187,24 @@
                                 O padrão do sistema é bloqueado; libere só quando a janela abrir.
                             </div>
 
+                            <hr />
+
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="mercadoFechado"
+                                           checked="@_mercadoFechado"
+                                           @onchange="e => _mercadoFechado = (bool)(e.Value ?? false)" />
+                                    <label class="form-check-label" for="mercadoFechado">Mercado fechado</label>
+                                </div>
+                                <span class="badge @(_mercadoFechadoSalvo ? "bg-danger" : "bg-success")">
+                                    @(_mercadoFechadoSalvo ? "Fechado agora" : "Aberto agora")
+                                </span>
+                            </div>
+                            <div class="form-text">
+                                Fechado, ninguém manda, aceita ou contraoferta proposta, nem compra ou anuncia jogador na lista de transferências.
+                                Tirar jogador da lista, recusar e cancelar propostas continuam liberados.
+                            </div>
+
                             <div class="mt-3">
                                 <button class="btn btn-primary" @onclick="SalvarTransf" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar")</button>
                                 <button class="btn btn-outline-secondary ms-2" @onclick="RestaurarTransf" disabled="@_saving">Restaurar padrões</button>
@@ -397,6 +415,7 @@
     private int _maxQuickSell, _maxTransfers, _minRoster, _maxLoans;
     private int _maxQuickSellSalvo, _maxTransfersSalvo, _minRosterSalvo;
     private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
+    private bool _mercadoFechado, _mercadoFechadoSalvo;
     private IReadOnlyList<TeamQuickSellStatusDto> _quickSells = Array.Empty<TeamQuickSellStatusDto>();
     private IReadOnlyList<TeamElencoMinimoDto> _elencos = Array.Empty<TeamElencoMinimoDto>();
     private readonly Dictionary<Guid, string?> _minimosEditados = new();
@@ -444,6 +463,8 @@
         _maxLoans = t.MaxLoans;
         _quickSellBloqueado = t.QuickSellBloqueado;
         _quickSellBloqueadoSalvo = t.QuickSellBloqueado;
+        _mercadoFechado = t.MercadoFechado;
+        _mercadoFechadoSalvo = t.MercadoFechado;
     }
 
     private async Task CarregarQuickSells()
@@ -604,7 +625,7 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans), CancellationToken.None);
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans, _mercadoFechado), CancellationToken.None);
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();
@@ -645,6 +666,7 @@
         _minRoster = d.MinRosterSize;
         _maxLoans = d.MaxLoans;
         _quickSellBloqueado = d.QuickSellBloqueado;
+        _mercadoFechado = d.MercadoFechado;
         _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";
     }
 

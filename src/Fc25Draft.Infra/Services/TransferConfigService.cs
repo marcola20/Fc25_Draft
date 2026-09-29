@@ -45,6 +45,7 @@ public class TransferConfigService : ITransferConfigService
         cfg.MaxLoans = dto.MaxLoans;
         cfg.MinRosterSize = dto.MinRosterSize;
         cfg.QuickSellBloqueado = dto.QuickSellBloqueado;
+        cfg.MercadoFechado = dto.MercadoFechado;
         cfg.AtualizadoEm = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -169,5 +170,5 @@ public class TransferConfigService : ITransferConfigService
     }
 
     private static TransferConfigDto ToDto(TransferConfig c) =>
-        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans);
+        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans, c.MercadoFechado);
 }

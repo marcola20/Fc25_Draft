@@ -10,6 +10,13 @@
 @inject IJSRuntime JS
 
 <div class="mt-3">
+    @if (_mercadoFechado)
+    {
+        <div class="alert alert-warning py-2" role="status">
+            <strong>Mercado fechado!</strong> Não dá para mandar nem aceitar propostas até a próxima janela. Recusar e cancelar continuam liberados.
+        </div>
+    }
+
     <ul class="nav nav-pills mb-3" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link @(ActiveSubTab == SubTab.Received ? "active" : "")"
@@ -608,7 +615,9 @@
         try
         {
             _maxTransfers = await TransferConfigSvc.GetMaxTransfersForAsync(TeamId, CancellationToken.None);
-            _maxLoans = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MaxLoans;
+            var cfg = await TransferConfigSvc.GetAsync(CancellationToken.None);
+            _maxLoans = cfg.MaxLoans;
+            _mercadoFechado = cfg.MercadoFechado;
         }
         catch { /* mantém o padrão se a config não carregar */ }
         await LoadDataAsync();
@@ -647,6 +656,7 @@
     }
 
     private int _maxTransfers = 5;
+    private bool _mercadoFechado;
 
     private async Task LoadDataAsync()
     {

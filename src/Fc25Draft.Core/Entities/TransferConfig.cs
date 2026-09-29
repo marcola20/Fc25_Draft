@@ -22,6 +22,12 @@ public class TransferConfig
     /// <summary>Quando true, ninguém pode fazer venda rápida (o admin libera em /admin/configuracoes).</summary>
     public bool QuickSellBloqueado { get; set; } = true;
 
+    /// <summary>
+    /// Quando true, a janela está fechada: ninguém manda, aceita nem contraoferta proposta,
+    /// compra ou anuncia jogador na lista de transferências.
+    /// </summary>
+    public bool MercadoFechado { get; set; }
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>

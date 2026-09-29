@@ -17,6 +17,13 @@
 <PageHeader Title="Lista de Transferências"
             Subtitle="Jogadores que os times colocaram como negociáveis. Compre direto pelo preço pedido ou mande uma proposta." />
 
+@if (_mercadoFechado)
+{
+    <div class="alert alert-warning" role="status">
+        <strong>Mercado fechado!</strong> Compras e propostas voltam na próxima janela de transferências.
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(_error))
 {
     <div class="alert alert-danger" role="alert">@_error</div>
@@ -126,10 +133,10 @@ else
                             }
                             else
                             {
-                                <button class="btn btn-success btn-sm me-1" disabled="@_processing" @onclick="() => _comprar = item">
+                                <button class="btn btn-success btn-sm me-1" disabled="@(_processing || _mercadoFechado)" @onclick="() => _comprar = item">
                                     Comprar
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" disabled="@_processing" @onclick="() => FazerProposta(item)">
+                                <button class="btn btn-outline-primary btn-sm" disabled="@(_processing || _mercadoFechado)" @onclick="() => FazerProposta(item)">
                                     Proposta
                                 </button>
                             }
@@ -184,6 +191,7 @@ else
     private TeamDetailsDto? _myTeam;
     private string? _token;
     private int _maxTransfers = 5;
+    private bool _mercadoFechado;
     private bool _loading = true;
     private bool _processing;
     private string? _error;
@@ -239,6 +247,7 @@ else
         try
         {
             _itens = (await OffersApi.GetTransferListAsync()).ToList();
+            _mercadoFechado = (await TransferConfigSvc.GetAsync(CancellationToken.None)).MercadoFechado;
             await CarregarMeuTimeAsync();
         }
         catch (Exception ex)

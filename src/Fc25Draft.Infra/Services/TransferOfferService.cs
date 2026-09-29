@@ -61,6 +61,7 @@ public class TransferOfferService : ITransferOfferService
             ?? throw new KeyNotFoundException("Time de destino não encontrado.");
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        EnsureMercadoAberto(cfg);
 
         if (dto.Type == OfferType.Loan)
         {
@@ -186,6 +187,7 @@ public class TransferOfferService : ITransferOfferService
         if (response == OfferStatus.Accepted)
         {
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+            EnsureMercadoAberto(cfg);
             if (offer.Type == OfferType.Loan)
             {
                 EnsureLoanLimit(cfg, LoanBorrower(offer) == offer.FromTeamId ? offer.FromTeam : offer.ToTeam);
@@ -322,6 +324,13 @@ public class TransferOfferService : ITransferOfferService
         if (askingPrice is <= 0)
             throw new ArgumentException("Informe um preço maior que zero.");
 
+        // Tirar da lista continua liberado com o mercado fechado; anunciar ou mudar o preço, não.
+        if (askingPrice is not null)
+        {
+            var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+            EnsureMercadoAberto(cfg);
+        }
+
         var roster = await _db.TeamRosters
             .FirstOrDefaultAsync(r => r.TeamId == teamId && r.Player.PlayerGuid == playerGuid, ct)
             ?? throw new KeyNotFoundException("Jogador não encontrado no seu elenco.");
@@ -366,6 +375,7 @@ public class TransferOfferService : ITransferOfferService
             ?? throw new KeyNotFoundException("Time vendedor não encontrado.");
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        EnsureMercadoAberto(cfg);
         EnsureTransferLimit(cfg, buyer);
 
         // Mesma venda de uma proposta aceita: o comprador propõe o preço pedido e o vendedor já aceitou ao listar.
@@ -683,6 +693,12 @@ public class TransferOfferService : ITransferOfferService
     /// <summary>Quem recebe o jogador no empréstimo: quem pediu (alvos) ou o outro time (oferecidos).</summary>
     private static Guid LoanBorrower(TransferOffer offer)
         => offer.Players.Any(p => p.IsTarget) ? offer.FromTeamId : offer.ToTeamId;
+
+    private static void EnsureMercadoAberto(TransferConfig cfg)
+    {
+        if (cfg.MercadoFechado)
+            throw new InvalidOperationException("Mercado fechado! As negociações estão bloqueadas até a próxima janela.");
+    }
 
     private static void EnsureLoanLimit(TransferConfig cfg, Team borrower)
     {
