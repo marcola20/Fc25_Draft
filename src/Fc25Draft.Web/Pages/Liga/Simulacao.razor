@@ -351,6 +351,24 @@
         var tipo = _liga?.Tipo ?? TipoCompetition.Liga;
         var todos = times.Values.ToList();
 
+        if (tipo != TipoCompetition.Copa && _regra.DesempateSerieB)
+        {
+            // Série B: empatados dividem a posição; na faixa que muda de zona, vão a jogo decisivo / mini liga.
+            var blocos = LigaDesempate.BlocosSerieB(todos, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+            var posicoesB = LigaDesempate.PosicoesSerieB(blocos, t => t.TimeId);
+            var emDecisao = LigaDesempate.EmpatadosEmZona(blocos, _regra, t => t.TimeId);
+            var tabelaB = blocos.SelectMany(b => b).ToList();
+
+            for (int i = 0; i < tabelaB.Count; i++)
+            {
+                tabelaB[i].Posicao = posicoesB[tabelaB[i].TimeId];
+                tabelaB[i].Ordem = i + 1;
+                tabelaB[i].EmDecisao = emDecisao.Contains(tabelaB[i].TimeId);
+            }
+
+            return tabelaB;
+        }
+
         if (tipo != TipoCompetition.Copa)
         {
             var ordenados = LigaDesempate.Ordenar(todos, tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
@@ -360,11 +378,10 @@
                 ordenados[i].Ordem = i + 1;
             }
 
-            // Empate no topo (igual ao encerramento da temporada): o título sai em jogo decisivo
-            // (2 times) ou mini liga (3+), então ninguém aparece como campeão. Série A: empate em
-            // pontos; Série B: empate em todos os critérios, inclusive confronto direto.
+            // Empate em pontos no topo (igual ao encerramento da temporada): o título sai em jogo
+            // decisivo (2 times) ou mini liga (3+), então ninguém aparece como campeão.
             var empatadosNoTopo = LigaDesempate.EmpatadosNoTopo(
-                ordenados, _regra.TituloPelosCriterios, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+                ordenados, false, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
             foreach (var t in ordenados.Where(t => empatadosNoTopo.Contains(t.TimeId)))
                 t.EmDecisao = true;
 

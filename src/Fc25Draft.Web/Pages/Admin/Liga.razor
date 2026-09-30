@@ -520,11 +520,25 @@
     @if (_tab == "decisivo-zona" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
     {
         <div class="alert alert-secondary py-2 small">
-            Nas posições que mudam de zona (acesso, playoff, rebaixamento), o desempate segue
-            <strong>Pontos → Vitórias → Saldo → Gols Pró → Confronto direto</strong>. Se ainda assim os times ficarem iguais,
-            a posição sai em jogo decisivo: rodada extra que <strong>não soma pontos</strong> e coloca o vencedor à frente.
+            @if (_ligaAtual.Divisao == Divisao.SerieB)
+            {
+                <text>
+                    Na Série B o desempate é <strong>Pontos → Vitórias → Saldo</strong>. Com <strong>2 times</strong> iguais vale o
+                    confronto direto e, se ele também empatar, o <strong>jogo decisivo</strong>. Com <strong>3 ou mais</strong>, a
+                    <strong>mini liga</strong>: um jogo entre cada par, na rodada extra, que <strong>não soma pontos</strong> — a ordem
+                    sai da tabela desses jogos. Vale para todas as posições que mudam de zona, inclusive o título.
+                </text>
+            }
+            else
+            {
+                <text>
+                    Nas posições que mudam de zona (acesso, playoff, rebaixamento), o desempate segue
+                    <strong>Pontos → Vitórias → Saldo → Gols Pró → Confronto direto</strong>. Se ainda assim os times ficarem iguais,
+                    a posição sai em jogo decisivo: rodada extra que <strong>não soma pontos</strong> e coloca o vencedor à frente.
+                    Empate no topo continua indo para a decisão de campeão.
+                </text>
+            }
             Os empates só aparecem depois de todos os jogos regulares, e a temporada não encerra com empate pendente.
-            Empate no topo continua indo para a decisão de campeão.
         </div>
 
         @if (!_empatesZona.Any())
@@ -537,7 +551,14 @@
                 @foreach (var empate in _empatesZona)
                 {
                     <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
-                        <span class="badge bg-secondary">@(empate.Posicao)º x @(empate.Posicao + 1)º</span>
+                        @if (empate.TimesEmpatados > 2)
+                        {
+                            <span class="badge bg-info text-dark">Mini liga · @(empate.Posicao)º ao @(empate.Posicao + empate.TimesEmpatados - 1)º</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@(empate.Posicao)º x @(empate.Posicao + 1)º</span>
+                        }
                         <span class="small text-muted">@empate.ZonaTimeA × @empate.ZonaTimeB</span>
 
                         <span class="fw-semibold">@empate.TimeANome</span>
@@ -551,8 +572,13 @@
                                 <button class="btn btn-sm btn-primary"
                                         @onclick="() => GerarJogoDecisivoZona(empate)"
                                         disabled="@(_saving || _ligaAtual.Status != LigaStatus.PrimeiraFase)">
-                                    Criar jogo decisivo
+                                    @(empate.TimesEmpatados > 2 ? "Criar jogo da mini liga" : "Criar jogo decisivo")
                                 </button>
+                            }
+                            else if (empate.TimesEmpatados > 2 && empate.StatusPartida == PartidaStatus.Encerrada)
+                            {
+                                <span class="fw-bold">@empate.GolsTimeA – @empate.GolsTimeB</span>
+                                <span class="badge bg-success">Jogo da mini liga encerrado</span>
                             }
                             else if (empate.VencedorId is not null)
                             {

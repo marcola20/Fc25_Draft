@@ -165,7 +165,7 @@
                     {
                         <tr class="@GetRowClass(item)">
                             <td>
-                                <span class="badge @GetBadgeClass(item)">@item.Posicao</span>
+                                <span class="badge @GetBadgeClass(item)">@Posicao(item)</span>
                             </td>
                             <td class="fw-semibold">@item.TimeNome</td>
                             <td class="text-center fw-bold">@item.Pontos</td>
@@ -196,7 +196,7 @@
             }
             @if (_classif.Any(EmpateNoTopo))
             {
-                <span><span class="badge @ZonaEstilo.BadgeEmpateTopo me-1">●</span> Empate no topo — jogo decisivo (2 times) ou mini liga (3+)</span>
+                <span><span class="badge @ZonaEstilo.BadgeEmpateTopo me-1">●</span> @RotuloEmpate</span>
             }
         </div>
         </ShareableCard>
@@ -210,7 +210,8 @@
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
     private IReadOnlyList<LigaPartidaDto> _jogosDecisivos = Array.Empty<LigaPartidaDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
-    private HashSet<Guid> _empatadosNoTopo = new();
+    private HashSet<Guid> _empatados = new();
+    private Dictionary<Guid, int>? _posicoes;
     private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private bool _loading = true;
 
@@ -253,24 +254,44 @@
         var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
         _jogosDecisivos = rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas).ToArray();
         _decisivos = LigaDesempate.DosJogos(_jogosDecisivos);
-        _empatadosNoTopo = LigaDesempate.EmpatadosNoTopo(
-            _classif, _regra.TituloPelosCriterios, c => c.TimeId, CopaStats, LigaDesempate.ConfrontosDasRodadas(rodadas), _decisivos);
+        var confrontos = LigaDesempate.ConfrontosDasRodadas(rodadas);
+
+        if (_regra.DesempateSerieB)
+        {
+            // Série B: quem segue empatado divide a posição; na faixa que muda de zona, fica azul.
+            var blocos = LigaDesempate.BlocosSerieB(_classif, c => c.TimeId, CopaStats, confrontos, _decisivos);
+            _classif = blocos.SelectMany(b => b).ToList();
+            _posicoes = LigaDesempate.PosicoesSerieB(blocos, c => c.TimeId);
+            _empatados = LigaDesempate.EmpatadosEmZona(blocos, _regra, c => c.TimeId);
+        }
+        else
+        {
+            _posicoes = null;
+            _empatados = LigaDesempate.EmpatadosNoTopo(_classif, false, c => c.TimeId, CopaStats, confrontos, _decisivos);
+        }
     }
+
+    private int Posicao(LigaClassificacaoItemDto item) =>
+        _posicoes is not null && _posicoes.TryGetValue(item.TimeId, out var p) ? p : item.Posicao;
 
     // Zonas valem durante a temporada também ("se terminasse hoje").
     private string GetRowClass(LigaClassificacaoItemDto item) =>
-        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, item.Posicao, _classif?.Count ?? 0));
+        EmpateNoTopo(item) ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, Posicao(item), _classif?.Count ?? 0));
 
     private string GetBadgeClass(LigaClassificacaoItemDto item) =>
-        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, item.Posicao, _classif?.Count ?? 0));
+        EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, Posicao(item), _classif?.Count ?? 0));
 
     /// <summary>
-    /// Empatado com o líder: o título sai em jogo decisivo (2 times) ou mini liga (3+).
-    /// Série A: empate em pontos; Série B: empate em todos os critérios, inclusive confronto direto.
-    /// Mesmo critério do encerramento da temporada (LigaAdminService).
+    /// Série A: empatado em pontos com o líder — o título sai em jogo decisivo (2 times) ou mini liga (3+).
+    /// Série B: empatado numa faixa que muda de zona (título, acesso, playoff), sem confronto direto
+    /// que resolva. Mesmo critério do encerramento da temporada (LigaAdminService).
     /// </summary>
     private bool EmpateNoTopo(LigaClassificacaoItemDto item) =>
-        _liga?.Status != LigaStatus.Criada && _empatadosNoTopo.Contains(item.TimeId);
+        _liga?.Status != LigaStatus.Criada && _empatados.Contains(item.TimeId);
+
+    private string RotuloEmpate => _regra.DesempateSerieB
+        ? "Empate em posição de zona — jogo decisivo (2 times) ou mini liga (3+) no fim da temporada"
+        : "Empate no topo — jogo decisivo (2 times) ou mini liga (3+)";
 
     /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
     private IEnumerable<GrupoCopa> GruposDaCopa() =>

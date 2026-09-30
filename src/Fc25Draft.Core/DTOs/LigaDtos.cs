@@ -205,7 +205,8 @@ public record LigaEmpateCopaDto(
 
 /// <summary>
 /// Empate total (inclusive no confronto direto) entre o <paramref name="Posicao"/>º e o seguinte,
-/// numa posição que muda a zona — e o jogo decisivo, quando já criado.
+/// numa posição que muda a zona — e o jogo decisivo, quando já criado. Com <paramref name="TimesEmpatados"/>
+/// 3+ (Série B), é um dos jogos da mini liga entre os empatados a partir do <paramref name="Posicao"/>º.
 /// </summary>
 public record LigaEmpateZonaDto(
     int Posicao,
@@ -220,7 +221,8 @@ public record LigaEmpateZonaDto(
     int? GolsTimeA,
     int? GolsTimeB,
     Guid? VencedorId,
-    string? VencedorNome);
+    string? VencedorNome,
+    int TimesEmpatados = 2);
 
 public record LigaGrupoTimeDto(
     Guid LigaId,

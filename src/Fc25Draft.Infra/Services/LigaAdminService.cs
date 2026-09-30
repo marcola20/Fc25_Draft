@@ -1575,8 +1575,17 @@ public class LigaAdminService : ILigaAdminService
                 resultados.Add((v, v == j.TimeCasaId ? j.TimeForaId : j.TimeCasaId));
         }
 
-        return new JogosDecisivos(resultados);
+        return new JogosDecisivos(
+            resultados,
+            jogos.Select(j => new ConfrontoDireto(j.TimeCasaId, j.TimeForaId, j.GolsCasa, j.GolsFora)));
     }
+
+    /// <summary>Ordem da tabela de uma Liga: a Série B tem desempate próprio (<see cref="LigaDesempate.BlocosSerieB"/>).</summary>
+    private static List<LigaClassificacao> OrdenarLiga(
+        Liga liga, IEnumerable<LigaClassificacao> classifs, IReadOnlyList<ConfrontoDireto> confrontos, JogosDecisivos decisivos) =>
+        liga.Divisao == Divisao.SerieB
+            ? LigaDesempate.BlocosSerieB(classifs, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos).SelectMany(b => b).ToList()
+            : LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
 
     /// <summary>Grupo da Copa já ordenado pelos critérios e pelos jogos decisivos encerrados.</summary>
     private static List<LigaClassificacao> OrdenarGrupoCopa(
@@ -1731,6 +1740,8 @@ public class LigaAdminService : ILigaAdminService
 
     // ── Desempate nas zonas (Liga com acesso/rebaixamento) ───────────────────
 
+    /// <param name="TimesEmpatados">2 = jogo decisivo; 3+ = este é um dos jogos da mini liga (Série B).</param>
+    /// <param name="Resolvido">Jogo decisivo com vencedor, ou jogo da mini liga encerrado.</param>
     private sealed record EmpateZona(
         int Posicao,
         ZonaClassificacao ZonaA,
@@ -1738,7 +1749,9 @@ public class LigaAdminService : ILigaAdminService
         LigaClassificacao TimeA,
         LigaClassificacao TimeB,
         LigaPartida? Partida,
-        Guid? VencedorId);
+        Guid? VencedorId,
+        int TimesEmpatados = 2,
+        bool Resolvido = false);
 
     /// <summary>
     /// Empates que decidem zona: iguais em Pontos, Vitórias, Saldo, Gols Pró e confronto direto,
@@ -1768,6 +1781,9 @@ public class LigaAdminService : ILigaAdminService
             .Where(p => p.Rodada.LigaId == liga.LigaId && p.Rodada.Desempate)
             .ToListAsync(ct);
 
+        if (regra.DesempateSerieB)
+            return EmpatesZonaSerieB(regra, classifs, confrontos, decisivos, jogosDecisivos);
+
         var ordenados = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
         var semDecisivo = LigaDesempate.PosicoesLiga(ordenados, c => c.TimeId, StatsDaClassificacao, confrontos);
         var total = ordenados.Count;
@@ -1785,12 +1801,60 @@ public class LigaAdminService : ILigaAdminService
                 (p.TimeCasaId == a.TimeId && p.TimeForaId == b.TimeId) ||
                 (p.TimeCasaId == b.TimeId && p.TimeForaId == a.TimeId));
 
+            var vencedor = partida is null ? null : decisivos.VencedorEntre(a.TimeId, b.TimeId);
             empates.Add(new EmpateZona(
                 posicao,
                 LigaZonas.Zona(regra, posicao, total),
                 LigaZonas.Zona(regra, posicao + 1, total),
-                a, b, partida,
-                partida is null ? null : decisivos.VencedorEntre(a.TimeId, b.TimeId)));
+                a, b, partida, vencedor,
+                Resolvido: vencedor is not null));
+        }
+
+        return empates;
+    }
+
+    /// <summary>
+    /// Série B: blocos empatados (sem contar os jogos de desempate, para o empate seguir listado depois
+    /// de resolvido) que cruzam uma fronteira de zona. Dupla → um jogo decisivo; 3+ → todos os jogos da mini liga.
+    /// </summary>
+    private static List<EmpateZona> EmpatesZonaSerieB(
+        LigaRegraZonas regra,
+        List<LigaClassificacao> classifs,
+        IReadOnlyList<ConfrontoDireto> confrontos,
+        JogosDecisivos decisivos,
+        List<LigaPartida> jogosDecisivos)
+    {
+        var blocos = LigaDesempate.BlocosSerieB(classifs, c => c.TimeId, StatsDaClassificacao, confrontos);
+        var total = classifs.Count;
+        var fronteiras = LigaZonas.Fronteiras(regra, total);
+        var empates = new List<EmpateZona>();
+        var antes = 0;
+
+        foreach (var bloco in blocos)
+        {
+            var (primeira, ultima) = (antes + 1, antes + bloco.Count);
+            antes += bloco.Count;
+
+            // Fronteira f separa o fº do (f+1)º: interessa se os dois lados estão dentro do bloco.
+            if (bloco.Count < 2 || !fronteiras.Any(f => f >= primeira && f < ultima)) continue;
+
+            var zonaTopo = LigaZonas.Zona(regra, primeira, total);
+            var zonaFim = LigaZonas.Zona(regra, ultima, total);
+
+            for (int i = 0; i < bloco.Count; i++)
+            for (int j = i + 1; j < bloco.Count; j++)
+            {
+                var (a, b) = (bloco[i], bloco[j]);
+                var partida = jogosDecisivos.FirstOrDefault(p =>
+                    (p.TimeCasaId == a.TimeId && p.TimeForaId == b.TimeId) ||
+                    (p.TimeCasaId == b.TimeId && p.TimeForaId == a.TimeId));
+                var vencedor = partida is null ? null : decisivos.VencedorEntre(a.TimeId, b.TimeId);
+
+                empates.Add(new EmpateZona(
+                    primeira, zonaTopo, zonaFim, a, b, partida, vencedor,
+                    bloco.Count,
+                    Resolvido: bloco.Count == 2 ? vencedor is not null : partida?.Status == PartidaStatus.Encerrada));
+            }
         }
 
         return empates;
@@ -1819,7 +1883,8 @@ public class LigaAdminService : ILigaAdminService
                 e.Partida is null ? null : aEmCasa ? e.Partida.GolsFora : e.Partida.GolsCasa,
                 e.VencedorId,
                 e.VencedorId == e.TimeA.TimeId ? e.TimeA.Time.TeamName
-                    : e.VencedorId == e.TimeB.TimeId ? e.TimeB.Time.TeamName : null);
+                    : e.VencedorId == e.TimeB.TimeId ? e.TimeB.Time.TeamName : null,
+                e.TimesEmpatados);
         }).ToList();
 
         static string RotuloZona(ZonaClassificacao z) => z == ZonaClassificacao.Nenhuma ? "Fora das zonas" : LigaZonas.Rotulo(z);
@@ -1846,8 +1911,14 @@ public class LigaAdminService : ILigaAdminService
     /// <summary>Impede encerrar a temporada com empate de zona sem jogo decisivo resolvido.</summary>
     private async Task GarantirDesempatesDeZonaAsync(Liga liga, CancellationToken ct)
     {
-        var pendente = (await CalcularEmpatesZonaAsync(liga, ct)).FirstOrDefault(e => e.VencedorId is null);
+        var pendente = (await CalcularEmpatesZonaAsync(liga, ct)).FirstOrDefault(e => !e.Resolvido);
         if (pendente is null) return;
+
+        if (pendente.TimesEmpatados > 2)
+            throw new InvalidOperationException(
+                $"{pendente.TimesEmpatados} times estão empatados em Pontos, Vitórias e Saldo a partir do {pendente.Posicao}º, " +
+                "numa faixa que muda de zona. Crie e encerre todos os jogos da mini liga (aba Jogo Decisivo) " +
+                "antes de encerrar a temporada.");
 
         throw new InvalidOperationException(
             $"{pendente.TimeA.Time.TeamName} e {pendente.TimeB.Time.TeamName} estão empatados em todos os critérios " +
@@ -1923,9 +1994,9 @@ public class LigaAdminService : ILigaAdminService
         var decisivos = await CarregarJogosDecisivosAsync(liga.LigaId, ct);
         var regra = LigaRegraZonas.De(liga.Tipo, liga.Divisao, liga.VagasDiretas, liga.VagasPlayoff);
 
-        var ordenados = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+        var ordenados = OrdenarLiga(liga, classifs, confrontos, decisivos);
         var empatados = LigaDesempate.EmpatadosNoTopo(
-            ordenados, regra.TituloPelosCriterios, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+            ordenados, regra.DesempateSerieB, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
 
         return (ordenados, empatados);
     }
@@ -2067,19 +2138,9 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.MiniLiga)
             throw new InvalidOperationException("Liga não está em Mini Liga.");
 
-        // Times empatados que disputam a mini liga
-        var classif = await _db.LigaClassificacoes
-            .AsNoTracking()
-            .Where(x => x.LigaId == ligaId)
-            .OrderBy(x => x.Posicao)
-            .ToListAsync(ct);
-
-        var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
-        // Mesmo critério do encerramento: empate em pontos com o líder.
-        var empatados = classif
-            .Where(c => c.Pontos == lider.Pontos)
-            .Select(c => c.TimeId)
-            .ToHashSet();
+        // Times empatados que disputam a mini liga (mesmo critério do encerramento)
+        var (classif, empatados) = await EmpatadosNoTopoAsync(liga, ct);
+        if (classif.Count == 0) throw new InvalidOperationException("Classificação vazia.");
 
         // Jogos da mini liga (Numero = 0)
         var jogos = await _db.LigaPartidas
@@ -2353,7 +2414,7 @@ public class LigaAdminService : ILigaAdminService
         else
         {
             // Jogo decisivo de zona (rodada de desempate) separa quem segue igual após o confronto direto.
-            resultado = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, Stats, confrontos, decisivos);
+            resultado = OrdenarLiga(liga, classifs, confrontos, decisivos);
             await AplicarDecisaoDeTituloAsync(ligaId, resultado, ct);
         }
 

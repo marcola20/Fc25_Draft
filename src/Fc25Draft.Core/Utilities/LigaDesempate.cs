@@ -19,8 +19,20 @@ public sealed class JogosDecisivos
 
     private readonly HashSet<(Guid Vencedor, Guid Perdedor)> _resultados;
 
-    public JogosDecisivos(IEnumerable<(Guid Vencedor, Guid Perdedor)> resultados) =>
+    public JogosDecisivos(
+        IEnumerable<(Guid Vencedor, Guid Perdedor)> resultados,
+        IEnumerable<ConfrontoDireto>? placares = null)
+    {
         _resultados = resultados.ToHashSet();
+        Placares = placares?.ToList() ?? new List<ConfrontoDireto>();
+    }
+
+    /// <summary>Placar de todos os jogos de desempate encerrados (a mini liga da Série B usa a tabela deles).</summary>
+    public IReadOnlyList<ConfrontoDireto> Placares { get; }
+
+    /// <summary>Já houve jogo de desempate encerrado entre os dois times, com ou sem vencedor.</summary>
+    public bool Jogaram(Guid timeA, Guid timeB) =>
+        Placares.Any(p => (p.TimeCasaId == timeA && p.TimeForaId == timeB) || (p.TimeCasaId == timeB && p.TimeForaId == timeA));
 
     /// <summary>Já houve jogo decisivo encerrado entre os dois times.</summary>
     public bool Decidiu(Guid timeA, Guid timeB) =>
@@ -40,6 +52,11 @@ public sealed class JogosDecisivos
 /// <para>
 /// <b>Liga:</b> Pontos → Vitórias → Saldo de Gols → Gols Pró → Confronto direto → jogo decisivo
 /// (só nas posições que mudam de zona; na Série A, empate em pontos no topo segue a decisão de campeão).
+/// </para>
+/// <para>
+/// <b>Série B:</b> Pontos → Vitórias → Saldo de Gols. Entre 2 empatados vale o confronto direto;
+/// entre 3 ou mais, a mini liga (jogos extras entre eles). Sem solução, dividem a posição e, nas
+/// posições que mudam de zona, a temporada só encerra depois do jogo decisivo / mini liga.
 /// </para>
 /// <para>
 /// <b>Copa:</b> Pontos → Vitórias → Saldo de Gols. Quem empatar nesses três critérios
@@ -70,9 +87,12 @@ public static class LigaDesempate
     public static JogosDecisivos DosJogos(IEnumerable<LigaPartidaDto> partidas)
     {
         var resultados = new List<(Guid, Guid)>();
+        var placares = new List<ConfrontoDireto>();
 
         foreach (var p in partidas.Where(x => x.Status == PartidaStatus.Encerrada))
         {
+            placares.Add(new ConfrontoDireto(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora));
+
             var vencedor = VencedorDoJogoDecisivo(
                 p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId);
 
@@ -80,7 +100,7 @@ public static class LigaDesempate
                 resultados.Add((v, v == p.TimeCasaId ? p.TimeForaId : p.TimeCasaId));
         }
 
-        return new JogosDecisivos(resultados);
+        return new JogosDecisivos(resultados, placares);
     }
 
     /// <summary>Confrontos diretos das rodadas regulares, igual ao recálculo oficial (sem desempates nem WO).</summary>
@@ -192,14 +212,13 @@ public static class LigaDesempate
     }
 
     /// <summary>
-    /// Times de uma Liga já ordenada que vão à decisão do título (jogo decisivo com 2, mini liga com 3+);
-    /// vazio quando o líder está isolado. Com <paramref name="tituloPelosCriterios"/> (Série B), só quem
-    /// divide a 1ª posição em todos os critérios, inclusive confronto direto; senão, basta empatar em
-    /// pontos com o líder.
+    /// Times que vão à decisão do título (jogo decisivo com 2, mini liga com 3+); vazio quando o
+    /// líder está isolado. Série A: basta empatar em pontos com o líder (<paramref name="ordenados"/>
+    /// já na ordem da tabela). Série B: quem divide a 1ª posição (<see cref="BlocosSerieB"/>).
     /// </summary>
     public static HashSet<Guid> EmpatadosNoTopo<T>(
         IReadOnlyList<T> ordenados,
-        bool tituloPelosCriterios,
+        bool serieB,
         Func<T, Guid> timeId,
         Func<T, DesempateStats> stats,
         IReadOnlyList<ConfrontoDireto> confrontos,
@@ -207,14 +226,128 @@ public static class LigaDesempate
     {
         if (ordenados.Count < 2) return new HashSet<Guid>();
 
-        var noTopo = tituloPelosCriterios
-            ? ordenados.Zip(PosicoesLiga(ordenados, timeId, stats, confrontos, decisivos))
-                .Where(x => x.Second == 1)
-                .Select(x => timeId(x.First))
-                .ToHashSet()
+        var noTopo = serieB
+            ? BlocosSerieB(ordenados, timeId, stats, confrontos, decisivos)[0].Select(timeId).ToHashSet()
             : ordenados.Where(x => stats(x).Pontos == stats(ordenados[0]).Pontos).Select(timeId).ToHashSet();
 
         return noTopo.Count > 1 ? noTopo : new HashSet<Guid>();
+    }
+
+    /// <summary>
+    /// Classificação da Série B em blocos, do 1º ao último: cada bloco é um time sozinho ou os times
+    /// que seguem empatados e dividem a posição. Pontos → Vitórias → Saldo; entre 2 empatados, o
+    /// confronto direto e, se igual (ou se ainda não se enfrentaram), o jogo decisivo; entre 3 ou
+    /// mais, a mini liga — só depois de todos os jogos dela, pela tabela desses jogos.
+    /// </summary>
+    public static List<List<T>> BlocosSerieB<T>(
+        IEnumerable<T> itens,
+        Func<T, Guid> timeId,
+        Func<T, DesempateStats> stats,
+        IReadOnlyList<ConfrontoDireto> confrontos,
+        JogosDecisivos? decisivos = null)
+    {
+        decisivos ??= JogosDecisivos.Nenhum;
+
+        var ordenados = itens
+            .OrderByDescending(x => stats(x).Pontos)
+            .ThenByDescending(x => stats(x).Vitorias)
+            .ThenByDescending(x => stats(x).SaldoGols)
+            .ThenBy(timeId)
+            .ToList();
+
+        var blocos = new List<List<T>>();
+        int i = 0;
+        while (i < ordenados.Count)
+        {
+            var primeiro = stats(ordenados[i]);
+            var empatados = ordenados.Skip(i).TakeWhile(x => EmpatadosNaCopa(stats(x), primeiro)).ToList();
+
+            blocos.AddRange(empatados.Count switch
+            {
+                1 => new List<List<T>> { empatados },
+                2 => DesempatarDupla(empatados, timeId, confrontos, decisivos),
+                _ => DesempatarPorMiniLiga(empatados, timeId, decisivos)
+            });
+
+            i += empatados.Count;
+        }
+
+        return blocos;
+    }
+
+    /// <summary>Posição de cada time nos blocos da Série B (empatados dividem a posição: 1, 2, 2, 4).</summary>
+    public static Dictionary<Guid, int> PosicoesSerieB<T>(IReadOnlyList<List<T>> blocos, Func<T, Guid> timeId)
+    {
+        var posicoes = new Dictionary<Guid, int>();
+        var antes = 0;
+
+        foreach (var bloco in blocos)
+        {
+            foreach (var item in bloco) posicoes[timeId(item)] = antes + 1;
+            antes += bloco.Count;
+        }
+
+        return posicoes;
+    }
+
+    /// <summary>
+    /// Série B: times de blocos empatados que cruzam uma fronteira de zona (título, acesso, playoff) —
+    /// "se terminasse hoje", a vaga sairia em jogo decisivo (2) ou mini liga (3+).
+    /// </summary>
+    public static HashSet<Guid> EmpatadosEmZona<T>(IReadOnlyList<List<T>> blocos, LigaRegraZonas regra, Func<T, Guid> timeId)
+    {
+        var fronteiras = LigaZonas.Fronteiras(regra, blocos.Sum(b => b.Count));
+        var empatados = new HashSet<Guid>();
+        var antes = 0;
+
+        foreach (var bloco in blocos)
+        {
+            if (bloco.Count > 1 && fronteiras.Any(f => f > antes && f < antes + bloco.Count))
+                empatados.UnionWith(bloco.Select(timeId));
+            antes += bloco.Count;
+        }
+
+        return empatados;
+    }
+
+    private static List<List<T>> DesempatarDupla<T>(
+        List<T> dupla, Func<T, Guid> timeId, IReadOnlyList<ConfrontoDireto> confrontos, JogosDecisivos decisivos)
+    {
+        var (a, b) = (dupla[0], dupla[1]);
+        var parciais = ParciaisConfrontoDireto(dupla.Select(timeId), confrontos);
+
+        if (parciais[timeId(a)] != parciais[timeId(b)])
+            return AplicarConfrontoDireto(dupla, timeId, parciais).Select(x => new List<T> { x }).ToList();
+
+        return decisivos.VencedorEntre(timeId(a), timeId(b)) switch
+        {
+            Guid v when v == timeId(a) => new() { new() { a }, new() { b } },
+            Guid => new() { new() { b }, new() { a } },
+            null => new() { dupla }
+        };
+    }
+
+    /// <summary>
+    /// Mini liga: com todos os jogos entre os empatados encerrados, ordena pela tabela deles
+    /// (Pts → V → SG → GP) e, se ainda igual, por quem venceu mais (pênaltis contam).
+    /// </summary>
+    private static List<List<T>> DesempatarPorMiniLiga<T>(List<T> bloco, Func<T, Guid> timeId, JogosDecisivos decisivos)
+    {
+        var ids = bloco.Select(timeId).ToList();
+        var completa = ids.SelectMany((x, i) => ids.Skip(i + 1).Select(y => (x, y))).All(par => decisivos.Jogaram(par.x, par.y));
+        if (!completa) return new List<List<T>> { bloco };
+
+        var tabela = ParciaisConfrontoDireto(ids, decisivos.Placares);
+
+        return bloco
+            .OrderByDescending(x => tabela[timeId(x)].Pts)
+            .ThenByDescending(x => tabela[timeId(x)].V)
+            .ThenByDescending(x => tabela[timeId(x)].SG)
+            .ThenByDescending(x => tabela[timeId(x)].GP)
+            .ThenByDescending(x => ids.Count(outro => decisivos.Venceu(timeId(x), outro)))
+            .ThenBy(timeId)
+            .Select(x => new List<T> { x })
+            .ToList();
     }
 
     /// <summary>
