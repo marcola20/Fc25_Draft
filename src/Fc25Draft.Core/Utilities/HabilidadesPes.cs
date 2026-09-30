@@ -37,8 +37,7 @@ public static class HabilidadesPes
     ];
 
     /// <summary>Ordem das notas guardadas em <c>Posicoes</c> (uma letra A/B/C por posição, "-" = sem dado).</summary>
-    public static readonly IReadOnlyList<string> Posicoes =
-        ["GOL", "ZAG", "LE", "LD", "VOL", "MC", "ME", "MD", "MEI", "PE", "PD", "SA", "CA"];
+    public static IReadOnlyList<string> Posicoes => OverallPes.PosicoesPt;
 
     public static IEnumerable<string> Marcadas(long? mascara, IReadOnlyList<string> nomes) =>
         mascara is long m ? nomes.Where((_, i) => (m >> i & 1) == 1) : [];

@@ -26,11 +26,11 @@ public static class OverallPes
         ["GK", "CB", "LB", "RB", "DMF", "CMF", "LMF", "RMF", "AMF", "LWF", "RWF", "SS", "CF"];
 
     public static readonly IReadOnlyList<string> PosicoesPt =
-        ["GOL", "ZAG", "LE", "LD", "VOL", "MC", "ME", "MD", "MEI", "PE", "PD", "SA", "CA"];
+        ["GOL", "ZAG", "LTE", "LTD", "VOL", "MLG", "MLE", "MLD", "MAT", "PTE", "PTD", "SA", "CA"];
 
     public static readonly IReadOnlyList<string> PosicoesNome =
     [
-        "Goleiro", "Zagueiro", "Lateral Esquerdo", "Lateral Direito", "Volante", "Meia Central", "Meia Esquerda",
+        "Goleiro", "Zagueiro", "Lateral Esquerdo", "Lateral Direito", "Volante", "Meia de Ligação", "Meia Esquerda",
         "Meia Direita", "Meia Atacante", "Ponta Esquerda", "Ponta Direita", "Segundo Atacante", "Centroavante",
     ];
 
