@@ -9,6 +9,7 @@ using ClosedXML.Excel;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -78,7 +79,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Age,
                         p.TeamRosters.Any() ? "Escolhido" : "Disponível",
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
-                        p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault()))
+                        p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault(),
+                        p.Atributos == null ? null : AtributosPes.ParaDto(p.Atributos)))
                     .FirstOrDefaultAsync(ct);
 
                 return player is null ? Results.NotFound() : Results.Ok(player);
@@ -161,11 +163,12 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             var adminPlayersApi = routes.MapGroup("/admin/players").RequireAuthorization("AdminOnly");
 
-            adminPlayersApi.MapPost(string.Empty, async (IPlayerService playerService, PlayerCreateDto dto) =>
+            adminPlayersApi.MapPost(string.Empty, async (IPlayerService playerService, IBasePesService basePes, PlayerCreateDto dto) =>
             {
                 try
                 {
                     var id = await playerService.CreateAsync(dto);
+                    await basePes.PreencherFaltantesAsync();
                     return Results.Created($"/api/players/{id}", new { id });
                 }
                 catch (ArgumentException ex)
@@ -199,6 +202,23 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            adminPlayersApi.MapPut("/{id:int}/atributos", async (IPlayerService playerService, int id, PlayerAtributosDto dto) =>
+            {
+                try
+                {
+                    await playerService.SalvarAtributosAsync(id, dto);
+                    return Results.NoContent();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+            });
+
             adminPlayersApi.MapDelete("/{id:int}", async (IPlayerService playerService, int id) =>
             {
                 try
@@ -216,7 +236,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
-            adminPlayersApi.MapPost("/import", async (HttpRequest request, IPlayerService playerService, CancellationToken ct) =>
+            adminPlayersApi.MapGet("/pes", (IBasePesService basePes, string? q) =>
+                Results.Ok(basePes.Buscar(q ?? string.Empty)));
+
+            adminPlayersApi.MapPost("/import", async (HttpRequest request, IPlayerService playerService, IBasePesService basePes, CancellationToken ct) =>
             {
                 if (!request.HasFormContentType)
                     return Results.BadRequest(new { message = "Envie um arquivo CSV válido." });
@@ -233,6 +256,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 await using var stream = file.OpenReadStream();
                 var result = await playerService.ImportCsvAsync(stream, ct);
+                await basePes.PreencherFaltantesAsync(ct);
                 return Results.Ok(result);
             });
 

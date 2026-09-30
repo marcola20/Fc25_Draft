@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -97,6 +98,25 @@ public class PlayerService : IPlayerService
         entity.Overall = dto.Overall;
         entity.PositionId = dto.PositionId;
 
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task SalvarAtributosAsync(int id, PlayerAtributosDto dto)
+    {
+        if (AtributosPes.Validar(dto) is { } erro)
+            throw new ArgumentException(erro);
+
+        if (!await _db.Players.AnyAsync(p => p.PlayerId == id))
+            throw new KeyNotFoundException("Jogador não encontrado.");
+
+        var atributos = await _db.PlayerAtributos.FirstOrDefaultAsync(a => a.PlayerId == id);
+        if (atributos is null)
+        {
+            atributos = new PlayerAtributos { PlayerId = id };
+            _db.PlayerAtributos.Add(atributos);
+        }
+
+        AtributosPes.Aplicar(dto, atributos);
         await _db.SaveChangesAsync();
     }
 

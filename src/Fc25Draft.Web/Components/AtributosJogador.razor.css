@@ -1,0 +1,57 @@
+.grupos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem 2rem;
+}
+
+.grupo-titulo {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6c757d;
+    border-bottom: 1px solid #eef0f3;
+    padding-bottom: .25rem;
+    margin-bottom: .25rem;
+}
+
+.linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .2rem 0;
+}
+
+.nome {
+    font-size: .9rem;
+}
+
+/* Faixas de cor como no jogo. */
+.valor {
+    min-width: 2.25rem;
+    text-align: center;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    border-radius: .25rem;
+    padding: .05rem .35rem;
+}
+
+.atr-90 {
+    background: #dc3545;
+    color: #fff;
+}
+
+.atr-80 {
+    background: #fd7e14;
+    color: #fff;
+}
+
+.atr-70 {
+    background: #ffc107;
+    color: #212529;
+}
+
+.atr-baixo {
+    background: #e9ecef;
+    color: #495057;
+}

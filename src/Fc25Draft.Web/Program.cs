@@ -1,3 +1,4 @@
+using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Web.Endpoints.Market;
 using Fc25Draft.Web.Extensions.Endpoints;
@@ -126,6 +127,9 @@ using (var scope = app.Services.CreateScope())
 
         lotteryService.Start(state);
     }
+
+    // A ligação jogador ↔ PES não é mais feita sozinha ao subir: quem liga é o Editor PES
+    // (PUT /api/admin/pes/ligacoes), com as ligações conferidas lá.
 }
 if (!app.Environment.IsEnvironment("Testing"))
 {
@@ -165,6 +169,7 @@ api.MapDraftEndpoints()
    .MapMarketHistoryEndpoints()
    .MapDraftWishlistEndpoints()
    .MapAdminEndpoints()
+   .MapPesEndpoints()
    .MapLigaEndpoints();
 
 app.MapBlazorHub();

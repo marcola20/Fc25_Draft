@@ -1,5 +1,6 @@
 @page "/players/details/{Id:int}"
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
 @using Fc25Draft.Web.Services
 @inject PlayersApiClient PlayersApiClient
 @inject NavigationManager Navigation
@@ -54,25 +55,67 @@ else
         </dd>
     </dl>
 
-    <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
-        Editar
-    </button>
+    <div class="d-flex flex-wrap gap-2">
+        @* Treinador logado com o token do time não é administrador. *@
+        @if (AdminAuth.IsAdmin)
+        {
+            <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
+                Editar
+            </button>
+        }
 
-    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
-        Voltar
-    </button>
+        <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-outline-primary">⚖️ Comparar com outro jogador</a>
 
-    <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-outline-primary">⚖️ Comparar com outro jogador</a>
+        @if (_podeObservar)
+        {
+            <button type="button" class="btn @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
+                    title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
+                @(_observando ? "★ Observando" : "☆ Observar")
+            </button>
+        }
 
-    @if (_podeObservar)
-    {
-        <button type="button" class="btn @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
-                title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
-            @(_observando ? "★ Observando" : "☆ Observar")
+        <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
+            Voltar
         </button>
-    }
+    </div>
 
-    <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
+    <ul class="nav nav-tabs mt-4 mb-3" role="tablist">
+        @if (player.Atributos is not null)
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(_aba == Aba.Atributos ? "active" : "")"
+                        type="button" @onclick="() => _aba = Aba.Atributos">
+                    Atributos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(_aba == Aba.Habilidades ? "active" : "")"
+                        type="button" @onclick="() => _aba = Aba.Habilidades">
+                    Habilidades
+                </button>
+            </li>
+        }
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_aba == Aba.Carreira ? "active" : "")"
+                    type="button" @onclick="() => _aba = Aba.Carreira">
+                Carreira
+            </button>
+        </li>
+    </ul>
+
+    @if (_aba == Aba.Atributos && player.Atributos is { } atributos)
+    {
+        <AtributosJogador Atributos="atributos" Goleiro="@(player.PositionId == (short)PositionType.Goleiro)"
+                          MostrarIdPes="AdminAuth.IsAdmin" />
+    }
+    else if (_aba == Aba.Habilidades && player.Atributos is { } atributosHab)
+    {
+        <HabilidadesJogador Atributos="atributosHab" />
+    }
+    else
+    {
+        <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
+    }
 }
 
 @code {
@@ -88,6 +131,9 @@ else
     {
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
+
+    private enum Aba { Atributos, Habilidades, Carreira }
+    private Aba _aba;
 
     private int? _carregadoId;
     private bool _podeObservar;
@@ -124,6 +170,8 @@ else
 
         _carregadoId = Id;
         await LoadPlayerAsync();
+        // Abre nos atributos quando o jogador tem; senão, na carreira.
+        _aba = player?.Atributos is not null ? Aba.Atributos : Aba.Carreira;
         await CarregarObservacaoAsync();
     }
 

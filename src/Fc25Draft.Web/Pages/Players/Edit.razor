@@ -2,6 +2,8 @@
 @page "/players/edit/{Id:int}"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
 @inject PlayersApiClient PlayersApiClient
 @inject IPositionService PositionService
 @inject NavigationManager Navigation
@@ -27,7 +29,7 @@ else if (!AdminAuth.IsAdmin)
 }
 else
 {
-    <EditForm EditContext="editContext" OnValidSubmit="HandleValidSubmit">
+    <EditForm id="formJogador" EditContext="editContext" OnValidSubmit="HandleValidSubmit">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
@@ -61,11 +63,111 @@ else
             <ValidationMessage For="() => model.PositionId" />
         </div>
 
-        <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit" disabled="@isSaving">Salvar</button>
-            <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancelar</button>
-        </div>
     </EditForm>
+
+    @* Fora do <form>: Enter na busca não pode salvar o jogador. *@
+    @if (Id.HasValue)
+    {
+        <fieldset class="mb-3 border rounded p-3">
+            <legend class="float-none w-auto px-2 fs-6 mb-0">Atributos</legend>
+
+            <div class="mb-3">
+                <label class="form-label small mb-0" for="buscaPes">Buscar no PES</label>
+                <div class="input-group input-group-sm">
+                    <input id="buscaPes" type="search" class="form-control" placeholder="Nome ou ID do jogador no PES"
+                           @bind="buscaPes" @bind:event="oninput" @onkeyup="BuscarNoPesAoTeclar" />
+                    <button type="button" class="btn btn-outline-primary" @onclick="BuscarNoPesAsync" disabled="@buscandoPes">Buscar</button>
+                </div>
+                @if (resultadosPes is { Count: 0 })
+                {
+                    <div class="small text-muted mt-1">Nenhum jogador encontrado no PES.</div>
+                }
+                else if (resultadosPes is not null)
+                {
+                    <div class="list-group list-group-flush border rounded mt-1 resultados-pes">
+                        @foreach (var r in resultadosPes)
+                        {
+                            var escolhido = r;
+                            <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => UsarDoPes(escolhido)">
+                                <span class="fw-semibold">@escolhido.Nome</span>
+                                <span class="text-muted small">
+                                    · ID @escolhido.PesId · @PositionName(escolhido.PositionId) · @escolhido.Idade anos
+                                    · @(escolhido.Times.Count > 0 ? string.Join(", ", escolhido.Times) : "sem time")
+                                    · @(escolhido.Atributos.PernaBoa == PernaBoa.Esquerda ? "canhoto" : "destro")
+                                    · Vel @escolhido.Atributos.Velocidade · Fin @escolhido.Atributos.Finalizacao · Pas @escolhido.Atributos.PasseRasteiro
+                                    @if (escolhido.PositionId == (short)PositionType.Goleiro)
+                                    {
+                                        <text> · Ref @escolhido.Atributos.ReflexosDoGoleiro</text>
+                                    }
+                                </span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (atributos is null)
+            {
+                <p class="text-muted small mb-2">Este jogador ainda não tem atributos. Busque no PES acima ou preencha à mão.</p>
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => atributos = PlayerAtributosDto.Minimos()">
+                    Preencher à mão
+                </button>
+            }
+            else
+            {
+                @if (atributosDoPes is not null)
+                {
+                    <div class="alert alert-info py-1 small">Preenchido com <strong>@atributosDoPes</strong>. Confira e clique em Salvar.</div>
+                }
+                <div class="small text-muted mb-2">
+                    @(atributos.PesId is int pesId ? $"ID no PES: {pesId}" : "Preenchido à mão (sem ID do PES)")
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-0" for="atrAltura">Altura (cm)</label>
+                        <input id="atrAltura" type="number" min="140" max="210" class="form-control form-control-sm"
+                               value="@atributos.Altura" @onchange="e => atributos.Altura = LerNumero(e)" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-0" for="atrPeso">Peso (kg)</label>
+                        <input id="atrPeso" type="number" min="40" max="125" class="form-control form-control-sm"
+                               value="@atributos.Peso" @onchange="e => atributos.Peso = LerNumero(e)" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-0" for="atrPerna">Perna boa</label>
+                        <select id="atrPerna" class="form-select form-select-sm" value="@((int?)atributos.PernaBoa)"
+                                @onchange="e => atributos.PernaBoa = LerNumero(e) is int p ? (PernaBoa)p : null">
+                            <option value="">-</option>
+                            <option value="@((int)PernaBoa.Direita)">Direita</option>
+                            <option value="@((int)PernaBoa.Esquerda)">Esquerda</option>
+                        </select>
+                    </div>
+                </div>
+
+                @foreach (var grupo in AtributosPes.PorGrupo)
+                {
+                    <div class="small fw-bold text-muted text-uppercase mt-2">@grupo.Key</div>
+                    <div class="row g-2">
+                        @foreach (var a in grupo)
+                        {
+                            var atributo = a;
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-0">@atributo.Nome</label>
+                                <input type="number" min="@AtributosPes.Minimo" max="@AtributosPes.Maximo" class="form-control form-control-sm"
+                                       value="@atributo.Get(atributos)"
+                                       @onchange="e => atributo.Set(atributos, LerNumero(e) ?? AtributosPes.Minimo)" />
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </fieldset>
+    }
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit" form="formJogador" disabled="@isSaving">Salvar</button>
+        <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancelar</button>
+    </div>
 }
 
 @code {
@@ -73,6 +175,7 @@ else
     public int? Id { get; set; }
 
     private readonly PlayerFormModel model = new();
+    private PlayerAtributosDto? atributos;
     private EditContext? editContext;
     private readonly List<Position> positions = new();
     private string? errorMessage;
@@ -136,6 +239,7 @@ else
             model.Age = details.Age;
             model.Overall = details.Overall;
             model.PositionId = details.PositionId;
+            atributos = details.Atributos;
         }
         catch (Exception ex)
         {
@@ -163,7 +267,18 @@ else
         {
             if (Id.HasValue)
             {
+                if (atributos is not null && AtributosPes.Validar(atributos) is { } erroAtributos)
+                {
+                    errorMessage = erroAtributos;
+                    return;
+                }
+
                 await PlayersApiClient.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+
+                if (atributos is not null)
+                {
+                    await PlayersApiClient.SalvarAtributosAsync(Id.Value, atributos);
+                }
             }
             else
             {
@@ -183,6 +298,48 @@ else
     }
 
     private void Cancel() => Navigation.NavigateTo("/players");
+
+    private string buscaPes = string.Empty;
+    private IReadOnlyList<JogadorPesDto>? resultadosPes;
+    private bool buscandoPes;
+    private string? atributosDoPes;
+
+    private async Task BuscarNoPesAoTeclar(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await BuscarNoPesAsync();
+    }
+
+    private async Task BuscarNoPesAsync()
+    {
+        if (buscaPes.Trim().Length < 2) return;
+
+        buscandoPes = true;
+        try
+        {
+            resultadosPes = await PlayersApiClient.BuscarNoPesAsync(buscaPes.Trim());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            buscandoPes = false;
+        }
+    }
+
+    private void UsarDoPes(JogadorPesDto jogador)
+    {
+        atributos = jogador.Atributos;
+        var times = jogador.Times.Count > 0 ? string.Join(", ", jogador.Times) : "sem time";
+        atributosDoPes = $"{jogador.Nome} ({times}, ID {jogador.PesId})";
+        resultadosPes = null;
+    }
+
+    private string PositionName(short id) => positions.FirstOrDefault(p => p.PositionId == id)?.Name ?? "-";
+
+    private static int? LerNumero(ChangeEventArgs e) =>
+        int.TryParse(e.Value?.ToString(), out var n) ? n : null;
 
     private void OnAuthenticationChanged()
     {

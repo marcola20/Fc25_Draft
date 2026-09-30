@@ -31,6 +31,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<DraftAdminService>();
             services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
+            services.AddScoped<IBasePesService, BasePesService>();
             services.AddComConexaoPropria<IPositionService, PositionService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddComConexaoPropria<IPricingConfigService, PricingConfigService>();

@@ -1,0 +1,71 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+
+@* Habilidades especiais, estilos e perfil do jogador no PES 2021. *@
+<div class="card habilidades">
+    <div class="card-body">
+        <div class="perfil">
+            <div><span class="rotulo">Estilo de jogo</span><strong>@HabilidadesPes.EstiloDeJogo(Atributos.EstiloDeJogo)</strong></div>
+            <div><span class="rotulo">Perna boa</span><strong>@PernaBoaTexto</strong></div>
+            <div><span class="rotulo">Pé fraco (uso)</span><strong>@Nota(Atributos.PeFracoUso, 4)</strong></div>
+            <div><span class="rotulo">Pé fraco (precisão)</span><strong>@Nota(Atributos.PeFracoPrecisao, 4)</strong></div>
+            <div><span class="rotulo">Condição</span><strong>@Nota(Atributos.Condicao, 8)</strong></div>
+            @if (Atributos.ResistenciaLesao is not null)
+            {
+                <div><span class="rotulo">Resistência a lesão</span><strong>@Nota(Atributos.ResistenciaLesao, 3)</strong></div>
+            }
+        </div>
+
+        <div class="grupo-titulo mt-3">Habilidades (@Habilidades.Count)</div>
+        @if (Habilidades.Count == 0)
+        {
+            <span class="text-muted small">Nenhuma.</span>
+        }
+        @foreach (var h in Habilidades)
+        {
+            <span class="badge rounded-pill bg-primary me-1 mb-1">@h</span>
+        }
+
+        <div class="grupo-titulo mt-3">Estilos de IA (@EstilosIa.Count)</div>
+        @if (EstilosIa.Count == 0)
+        {
+            <span class="text-muted small">Nenhum.</span>
+        }
+        @foreach (var e in EstilosIa)
+        {
+            <span class="badge rounded-pill bg-secondary me-1 mb-1">@e</span>
+        }
+
+        @if (Atributos.Posicoes is { Length: > 0 } notas)
+        {
+            <div class="grupo-titulo mt-3">Posições</div>
+            <div class="posicoes">
+                @for (var i = 0; i < HabilidadesPes.Posicoes.Count && i < notas.Length; i++)
+                {
+                    var nota = notas[i];
+                    <div class="posicao nota-@(nota == '-' ? "sem" : nota.ToString())">
+                        <span class="sigla">@HabilidadesPes.Posicoes[i]</span>
+                        <span class="letra">@nota</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PlayerAtributosDto Atributos { get; set; } = null!;
+
+    private List<string> Habilidades => HabilidadesPes.Marcadas(Atributos.Habilidades, HabilidadesPes.Habilidades).ToList();
+    private List<string> EstilosIa => HabilidadesPes.Marcadas(Atributos.EstilosIa, HabilidadesPes.EstilosIa).ToList();
+
+    private string PernaBoaTexto => Atributos.PernaBoa switch
+    {
+        PernaBoa.Esquerda => "Esquerda",
+        PernaBoa.Direita => "Direita",
+        _ => "-",
+    };
+
+    private static string Nota(int? valor, int maximo) => valor is int v ? $"{v} / {maximo}" : "-";
+}

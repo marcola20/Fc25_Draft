@@ -29,5 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Data\Regulamentos\*.html" />
+    <!-- Jogadores do PES 2021 (gerado por scripts/pes/gerar_base_pes.py) -->
+    <EmbeddedResource Include="Data\Pes\pes-jogadores.json.gz" LogicalName="pes-jogadores.json.gz" />
   </ItemGroup>
 </Project>

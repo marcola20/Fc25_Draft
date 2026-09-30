@@ -1464,6 +1464,128 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("Players");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PlayerAtributos", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Aceleracao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AfastamentoDoGoleiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Agressividade")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AlcanceDoGoleiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Altura")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BolaParada")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Cabeceio")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Condicao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ConducaoFirme")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContatoFisico")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ControleDeBola")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Curva")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Desarme")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Drible")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Equilibrio")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EstiloDeJogo")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EstilosIa")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Finalizacao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FirmezaDoGoleiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ForcaDoChute")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("Habilidades")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Impulsao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PasseAlto")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PasseRasteiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PeFracoPrecisao")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PeFracoUso")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PernaBoa")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PesId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Peso")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Posicoes")
+                        .HasMaxLength(13)
+                        .HasColumnType("character varying(13)");
+
+                    b.Property<int>("ReflexosDoGoleiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Resistencia")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ResistenciaLesao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TalentoDeGoleiro")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TalentoDefensivo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TalentoOfensivo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Velocidade")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId");
+
+                    b.ToTable("PlayerAtributos", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Position", b =>
                 {
                     b.Property<short>("PositionId")
@@ -2939,6 +3061,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Position");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PlayerAtributos", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithOne("Atributos")
+                        .HasForeignKey("Fc25Draft.Core.Entities.PlayerAtributos", "PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.PremiacaoItem", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Premiacao", "Premiacao")
@@ -3341,6 +3474,8 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
+                    b.Navigation("Atributos");
+
                     b.Navigation("DraftPicks");
 
                     b.Navigation("MarketItems");

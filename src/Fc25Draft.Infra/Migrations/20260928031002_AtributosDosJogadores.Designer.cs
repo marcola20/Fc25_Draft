@@ -3,6 +3,7 @@ using System;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fc25Draft.Infra.Migrations
 {
     [DbContext(typeof(DraftDbContext))]
-    partial class DraftDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928031002_AtributosDosJogadores")]
+    partial class AtributosDosJogadores
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1487,9 +1490,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Cabeceio")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("Condicao")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ConducaoFirme")
                         .HasColumnType("integer");
 
@@ -1511,12 +1511,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Equilibrio")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("EstiloDeJogo")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("EstilosIa")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Finalizacao")
                         .HasColumnType("integer");
 
@@ -1526,9 +1520,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("ForcaDoChute")
                         .HasColumnType("integer");
 
-                    b.Property<long?>("Habilidades")
-                        .HasColumnType("bigint");
-
                     b.Property<int>("Impulsao")
                         .HasColumnType("integer");
 
@@ -1536,12 +1527,6 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("PasseRasteiro")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PeFracoPrecisao")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PeFracoUso")
                         .HasColumnType("integer");
 
                     b.Property<int?>("PernaBoa")
@@ -1553,17 +1538,10 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int?>("Peso")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Posicoes")
-                        .HasMaxLength(13)
-                        .HasColumnType("character varying(13)");
-
                     b.Property<int>("ReflexosDoGoleiro")
                         .HasColumnType("integer");
 
                     b.Property<int>("Resistencia")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ResistenciaLesao")
                         .HasColumnType("integer");
 
                     b.Property<int>("TalentoDeGoleiro")
@@ -2200,9 +2178,6 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("MaxTransfers")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("MercadoFechado")
-                        .HasColumnType("boolean");
 
                     b.Property<int>("MinRosterSize")
                         .HasColumnType("integer");

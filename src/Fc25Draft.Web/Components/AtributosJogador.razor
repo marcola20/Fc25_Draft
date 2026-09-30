@@ -1,0 +1,60 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+
+@* Atributos do PES 2021, agrupados como na tela do jogo. *@
+<div class="card atributos">
+    <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
+        <strong>Atributos</strong>
+        @if (Atributos.Altura is int altura)
+        {
+            <span class="text-muted small">@altura cm</span>
+        }
+        @if (Atributos.Peso is int peso)
+        {
+            <span class="text-muted small">· @peso kg</span>
+        }
+        @if (Atributos.PernaBoa is { } perna)
+        {
+            <span class="text-muted small">· perna boa: @(perna == PernaBoa.Esquerda ? "esquerda" : "direita")</span>
+        }
+        @if (MostrarIdPes && Atributos.PesId is int pesId)
+        {
+            <span class="text-muted small ms-auto" title="ID do jogador no PES 2021">ID PES @pesId</span>
+        }
+    </div>
+    <div class="card-body">
+        <div class="grupos">
+            @foreach (var grupo in Grupos)
+            {
+                <div class="grupo">
+                    <div class="grupo-titulo">@grupo.Key</div>
+                    @foreach (var a in grupo)
+                    {
+                        var valor = a.Get(Atributos);
+                        <div class="linha">
+                            <span class="nome">@a.Nome</span>
+                            <span class="valor @AtributosPes.Faixa(valor)">@valor</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PlayerAtributosDto Atributos { get; set; } = null!;
+
+    /// <summary>Os atributos de goleiro só aparecem para goleiros.</summary>
+    [Parameter] public bool Goleiro { get; set; }
+
+    /// <summary>ID do jogador no PES: só interessa ao administrador.</summary>
+    [Parameter] public bool MostrarIdPes { get; set; }
+
+    // Para goleiro, o grupo de goleiro vem primeiro.
+    private IEnumerable<IGrouping<string, AtributosPes.Atributo>> Grupos =>
+        Goleiro
+            ? AtributosPes.PorGrupo.OrderBy(g => g.Key != AtributosPes.GrupoGoleiro)
+            : AtributosPes.PorGrupo.Where(g => g.Key != AtributosPes.GrupoGoleiro);
+}

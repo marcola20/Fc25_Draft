@@ -222,7 +222,7 @@ else
                 @foreach (var player in players)
                 {
                     <tr>
-                        <td>@player.Name</td>
+                        <td><a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a></td>
                         <td>@player.PositionName</td>
                         <td>@player.Overall</td>
                         <td>@(player.Age?.ToString() ?? "-")</td>

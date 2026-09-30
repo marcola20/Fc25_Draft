@@ -119,6 +119,21 @@ public class PlayersApiClient
         await EnsureSuccessAsync(response);
     }
 
+    public async Task<IReadOnlyList<JogadorPesDto>> BuscarNoPesAsync(string texto, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.GetAsync($"api/admin/players/pes?q={Uri.EscapeDataString(texto)}", ct);
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<List<JogadorPesDto>>(cancellationToken: ct) ?? [];
+    }
+
+    public async Task SalvarAtributosAsync(int id, PlayerAtributosDto dto, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PutAsJsonAsync($"api/admin/players/{id}/atributos", dto, ct);
+        await EnsureSuccessAsync(response);
+    }
+
     public async Task DeleteAsync(int id, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true);

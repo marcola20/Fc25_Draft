@@ -12,6 +12,8 @@ public interface IPlayerService
     Task<Player?> GetAsync(int id);
     Task<int> CreateAsync(PlayerCreateDto dto);
     Task UpdateAsync(int id, PlayerUpdateDto dto);
+    /// <summary>Cria ou atualiza os atributos do PES do jogador.</summary>
+    Task SalvarAtributosAsync(int id, PlayerAtributosDto dto);
     Task DeleteAsync(int id);
     Task<PlayerImportResultDto> ImportCsvAsync(Stream csvStream, CancellationToken ct = default);
 }

@@ -1,0 +1,62 @@
+.perfil {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: .75rem 1.5rem;
+}
+
+.perfil .rotulo {
+    display: block;
+    font-size: .75rem;
+    color: #6c757d;
+}
+
+.grupo-titulo {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6c757d;
+    border-bottom: 1px solid #eef0f3;
+    padding-bottom: .25rem;
+    margin-bottom: .5rem;
+}
+
+.posicoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+
+.posicao {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 3rem;
+    padding: .2rem .4rem;
+    border-radius: .35rem;
+    border: 1px solid #dee2e6;
+}
+
+.posicao .sigla {
+    font-size: .7rem;
+    color: #6c757d;
+}
+
+.posicao .letra {
+    font-weight: 700;
+}
+
+/* A = joga bem, B = quebra-galho, C = fora de posição. */
+.nota-A {
+    background: #d1e7dd;
+    border-color: #a3cfbb;
+}
+
+.nota-B {
+    background: #fff3cd;
+    border-color: #ffe69c;
+}
+
+.nota-C, .nota-sem {
+    color: #adb5bd;
+}
