@@ -27,6 +27,7 @@
         </div>
         <p class="text-muted small mb-3">
             Quem está mais forte agora, juntando Série A e Série B: elenco, rating dos resultados e forma recente.
+            Clique em Nota, XI, Rating ou Forma para ordenar; o # continua sendo a posição no Power Ranking.
             @if (_ranking.AtualizadoAte is DateOnly ate)
             {
                 <span>Jogos até @ate.ToString("dd/MM")@(_ranking.ComparadoCom is DateOnly antes ? $"; setas comparam com {antes:dd/MM}" : "").</span>
@@ -41,14 +42,14 @@
                             <th class="text-center">#</th>
                             <th class="text-center" title="Posições ganhas ou perdidas desde o dia de jogos anterior">±</th>
                             <th>Clube</th>
-                            <th class="text-center" title="Nota final (0 a 100)">Nota</th>
-                            <th class="text-center" title="Média de overall dos @PowerRankingCriterios.JogadoresNoXI melhores">XI</th>
-                            <th class="text-center d-none d-md-table-cell" title="Rating Elo de todos os jogos">Rating</th>
-                            <th class="d-none d-sm-table-cell" title="Últimos jogos, do mais recente para o mais antigo">Forma</th>
+                            <th class="text-center" role="button" title="Nota final (0 a 100)" @onclick="() => OrdenarPor(Coluna.Nota)">Nota@(Seta(Coluna.Nota))</th>
+                            <th class="text-center" role="button" title="Média de overall dos @PowerRankingCriterios.JogadoresNoXI melhores" @onclick="() => OrdenarPor(Coluna.XI)">XI@(Seta(Coluna.XI))</th>
+                            <th class="text-center d-none d-md-table-cell" role="button" title="Rating Elo de todos os jogos" @onclick="() => OrdenarPor(Coluna.Rating)">Rating@(Seta(Coluna.Rating))</th>
+                            <th class="d-none d-sm-table-cell" role="button" title="Últimos jogos, do mais recente para o mais antigo (ordena pelo aproveitamento)" @onclick="() => OrdenarPor(Coluna.Forma)">Forma@(Seta(Coluna.Forma))</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var r in _ranking.Itens)
+                        @foreach (var r in Linhas)
                         {
                             <tr>
                                 <td class="text-center">
@@ -134,6 +135,40 @@
     private bool _loading = true;
     private string? _erro;
     private PowerRankingDto? _ranking;
+
+    private enum Coluna { Nota, XI, Rating, Forma }
+
+    private Coluna _coluna = Coluna.Nota;
+    private bool _crescente;
+
+    // O desempate é sempre a posição no Power Ranking.
+    private IEnumerable<PowerRankingItemDto> Linhas
+    {
+        get
+        {
+            if (_ranking is null)
+                return Array.Empty<PowerRankingItemDto>();
+
+            Func<PowerRankingItemDto, double> chave = _coluna switch
+            {
+                Coluna.XI => r => r.ForcaXI,
+                Coluna.Rating => r => r.Rating,
+                Coluna.Forma => r => r.NotaForma,
+                _ => r => r.Nota
+            };
+            var ordenadas = _crescente ? _ranking.Itens.OrderBy(chave) : _ranking.Itens.OrderByDescending(chave);
+            return ordenadas.ThenBy(r => r.Posicao);
+        }
+    }
+
+    // Primeiro clique ordena do maior para o menor; clicar de novo inverte.
+    private void OrdenarPor(Coluna coluna)
+    {
+        _crescente = _coluna == coluna && !_crescente;
+        _coluna = coluna;
+    }
+
+    private string Seta(Coluna coluna) => _coluna != coluna ? "" : _crescente ? " ▲" : " ▼";
 
     private string Subtitulo => _ranking?.AtualizadoAte is DateOnly ate ? $"Jogos até {ate:dd/MM}" : "Elenco atual";
 
