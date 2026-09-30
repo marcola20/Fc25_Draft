@@ -1,0 +1,322 @@
+@page "/overall"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject AdminAuthService AdminAuth
+@inject ISincronizacaoPesService SincronizacaoPes
+
+@implements IDisposable
+
+<PageTitle>Como o overall é calculado — CBFV</PageTitle>
+
+<PageHeader Title="Como o overall é calculado" />
+
+<div class="como-overall">
+    <div class="card mb-3">
+        <div class="card-body">
+            <p>
+                O overall dos jogadores com atributos do PES <strong>não é digitado</strong>: sai dos atributos, pela mesma
+                conta que o PES 2021 faz. O jogo não guarda o overall em lugar nenhum; ele calcula na hora a partir de:
+            </p>
+            <ul>
+                <li>os <strong>25 atributos</strong> (ataque, físico, defesa e goleiro);</li>
+                <li>a <strong>posição registrada no PES</strong> (a do jogo, que às vezes é diferente da do site);</li>
+                <li>o <strong>pé fraco</strong> (uso e precisão).</li>
+            </ul>
+            <p class="mb-0 text-muted small">
+                Altura, peso, habilidades, estilo de jogo e condição física não entram na conta.
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><strong>A conta</strong></div>
+        <div class="card-body">
+            <p>
+                A Konami não divulga a fórmula. A que o site usa foi ajustada com os jogadores do pesdb.net e conferida
+                com o overall que aparece no jogo: dos 511 jogadores da liga conferidos na tela do PES, <strong>485 batem
+                exato (95%)</strong> e o resto fica a 1 ponto.
+            </p>
+            <ol>
+                <li>
+                    <strong>Nota base.</strong> Cada posição tem um peso para cada atributo. A soma de
+                    <em>peso × atributo</em> (mais o pé fraco) dá uma nota base, que fica perto do próprio overall.
+                </li>
+                <li>
+                    <strong>Curva.</strong> Cada vez que a nota base passa de um degrau
+                    (@string.Join(", ", OverallPes.Degraus.Select(d => d.ToString("0", Br)))), o peso dos atributos
+                    muda um pouco. É por isso que o mesmo +1 num atributo rende mais em uns jogadores do que em outros.
+                </li>
+                <li>
+                    <strong>Arredondamento.</strong> O jogo mostra o número arredondado: de 85,50 a 86,49 aparece 86.
+                </li>
+            </ol>
+            <p class="mb-0 small text-muted">
+                Na página de cada jogador aparece o valor com as casas decimais (ex.: 85,62), que diz o quanto ele está
+                perto de subir ou cair um ponto.
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><strong>Quanto cada atributo pesa</strong></div>
+        <div class="card-body">
+            <div class="row g-2 mb-3">
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label small mb-0" for="posicao">Posição no PES</label>
+                    <select id="posicao" class="form-select form-select-sm" @bind="_posicao">
+                        @for (var p = 0; p < OverallPes.Posicoes.Count; p++)
+                        {
+                            <option value="@p">@OverallPes.PosicoesPt[p] — @OverallPes.PosicoesNome[p]</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label small mb-0" for="nivel">Jogador de overall perto de</label>
+                    <select id="nivel" class="form-select form-select-sm" @bind="_nivel">
+                        @foreach (var n in Niveis)
+                        {
+                            <option value="@n">@n</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <p class="small text-muted">Quanto o overall sobe com +1 ponto em cada atributo:</p>
+            <div class="pesos">
+                @foreach (var (nome, peso) in PesosQueContam)
+                {
+                    <div class="peso-linha">
+                        <span class="peso-nome">@nome</span>
+                        <span class="peso-barra"><span style="width: @Largura(peso)"></span></span>
+                        <span class="peso-valor">+@peso.ToString("0.00", Br)</span>
+                    </div>
+                }
+            </div>
+            @if (PesosQueNaoContam.Count > 0)
+            {
+                <p class="small text-muted mt-2 mb-0">
+                    Praticamente não contam nessa posição: @string.Join(", ", PesosQueNaoContam).
+                </p>
+            }
+            <p class="small text-muted mt-2 mb-0">
+                Exemplo: com +0,20 por ponto, subir 5 pontos nesse atributo dá +1 no overall.
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><strong>Evolução na venda rápida</strong></div>
+        <div class="card-body">
+            <p>
+                Quando um jogador é vendido na venda rápida, ele evolui. O quanto depende do overall que ele tinha:
+            </p>
+            <table class="table table-sm w-auto">
+                <thead><tr><th>Overall</th><th>Sobe</th></tr></thead>
+                <tbody>
+                    <tr><td>até 74</td><td>não evolui</td></tr>
+                    <tr><td>75 e 76</td><td>+7</td></tr>
+                    <tr><td>77 e 78</td><td>+5 ou +6</td></tr>
+                    <tr><td>79</td><td>+4 ou +5</td></tr>
+                    <tr><td>80</td><td>+4</td></tr>
+                    <tr><td>81 e 82</td><td>+3</td></tr>
+                    <tr><td>83 e 84</td><td>+2 ou +3</td></tr>
+                    <tr><td>85 e 86</td><td>+1 ou +2</td></tr>
+                    <tr><td>87 ou mais</td><td>não evolui</td></tr>
+                </tbody>
+            </table>
+            <p>
+                Quem sobe são os <strong>atributos</strong>, não o overall direto: o site sobe 1 ponto por vez, em rodízio,
+                até a fórmula chegar no novo overall. Primeiro sobem os atributos que o <strong>estilo de jogo</strong> do
+                jogador pede (ex.: Homem de Área → Finalização, Talento Ofensivo, Cabeceio, Contato Físico); depois os que
+                mais pesam na posição dele. Goleiro só sobe atributos de goleiro.
+            </p>
+            <p class="mb-0">
+                As mudanças ficam no histórico de transferências e vão para o save do PES pelo Editor PES, para o jogo
+                mostrar o mesmo overall do site.
+            </p>
+        </div>
+    </div>
+
+    @if (AdminAuth.IsAdmin)
+    {
+        <div class="card mb-3 border-warning">
+            <div class="card-header"><strong>Administração</strong></div>
+            <div class="card-body">
+                @if (_erro is not null)
+                {
+                    <div class="alert alert-danger py-2">@_erro</div>
+                }
+
+                <h6>Evoluções esperando o Editor PES</h6>
+                @if (_pendentes is null)
+                {
+                    <button class="btn btn-outline-secondary btn-sm mb-3" @onclick="CarregarPendentesAsync">Ver pendentes</button>
+                }
+                else if (_pendentes.Count == 0)
+                {
+                    <p class="small text-muted">Nenhuma: o save do PES está com tudo o que mudou no site.</p>
+                }
+                else
+                {
+                    <table class="table table-sm small">
+                        <thead><tr><th>Quando</th><th>Jogador</th><th>Motivo</th><th>Overall</th><th>Atributos</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in _pendentes)
+                            {
+                                <tr>
+                                    <td>@e.CriadaEmUtc.ToLocalTime().ToString("dd/MM HH:mm", Br)</td>
+                                    <td>@e.Nome @(e.PesId is null ? "(sem ID do PES!)" : "")</td>
+                                    <td>@e.Motivo</td>
+                                    <td>@e.OverallAntes → @e.OverallDepois</td>
+                                    <td>@DescreverMudancas(e.Mudancas)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                <h6 class="mt-2">Recalcular o overall de todos pela fórmula</h6>
+                <p class="small text-muted">
+                    Acerta o overall de todos os jogadores que têm atributos (normalmente o site já faz isso sozinho ao salvar
+                    atributos). Primeiro mostra o que muda; só grava quando você confirmar.
+                </p>
+                <button class="btn btn-outline-primary btn-sm" disabled="@_processando" @onclick="() => RecalcularAsync(false)">Ver o que muda</button>
+                @if (_mudancas is { Count: > 0 } && !_gravado)
+                {
+                    <button class="btn btn-warning btn-sm ms-2" disabled="@_processando" @onclick="() => RecalcularAsync(true)">
+                        Gravar @_mudancas.Count mudança(s)
+                    </button>
+                }
+
+                @if (_mudancas is not null)
+                {
+                    @if (_mudancas.Count == 0)
+                    {
+                        <p class="small mt-2 mb-0">Todos já estão com o overall da fórmula.</p>
+                    }
+                    else
+                    {
+                        <p class="small mt-2">@(_gravado ? "Gravado:" : "Mudaria:")</p>
+                        <table class="table table-sm small w-auto">
+                            <thead><tr><th>Jogador</th><th>Hoje</th><th>Fórmula</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var m in _mudancas)
+                                {
+                                    <tr>
+                                        <td><a href="/players/details/@m.PlayerId">@m.Nome</a></td>
+                                        <td>@m.Antes</td>
+                                        <td>@m.Depois</td>
+                                        <td class="text-muted">@m.Formula.ToString("0.00", Br)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly int[] Niveis = [60, 65, 70, 75, 80, 85, 90];
+    private const double PesoMinimo = 0.01;
+
+    private int _posicao = 12;
+    private int _nivel = 80;
+
+    private IReadOnlyList<EvolucaoPesDto>? _pendentes;
+    private IReadOnlyList<MudancaOverallDto>? _mudancas;
+    private bool _gravado;
+    private bool _processando;
+    private string? _erro;
+
+    private double[] Pesos => OverallPes.PesosNoNivel(_posicao, _nivel);
+
+    private IEnumerable<int> Indices => _posicao == 0 ? Enumerable.Range(20, 5) : Enumerable.Range(0, 20);
+
+    private List<(string Nome, double Peso)> PesosQueContam
+    {
+        get
+        {
+            var w = Pesos;
+            return Indices.Where(i => w[i] >= PesoMinimo)
+                .OrderByDescending(i => w[i])
+                .Select(i => (AtributosPes.Todos[i].Nome, w[i]))
+                .ToList();
+        }
+    }
+
+    private List<string> PesosQueNaoContam
+    {
+        get
+        {
+            var w = Pesos;
+            return Indices.Where(i => w[i] < PesoMinimo).Select(i => AtributosPes.Todos[i].Nome).ToList();
+        }
+    }
+
+    private string Largura(double peso)
+    {
+        var maior = PesosQueContam.Select(p => p.Peso).DefaultIfEmpty(1).Max();
+        return (100 * peso / maior).ToString("0", CultureInfo.InvariantCulture) + "%";
+    }
+
+    private static string DescreverMudancas(int[] mudancas) =>
+        string.Join(", ", mudancas.Select((d, i) => (d, i)).Where(x => x.d != 0)
+            .Select(x => $"{AtributosPes.Todos[x.i].Nome} {x.d:+#;-#}"));
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/overall"));
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await AdminAuth.EnsureInitializedAsync();
+    }
+
+    private async Task CarregarPendentesAsync()
+    {
+        _erro = null;
+        try
+        {
+            _pendentes = await SincronizacaoPes.EvolucoesPendentesAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private async Task RecalcularAsync(bool gravar)
+    {
+        if (!AdminAuth.IsAdmin) return;
+        _processando = true;
+        _erro = null;
+        try
+        {
+            _mudancas = await SincronizacaoPes.RecalcularTodosAsync(gravar);
+            _gravado = gravar;
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+
+    private void OnAuthenticationChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
+}

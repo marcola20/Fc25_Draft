@@ -37,25 +37,52 @@
             <span class="badge rounded-pill bg-secondary me-1 mb-1">@e</span>
         }
 
-        @if (Atributos.Posicoes is { Length: > 0 } notas)
+        @if (Atributos.Posicoes is { Length: > 0 } || Atributos.PosicaoPes is not null)
         {
+            var notas = Atributos.Posicoes ?? "";
+            var overalls = OverallPorPosicao;
             <div class="grupo-titulo mt-3">Posições</div>
             <div class="posicoes">
-                @for (var i = 0; i < HabilidadesPes.Posicoes.Count && i < notas.Length; i++)
+                @for (var i = 0; i < HabilidadesPes.Posicoes.Count; i++)
                 {
-                    var nota = notas[i];
-                    <div class="posicao nota-@(nota == '-' ? "sem" : nota.ToString())">
+                    var nota = i < notas.Length ? notas[i] : '-';
+                    <div class="posicao nota-@(nota == '-' ? "sem" : nota.ToString()) @(i == Atributos.PosicaoPes ? "registrada" : "")"
+                         title="@(i == Atributos.PosicaoPes ? "Posição registrada no PES (a do overall do jogador)" : null)">
                         <span class="sigla">@HabilidadesPes.Posicoes[i]</span>
                         <span class="letra">@nota</span>
+                        @if (overalls is not null)
+                        {
+                            <span class="ovr" title="Overall pela fórmula do PES nesta posição: @overalls[i].ToString("0.00")">@OverallPes.Arredondar(overalls[i])</span>
+                        }
                     </div>
                 }
             </div>
+            @if (overalls is not null)
+            {
+                <div class="small text-muted mt-1">
+                    Embaixo da nota, o overall que os atributos dão em cada posição (<a href="/overall">como é calculado</a>).
+                    Em destaque, a posição registrada no PES.
+                </div>
+            }
         }
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public PlayerAtributosDto Atributos { get; set; } = null!;
+
+    /// <summary>Overall em cada posição; só com atributos do jogo (os antigos não têm a posição do PES).</summary>
+    private double[]? OverallPorPosicao
+    {
+        get
+        {
+            if (Atributos.PosicaoPes is null) return null;
+            var valores = OverallPes.Valores(Atributos);
+            return Enumerable.Range(0, OverallPes.Posicoes.Count)
+                .Select(p => OverallPes.Calcular(valores, p, Atributos.PeFracoUso, Atributos.PeFracoPrecisao))
+                .ToArray();
+        }
+    }
 
     private List<string> Habilidades => HabilidadesPes.Marcadas(Atributos.Habilidades, HabilidadesPes.Habilidades).ToList();
     private List<string> EstilosIa => HabilidadesPes.Marcadas(Atributos.EstilosIa, HabilidadesPes.EstilosIa).ToList();

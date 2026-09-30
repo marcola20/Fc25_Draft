@@ -1,6 +1,7 @@
 @page "/players/details/{Id:int}"
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Services
 @inject PlayersApiClient PlayersApiClient
 @inject NavigationManager Navigation
@@ -31,7 +32,16 @@ else
         <dd class="col-sm-9">@player.Name</dd>
 
         <dt class="col-sm-3">Overall</dt>
-        <dd class="col-sm-9">@player.Overall</dd>
+        <dd class="col-sm-9">
+            @player.Overall
+            @if (OverallPes.CalcularDoJogador(player.Atributos) is double formula)
+            {
+                <span class="text-muted small ms-1">
+                    pelos atributos do PES (@formula.ToString("0.00") na fórmula) ·
+                    <a href="/overall">como é calculado</a>
+                </span>
+            }
+        </dd>
 
         <dt class="col-sm-3">Idade</dt>
         <dd class="col-sm-9">@(player.Age?.ToString() ?? "-")</dd>

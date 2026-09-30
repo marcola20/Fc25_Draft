@@ -13,6 +13,9 @@ public class PlayerAtributos
     /// <summary>Id do jogador no banco do PES, quando veio da importação.</summary>
     public int? PesId { get; set; }
 
+    /// <summary>Posição registrada no PES (0 = GK … 12 = CF, ver OverallPes.Posicoes): é a que o overall usa.</summary>
+    public int? PosicaoPes { get; set; }
+
     public int? Altura { get; set; }
     public int? Peso { get; set; }
     public PernaBoa? PernaBoa { get; set; }

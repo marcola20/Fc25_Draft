@@ -35,6 +35,9 @@ public class PlayerAtributosDto
     /// <summary>Jogador do PES de onde vieram os dados (nulo = preenchido à mão).</summary>
     public int? PesId { get; set; }
 
+    /// <summary>Posição registrada no PES (0 = GK … 12 = CF); nula = usa a posição do site.</summary>
+    public int? PosicaoPes { get; set; }
+
     public int? Altura { get; set; }
     public int? Peso { get; set; }
     public Enums.PernaBoa? PernaBoa { get; set; }

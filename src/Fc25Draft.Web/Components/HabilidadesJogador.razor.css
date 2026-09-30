@@ -60,3 +60,15 @@
 .nota-C, .nota-sem {
     color: #adb5bd;
 }
+
+/* Overall pela fórmula em cada posição; a registrada no PES em destaque. */
+.posicao .ovr {
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+    color: #212529;
+}
+
+.posicao.registrada {
+    outline: 2px solid #0d6efd;
+    outline-offset: 1px;
+}

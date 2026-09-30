@@ -7,6 +7,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,7 @@ public class TeamQuickSellService : ITeamQuickSellService
 
                 var player = await _dbContext.Players
                     .Include(p => p.TeamRosters)
+                    .Include(p => p.Atributos)
                     .FirstOrDefaultAsync(p => p.PlayerGuid == playerId, ct)
                     .ConfigureAwait(false)
                     ?? throw new QuickSellException("Jogador não encontrado.", StatusCodes.Status404NotFound);
@@ -120,39 +122,53 @@ public class TeamQuickSellService : ITeamQuickSellService
                     throw new QuickSellException("Preço base inválido para o jogador.", StatusCodes.Status400BadRequest);
 
                 var payout = decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
-                var hasPendingBump = player.QuickSellTeamId == teamId
-                    && player.QuickSellOldOverall.HasValue
-                    && player.QuickSellNewOverall.HasValue
-                    && player.QuickSellNewOverall.Value == player.Overall;
-
-                var oldOverall = hasPendingBump
-                    ? player.QuickSellOldOverall!.Value
-                    : player.Overall;
-
-                var newOverall = hasPendingBump
-                    ? player.QuickSellNewOverall!.Value
-                    : QuickSellOverallCalculator.CalculateNewOverall(oldOverall);
-
-                if (!hasPendingBump)
+                int oldOverall, newOverall;
+                string? evolucao = null;
+                if (player.Atributos is not null
+                    && OverallPes.CalcularDoJogador(AtributosPes.ParaDto(player.Atributos)) is not null)
                 {
-                    player.Overall = newOverall;
-                    player.QuickSellTeamId = teamId;
-                    player.QuickSellOldOverall = oldOverall;
-                    player.QuickSellNewOverall = newOverall;
+                    // Com atributos do PES, a evolução é nos atributos; o overall sai da fórmula.
+                    OverallPes.Recalcular(player);
+                    oldOverall = player.Overall;
+                    evolucao = EvoluirAtributos(player, QuickSellOverallCalculator.CalculateNewOverall(oldOverall), now);
+                    newOverall = player.Overall;
+                }
+                else
+                {
+                    var hasPendingBump = player.QuickSellTeamId == teamId
+                        && player.QuickSellOldOverall.HasValue
+                        && player.QuickSellNewOverall.HasValue
+                        && player.QuickSellNewOverall.Value == player.Overall;
 
-                    try
+                    oldOverall = hasPendingBump
+                        ? player.QuickSellOldOverall!.Value
+                        : player.Overall;
+
+                    newOverall = hasPendingBump
+                        ? player.QuickSellNewOverall!.Value
+                        : QuickSellOverallCalculator.CalculateNewOverall(oldOverall);
+
+                    if (!hasPendingBump)
                     {
-                        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-                    }
-                    catch (DbUpdateException dbEx)
-                    {
-                        _logger.LogError(dbEx, "Erro ao persistir o novo overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
-                        throw new QuickSellException("Não foi possível atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Erro inesperado ao atualizar o overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
-                        throw new QuickSellException("Erro inesperado ao atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
+                        player.Overall = newOverall;
+                        player.QuickSellTeamId = teamId;
+                        player.QuickSellOldOverall = oldOverall;
+                        player.QuickSellNewOverall = newOverall;
+
+                        try
+                        {
+                            await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+                        }
+                        catch (DbUpdateException dbEx)
+                        {
+                            _logger.LogError(dbEx, "Erro ao persistir o novo overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
+                            throw new QuickSellException("Não foi possível atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Erro inesperado ao atualizar o overall do jogador {PlayerId} na venda rápida.", player.PlayerId);
+                            throw new QuickSellException("Erro inesperado ao atualizar o overall do jogador.", StatusCodes.Status500InternalServerError);
+                        }
                     }
                 }
 
@@ -174,7 +190,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                 team.Budget = decimal.Round(team.Budget + payout, 2, MidpointRounding.AwayFromZero);
                 team.QuickSellCount++;
 
-                var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout);
+                var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout, evolucao);
                 var historyEntry = new TransferHistory
                 {
                     TransferId = Guid.NewGuid(),
@@ -206,7 +222,8 @@ public class TeamQuickSellService : ITeamQuickSellService
                     basePrice,
                     payout,
                     team.Budget,
-                    now);
+                    now,
+                    evolucao);
             }
             catch (QuickSellException)
             {
@@ -230,10 +247,46 @@ public class TeamQuickSellService : ITeamQuickSellService
         return result!;
     }
 
-    private static string BuildHistoryNotes(string playerName, int oldOver, int newOver, decimal payout)
+    /// <summary>
+    /// Sobe os atributos até a fórmula do PES dar o overall-alvo, acerta o overall e deixa a mudança pendente
+    /// para o Editor PES levar ao save do jogo. Devolve "Finalização +2, ..." ou null se nada mudou.
+    /// </summary>
+    private string? EvoluirAtributos(Player player, int alvo, DateTime now)
+    {
+        var dto = AtributosPes.ParaDto(player.Atributos!);
+        var antes = OverallPes.Valores(dto);
+        var overallAntes = player.Overall;
+        var pos = dto.PosicaoPes!.Value;
+        var evolucao = OverallPes.Evoluir(antes, pos, dto.EstiloDeJogo, dto.PeFracoUso, dto.PeFracoPrecisao, alvo);
+        if (evolucao.Novos.SequenceEqual(antes))
+            return null;
+
+        for (var i = 0; i < antes.Length; i++)
+            AtributosPes.Todos[i].Set(dto, evolucao.Novos[i]);
+        AtributosPes.Aplicar(dto, player.Atributos!);
+        OverallPes.Recalcular(player);
+
+        _dbContext.EvolucoesPes.Add(new EvolucaoPes
+        {
+            PlayerId = player.PlayerId,
+            Motivo = "Venda rápida",
+            CriadaEmUtc = now,
+            OverallAntes = overallAntes,
+            OverallDepois = player.Overall,
+            Mudancas = EvolucaoPes.EscreverMudancas(antes, evolucao.Novos),
+        });
+
+        if (!evolucao.Alcancou)
+            _logger.LogWarning("Venda rápida de {PlayerId}: atributos no máximo, overall ficou em {Overall} (alvo {Alvo}).",
+                player.PlayerId, player.Overall, alvo);
+        return OverallPes.DescreverMudancas(antes, evolucao.Novos);
+    }
+
+    private static string BuildHistoryNotes(string playerName, int oldOver, int newOver, decimal payout, string? evolucao)
     {
         var culture = CultureInfo.GetCultureInfo("pt-BR");
         var formatted = payout.ToString("C", culture);
-        return $"Venda rápida de {playerName} por {formatted}.\n\r\n\r Over evoluído de {oldOver} para {newOver}!";
+        var notas = $"Venda rápida de {playerName} por {formatted}.\n\r\n\r Over evoluído de {oldOver} para {newOver}!";
+        return evolucao is null ? notas : $"{notas}\n\r Atributos: {evolucao}.";
     }
 }

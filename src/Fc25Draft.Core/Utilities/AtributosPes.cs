@@ -68,6 +68,7 @@ public static class AtributosPes
             if (v is < Minimo or > Maximo)
                 return $"{a.Nome} deve estar entre {Minimo} e {Maximo}.";
         }
+        if (dto.PosicaoPes is < 0 or > 12) return "Posição do PES inválida.";
         if (dto.Altura is < 140 or > 210) return "Altura deve estar entre 140 e 210 cm.";
         if (dto.Peso is < 40 or > 125) return "Peso deve estar entre 40 e 125 kg.";
         if (dto.EstiloDeJogo is { } estilo && (estilo < 0 || estilo >= HabilidadesPes.EstilosDeJogo.Count))
@@ -82,7 +83,7 @@ public static class AtributosPes
 
     public static PlayerAtributosDto ParaDto(PlayerAtributos e) => new()
     {
-        PesId = e.PesId, Altura = e.Altura, Peso = e.Peso, PernaBoa = e.PernaBoa,
+        PesId = e.PesId, PosicaoPes = e.PosicaoPes, Altura = e.Altura, Peso = e.Peso, PernaBoa = e.PernaBoa,
         EstiloDeJogo = e.EstiloDeJogo, Habilidades = e.Habilidades, EstilosIa = e.EstilosIa, Posicoes = e.Posicoes,
         Condicao = e.Condicao, ResistenciaLesao = e.ResistenciaLesao, PeFracoUso = e.PeFracoUso,
         PeFracoPrecisao = e.PeFracoPrecisao,
@@ -99,7 +100,7 @@ public static class AtributosPes
 
     public static void Aplicar(PlayerAtributosDto d, PlayerAtributos e)
     {
-        e.PesId = d.PesId; e.Altura = d.Altura; e.Peso = d.Peso; e.PernaBoa = d.PernaBoa;
+        e.PesId = d.PesId; e.PosicaoPes = d.PosicaoPes; e.Altura = d.Altura; e.Peso = d.Peso; e.PernaBoa = d.PernaBoa;
         e.EstiloDeJogo = d.EstiloDeJogo; e.Habilidades = d.Habilidades; e.EstilosIa = d.EstilosIa; e.Posicoes = d.Posicoes;
         e.Condicao = d.Condicao; e.ResistenciaLesao = d.ResistenciaLesao; e.PeFracoUso = d.PeFracoUso;
         e.PeFracoPrecisao = d.PeFracoPrecisao;

@@ -47,7 +47,20 @@ else
 
         <div class="mb-3">
             <label class="form-label" for="playerOverall">Overall</label>
-            <InputNumber id="playerOverall" class="form-control" @bind-Value="model.Overall" />
+            @if (OverallDaFormula is double formula)
+            {
+                @* Com atributos, o overall é o da fórmula do PES: muda junto com os atributos abaixo. *@
+                <input id="playerOverall" class="form-control" value="@OverallPes.Arredondar(formula)" disabled />
+                <div class="form-text">
+                    Calculado pelos atributos: @formula.ToString("0.00") na fórmula do PES
+                    (posição @OverallPes.PosicoesPt[atributos!.PosicaoPes!.Value] no PES).
+                    <a href="/overall" target="_blank">Como é calculado</a>
+                </div>
+            }
+            else
+            {
+                <InputNumber id="playerOverall" class="form-control" @bind-Value="model.Overall" />
+            }
             <ValidationMessage For="() => model.Overall" />
         </div>
 
@@ -142,6 +155,17 @@ else
                             <option value="@((int)PernaBoa.Esquerda)">Esquerda</option>
                         </select>
                     </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-0" for="atrPosicaoPes" title="Posição registrada no jogo: é a que o overall usa">Posição no PES</label>
+                        <select id="atrPosicaoPes" class="form-select form-select-sm" value="@atributos.PosicaoPes"
+                                @onchange="e => atributos.PosicaoPes = LerNumero(e)">
+                            <option value="">— (overall digitado)</option>
+                            @for (var p = 0; p < OverallPes.Posicoes.Count; p++)
+                            {
+                                <option value="@p">@OverallPes.PosicoesPt[p] — @OverallPes.PosicoesNome[p]</option>
+                            }
+                        </select>
+                    </div>
                 </div>
 
                 @foreach (var grupo in AtributosPes.PorGrupo)
@@ -184,6 +208,8 @@ else
     private bool authInitialized;
 
     private string Title => Id.HasValue ? "Editar Jogador" : "Novo Jogador";
+
+    private double? OverallDaFormula => OverallPes.CalcularDoJogador(atributos);
 
     protected override void OnInitialized()
     {

@@ -73,6 +73,7 @@ public class BasePesService : IBasePesService
         var dto = new PlayerAtributosDto
         {
             PesId = r.Id,
+            PosicaoPes = r.Posicao,
             Altura = r.Altura,
             Peso = r.Peso,
             PernaBoa = r.Perna == 1 ? PernaBoa.Esquerda : PernaBoa.Direita,
@@ -88,6 +89,9 @@ public class BasePesService : IBasePesService
             AtributosPes.Todos[i].Set(dto, r.Atributos[i]);
         return dto;
     }
+
+    private static readonly Lazy<Dictionary<int, Registro>> PorId =
+        new(() => Base.Value.GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.First()));
 
     private static JogadorPesDto ParaDto(Registro r) => new(r.Id, r.Nome, r.Times, Posicao(r), r.Idade, Atributos(r));
 
@@ -128,7 +132,7 @@ public class BasePesService : IBasePesService
         if (faltantes.Count == 0) return 0;
 
         var porNome = Base.Value.ToLookup(r => r.Chave);
-        var preenchidos = 0;
+        var novos = new Dictionary<int, PlayerAtributos>();
 
         foreach (var jogador in faltantes)
         {
@@ -169,10 +173,12 @@ public class BasePesService : IBasePesService
             var atributos = new PlayerAtributos { PlayerId = jogador.PlayerId };
             AtributosPes.Aplicar(Atributos(candidatos[0]), atributos);
             _db.PlayerAtributos.Add(atributos);
-            preenchidos++;
+            novos[jogador.PlayerId] = atributos;
         }
 
+        await RecalcularOverallsAsync(novos, ct);
         await _db.SaveChangesAsync(ct);
+        var preenchidos = novos.Count;
         _logger.LogInformation("Atributos do PES: {Preenchidos} de {Faltantes} jogadores sem atributos foram preenchidos.",
             preenchidos, faltantes.Count);
         return preenchidos;
@@ -192,7 +198,7 @@ public class BasePesService : IBasePesService
         if (repetidos.Count > 0)
             throw new ArgumentException($"ID do PES em mais de um jogador: {string.Join(", ", repetidos)}.");
 
-        var porId = Base.Value.GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.First());
+        var porId = PorId.Value;
         var inexistentes = itens.Where(i => i.PesId is int id && !porId.ContainsKey(id)).Select(i => i.PesId).ToList();
         if (inexistentes.Count > 0)
             throw new ArgumentException($"ID do PES fora da base: {string.Join(", ", inexistentes)}.");
@@ -237,16 +243,30 @@ public class BasePesService : IBasePesService
             {
                 atributos = new PlayerAtributos { PlayerId = item.PlayerId };
                 _db.PlayerAtributos.Add(atributos);
+                atuais[item.PlayerId] = atributos;
             }
             AtributosPes.Aplicar(Atributos(porId[pesId]), atributos);
             ligados++;
         }
 
+        await RecalcularOverallsAsync(atuais, ct);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation(
             "Ligações do PES pelo editor: {Ligados} ligados, {Desligados} desligados, {Iguais} iguais, {Atualizados} com atributos atualizados.",
             ligados, desligados, iguais, atualizados);
         return new ResultadoLigacoesPesDto(ligados, desligados, iguais, atualizados);
+    }
+
+    /// <summary>Overall pela fórmula do PES de quem teve os atributos mexidos.</summary>
+    private async Task RecalcularOverallsAsync(IReadOnlyDictionary<int, PlayerAtributos> atributos, CancellationToken ct)
+    {
+        var ids = atributos.Keys.ToList();
+        var jogadores = await _db.Players.Where(p => ids.Contains(p.PlayerId)).ToListAsync(ct);
+        foreach (var jogador in jogadores)
+        {
+            jogador.Atributos = atributos[jogador.PlayerId];
+            OverallPes.Recalcular(jogador);
+        }
     }
 
     /// <summary>Mesmo time, aceitando nome abreviado no site ("Vasco" x "Vasco da Gama", "Sport" x "Sport Recife").</summary>

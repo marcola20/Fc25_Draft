@@ -73,4 +73,5 @@ public record QuickSellResultDto(
     decimal BasePrice,
     decimal Payout,
     decimal TeamBudgetAfter,
-    DateTime OccurredAtUtc);
+    DateTime OccurredAtUtc,
+    string? Evolucao = null);

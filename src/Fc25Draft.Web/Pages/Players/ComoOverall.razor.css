@@ -1,0 +1,34 @@
+.como-overall {
+    max-width: 860px;
+}
+
+.pesos {
+    display: grid;
+    gap: 4px;
+}
+
+.peso-linha {
+    display: grid;
+    grid-template-columns: minmax(120px, 170px) 1fr 52px;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.peso-barra {
+    background: var(--bs-secondary-bg, #e9ecef);
+    border-radius: 3px;
+    height: 10px;
+    overflow: hidden;
+}
+
+.peso-barra > span {
+    display: block;
+    height: 100%;
+    background: var(--bs-primary, #0d6efd);
+}
+
+.peso-valor {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

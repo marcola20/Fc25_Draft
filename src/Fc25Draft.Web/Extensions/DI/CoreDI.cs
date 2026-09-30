@@ -32,6 +32,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IBasePesService, BasePesService>();
+            services.AddComConexaoPropria<ISincronizacaoPesService, SincronizacaoPesService>();
             services.AddComConexaoPropria<IPositionService, PositionService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddComConexaoPropria<IPricingConfigService, PricingConfigService>();

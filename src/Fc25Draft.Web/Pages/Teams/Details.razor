@@ -879,6 +879,11 @@ else
             ApplyRosterSort();
 
             _quickSellSuccessMessage = $"Jogador {_quickSellTarget.Name} vendido por {FormatCurrency(result.Payout)}. Caixa atualizado.";
+            if (result.NewOverall != result.OldOverall)
+            {
+                _quickSellSuccessMessage += $" Overall {result.OldOverall} → {result.NewOverall}"
+                    + (result.Evolucao is null ? "." : $" ({result.Evolucao}).");
+            }
             _quickSellModalOpen = false;
             _quickSellTarget = null;
             _quickSellPayout = 0m;

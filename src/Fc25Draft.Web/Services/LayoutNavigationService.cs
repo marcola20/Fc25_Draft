@@ -36,6 +36,7 @@ public class LayoutNavigationService
             new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
             new("Jogadores", "/players", "oi oi-person"),
             new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
+            new("Como o overall é calculado", "/overall", "oi oi-calculator"),
             new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
             new("Valor de Elenco", "/times/caixa", "oi oi-dollar")
         }),
@@ -109,6 +110,7 @@ public class LayoutNavigationService
         ["/market"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
         ["/players"] = CreateDefinition("Jogadores", "Mercado", "/players"),
         ["/jogadores/comparar"] = CreateDefinition("Comparar Jogadores", "Mercado", "/jogadores/comparar"),
+        ["/overall"] = CreateDefinition("Como o overall é calculado", "Mercado", "/overall"),
         ["/mercado/negociacoes"] = CreateDefinition("Negociações", "Admin", "/mercado/negociacoes", true),
         ["/admin/negociacoes"] = CreateDefinition("Negociações", "Admin", "/admin/negociacoes", true),
         ["/mercado/historico"] = CreateDefinition("Histórico de Mercado", "Admin", "/mercado/historico", true),

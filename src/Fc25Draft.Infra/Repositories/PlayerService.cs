@@ -88,7 +88,7 @@ public class PlayerService : IPlayerService
     {
         Validate(dto);
 
-        var entity = await _db.Players.FirstOrDefaultAsync(p => p.PlayerId == id)
+        var entity = await _db.Players.Include(p => p.Atributos).FirstOrDefaultAsync(p => p.PlayerId == id)
                      ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
         await EnsurePositionExists(dto.PositionId);
@@ -97,6 +97,7 @@ public class PlayerService : IPlayerService
         entity.Age = dto.Age;
         entity.Overall = dto.Overall;
         entity.PositionId = dto.PositionId;
+        OverallPes.Recalcular(entity); // com atributos, o overall é o da fórmula do PES
 
         await _db.SaveChangesAsync();
     }
@@ -106,17 +107,17 @@ public class PlayerService : IPlayerService
         if (AtributosPes.Validar(dto) is { } erro)
             throw new ArgumentException(erro);
 
-        if (!await _db.Players.AnyAsync(p => p.PlayerId == id))
-            throw new KeyNotFoundException("Jogador não encontrado.");
+        var jogador = await _db.Players.Include(p => p.Atributos).FirstOrDefaultAsync(p => p.PlayerId == id)
+                      ?? throw new KeyNotFoundException("Jogador não encontrado.");
 
-        var atributos = await _db.PlayerAtributos.FirstOrDefaultAsync(a => a.PlayerId == id);
-        if (atributos is null)
+        if (jogador.Atributos is null)
         {
-            atributos = new PlayerAtributos { PlayerId = id };
-            _db.PlayerAtributos.Add(atributos);
+            jogador.Atributos = new PlayerAtributos { PlayerId = id };
+            _db.PlayerAtributos.Add(jogador.Atributos);
         }
 
-        AtributosPes.Aplicar(dto, atributos);
+        AtributosPes.Aplicar(dto, jogador.Atributos);
+        OverallPes.Recalcular(jogador);
         await _db.SaveChangesAsync();
     }
 
