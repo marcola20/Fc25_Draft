@@ -322,26 +322,15 @@ public class LigaAdminService : ILigaAdminService
             // Liga (pontos corridos): o campeão é o 1º colocado. Só há fase extra em caso
             // de empate no topo — jogo decisivo (2 times) ou mini liga (3+). Sem empate,
             // a competição encerra direto no líder (não há playoffs no formato da Liga).
+            // Série A: empatou em pontos já é empate. Série B: V, SG, GP e confronto direto desempatam.
             // Com acesso/rebaixamento, empate total numa posição de zona precisa estar resolvido antes.
             await GarantirDesempatesDeZonaAsync(liga, ct);
 
-            var classif = await _db.LigaClassificacoes
-                .AsNoTracking()
-                .Where(x => x.LigaId == ligaId)
-                .OrderByDescending(x => x.Pontos)
-                .ThenByDescending(x => x.Vitorias)
-                .ThenByDescending(x => x.GolsPro - x.GolsContra)
-                .ThenByDescending(x => x.GolsPro)
-                .ToListAsync(ct);
+            var (classif, empatados) = await EmpatadosNoTopoAsync(liga, ct);
 
             if (classif.Count >= 2)
             {
                 var lider = classif[0];
-                // O título não sai em V/SG/GP: quem empatar em pontos com o líder
-                // disputa jogo decisivo (2 times) ou mini liga (3+).
-                var empatados = classif
-                    .Where(c => c.Pontos == lider.Pontos)
-                    .ToList();
 
                 if (empatados.Count >= 3)
                 {
@@ -1918,6 +1907,29 @@ public class LigaAdminService : ILigaAdminService
     private const int NumeroMiniLiga = 0;
     private const int NumeroJogoDecisivo = -1;
 
+    /// <summary>
+    /// Classificação ordenada pelos critérios e quem disputa o título fora da tabela
+    /// (vazio com líder isolado). Série A: empate em pontos; Série B: empate em tudo.
+    /// </summary>
+    private async Task<(List<LigaClassificacao> Ordenados, HashSet<Guid> Empatados)> EmpatadosNoTopoAsync(
+        Liga liga, CancellationToken ct)
+    {
+        var classifs = await _db.LigaClassificacoes
+            .AsNoTracking()
+            .Where(x => x.LigaId == liga.LigaId)
+            .ToListAsync(ct);
+
+        var confrontos = await CarregarConfrontosAsync(liga.LigaId, ct);
+        var decisivos = await CarregarJogosDecisivosAsync(liga.LigaId, ct);
+        var regra = LigaRegraZonas.De(liga.Tipo, liga.Divisao, liga.VagasDiretas, liga.VagasPlayoff);
+
+        var ordenados = LigaDesempate.Ordenar(classifs, liga.Tipo, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+        var empatados = LigaDesempate.EmpatadosNoTopo(
+            ordenados, regra.TituloPelosCriterios, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+
+        return (ordenados, empatados);
+    }
+
     public async Task<LigaDto> IniciarDecisaoCampeaoAsync(Guid ligaId, CancellationToken ct)
     {
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
@@ -2014,19 +2026,11 @@ public class LigaAdminService : ILigaAdminService
         if (liga.Status != LigaStatus.MiniLiga)
             throw new InvalidOperationException("Liga não está em MiniLiga.");
 
-        // Busca os times empatados no topo
-        var classif = await _db.LigaClassificacoes
-            .AsNoTracking()
-            .Where(x => x.LigaId == ligaId)
-            .OrderBy(x => x.Posicao)
-            .ToListAsync(ct);
+        // Mesmo critério do encerramento da temporada.
+        var (classif, noTopo) = await EmpatadosNoTopoAsync(liga, ct);
+        if (classif.Count == 0) throw new InvalidOperationException("Classificação vazia.");
 
-        var lider = classif.FirstOrDefault() ?? throw new InvalidOperationException("Classificação vazia.");
-        // Mesmo critério do encerramento: empate em pontos com o líder.
-        var empatados = classif
-            .Where(c => c.Pontos == lider.Pontos)
-            .Select(c => c.TimeId)
-            .ToList();
+        var empatados = classif.Select(c => c.TimeId).Where(noTopo.Contains).ToList();
 
         if (empatados.Count < 3)
             throw new InvalidOperationException("Mini liga requer 3 ou mais times empatados.");

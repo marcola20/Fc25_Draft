@@ -360,15 +360,13 @@
                 ordenados[i].Ordem = i + 1;
             }
 
-            // Empate em pontos no topo (igual ao encerramento da temporada): o título sai
-            // em jogo decisivo (2 times) ou mini liga (3+), então ninguém aparece como campeão.
-            if (ordenados.Count > 1)
-            {
-                var pontosLider = ordenados[0].Pontos;
-                var empatadosNoTopo = ordenados.TakeWhile(t => t.Pontos == pontosLider).ToList();
-                if (empatadosNoTopo.Count > 1)
-                    foreach (var t in empatadosNoTopo) t.EmDecisao = true;
-            }
+            // Empate no topo (igual ao encerramento da temporada): o título sai em jogo decisivo
+            // (2 times) ou mini liga (3+), então ninguém aparece como campeão. Série A: empate em
+            // pontos; Série B: empate em todos os critérios, inclusive confronto direto.
+            var empatadosNoTopo = LigaDesempate.EmpatadosNoTopo(
+                ordenados, _regra.TituloPelosCriterios, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+            foreach (var t in ordenados.Where(t => empatadosNoTopo.Contains(t.TimeId)))
+                t.EmDecisao = true;
 
             // Empate total (inclusive confronto direto) numa posição que muda a zona: jogo decisivo.
             // Só com todos os jogos com placar; antes disso quase todo mundo "empata".

@@ -26,6 +26,12 @@ public sealed record LigaRegraZonas(Divisao? Divisao, int VagasDiretas, int Vaga
 
     public bool TemAcessoRebaixamento => Divisao is not null && VagasDiretas + VagasPlayoff > 0;
 
+    /// <summary>
+    /// Série B: o título sai pelos critérios da tabela (Pts → V → SG → GP → confronto direto) e só
+    /// o empate em tudo vai a jogo decisivo. Série A: empatou em pontos com o líder, decisão de campeão.
+    /// </summary>
+    public bool TituloPelosCriterios => Divisao == Enums.Divisao.SerieB;
+
     public static LigaRegraZonas De(TipoCompetition tipo, Divisao? divisao, int? vagasDiretas, int? vagasPlayoff) =>
         tipo != TipoCompetition.Liga || divisao is null
             ? SoCampeao
@@ -76,12 +82,17 @@ public static class LigaZonas
 
     /// <summary>
     /// Posições <c>p</c> em que um empate entre o <c>p</c>º e o <c>(p+1)</c>º muda a zona de alguém.
-    /// A fronteira 1º/2º fica de fora: empate no topo é resolvido pela decisão de campeão.
+    /// Na Série A a fronteira 1º/2º fica de fora: empate no topo é resolvido pela decisão de campeão.
+    /// Na Série B ela entra, porque o título sai pelos critérios (<see cref="LigaRegraZonas.TituloPelosCriterios"/>).
     /// </summary>
-    public static IReadOnlyList<int> Fronteiras(LigaRegraZonas regra, int totalTimes) =>
-        Enumerable.Range(2, Math.Max(totalTimes - 2, 0))
+    public static IReadOnlyList<int> Fronteiras(LigaRegraZonas regra, int totalTimes)
+    {
+        var primeira = regra.TituloPelosCriterios ? 1 : 2;
+
+        return Enumerable.Range(primeira, Math.Max(totalTimes - primeira, 0))
             .Where(p => Zona(regra, p, totalTimes) != Zona(regra, p + 1, totalTimes))
             .ToList();
+    }
 
     public static string Rotulo(ZonaClassificacao zona) => zona switch
     {

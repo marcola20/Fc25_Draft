@@ -210,6 +210,7 @@
     private IReadOnlyList<LigaClassificacaoItemDto>? _classif;
     private IReadOnlyList<LigaPartidaDto> _jogosDecisivos = Array.Empty<LigaPartidaDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+    private HashSet<Guid> _empatadosNoTopo = new();
     private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private bool _loading = true;
 
@@ -252,6 +253,8 @@
         var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
         _jogosDecisivos = rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas).ToArray();
         _decisivos = LigaDesempate.DosJogos(_jogosDecisivos);
+        _empatadosNoTopo = LigaDesempate.EmpatadosNoTopo(
+            _classif, _regra.TituloPelosCriterios, c => c.TimeId, CopaStats, LigaDesempate.ConfrontosDasRodadas(rodadas), _decisivos);
     }
 
     // Zonas valem durante a temporada também ("se terminasse hoje").
@@ -262,17 +265,12 @@
         EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, item.Posicao, _classif?.Count ?? 0));
 
     /// <summary>
-    /// Empatado em pontos com o líder: o título sai em jogo decisivo (2 times) ou mini liga (3+).
+    /// Empatado com o líder: o título sai em jogo decisivo (2 times) ou mini liga (3+).
+    /// Série A: empate em pontos; Série B: empate em todos os critérios, inclusive confronto direto.
     /// Mesmo critério do encerramento da temporada (LigaAdminService).
     /// </summary>
-    private bool EmpateNoTopo(LigaClassificacaoItemDto item)
-    {
-        if (_classif is not { Count: > 1 } || _liga?.Status == LigaStatus.Criada)
-            return false;
-
-        var pontosDoLider = _classif[0].Pontos;
-        return item.Pontos == pontosDoLider && _classif.Count(c => c.Pontos == pontosDoLider) > 1;
-    }
+    private bool EmpateNoTopo(LigaClassificacaoItemDto item) =>
+        _liga?.Status != LigaStatus.Criada && _empatadosNoTopo.Contains(item.TimeId);
 
     /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
     private IEnumerable<GrupoCopa> GruposDaCopa() =>

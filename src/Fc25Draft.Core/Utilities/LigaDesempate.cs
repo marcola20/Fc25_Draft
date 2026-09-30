@@ -39,7 +39,7 @@ public sealed class JogosDecisivos
 /// e a simulação do admin.
 /// <para>
 /// <b>Liga:</b> Pontos → Vitórias → Saldo de Gols → Gols Pró → Confronto direto → jogo decisivo
-/// (só nas posições que mudam de zona; empate no topo segue a decisão de campeão).
+/// (só nas posições que mudam de zona; na Série A, empate em pontos no topo segue a decisão de campeão).
 /// </para>
 /// <para>
 /// <b>Copa:</b> Pontos → Vitórias → Saldo de Gols. Quem empatar nesses três critérios
@@ -82,6 +82,15 @@ public static class LigaDesempate
 
         return new JogosDecisivos(resultados);
     }
+
+    /// <summary>Confrontos diretos das rodadas regulares, igual ao recálculo oficial (sem desempates nem WO).</summary>
+    public static IReadOnlyList<ConfrontoDireto> ConfrontosDasRodadas(IEnumerable<LigaRodadaComPartidasDto> rodadas) =>
+        rodadas
+            .Where(r => r.Numero > 0 && !r.Desempate)
+            .SelectMany(r => r.Partidas)
+            .Where(p => p.Status == PartidaStatus.Encerrada && !p.IsWO)
+            .Select(p => new ConfrontoDireto(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora))
+            .ToList();
 
     public static List<T> Ordenar<T>(
         IEnumerable<T> itens,
@@ -180,6 +189,32 @@ public static class LigaDesempate
         }
 
         return posicoes;
+    }
+
+    /// <summary>
+    /// Times de uma Liga já ordenada que vão à decisão do título (jogo decisivo com 2, mini liga com 3+);
+    /// vazio quando o líder está isolado. Com <paramref name="tituloPelosCriterios"/> (Série B), só quem
+    /// divide a 1ª posição em todos os critérios, inclusive confronto direto; senão, basta empatar em
+    /// pontos com o líder.
+    /// </summary>
+    public static HashSet<Guid> EmpatadosNoTopo<T>(
+        IReadOnlyList<T> ordenados,
+        bool tituloPelosCriterios,
+        Func<T, Guid> timeId,
+        Func<T, DesempateStats> stats,
+        IReadOnlyList<ConfrontoDireto> confrontos,
+        JogosDecisivos? decisivos = null)
+    {
+        if (ordenados.Count < 2) return new HashSet<Guid>();
+
+        var noTopo = tituloPelosCriterios
+            ? ordenados.Zip(PosicoesLiga(ordenados, timeId, stats, confrontos, decisivos))
+                .Where(x => x.Second == 1)
+                .Select(x => timeId(x.First))
+                .ToHashSet()
+            : ordenados.Where(x => stats(x).Pontos == stats(ordenados[0]).Pontos).Select(timeId).ToHashSet();
+
+        return noTopo.Count > 1 ? noTopo : new HashSet<Guid>();
     }
 
     /// <summary>

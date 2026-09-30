@@ -739,6 +739,7 @@
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
     private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
+    private HashSet<Guid> _empatadosNoTopo = new();
     private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
@@ -896,6 +897,8 @@
         // O jogo decisivo da Copa aparece como rodada normal, mas não soma pontos:
         // o que ele resolve é a ordem entre os empatados.
         _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));
+        _empatadosNoTopo = LigaDesempate.EmpatadosNoTopo(
+            _classif, _regra.TituloPelosCriterios, c => c.TimeId, CopaStats, LigaDesempate.ConfrontosDasRodadas(rodadas), _decisivos);
         _knockoutJogos = await LigaService.GetKnockoutAsync(ligaId, CancellationToken.None);
         _tituloNoMataMata = _liga?.Tipo == TipoCompetition.Liga && _knockoutJogos.Count > 0;
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
@@ -999,17 +1002,12 @@
         EmpateNoTopo(item) ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(ZonaDaPosicao(item.Posicao));
 
     /// <summary>
-    /// Empatado em pontos com o líder: o título sai em jogo decisivo (2 times) ou mini liga (3+).
+    /// Empatado com o líder: o título sai em jogo decisivo (2 times) ou mini liga (3+).
+    /// Série A: empate em pontos; Série B: empate em todos os critérios, inclusive confronto direto.
     /// Mesmo critério do encerramento da temporada (LigaAdminService).
     /// </summary>
-    private bool EmpateNoTopo(LigaClassificacaoItemDto item)
-    {
-        if (_classif.Count < 2 || _liga?.Status == LigaStatus.Criada)
-            return false;
-
-        var pontosDoLider = _classif[0].Pontos;
-        return item.Pontos == pontosDoLider && _classif.Count(c => c.Pontos == pontosDoLider) > 1;
-    }
+    private bool EmpateNoTopo(LigaClassificacaoItemDto item) =>
+        _liga?.Status != LigaStatus.Criada && _empatadosNoTopo.Contains(item.TimeId);
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {
