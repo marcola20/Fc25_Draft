@@ -366,6 +366,52 @@ public class LigaPublicService : ILigaPublicService
         IReadOnlyDictionary<int, (Guid TimeId, string TimeNome)> timesAtuais, int jogadorId) =>
         timesAtuais.TryGetValue(jogadorId, out var time) ? time : (Guid.Empty, SemTimeLabel);
 
+    public async Task<PowerRankingDto> GetPowerRankingAsync(CancellationToken ct)
+    {
+        // Entram os times com elenco; a divisão é a da liga em andamento.
+        var elencos = await _db.TeamRosters.AsNoTracking()
+            .Select(r => new { r.TeamId, r.Team.TeamName, r.Player.Overall })
+            .ToListAsync(ct);
+
+        var divisoes = await _db.LigaTimes.AsNoTracking()
+            .Where(t => t.Liga.Tipo == TipoCompetition.Liga && t.Liga.Status != LigaStatus.Encerrada)
+            .Select(t => new { t.TimeId, t.Liga.Divisao })
+            .ToListAsync(ct);
+        var divisaoPorTime = divisoes
+            .GroupBy(d => d.TimeId)
+            .ToDictionary(g => g.Key, g => g.Min(d => d.Divisao));
+
+        var times = elencos
+            .GroupBy(e => (e.TeamId, e.TeamName))
+            .Select(g => new PowerRankingTimeInput(
+                g.Key.TeamId, g.Key.TeamName, divisaoPorTime.GetValueOrDefault(g.Key.TeamId),
+                g.Select(e => e.Overall).ToList()))
+            .ToList();
+
+        // W.O. não diz nada sobre a força do time e fica de fora.
+        var partidas = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && !p.IsWO)
+            .Select(p => new
+            {
+                p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.EncerradaEm,
+                p.Rodada.DataHora, p.Rodada.Numero, Temporada = p.Rodada.Liga.Temporada, LigaCriadaEm = p.Rodada.Liga.CriadoEm
+            })
+            .ToListAsync(ct);
+
+        var inputs = partidas
+            .Select(p =>
+            {
+                var quando = p.EncerradaEm ?? p.DataHora ?? p.LigaCriadaEm.AddMinutes(p.Numero);
+                // Brasília é UTC-3 o ano todo (sem horário de verão desde 2019).
+                return new PowerRankingPartidaInput(
+                    p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora,
+                    p.Temporada ?? p.LigaCriadaEm.Year, DateOnly.FromDateTime(quando.AddHours(-3)), quando);
+            })
+            .ToList();
+
+        return PowerRanking.Calcular(times, inputs);
+    }
+
     public async Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct)
     {
         var eventos = await _db.LigaEventos

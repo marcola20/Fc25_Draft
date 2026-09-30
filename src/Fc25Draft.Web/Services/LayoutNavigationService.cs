@@ -50,6 +50,7 @@ public class LayoutNavigationService
             new("Treinadores", "/treinadores", "oi oi-person"),
             new("Bolão da rodada", "/bolao", "oi oi-target"),
             new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart"),
+            new("Power Ranking", "/power-ranking", "oi oi-pulse"),
             new("Recordes", "/liga/recordes", "oi oi-star"),
             new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
             new("Premiação", "/premiacao", "oi oi-dollar"),
@@ -489,6 +490,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Ranking de Clubes")
+            }
+        },
+        ["/power-ranking"] = new PageDefinition
+        {
+            Route = "/power-ranking",
+            Title = "Power Ranking",
+            Subtitle = "Quem está mais forte agora: elenco, rating e forma",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Power Ranking")
             }
         },
         ["/admin/hall-of-fame"] = new PageDefinition

@@ -445,3 +445,29 @@ public record RankingClubeDto(
     public int Titulos => TitulosSerieA + TitulosSerieB + TitulosCopa + TitulosSupercopa;
     public int SaldoGols => GolsPro - GolsContra;
 }
+
+/// <summary>Linha do Power Ranking: quem está mais forte agora. Notas de 0 a 100.</summary>
+public record PowerRankingItemDto(
+    int Posicao,
+    Guid TimeId,
+    string TimeNome,
+    // Divisão na temporada atual; nulo se o time não está em nenhuma liga em andamento.
+    Divisao? Divisao,
+    double Nota,
+    // Posições ganhas (+) ou perdidas (-) desde o dia de jogos anterior. Nulo sem comparação.
+    int? Variacao,
+    // Média de overall dos 11 melhores.
+    double ForcaXI,
+    double NotaElenco,
+    int Rating,
+    double NotaRating,
+    // "V", "E" ou "D", do mais recente para o mais antigo.
+    IReadOnlyList<string> Forma,
+    double NotaForma);
+
+public record PowerRankingDto(
+    IReadOnlyList<PowerRankingItemDto> Itens,
+    // Último dia com jogo encerrado (horário de Brasília).
+    DateOnly? AtualizadoAte,
+    // Dia de jogos usado na comparação da variação.
+    DateOnly? ComparadoCom);

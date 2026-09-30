@@ -64,4 +64,10 @@ public interface ILigaPublicService
     /// encerrados (inclusive os da temporada em andamento), títulos, finais, semis e posições.
     /// </summary>
     Task<IReadOnlyList<RankingClubeDto>> GetRankingClubesAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Power Ranking dos times com elenco: força do XI, rating Elo de todos os jogos e forma recente,
+    /// com a variação de posição desde o dia de jogos anterior.
+    /// </summary>
+    Task<PowerRankingDto> GetPowerRankingAsync(CancellationToken ct);
 }
