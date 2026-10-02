@@ -1,0 +1,224 @@
+@using System.Globalization
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@inject IRetrospectivaService Retrospectiva
+@inject EscudoService Escudos
+
+@* Aba "Retrospectiva" da página do time: o resumo de uma temporada, pronto para virar imagem no WhatsApp. *@
+@if (_temporadas is null)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_temporadas.Count == 0)
+{
+    <div class="text-muted">O time ainda não disputou nenhuma competição.</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <select class="form-select form-select-sm w-auto" @onchange="TrocarTemporadaAsync" disabled="@_carregando">
+            @foreach (var t in _temporadas)
+            {
+                <option value="@t" selected="@(t == _temporada)">Temporada @t</option>
+            }
+        </select>
+        <span class="text-muted small">O resumo da temporada; o botão gera a imagem para o WhatsApp.</span>
+    </div>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_r is null)
+    {
+        <div class="text-muted">Sem dados desta temporada.</div>
+    }
+    else
+    {
+        <div class="retro-largura">
+            <ShareableCard Id="@CardId" Titulo="@($"{_r.TimeNome} · Temporada {_r.Temporada}")" Subtitulo="Retrospectiva" Arquivo="@Arquivo">
+                <div class="retro">
+                    <div class="retro-topo">
+                        <img src="@Escudos.GetEscudo(_r.TimeNome)" alt="" width="64" height="64" />
+                        <div class="min-w-0">
+                            <div class="retro-time">@_r.TimeNome</div>
+                            <div class="retro-temporada">
+                                Temporada @_r.Temporada
+                                @if (_r.EmAndamento)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">em andamento</span>
+                                }
+                            </div>
+                            @if (_r.Tecnico is not null)
+                            {
+                                <div class="small text-muted">Técnico: @_r.Tecnico</div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="retro-secao">Competições</div>
+                    <div class="retro-caixa">
+                        @foreach (var c in _r.Competicoes)
+                        {
+                            <div class="retro-competicao">
+                                <span class="me-2">@IconeCompeticao(c)</span>
+                                <span class="me-auto">@c.Nome</span>
+                                <strong class="@(c.Campeao ? "text-success" : "")">@c.Resultado</strong>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_r.Jogos > 0)
+                    {
+                        <div class="retro-secao">Campanha</div>
+                        <div class="retro-numeros">
+                            @Numero(_r.Jogos.ToString(), "jogos")
+                            @Numero($"{_r.Vitorias}-{_r.Empates}-{_r.Derrotas}", "V-E-D")
+                            @Numero($"{_r.GolsPro}:{_r.GolsContra}", "gols")
+                            @Numero(_r.Aproveitamento is decimal a ? a.ToString("0.#", Brasil) + "%" : "—", "aproveitamento")
+                        </div>
+                    }
+
+                    @if (_r.Artilheiro is not null || _r.Garcom is not null || _r.MelhorNota is not null)
+                    {
+                        <div class="retro-secao">Destaques</div>
+                        <div class="retro-grade">
+                            @if (_r.Artilheiro is { } art)
+                            {
+                                @Destaque("⚽ Artilheiro", art.PlayerId, art.Nome, $"{art.Valor:0} gol{(art.Valor == 1 ? "" : "s")}")
+                            }
+                            @if (_r.Garcom is { } gar)
+                            {
+                                @Destaque("🎯 Garçom", gar.PlayerId, gar.Nome, $"{gar.Valor:0} assistência{(gar.Valor == 1 ? "" : "s")}")
+                            }
+                            @if (_r.MelhorNota is { } nota)
+                            {
+                                @Destaque("⭐ Melhor nota", nota.PlayerId, nota.Nome, $"média {nota.Valor.ToString("0.00", Brasil)} em {nota.Jogos} jogo{(nota.Jogos == 1 ? "" : "s")}")
+                            }
+                        </div>
+                    }
+
+                    @if (_r.MaiorVitoria is not null || _r.PiorDerrota is not null)
+                    {
+                        <div class="retro-grade mt-2">
+                            @if (_r.MaiorVitoria is { } v)
+                            {
+                                @Jogo("💥 Maior vitória", v)
+                            }
+                            @if (_r.PiorDerrota is { } d)
+                            {
+                                @Jogo("😖 Pior derrota", d)
+                            }
+                        </div>
+                    }
+
+                    @if (_r.Chegadas + _r.Saidas > 0)
+                    {
+                        <div class="retro-secao">Mercado</div>
+                        <div class="retro-grade">
+                            @if (_r.MaiorContratacao is { } contr)
+                            {
+                                @Destaque("💸 Maior contratação", contr.PlayerId, contr.Nome,
+                                    Dinheiro.Curto(contr.Valor) + (contr.OutroTime is null ? "" : $" · {contr.OutroTime}"))
+                            }
+                            @if (_r.MaiorVenda is { } venda)
+                            {
+                                @Destaque("💰 Maior venda", venda.PlayerId, venda.Nome,
+                                    Dinheiro.Curto(venda.Valor) + (venda.OutroTime is null ? "" : $" · {venda.OutroTime}"))
+                            }
+                        </div>
+                        <div class="retro-mercado-linha">
+                            <span>⬇️ @_r.Chegadas chegada@(_r.Chegadas == 1 ? "" : "s")</span>
+                            <span>⬆️ @_r.Saidas saída@(_r.Saidas == 1 ? "" : "s")</span>
+                            <span>Gastou <strong>@Dinheiro.Curto(_r.Gasto)</strong></span>
+                            <span>Recebeu <strong>@Dinheiro.Curto(_r.Recebido)</strong></span>
+                            <span class="@(Saldo >= 0 ? "text-success" : "text-danger")">Saldo <strong>@(Saldo > 0 ? "+" : "")@Dinheiro.Curto(Saldo)</strong></span>
+                        </div>
+                    }
+                </div>
+            </ShareableCard>
+        </div>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private IReadOnlyList<int>? _temporadas;
+    private int _temporada;
+    private RetrospectivaDto? _r;
+    private bool _carregando;
+
+    private string CardId => $"cap-retro-{TeamId:N}";
+    private string Arquivo => $"cbfv-retrospectiva-{_r?.Temporada}.png";
+    private decimal Saldo => (_r?.Recebido ?? 0) - (_r?.Gasto ?? 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _temporadas = await Retrospectiva.TemporadasAsync(TeamId, CancellationToken.None);
+        if (_temporadas.Count == 0) return;
+        _temporada = _temporadas[0];
+        await CarregarAsync();
+    }
+
+    private async Task TrocarTemporadaAsync(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var t)) return;
+        _temporada = t;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _r = await Retrospectiva.MontarAsync(TeamId, _temporada, CancellationToken.None);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private static string IconeCompeticao(RetrospectivaCompeticaoDto c) => c.Campeao ? "🏆" : c.Tipo switch
+    {
+        TipoCompetition.Liga => "📊",
+        TipoCompetition.Copa => "🏟️",
+        _ => "🥇"
+    };
+
+    private static RenderFragment Numero(string valor, string rotulo) => __builder =>
+    {
+        <div class="retro-numero">
+            <div class="retro-numero-valor">@valor</div>
+            <div class="retro-numero-rotulo">@rotulo</div>
+        </div>
+    };
+
+    private static RenderFragment Destaque(string titulo, int playerId, string nome, string detalhe) => __builder =>
+    {
+        <div class="retro-destaque">
+            <FotoJogador PlayerId="@playerId" Tamanho="44" Lazy="false" />
+            <div class="min-w-0">
+                <div class="retro-destaque-titulo">@titulo</div>
+                <div class="fw-semibold text-truncate">@nome</div>
+                <div class="small text-muted">@detalhe</div>
+            </div>
+        </div>
+    };
+
+    private RenderFragment Jogo(string titulo, RetrospectivaJogoDto j) => __builder =>
+    {
+        <div class="retro-destaque">
+            <img src="@Escudos.GetEscudo(j.Adversario)" alt="" width="44" height="44" style="object-fit: contain;" />
+            <div class="min-w-0">
+                <div class="retro-destaque-titulo">@titulo</div>
+                <div class="fw-semibold">@j.GolsPro x @j.GolsContra contra o @j.Adversario</div>
+                <div class="small text-muted text-truncate">@(j.EmCasa ? "em casa" : "fora") · @j.Competicao</div>
+            </div>
+        </div>
+    };
+}

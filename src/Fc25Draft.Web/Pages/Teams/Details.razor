@@ -153,6 +153,12 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Retrospectiva ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Retrospectiva">
+                Retrospectiva
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Transferencias ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Transferencias">
                 Transferências
@@ -189,6 +195,10 @@ else
     else if (_activeMainTab == MainTab.Historico)
     {
         <TimeHistoricoTab @key="Id" TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Retrospectiva)
+    {
+        <TimeRetrospectivaTab @key="Id" TeamId="@Id" />
     }
     else if (_activeMainTab == MainTab.Transferencias)
     {
@@ -1037,6 +1047,7 @@ else
         Temporada,
         Jogos,
         Historico,
+        Retrospectiva,
         Transferencias,
         Negotiations,
         Extrato

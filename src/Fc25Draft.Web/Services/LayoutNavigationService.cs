@@ -64,7 +64,7 @@ public class LayoutNavigationService
             new("Recordes", "/liga/recordes", "oi oi-star"),
             new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart")
         }),
-        new("Admin · Temporada e Liga", new List<MenuItem>
+        new("Admin · Temporada", new List<MenuItem>
         {
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular"),
@@ -85,7 +85,7 @@ public class LayoutNavigationService
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus"),
             new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star")
         }, RequiredRole: "Admin", CollapseByDefault: true),
-        new("Admin · Pessoas e Sistema", new List<MenuItem>
+        new("Admin · Sistema", new List<MenuItem>
         {
             new("Gerenciar Treinadores", "/admin/treinadores", "oi oi-person"),
             new("Cadastro de Times", "/teams", "oi oi-plus"),

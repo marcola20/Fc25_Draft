@@ -1,6 +1,6 @@
 @* Foto do jogador (ou a silhueta, quando não tem): o endereço é sempre o mesmo, o servidor decide. *@
 <img src="@Src"
-     alt="@Alt" loading="lazy" decoding="async"
+     alt="@Alt" loading="@(Lazy ? "lazy" : "eager")" decoding="async"
      class="foto-jogador @Classe"
      style="width: @(Tamanho)px; height: @(Tamanho)px;" />
 
@@ -13,6 +13,12 @@
     [Parameter] public string? Classe { get; set; }
 
     [Parameter] public string Alt { get; set; } = "";
+
+    /// <summary>
+    /// Falso para carregar na hora: imagem fora da tela que vai virar figura (compartilhar) não pode esperar
+    /// a pessoa rolar até ela.
+    /// </summary>
+    [Parameter] public bool Lazy { get; set; } = true;
 
     /// <summary>Muda quando a foto é trocada, para o navegador não mostrar a antiga do cache.</summary>
     [Parameter] public string? Versao { get; set; }

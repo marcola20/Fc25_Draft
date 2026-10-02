@@ -1,0 +1,116 @@
+.retro-largura {
+    max-width: 700px;
+}
+
+.retro {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.retro-topo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+    .retro-topo img {
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+
+.retro-time {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.retro-temporada {
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+}
+
+.retro-secao {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+
+.retro-caixa {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+}
+
+.retro-competicao {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+    .retro-competicao:last-child {
+        border-bottom: 0;
+    }
+
+.retro-numeros {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.retro-numero {
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+    border-radius: 0.5rem;
+    background: var(--bs-tertiary-bg);
+}
+
+.retro-numero-valor {
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.retro-numero-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+}
+
+.retro-grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.5rem;
+}
+
+.retro-destaque {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+}
+
+.retro-destaque-titulo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--bs-secondary-color);
+}
+
+.retro-mercado-linha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 576px) {
+    .retro-numeros {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
