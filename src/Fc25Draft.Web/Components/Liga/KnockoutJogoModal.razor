@@ -55,6 +55,7 @@
                 <PartidaTelaoLink PartidaId="Jogo.PartidaId.Value" YoutubeVideoId="@Jogo.YoutubeVideoId" OnAlterado="() => OnAlterado.InvokeAsync()" />
                 <PartidaEscalacoes Dados="_escalacoes">
                 <Estatisticas>
+                <PartidaNumeros PartidaId="Jogo.PartidaId.Value" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" />
                 @if (_eventos.Any())
                 {
                     var gols = _eventos.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();

@@ -1,0 +1,53 @@
+@using System.Globalization
+@using Fc25Draft.Core.Interfaces
+@inject IEstatisticasPesService Estatisticas
+
+@* Números do PES da partida (posse, chutes, passes…) em barras lado a lado. Some quando o jogo não veio do PES. *@
+@if (_numeros is { Count: > 0 } numeros)
+{
+    <div class="partida-numeros mb-3">
+        <div class="partida-numeros-times">
+            <span class="partida-numeros-casa">@CasaNome</span>
+            <span class="text-muted small">números do PES</span>
+            <span class="partida-numeros-fora">@ForaNome</span>
+        </div>
+        @foreach (var n in numeros)
+        {
+            var total = n.Casa + n.Fora;
+            var casaPct = total > 0 ? n.Casa * 100 / total : 50;
+            <div class="partida-numeros-linha">
+                <div class="partida-numeros-valores">
+                    <span class="@(n.Casa > n.Fora ? "fw-bold" : "")">@Texto(n.Casa, n.Percentual)</span>
+                    <span class="partida-numeros-rotulo">@n.Rotulo</span>
+                    <span class="@(n.Fora > n.Casa ? "fw-bold" : "")">@Texto(n.Fora, n.Percentual)</span>
+                </div>
+                <div class="partida-numeros-barra" aria-hidden="true">
+                    <div class="partida-numeros-barra-casa" style="width: @Num(casaPct)%"></div>
+                    <div class="partida-numeros-barra-fora" style="width: @Num(100 - casaPct)%"></div>
+                </div>
+            </div>
+        }
+    </div>
+    <hr />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+
+    private IReadOnlyList<NumeroDaPartidaDto>? _numeros;
+    private Guid _carregada;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregada == PartidaId) return;
+        _carregada = PartidaId;
+        _numeros = await Estatisticas.DaPartidaAsync(PartidaId, CancellationToken.None);
+    }
+
+    private static string Texto(decimal valor, bool percentual) =>
+        valor.ToString(valor % 1 == 0 ? "0" : "0.0", CultureInfo.GetCultureInfo("pt-BR")) + (percentual ? "%" : "");
+
+    private static string Num(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}

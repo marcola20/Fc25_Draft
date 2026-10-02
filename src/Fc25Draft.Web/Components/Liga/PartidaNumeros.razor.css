@@ -1,0 +1,46 @@
+.partida-numeros {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.partida-numeros-times {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 700;
+}
+
+.partida-numeros-casa { color: var(--cbfv-azul); }
+.partida-numeros-fora { color: var(--cbfv-laranja); }
+
+.partida-numeros-valores {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.partida-numeros-rotulo {
+    color: var(--bs-secondary-color);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.partida-numeros-barra {
+    display: flex;
+    gap: 3px;
+    height: 6px;
+    margin-top: 0.2rem;
+}
+
+.partida-numeros-barra-casa,
+.partida-numeros-barra-fora {
+    height: 100%;
+    border-radius: 3px;
+    min-width: 3px;
+}
+
+.partida-numeros-barra-casa { background-color: var(--cbfv-azul); }
+.partida-numeros-barra-fora { background-color: var(--cbfv-laranja); }

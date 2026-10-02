@@ -7,6 +7,7 @@
 @using Fc25Draft.Web.Components.Liga
 @using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
+@inject IEstatisticasPesService EstatisticasPes
 @inject AdminAuthService AdminAuth
 @inject ILigaAdminService AdminSvc
 @implements IDisposable
@@ -508,7 +509,55 @@
                 <li class="nav-item">
                     <button class="nav-link @(_statsTab == "notas" ? "active" : "")" @onclick='() => _statsTab = "notas"'>Notas</button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "times" ? "active" : "")" @onclick='() => _statsTab = "times"'>Times</button>
+                </li>
             </ul>
+
+            @if (_statsTab == "times")
+            {
+                if (_numerosTimes.Count == 0)
+                {
+                    <div class="alert alert-info">Nenhuma partida desta competição tem os números do PES (posse, chutes, passes…).</div>
+                }
+                else
+                {
+                    <p class="small text-muted mb-2">
+                        Médias por jogo das partidas importadas do PES. Clique no título da coluna para ordenar.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle text-center" style="font-size:0.85rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-start">Time</th>
+                                    @foreach (var coluna in ColunasDosTimes)
+                                    {
+                                        var c = coluna;
+                                        <th role="button" title="@c.Dica" @onclick="() => OrdenarTimes(c.Chave)" class="text-nowrap">
+                                            @c.Titulo@(_ordemTimes == c.Chave ? (_ordemTimesDesc ? " ▼" : " ▲") : "")
+                                        </th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in TimesOrdenados)
+                                {
+                                    <tr>
+                                        <td class="text-start text-nowrap">
+                                            <img src="@EscudoUrl(t.TimeNome)" alt="" width="20" height="20" style="object-fit:contain" class="me-1" />
+                                            <a href="/teams/details/@t.TimeId">@t.TimeNome</a>
+                                        </td>
+                                        @foreach (var coluna in ColunasDosTimes)
+                                        {
+                                            <td class="@(_ordemTimes == coluna.Chave ? "fw-semibold" : "")">@coluna.Texto(t)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
 
             @if (_statsTab == "notas")
             {
@@ -778,6 +827,7 @@
                     <PartidaTelaoLink PartidaId="_partidaDetalhes.PartidaId" YoutubeVideoId="@_partidaDetalhes.YoutubeVideoId" OnAlterado="AtualizarAposVideo" />
                     <PartidaEscalacoes Dados="_escalacoesPartida">
                     <Estatisticas>
+                    <PartidaNumeros PartidaId="_partidaDetalhes.PartidaId" CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome" />
                     @if (_eventoPartida.Any())
                     {
                         var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
@@ -910,6 +960,52 @@
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
+
+    // ── Números do PES por time (aba Estatísticas › Times) ──
+    private IReadOnlyList<NumerosDoTimeDto> _numerosTimes = Array.Empty<NumerosDoTimeDto>();
+    private string _ordemTimes = "posse";
+    private bool _ordemTimesDesc = true;
+
+    private sealed record ColunaDoTime(string Chave, string Titulo, string Dica, Func<NumerosDoTimeDto, decimal?> Valor, bool EmPercentual = false)
+    {
+        public string Texto(NumerosDoTimeDto t) =>
+            Valor(t) is decimal v ? v.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) + (EmPercentual ? "%" : "") : "—";
+    }
+
+    private static readonly ColunaDoTime[] ColunasDosTimes =
+    [
+        new("jogos", "J", "Jogos com números do PES", t => t.Jogos),
+        new("posse", "Posse", "Posse de bola média", t => t.Posse, EmPercentual: true),
+        new("chutes", "Chutes", "Chutes por jogo", t => t.ChutesPorJogo),
+        new("agol", "A gol", "Chutes a gol por jogo", t => t.ChutesAGolPorJogo),
+        new("pontaria", "Pontaria", "Chutes a gol sobre chutes", t => t.Pontaria, EmPercentual: true),
+        new("conversao", "Conversão", "Gols a cada chute a gol", t => t.Conversao, EmPercentual: true),
+        new("passes", "Passes", "Acerto de passes", t => t.AcertoDePasses, EmPercentual: true),
+        new("sofridos", "Sofre", "Chutes do adversário por jogo", t => t.ChutesSofridosPorJogo),
+        new("sofridosgol", "Sofre a gol", "Chutes a gol do adversário por jogo", t => t.ChutesAGolSofridosPorJogo),
+        new("defesas", "Defesas", "Defesas do goleiro por jogo", t => t.DefesasPorJogo),
+        new("desarmes", "Desarmes", "Desarmes por jogo", t => t.DesarmesPorJogo),
+        new("escanteios", "Escanteios", "Escanteios por jogo", t => t.EscanteiosPorJogo),
+        new("faltas", "Faltas", "Faltas cometidas por jogo", t => t.FaltasPorJogo),
+    ];
+
+    private IEnumerable<NumerosDoTimeDto> TimesOrdenados
+    {
+        get
+        {
+            var coluna = ColunasDosTimes.FirstOrDefault(c => c.Chave == _ordemTimes) ?? ColunasDosTimes[1];
+            return _ordemTimesDesc
+                ? _numerosTimes.OrderByDescending(t => coluna.Valor(t) ?? decimal.MinValue)
+                : _numerosTimes.OrderBy(t => coluna.Valor(t) ?? decimal.MaxValue);
+        }
+    }
+
+    // Clicar de novo na mesma coluna inverte a ordem.
+    private void OrdenarTimes(string chave)
+    {
+        _ordemTimesDesc = _ordemTimes != chave || !_ordemTimesDesc;
+        _ordemTimes = chave;
+    }
     private IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>> _selecoes = new Dictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>();
     private IReadOnlyList<NotaMediaJogadorDto> _notas = Array.Empty<NotaMediaJogadorDto>();
     private DisciplinaDto? _disciplina;
@@ -1094,6 +1190,7 @@
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
+        _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);
