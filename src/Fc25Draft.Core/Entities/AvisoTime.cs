@@ -20,5 +20,8 @@ public class AvisoTime
     public DateTime CriadoEm { get; set; }
     public DateTime? LidoEm { get; set; }
 
+    /// <summary>Quando virou notificação no celular (ou foi descartado por estar velho). Nulo = ainda não.</summary>
+    public DateTime? PushEnviadoEm { get; set; }
+
     public Team Team { get; set; } = null!;
 }

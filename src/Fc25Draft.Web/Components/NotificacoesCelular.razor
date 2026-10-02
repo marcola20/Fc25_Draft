@@ -1,0 +1,168 @@
+@using Fc25Draft.Core.Interfaces
+@inject IJSRuntime JS
+@inject IPushService Push
+@inject AdminAuthService AdminAuth
+
+@* Liga e desliga as notificações no celular deste aparelho (Minha Área). O estado depende do navegador,
+   então só é lido depois de renderizar. *@
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+        <strong>📲 Notificações no celular</strong>
+        @if (_estado == "ligado")
+        {
+            <span class="badge bg-success ms-auto">ligadas neste aparelho</span>
+        }
+    </div>
+    <div class="card-body">
+        @switch (_estado)
+        {
+            case null:
+                <span class="text-muted small">Verificando este aparelho…</span>
+                break;
+            case "sem-suporte":
+                <p class="small text-muted mb-0">
+                    Este navegador não recebe notificações. No Android use o Chrome; no iPhone, instale o site na tela inicial.
+                </p>
+                break;
+            case "ios-instalar":
+                <p class="small mb-0">
+                    No iPhone, as notificações só funcionam com o site instalado: toque em <strong>Compartilhar</strong> ›
+                    <strong>Adicionar à Tela de Início</strong>, abra o CBFV pelo ícone e volte aqui para ativar.
+                </p>
+                break;
+            case "negado":
+                <p class="small mb-0">
+                    As notificações estão bloqueadas para este site. Libere nas configurações do navegador
+                    (cadeado ao lado do endereço › Notificações) e recarregue a página.
+                </p>
+                break;
+            case "ligado":
+                <p class="small text-muted mb-2">
+                    Chegam aqui os avisos do seu time (propostas, lances superados, leilão vencido, vendas…), a sua vez no
+                    draft e o lembrete do bolão 3 horas antes da rodada, se faltar palpite.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="TestarAsync">Enviar um teste</button>
+                    <button class="btn btn-sm btn-outline-secondary" disabled="@_ocupado" @onclick="DesativarAsync">Desligar neste aparelho</button>
+                </div>
+                break;
+            default:
+                <p class="small text-muted mb-2">
+                    Receba no celular os avisos do seu time, a sua vez no draft e o lembrete do bolão, mesmo com o site fechado.
+                </p>
+                <button class="btn btn-sm btn-primary" disabled="@_ocupado" @onclick="AtivarAsync">Ativar neste aparelho</button>
+                break;
+        }
+
+        @if (!string.IsNullOrEmpty(_mensagem))
+        {
+            <div class="small mt-2 @(_erro ? "text-danger" : "text-success")">@_mensagem</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string? _estado;
+    private bool _ocupado;
+    private string? _mensagem;
+    private bool _erro;
+
+    private sealed record EstadoDoAparelho(string Estado, string? Endpoint);
+    private sealed record Assinatura(string Endpoint, string P256dh, string Auth, string? Aparelho);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LerEstadoAsync();
+        StateHasChanged();
+    }
+
+    private async Task LerEstadoAsync()
+    {
+        try
+        {
+            var aparelho = await JS.InvokeAsync<EstadoDoAparelho>("cbfvPush.estado");
+            _estado = aparelho.Estado;
+
+            // Assinado no navegador, mas de outra pessoa (ou apagado no servidor): conta como desligado.
+            if (_estado == "ligado" && !await Push.InscritoAsync(AdminAuth.Token, aparelho.Endpoint!, CancellationToken.None))
+                _estado = "desligado";
+        }
+        catch (JSException)
+        {
+            _estado = "sem-suporte";
+        }
+    }
+
+    private async Task AtivarAsync()
+    {
+        await ExecutarAsync(async () =>
+        {
+            var chave = await Push.ChavePublicaAsync(CancellationToken.None);
+            var assinatura = await JS.InvokeAsync<Assinatura?>("cbfvPush.ativar", chave);
+            if (assinatura is null)
+            {
+                await LerEstadoAsync();
+                if (_estado != "negado") Mensagem("Permissão não concedida. Toque em Ativar e escolha Permitir.", erro: true);
+                return;
+            }
+
+            await Push.InscreverAsync(AdminAuth.Token,
+                new InscricaoPushRequest(assinatura.Endpoint, assinatura.P256dh, assinatura.Auth, assinatura.Aparelho),
+                CancellationToken.None);
+            _estado = "ligado";
+            Mensagem("Notificações ligadas neste aparelho.");
+        });
+    }
+
+    private async Task DesativarAsync()
+    {
+        await ExecutarAsync(async () =>
+        {
+            var endpoint = await JS.InvokeAsync<string?>("cbfvPush.desativar");
+            if (endpoint is not null)
+                await Push.CancelarAsync(AdminAuth.Token, endpoint, CancellationToken.None);
+            _estado = "desligado";
+            Mensagem("Notificações desligadas neste aparelho.");
+        });
+    }
+
+    private async Task TestarAsync()
+    {
+        await ExecutarAsync(async () =>
+        {
+            var aparelhos = await Push.EnviarTesteAsync(AdminAuth.Token, CancellationToken.None);
+            Mensagem(aparelhos > 0
+                ? $"Teste enviado para {aparelhos} aparelho{(aparelhos == 1 ? "" : "s")}. Deve chegar em alguns segundos."
+                : "Nenhum aparelho recebeu. Desligue e ative de novo.", erro: aparelhos == 0);
+        });
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao)
+    {
+        _ocupado = true;
+        _mensagem = null;
+        try
+        {
+            await acao();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Mensagem(ex.Message, erro: true);
+        }
+        catch (JSException)
+        {
+            Mensagem("O navegador não deixou ativar as notificações.", erro: true);
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Mensagem(string texto, bool erro = false)
+    {
+        _mensagem = texto;
+        _erro = erro;
+    }
+}

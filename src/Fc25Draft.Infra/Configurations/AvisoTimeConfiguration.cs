@@ -15,5 +15,7 @@ public class AvisoTimeConfiguration : IEntityTypeConfiguration<AvisoTime>
         b.Property(x => x.Link).HasMaxLength(200);
         b.HasOne(x => x.Team).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.TeamId, x.CriadoEm });
+        // Fila das notificações no celular: só os ainda não enviados.
+        b.HasIndex(x => x.PushEnviadoEm).HasFilter("\"PushEnviadoEm\" IS NULL");
     }
 }

@@ -33,7 +33,7 @@
                 <div class="input-group">
                     <input type="password" class="form-control" placeholder="Seu token" value="@_tokenDigitado"
                            @oninput="e => _tokenDigitado = e.Value?.ToString() ?? string.Empty" autocomplete="one-time-code" />
-                    <button class="btn btn-primary" disabled="@(_carregando || string.IsNullOrWhiteSpace(_tokenDigitado))" @onclick="CarregarAsync">Entrar</button>
+                    <button class="btn btn-primary" disabled="@(_carregando || string.IsNullOrWhiteSpace(_tokenDigitado))" @onclick="EntrarAsync">Entrar</button>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_erro))
                 {
@@ -99,6 +99,8 @@
                 </ul>
             </div>
         }
+
+        <NotificacoesCelular />
 
         @if (_avisos.Count > 0)
         {
@@ -327,7 +329,23 @@
 
     private string? Token => AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(AdminAuth.Token)
         ? AdminAuth.Token
-        : string.IsNullOrWhiteSpace(_tokenDigitado) ? null : _tokenDigitado.Trim();
+        : null;
+
+    // O token colado aqui faz o mesmo login do botão do topo: conta no limite de tentativas, fica
+    // guardado no navegador e o resto do site (sino, notificações) passa a reconhecer a pessoa.
+    private async Task EntrarAsync()
+    {
+        _erro = null;
+        var resultado = await AdminAuth.EntrarAsync(_tokenDigitado);
+        if (!resultado.Sucesso)
+        {
+            _erro = resultado.Mensagem;
+            return;
+        }
+
+        // O login avisa a página (OnAuthChanged), que carrega a área do time.
+        _tokenDigitado = string.Empty;
+    }
 
     protected override void OnInitialized()
     {

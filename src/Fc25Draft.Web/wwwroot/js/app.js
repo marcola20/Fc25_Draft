@@ -268,3 +268,73 @@ window.fc25Telao = {
         if (el) el.scrollTop = el.scrollHeight;
     }
 };
+
+// Notificações no celular (Web Push), usado pelo cartão da Minha Área.
+window.cbfvPush = (function () {
+    function suportado() {
+        return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    }
+
+    function chaveEmBytes(base64url) {
+        const base64 = (base64url + '='.repeat((4 - base64url.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+        const bruto = atob(base64);
+        return Uint8Array.from(bruto, c => c.charCodeAt(0));
+    }
+
+    async function registro() {
+        await navigator.serviceWorker.register('sw.js');
+        return navigator.serviceWorker.ready;
+    }
+
+    // iPhone só recebe notificação com o site instalado na tela inicial.
+    function iosSemInstalar() {
+        const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+        const instalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        return ios && !instalado;
+    }
+
+    function aparelho() {
+        const ua = navigator.userAgent;
+        const so = /android/i.test(ua) ? 'Android' : /iphone|ipad|ipod/i.test(ua) ? 'iPhone' : /windows/i.test(ua) ? 'Windows' : /mac os/i.test(ua) ? 'Mac' : 'Outro';
+        const nav = /samsungbrowser/i.test(ua) ? 'Samsung Internet' : /edg\//i.test(ua) ? 'Edge' : /chrome|crios/i.test(ua) ? 'Chrome' : /firefox|fxios/i.test(ua) ? 'Firefox' : /safari/i.test(ua) ? 'Safari' : 'navegador';
+        const app = window.matchMedia('(display-mode: standalone)').matches ? ' (app)' : '';
+        return so + ' · ' + nav + app;
+    }
+
+    return {
+        // 'sem-suporte' | 'ios-instalar' | 'negado' | 'desligado' | 'ligado'; endpoint quando ligado.
+        estado: async function () {
+            if (iosSemInstalar()) return { estado: 'ios-instalar', endpoint: null };
+            if (!suportado()) return { estado: 'sem-suporte', endpoint: null };
+            if (Notification.permission === 'denied') return { estado: 'negado', endpoint: null };
+            const reg = await registro();
+            const sub = await reg.pushManager.getSubscription();
+            return sub ? { estado: 'ligado', endpoint: sub.endpoint } : { estado: 'desligado', endpoint: null };
+        },
+
+        // Pede permissão e assina; devolve a inscrição para o servidor guardar (ou null se a pessoa negou).
+        ativar: async function (chavePublica) {
+            if (!suportado()) return null;
+            const permissao = await Notification.requestPermission();
+            if (permissao !== 'granted') return null;
+            const reg = await registro();
+            let sub = await reg.pushManager.getSubscription();
+            if (!sub) {
+                sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveEmBytes(chavePublica) });
+            }
+            const json = sub.toJSON();
+            return { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, aparelho: aparelho() };
+        },
+
+        // Cancela a assinatura deste aparelho; devolve o endpoint que saiu.
+        desativar: async function () {
+            if (!suportado()) return null;
+            const reg = await registro();
+            const sub = await reg.pushManager.getSubscription();
+            if (!sub) return null;
+            const endpoint = sub.endpoint;
+            await sub.unsubscribe();
+            return endpoint;
+        }
+    };
+})();

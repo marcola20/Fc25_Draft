@@ -23,7 +23,8 @@ public class BolaoService : IBolaoService
         _time = time ?? TimeProvider.System;
     }
 
-    private DateTime Agora => _time.GetLocalNow().DateTime;
+    // As rodadas guardam o horário de Brasília; o servidor (Render) roda em UTC.
+    private DateTime Agora => HorarioDeBrasilia.Agora(_time);
 
     public async Task<IReadOnlyList<BolaoRodadaDto>> RodadasAbertasAsync(Guid? treinadorId, CancellationToken ct)
     {
