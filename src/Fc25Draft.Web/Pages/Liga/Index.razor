@@ -483,7 +483,67 @@
                 <li class="nav-item">
                     <button class="nav-link @(_statsTab == "cartoes" ? "active" : "")" @onclick='() => _statsTab = "cartoes"'>Cartões</button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "notas" ? "active" : "")" @onclick='() => _statsTab = "notas"'>Notas</button>
+                </li>
             </ul>
+
+            @if (_statsTab == "notas")
+            {
+                var minimo = MinimoDeJogosComNota;
+                var notas = _notas.Where(n => _todasAsNotas || n.Jogos >= minimo).ToList();
+                @if (!_notas.Any())
+                {
+                    <div class="text-muted">Sem notas do PES nesta competição.</div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted">
+                        <span>Média das notas do PES nos jogos importados.</span>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="todasNotas" @bind="_todasAsNotas" />
+                            <label class="form-check-label" for="todasNotas">
+                                Mostrar todos (sem o mínimo de @minimo jogo@(minimo == 1 ? "" : "s"))
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width:35px;">#</th>
+                                    <th>Jogador</th>
+                                    <th class="d-none d-md-table-cell">Time</th>
+                                    <th class="text-center" style="width:45px;">J</th>
+                                    <th class="text-center" style="width:65px;">Média</th>
+                                    <th class="text-center d-none d-sm-table-cell" style="width:65px;" title="Melhor nota">Máx.</th>
+                                    <th class="text-center" style="width:40px;" title="Melhor em campo">⭐</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < notas.Count; i++)
+                                {
+                                    var n = notas[i];
+                                    <tr style="height:40px;">
+                                        <td class="fw-bold text-muted">@(i + 1)</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            @n.JogadorNome <span class="text-muted small">@n.Posicao</span>
+                                        </td>
+                                        <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <img src="@EscudoUrl(n.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            @n.TimeNome
+                                        </td>
+                                        <td class="text-center">@n.Jogos</td>
+                                        <td class="text-center"><span class="badge @NotaPes.Cor(n.Media)">@NotaPes.Media(n.Media)</span></td>
+                                        <td class="text-center text-muted d-none d-sm-table-cell">@NotaPes.Texto(n.MelhorNota)</td>
+                                        <td class="text-center">@(n.VezesMelhorEmCampo > 0 ? n.VezesMelhorEmCampo.ToString() : "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
 
             @if (_statsTab == "artilheiros")
             {
@@ -787,6 +847,11 @@
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
     private IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>> _selecoes = new Dictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>();
+    private IReadOnlyList<NotaMediaJogadorDto> _notas = Array.Empty<NotaMediaJogadorDto>();
+    private bool _todasAsNotas;
+
+    /// <summary>Para entrar no ranking de notas: metade dos jogos de quem mais jogou com nota (arredondando para cima).</summary>
+    private int MinimoDeJogosComNota => _notas.Count == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_notas.Max(n => n.Jogos) / 2.0));
 
     private bool _mostraDetalhesPartida = false;
     private bool _showEditor;
@@ -965,6 +1030,7 @@
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
+        _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
 
         _rodadaIdx = 0;
         for (int i = _rodadas.Count - 1; i >= 0; i--)
