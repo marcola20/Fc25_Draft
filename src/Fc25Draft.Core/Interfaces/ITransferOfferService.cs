@@ -16,6 +16,12 @@ public interface ITransferOfferService
     Task<IReadOnlyList<TransferOfferListItemDto>> GetAllPendingOffersAsync(CancellationToken ct);
     Task<TransferOfferListItemDto> CancelOfferAsync(Guid offerId, Guid teamId, CancellationToken ct);
 
+    /// <summary>O admin cancela uma proposta pendente; os dois times são avisados e a ação fica no log.</summary>
+    Task CancelarPeloAdminAsync(Guid offerId, string adminToken, string? motivo, CancellationToken ct);
+
+    /// <summary>Expira as propostas pendentes há mais de 48 horas. Retorna quantas expiraram.</summary>
+    Task<int> ExpirarAntigasAsync(CancellationToken ct);
+
     /// <summary>Todos os jogadores negociáveis (lista de transferência), de todos os times.</summary>
     Task<IReadOnlyList<ListaTransferenciaItemDto>> GetTransferListAsync(CancellationToken ct);
 

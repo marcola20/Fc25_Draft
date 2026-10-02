@@ -250,6 +250,9 @@ public partial class AdminTransferService
             ExtratoCaixa.Lancar(_dbContext, fromTeam.TeamId, normalizedAmount, ExtratoCaixa.VendaAdmin, descricaoVenda, now);
 
             foreach (var player in players) player.CurrentTeamId = toTeamId;
+            foreach (var player in players)
+                await ClausulasDeRevenda.PagarAsync(_dbContext, player.PlayerId, player.Name, fromTeam,
+                    normalizedAmount / players.Count, "venda pela organização", now, ctoken).ConfigureAwait(false);
             await PropostasPendentes.CancelarComJogadoresAsync(_dbContext, playerNumericIds, null,
                 "a organização transferiu um jogador dela.", now, ctoken).ConfigureAwait(false);
 

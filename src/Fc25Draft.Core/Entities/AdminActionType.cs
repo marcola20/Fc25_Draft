@@ -8,5 +8,6 @@ public enum AdminActionType
     SellPlayers = 3,
     SwapPlayers = 4,
     MovePlayer = 5,
-    ResetMarketItemBids = 6
+    ResetMarketItemBids = 6,
+    CancelOffer = 7
 }

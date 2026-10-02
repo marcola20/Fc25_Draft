@@ -221,6 +221,9 @@ public class TransferOfferService : ITransferOfferService
         if (offer.Status != OfferStatus.Pending)
             throw new InvalidOperationException("Esta proposta já foi respondida.");
 
+        if (offer.CreatedAtUtc < _timeProvider.GetUtcNow().UtcDateTime.AddHours(-TransferOffer.HorasParaExpirar))
+            throw new InvalidOperationException($"Esta proposta expirou: ficou mais de {TransferOffer.HorasParaExpirar} horas sem resposta.");
+
         if (response == OfferStatus.Accepted)
         {
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
@@ -322,6 +325,67 @@ public class TransferOfferService : ITransferOfferService
             .FirstOrDefaultAsync(o => o.OfferId == offerId, ct);
 
         return offer is null ? null : MapToDto(offer);
+    }
+
+    public async Task CancelarPeloAdminAsync(Guid offerId, string adminToken, string? motivo, CancellationToken ct)
+    {
+        var admin = await _db.AdminTokens.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Token == adminToken && a.IsActive, ct)
+            ?? throw new UnauthorizedAccessException("Token de administrador inválido.");
+
+        var offer = await _db.TransferOffers
+            .Include(o => o.FromTeam)
+            .Include(o => o.ToTeam)
+            .FirstOrDefaultAsync(o => o.OfferId == offerId, ct)
+            ?? throw new KeyNotFoundException("Proposta não encontrada.");
+        if (offer.Status != OfferStatus.Pending)
+            throw new InvalidOperationException("Só é possível cancelar propostas pendentes.");
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        offer.Status = OfferStatus.Cancelled;
+        offer.UpdatedAtUtc = now;
+
+        var porque = string.IsNullOrWhiteSpace(motivo) ? "" : $" Motivo: {motivo.Trim()}";
+        AvisosDoTime.Criar(_db, offer.FromTeamId, AvisosDoTime.PropostaCancelada,
+            $"A organização cancelou sua proposta ao {offer.ToTeam.TeamName}.{porque}", "/minha-area", now);
+        AvisosDoTime.Criar(_db, offer.ToTeamId, AvisosDoTime.PropostaCancelada,
+            $"A organização cancelou a proposta do {offer.FromTeam.TeamName}.{porque}", "/minha-area", now);
+
+        _db.AdminActionsLogs.Add(new AdminActionsLog
+        {
+            ActionId = Guid.NewGuid(),
+            ActionType = AdminActionType.CancelOffer,
+            PerformedBy = admin.AdminTokenId.ToString(),
+            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                offerId, fromTeamId = offer.FromTeamId, toTeamId = offer.ToTeamId, reason = motivo?.Trim()
+            }),
+            CreatedAtUtc = now
+        });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<int> ExpirarAntigasAsync(CancellationToken ct)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var limite = now.AddHours(-TransferOffer.HorasParaExpirar);
+        var vencidas = await _db.TransferOffers
+            .Include(o => o.ToTeam)
+            .Where(o => o.Status == OfferStatus.Pending && o.CreatedAtUtc < limite)
+            .ToListAsync(ct);
+
+        foreach (var offer in vencidas)
+        {
+            offer.Status = OfferStatus.Expired;
+            offer.UpdatedAtUtc = now;
+            AvisosDoTime.Criar(_db, offer.FromTeamId, AvisosDoTime.PropostaExpirada,
+                $"Sua proposta ao {offer.ToTeam.TeamName} expirou: ficou {TransferOffer.HorasParaExpirar} horas sem resposta.",
+                "/minha-area", now);
+        }
+
+        if (vencidas.Count > 0) await _db.SaveChangesAsync(ct);
+        return vencidas.Count;
     }
 
     public async Task<TransferOfferListItemDto> CancelOfferAsync(Guid offerId, Guid teamId, CancellationToken ct)
@@ -706,6 +770,24 @@ public class TransferOfferService : ITransferOfferService
         {
             await RegisterLoansAsync(offer, fromTeam, toTeam, targetPlayers, offeredPlayers, cfg, now, ct);
             return;
+        }
+
+        // Percentual de revenda: quem vendeu paga as cláusulas antigas sobre o que recebeu por jogador
+        // (o dinheiro da proposta dividido pelos jogadores que ele cedeu), e nascem as cláusulas desta venda.
+        var comoSaiu = offer.Type == OfferType.Swap ? "troca" : "venda";
+        var recebidoPeloDestino = offer.MoneyPayerTeamId == fromTeam.TeamId ? offer.Money : 0m;
+        var recebidoPelaOrigem = offer.MoneyPayerTeamId == toTeam.TeamId ? offer.Money : 0m;
+        foreach (var player in targetPlayers)
+        {
+            await ClausulasDeRevenda.PagarAsync(_db, player.PlayerId, player.Name, toTeam,
+                recebidoPeloDestino / targetPlayers.Count, comoSaiu, now, ct);
+            ClausulasDeRevenda.Criar(_db, player.PlayerId, toTeam.TeamId, fromTeam.TeamId, offer.SellOnPercentage, offer.OfferId, now);
+        }
+        foreach (var player in offeredPlayers)
+        {
+            await ClausulasDeRevenda.PagarAsync(_db, player.PlayerId, player.Name, fromTeam,
+                recebidoPelaOrigem / offeredPlayers.Count, comoSaiu, now, ct);
+            ClausulasDeRevenda.Criar(_db, player.PlayerId, fromTeam.TeamId, toTeam.TeamId, offer.SellOnPercentage, offer.OfferId, now);
         }
 
         fromTeam.TransferCount++;

@@ -6,6 +6,9 @@ public class TransferOffer
     public Guid FromTeamId { get; set; }
     public Guid ToTeamId { get; set; }
     public OfferType Type { get; set; }
+    /// <summary>Proposta pendente sem resposta nesse tempo expira sozinha.</summary>
+    public const int HorasParaExpirar = 48;
+
     public OfferStatus Status { get; set; }
     public decimal Money { get; set; }
     public Guid? MoneyPayerTeamId { get; set; }

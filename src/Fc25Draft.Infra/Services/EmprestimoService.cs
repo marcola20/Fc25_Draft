@@ -73,6 +73,14 @@ public class EmprestimoService : IEmprestimoService
         var tomador = emprestimo.TomadorTeam;
         var dono = emprestimo.DonoTeam;
 
+        // Comprar o emprestado é uma transferência: respeita a janela e o limite de quem compra.
+        var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        if (cfg.MercadoFechado)
+            throw new InvalidOperationException("O mercado está fechado: a opção de compra só pode ser exercida com a janela aberta.");
+        var limite = cfg.MaxTransfersFor(tomador);
+        if (tomador.TransferCount >= limite)
+            throw new InvalidOperationException($"O {tomador.TeamName} já atingiu o limite de transferências da janela ({tomador.TransferCount}/{limite}).");
+
         var disponivel = decimal.Round(tomador.Budget - tomador.BudgetBlocked, 2, MidpointRounding.AwayFromZero);
         if (disponivel < preco)
             throw new InvalidOperationException($"Saldo insuficiente: a opção de compra custa {preco.ToString("C", BrCulture)}.");
@@ -81,7 +89,9 @@ public class EmprestimoService : IEmprestimoService
 
         tomador.Budget = decimal.Round(tomador.Budget - preco, 2, MidpointRounding.AwayFromZero);
         dono.Budget = decimal.Round(dono.Budget + preco, 2, MidpointRounding.AwayFromZero);
+        tomador.TransferCount++;
         var descricao = $"Opção de compra de {emprestimo.Player.Name}: {tomador.TeamName} compra do {dono.TeamName}";
+        await ClausulasDeRevenda.PagarAsync(_db, emprestimo.PlayerId, emprestimo.Player.Name, dono, preco, "opção de compra", now, ct);
         ExtratoCaixa.Lancar(_db, tomador.TeamId, -preco, ExtratoCaixa.OpcaoDeCompra, descricao, now);
         ExtratoCaixa.Lancar(_db, dono.TeamId, preco, ExtratoCaixa.OpcaoDeCompra, descricao, now);
 

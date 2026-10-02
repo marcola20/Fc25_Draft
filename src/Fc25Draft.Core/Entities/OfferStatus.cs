@@ -7,5 +7,7 @@ public enum OfferStatus
     Accepted = 2,
     Rejected = 3,
     Countered = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    /// <summary>Ficou <see cref="TransferOffer.HorasParaExpirar"/> horas sem resposta.</summary>
+    Expired = 6
 }

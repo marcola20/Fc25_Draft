@@ -71,6 +71,7 @@ public class LayoutNavigationService
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin"),
+            new("Log de ações", "/admin/log-acoes", "oi oi-list", RequiredRole: "Admin"),
             new("Administradores", "/admin/administradores", "oi oi-key", RequiredRole: "AdminPrincipal")
         }, RequiredRole: "Admin")
     };
@@ -408,6 +409,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Treinadores")
+            }
+        },
+        ["/admin/log-acoes"] = new PageDefinition
+        {
+            Route = "/admin/log-acoes",
+            Title = "Log de ações",
+            Subtitle = "O que a organização fez no mercado",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Log de ações")
             }
         },
         ["/admin/administradores"] = new PageDefinition

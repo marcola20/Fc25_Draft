@@ -198,10 +198,14 @@ public class AuctionSettlementService : IAuctionSettlementService
             await EnsureSquadLimitAsync(team.TeamId, item.ItemId, ct).ConfigureAwait(false);
 
             team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - amount);
+            // O débito é o real: zerar escondia o rombo (o extrato e o caixa deixavam de bater).
             team.Budget -= amount;
             if (team.Budget < 0m)
             {
-                team.Budget = 0m;
+                _logger.LogWarning("Leilão de {Jogador} deixou o caixa do {Time} negativo: {Saldo}", item.Player.Name, team.TeamName, team.Budget);
+                AvisosDoTime.Criar(_dbContext, team.TeamId, AvisosDoTime.CaixaNegativo,
+                    $"Seu caixa ficou negativo depois do leilão de {item.Player.Name}. Venda alguém para voltar ao positivo.",
+                    $"/teams/details/{team.TeamId}?aba=extrato", _timeProvider.GetUtcNow().UtcDateTime);
             }
             ExtratoCaixa.Lancar(_dbContext, team.TeamId, -amount, ExtratoCaixa.Leilao,
                 $"Leilão: {item.Player.Name}", _timeProvider.GetUtcNow().UtcDateTime);

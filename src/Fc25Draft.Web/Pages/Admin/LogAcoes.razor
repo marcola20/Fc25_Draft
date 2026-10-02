@@ -1,0 +1,75 @@
+@page "/admin/log-acoes"
+@attribute [Authorize(Roles = "Admin")]
+@inject IAdminLogService AdminLog
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Log de ações — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    <p class="text-muted small mb-3">
+        O que a organização fez no mercado: ajustes de caixa, vendas, trocas e movimentações de jogador, itens do leilão
+        cancelados e propostas canceladas. As @Limite ações mais recentes.
+    </p>
+
+    @if (_itens is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_itens.Count == 0)
+    {
+        <div class="alert alert-info">Nenhuma ação registrada.</div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            @foreach (var acao in _itens.Select(i => i.Acao).Distinct().OrderBy(a => a))
+            {
+                var a = acao;
+                <button type="button" class="btn btn-sm @(_filtro == a ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick="() => _filtro = _filtro == a ? null : a">@a</button>
+            }
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle" style="font-size:0.875rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:8.5rem;">Quando</th>
+                        <th>Ação</th>
+                        <th class="d-none d-md-table-cell">Quem</th>
+                        <th>Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _itens.Where(i => _filtro is null || i.Acao == _filtro))
+                    {
+                        <tr>
+                            <td class="text-muted small">@BrazilTime.FormatDateTime(item.CriadoEmUtc, "dd/MM/yy HH:mm")</td>
+                            <td class="fw-semibold">@item.Acao</td>
+                            <td class="d-none d-md-table-cell text-muted">@item.QuemFez</td>
+                            <td class="small">
+                                @foreach (var d in item.Detalhes)
+                                {
+                                    <span class="me-2"><span class="text-muted">@d.Campo:</span> @d.Valor</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private const int Limite = 300;
+    private IReadOnlyList<AdminLogItemDto>? _itens;
+    private string? _filtro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/log-acoes"));
+        _itens = await AdminLog.ListarAsync(Limite, CancellationToken.None);
+    }
+}

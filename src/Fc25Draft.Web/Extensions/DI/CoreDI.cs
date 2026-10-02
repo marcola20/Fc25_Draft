@@ -28,6 +28,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<DraftAutoPickService>();
             services.AddSingleton<DraftAvisoTempoEsgotado>();
             services.AddHostedService<DraftRelogioService>();
+            services.AddHostedService<PropostasExpiradasService>();
             services.AddScoped<DraftAdminService>();
             services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
@@ -61,6 +62,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<ITermometroMercadoService, TermometroMercadoService>();
             services.AddComConexaoPropria<IMinhaAreaService, MinhaAreaService>();
             services.AddComConexaoPropria<IAvisosService, AvisosService>();
+            services.AddComConexaoPropria<IAdminLogService, AdminLogService>();
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
             services.AddComConexaoPropria<IPremiacaoService, PremiacaoService>();
             services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();

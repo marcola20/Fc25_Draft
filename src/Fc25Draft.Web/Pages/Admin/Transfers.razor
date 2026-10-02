@@ -14,6 +14,7 @@
 @inject ILogger<Fc25Draft.Web.Pages.Admin.Transfers> Logger
 @inject IJSRuntime JSRuntime
 @inject IEmprestimoService EmprestimoSvc
+@inject ITransferOfferService TransferOfferSvc
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -543,7 +544,7 @@ else
                 }
 
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <span class="text-muted small">Propostas entre times ainda pendentes de resposta. Somente visualização.</span>
+                    <span class="text-muted small">Propostas entre times ainda pendentes de resposta. Expiram sozinhas em 48 horas; a organização pode cancelar antes (os dois times são avisados).</span>
                     <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="LoadPendingOffersAsync" disabled="@isLoadingOffers">
                         @(isLoadingOffers ? "Carregando..." : "Recarregar")
                     </button>
@@ -632,6 +633,11 @@ else
                                         {
                                             <div class="small text-muted"><strong>Obs.:</strong> @offer.Notes</div>
                                         }
+
+                                        <div class="mt-2 text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@isLoadingOffers"
+                                                    @onclick="() => CancelarPropostaAsync(offer)">Cancelar proposta</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -813,6 +819,24 @@ else
         {
             _ = LoadLoansAsync();
         }
+    }
+
+    private async Task CancelarPropostaAsync(TransferOfferListItemDto offer)
+    {
+        var motivo = await JSRuntime.InvokeAsync<string?>("prompt",
+            $"Cancelar a proposta do {offer.FromTeamName} ao {offer.ToTeamName}? Os dois times serão avisados. Motivo (opcional):", "");
+        if (motivo is null) return;
+
+        offersErrorMessage = null;
+        try
+        {
+            await TransferOfferSvc.CancelarPeloAdminAsync(offer.OfferId, AdminAuth.Token ?? "", motivo, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException)
+        {
+            offersErrorMessage = ex.Message;
+        }
+        await LoadPendingOffersAsync();
     }
 
     private async Task LoadPendingOffersAsync()
