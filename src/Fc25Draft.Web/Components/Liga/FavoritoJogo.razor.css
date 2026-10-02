@@ -1,0 +1,27 @@
+.favorito {
+    width: 100%;
+    max-width: 22rem;
+    margin: 0.15rem auto 0;
+}
+
+.favorito-barra {
+    display: flex;
+    gap: 2px;
+    height: 5px;
+}
+
+    .favorito-barra span {
+        height: 100%;
+        border-radius: 3px;
+    }
+
+.favorito-casa { background-color: var(--cbfv-azul); }
+.favorito-empate { background-color: var(--bs-secondary-bg); }
+.favorito-fora { background-color: var(--cbfv-laranja); }
+
+.favorito-textos {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}

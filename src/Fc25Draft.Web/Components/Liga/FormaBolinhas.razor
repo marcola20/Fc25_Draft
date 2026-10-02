@@ -1,0 +1,15 @@
+@using Fc25Draft.Core.Utilities
+
+@* Forma recente: uma bolinha por jogo (V verde, E cinza, D vermelha), o mais recente à direita. *@
+<span class="forma" aria-label="@Rotulo">
+    @foreach (var j in Jogos)
+    {
+        <span class="forma-bolinha forma-@char.ToLowerInvariant(j.Resultado)" title="@j.Descricao">@j.Resultado</span>
+    }
+</span>
+
+@code {
+    [Parameter] public IReadOnlyList<ResultadoForma> Jogos { get; set; } = Array.Empty<ResultadoForma>();
+
+    private string Rotulo => Jogos.Count == 0 ? "Sem jogos" : "Últimos jogos: " + string.Join(", ", Jogos.Select(j => j.Descricao));
+}

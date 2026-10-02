@@ -111,6 +111,25 @@ public static class CalculadoraRetaFinal
             : new RetaFinalMeta(SituacaoObjetivo.PrecisaDeAjuda, null, chance);
     }
 
+    /// <summary>
+    /// Chance de vitória do mandante, de empate e de vitória do visitante, pela campanha dos dois: o aproveitamento
+    /// de cada um, puxado para o meio como se todo time tivesse mais 8 jogos de campanha média (no começo da
+    /// temporada um jogo só não pode decidir quem é forte). Times iguais: 37% · 26% · 37%.
+    /// </summary>
+    public static (double Casa, double Empate, double Fora) Chances(int pontosCasa, int jogosCasa, int pontosFora, int jogosFora)
+    {
+        var d = Forca(pontosCasa, jogosCasa) - Forca(pontosFora, jogosFora);
+        var casa = Math.Clamp(0.37 + 0.30 * d, 0.08, 0.84);
+        var fora = Math.Clamp(0.37 - 0.30 * d, 0.08, 0.84);
+        return (casa, 1 - casa - fora, fora);
+    }
+
+    private static double Forca(int pontos, int jogos)
+    {
+        const double JogosDeReferencia = 8;
+        return Math.Clamp((pontos + 1.5 * JogosDeReferencia) / (3.0 * (jogos + JogosDeReferencia)), 0, 1);
+    }
+
     /// <summary>Fração das simulações em que cada time (linha) cumpriu cada objetivo (coluna).</summary>
     private static double[,] Simular(
         IReadOnlyList<RetaFinalTime> tabela, (int Casa, int Fora)[] jogos, IReadOnlyList<RetaFinalObjetivo> objetivos,
@@ -123,18 +142,10 @@ public static class CalculadoraRetaFinal
         // Sem jogos restantes, a tabela de hoje é a final.
         if (jogos.Length == 0) simulacoes = 1;
 
-        // Aproveitamento de 0 a 1, puxado para o meio como se todo time tivesse mais 8 jogos de campanha média:
-        // no começo da temporada um jogo só não pode decidir quem é forte.
-        const double JogosDeReferencia = 8;
-        var forca = tabela
-            .Select(t => Math.Clamp((t.Pontos + 1.5 * JogosDeReferencia) / (3.0 * (t.Jogos + JogosDeReferencia)), 0, 1))
-            .ToArray();
         var probabilidades = jogos.Select(j =>
         {
-            var d = forca[j.Casa] - forca[j.Fora];
-            var casa = Math.Clamp(0.37 + 0.30 * d, 0.08, 0.84);
-            var fora = Math.Clamp(0.37 - 0.30 * d, 0.08, 0.84);
-            return (Casa: casa, Empate: 1 - casa - fora);
+            var chances = Chances(tabela[j.Casa].Pontos, tabela[j.Casa].Jogos, tabela[j.Fora].Pontos, tabela[j.Fora].Jogos);
+            return (chances.Casa, chances.Empate);
         }).ToArray();
 
         var sorteio = new Random(semente);

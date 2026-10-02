@@ -1,12 +1,14 @@
-@page "/bolao"
+﻿@page "/bolao"
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Liga
 @inject IBolaoService BolaoSvc
 @inject ITreinadorService TreinadorSvc
 @inject AdminAuthService AdminAuth
 @inject EscudoService EscudoService
+@inject ILigaPublicService LigaService
 @implements IDisposable
 
 <PageTitle>Bolão da rodada</PageTitle>
@@ -103,6 +105,12 @@
                             <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
                             <span style="min-width:9rem;">@jogo.TimeFora</span>
                         </div>
+                        @if (NaTabela(rodada.LigaId, jogo.TimeCasaId) is { } mandante && NaTabela(rodada.LigaId, jogo.TimeForaId) is { } visitante)
+                        {
+                            <div class="mb-3">
+                                <FavoritoJogo PontosCasa="mandante.Pontos" JogosCasa="mandante.Jogos" PontosFora="visitante.Pontos" JogosFora="visitante.Jogos" />
+                            </div>
+                        }
                     }
 
                     <div class="d-flex justify-content-end gap-2 mt-3">
@@ -233,6 +241,11 @@
             _fechadas = await BolaoSvc.RodadasFechadasAsync(_eu?.TreinadorId, 3, CancellationToken.None);
             _resumo = _eu is null ? null : await BolaoSvc.ResumoAsync(_eu.TreinadorId, CancellationToken.None);
 
+            // Classificação de cada competição aberta, para a chance de cada jogo.
+            _tabelas.Clear();
+            foreach (var ligaId in _abertas.Select(r => r.LigaId).Distinct())
+                _tabelas[ligaId] = (await LigaService.GetClassificacaoAsync(ligaId, CancellationToken.None)).ToDictionary(c => c.TimeId);
+
             _rascunho.Clear();
             foreach (var rodada in _abertas)
                 foreach (var jogo in rodada.Jogos)
@@ -241,6 +254,11 @@
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
+
+    private readonly Dictionary<Guid, Dictionary<Guid, LigaClassificacaoItemDto>> _tabelas = new();
+
+    private LigaClassificacaoItemDto? NaTabela(Guid ligaId, Guid timeId) =>
+        _tabelas.TryGetValue(ligaId, out var tabela) && tabela.TryGetValue(timeId, out var item) ? item : null;
 
     private (int? Casa, int? Fora) Palpite(Guid rodadaId, Guid partidaId) =>
         _rascunho.TryGetValue((rodadaId, partidaId), out var p) ? p : (null, null);

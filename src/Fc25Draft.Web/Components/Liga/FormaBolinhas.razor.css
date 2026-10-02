@@ -1,0 +1,22 @@
+.forma {
+    display: inline-flex;
+    gap: 3px;
+    vertical-align: middle;
+}
+
+.forma-bolinha {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+
+.forma-v { background-color: #198754; }
+.forma-e { background-color: #8a9199; }
+.forma-d { background-color: #dc3545; }

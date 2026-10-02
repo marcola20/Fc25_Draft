@@ -177,6 +177,7 @@
                                         <th class="text-center" title="Gols Pró" style="width:35px;">GP</th>
                                         <th class="text-center" title="Gols Contra" style="width:35px;">GC</th>
                                         <th class="text-center" title="Saldo de Gols" style="width:35px;">SG</th>
+                                        <th class="text-center" title="Últimos 5 jogos (o mais recente à direita)">Últimos 5</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -198,6 +199,7 @@
                                             <td class="text-center @(item.Item.SaldoGols > 0 ? "text-success" : item.Item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
                                                 @(item.Item.SaldoGols > 0 ? "+" : "")@item.Item.SaldoGols
                                             </td>
+                                            <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.Item.TimeId)" /></td>
                                         </tr>
                                     }
                                 </tbody>
@@ -235,6 +237,7 @@
                                     <th class="text-center" title="Gols Pró" style="width:35px;">GP</th>
                                     <th class="text-center" title="Gols Contra" style="width:35px;">GC</th>
                                     <th class="text-center" title="Saldo de Gols" style="width:35px;">SG</th>
+                                    <th class="text-center" title="Últimos 5 jogos (o mais recente à direita)">Últimos 5</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -258,6 +261,7 @@
                                         <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
                                             @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                                         </td>
+                                        <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.TimeId)" /></td>
                                     </tr>
                                 }
                             </tbody>
@@ -367,6 +371,12 @@
                                     @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="font-size:0.7rem;">Pen</span> }
                                     @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span title="Tem vídeo no telão" style="font-size:0.85rem;">📺</span> }
                                 </div>
+                                @if (p.Status == PartidaStatus.Agendada && NaTabela(p.TimeCasaId) is { } mandante && NaTabela(p.TimeForaId) is { } visitante)
+                                {
+                                    <div class="w-100">
+                                        <FavoritoJogo PontosCasa="mandante.Pontos" JogosCasa="mandante.Jogos" PontosFora="visitante.Pontos" JogosFora="visitante.Jogos" />
+                                    </div>
+                                }
                             </div>
                             }
                         </div>
@@ -914,6 +924,22 @@
     private IReadOnlyList<LigaDto>? _ligas;
     private IReadOnlyList<LigaClassificacaoItemDto> _classif = Array.Empty<LigaClassificacaoItemDto>();
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
+
+    // Forma recente (últimos 5) de cada time, recalculada quando as rodadas mudam.
+    private IReadOnlyDictionary<Guid, IReadOnlyList<ResultadoForma>> _forma = new Dictionary<Guid, IReadOnlyList<ResultadoForma>>();
+    private object? _formaDasRodadas;
+
+    private IReadOnlyList<ResultadoForma> Forma(Guid timeId)
+    {
+        if (!ReferenceEquals(_formaDasRodadas, _rodadas))
+        {
+            _forma = FormaDosTimes.Calcular(_rodadas);
+            _formaDasRodadas = _rodadas;
+        }
+        return _forma.TryGetValue(timeId, out var jogos) ? jogos : Array.Empty<ResultadoForma>();
+    }
+
+    private LigaClassificacaoItemDto? NaTabela(Guid timeId) => _classif.FirstOrDefault(c => c.TimeId == timeId);
     private IReadOnlyList<LigaKnockoutJogoDto> _knockoutJogos = Array.Empty<LigaKnockoutJogoDto>();
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
     private HashSet<Guid> _empatados = new();

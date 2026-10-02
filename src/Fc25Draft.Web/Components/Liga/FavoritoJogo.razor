@@ -1,0 +1,49 @@
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+
+@* Chance de cada resultado pela campanha dos dois times (mesmo modelo da Reta final): barra e porcentagens.
+   Some quando nenhum dos dois jogou ainda na competição. *@
+@if (_chances is { } c)
+{
+    <div class="favorito" title="Chance pela campanha dos dois times na competição">
+        <div class="favorito-barra" aria-hidden="true">
+            <span class="favorito-casa" style="width: @Num(c.Casa)%"></span>
+            <span class="favorito-empate" style="width: @Num(c.Empate)%"></span>
+            <span class="favorito-fora" style="width: @Num(c.Fora)%"></span>
+        </div>
+        <div class="favorito-textos">
+            <span class="@(c.Casa > c.Fora ? "fw-bold" : "")">@Pct(c.Casa)</span>
+            <span class="text-muted">empate @Pct(c.Empate)</span>
+            <span class="@(c.Fora > c.Casa ? "fw-bold" : "")">@Pct(c.Fora)</span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int PontosCasa { get; set; }
+    [Parameter] public int JogosCasa { get; set; }
+    [Parameter] public int PontosFora { get; set; }
+    [Parameter] public int JogosFora { get; set; }
+
+    private (double Casa, double Empate, double Fora)? _chances;
+
+    protected override void OnParametersSet()
+    {
+        // Ninguém jogou ainda: daria 37% · 26% · 37% em todo jogo, que não diz nada.
+        if (JogosCasa == 0 && JogosFora == 0)
+        {
+            _chances = null;
+            return;
+        }
+
+        var c = CalculadoraRetaFinal.Chances(PontosCasa, JogosCasa, PontosFora, JogosFora);
+        // Arredonda para somar 100: o empate fica com a sobra.
+        var casa = Math.Round(c.Casa * 100);
+        var fora = Math.Round(c.Fora * 100);
+        _chances = (casa, 100 - casa - fora, fora);
+    }
+
+    private static string Pct(double v) => v.ToString("0", CultureInfo.InvariantCulture) + "%";
+
+    private static string Num(double v) => v.ToString("0", CultureInfo.InvariantCulture);
+}
