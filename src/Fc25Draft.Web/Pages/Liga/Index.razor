@@ -369,11 +369,12 @@
 
                     @if (_selecoes.TryGetValue(_rodadaAtual.RodadaId, out var selecao) && selecao.Count > 0)
                     {
+                        <div class="mt-4">
                         <ShareableCard Id="cap-selecao"
                                        Titulo="@LigaNome"
                                        Subtitulo='@($"Seleção da {(_rodadaAtual.Titulo ?? $"rodada {_rodadaAtual.Numero}")}")'
                                        Arquivo='@($"cbfv-selecao-{_rodadaAtual.Numero}.png")'>
-                            <div class="card mt-3">
+                            <div class="card">
                                 <div class="card-header fw-bold">
                                     ⭐ Seleção da rodada
                                     <span class="text-muted small fw-normal">· 4-3-3 pelas notas do PES</span>
@@ -396,6 +397,7 @@
                                 </ul>
                             </div>
                         </ShareableCard>
+                        </div>
                     }
                 }
             }
