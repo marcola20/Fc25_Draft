@@ -362,6 +362,15 @@
                                 Libera um time para ficar abaixo do mínimo geral (@_minRosterSalvo) por um tempo, por exemplo quem perdeu jogadores
                                 no draft de expansão. Deixe em branco para usar o mínimo geral.
                             </p>
+                            @{ var abaixoDoMinimo = _elencos.Where(t => t.Elenco < (t.MinimoTemporario ?? _minRosterSalvo)).ToList(); }
+                            @if (abaixoDoMinimo.Count > 0)
+                            {
+                                <div class="alert alert-warning small py-2">
+                                    <strong>Abaixo do mínimo:</strong>
+                                    @string.Join(", ", abaixoDoMinimo.Select(t => $"{t.TeamName} ({t.Elenco} de {t.MinimoTemporario ?? _minRosterSalvo})")).
+                                    Esses times só podem contratar até voltar ao mínimo.
+                                </div>
+                            }
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">

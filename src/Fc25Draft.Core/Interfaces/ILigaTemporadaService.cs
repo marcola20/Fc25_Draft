@@ -14,8 +14,14 @@ public interface ILigaTemporadaService
     /// <summary>Cria o jogo único de cada vaga de playoff (Série A x Série B). Não vale pontos.</summary>
     Task<IReadOnlyList<TemporadaPlayoffDto>> CriarPlayoffAcessoAsync(int temporada, CancellationToken ct);
 
-    /// <summary>Cria a Supercopa da temporada: jogo único entre o campeão da Série A e o campeão da Copa.</summary>
+    /// <summary>
+    /// Cria a Supercopa da temporada: jogo único entre o campeão da Série A e o campeão da Copa. Se o
+    /// mesmo time ganhou as duas, cria a semifinal (vice da Série A x vice da Copa); a final vem depois.
+    /// </summary>
     Task<LigaDto> CriarSupercopaAsync(int temporada, string? nome, DateTime data, CancellationToken ct);
+
+    /// <summary>Cria a final da Supercopa com semifinal: o campeão das duas x o vencedor da semifinal.</summary>
+    Task CriarFinalSupercopaAsync(int temporada, CancellationToken ct);
 
     /// <summary>Dia em que a temporada abre (o da Supercopa); nulo se ainda não foi definido.</summary>
     Task<DateTime?> GetAberturaAsync(int temporada, CancellationToken ct);

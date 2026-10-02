@@ -60,7 +60,7 @@ internal static class CalendarioDaTemporada
 
         return CalendarioTemporada.ComDatasGravadas(calendario, d =>
             d.Tipo == TipoCompetition.Supercopa
-                ? rodadas.FirstOrDefault(r => r.Tipo == TipoCompetition.Supercopa)?.DataHora
+                ? rodadas.Where(r => r.Tipo == TipoCompetition.Supercopa).OrderByDescending(r => r.Numero).FirstOrDefault()?.DataHora
                 : d.Rodada is int numero
                     ? rodadas.FirstOrDefault(r => r.Tipo == d.Tipo && r.Divisao == d.Divisao && r.Numero == numero)?.DataHora
                     : null);

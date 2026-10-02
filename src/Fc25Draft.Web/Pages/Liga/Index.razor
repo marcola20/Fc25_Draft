@@ -109,12 +109,20 @@
         <!-- ── Classificação ── -->
         @if (_tab == "classif")
         {
-            @if (EhSupercopa)
+            @if (EhSupercopa && JogoUnico)
             {
                 <!-- Supercopa é jogo único: não tem tabela nem rodadas. -->
                 <div class="alert alert-secondary">
                     <strong>Jogo único</strong> entre o campeão da Série A e o campeão da Copa.
                     Quem vencer leva a Supercopa; empate vai para os pênaltis.
+                </div>
+            }
+            else if (EhSupercopa)
+            {
+                <!-- O mesmo time ganhou a Série A e a Copa: semifinal entre os vices e final contra ele. -->
+                <div class="alert alert-secondary">
+                    O mesmo time ganhou a Série A e a Copa: a Supercopa tem <strong>semifinal</strong> entre o vice da Série A
+                    e o vice da Copa, e o vencedor enfrenta o campeão na <strong>final</strong>. Empate vai para os pênaltis.
                 </div>
             }
             else if (!_classif.Any())
@@ -268,11 +276,11 @@
             @if (_rodadas.Any())
             {
                 <hr class="my-4" />
-                <h5 class="text-uppercase text-muted small fw-bold mb-3">@(EhSupercopa ? "A decisão" : "Partidas")</h5>
+                <h5 class="text-uppercase text-muted small fw-bold mb-3">@(EhSupercopa && JogoUnico ? "A decisão" : "Partidas")</h5>
 
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        @if (EhSupercopa)
+                        @if (EhSupercopa && JogoUnico)
                         {
                             <span class="fw-bold">Jogo único</span>
                         }
@@ -317,11 +325,11 @@
                                       Rodada="@_rodadaAtual"
                                       ProximaRodada="@_proximaRodada"
                                       Classificacao="@(_liga?.Tipo == TipoCompetition.Liga ? _classif : Array.Empty<LigaClassificacaoItemDto>())"
-                                      JogoUnico="@EhSupercopa" />
+                                      JogoUnico="@(EhSupercopa && JogoUnico)" />
 
                     <ShareableCard Id="cap-rodada"
                                    Titulo="@LigaNome"
-                                   Subtitulo='@(EhSupercopa ? "Jogo único" : _rodadaAtual.Titulo ?? $"Rodada {_rodadaAtual.Numero}")'
+                                   Subtitulo='@(EhSupercopa && JogoUnico ? "Jogo único" : _rodadaAtual.Titulo ?? $"Rodada {_rodadaAtual.Numero}")'
                                    Arquivo='@(EhSupercopa ? "cbfv-supercopa.png" : _rodadaAtual.Titulo is null ? $"cbfv-rodada-{_rodadaAtual.Numero}.png" : "cbfv-decisao.png")'
                                    MostrarBotao="false"
                                    @ref="_rodadaCardRef">
@@ -761,6 +769,9 @@
 
     /// <summary>Supercopa é jogo único: sem tabela, sem rodadas e sem chaveamento.</summary>
     private bool EhSupercopa => _liga?.Tipo == TipoCompetition.Supercopa;
+
+    /// <summary>Supercopa sem semifinal: as rodadas dela não têm título ("Semifinal"/"Final").</summary>
+    private bool JogoUnico => _rodadas.All(r => r.Titulo is null);
 
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 

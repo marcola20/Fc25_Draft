@@ -153,23 +153,57 @@
                 <div class="card-header fw-bold">Supercopa</div>
                 <div class="card-body">
                     @{ var sc = _resumo.Supercopa; }
-                    <p class="text-muted small mb-2">
-                        Jogo único entre o <strong>campeão da Série A</strong> e o <strong>campeão da Copa</strong> da temporada.
-                    </p>
+                    @if (sc.ComSemifinal)
+                    {
+                        <p class="text-muted small mb-2">
+                            O <strong>@sc.CampeaoSerieANome</strong> ganhou a Série A e a Copa: a Supercopa tem <strong>semifinal</strong>
+                            entre o vice da Série A (@(sc.ViceSerieANome ?? "—")) e o vice da Copa (@(sc.ViceCopaNome ?? "—")),
+                            e o vencedor enfrenta o @sc.CampeaoSerieANome na <strong>final</strong>.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-2">
+                            Jogo único entre o <strong>campeão da Série A</strong> e o <strong>campeão da Copa</strong> da temporada.
+                        </p>
+                    }
 
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <span class="badge bg-success">Série A: @(sc.CampeaoSerieANome ?? "—")</span>
-                        <span class="text-muted">x</span>
-                        <span class="badge bg-primary">Copa: @(sc.CampeaoCopaNome ?? "—")</span>
-                        @if (sc.GolsSerieA is not null)
+                    @if (sc.ComSemifinal)
+                    {
+                        @foreach (var jogo in sc.Jogos ?? [])
                         {
-                            <span class="fw-bold">@sc.GolsSerieA – @sc.GolsCopa</span>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                <span class="badge bg-secondary">@jogo.Fase</span>
+                                <span>@jogo.CasaNome</span>
+                                <span class="fw-bold">@(jogo.Status == PartidaStatus.Agendada ? "x" : $"{jogo.GolsCasa} – {jogo.GolsFora}")</span>
+                                <span>@jogo.ForaNome</span>
+                                @if (jogo.VencedorNome is not null && jogo.Fase == "Semifinal")
+                                {
+                                    <span class="text-muted small">· @jogo.VencedorNome vai à final</span>
+                                }
+                            </div>
                         }
                         @if (sc.CampeaoNome is not null)
                         {
-                            <span class="badge bg-warning text-dark">🏆 Campeão: @sc.CampeaoNome</span>
+                            <span class="badge bg-warning text-dark mb-2">🏆 Campeão: @sc.CampeaoNome</span>
                         }
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <span class="badge bg-success">Série A: @(sc.CampeaoSerieANome ?? "—")</span>
+                            <span class="text-muted">x</span>
+                            <span class="badge bg-primary">Copa: @(sc.CampeaoCopaNome ?? "—")</span>
+                            @if (sc.GolsSerieA is not null)
+                            {
+                                <span class="fw-bold">@sc.GolsSerieA – @sc.GolsCopa</span>
+                            }
+                            @if (sc.CampeaoNome is not null)
+                            {
+                                <span class="badge bg-warning text-dark">🏆 Campeão: @sc.CampeaoNome</span>
+                            }
+                        </div>
+                    }
 
                     @if (sc.LigaId is null)
                     {
@@ -191,9 +225,15 @@
                     }
                     else
                     {
-                        <a class="btn btn-sm btn-outline-secondary" href="@($"/admin/liga/{sc.LigaId}?tab=rodadas")">
-                            Abrir @sc.Nome (@(sc.Status == LigaStatus.Encerrada ? "encerrada" : "registrar o jogo"))
-                        </a>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <a class="btn btn-sm btn-outline-secondary" href="@($"/admin/liga/{sc.LigaId}?tab=rodadas")">
+                                Abrir @sc.Nome (@(sc.Status == LigaStatus.Encerrada ? "encerrada" : "registrar o jogo"))
+                            </a>
+                            @if (sc.PodeCriarFinal)
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick="CriarFinalSupercopa" disabled="@_salvando">Criar a final</button>
+                            }
+                        </div>
                     }
                 </div>
             </div>
@@ -445,6 +485,19 @@
             var liga = await TemporadaSvc.CriarSupercopaAsync(_temporada, _nomeSupercopa, _dataSupercopa, CancellationToken.None);
             _ok = $"{liga.Nome} criada. Registre o placar na rodada da competição.";
             _nomeSupercopa = "";
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task CriarFinalSupercopa()
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await TemporadaSvc.CriarFinalSupercopaAsync(_temporada, CancellationToken.None);
+            _ok = "Final da Supercopa criada. Registre o placar na rodada 2 da competição.";
             await CarregarAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }

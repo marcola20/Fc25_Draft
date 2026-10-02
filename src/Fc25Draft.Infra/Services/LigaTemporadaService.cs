@@ -146,15 +146,63 @@ public class LigaTemporadaService : ILigaTemporadaService
             string.IsNullOrWhiteSpace(nome) ? $"Supercopa CBFV {temporada}" : nome.Trim(),
             data, data, TipoCompetition.Supercopa, temporada), ct);
 
-        var casa = supercopa.CampeaoSerieAId!.Value;
-        var fora = supercopa.CampeaoCopaId!.Value;
+        var campeaoA = supercopa.CampeaoSerieAId!.Value;
+        var campeaoCopa = supercopa.CampeaoCopaId!.Value;
+        var (viceA, viceCopa) = await VicesAsync(temporada, ct);
 
-        await _ligas.ConfigurarTimesLigaAsync(criada.LigaId, new[] { casa, fora }, ct);
+        // Inscritos: 2 = jogo único; 3 = com semifinal (é assim que o resto do site reconhece o formato).
+        var (inscritos, casa, fora) = campeaoA != campeaoCopa
+            ? (new[] { campeaoA, campeaoCopa }, campeaoA, campeaoCopa)
+            : viceA == viceCopa
+                // O vice da Série A também foi o vice da Copa: não há semifinal, ele vai direto à final.
+                ? (new[] { campeaoA, viceA!.Value }, campeaoA, viceA.Value)
+                : (new[] { campeaoA, viceA!.Value, viceCopa!.Value }, viceA.Value, viceCopa.Value);
+
+        await _ligas.ConfigurarTimesLigaAsync(criada.LigaId, inscritos, ct);
         await _ligas.IniciarPrimeiraFaseAsync(criada.LigaId, ct);
         var rodada = await _ligas.CreateRodadaAsync(criada.LigaId, ct);
         await _ligas.CreatePartidaAsync(rodada.RodadaId, new LigaPartidaCreateRequest(casa, fora), ct);
 
         return (await _ligas.GetByIdAsync(criada.LigaId, ct))!;
+    }
+
+    public async Task CriarFinalSupercopaAsync(int temporada, CancellationToken ct)
+    {
+        var supercopa = await CarregarSupercopaAsync(temporada, ct);
+        if (!supercopa.PodeCriarFinal)
+            throw new InvalidOperationException(supercopa.ComSemifinal
+                ? "A final só pode ser criada com a semifinal encerrada (com vencedor nos pênaltis, se empatou) e uma vez só."
+                : "Esta Supercopa é jogo único: não tem final para criar.");
+
+        var semifinal = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Rodada.LigaId == supercopa.LigaId)
+            .OrderBy(p => p.Rodada.Numero)
+            .FirstAsync(ct);
+        var vencedor = LigaDesempate.VencedorDoJogoDecisivo(
+            semifinal.TimeCasaId, semifinal.TimeForaId, semifinal.GolsCasa, semifinal.GolsFora,
+            semifinal.TemPenaltis, semifinal.PenaltisVencedorId)!.Value;
+
+        var rodada = await _ligas.CreateRodadaAsync(supercopa.LigaId!.Value, ct);
+        await _ligas.CreatePartidaAsync(rodada.RodadaId, new LigaPartidaCreateRequest(supercopa.CampeaoSerieAId!.Value, vencedor), ct);
+    }
+
+    /// <summary>Vice da Série A (2º da tabela final) e vice da Copa (quem perdeu a final do mata-mata).</summary>
+    private async Task<(Guid? ViceSerieA, Guid? ViceCopa)> VicesAsync(int temporada, CancellationToken ct)
+    {
+        var viceA = await _db.LigaClassificacoes.AsNoTracking()
+            .Where(c => c.Liga.Temporada == temporada && c.Liga.Tipo == TipoCompetition.Liga
+                        && c.Liga.Divisao == Divisao.SerieA && c.Posicao == 2)
+            .Select(c => (Guid?)c.TimeId)
+            .FirstOrDefaultAsync(ct);
+
+        var final = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.Liga.Temporada == temporada && k.Liga.Tipo == TipoCompetition.Copa
+                        && k.Fase == FaseKnockout.Final && k.VencedorId != null)
+            .Select(k => new { k.TimeCasaId, k.TimeForaId, k.VencedorId })
+            .FirstOrDefaultAsync(ct);
+        var viceCopa = final is null ? null : final.VencedorId == final.TimeCasaId ? final.TimeForaId : final.TimeCasaId;
+
+        return (viceA, viceCopa);
     }
 
     public async Task<IReadOnlyList<LigaDto>> GerarProximaTemporadaAsync(GerarProximaTemporadaRequest request, CancellationToken ct)
@@ -264,7 +312,9 @@ public class LigaTemporadaService : ILigaTemporadaService
         if (request.LimparListaTransferencias)
             await _db.TeamRosters
                 .Where(r => r.AskingPrice != null)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AskingPrice, (decimal?)null), ct);
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.AskingPrice, (decimal?)null)
+                    .SetProperty(r => r.ListedAtUtc, (DateTime?)null), ct);
 
         if (request.RemoverMinimosTemporarios)
             await _db.Teams
@@ -283,27 +333,58 @@ public class LigaTemporadaService : ILigaTemporadaService
         var copa = daTemporada.FirstOrDefault(l => l.Tipo == TipoCompetition.Copa);
         var supercopa = daTemporada.FirstOrDefault(l => l.Tipo == TipoCompetition.Supercopa);
 
+        // O mesmo time ganhou a Série A e a Copa: semifinal entre os vices, final contra ele.
+        var duploCampeao = serieA?.CampeaoTimeId is not null && serieA.CampeaoTimeId == copa?.CampeaoTimeId;
+        var (viceA, viceCopa) = duploCampeao ? await VicesAsync(temporada, ct) : (null, null);
+        var nomes = await _db.Teams.AsNoTracking()
+            .Where(t => t.TeamId == viceA || t.TeamId == viceCopa)
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+        string? Nome(Guid? id) => id is Guid g && nomes.TryGetValue(g, out var n) ? n : null;
+
         int? golsA = null, golsCopa = null;
+        var jogos = new List<TemporadaSupercopaJogoDto>();
+        var comSemifinal = false;
+        var podeCriarFinal = false;
         if (supercopa is not null)
         {
-            var partida = await _db.LigaPartidas.AsNoTracking()
+            var partidas = await _db.LigaPartidas.AsNoTracking()
+                .Include(p => p.TimeCasa).Include(p => p.TimeFora)
                 .Where(p => p.Rodada.LigaId == supercopa.LigaId)
                 .OrderBy(p => p.Rodada.Numero)
-                .FirstOrDefaultAsync(ct);
+                .ToListAsync(ct);
+            comSemifinal = await _db.LigaTimes.CountAsync(t => t.LigaId == supercopa.LigaId, ct) > 2;
 
-            if (partida is not null && partida.Status != PartidaStatus.Agendada)
+            var partida = partidas.FirstOrDefault();
+            if (!comSemifinal && partida is not null && partida.Status != PartidaStatus.Agendada)
             {
                 var casaEhSerieA = partida.TimeCasaId == serieA?.CampeaoTimeId;
                 golsA = casaEhSerieA ? partida.GolsCasa : partida.GolsFora;
                 golsCopa = casaEhSerieA ? partida.GolsFora : partida.GolsCasa;
             }
+
+            for (int i = 0; i < partidas.Count; i++)
+            {
+                var p = partidas[i];
+                var vencedor = p.Status == PartidaStatus.Encerrada
+                    ? LigaDesempate.VencedorDoJogoDecisivo(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId)
+                    : null;
+                jogos.Add(new TemporadaSupercopaJogoDto(
+                    comSemifinal && i == 0 ? "Semifinal" : partidas.Count > 1 || comSemifinal ? "Final" : "Jogo único",
+                    p.TimeCasa.TeamName, p.TimeFora.TeamName, p.GolsCasa, p.GolsFora, p.Status,
+                    vencedor == p.TimeCasaId ? p.TimeCasa.TeamName : vencedor == p.TimeForaId ? p.TimeFora.TeamName : null));
+            }
+
+            podeCriarFinal = comSemifinal && partidas.Count == 1 && partidas[0].Status == PartidaStatus.Encerrada
+                             && LigaDesempate.VencedorDoJogoDecisivo(partidas[0].TimeCasaId, partidas[0].TimeForaId,
+                                 partidas[0].GolsCasa, partidas[0].GolsFora, partidas[0].TemPenaltis, partidas[0].PenaltisVencedorId) is not null;
         }
 
         var impedimento =
             serieA?.CampeaoTimeId is null ? "A Série A da temporada ainda não tem campeão."
             : copa is null ? "A temporada não tem Copa cadastrada."
             : copa.CampeaoTimeId is null ? "A Copa da temporada ainda não tem campeão."
-            : serieA.CampeaoTimeId == copa.CampeaoTimeId ? "O mesmo time venceu a Série A e a Copa: não há Supercopa."
+            : duploCampeao && viceA is null ? "O mesmo time venceu a Série A e a Copa, e a Série A ainda não tem vice (2º colocado)."
+            : duploCampeao && viceCopa is null ? "O mesmo time venceu a Série A e a Copa, e a final da Copa não tem vencedor gravado."
             : null;
 
         return new TemporadaSupercopaDto(
@@ -316,7 +397,12 @@ public class LigaTemporadaService : ILigaTemporadaService
             supercopa?.CampeaoTimeId,
             supercopa?.Campeao,
             supercopa is null && impedimento is null,
-            impedimento);
+            impedimento,
+            supercopa is not null ? comSemifinal : duploCampeao && viceA != viceCopa,
+            Nome(viceA),
+            Nome(viceCopa),
+            jogos,
+            podeCriarFinal);
     }
 
     // ── Estado da temporada ──────────────────────────────────────────────────

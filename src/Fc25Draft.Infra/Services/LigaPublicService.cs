@@ -295,11 +295,14 @@ public class LigaPublicService : ILigaPublicService
             .Select(k => new { k.Fase, k.TimeCasaId, k.TimeForaId })
             .ToListAsync(ct);
 
-        // A Supercopa é um jogo único: quem entra em campo disputou uma final.
-        var supercopas = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.Rodada.Liga.Tipo == TipoCompetition.Supercopa)
-            .Select(p => new { p.TimeCasaId, p.TimeForaId })
-            .ToListAsync(ct);
+        // Na Supercopa quem entra em campo disputou uma final — menos na semifinal (rodada 1 das que têm 3 inscritos).
+        var supercopasComSemifinal = await SupercopasComSemifinalAsync(ct);
+        var supercopas = (await _db.LigaPartidas.AsNoTracking()
+                .Where(p => p.Rodada.Liga.Tipo == TipoCompetition.Supercopa)
+                .Select(p => new { p.TimeCasaId, p.TimeForaId, p.Rodada.LigaId, p.Rodada.Numero })
+                .ToListAsync(ct))
+            .Select(p => new { p.TimeCasaId, p.TimeForaId, Final = !(supercopasComSemifinal.Contains(p.LigaId) && p.Numero == 1) })
+            .ToList();
 
         var fases = chaves
             .SelectMany(k => new[] { k.TimeCasaId, k.TimeForaId }
@@ -307,8 +310,8 @@ public class LigaPublicService : ILigaPublicService
                 .Select(id => new RankingFaseInput(id!.Value, k.Fase == FaseKnockout.Final)))
             .Concat(supercopas.SelectMany(p => new[]
             {
-                new RankingFaseInput(p.TimeCasaId, true),
-                new RankingFaseInput(p.TimeForaId, true)
+                new RankingFaseInput(p.TimeCasaId, p.Final),
+                new RankingFaseInput(p.TimeForaId, p.Final)
             }))
             .ToList();
 
@@ -557,8 +560,19 @@ public class LigaPublicService : ILigaPublicService
             .OrderBy(x => x.Numero)
             .ToListAsync(ct);
 
-        return rodadas.Select(r => RodadaComPartidas(r)).ToArray();
+        // Supercopa com semifinal (3 inscritos): rodada 1 é a semifinal e a 2 é a final.
+        var comSemifinal = (await SupercopasComSemifinalAsync(ct)).Contains(ligaId);
+        return rodadas.Select(r => RodadaComPartidas(r, comSemifinal ? (r.Numero == 1 ? "Semifinal" : "Final") : null)).ToArray();
     }
+
+    /// <summary>Supercopas com semifinal: as que têm 3 inscritos (o mesmo time ganhou a Série A e a Copa).</summary>
+    private async Task<HashSet<Guid>> SupercopasComSemifinalAsync(CancellationToken ct) =>
+        (await _db.LigaTimes.AsNoTracking()
+            .Where(t => t.Liga.Tipo == TipoCompetition.Supercopa)
+            .GroupBy(t => t.LigaId)
+            .Where(g => g.Count() > 2)
+            .Select(g => g.Key)
+            .ToListAsync(ct)).ToHashSet();
 
     public async Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetJogosExtrasAsync(Guid ligaId, CancellationToken ct)
     {
@@ -685,7 +699,10 @@ public class LigaPublicService : ILigaPublicService
             .Select(k => (FaseKnockout?)k.Fase)
             .FirstOrDefaultAsync(ct);
 
+        var supercopaComSemifinal = liga.Tipo == TipoCompetition.Supercopa
+                                    && await _db.LigaTimes.CountAsync(t => t.LigaId == liga.LigaId, ct) > 2;
         var rotulo = fase is not null ? FaseLabelMap.GetValueOrDefault(fase.Value, fase.Value.ToString())
+            : supercopaComSemifinal ? (p.Rodada.Numero == 1 ? "Semifinal" : "Final")
             : liga.Tipo == TipoCompetition.Supercopa ? "Jogo único"
             : p.Rodada.Desempate ? "Jogo decisivo"
             : $"Rodada {p.Rodada.Numero}";
@@ -1301,6 +1318,7 @@ public class LigaPublicService : ILigaPublicService
             })
             .ToListAsync(ct);
 
+        var supercopasComSemifinal = await SupercopasComSemifinalAsync(ct);
         var fases = (await _db.LigaKnockoutJogos.AsNoTracking()
                 .Where(k => k.PartidaId != null)
                 .Select(k => new { PartidaId = k.PartidaId!.Value, k.Fase })
@@ -1310,7 +1328,8 @@ public class LigaPublicService : ILigaPublicService
         var inputs = partidas
             .Select(p =>
             {
-                var etapa = EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var f) ? f : null);
+                var etapa = EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var f) ? f : null,
+                    supercopasComSemifinal.Contains(p.LigaId) && p.Numero == 1);
                 return new PlantaoPartidaInput(p.PartidaId, p.LigaId, p.LigaNome, etapa, etapa == "Final",
                     p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.EncerradaEm);
             })
@@ -1369,6 +1388,7 @@ public class LigaPublicService : ILigaPublicService
             .ToListAsync(ct);
 
         var partidaIds = partidas.Select(p => p.PartidaId).ToHashSet();
+        var supercopasComSemifinal = await SupercopasComSemifinalAsync(ct);
         var fases = (await _db.LigaKnockoutJogos.AsNoTracking()
                 .Where(k => k.PartidaId != null)
                 .Select(k => new { PartidaId = k.PartidaId!.Value, k.Fase })
@@ -1390,7 +1410,8 @@ public class LigaPublicService : ILigaPublicService
             .Select(p => new TimePerfilPartidaInput(
                 p.PartidaId,
                 p.LigaNome,
-                EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var fase) ? fase : null),
+                EtapaLabel(p.LigaTipo, p.Numero, p.Desempate, fases.TryGetValue(p.PartidaId, out var fase) ? fase : null,
+                    supercopasComSemifinal.Contains(p.LigaId) && p.Numero == 1),
                 p.TimeCasaId,
                 p.TimeForaId,
                 p.GolsCasa,
@@ -1405,13 +1426,14 @@ public class LigaPublicService : ILigaPublicService
             .ToList();
     }
 
-    private static string EtapaLabel(TipoCompetition tipo, int rodada, bool desempate, FaseKnockout? fase) => fase switch
+    /// <param name="semifinalDaSupercopa">Rodada 1 de uma Supercopa com semifinal.</param>
+    private static string EtapaLabel(TipoCompetition tipo, int rodada, bool desempate, FaseKnockout? fase, bool semifinalDaSupercopa = false) => fase switch
     {
         FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C => "Play-In",
         FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas de final",
         FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
         FaseKnockout.Final => "Final",
-        _ when tipo == TipoCompetition.Supercopa => "Final",
+        _ when tipo == TipoCompetition.Supercopa => semifinalDaSupercopa ? "Semifinal" : "Final",
         _ when desempate => "Jogo decisivo",
         _ => $"Rodada {rodada}"
     };

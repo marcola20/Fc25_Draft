@@ -290,10 +290,15 @@ public class LigaAdminService : ILigaAdminService
 
         if (liga.Tipo == TipoCompetition.Supercopa)
         {
-            // Jogo único: o campeão sai do placar (ou dos pênaltis), sem passar pela classificação.
+            // O campeão sai do placar (ou dos pênaltis) da final, sem passar pela classificação. Com
+            // semifinal (3 inscritos), a final é a segunda rodada e precisa existir.
+            var comSemifinal = await _db.LigaTimes.CountAsync(t => t.LigaId == ligaId, ct) > 2;
+            if (comSemifinal && await _db.LigaRodadas.CountAsync(r => r.LigaId == ligaId, ct) < 2)
+                throw new InvalidOperationException("Crie a final da Supercopa (em Admin › Temporada) antes de encerrar.");
+
             var decisao = await _db.LigaPartidas.AsNoTracking()
                 .Where(p => p.Rodada.LigaId == ligaId)
-                .OrderBy(p => p.Rodada.Numero)
+                .OrderByDescending(p => p.Rodada.Numero)
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("A Supercopa não tem partida cadastrada.");
 
@@ -527,9 +532,11 @@ public class LigaAdminService : ILigaAdminService
         var calendario = await CalendarioDaTemporada.MontarAsync(_db, temporada, ct);
         if (calendario is null) return Array.Empty<DateTime>();
 
-        // Supercopa é jogo único: fica na abertura.
+        // Supercopa: a final fica na abertura; com semifinal, ela vem na quarta anterior.
         if (liga.Tipo == TipoCompetition.Supercopa)
-            return new[] { calendario[0].Quando };
+            return await _db.LigaTimes.CountAsync(t => t.LigaId == liga.LigaId, ct) > 2
+                ? new[] { calendario[0].Quando.AddDays(-4), calendario[0].Quando }
+                : new[] { calendario[0].Quando };
 
         return CalendarioTemporada.DatasDasRodadas(calendario, liga.Tipo, liga.Divisao);
     }

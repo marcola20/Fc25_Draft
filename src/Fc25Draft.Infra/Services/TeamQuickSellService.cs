@@ -95,7 +95,9 @@ public class TeamQuickSellService : ITeamQuickSellService
 
                 var minRoster = cfg.MinRosterSizeFor(team);
                 if (rosterCount <= minRoster)
-                    throw new QuickSellException($"Você não pode realizar esta ação. O time ficaria com menos de {minRoster} jogadores.", StatusCodes.Status409Conflict);
+                    throw new QuickSellException(rosterCount < minRoster
+                        ? $"O elenco está abaixo do mínimo ({rosterCount} de {minRoster} jogadores): só dá para contratar até voltar ao mínimo."
+                        : $"Você não pode realizar esta ação. O time ficaria com menos de {minRoster} jogadores.", StatusCodes.Status409Conflict);
 
                 if (cfg.QuickSellBloqueado)
                     throw new QuickSellException("As vendas rápidas estão bloqueadas no momento.", StatusCodes.Status409Conflict);

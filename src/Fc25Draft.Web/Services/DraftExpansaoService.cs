@@ -47,6 +47,7 @@ public class DraftExpansaoService
             throw new InvalidOperationException("Selecione os times novos.");
 
         await _draftService.EnsureNoDraftInProgressAsync(ct);
+        await GarantirSemEmprestimosAsync(ct);
 
         // Capacidade: cada time existente cede no máximo o limite de perdas e nunca um protegido.
         var elencos = await _db.Teams
@@ -153,6 +154,19 @@ public class DraftExpansaoService
                 protegidos.TryGetValue(p.PlayerId, out var peloTime) && !peloTime)).ToList());
     }
 
+    /// <summary>
+    /// O emprestado fica no elenco de quem o pegou: o dono não poderia protegê-lo (e ele escaparia do draft
+    /// sem gastar vaga) e o tomador gastaria vaga com quem não é dele. A virada de temporada devolve todos.
+    /// </summary>
+    private async Task GarantirSemEmprestimosAsync(CancellationToken ct)
+    {
+        var ativos = await _db.Emprestimos.CountAsync(e => e.Status == EmprestimoStatus.Ativo, ct);
+        if (ativos > 0)
+            throw new InvalidOperationException(
+                $"Há {ativos} empréstimo(s) ativo(s). Gere a virada de temporada (que devolve os emprestados) " +
+                "ou encerre os empréstimos antes do draft de expansão.");
+    }
+
     public async Task SalvarProtecaoAsync(Guid teamId, IReadOnlyCollection<int> playerIds, CancellationToken ct)
     {
         var draft = await GetExpansaoAtivaAsync(ct)
@@ -206,6 +220,9 @@ public class DraftExpansaoService
 
         if (draft.ProtecaoEncerradaEm is not null)
             throw new InvalidOperationException("As listas de protegidos já foram encerradas.");
+
+        // Empréstimo feito depois de abrir o draft também bagunçaria as listas.
+        await GarantirSemEmprestimosAsync(ct);
 
         var novos = await GetTimesNovosAsync(draft.DraftId, ct);
         var protegidosPorTime = draft.ProtegidosPorTime ?? 0;

@@ -58,7 +58,7 @@
                 </div>
                 <div class="text-center px-3">
                     <div class="small text-muted">Elenco</div>
-                    <div class="fs-5 fw-bold">@d.Elenco</div>
+                    <div class="fs-5 fw-bold @(d.AbaixoDoMinimo ? "text-danger" : "")">@d.Elenco</div>
                     <div class="small text-muted">jogadores</div>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
@@ -68,6 +68,15 @@
                 </div>
             </div>
         </div>
+
+        @if (d.AbaixoDoMinimo)
+        {
+            <div class="alert alert-warning">
+                <strong>Elenco abaixo do mínimo:</strong> o time tem @d.Elenco jogadores e o mínimo é @d.ElencoMinimo.
+                Até contratar @(d.ElencoMinimo - d.Elenco) jogador(es), vendas, empréstimos, trocas que diminuam o elenco
+                e vendas rápidas ficam bloqueadas.
+            </div>
+        }
 
         <TimeResumoFaixa Perfil="@_perfil" />
 

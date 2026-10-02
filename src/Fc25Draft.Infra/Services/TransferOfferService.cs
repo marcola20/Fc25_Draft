@@ -107,6 +107,10 @@ public class TransferOfferService : ITransferOfferService
 
         await EnsureNotOnLoanAsync(targetPlayers.Concat(offeredPlayers), ct);
 
+        // Os alvos saem do time de destino e os oferecidos saem do time de origem.
+        await EnsureElencoMinimoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
+        await EnsureElencoMinimoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
+
         if (dto.ParentOfferId.HasValue)
         {
             var parent = await _db.TransferOffers
@@ -319,6 +323,23 @@ public class TransferOfferService : ITransferOfferService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Quem cede jogador não pode ficar abaixo do mínimo de elenco; quem já está abaixo do mínimo
+    /// só contrata (não vende, não empresta) até voltar a ele.
+    /// </summary>
+    private async Task EnsureElencoMinimoAsync(TransferConfig cfg, Team team, int saem, int entram, CancellationToken ct)
+    {
+        if (saem == 0) return;
+
+        var elenco = await _db.TeamRosters.CountAsync(r => r.TeamId == team.TeamId, ct);
+        var minimo = cfg.MinRosterSizeFor(team);
+        if (elenco - saem + entram >= minimo) return;
+
+        throw new InvalidOperationException(elenco < minimo
+            ? $"O {team.TeamName} está abaixo do mínimo de elenco ({elenco} de {minimo} jogadores): só pode contratar até voltar ao mínimo."
+            : $"O {team.TeamName} ficaria com menos de {minimo} jogadores.");
+    }
+
     public async Task SetAskingPriceAsync(Guid teamId, Guid playerGuid, decimal? askingPrice, CancellationToken ct)
     {
         if (askingPrice is <= 0)
@@ -337,6 +358,14 @@ public class TransferOfferService : ITransferOfferService
 
         if (askingPrice is not null && await _db.Emprestimos.AnyAsync(e => e.PlayerId == roster.PlayerId && e.Status == EmprestimoStatus.Ativo, ct))
             throw new InvalidOperationException("Jogador emprestado não pode ser colocado à venda.");
+
+        // Anunciar é querer vender: com o elenco no mínimo (ou abaixo), a venda não passaria.
+        if (askingPrice is not null && roster.AskingPrice is null)
+        {
+            var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+            var team = await _db.Teams.AsNoTracking().FirstAsync(t => t.TeamId == teamId, ct);
+            await EnsureElencoMinimoAsync(cfg, team, saem: 1, entram: 0, ct);
+        }
 
         if (askingPrice is null)
         {
@@ -465,21 +494,10 @@ public class TransferOfferService : ITransferOfferService
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
 
-        // Valida o tamanho do elenco para os times manterem o mínimo de jogadores
-        var fromTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == fromTeam.TeamId, ct);
-        var toTeamRosterCount = await _db.TeamRosters.CountAsync(r => r.TeamId == toTeam.TeamId, ct);
-
+        // Valida o tamanho do elenco para os times manterem o mínimo de jogadores.
         // targetPlayers saem de toTeam e entram em fromTeam; offeredPlayers saem de fromTeam e entram em toTeam.
-        // Considera o saldo líquido (saídas e entradas) de cada time.
-        var toTeamAfter = toTeamRosterCount - targetPlayers.Count + offeredPlayers.Count;
-        var toTeamMin = cfg.MinRosterSizeFor(toTeam);
-        if (targetPlayers.Count > 0 && toTeamAfter < toTeamMin)
-            throw new InvalidOperationException($"O time {toTeam.TeamName} ficaria com menos de {toTeamMin} jogadores.");
-
-        var fromTeamAfter = fromTeamRosterCount - offeredPlayers.Count + targetPlayers.Count;
-        var fromTeamMin = cfg.MinRosterSizeFor(fromTeam);
-        if (offeredPlayers.Count > 0 && fromTeamAfter < fromTeamMin)
-            throw new InvalidOperationException($"O time {fromTeam.TeamName} ficaria com menos de {fromTeamMin} jogadores.");
+        await EnsureElencoMinimoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
+        await EnsureElencoMinimoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {

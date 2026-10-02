@@ -28,7 +28,20 @@ public record TemporadaPlayoffDto(
 /// <summary>Time sem divisão na temporada (ex.: entrou pelo draft de expansão).</summary>
 public record TemporadaTimeLivreDto(Guid TimeId, string Nome, int Elenco);
 
-/// <summary>Supercopa da temporada: campeão da Série A x campeão da Copa, em jogo único.</summary>
+/// <summary>Um jogo da Supercopa (semifinal ou final), para a tela da temporada.</summary>
+public record TemporadaSupercopaJogoDto(
+    string Fase,
+    string CasaNome,
+    string ForaNome,
+    int GolsCasa,
+    int GolsFora,
+    PartidaStatus Status,
+    string? VencedorNome);
+
+/// <summary>
+/// Supercopa da temporada: campeão da Série A x campeão da Copa, em jogo único. Quando o mesmo time
+/// ganha as duas, há semifinal entre o vice da Série A e o vice da Copa, e o vencedor pega o campeão na final.
+/// </summary>
 public record TemporadaSupercopaDto(
     Guid? LigaId,
     string? Nome,
@@ -42,7 +55,12 @@ public record TemporadaSupercopaDto(
     Guid? CampeaoId,
     string? CampeaoNome,
     bool PodeCriar,
-    string? Impedimento);
+    string? Impedimento,
+    bool ComSemifinal = false,
+    string? ViceSerieANome = null,
+    string? ViceCopaNome = null,
+    IReadOnlyList<TemporadaSupercopaJogoDto>? Jogos = null,
+    bool PodeCriarFinal = false);
 
 public record TemporadaResumoDto(
     int Temporada,

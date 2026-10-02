@@ -44,7 +44,11 @@ public record MinhaAreaDto(
     IReadOnlyList<MinhaAreaPropostaDto> Propostas,
     MinhaAreaDraftDto? Draft,
     MinhaAreaAutoPickDto? EscolhaAutomatica,
-    IReadOnlyList<MinhaAreaObservadoDto> Observados)
+    IReadOnlyList<MinhaAreaObservadoDto> Observados,
+    // Mínimo de elenco que vale para o time (o temporário dele, se houver, senão o geral).
+    int ElencoMinimo = 0)
 {
     public decimal CaixaLivre => Caixa - CaixaBloqueado;
+
+    public bool AbaixoDoMinimo => Elenco < ElencoMinimo;
 }

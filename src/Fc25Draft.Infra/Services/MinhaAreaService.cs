@@ -28,8 +28,10 @@ public class MinhaAreaService : IMinhaAreaService
 
         var time = await _db.Teams.AsNoTracking()
             .Where(t => t.TeamId == teamId)
-            .Select(t => new { t.TeamName, t.OwnerName, t.Budget, t.BudgetBlocked, Elenco = t.Roster.Count })
+            .Select(t => new { t.TeamName, t.OwnerName, t.Budget, t.BudgetBlocked, Elenco = t.Roster.Count, t.MinRosterSizeOverride })
             .FirstAsync(ct);
+        var minimoGeral = await _db.TransferConfigs.AsNoTracking().Select(c => (int?)c.MinRosterSize).FirstOrDefaultAsync(ct)
+                          ?? TransferConfig.Default().MinRosterSize;
 
         var nomes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
         string? Nome(Guid? id) => id is Guid g && nomes.TryGetValue(g, out var n) ? n : null;
@@ -45,7 +47,8 @@ public class MinhaAreaService : IMinhaAreaService
             await PropostasAsync(teamId, Nome, ct),
             await DraftAsync(teamId, ct),
             await EscolhaAutomaticaAsync(teamId, ct),
-            await ObservadosAsync(teamId, Nome, ct));
+            await ObservadosAsync(teamId, Nome, ct),
+            time.MinRosterSizeOverride ?? minimoGeral);
     }
 
     public async Task<bool> EstaObservandoAsync(string? token, int playerId, CancellationToken ct)

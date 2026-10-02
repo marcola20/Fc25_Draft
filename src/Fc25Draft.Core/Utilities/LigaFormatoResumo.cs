@@ -13,7 +13,10 @@ public static class LigaFormatoResumo
     public static IReadOnlyList<string> Itens(LigaEdicaoDto e)
     {
         if (e.Tipo == TipoCompetition.Supercopa)
-            return new[] { "Jogo único", "Campeão da Série A x campeão da Copa" };
+            return e.TotalTimes > 2
+                // O mesmo time ganhou a Série A e a Copa.
+                ? new[] { "Semifinal e final", "Vice da Série A x vice da Copa; o vencedor pega o campeão das duas" }
+                : new[] { "Jogo único", "Campeão da Série A x campeão da Copa" };
 
         var itens = new List<string>();
 
