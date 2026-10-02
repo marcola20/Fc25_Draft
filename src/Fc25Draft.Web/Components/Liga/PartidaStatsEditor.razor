@@ -181,6 +181,8 @@ else
         </div>
     </div>
 
+    <PartidaNumerosEditor PartidaId="PartidaId" CasaNome="@_partida.TimeCasaNome" ForaNome="@_partida.TimeForaNome" OnChanged="() => OnChanged.InvokeAsync()" />
+
     @if (_escalacoes is not null)
     {
         <div class="mb-4">

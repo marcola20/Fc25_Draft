@@ -24,6 +24,9 @@ public record NumerosDoTimeDto(
     // Gols feitos a cada chute a gol, em %.
     decimal? Conversao);
 
+/// <summary>Um número da partida no formulário do admin; nulo nos dois lados = não informado.</summary>
+public record CampoNumeroDto(string Chave, string Rotulo, decimal? Casa, decimal? Fora);
+
 /// <summary>Os números que o PES manda em cada partida importada (posse, chutes, passes…).</summary>
 public interface IEstatisticasPesService
 {
@@ -32,4 +35,13 @@ public interface IEstatisticasPesService
 
     /// <summary>Médias de cada time na competição, das partidas encerradas com números do PES.</summary>
     Task<IReadOnlyList<NumerosDoTimeDto>> DosTimesAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Todos os números editáveis da partida, preenchidos com o que já existe.</summary>
+    Task<IReadOnlyList<CampoNumeroDto>> ParaEditarAsync(Guid partidaId, CancellationToken ct);
+
+    /// <summary>
+    /// Grava os números digitados pelo admin (partida sem JSON do PES, ou para corrigir). Mantém o resto do
+    /// JSON da importação; campo vazio nos dois lados é apagado.
+    /// </summary>
+    Task SalvarAsync(Guid partidaId, IReadOnlyList<CampoNumeroDto> campos, CancellationToken ct);
 }

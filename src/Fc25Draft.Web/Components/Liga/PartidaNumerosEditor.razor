@@ -1,0 +1,119 @@
+@using System.Globalization
+@using Fc25Draft.Core.Interfaces
+@inject IEstatisticasPesService Estatisticas
+
+@* Admin: digitar ou corrigir os números do PES da partida (posse, chutes, passes…), para jogo que veio sem eles. *@
+<details class="card mb-4" open="@_aberto">
+    <summary class="card-header fw-bold" @onclick="() => _aberto = !_aberto" @onclick:preventDefault>
+        📊 Números do PES
+        <span class="fw-normal small text-muted">· @(_preenchidos == 0 ? "sem números" : $"{_preenchidos} preenchido{(_preenchidos == 1 ? "" : "s")}")</span>
+    </summary>
+    @if (_aberto && _campos is not null)
+    {
+        <div class="card-body">
+            <p class="small text-muted mb-2">
+                Copie da tela de fim de jogo do PES. Em "Chutes (a gol)" o número entre parênteses vai em <em>Chutes a gol</em>;
+                em "Passes (certos)", em <em>Passes certos</em>; em "Faltas (impedimento)", em <em>Impedimentos</em>.
+                Deixe os dois lados vazios para apagar um número.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-2 numeros-editor">
+                    <thead>
+                        <tr>
+                            <th class="text-end">@CasaNome</th>
+                            <th class="text-center"></th>
+                            <th>@ForaNome</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in _campos)
+                        {
+                            <tr>
+                                <td><input type="number" min="0" step="any" class="form-control form-control-sm text-end ms-auto" value="@Texto(c.Casa)" @onchange="e => c.Casa = Numero(e)" /></td>
+                                <td class="text-center small text-nowrap">@c.Rotulo</td>
+                                <td><input type="number" min="0" step="any" class="form-control form-control-sm" value="@Texto(c.Fora)" @onchange="e => c.Fora = Numero(e)" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (_erro is not null)
+            {
+                <div class="alert alert-danger py-2 small">@_erro</div>
+            }
+            @if (_ok)
+            {
+                <div class="alert alert-success py-2 small">Números salvos.</div>
+            }
+            <button type="button" class="btn btn-primary btn-sm" @onclick="SalvarAsync" disabled="@_salvando">Salvar números</button>
+        </div>
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "Casa";
+    [Parameter] public string ForaNome { get; set; } = "Fora";
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private sealed class Campo
+    {
+        public required string Chave { get; init; }
+        public required string Rotulo { get; init; }
+        public decimal? Casa { get; set; }
+        public decimal? Fora { get; set; }
+    }
+
+    private List<Campo>? _campos;
+    private Guid _carregada;
+    private bool _aberto;
+    private bool _salvando;
+    private bool _ok;
+    private string? _erro;
+    private int _preenchidos;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregada == PartidaId) return;
+        _carregada = PartidaId;
+        await CarregarAsync();
+        // Abre sozinho quando a partida está sem números: é para isso que o admin veio.
+        _aberto = _preenchidos == 0;
+    }
+
+    private async Task CarregarAsync()
+    {
+        var campos = await Estatisticas.ParaEditarAsync(PartidaId, CancellationToken.None);
+        _campos = campos.Select(c => new Campo { Chave = c.Chave, Rotulo = c.Rotulo, Casa = c.Casa, Fora = c.Fora }).ToList();
+        _preenchidos = campos.Count(c => c.Casa is not null);
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (_campos is null) return;
+        _salvando = true;
+        _erro = null;
+        _ok = false;
+        try
+        {
+            await Estatisticas.SalvarAsync(PartidaId,
+                _campos.Select(c => new CampoNumeroDto(c.Chave, c.Rotulo, c.Casa, c.Fora)).ToList(), CancellationToken.None);
+            await CarregarAsync();
+            _ok = true;
+            await OnChanged.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private static string Texto(decimal? valor) => valor?.ToString(CultureInfo.InvariantCulture) ?? "";
+
+    private static decimal? Numero(ChangeEventArgs e) =>
+        decimal.TryParse(e.Value?.ToString()?.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var n) ? n : null;
+}

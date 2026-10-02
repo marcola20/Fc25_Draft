@@ -1,0 +1,12 @@
+.numeros-editor input {
+    max-width: 6.5rem;
+}
+
+summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+    summary::-webkit-details-marker {
+        display: none;
+    }

@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
@@ -31,8 +33,83 @@ public class EstatisticasPesService : IEstatisticasPesService
     ];
 
     private readonly DraftDbContext _db;
+    private readonly TimeProvider _time;
 
-    public EstatisticasPesService(DraftDbContext db) => _db = db;
+    public EstatisticasPesService(DraftDbContext db, TimeProvider? time = null)
+    {
+        _db = db;
+        _time = time ?? TimeProvider.System;
+    }
+
+    /// <summary>O formulário do admin: o catálogo, com os passes certos logo depois dos passes.</summary>
+    private static IEnumerable<(string Chave, string Rotulo)> Editaveis() =>
+        Catalogo.SelectMany(c => c.Chave == "passes"
+            ? new[] { c, ("passes_certos", "Passes certos") }
+            : new[] { c });
+
+    public async Task<IReadOnlyList<CampoNumeroDto>> ParaEditarAsync(Guid partidaId, CancellationToken ct)
+    {
+        var json = await _db.LigaPartidaImportacoes.AsNoTracking()
+            .Where(i => i.PartidaId == partidaId)
+            .Select(i => i.Json)
+            .FirstOrDefaultAsync(ct);
+        var numeros = Ler(json);
+
+        return Editaveis()
+            .Select(c => numeros.TryGetValue(c.Chave, out var n)
+                ? new CampoNumeroDto(c.Chave, c.Rotulo, n.Casa, n.Fora)
+                : new CampoNumeroDto(c.Chave, c.Rotulo, null, null))
+            .ToList();
+    }
+
+    public async Task SalvarAsync(Guid partidaId, IReadOnlyList<CampoNumeroDto> campos, CancellationToken ct)
+    {
+        var rotulos = Editaveis().ToDictionary(c => c.Chave, c => c.Rotulo);
+        foreach (var c in campos.Where(c => rotulos.ContainsKey(c.Chave)))
+        {
+            if ((c.Casa is null) != (c.Fora is null))
+                throw new InvalidOperationException($"Preencha os dois times em \"{rotulos[c.Chave]}\" (ou deixe os dois vazios).");
+            if (c.Casa < 0 || c.Fora < 0)
+                throw new InvalidOperationException($"\"{rotulos[c.Chave]}\" não pode ser negativo.");
+        }
+
+        var importacao = await _db.LigaPartidaImportacoes.FirstOrDefaultAsync(i => i.PartidaId == partidaId, ct);
+        if (importacao is null && !await _db.LigaPartidas.AnyAsync(p => p.PartidaId == partidaId, ct))
+            throw new InvalidOperationException("Partida não encontrada.");
+
+        // O resto do JSON da importação (eventos, notas, vídeo…) fica como está.
+        JsonObject raiz;
+        try
+        {
+            raiz = importacao is null ? new JsonObject() : JsonNode.Parse(importacao.Json) as JsonObject ?? new JsonObject();
+        }
+        catch (JsonException)
+        {
+            raiz = new JsonObject();
+        }
+        var estatisticas = raiz["estatisticas"] as JsonObject ?? new JsonObject();
+        raiz["estatisticas"] = estatisticas;
+
+        foreach (var c in campos.Where(c => rotulos.ContainsKey(c.Chave)))
+        {
+            if (c.Casa is decimal casa && c.Fora is decimal fora)
+                estatisticas[c.Chave] = new JsonObject { ["casa"] = casa, ["fora"] = fora };
+            else
+                estatisticas.Remove(c.Chave);
+        }
+
+        if (importacao is null && estatisticas.Count == 0) return;
+
+        var agora = _time.GetUtcNow().UtcDateTime;
+        if (importacao is null)
+        {
+            importacao = new LigaPartidaImportacao { PartidaId = partidaId, ImportadoEm = agora };
+            _db.LigaPartidaImportacoes.Add(importacao);
+        }
+        importacao.Json = raiz.ToJsonString();
+        importacao.AtualizadoEm = agora;
+        await _db.SaveChangesAsync(ct);
+    }
 
     public async Task<IReadOnlyList<NumeroDaPartidaDto>> DaPartidaAsync(Guid partidaId, CancellationToken ct)
     {
