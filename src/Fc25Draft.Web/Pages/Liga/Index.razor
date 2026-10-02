@@ -95,6 +95,9 @@
                     <li class="nav-item">
                         <button class="nav-link @(_tab == "matriz" ? "active" : "")" @onclick='() => _tab = "matriz"'>Confrontos</button>
                     </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_tab == "linha" ? "active" : "")" @onclick='() => _tab = "linha"'>Linha do tempo</button>
+                    </li>
                 }
                 <li class="nav-item">
                     <button class="nav-link @(_tab == "stats" ? "active" : "")" @onclick='() => _tab = "stats"'>Estatísticas</button>
@@ -292,7 +295,6 @@
                 </ShareableCard>
 
                 <PosicaoRodadaGrafico Posicoes="_posicoesPorRodada" Tabela="_classif" Regra="_regra" />
-                <LinhaDoTempoCard Rodadas="_rodadas" Tabela="_classif" Posicoes="_posicoesPorRodada" Regra="_regra" OnAbrir="AbrirDetalhesPartida" />
             }
 
             <!-- Matches/Rounds -->
@@ -527,6 +529,12 @@
         @if (_tab == "matriz")
         {
             <MatrizResultados Rodadas="_rodadas" Tabela="_classif" OnAbrir="AbrirDetalhesPartida" />
+        }
+
+        <!-- ── Linha do tempo da temporada (Liga) ── -->
+        @if (_tab == "linha")
+        {
+            <LinhaDoTempoCard Rodadas="_rodadas" Tabela="_classif" Posicoes="_posicoesPorRodada" Regra="_regra" OnAbrir="AbrirDetalhesPartida" />
         }
 
         <!-- ── Estatísticas ── -->

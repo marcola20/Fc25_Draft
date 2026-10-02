@@ -3,12 +3,16 @@
 @inject EscudoService Escudos
 
 @* A história da fase de pontos, da rodada mais recente para a primeira. Fato com jogo abre o jogo. *@
-@if (_fatos.Count > 0)
+@if (_fatos.Count == 0)
+{
+    <div class="alert alert-info">A linha do tempo começa quando a primeira rodada for disputada.</div>
+}
+else
 {
     var grupos = _fatos.GroupBy(f => f.Rodada).OrderByDescending(g => g.Key).ToList();
     var visiveis = _tudo ? grupos : grupos.Take(RodadasIniciais).ToList();
 
-    <div class="card mt-3 linha-do-tempo">
+    <div class="card linha-do-tempo">
         <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
             <strong>🗓️ Linha do tempo da temporada</strong>
             <span class="small text-muted">Os fatos que marcaram cada rodada</span>
@@ -55,7 +59,7 @@
     [Parameter, EditorRequired] public LigaRegraZonas Regra { get; set; } = LigaRegraZonas.SoCampeao;
     [Parameter] public EventCallback<LigaPartidaDto> OnAbrir { get; set; }
 
-    private const int RodadasIniciais = 5;
+    private const int RodadasIniciais = 10;
 
     private IReadOnlyList<FatoDaTemporada> _fatos = [];
     private object? _geradoDe;
