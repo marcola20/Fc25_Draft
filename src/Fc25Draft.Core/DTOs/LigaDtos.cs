@@ -82,13 +82,15 @@ public record LigaRodadaDto(
     bool Desempate = false,
     DateTime? DataHora = null);
 
+/// <param name="Titulo">Nome dos jogos fora das rodadas normais ("Mini liga do título", "Playoff de acesso"); nulo nas rodadas.</param>
 public record LigaRodadaComPartidasDto(
     Guid RodadaId,
     Guid LigaId,
     int Numero,
     IReadOnlyList<LigaPartidaDto> Partidas,
     bool Desempate = false,
-    DateTime? DataHora = null);
+    DateTime? DataHora = null,
+    string? Titulo = null);
 
 public record LigaPartidaDto(
     Guid PartidaId,

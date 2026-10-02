@@ -17,6 +17,12 @@ public interface ILigaPublicService
     Task<IReadOnlyList<LigaCartaoEstatDto>> GetCartoesEstatAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaKnockoutJogoDto>> GetKnockoutAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetRodadasComPartidasAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>
+    /// Jogos da Liga fora das rodadas normais, que não entram na tabela: mini liga e jogo decisivo do
+    /// título e playoff de acesso (guardado na Série A; a Série B da mesma temporada mostra o mesmo jogo).
+    /// </summary>
+    Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetJogosExtrasAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaGrupoTimeDto>> GetGruposAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct);
 

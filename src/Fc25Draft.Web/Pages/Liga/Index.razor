@@ -280,12 +280,12 @@
                         {
                             <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
                             <span class="fw-bold px-2">
-                                Rodada @(_rodadaAtual?.Numero)
+                                @(_rodadaAtual?.Titulo ?? $"Rodada {_rodadaAtual?.Numero}")
                                 @if (_rodadaAtual?.DataHora is DateTime quando)
                                 {
                                     <span class="text-muted fw-normal ms-1">· @quando.ToString("ddd dd/MM · HH'h'", Br)</span>
                                 }
-                                @if (_rodadaAtual?.Desempate == true)
+                                @if (_rodadaAtual is { Desempate: true, Titulo: null })
                                 {
                                     <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
                                 }
@@ -321,8 +321,8 @@
 
                     <ShareableCard Id="cap-rodada"
                                    Titulo="@LigaNome"
-                                   Subtitulo='@(EhSupercopa ? "Jogo único" : $"Rodada {_rodadaAtual.Numero}")'
-                                   Arquivo='@(EhSupercopa ? "cbfv-supercopa.png" : $"cbfv-rodada-{_rodadaAtual.Numero}.png")'
+                                   Subtitulo='@(EhSupercopa ? "Jogo único" : _rodadaAtual.Titulo ?? $"Rodada {_rodadaAtual.Numero}")'
+                                   Arquivo='@(EhSupercopa ? "cbfv-supercopa.png" : _rodadaAtual.Titulo is null ? $"cbfv-rodada-{_rodadaAtual.Numero}.png" : "cbfv-decisao.png")'
                                    MostrarBotao="false"
                                    @ref="_rodadaCardRef">
                         <div class="list-group">
@@ -894,7 +894,9 @@
     {
         _classif = await LigaService.GetClassificacaoAsync(ligaId, CancellationToken.None);
         var rodadas = await LigaService.GetRodadasComPartidasAsync(ligaId, CancellationToken.None);
-        _rodadas = rodadas.Where(r => r.Numero > 0).ToArray();
+        // Mini liga, decisão do título e playoff de acesso vêm depois das rodadas, com nome próprio.
+        var extras = await LigaService.GetJogosExtrasAsync(ligaId, CancellationToken.None);
+        _rodadas = rodadas.Where(r => r.Numero > 0).Concat(extras).ToArray();
         // O jogo decisivo da Copa aparece como rodada normal, mas não soma pontos:
         // o que ele resolve é a ordem entre os empatados.
         _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));

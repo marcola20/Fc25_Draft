@@ -557,17 +557,62 @@ public class LigaPublicService : ILigaPublicService
             .OrderBy(x => x.Numero)
             .ToListAsync(ct);
 
-        return rodadas.Select(r => new LigaRodadaComPartidasDto(
-            r.RodadaId, r.LigaId, r.Numero,
-            r.Partidas.Select(p => new LigaPartidaDto(
-                p.PartidaId, p.RodadaId, r.Numero,
-                p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
-                p.TimeForaId, p.TimeFora?.TeamName ?? "?",
-                p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
-                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId)).ToArray(),
-            r.Desempate, r.DataHora
-        )).ToArray();
+        return rodadas.Select(r => RodadaComPartidas(r)).ToArray();
     }
+
+    public async Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetJogosExtrasAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(l => l.LigaId == ligaId, ct);
+        if (liga is null || liga.Tipo != TipoCompetition.Liga) return Array.Empty<LigaRodadaComPartidasDto>();
+
+        // O playoff de acesso fica na Série A; na página da Série B aparece o mesmo jogo.
+        var serieAId = liga.Divisao == Divisao.SerieB && liga.Temporada is int temporada
+            ? await _db.Ligas.AsNoTracking()
+                .Where(l => l.Temporada == temporada && l.Tipo == TipoCompetition.Liga && l.Divisao == Divisao.SerieA)
+                .Select(l => (Guid?)l.LigaId)
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        var rodadas = await _db.LigaRodadas
+            .AsNoTracking()
+            .Where(x => ((x.LigaId == ligaId && x.Numero <= 0) || (x.LigaId == serieAId && x.Numero == NumeroPlayoffAcesso))
+                        && x.Partidas.Any())
+            .Include(x => x.Partidas).ThenInclude(p => p.TimeCasa)
+            .Include(x => x.Partidas).ThenInclude(p => p.TimeFora)
+            .ToListAsync(ct);
+
+        // Mini liga (0) e decisão do título (-1) antes do playoff (-2); as rodadas da mini liga na
+        // ordem em que foram jogadas.
+        var ordenadas = rodadas
+            .OrderByDescending(r => r.Numero)
+            .ThenBy(r => r.DataHora ?? r.Partidas.Min(p => p.IniciadaEm) ?? DateTime.MaxValue)
+            .ThenBy(r => r.RodadaId)
+            .ToList();
+
+        var rodadasDaMiniLiga = ordenadas.Count(r => r.Numero == NumeroMiniLiga);
+        var miniLiga = 0;
+        return ordenadas.Select(r => RodadaComPartidas(r, r.Numero switch
+        {
+            NumeroMiniLiga => rodadasDaMiniLiga > 1 ? $"Mini liga do título · {++miniLiga}ª rodada" : "Mini liga do título",
+            NumeroJogoDecisivo => "Jogo decisivo do título",
+            _ => "Playoff de acesso"
+        })).ToArray();
+    }
+
+    // Rodadas sentinela da Liga (LigaAdminService / LigaTemporadaService).
+    private const int NumeroMiniLiga = 0;
+    private const int NumeroJogoDecisivo = -1;
+    private const int NumeroPlayoffAcesso = -2;
+
+    private static LigaRodadaComPartidasDto RodadaComPartidas(LigaRodada r, string? titulo = null) => new(
+        r.RodadaId, r.LigaId, r.Numero,
+        r.Partidas.Select(p => new LigaPartidaDto(
+            p.PartidaId, p.RodadaId, r.Numero,
+            p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
+            p.TimeForaId, p.TimeFora?.TeamName ?? "?",
+            p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
+            p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId)).ToArray(),
+        r.Desempate, r.DataHora, titulo);
 
     public async Task<IReadOnlyList<LigaEventoDto>> GetGolsRodadaAsync(Guid rodadaId, CancellationToken ct)
     {

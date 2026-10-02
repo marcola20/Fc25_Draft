@@ -13,12 +13,20 @@ namespace Fc25Draft.Infra.Services;
 /// Importa o JSON de uma partida simulada no PES 2021. A partida é achada pelo par ordenado
 /// mandante x visitante — único numa competição de pontos corridos, já que o returno inverte
 /// o mando — e nunca por adivinhação: nada encontrado ou mais de um candidato é erro.
+/// Vale para Liga, Copa (grupos e mata-mata) e Supercopa, e também para os jogos fora das
+/// rodadas normais (mini liga, jogos decisivos e playoff de acesso). Jogo que precisa de
+/// vencedor e termina empatado fica em andamento para registrar os pênaltis na tela.
 /// Reenviar o mesmo jogo substitui os eventos (idempotente).
 /// </summary>
 public class ResultadoPesService : IResultadoPesService
 {
     private const string Casa = "casa";
     private const string Fora = "fora";
+
+    // Rodadas sentinela (LigaAdminService / LigaTemporadaService).
+    private const int NumeroMiniLiga = 0;
+    private const int NumeroJogoDecisivo = -1;
+    private const int NumeroPlayoffAcesso = -2;
 
     private readonly DraftDbContext _db;
     private readonly ILigaAdminService _ligaAdmin;
@@ -35,7 +43,7 @@ public class ResultadoPesService : IResultadoPesService
         ResultadoPesRequest request, string jsonBruto, bool simular, CancellationToken ct)
     {
         Validar(request);
-        var partidaId = await AcharPartidaAsync(request, ct);
+        var alvo = await AcharPartidaAsync(request, ct);
 
         ResultadoPesRespostaDto resposta = null!;
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -43,7 +51,7 @@ public class ResultadoPesService : IResultadoPesService
         {
             _db.ChangeTracker.Clear();
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
-            resposta = await GravarAsync(partidaId, request, jsonBruto, simular, ct);
+            resposta = await GravarAsync(alvo, request, jsonBruto, simular, ct);
             if (simular)
                 await tx.RollbackAsync(ct);
             else
@@ -93,24 +101,56 @@ public class ResultadoPesService : IResultadoPesService
 
     // ── Busca da partida ──────────────────────────────────────────────────────
 
-    private enum CompeticaoDoVideo { Qualquer, Liga, Supercopa }
+    private enum CompeticaoDoVideo { Qualquer, Liga, Copa, Supercopa }
 
     /// <summary>
     /// O nome do vídeo diz a competição quando cita ("… ｜ Série A", "… Brasileirão CBFV",
-    /// "… Supercopa"). Sem isso, um clássico da Série A que também é a Supercopa é ambíguo.
+    /// "… Copa", "… Supercopa"). Sem isso, um clássico da Série A que também é a Supercopa é ambíguo.
     /// </summary>
     private static CompeticaoDoVideo LerCompeticao(string? video)
     {
         var nome = NomesPes.Normalizar(video);
         if (nome.Contains("supercopa")) return CompeticaoDoVideo.Supercopa;
-        if (nome.Contains("copa"))
-            throw new ResultadoPesException(ResultadoPesErro.Invalido,
-                "Jogos de Copa ainda não são importados automaticamente; lance pela tela da liga.");
+        if (nome.Contains("copa")) return CompeticaoDoVideo.Copa;
         if (nome.Contains("serie") || nome.Contains("brasileirao")) return CompeticaoDoVideo.Liga;
         return CompeticaoDoVideo.Qualquer;
     }
 
-    private async Task<Guid> AcharPartidaAsync(ResultadoPesRequest r, CancellationToken ct)
+    private static readonly string[] PalavrasDeJogoExtra =
+        { "decisivo", "desempate", "mini liga", "miniliga", "playoff", "play off", "acesso", "quartas", "semi", "final" };
+
+    /// <summary>O vídeo diz que é jogo fora das rodadas normais (desempate, mini liga, playoff, mata-mata)?</summary>
+    private static bool VideoDeJogoExtra(string? video)
+    {
+        var nome = NomesPes.Normalizar(video);
+        return PalavrasDeJogoExtra.Any(nome.Contains);
+    }
+
+    /// <summary>
+    /// Partida candidata. <see cref="PartidaId"/> é nulo no jogo de mata-mata cuja partida ainda
+    /// não foi criada (a importação cria). <see cref="Extra"/> = fora das rodadas normais.
+    /// </summary>
+    private sealed record Alvo(
+        Guid? PartidaId, Guid? KnockoutJogoId, int Numero, bool Desempate,
+        string Liga, TipoCompetition Tipo, Divisao? Divisao, bool Extra, string Onde);
+
+    private static string OndeNaLiga(int numero, bool desempate) => numero switch
+    {
+        NumeroMiniLiga => "mini liga",
+        NumeroJogoDecisivo => "jogo decisivo do título",
+        NumeroPlayoffAcesso => "playoff de acesso",
+        _ => desempate ? $"jogo decisivo (rodada {numero})" : $"rodada {numero}"
+    };
+
+    private static string OndeNoMataMata(FaseKnockout fase) => fase switch
+    {
+        FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "quartas de final",
+        FaseKnockout.Semi1 or FaseKnockout.Semi2 => "semifinal",
+        FaseKnockout.Final => "final",
+        _ => "play-in"
+    };
+
+    private async Task<Alvo> AcharPartidaAsync(ResultadoPesRequest r, CancellationToken ct)
     {
         var competicao = LerCompeticao(r.Video);
         Divisao? divisao = r.Serie?.Trim().ToUpperInvariant() switch
@@ -133,28 +173,54 @@ public class ResultadoPesService : IResultadoPesService
         var casaId = AcharTime(r.Casa!.Time!, Casa);
         var foraId = AcharTime(r.Fora!.Time!, Fora);
 
-        // Só rodadas regulares (Numero > 0, sem desempate) de Liga ou Supercopa não encerradas:
-        // mata-mata, mini liga, jogo decisivo e playoff de acesso ficam de fora.
-        async Task<List<(Guid PartidaId, int Numero, string Liga, TipoCompetition Tipo)>> Buscar(Guid mandante, Guid visitante)
+        // Partidas de competições não encerradas, de qualquer rodada, e os jogos de mata-mata
+        // com os times definidos que ainda não têm partida criada.
+        async Task<List<Alvo>> Buscar(Guid mandante, Guid visitante)
         {
-            var linhas = await _db.LigaPartidas.AsNoTracking()
+            var partidas = await _db.LigaPartidas.AsNoTracking()
                 .Where(p => p.TimeCasaId == mandante && p.TimeForaId == visitante
-                            && p.Rodada.Numero > 0 && !p.Rodada.Desempate
-                            && p.Rodada.Liga.Status != LigaStatus.Encerrada
-                            && (p.Rodada.Liga.Tipo == TipoCompetition.Liga || p.Rodada.Liga.Tipo == TipoCompetition.Supercopa))
-                .Select(p => new { p.PartidaId, p.Rodada.Numero, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
+                            && p.Rodada.Liga.Status != LigaStatus.Encerrada)
+                .Select(p => new { p.PartidaId, p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
                 .ToListAsync(ct);
 
-            return linhas
-                .Where(p => competicao switch
+            var ids = partidas.Select(p => p.PartidaId).ToList();
+            var doMataMata = await _db.LigaKnockoutJogos.AsNoTracking()
+                .Where(k => k.PartidaId != null && ids.Contains(k.PartidaId.Value))
+                .Select(k => new { PartidaId = k.PartidaId!.Value, k.KnockoutJogoId, k.Fase })
+                .ToDictionaryAsync(k => k.PartidaId, ct);
+
+            var semPartida = await _db.LigaKnockoutJogos.AsNoTracking()
+                .Where(k => k.TimeCasaId == mandante && k.TimeForaId == visitante
+                            && k.PartidaId == null && k.VencedorId == null
+                            && k.Liga.Status != LigaStatus.Encerrada)
+                .Select(k => new { k.KnockoutJogoId, k.Fase, k.Liga.Nome, k.Liga.Tipo, k.Liga.Divisao })
+                .ToListAsync(ct);
+
+            var alvos = new List<Alvo>();
+            foreach (var p in partidas)
+            {
+                if (doMataMata.TryGetValue(p.PartidaId, out var ko))
+                    alvos.Add(new Alvo(p.PartidaId, ko.KnockoutJogoId, p.Numero, p.Desempate, p.Nome, p.Tipo, p.Divisao, true, OndeNoMataMata(ko.Fase)));
+                else if (p.Numero > 0 || p.Tipo == TipoCompetition.Liga)
+                    // Na Copa a rodada 0 só tem partidas do mata-mata; sem jogo ligado, não é de ninguém.
+                    alvos.Add(new Alvo(p.PartidaId, null, p.Numero, p.Desempate, p.Nome, p.Tipo, p.Divisao,
+                        p.Numero <= 0 || p.Desempate, OndeNaLiga(p.Numero, p.Desempate)));
+            }
+            alvos.AddRange(semPartida.Select(k =>
+                new Alvo(null, k.KnockoutJogoId, 0, false, k.Nome, k.Tipo, k.Divisao, true, OndeNoMataMata(k.Fase))));
+
+            return alvos
+                .Where(a => competicao switch
                 {
-                    CompeticaoDoVideo.Liga => p.Tipo == TipoCompetition.Liga,
-                    CompeticaoDoVideo.Supercopa => p.Tipo == TipoCompetition.Supercopa,
+                    CompeticaoDoVideo.Liga => a.Tipo == TipoCompetition.Liga,
+                    CompeticaoDoVideo.Copa => a.Tipo == TipoCompetition.Copa,
+                    CompeticaoDoVideo.Supercopa => a.Tipo == TipoCompetition.Supercopa,
                     _ => true
                 })
-                // A série só filtra a Liga; a Supercopa junta campeões de séries diferentes.
-                .Where(p => divisao is null || p.Tipo == TipoCompetition.Supercopa || p.Divisao is null || p.Divisao == divisao)
-                .Select(p => (p.PartidaId, p.Numero, p.Nome, p.Tipo))
+                // A série só filtra a Liga; Copa e Supercopa juntam as duas séries, e o playoff
+                // (guardado na Série A) é entre um time de cada.
+                .Where(a => divisao is null || a.Tipo != TipoCompetition.Liga || a.Divisao is null
+                            || a.Divisao == divisao || a.Numero == NumeroPlayoffAcesso)
                 .ToList();
         }
 
@@ -166,31 +232,52 @@ public class ResultadoPesService : IResultadoPesService
         {
             var invertido = await Buscar(foraId, casaId);
             var dica = invertido.Count > 0
-                ? $" Existe {r.Fora.Time} x {r.Casa.Time} ({invertido[0].Liga}, rodada {invertido[0].Numero}): o mando está invertido?"
-                : " Confira se as rodadas foram geradas e se a competição não está encerrada.";
+                ? $" Existe {r.Fora.Time} x {r.Casa.Time} ({invertido[0].Liga}, {invertido[0].Onde}): o mando está invertido?"
+                : " Confira se as rodadas (ou o jogo do mata-mata) foram geradas e se a competição não está encerrada.";
             throw new ResultadoPesException(ResultadoPesErro.NaoEncontrado,
                 $"Nenhuma partida aberta {jogo}{ondeSerie}.{dica}");
         }
 
+        // O mesmo par pode ter o jogo da rodada e um jogo extra (decisivo, mini liga, mata-mata):
+        // o nome do vídeo diz se é extra; senão vale a rodada do JSON. Nunca se escolhe no chute.
+        if (candidatos.Count > 1)
+        {
+            var filtrados = VideoDeJogoExtra(r.Video)
+                ? candidatos.Where(c => c.Extra).ToList()
+                : r.Rodada is int numero
+                    ? candidatos.Where(c => !c.Extra && c.Numero == numero).ToList()
+                    : candidatos;
+            if (filtrados.Count > 0) candidatos = filtrados;
+        }
+
         if (candidatos.Count > 1)
             throw new ResultadoPesException(ResultadoPesErro.Ambiguo,
-                $"Mais de uma partida possível para {jogo}{ondeSerie}; cite a competição no nome do vídeo (\"Série A\", \"Supercopa\").",
-                candidatos.Select(c => $"{c.Liga} · rodada {c.Numero}").ToList());
+                $"Mais de uma partida possível para {jogo}{ondeSerie}; cite no nome do vídeo a competição (\"Série A\", \"Copa\", \"Supercopa\") "
+                + "e, se for jogo decisivo, mini liga, playoff ou mata-mata, diga isso também (ou informe a rodada no JSON).",
+                candidatos.Select(c => $"{c.Liga} · {c.Onde}").ToList());
 
         var achada = candidatos[0];
-        if (r.Rodada is int rodada && achada.Tipo == TipoCompetition.Liga && rodada != achada.Numero)
+        if (r.Rodada is int rodada && achada.Tipo == TipoCompetition.Liga && !achada.Extra && rodada != achada.Numero)
             throw new ResultadoPesException(ResultadoPesErro.Ambiguo,
                 $"A rodada não confere: o JSON diz rodada {rodada}, mas {jogo} é da rodada {achada.Numero} ({achada.Liga}).");
 
-        return achada.PartidaId;
+        return achada;
     }
 
     // ── Gravação ──────────────────────────────────────────────────────────────
 
     private async Task<ResultadoPesRespostaDto> GravarAsync(
-        Guid partidaId, ResultadoPesRequest r, string jsonBruto, bool simular, CancellationToken ct)
+        Alvo alvo, ResultadoPesRequest r, string jsonBruto, bool simular, CancellationToken ct)
     {
         var agora = _time.GetUtcNow().UtcDateTime;
+
+        // Jogo do mata-mata sem partida: cria como na tela (botão "Criar partida" do chaveamento).
+        var partidaId = alvo.PartidaId
+            ?? (await _ligaAdmin.CriarPartidaKnockoutAsync(alvo.KnockoutJogoId!.Value, ct)).PartidaId;
+        var jogoKo = alvo.KnockoutJogoId is Guid koId
+            ? await _db.LigaKnockoutJogos.FirstAsync(k => k.KnockoutJogoId == koId, ct)
+            : null;
+
         var partida = await _db.LigaPartidas
             .Include(p => p.Rodada).ThenInclude(x => x.Liga)
             .Include(p => p.TimeCasa)
@@ -335,19 +422,38 @@ public class ResultadoPesService : IResultadoPesService
         partida.IsWO = false;
         partida.IniciadaEm ??= agora;
 
+        // Jogo único que precisa de vencedor: Supercopa, mata-mata, jogos decisivos e playoff de acesso
+        // (que é rodada de desempate). A mini liga é por pontos e aceita empate.
+        var rodadaDaPartida = partida.Rodada;
+        var precisaDeVencedor = liga.Tipo == TipoCompetition.Supercopa || jogoKo is not null
+                                || rodadaDaPartida.Desempate || rodadaDaPartida.Numero == NumeroJogoDecisivo;
+
         var empate = partida.GolsCasa == partida.GolsFora;
-        if (liga.Tipo != TipoCompetition.Supercopa || !empate)
+        if (!precisaDeVencedor || !empate)
         {
             partida.TemPenaltis = false;
             partida.PenaltisVencedorId = null;
         }
 
-        if (liga.Tipo == TipoCompetition.Supercopa && empate && !partida.TemPenaltis)
+        // Mata-mata já decidido (reenvio): o placar novo não pode trocar quem avançou.
+        if (jogoKo?.VencedorId is Guid jaAvancou)
+        {
+            Guid? vencedorAgora = !empate ? (partida.GolsCasa > partida.GolsFora ? partida.TimeCasaId : partida.TimeForaId)
+                : partida.TemPenaltis ? partida.PenaltisVencedorId : null;
+            if (vencedorAgora != jaAvancou)
+                throw new ResultadoPesException(ResultadoPesErro.Invalido,
+                    $"{liga.Nome} · {alvo.Onde}: o jogo já foi decidido e o vencedor avançou no chaveamento; " +
+                    "o placar do JSON muda o vencedor. Corrija o mata-mata na tela.");
+        }
+
+        if (precisaDeVencedor && empate && !partida.TemPenaltis)
         {
             // O JSON não traz pênaltis: a partida fica em andamento para registrar o vencedor na tela.
             partida.Status = PartidaStatus.EmAndamento;
             partida.EncerradaEm = null;
-            avisos.Add("Supercopa empatada: registre o vencedor dos pênaltis na tela da liga para encerrar a partida.");
+            avisos.Add(jogoKo is not null
+                ? $"{liga.Nome} · {alvo.Onde}: jogo empatado. Registre o vencedor dos pênaltis no mata-mata (tela da liga) para encerrar e avançar o vencedor."
+                : $"{liga.Nome} · {alvo.Onde}: jogo empatado. Registre o vencedor dos pênaltis na tela da liga para encerrar a partida.");
         }
         else
         {
@@ -369,6 +475,20 @@ public class ResultadoPesService : IResultadoPesService
 
         await _db.SaveChangesAsync(ct);
         await _ligaAdmin.RecalcularClassificacaoAsync(partida.RodadaId, ct);
+
+        if (partida.Status == PartidaStatus.Encerrada)
+        {
+            if (jogoKo is { VencedorId: null })
+            {
+                // Mesmo caminho do "Encerrar" do chaveamento: grava o vencedor e avança no mata-mata.
+                await _ligaAdmin.EncerrarKnockoutJogoAsync(jogoKo.KnockoutJogoId, new LigaEncerrarKnockoutRequest(false, null), ct);
+                avisos.Add($"{liga.Nome} · {alvo.Onde}: vencedor avançou no chaveamento.");
+            }
+            else if (liga.Tipo == TipoCompetition.Liga && rodadaDaPartida.Numero == NumeroJogoDecisivo)
+                avisos.Add("Jogo decisivo do título encerrado: defina o campeão na tela da liga.");
+            else if (liga.Tipo == TipoCompetition.Liga && rodadaDaPartida.Numero == NumeroMiniLiga)
+                avisos.Add("Jogo da mini liga do título: quando todos terminarem, conclua a mini liga na tela da liga.");
+        }
 
         return new ResultadoPesRespostaDto(
             partidaId, liga.Nome, partida.Rodada.Numero,

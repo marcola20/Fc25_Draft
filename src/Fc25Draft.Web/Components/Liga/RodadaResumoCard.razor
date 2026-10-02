@@ -142,7 +142,7 @@
                 @if (ProximaRodada is { Partidas.Count: > 0 } proxima)
                 {
                     <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 11px; letter-spacing: .5px;">
-                        Próxima rodada · Rodada @proxima.Numero
+                        Próxima rodada · @(proxima.Titulo ?? $"Rodada {proxima.Numero}")
                     </div>
                     <div class="d-flex flex-wrap" style="font-size: 13px;">
                         @foreach (var p in proxima.Partidas)
@@ -174,9 +174,9 @@
 
     private string Subtitulo => JogoUnico
         ? "A decisão"
-        : $"Rodada {Rodada?.Numero}{(Rodada?.Desempate == true ? " · Jogo decisivo" : "")}";
+        : Rodada?.Titulo ?? $"Rodada {Rodada?.Numero}{(Rodada?.Desempate == true ? " · Jogo decisivo" : "")}";
 
-    private string Arquivo => JogoUnico ? "cbfv-supercopa.png" : $"cbfv-rodada-{Rodada?.Numero}.png";
+    private string Arquivo => JogoUnico ? "cbfv-supercopa.png" : Rodada?.Titulo is null ? $"cbfv-rodada-{Rodada?.Numero}.png" : "cbfv-decisao.png";
 
     private IReadOnlyList<LigaClassificacaoItemDto> Tabela =>
         Classificacao.OrderBy(c => c.Posicao).Take(MaxLinhasTabela).ToList();
