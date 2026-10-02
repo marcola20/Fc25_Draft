@@ -102,5 +102,5 @@ public class HallOfFameService : IHallOfFameService
     }
 
     private static HallOfFameEntryDto ToDto(HallOfFameEntry e) =>
-        new(e.HallOfFameId, e.Descricao, e.Tipo, e.Divisao, e.TimeCampeao, e.Tecnico, e.TreinadorId, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm);
+        new(e.HallOfFameId, e.Descricao, e.Tipo, e.Divisao, e.TimeCampeao, e.Tecnico, e.TreinadorId, e.Ano, e.Temporada, e.CriadoEm, e.AtualizadoEm, e.LigaId is not null);
 }

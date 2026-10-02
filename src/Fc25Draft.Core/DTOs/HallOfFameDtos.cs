@@ -14,7 +14,8 @@ public record HallOfFameEntryDto(
     int? Ano,
     string? Temporada,
     DateTime CriadoEm,
-    DateTime AtualizadoEm);
+    DateTime AtualizadoEm,
+    bool Automatica = false);
 
 public record HallOfFameCreateRequest(
     [Required, MaxLength(200)] string Descricao,

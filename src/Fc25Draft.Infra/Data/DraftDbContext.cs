@@ -25,16 +25,19 @@ public class DraftDbContext : DbContext
     /// <summary>Disparado depois de gravar avisos, com os times que os receberam.</summary>
     public static event Action<IReadOnlyCollection<Guid>>? AvisosGravados;
 
-    // Quem sai do elenco sai das escalações do time no mesmo save (ver EscalacoesDeQuemSaiu).
+    // No mesmo save: quem sai do elenco sai das escalações do time (EscalacoesDeQuemSaiu) e a competição
+    // encerrada com campeão entra no Hall da Fama (HallDaFamaAutomatico).
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         await EscalacoesDeQuemSaiu.TirarAsync(this, cancellationToken);
+        await HallDaFamaAutomatico.AtualizarAsync(this, cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         EscalacoesDeQuemSaiu.TirarAsync(this, CancellationToken.None).GetAwaiter().GetResult();
+        HallDaFamaAutomatico.AtualizarAsync(this, CancellationToken.None).GetAwaiter().GetResult();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 

@@ -161,7 +161,13 @@
                                             @(entrada.Tecnico ?? "—")
                                         }
                                     </td>
-                                    <td>@entrada.Descricao</td>
+                                    <td>
+                                        @entrada.Descricao
+                                        @if (entrada.Automatica)
+                                        {
+                                            <span class="badge bg-light text-muted border ms-1" title="Entrou sozinha quando a competição foi encerrada">automático</span>
+                                        }
+                                    </td>
                                     <td class="text-center"><span class="badge bg-dark">@RotuloCompeticao(entrada)</span></td>
                                     <td class="text-center text-muted">@(entrada.Temporada is not null ? TemporadaLabel(entrada.Temporada) : (entrada.Ano?.ToString() ?? "—"))</td>
                                     <td class="text-end">

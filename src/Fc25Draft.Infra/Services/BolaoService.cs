@@ -190,7 +190,7 @@ public class BolaoService : IBolaoService
 
     // ── Bastidores ─────────────────────────────────────────────────────────────
 
-    private record Jogo(Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora, bool Encerrado, int GolsCasa, int GolsFora);
+    private record Jogo(Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora, bool Comecou, bool Encerrado, int GolsCasa, int GolsFora);
 
     private record Rodada(
         Guid RodadaId, Guid LigaId, string Competicao, TipoCompetition Tipo, int Numero, bool Desempate,
@@ -237,6 +237,7 @@ public class BolaoService : IBolaoService
                 LigaLabels.Competicao(r.Tipo, r.Divisao), r.Tipo, r.Numero, r.Desempate, r.Temporada, r.DataHora,
                 r.Jogos.Select(j => new Jogo(
                     j.PartidaId, j.TimeCasaId, j.Casa, j.TimeForaId, j.Fora,
+                    j.IniciadaEm is not null || j.EncerradaEm is not null || j.Status != PartidaStatus.Agendada,
                     j.EncerradaEm is not null || j.Status == PartidaStatus.Encerrada,
                     j.GolsCasa, j.GolsFora)).ToList()))
             .ToList();
@@ -250,7 +251,7 @@ public class BolaoService : IBolaoService
     /// </summary>
     private bool EstaAberta(Rodada rodada)
     {
-        if (rodada.Jogos.Any(j => j.Encerrado)) return false;
+        if (rodada.Jogos.Any(j => j.Comecou)) return false;
         return rodada.Quando is not DateTime quando || Agora < quando;
     }
 

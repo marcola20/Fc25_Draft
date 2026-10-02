@@ -118,6 +118,39 @@ else
         }
         else
         {
+            @if (PerdasDaExpansao.Count > 0)
+            {
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Draft de expansão: quem perdeu jogadores</strong></div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Perdeu</th>
+                                        <th class="text-end">Compensação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var perda in PerdasDaExpansao)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@perda.Time</td>
+                                            <td class="small">@string.Join(", ", perda.Jogadores)</td>
+                                            <td class="text-end text-nowrap">@Dinheiro.Curto(perda.Compensacao)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer small text-muted">
+                        A compensação é o valor de mercado do jogador vezes o fator do draft, creditada no caixa de quem perdeu.
+                    </div>
+                </div>
+            }
+
             @if (RoundToDisplay is not null)
             {
                 <div class="card mb-3">
@@ -160,6 +193,11 @@ else
                                         <th>Time</th>
                                         <th>Responsável</th>
                                         <th>Jogador</th>
+                                        @if (EhExpansao)
+                                        {
+                                            <th>Veio do</th>
+                                            <th class="text-end">Compensação</th>
+                                        }
                                         <th>Data/Hora</th>
                                     </tr>
                                 </thead>
@@ -171,6 +209,11 @@ else
                                             <td>@pick.TeamName</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.TeamOwner) ? "-" : pick.TeamOwner)</td>
                                             <td>@(string.IsNullOrWhiteSpace(pick.PlayerName) ? "Disponível" : pick.PlayerName)</td>
+                                            @if (EhExpansao)
+                                            {
+                                                <td>@(pick.FromTeamName ?? "-")</td>
+                                                <td class="text-end text-nowrap">@(pick.Compensacao is decimal c ? Dinheiro.Curto(c) : "-")</td>
+                                            }
                                             <td>@FormatDateTimePtBr(pick.PickedAtUtc)</td>
                                         </tr>
                                     }
@@ -805,6 +848,23 @@ else
     }
 
     private IEnumerable<DraftPickOrderRow> UnusedPicks => PickOrderRows.Where(p => !p.IsUsed);
+
+    // Draft de expansão: as escolhas guardam de qual time o jogador saiu.
+    private IEnumerable<DraftRoundPickDto> EscolhasDaExpansao =>
+        selectedDraft?.Rounds?.SelectMany(r => r.Picks).Where(p => p.FromTeamName is not null) ?? [];
+
+    private bool EhExpansao => EscolhasDaExpansao.Any();
+
+    private sealed record PerdaDaExpansao(string Time, IReadOnlyList<string> Jogadores, decimal Compensacao);
+
+    private IReadOnlyList<PerdaDaExpansao> PerdasDaExpansao => EscolhasDaExpansao
+        .GroupBy(p => p.FromTeamName!)
+        .Select(g => new PerdaDaExpansao(
+            g.Key,
+            g.OrderBy(p => p.OverallPick).Select(p => $"{p.PlayerName} (para o {p.TeamName})").ToList(),
+            g.Sum(p => p.Compensacao ?? 0m)))
+        .OrderByDescending(p => p.Compensacao)
+        .ToList();
 
     private sealed class DraftPickOrderRow
     {

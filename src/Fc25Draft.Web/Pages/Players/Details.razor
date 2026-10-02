@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IMinhaAreaService MinhaArea
+@inject IPricingService Pricing
 
 @implements IDisposable
 
@@ -45,6 +46,9 @@ else
 
         <dt class="col-sm-3">Idade</dt>
         <dd class="col-sm-9">@(player.Age?.ToString() ?? "-")</dd>
+
+        <dt class="col-sm-3">Valor de mercado</dt>
+        <dd class="col-sm-9">@(_valorDeMercado is decimal valor ? Dinheiro.Curto(valor) : "-")</dd>
 
         <dt class="col-sm-3">Posição</dt>
         <dd class="col-sm-9">@player.PositionName</dd>
@@ -197,10 +201,14 @@ else
         StateHasChanged();
     }
 
+    // Mesmo cálculo do leilão, da venda rápida e da compensação do draft de expansão (posição, overall e idade).
+    private decimal? _valorDeMercado;
+
     private async Task LoadPlayerAsync()
     {
         isLoading = true;
         errorMessage = null;
+        _valorDeMercado = null;
 
         try
         {
@@ -208,6 +216,10 @@ else
             if (player is null)
             {
                 errorMessage = "Jogador não encontrado.";
+            }
+            else
+            {
+                _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
             }
         }
         catch (Exception ex)

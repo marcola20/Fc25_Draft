@@ -145,7 +145,10 @@ public record DraftRoundPickDto(
     string? TeamOwner,
     int? PlayerId,
     string? PlayerName,
-    DateTime? PickedAtUtc);
+    DateTime? PickedAtUtc,
+    // Draft de expansão: de quem o jogador saiu e quanto esse time recebeu.
+    string? FromTeamName = null,
+    decimal? Compensacao = null);
 
 public record DraftRoundDetailsDto(
     int RoundNumber,

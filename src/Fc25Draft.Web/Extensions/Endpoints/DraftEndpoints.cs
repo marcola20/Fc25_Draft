@@ -154,7 +154,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                         p.Team.OwnerName,
                                         p.PlayerId,
                                         p.Player != null ? p.Player.Name : null,
-                                        p.PickedAtUtc))
+                                        p.PickedAtUtc,
+                                        p.FromTeam != null ? p.FromTeam.TeamName : null,
+                                        p.Compensacao))
                                     .ToList()))
                             .ToList()))
                     .FirstOrDefaultAsync(ct);
