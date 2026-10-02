@@ -43,6 +43,32 @@
             </select>
         </div>
 
+        <div class="card mb-3">
+            <div class="card-header fw-bold">Calendário</div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">
+                    A temporada abre no domingo da Supercopa, e é dessa data que saem todas as rodadas, as janelas de
+                    transferência e o playoff (veja em <a href="/formato" target="_blank">Formato</a>). Para mudar só uma
+                    rodada, use a aba Rodadas da competição.
+                </p>
+                <div class="d-flex flex-wrap align-items-end gap-3">
+                    <div>
+                        <label class="form-label">Abertura de @_temporada</label>
+                        <input type="date" class="form-control" @bind="_abertura" />
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="remarcar" @bind="_remarcarRodadas" />
+                        <label class="form-check-label" for="remarcar">Remarcar as rodadas ainda não jogadas</label>
+                    </div>
+                    <button class="btn btn-primary mb-1" @onclick="SalvarAbertura" disabled="@(_salvando || _abertura is null)">Salvar</button>
+                </div>
+                @if (_aberturaGravada is null)
+                {
+                    <div class="form-text text-warning">A abertura de @_temporada ainda não foi definida: o calendário não aparece e as rodadas ficam sem data.</div>
+                }
+            </div>
+        </div>
+
         @if (_resumo is null)
         {
             <div class="alert alert-info">Temporada sem Série A ou Série B.</div>
@@ -294,6 +320,8 @@
     private int _vagasDiretasA = 1, _vagasPlayoffA = 1, _vagasDiretasB = 1, _vagasPlayoffB = 1;
     private bool _criarSerieB = true;
     private readonly HashSet<Guid> _extras = new();
+    private DateTime? _abertura, _aberturaGravada;
+    private bool _remarcarRodadas = true;
     private string _nomeSupercopa = "";
     private DateTime _dataSupercopa = DateTime.Today;
 
@@ -312,6 +340,8 @@
 
     private async Task CarregarAsync()
     {
+        _aberturaGravada = _temporadas.Count == 0 ? null : await TemporadaSvc.GetAberturaAsync(_temporada, CancellationToken.None);
+        _abertura = _aberturaGravada;
         _resumo = _temporadas.Count == 0 ? null : await TemporadaSvc.GetResumoAsync(_temporada, CancellationToken.None);
         _extras.Clear();
         if (_resumo is null) return;
@@ -348,6 +378,25 @@
     }
 
     private int ContarProxima(Divisao divisao) => _resumo?.Times.Count(t => t.DivisaoProxima == divisao) ?? 0;
+
+    private async Task SalvarAbertura()
+    {
+        if (_abertura is not DateTime abertura) return;
+        if (_remarcarRodadas && !await JSRuntime.InvokeAsync<bool>("confirm",
+                "As rodadas ainda não jogadas voltam para as datas do calendário, inclusive as que foram mudadas à mão. Continuar?"))
+            return;
+
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            var remarcadas = await TemporadaSvc.DefinirAberturaAsync(_temporada, abertura, _remarcarRodadas, CancellationToken.None);
+            _aberturaGravada = abertura;
+            _ok = $"Abertura de {_temporada} em {abertura:dd/MM/yyyy}."
+                + (_remarcarRodadas ? $" {remarcadas} rodada(s) remarcada(s)." : "");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
 
     private async Task CriarSupercopa()
     {

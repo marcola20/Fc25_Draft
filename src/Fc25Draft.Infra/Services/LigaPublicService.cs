@@ -366,6 +366,17 @@ public class LigaPublicService : ILigaPublicService
         IReadOnlyDictionary<int, (Guid TimeId, string TimeNome)> timesAtuais, int jogadorId) =>
         timesAtuais.TryGetValue(jogadorId, out var time) ? time : (Guid.Empty, SemTimeLabel);
 
+    public async Task<CalendarioTemporadaDto?> GetCalendarioAtualAsync(CancellationToken ct)
+    {
+        var temporada = await _db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada != null && l.Tipo == TipoCompetition.Liga)
+            .MaxAsync(l => l.Temporada, ct);
+        if (temporada is not int t) return null;
+
+        var datas = await CalendarioDaTemporada.MontarComDatasGravadasAsync(_db, t, ct);
+        return new CalendarioTemporadaDto(t, await CalendarioDaTemporada.AberturaAsync(_db, t, ct), datas ?? Array.Empty<DataDaTemporada>());
+    }
+
     public async Task<PowerRankingDto> GetPowerRankingAsync(CancellationToken ct)
     {
         // Entram os times com elenco; a divisão é a da liga em andamento.

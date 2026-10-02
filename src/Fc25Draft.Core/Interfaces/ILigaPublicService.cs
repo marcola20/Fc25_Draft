@@ -70,4 +70,10 @@ public interface ILigaPublicService
     /// com a variação de posição desde o dia de jogos anterior.
     /// </summary>
     Task<PowerRankingDto> GetPowerRankingAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Calendário da temporada mais recente como está marcado: a conta a partir da abertura, com a
+    /// data gravada nas rodadas que já têm uma. Datas vazias se a abertura ainda não foi definida.
+    /// </summary>
+    Task<CalendarioTemporadaDto?> GetCalendarioAtualAsync(CancellationToken ct);
 }

@@ -13,6 +13,7 @@
 
 @code {
     private IReadOnlyList<DataDaTemporada> _calendario = Array.Empty<DataDaTemporada>();
+    private CalendarioTemporadaDto? _temporadaCalendario;
 
     protected override void OnInitialized()
     {
@@ -21,25 +22,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // A abertura é a data combinada da temporada; o número de rodadas vem de quantos times
-        // cada divisão tem.
-        var edicoes = await LigaService.ListEdicoesAsync(CancellationToken.None);
-        var temporada = edicoes.Select(e => e.Temporada).Where(t => t is not null).DefaultIfEmpty(null).Max();
-        var daTemporada = edicoes.Where(e => e.Temporada == temporada).ToList();
-
-        int RodadasDa(Divisao divisao)
-        {
-            var liga = daTemporada.FirstOrDefault(e => e.Tipo == TipoCompetition.Liga && e.Divisao == divisao);
-            return liga is { TotalTimes: > 1 } ? liga.TotalTimes - 1 : 0;
-        }
-
-        var copa = daTemporada.FirstOrDefault(e => e.Tipo == TipoCompetition.Copa);
-
-        _calendario = CalendarioTemporada.Montar(
-            CalendarioTemporada.Abertura,
-            RodadasDa(Divisao.SerieA) is var a && a > 0 ? a : 9,
-            RodadasDa(Divisao.SerieB) is var b && b > 0 ? b : 7,
-            copa is { Rodadas: > 0 } ? copa.Rodadas : 4);
+        // A abertura é a gravada para a temporada (Admin › Temporada); rodada com data mudada à mão
+        // aparece na data nova.
+        _temporadaCalendario = await LigaService.GetCalendarioAtualAsync(CancellationToken.None);
+        _calendario = _temporadaCalendario?.Datas ?? Array.Empty<DataDaTemporada>();
     }
 
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
@@ -404,11 +390,11 @@
                 <div class="fmt-stat-label">Datas</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">9</div>
+                <div class="fmt-stat-number">@_calendario.Count(d => d.Divisao == Divisao.SerieA && d.Rodada is not null)</div>
                 <div class="fmt-stat-label">Rodadas da Série A</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">7</div>
+                <div class="fmt-stat-number">@_calendario.Count(d => d.Divisao == Divisao.SerieB && d.Rodada is not null)</div>
                 <div class="fmt-stat-label">Rodadas da Série B</div>
             </div>
             <div class="fmt-stat-card">
@@ -432,6 +418,11 @@
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-mercado"></span>Mercado</span>
             <span class="fmt-cal-legend-item"><span class="fmt-cal-dot fmt-dot-final"></span>Decisões</span>
         </div>
+
+        @if (_temporadaCalendario is { Abertura: null })
+        {
+            <div class="alert alert-info">O calendário da temporada @_temporadaCalendario.Temporada ainda não foi definido.</div>
+        }
 
         <div class="fmt-cal-grid">
             @foreach (var data in _calendario)

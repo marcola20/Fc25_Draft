@@ -32,12 +32,6 @@ public static class CalendarioTemporada
     /// <summary>Horário em que a janela de transferências abre, depois dos jogos.</summary>
     public static readonly TimeSpan HorarioDaJanela = new(20, 0, 0);
 
-    /// <summary>
-    /// Abertura combinada da temporada: domingo 27/09, com a final da Supercopa. É daqui que sai
-    /// todo o resto do calendário — para mudar de temporada, basta trocar esta data.
-    /// </summary>
-    public static readonly DateTime Abertura = new(2026, 9, 27);
-
     public static IReadOnlyList<DataDaTemporada> Montar(
         DateTime abertura,
         int rodadasSerieA = 9,
@@ -126,6 +120,20 @@ public static class CalendarioTemporada
 
         return datas;
     }
+
+    /// <summary>
+    /// Troca a data das rodadas que já têm data gravada (mudada à mão ou aplicada antes) e põe o
+    /// calendário na ordem cronológica, renumerando. O resto (mercado, mata-mata da Copa, playoff)
+    /// segue a conta a partir da abertura.
+    /// </summary>
+    public static IReadOnlyList<DataDaTemporada> ComDatasGravadas(
+        IEnumerable<DataDaTemporada> calendario, Func<DataDaTemporada, DateTime?> dataGravada) =>
+        calendario
+            .Select(d => dataGravada(d) is DateTime gravada ? d with { Quando = gravada } : d)
+            .OrderBy(d => d.Quando)
+            .ThenBy(d => d.Numero)
+            .Select((d, i) => d with { Numero = i + 1 })
+            .ToList();
 
     /// <summary>Datas de uma competição da temporada, na ordem das rodadas.</summary>
     public static IReadOnlyList<DateTime> DatasDasRodadas(

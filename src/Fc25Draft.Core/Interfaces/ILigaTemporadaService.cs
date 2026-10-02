@@ -17,6 +17,16 @@ public interface ILigaTemporadaService
     /// <summary>Cria a Supercopa da temporada: jogo único entre o campeão da Série A e o campeão da Copa.</summary>
     Task<LigaDto> CriarSupercopaAsync(int temporada, string? nome, DateTime data, CancellationToken ct);
 
+    /// <summary>Dia em que a temporada abre (o da Supercopa); nulo se ainda não foi definido.</summary>
+    Task<DateTime?> GetAberturaAsync(int temporada, CancellationToken ct);
+
+    /// <summary>
+    /// Grava a abertura da temporada. Com <paramref name="reaplicarNasRodadas"/>, as rodadas ainda não
+    /// jogadas das competições da temporada (e a Supercopa que a abre) voltam para as datas do
+    /// calendário, inclusive as que foram mudadas à mão. Retorna quantas rodadas foram remarcadas.
+    /// </summary>
+    Task<int> DefinirAberturaAsync(int temporada, DateTime abertura, bool reaplicarNasRodadas, CancellationToken ct);
+
     /// <summary>Cria as ligas da temporada seguinte com os times já promovidos e rebaixados.</summary>
     Task<IReadOnlyList<LigaDto>> GerarProximaTemporadaAsync(GerarProximaTemporadaRequest request, CancellationToken ct);
 }

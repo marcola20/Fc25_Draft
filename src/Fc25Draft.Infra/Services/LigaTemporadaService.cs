@@ -36,6 +36,39 @@ public class LigaTemporadaService : ILigaTemporadaService
             .OrderByDescending(t => t)
             .ToListAsync(ct);
 
+    public Task<DateTime?> GetAberturaAsync(int temporada, CancellationToken ct) =>
+        CalendarioDaTemporada.AberturaAsync(_db, temporada, ct);
+
+    public async Task<int> DefinirAberturaAsync(int temporada, DateTime abertura, bool reaplicarNasRodadas, CancellationToken ct)
+    {
+        var registro = await _db.AberturasTemporada.FirstOrDefaultAsync(a => a.Temporada == temporada, ct);
+        if (registro is null)
+        {
+            registro = new AberturaTemporada { Temporada = temporada };
+            _db.AberturasTemporada.Add(registro);
+        }
+
+        registro.Abertura = abertura.Date;
+        registro.AtualizadoEm = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        if (!reaplicarNasRodadas) return 0;
+
+        // Competições da temporada e a Supercopa da anterior, que é o jogo de abertura.
+        var ligas = await _db.Ligas.AsNoTracking()
+            .Where(l => ((l.Temporada == temporada && l.Tipo != TipoCompetition.Supercopa)
+                         || (l.Temporada == temporada - 1 && l.Tipo == TipoCompetition.Supercopa))
+                        && l.Rodadas.Any(r => r.Numero > 0 && !r.Desempate))
+            .Select(l => l.LigaId)
+            .ToListAsync(ct);
+
+        var remarcadas = 0;
+        foreach (var ligaId in ligas)
+            remarcadas += await _ligas.AplicarCalendarioAsync(ligaId, ct);
+
+        return remarcadas;
+    }
+
     public async Task<TemporadaResumoDto?> GetResumoAsync(int temporada, CancellationToken ct)
     {
         var estado = await CarregarAsync(temporada, ct);

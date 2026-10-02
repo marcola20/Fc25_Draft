@@ -22,6 +22,9 @@ public interface ILigaAdminService
     /// <summary>Marca as rodadas com as datas do calendário da temporada. Retorna quantas foram marcadas.</summary>
     Task<int> AplicarCalendarioAsync(Guid ligaId, CancellationToken ct);
 
+    /// <summary>Muda a data e a hora de uma rodada (nulo tira a data), sem mexer no resto do calendário.</summary>
+    Task<LigaRodadaDto> DefinirDataRodadaAsync(Guid rodadaId, DateTime? dataHora, CancellationToken ct);
+
     Task<IReadOnlyList<LigaRodadaDto>> GerarRodadasAutoAsync(Guid ligaId, CancellationToken ct);
     Task DeleteRodadaAsync(Guid rodadaId, CancellationToken ct);
 

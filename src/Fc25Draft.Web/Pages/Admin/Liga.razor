@@ -708,9 +708,20 @@
                             {
                                 <span class="badge bg-primary" title="Não vale pontos na classificação">Jogo Decisivo</span>
                             }
-                            @if (r.DataHora is DateTime quando)
+                            @if (_editandoDataRodada == r.RodadaId)
                             {
-                                <div class="small text-muted">@quando.ToString("ddd dd/MM · HH:mm", Br)</div>
+                                <input type="datetime-local" class="form-control form-control-sm my-1" @bind="_novaDataRodada" />
+                                <div class="d-flex gap-1 justify-content-center mb-1">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => SalvarDataRodada(r)" disabled="@_saving">Salvar</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => _editandoDataRodada = null">Cancelar</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 small text-muted text-decoration-none"
+                                        title="Mudar a data só desta rodada" @onclick="() => EditarDataRodada(r)">
+                                    @(r.DataHora is DateTime quando ? quando.ToString("ddd dd/MM · HH:mm", Br) : "sem data") ✏️
+                                </button>
                             }
                             <div class="small text-muted">@r.TotalPartidas partidas</div>
                             <div class="d-flex gap-1 justify-content-center mt-1">
@@ -1506,6 +1517,30 @@
         finally { _saving = false; }
     }
 
+    private Guid? _editandoDataRodada;
+    private DateTime? _novaDataRodada;
+
+    private void EditarDataRodada(LigaRodadaDto r)
+    {
+        _editandoDataRodada = r.RodadaId;
+        _novaDataRodada = r.DataHora ?? DateTime.Today.Add(CalendarioTemporada.Horario);
+    }
+
+    /// <summary>Muda só esta rodada; o resto do calendário fica como está.</summary>
+    private async Task SalvarDataRodada(LigaRodadaDto r)
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var salva = await AdminSvc.DefinirDataRodadaAsync(r.RodadaId, _novaDataRodada, CancellationToken.None);
+            _editandoDataRodada = null;
+            await CarregarDados();
+            _ok = $"{RodadaLabel(r.Numero)}: {salva.DataHora?.ToString("ddd dd/MM · HH:mm", Br) ?? "sem data"}.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
     /// <summary>Marca as rodadas já criadas com as datas do calendário da temporada.</summary>
     private async Task AplicarCalendario()
     {
@@ -1516,7 +1551,7 @@
         {
             var marcadas = await AdminSvc.AplicarCalendarioAsync(_ligaAtual.LigaId, CancellationToken.None);
             await CarregarDados();
-            _ok = $"{marcadas} rodada(s) marcada(s) pelo calendário da temporada.";
+            _ok = $"{marcadas} rodada(s) marcada(s) pelo calendário da temporada (as já jogadas ficam como estão).";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }

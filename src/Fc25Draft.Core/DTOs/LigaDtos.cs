@@ -4,6 +4,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Fc25Draft.Core.DTOs;
 
+/// <summary>Calendário de uma temporada; <paramref name="Abertura"/> nula enquanto não foi definida.</summary>
+public record CalendarioTemporadaDto(int Temporada, DateTime? Abertura, IReadOnlyList<DataDaTemporada> Datas);
+
 public record LigaDto(
     Guid LigaId,
     string Nome,
