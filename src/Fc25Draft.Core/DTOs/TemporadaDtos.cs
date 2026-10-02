@@ -68,4 +68,18 @@ public record GerarProximaTemporadaRequest(
     int VagasDiretasSerieB = 1,
     int VagasPlayoffSerieB = 1,
     IReadOnlyList<Guid>? TimesExtrasSerieB = null,
-    bool CriarSerieB = true);
+    bool CriarSerieB = true,
+    bool ZerarContadores = true,
+    bool CancelarPropostas = true,
+    bool LimparListaTransferencias = true,
+    bool RemoverMinimosTemporarios = false);
+
+/// <summary>O que a virada de temporada mexe no mercado, para a tela mostrar antes de gerar.</summary>
+/// <param name="TimesComContador">Times com transferências, empréstimos ou vendas rápidas usados na janela.</param>
+/// <param name="MinimosTemporarios">Times com mínimo de elenco temporário, já com o valor ("Time (12)").</param>
+public record TemporadaViradaMercadoDto(
+    int Emprestimos,
+    int PropostasPendentes,
+    int JogadoresNaLista,
+    int TimesComContador,
+    IReadOnlyList<string> MinimosTemporarios);

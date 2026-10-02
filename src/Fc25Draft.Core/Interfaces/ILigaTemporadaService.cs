@@ -27,6 +27,12 @@ public interface ILigaTemporadaService
     /// </summary>
     Task<int> DefinirAberturaAsync(int temporada, DateTime abertura, bool reaplicarNasRodadas, CancellationToken ct);
 
-    /// <summary>Cria as ligas da temporada seguinte com os times já promovidos e rebaixados.</summary>
+    /// <summary>Empréstimos, propostas, lista de transferências e contadores que a virada vai mexer.</summary>
+    Task<TemporadaViradaMercadoDto> GetViradaMercadoAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Cria as ligas da temporada seguinte com os times já promovidos e rebaixados, devolve os
+    /// emprestados e faz a limpeza do mercado pedida — tudo numa transação: ou faz tudo, ou nada.
+    /// </summary>
     Task<IReadOnlyList<LigaDto>> GerarProximaTemporadaAsync(GerarProximaTemporadaRequest request, CancellationToken ct);
 }

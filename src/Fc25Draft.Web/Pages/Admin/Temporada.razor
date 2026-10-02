@@ -286,7 +286,12 @@
                     }
 
                     <div class="alert alert-light border mt-3 mb-2 small">
-                        Série A: <strong>@ContarProxima(Divisao.SerieA)</strong> times ·
+                        Série A: <strong>@ContarProxima(Divisao.SerieA)</strong> times
+                        @if (ContarProxima(Divisao.SerieA) != _resumo.Times.Count(t => t.Divisao == Divisao.SerieA))
+                        {
+                            <span class="text-warning">(hoje @_resumo.Times.Count(t => t.Divisao == Divisao.SerieA))</span>
+                        }
+                        ·
                         Série B: <strong>@(ContarProxima(Divisao.SerieB) + _extras.Count)</strong> times
                         @if (_resumo.Times.Any(t => t.DivisaoProxima is null))
                         {
@@ -294,9 +299,40 @@
                         }
                     </div>
 
-                    <p class="small text-muted mb-2">
-                        Ao gerar a próxima temporada, todos os jogadores emprestados voltam para os times donos.
-                    </p>
+                    <div class="border rounded p-2 mb-3 small">
+                        <div class="fw-semibold mb-1">Mercado na virada</div>
+                        <div class="text-muted mb-1">
+                            @(_virada?.Emprestimos ?? 0) jogador(es) emprestado(s) voltam para os times donos.
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="zerarContadores" @bind="_zerarContadores" />
+                            <label class="form-check-label" for="zerarContadores">
+                                Zerar transferências, empréstimos e vendas rápidas usados na janela
+                                <span class="text-muted">(@(_virada?.TimesComContador ?? 0) time(s) com algo usado)</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cancelarPropostas" @bind="_cancelarPropostas" />
+                            <label class="form-check-label" for="cancelarPropostas">
+                                Cancelar as propostas pendentes <span class="text-muted">(@(_virada?.PropostasPendentes ?? 0))</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="limparLista" @bind="_limparLista" />
+                            <label class="form-check-label" for="limparLista">
+                                Tirar os jogadores da lista de transferências <span class="text-muted">(@(_virada?.JogadoresNaLista ?? 0))</span>
+                            </label>
+                        </div>
+                        @if (_virada is { MinimosTemporarios.Count: > 0 })
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="removerMinimos" @bind="_removerMinimos" />
+                                <label class="form-check-label" for="removerMinimos">
+                                    Tirar o mínimo de elenco temporário de @string.Join(", ", _virada.MinimosTemporarios)
+                                </label>
+                            </div>
+                        }
+                    </div>
 
                     <button class="btn btn-success" @onclick="GerarProxima" disabled="@(_salvando || !_resumo.PodeGerarProxima)">
                         Gerar temporada @(_temporada + 1)
@@ -320,6 +356,8 @@
     private int _vagasDiretasA = 1, _vagasPlayoffA = 1, _vagasDiretasB = 1, _vagasPlayoffB = 1;
     private bool _criarSerieB = true;
     private readonly HashSet<Guid> _extras = new();
+    private TemporadaViradaMercadoDto? _virada;
+    private bool _zerarContadores = true, _cancelarPropostas = true, _limparLista = true, _removerMinimos;
     private DateTime? _abertura, _aberturaGravada;
     private bool _remarcarRodadas = true;
     private string _nomeSupercopa = "";
@@ -341,6 +379,7 @@
     private async Task CarregarAsync()
     {
         _aberturaGravada = _temporadas.Count == 0 ? null : await TemporadaSvc.GetAberturaAsync(_temporada, CancellationToken.None);
+        _virada = await TemporadaSvc.GetViradaMercadoAsync(CancellationToken.None);
         _abertura = _aberturaGravada;
         _resumo = _temporadas.Count == 0 ? null : await TemporadaSvc.GetResumoAsync(_temporada, CancellationToken.None);
         _extras.Clear();
@@ -440,7 +479,8 @@
                 new GerarProximaTemporadaRequest(
                     _temporada, _nomeA, _nomeB, _inicio, _fim,
                     _vagasDiretasA, _vagasPlayoffA, _vagasDiretasB, _vagasPlayoffB,
-                    _extras.ToList(), _criarSerieB),
+                    _extras.ToList(), _criarSerieB,
+                    _zerarContadores, _cancelarPropostas, _limparLista, _removerMinimos),
                 CancellationToken.None);
 
             _ok = $"Temporada {_temporada + 1} criada: {string.Join(", ", criadas.Select(l => l.Nome))}. Gere as rodadas em Gerenciar Liga.";

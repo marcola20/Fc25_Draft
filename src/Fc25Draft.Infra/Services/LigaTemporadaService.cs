@@ -19,13 +19,11 @@ public class LigaTemporadaService : ILigaTemporadaService
 
     private readonly DraftDbContext _db;
     private readonly ILigaAdminService _ligas;
-    private readonly IEmprestimoService _emprestimos;
 
-    public LigaTemporadaService(DraftDbContext db, ILigaAdminService ligas, IEmprestimoService emprestimos)
+    public LigaTemporadaService(DraftDbContext db, ILigaAdminService ligas)
     {
         _db = db;
         _ligas = ligas;
-        _emprestimos = emprestimos;
     }
 
     public async Task<IReadOnlyList<int>> ListTemporadasAsync(CancellationToken ct) =>
@@ -190,27 +188,88 @@ public class LigaTemporadaService : ILigaTemporadaService
         if (!request.CriarSerieB && timesSerieB.Count > 0)
             throw new InvalidOperationException("Há times destinados à Série B; crie a Série B ou ajuste as vagas da temporada atual.");
 
+        // Uma transação só: se algo falhar no meio, não sobra liga criada (que bloquearia tentar de novo)
+        // nem mercado meio limpo.
         var criadas = new List<LigaDto>();
-
-        var serieA = await _ligas.CreateAsync(new LigaCreateRequest(
-            request.NomeSerieA, request.DataInicio, request.DataFim, TipoCompetition.Liga,
-            proxima, Divisao.SerieA, request.VagasDiretasSerieA, request.VagasPlayoffSerieA), ct);
-        await _ligas.ConfigurarTimesLigaAsync(serieA.LigaId, timesSerieA, ct);
-        criadas.Add(serieA);
-
-        if (request.CriarSerieB)
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            var serieB = await _ligas.CreateAsync(new LigaCreateRequest(
-                request.NomeSerieB!, request.DataInicio, request.DataFim, TipoCompetition.Liga,
-                proxima, Divisao.SerieB, request.VagasDiretasSerieB, request.VagasPlayoffSerieB), ct);
-            await _ligas.ConfigurarTimesLigaAsync(serieB.LigaId, timesSerieB, ct);
-            criadas.Add(serieB);
-        }
+            criadas.Clear();
+            _db.ChangeTracker.Clear();
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        // Temporada nova: os emprestados voltam para os donos.
-        await _emprestimos.DevolverTodosAsync("fim-de-temporada", ct);
+            var serieA = await _ligas.CreateAsync(new LigaCreateRequest(
+                request.NomeSerieA, request.DataInicio, request.DataFim, TipoCompetition.Liga,
+                proxima, Divisao.SerieA, request.VagasDiretasSerieA, request.VagasPlayoffSerieA), ct);
+            await _ligas.ConfigurarTimesLigaAsync(serieA.LigaId, timesSerieA, ct);
+            criadas.Add(serieA);
+
+            if (request.CriarSerieB)
+            {
+                var serieB = await _ligas.CreateAsync(new LigaCreateRequest(
+                    request.NomeSerieB!, request.DataInicio, request.DataFim, TipoCompetition.Liga,
+                    proxima, Divisao.SerieB, request.VagasDiretasSerieB, request.VagasPlayoffSerieB), ct);
+                await _ligas.ConfigurarTimesLigaAsync(serieB.LigaId, timesSerieB, ct);
+                criadas.Add(serieB);
+            }
+
+            // Temporada nova: os emprestados voltam para os donos. Os serviços de empréstimo e de
+            // configuração são registrados com conexão própria; aqui usam a desta transação.
+            await new EmprestimoService(_db).DevolverTodosAsync("fim-de-temporada", ct);
+            await LimparMercadoAsync(request, ct);
+
+            await tx.CommitAsync(ct);
+        });
 
         return criadas;
+    }
+
+    public async Task<TemporadaViradaMercadoDto> GetViradaMercadoAsync(CancellationToken ct)
+    {
+        var minimos = await _db.Teams.AsNoTracking()
+            .Where(t => t.MinRosterSizeOverride != null)
+            .OrderBy(t => t.TeamName)
+            .Select(t => new { t.TeamName, t.MinRosterSizeOverride })
+            .ToListAsync(ct);
+
+        return new TemporadaViradaMercadoDto(
+            await _db.Emprestimos.CountAsync(e => e.Status == EmprestimoStatus.Ativo, ct),
+            await _db.TransferOffers.CountAsync(o => o.Status == OfferStatus.Pending, ct),
+            await _db.TeamRosters.CountAsync(r => r.AskingPrice != null, ct),
+            await _db.Teams.CountAsync(t => t.TransferCount != 0 || t.LoanCount != 0 || t.QuickSellCount != 0, ct),
+            minimos.Select(t => $"{t.TeamName} ({t.MinRosterSizeOverride})").ToList());
+    }
+
+    /// <summary>A janela da temporada nova começa do zero, conforme o que a virada pediu.</summary>
+    private async Task LimparMercadoAsync(GerarProximaTemporadaRequest request, CancellationToken ct)
+    {
+        if (request.ZerarContadores)
+        {
+            // Transferências e empréstimos zeram juntos; vendas rápidas à parte.
+            var transferConfig = new TransferConfigService(_db);
+            await transferConfig.ResetTransferCountsAsync(ct);
+            await transferConfig.ResetQuickSellCountsAsync(ct);
+        }
+
+        if (request.CancelarPropostas)
+        {
+            var agora = DateTime.UtcNow;
+            await _db.TransferOffers
+                .Where(o => o.Status == OfferStatus.Pending)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(o => o.Status, OfferStatus.Cancelled)
+                    .SetProperty(o => o.UpdatedAtUtc, agora), ct);
+        }
+
+        if (request.LimparListaTransferencias)
+            await _db.TeamRosters
+                .Where(r => r.AskingPrice != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AskingPrice, (decimal?)null), ct);
+
+        if (request.RemoverMinimosTemporarios)
+            await _db.Teams
+                .Where(t => t.MinRosterSizeOverride != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.MinRosterSizeOverride, (int?)null), ct);
     }
 
     private async Task<TemporadaSupercopaDto> CarregarSupercopaAsync(int temporada, CancellationToken ct)
