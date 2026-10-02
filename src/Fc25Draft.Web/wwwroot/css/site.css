@@ -368,3 +368,12 @@ a, .btn-link {
     --cbfv-teal: #5eead4;
     --cbfv-rosa: #f783ac;
 }
+
+/* Foto do jogador: redonda, recortada no centro; a silhueta aparece quando não tem foto. */
+.foto-jogador {
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--bs-tertiary-bg);
+    flex-shrink: 0;
+    vertical-align: middle;
+}

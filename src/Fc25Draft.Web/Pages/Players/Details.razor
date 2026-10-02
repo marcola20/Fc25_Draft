@@ -8,10 +8,11 @@
 @inject AdminAuthService AdminAuth
 @inject IMinhaAreaService MinhaArea
 @inject IPricingService Pricing
+@inject IFotosJogadoresService Fotos
+@inject IJSRuntime JS
+@inject EscudoService Escudos
 
 @implements IDisposable
-
-<h3>Detalhes do Jogador</h3>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -28,72 +29,101 @@ else if (player is null)
 }
 else
 {
-    <dl class="row">
-        <dt class="col-sm-3">Nome</dt>
-        <dd class="col-sm-9">@player.Name</dd>
+    <div class="card jogador-hero mb-3">
+        <div class="card-body">
+            <div class="jogador-hero-corpo">
+                <div class="jogador-hero-foto">
+                    <FotoJogador PlayerId="@player.PlayerId" Tamanho="120" Versao="@_versaoFoto" Alt="@player.Name" Classe="jogador-hero-img" />
+                    @if (AdminAuth.IsAdmin)
+                    {
+                        <div class="jogador-hero-foto-admin">
+                            <label class="btn btn-link btn-sm p-0" title="Trocar a foto deste jogador">
+                                📷 Trocar
+                                <input type="file" id="fotoJogadorArquivo" accept="image/*" class="d-none" @onchange="TrocarFotoAsync" />
+                            </label>
+                            @if (_foto?.TemFoto == true)
+                            {
+                                <span class="text-muted">·</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-danger" @onclick="RemoverFotoAsync">Remover</button>
+                            }
+                        </div>
+                        @if (_foto?.TemFoto == true)
+                        {
+                            <div class="small text-muted">@(_foto.Origem == "MANUAL" ? "foto trocada à mão" : "foto do PES")</div>
+                        }
+                    }
+                </div>
 
-        <dt class="col-sm-3">Overall</dt>
-        <dd class="col-sm-9">
-            @player.Overall
-            @if (OverallPes.CalcularDoJogador(player.Atributos) is double formula)
-            {
-                <span class="text-muted small ms-1">
-                    pelos atributos do PES (@formula.ToString("0.00") na fórmula) ·
-                    <a href="/overall">como é calculado</a>
-                </span>
-            }
-        </dd>
+                <div class="jogador-hero-info">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h2 class="jogador-hero-nome">@player.Name</h2>
+                        <span class="badge jogador-hero-overall @CorDoOverall(player.Overall)" title="Overall">@player.Overall</span>
+                    </div>
+                    <div class="jogador-hero-sub">
+                        <span>@player.PositionName</span>
+                        @if (player.Age is int idade)
+                        {
+                            <span>· @idade anos</span>
+                        }
+                        <span>·</span>
+                        @if (player.TeamId is Guid teamId && !string.IsNullOrWhiteSpace(player.TeamName))
+                        {
+                            <a href="/teams/details/@teamId" class="jogador-hero-time">
+                                <img src="@Escudos.GetEscudo(player.TeamName)" alt="" />@player.TeamName
+                            </a>
+                        }
+                        else
+                        {
+                            <span>sem time</span>
+                        }
+                    </div>
 
-        <dt class="col-sm-3">Idade</dt>
-        <dd class="col-sm-9">@(player.Age?.ToString() ?? "-")</dd>
+                    <div class="jogador-hero-numeros">
+                        <div>
+                            <div class="jogador-hero-rotulo">Valor de mercado</div>
+                            <div class="jogador-hero-valor">@(_valorDeMercado is decimal valor ? Dinheiro.Curto(valor) : "—")</div>
+                        </div>
+                        <div>
+                            <div class="jogador-hero-rotulo">Situação</div>
+                            <div class="jogador-hero-valor">@player.Status</div>
+                        </div>
+                        @if (OverallPes.CalcularDoJogador(player.Atributos) is double formula)
+                        {
+                            <div>
+                                <div class="jogador-hero-rotulo">Overall pela fórmula do PES</div>
+                                <div class="jogador-hero-valor">
+                                    @formula.ToString("0.00") <a href="/overall" class="small fw-normal">como é calculado</a>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
 
-        <dt class="col-sm-3">Valor de mercado</dt>
-        <dd class="col-sm-9">@(_valorDeMercado is decimal valor ? Dinheiro.Curto(valor) : "-")</dd>
-
-        <dt class="col-sm-3">Posição</dt>
-        <dd class="col-sm-9">@player.PositionName</dd>
-
-        <dt class="col-sm-3">Status</dt>
-        <dd class="col-sm-9">@player.Status</dd>
-
-        <dt class="col-sm-3">Time</dt>
-        <dd class="col-sm-9">
-            @if (player.TeamId is Guid teamId && !string.IsNullOrWhiteSpace(player.TeamName))
-            {
-                <a href="/teams/details/@teamId" class="text-primary">@player.TeamName</a>
-            }
-            else
-            {
-                <span>-</span>
-            }
-        </dd>
-    </dl>
-
-    <div class="d-flex flex-wrap gap-2">
-        @* Treinador logado com o token do time não é administrador. *@
-        @if (AdminAuth.IsAdmin)
-        {
-            <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
-                Editar
-            </button>
-        }
-
-        <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-outline-primary">⚖️ Comparar com outro jogador</a>
-
-        @if (_podeObservar)
-        {
-            <button type="button" class="btn @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
-                    title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
-                @(_observando ? "★ Observando" : "☆ Observar")
-            </button>
-        }
-
-        <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
-            Voltar
-        </button>
+                <div class="jogador-hero-acoes">
+                    @* Treinador logado com o token do time não é administrador. *@
+                    @if (AdminAuth.IsAdmin)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
+                            ✏️ Editar
+                        </button>
+                    }
+                    <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-sm btn-outline-primary">⚖️ Comparar</a>
+                    @if (_podeObservar)
+                    {
+                        <button type="button" class="btn btn-sm @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
+                                title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
+                            @(_observando ? "★ Observando" : "☆ Observar")
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
+                        ← Jogadores
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <ul class="nav nav-tabs mt-4 mb-3" role="tablist">
+    <ul class="nav nav-tabs mb-3" role="tablist">
         @if (player.Atributos is not null)
         {
             <li class="nav-item" role="presentation">
@@ -109,6 +139,12 @@ else
                 </button>
             </li>
         }
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(_aba == Aba.Jogos ? "active" : "")"
+                    type="button" @onclick="() => _aba = Aba.Jogos">
+                Jogos
+            </button>
+        </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link @(_aba == Aba.Carreira ? "active" : "")"
                     type="button" @onclick="() => _aba = Aba.Carreira">
@@ -126,8 +162,13 @@ else
     {
         <HabilidadesJogador Atributos="atributosHab" />
     }
+    else if (_aba == Aba.Jogos)
+    {
+        <JogadorJogos @key="@($"jogos-{player.PlayerId}")" PlayerId="@player.PlayerId" />
+    }
     else
     {
+        <EvolucaoOverall @key="@($"overall-{player.PlayerId}")" PlayerId="@player.PlayerId" />
         <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
     }
 }
@@ -146,7 +187,52 @@ else
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
 
-    private enum Aba { Atributos, Habilidades, Carreira }
+    private enum Aba { Atributos, Habilidades, Jogos, Carreira }
+
+    // Mesma escala de cores dos atributos.
+    private static string CorDoOverall(int overall) => overall switch
+    {
+        >= 90 => "bg-danger",
+        >= 85 => "jogador-overall-laranja",
+        >= 80 => "bg-warning text-dark",
+        >= 75 => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    // Foto: origem (PES ou trocada à mão) e a versão que força o navegador a buscar a nova.
+    private FotoJogadorInfo? _foto;
+    private string? _versaoFoto;
+
+    private sealed record FotoLida(string Base64, string Tipo);
+
+    private async Task TrocarFotoAsync(ChangeEventArgs _)
+    {
+        if (!AdminAuth.IsAdmin || player is null) return;
+        try
+        {
+            var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", "fotoJogadorArquivo");
+            if (lida is null) return;
+            await Fotos.TrocarAsync(player.PlayerId, Convert.FromBase64String(lida.Base64), CancellationToken.None);
+            await AtualizarFotoAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException or FormatException)
+        {
+            errorMessage = ex is JSException ? "Não foi possível ler a imagem escolhida." : ex.Message;
+        }
+    }
+
+    private async Task RemoverFotoAsync()
+    {
+        if (!AdminAuth.IsAdmin || player is null) return;
+        await Fotos.RemoverAsync(player.PlayerId, CancellationToken.None);
+        await AtualizarFotoAsync();
+    }
+
+    private async Task AtualizarFotoAsync()
+    {
+        _foto = await Fotos.InfoAsync(player!.PlayerId, CancellationToken.None);
+        _versaoFoto = DateTime.UtcNow.Ticks.ToString("x");
+    }
     private Aba _aba;
 
     private int? _carregadoId;
@@ -220,6 +306,7 @@ else
             else
             {
                 _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
+                _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
             }
         }
         catch (Exception ex)

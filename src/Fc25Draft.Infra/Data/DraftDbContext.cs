@@ -98,6 +98,7 @@ public class DraftDbContext : DbContext
     public DbSet<InscricaoPush> InscricoesPush => Set<InscricaoPush>();
     public DbSet<ChavePush> ChavesPush => Set<ChavePush>();
     public DbSet<NotificacaoEnviada> NotificacoesEnviadas => Set<NotificacaoEnviada>();
+    public DbSet<FotoJogador> FotosJogadores => Set<FotoJogador>();
     public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
     public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
     public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();

@@ -1,0 +1,60 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IJogadorHistoricoService Historico
+
+@* Degraus do overall ao longo do tempo (venda rápida, evolução no PES…). Some quando nunca mudou. *@
+@if (_pontos is { Count: > 1 } pontos)
+{
+    var min = pontos.Min(p => p.Overall) - 1;
+    var max = pontos.Max(p => p.Overall) + 1;
+    var largura = 600.0;
+    var altura = 120.0;
+    double X(int i) => 30 + i * (largura - 50) / (pontos.Count - 1);
+    double Y(int overall) => 10 + (max - overall) * (altura - 30) / Math.Max(1, max - min);
+
+    <div class="card mb-3">
+        <div class="card-header"><strong>📈 Evolução do overall</strong></div>
+        <div class="card-body">
+            <svg viewBox="0 0 @Num(largura) @Num(altura)" class="w-100" style="max-height: 160px;" role="img"
+                 aria-label="Evolução do overall de @pontos[0].Overall para @pontos[^1].Overall">
+                <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5"
+                          points="@string.Join(" ", pontos.Select((p, i) => i == 0
+                                      ? $"{Num(X(i))},{Num(Y(p.Overall))}"
+                                      : $"{Num(X(i))},{Num(Y(pontos[i - 1].Overall))} {Num(X(i))},{Num(Y(p.Overall))}"))" />
+                @for (var i = 0; i < pontos.Count; i++)
+                {
+                    var p = pontos[i];
+                    <circle cx="@Num(X(i))" cy="@Num(Y(p.Overall))" r="5" fill="var(--cbfv-azul)">
+                        <title>@BrazilTime.FormatDateTime(p.Data, "dd/MM/yy") · @p.Motivo · @p.Overall</title>
+                    </circle>
+                    <g><text x="@Num(X(i))" y="@Num(Y(p.Overall) - 9)" text-anchor="middle" font-size="12"
+                          fill="currentColor">@p.Overall</text></g>
+                }
+            </svg>
+            <ul class="list-unstyled small text-muted mb-0 mt-2">
+                @for (var i = 1; i < pontos.Count; i++)
+                {
+                    var p = pontos[i];
+                    var dif = p.Overall - pontos[i - 1].Overall;
+                    <li>
+                        @BrazilTime.FormatDateTime(p.Data, "dd/MM/yy") · @p.Motivo:
+                        <span class="@(dif > 0 ? "text-success" : "text-danger") fw-semibold">@(dif > 0 ? "+" : "")@dif</span>
+                        (@pontos[i - 1].Overall → @p.Overall)
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    private IReadOnlyList<JogadorOverallPontoDto>? _pontos;
+
+    protected override async Task OnParametersSetAsync() =>
+        _pontos = await Historico.EvolucaoOverallAsync(PlayerId, CancellationToken.None);
+
+    private static string Num(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+}

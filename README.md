@@ -79,3 +79,16 @@ Os administradores têm token próprio, gerenciado em Admin › Administradores.
 Os jogos simulados no PES 2021 entram pelo `POST /api/admin/liga/resultados-pes` (token de admin;
 `?simular=true` testa sem gravar). O envio é feito pelo `enviar_resultados.py`, que fica no projeto
 Auto_PES21.
+
+## Fotos dos jogadores
+
+As fotos ficam no banco (tabela `FotosJogadores`). As do PES entram pelo script, que lê os rostos do
+patch e manda só os dos jogadores ligados ao PES (precisa do Pillow):
+
+```powershell
+$env:CBFV_API_TOKEN = "<token de admin>"
+python scripts/pes/enviar_fotos_pes.py
+```
+
+Foto errada se troca na página do jogador (botão "Trocar foto", só admin). A trocada à mão nunca é
+sobrescrita pelo script, que pode rodar de novo sempre que jogadores novos forem ligados ao PES.

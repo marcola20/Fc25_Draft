@@ -1,0 +1,21 @@
+@* Foto do jogador (ou a silhueta, quando não tem): o endereço é sempre o mesmo, o servidor decide. *@
+<img src="@Src"
+     alt="@Alt" loading="lazy" decoding="async"
+     class="foto-jogador @Classe"
+     style="width: @(Tamanho)px; height: @(Tamanho)px;" />
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    /// <summary>Lado em pixels.</summary>
+    [Parameter] public int Tamanho { get; set; } = 28;
+
+    [Parameter] public string? Classe { get; set; }
+
+    [Parameter] public string Alt { get; set; } = "";
+
+    /// <summary>Muda quando a foto é trocada, para o navegador não mostrar a antiga do cache.</summary>
+    [Parameter] public string? Versao { get; set; }
+
+    private string Src => string.IsNullOrEmpty(Versao) ? $"/fotos/jogadores/{PlayerId}" : $"/fotos/jogadores/{PlayerId}?v={Versao}";
+}

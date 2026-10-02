@@ -338,3 +338,41 @@ window.cbfvPush = (function () {
         }
     };
 })();
+
+// Foto do jogador escolhida pelo admin: recorta no centro, reduz para 160×160 e comprime (WebP, ou JPEG
+// onde o navegador não gera WebP) para caber na conexão do Blazor (~32 KB por mensagem).
+window.cbfvFoto = {
+    ler: async function (inputId) {
+        const input = document.getElementById(inputId);
+        const arquivo = input && input.files && input.files[0];
+        if (!arquivo) return null;
+
+        const url = URL.createObjectURL(arquivo);
+        try {
+            const img = await new Promise((ok, erro) => {
+                const i = new Image();
+                i.onload = () => ok(i);
+                i.onerror = erro;
+                i.src = url;
+            });
+            const lado = Math.min(img.naturalWidth, img.naturalHeight);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 160;
+            canvas.getContext('2d').drawImage(img,
+                (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, 160, 160);
+
+            for (const qualidade of [0.85, 0.7, 0.55]) {
+                let dados = canvas.toDataURL('image/webp', qualidade);
+                if (!dados.startsWith('data:image/webp')) dados = canvas.toDataURL('image/jpeg', qualidade);
+                const base64 = dados.substring(dados.indexOf(',') + 1);
+                if (base64.length < 28000) {
+                    return { base64: base64, tipo: dados.substring(5, dados.indexOf(';')) };
+                }
+            }
+            throw new Error('Imagem grande demais mesmo comprimida.');
+        } finally {
+            URL.revokeObjectURL(url);
+            input.value = '';
+        }
+    }
+};

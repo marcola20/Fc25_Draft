@@ -1,0 +1,127 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IJogadorHistoricoService Historico
+
+@* Jogo a jogo do jogador, com a nota do PES. *@
+@if (_dados is null)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_dados.Jogos.Count == 0)
+{
+    <div class="alert alert-info mb-0">Nenhum jogo registrado ainda.</div>
+}
+else
+{
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Jogos</div><h4 class="mb-0">@_dados.Jogos.Count</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Média das notas</div>
+                <h4 class="mb-0">@(_dados.MediaNotas?.ToString("0.00") ?? "—")</h4>
+                @if (_dados.JogosComNota > 0)
+                {
+                    <div class="small text-muted">em @_dados.JogosComNota jogo@(_dados.JogosComNota == 1 ? "" : "s")</div>
+                }
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Melhor nota</div><h4 class="mb-0">@(_dados.MelhorNota?.ToString("0.0") ?? "—")</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Melhor em campo</div><h4 class="mb-0">⭐ @_dados.VezesMelhorEmCampo</h4>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" style="font-size:0.875rem;">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data</th>
+                    <th>Jogo</th>
+                    <th class="text-center">Placar</th>
+                    <th class="text-center">Nota</th>
+                    <th class="text-center" title="Gols">G</th>
+                    <th class="text-center" title="Assistências">A</th>
+                    <th class="text-center d-none d-md-table-cell">Cartões</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var j in _dados.Jogos)
+                {
+                    <tr>
+                        <td class="text-muted small text-nowrap">@(j.Quando?.ToString("dd/MM/yy") ?? "—")</td>
+                        <td>
+                            <div>
+                                @(j.EmCasa ? "x" : "@") <a href="/teams/details/@j.AdversarioId">@j.AdversarioNome</a>
+                                @if (j.Titular == false)
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1" title="Entrou durante o jogo">reserva</span>
+                                }
+                            </div>
+                            <div class="small text-muted">@j.Competicao · @j.Rotulo · pelo @j.TimeNome</div>
+                        </td>
+                        <td class="text-center text-nowrap">
+                            <span class="badge @CorDoResultado(j.Resultado)">@j.GolsPro x @j.GolsContra</span>
+                        </td>
+                        <td class="text-center text-nowrap">
+                            @if (j.Nota is decimal nota)
+                            {
+                                <span class="fw-semibold @CorDaNota(nota)">@nota.ToString("0.0")</span>
+                                @if (j.MelhorEmCampo)
+                                {
+                                    <span title="Melhor em campo">⭐</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td class="text-center">@(j.Gols > 0 ? j.Gols.ToString() : "")</td>
+                        <td class="text-center">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "")</td>
+                        <td class="text-center d-none d-md-table-cell">
+                            @for (var i = 0; i < j.Amarelos; i++) { <span>🟨</span> }
+                            @for (var i = 0; i < j.Vermelhos; i++) { <span>🟥</span> }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="small text-muted mb-0">A nota é a do PES, que só avalia os titulares.</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    private JogadorJogosDto? _dados;
+
+    protected override async Task OnParametersSetAsync() =>
+        _dados = await Historico.JogosAsync(PlayerId, CancellationToken.None);
+
+    private static string CorDoResultado(string? r) => r switch
+    {
+        "V" => "bg-success",
+        "D" => "bg-danger",
+        "E" => "bg-secondary",
+        _ => "bg-info text-dark"
+    };
+
+    // Mesma leitura do PES: 7+ muito bom, 6 regular, abaixo de 5,5 ruim.
+    private static string CorDaNota(decimal nota) => nota switch
+    {
+        >= 7.0m => "text-success",
+        >= 6.0m => "",
+        >= 5.5m => "text-warning-emphasis",
+        _ => "text-danger"
+    };
+}

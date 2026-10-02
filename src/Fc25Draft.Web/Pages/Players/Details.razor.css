@@ -1,0 +1,142 @@
+/* Cartão de apresentação do jogador: foto, nome com o overall, dados e ações. */
+.jogador-hero {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 8px 24px rgba(27, 38, 59, 0.08);
+    overflow: hidden;
+    background:
+        linear-gradient(135deg, rgba(13, 110, 253, 0.08), transparent 55%),
+        var(--bs-body-bg);
+}
+
+.jogador-hero-corpo {
+    display: flex;
+    align-items: center;
+    gap: 1.75rem;
+}
+
+.jogador-hero-foto {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.jogador-hero-foto ::deep .jogador-hero-img {
+    box-shadow: 0 0 0 4px var(--bs-body-bg), 0 0 0 6px var(--cbfv-azul), 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.jogador-hero-foto-admin {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+}
+
+.jogador-hero-foto-admin .btn-link {
+    font-size: 0.8rem;
+    text-decoration: none;
+}
+
+.jogador-hero-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.jogador-hero-nome {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--bs-emphasis-color);
+}
+
+.jogador-hero-overall {
+    font-size: 1.15rem;
+    padding: 0.4em 0.6em;
+    border-radius: 0.6rem;
+}
+
+.jogador-overall-laranja {
+    background-color: #fd7e14;
+    color: #fff;
+}
+
+.jogador-hero-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+    color: var(--bs-secondary-color);
+    font-size: 1rem;
+}
+
+.jogador-hero-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.jogador-hero-time img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.jogador-hero-numeros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2rem;
+    margin-top: 1rem;
+}
+
+.jogador-hero-rotulo {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color);
+}
+
+.jogador-hero-valor {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--bs-emphasis-color);
+}
+
+.jogador-hero-acoes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-self: flex-start;
+    flex-shrink: 0;
+}
+
+/* Celular: foto e nome no centro, ações embaixo em linha. */
+@media (max-width: 768px) {
+    .jogador-hero-corpo {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .jogador-hero-info .d-flex,
+    .jogador-hero-sub,
+    .jogador-hero-numeros {
+        justify-content: center;
+    }
+
+    .jogador-hero-nome {
+        font-size: 1.6rem;
+    }
+
+    .jogador-hero-acoes {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-self: stretch;
+    }
+}

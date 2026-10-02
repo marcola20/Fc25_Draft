@@ -65,6 +65,8 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IAvisosService, AvisosService>();
             services.AddComConexaoPropria<IAdminLogService, AdminLogService>();
             services.AddComConexaoPropria<IPushService, PushService>();
+            services.AddComConexaoPropria<IFotosJogadoresService, FotosJogadoresService>();
+            services.AddComConexaoPropria<IJogadorHistoricoService, JogadorHistoricoService>();
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
             services.AddComConexaoPropria<IPremiacaoService, PremiacaoService>();
             services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();

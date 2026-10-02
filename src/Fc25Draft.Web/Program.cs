@@ -193,6 +193,7 @@ api.MapDraftEndpoints()
    .MapPesEndpoints()
    .MapLigaEndpoints();
 
+app.MapFotosEndpoints();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 app.MapHealthChecks("/health");
