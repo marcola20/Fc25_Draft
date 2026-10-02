@@ -159,6 +159,12 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Extrato ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Extrato">
+                Extrato
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Negotiations ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Negotiations"
                     disabled="@(!_canQuickSell)">
@@ -187,6 +193,10 @@ else
     else if (_activeMainTab == MainTab.Transferencias)
     {
         <TimeTransferenciasTab @key="Id" TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Extrato)
+    {
+        <TimeExtratoTab @key="Id" TeamId="@Id" />
     }
     else
     {
@@ -481,6 +491,10 @@ else
     [Parameter, SupplyParameterFromQuery(Name = "negociar")]
     public Guid? NegociarJogador { get; set; }
 
+    /// <summary>Aba que a página já abre (?aba=extrato vem da Minha Área).</summary>
+    [Parameter, SupplyParameterFromQuery(Name = "aba")]
+    public string? Aba { get; set; }
+
     private Guid? _propostaPorJogador;
     private RosterPlayerViewModel? _listingTarget;
     private decimal _listingPrice;
@@ -543,7 +557,7 @@ else
         }
 
         _carregadoId = Id;
-        _activeMainTab = MainTab.Info;
+        _activeMainTab = string.Equals(Aba, "extrato", StringComparison.OrdinalIgnoreCase) ? MainTab.Extrato : MainTab.Info;
         _quickSellSuccessMessage = null;
         _perfil = null;
 
@@ -1023,7 +1037,8 @@ else
         Jogos,
         Historico,
         Transferencias,
-        Negotiations
+        Negotiations,
+        Extrato
     }
 
     private enum RosterSortColumn

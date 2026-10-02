@@ -191,6 +191,8 @@ public class TeamQuickSellService : ITeamQuickSellService
 
                 team.Budget = decimal.Round(team.Budget + payout, 2, MidpointRounding.AwayFromZero);
                 team.QuickSellCount++;
+                ExtratoCaixa.Lancar(_dbContext, team.TeamId, payout, ExtratoCaixa.VendaRapida,
+                    $"Venda rápida de {player.Name}", _timeProvider.GetUtcNow().UtcDateTime);
 
                 var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout, evolucao);
                 var historyEntry = new TransferHistory

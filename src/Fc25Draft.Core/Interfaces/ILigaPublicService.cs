@@ -68,6 +68,9 @@ public interface ILigaPublicService
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Extrato do caixa do time: cada entrada e saída, com o saldo depois de cada uma.</summary>
+    Task<ExtratoTimeDto?> GetExtratoTimeAsync(Guid timeId, CancellationToken ct);
+
     /// <summary>Carreira do jogador: números por competição e time, títulos e trajetória (draft e transferências).</summary>
     Task<JogadorCarreiraDto?> GetCarreiraJogadorAsync(int jogadorId, CancellationToken ct);
 

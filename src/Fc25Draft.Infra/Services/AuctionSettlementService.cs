@@ -203,6 +203,8 @@ public class AuctionSettlementService : IAuctionSettlementService
             {
                 team.Budget = 0m;
             }
+            ExtratoCaixa.Lancar(_dbContext, team.TeamId, -amount, ExtratoCaixa.Leilao,
+                $"Leilão: {item.Player.Name}", _timeProvider.GetUtcNow().UtcDateTime);
 
             var player = await _dbContext.Players
                 .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)

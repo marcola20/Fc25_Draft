@@ -164,6 +164,8 @@ public partial class AdminTransferService
                 ?? throw new KeyNotFoundException($"Time {teamId} não encontrado.");
 
             team.Budget = decimal.Round(team.Budget + normalizedDelta, 2, MidpointRounding.AwayFromZero);
+            ExtratoCaixa.Lancar(_dbContext, team.TeamId, normalizedDelta, ExtratoCaixa.AjusteAdmin,
+                string.IsNullOrWhiteSpace(normalizedReason) ? "Ajuste de caixa pela organização" : $"Ajuste de caixa: {normalizedReason}", now);
 
             var logEntry = new AdminActionsLog
             {
@@ -239,6 +241,9 @@ public partial class AdminTransferService
 
             toTeam.Budget = decimal.Round(toTeam.Budget - normalizedAmount, 2, MidpointRounding.AwayFromZero);
             fromTeam.Budget = decimal.Round(fromTeam.Budget + normalizedAmount, 2, MidpointRounding.AwayFromZero);
+            var descricaoVenda = $"Venda (pela organização) de {FormatPlayerList(players)}: {fromTeam.TeamName} para {toTeam.TeamName}";
+            ExtratoCaixa.Lancar(_dbContext, toTeam.TeamId, -normalizedAmount, ExtratoCaixa.VendaAdmin, descricaoVenda, now);
+            ExtratoCaixa.Lancar(_dbContext, fromTeam.TeamId, normalizedAmount, ExtratoCaixa.VendaAdmin, descricaoVenda, now);
 
             foreach (var player in players) player.CurrentTeamId = toTeamId;
 
@@ -448,6 +453,12 @@ public partial class AdminTransferService
                 var abs = Math.Abs(normalizedCashAdjust);
                 teamB.Budget = decimal.Round(teamB.Budget - abs, 2, MidpointRounding.AwayFromZero);
                 teamA.Budget = decimal.Round(teamA.Budget + abs, 2, MidpointRounding.AwayFromZero);
+            }
+            if (normalizedCashAdjust != 0m)
+            {
+                var descricaoTroca = $"Troca (pela organização) entre {teamA.TeamName} e {teamB.TeamName}";
+                ExtratoCaixa.Lancar(_dbContext, teamA.TeamId, -normalizedCashAdjust, ExtratoCaixa.TrocaAdmin, descricaoTroca, now);
+                ExtratoCaixa.Lancar(_dbContext, teamB.TeamId, normalizedCashAdjust, ExtratoCaixa.TrocaAdmin, descricaoTroca, now);
             }
 
             string adjustmentDescription;

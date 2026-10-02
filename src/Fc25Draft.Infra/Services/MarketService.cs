@@ -350,6 +350,8 @@ public class MarketService : IMarketService
 
             team.Budget -= buyNowPrice;
             team.BudgetBlocked = Math.Max(0m, team.BudgetBlocked - blockedForItem);
+            ExtratoCaixa.Lancar(_dbContext, team.TeamId, -buyNowPrice, ExtratoCaixa.CompraImediata,
+                $"Compra imediata: {player.Name}", _timeProvider.GetUtcNow().UtcDateTime);
 
             player.CurrentTeamId = team.TeamId;
             await SyncRosterAsync(team.TeamId, player.PlayerId, ct2);

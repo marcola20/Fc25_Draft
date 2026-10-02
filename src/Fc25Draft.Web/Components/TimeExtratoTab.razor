@@ -1,0 +1,150 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject ILigaPublicService LigaService
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_erro is not null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar o extrato:</strong> @_erro</div>
+}
+else if (_dados is null)
+{
+    <div class="alert alert-info mb-0">Time não encontrado.</div>
+}
+else
+{
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Caixa hoje</div><h4 class="mb-0">@Dinheiro.Curto(_dados.Saldo)</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Entradas</div><h4 class="mb-0 text-success">@Dinheiro.Curto(_dados.Entradas)</h4>
+            </div></div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">Saídas</div><h4 class="mb-0 text-danger">@Dinheiro.Curto(_dados.Saidas)</h4>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        @foreach (var filtro in Filtros)
+        {
+            var f = filtro;
+            <button type="button" class="btn btn-sm @(_filtro == f.Chave ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => _filtro = f.Chave">@f.Rotulo</button>
+        }
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" style="font-size:0.875rem;">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width:8.5rem;">Data</th>
+                    <th>Movimento</th>
+                    <th class="text-end" style="width:8rem;">Valor</th>
+                    <th class="text-end d-none d-md-table-cell" style="width:8rem;">Saldo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Visiveis)
+                {
+                    <tr>
+                        <td class="text-muted small">@BrazilTime.FormatDateTime(l.DataUtc, "dd/MM/yy HH:mm")</td>
+                        <td>
+                            <span class="badge bg-light text-dark border me-1">@Rotulo(l.Origem)</span>
+                            <span class="small">@l.Descricao</span>
+                        </td>
+                        <td class="text-end fw-semibold text-nowrap @(l.Valor >= 0 ? "text-success" : "text-danger")">
+                            @(l.Valor >= 0 ? "+" : "−")@Dinheiro.Curto(Math.Abs(l.Valor))
+                        </td>
+                        <td class="text-end text-muted text-nowrap d-none d-md-table-cell">@Dinheiro.Curto(l.SaldoDepois)</td>
+                    </tr>
+                }
+                @if (_filtro == "todos")
+                {
+                    <tr class="table-light">
+                        <td></td>
+                        <td class="small text-muted" colspan="2">
+                            Saldo anterior: caixa inicial e ajustes antigos que não deixaram registro
+                        </td>
+                        <td class="text-end text-muted text-nowrap d-none d-md-table-cell">@Dinheiro.Curto(_dados.SaldoAnterior)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (!Visiveis.Any())
+        {
+            <div class="text-center text-muted py-3">Nenhum lançamento.</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private ExtratoTimeDto? _dados;
+    private bool _loading = true;
+    private string? _erro;
+    private string _filtro = "todos";
+
+    private sealed record Filtro(string Chave, string Rotulo, Func<ExtratoLancamentoDto, bool> Aceita);
+
+    private static readonly Filtro[] Filtros =
+    [
+        new("todos", "Tudo", _ => true),
+        new("entradas", "Entradas", l => l.Valor > 0),
+        new("saidas", "Saídas", l => l.Valor < 0),
+        new("mercado", "Leilão", l => l.Origem is "LEILAO" or "COMPRA_IMEDIATA"),
+        new("transferencias", "Transferências", l => l.Origem is "TRANSFERENCIA" or "TROCA" or "EMPRESTIMO" or "OPCAO_COMPRA" or "VENDA_ADMIN" or "TROCA_ADMIN"),
+        new("vendarapida", "Vendas rápidas", l => l.Origem == "VENDA_RAPIDA"),
+        new("premios", "Prêmios e organização", l => l.Origem is "PREMIACAO" or "DRAFT_EXPANSAO" or "EXPANSAO_CAIXA_INICIAL" or "AJUSTE_ADMIN"),
+    ];
+
+    private IEnumerable<ExtratoLancamentoDto> Visiveis =>
+        (_dados?.Lancamentos ?? []).Where(Filtros.First(f => f.Chave == _filtro).Aceita);
+
+    private static string Rotulo(string origem) => origem switch
+    {
+        "LEILAO" => "Leilão",
+        "COMPRA_IMEDIATA" => "Compra imediata",
+        "VENDA_RAPIDA" => "Venda rápida",
+        "TRANSFERENCIA" => "Transferência",
+        "TROCA" => "Troca",
+        "EMPRESTIMO" => "Empréstimo",
+        "OPCAO_COMPRA" => "Opção de compra",
+        "PREMIACAO" => "Premiação",
+        "DRAFT_EXPANSAO" => "Draft de expansão",
+        "EXPANSAO_CAIXA_INICIAL" => "Caixa inicial",
+        "AJUSTE_ADMIN" => "Ajuste",
+        "VENDA_ADMIN" => "Venda (organização)",
+        "TROCA_ADMIN" => "Troca (organização)",
+        _ => CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(origem.Replace('_', ' ').ToLowerInvariant())
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _erro = null;
+        try
+        {
+            _dados = await LigaService.GetExtratoTimeAsync(TeamId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

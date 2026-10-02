@@ -153,6 +153,20 @@ public record PartidaEscalacaoJogadorDto(
     decimal? Nota = null,
     bool MelhorEmCampo = false);
 
+/// <summary>Um lançamento do extrato do caixa. <paramref name="Valor"/> com sinal: positivo entrou, negativo saiu.</summary>
+public record ExtratoLancamentoDto(DateTime DataUtc, string Origem, string? Descricao, decimal Valor, decimal SaldoDepois);
+
+/// <summary>
+/// Extrato do caixa do time, do mais recente para o mais antigo. <paramref name="SaldoAnterior"/> é o caixa
+/// antes do primeiro lançamento registrado (caixa inicial e ajustes antigos que não deixaram registro).
+/// </summary>
+public record ExtratoTimeDto(
+    decimal Saldo,
+    decimal Entradas,
+    decimal Saidas,
+    decimal SaldoAnterior,
+    IReadOnlyList<ExtratoLancamentoDto> Lancamentos);
+
 /// <summary>Jogador da seleção da rodada, escolhido pela nota do PES.</summary>
 public record SelecaoRodadaJogadorDto(
     int JogadorId,

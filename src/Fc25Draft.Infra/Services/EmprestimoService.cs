@@ -67,6 +67,9 @@ public class EmprestimoService : IEmprestimoService
 
         tomador.Budget = decimal.Round(tomador.Budget - preco, 2, MidpointRounding.AwayFromZero);
         dono.Budget = decimal.Round(dono.Budget + preco, 2, MidpointRounding.AwayFromZero);
+        var descricao = $"Opção de compra de {emprestimo.Player.Name}: {tomador.TeamName} compra do {dono.TeamName}";
+        ExtratoCaixa.Lancar(_db, tomador.TeamId, -preco, ExtratoCaixa.OpcaoDeCompra, descricao, now);
+        ExtratoCaixa.Lancar(_db, dono.TeamId, preco, ExtratoCaixa.OpcaoDeCompra, descricao, now);
 
         emprestimo.Status = EmprestimoStatus.Comprado;
         emprestimo.FimUtc = now;

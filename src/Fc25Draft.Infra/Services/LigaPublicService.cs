@@ -1493,6 +1493,40 @@ public class LigaPublicService : ILigaPublicService
         _ => $"Rodada {rodada}"
     };
 
+    public async Task<ExtratoTimeDto?> GetExtratoTimeAsync(Guid timeId, CancellationToken ct)
+    {
+        var saldo = await _db.Teams.AsNoTracking()
+            .Where(t => t.TeamId == timeId)
+            .Select(t => (decimal?)t.Budget)
+            .FirstOrDefaultAsync(ct);
+        if (saldo is not decimal caixa) return null;
+
+        var lancamentos = await _db.BudgetLedgers.AsNoTracking()
+            .Where(l => l.TeamId == timeId)
+            .OrderByDescending(l => l.DataUtc)
+            .ThenByDescending(l => l.Tipo) // no mesmo instante, a saída aparece antes da entrada
+            .Select(l => new { l.DataUtc, l.Origem, l.Descricao, Valor = l.Tipo == "CREDIT" ? l.Valor : -l.Valor })
+            .ToListAsync(ct);
+
+        // Saldo depois de cada lançamento, voltando a partir do caixa de hoje.
+        var itens = new List<ExtratoLancamentoDto>(lancamentos.Count);
+        var depois = caixa;
+        foreach (var l in lancamentos)
+        {
+            // timestamptz chega em hora local (Npgsql em modo legado): normaliza para UTC.
+            var dataUtc = l.DataUtc.Kind == DateTimeKind.Local ? l.DataUtc.ToUniversalTime() : l.DataUtc;
+            itens.Add(new ExtratoLancamentoDto(dataUtc, l.Origem, l.Descricao, l.Valor, depois));
+            depois -= l.Valor;
+        }
+
+        return new ExtratoTimeDto(
+            caixa,
+            lancamentos.Where(l => l.Valor > 0).Sum(l => l.Valor),
+            -lancamentos.Where(l => l.Valor < 0).Sum(l => l.Valor),
+            depois,
+            itens);
+    }
+
     public async Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct)
     {
         var historico = await _db.TransferHistories.AsNoTracking()

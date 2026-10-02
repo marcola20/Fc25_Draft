@@ -562,6 +562,20 @@ public class TransferOfferService : ITransferOfferService
         if (historyNotes.Length > 400)
             historyNotes = historyNotes[..397] + "...";
 
+        if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
+        {
+            var payerId = offer.MoneyPayerTeamId.Value;
+            var receiverId = payerId == fromTeam.TeamId ? toTeam.TeamId : fromTeam.TeamId;
+            var origem = offer.Type switch
+            {
+                OfferType.Swap => ExtratoCaixa.Troca,
+                OfferType.Loan => ExtratoCaixa.Emprestimo,
+                _ => ExtratoCaixa.Transferencia
+            };
+            ExtratoCaixa.Lancar(_db, payerId, -offer.Money, origem, historyNotes, now);
+            ExtratoCaixa.Lancar(_db, receiverId, offer.Money, origem, historyNotes, now);
+        }
+
         foreach (var player in targetPlayers)
         {
             var tracked = await _db.Players.FirstAsync(p => p.PlayerId == player.PlayerId, ct);
