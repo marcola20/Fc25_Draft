@@ -82,6 +82,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IBolaoService, BolaoService>();
             services.AddComConexaoPropria<IResumoRodadaService, ResumoRodadaService>();
             services.AddComConexaoPropria<IPartidaChatService, PartidaChatService>();
+            services.AddComConexaoPropria<IPartidaReacaoService, PartidaReacaoService>();
             services.AddScoped<IDraftWishlistService, DraftWishlistService>();
             services.AddSingleton<LotteryStateService>();
             services.AddSingleton<CopaSorteioAoVivoService>();

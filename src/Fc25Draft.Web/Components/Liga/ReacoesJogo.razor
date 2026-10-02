@@ -1,0 +1,130 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IPartidaReacaoService ReacaoSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject TelaoJogoAoVivoService AoVivo
+@implements IDisposable
+
+@* Emojis de reação do jogo: todo mundo vê, treinador logado marca. As outras telas abertas atualizam na hora. *@
+<div class="reacoes @Class">
+    @foreach (var emoji in ReacoesPartida.Emojis)
+    {
+        var r = _reacoes.GetValueOrDefault(emoji);
+        <button type="button" class="reacao @(r is null ? "zerada" : "") @(r?.Minha == true ? "minha" : "")"
+                title="@Dica(r)" @onclick="() => AlternarAsync(emoji)">
+            <span class="emoji">@emoji</span>
+            @if (r is not null)
+            {
+                <span class="qtd">@r.Quantidade</span>
+            }
+        </button>
+    }
+    @if (_aviso is not null)
+    {
+        <span class="aviso">@_aviso</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private Dictionary<string, PartidaReacaoDto> _reacoes = new();
+    private Guid? _eu;
+    private Guid _carregada;
+    private bool _iniciado;
+    private string? _aviso;
+
+    // Clique, aviso de outra tela e troca de token podem chegar juntos: um acesso ao banco por vez.
+    private readonly SemaphoreSlim _banco = new(1, 1);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_iniciado && _carregada != PartidaId)
+            await CarregarAsync();
+    }
+
+    // O token só é lido depois que a página fica interativa (não existe no pré-render).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await AdminAuth.EnsureInitializedAsync();
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        AoVivo.ReacoesMudaram += AoMudarReacoes;
+
+        await DescobrirEuAsync();
+        await CarregarAsync();
+        _iniciado = true;
+        StateHasChanged();
+    }
+
+    private async Task DescobrirEuAsync()
+    {
+        await _banco.WaitAsync();
+        try
+        {
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token)
+                ? null
+                : (await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None))?.TreinadorId;
+        }
+        finally { _banco.Release(); }
+    }
+
+    private async Task CarregarAsync()
+    {
+        var partida = PartidaId;
+        await _banco.WaitAsync();
+        try
+        {
+            var lista = await ReacaoSvc.ListarAsync(partida, _eu, CancellationToken.None);
+            _reacoes = lista.ToDictionary(r => r.Emoji);
+            _carregada = partida;
+        }
+        finally { _banco.Release(); }
+    }
+
+    private async Task AlternarAsync(string emoji)
+    {
+        if (_eu is not Guid eu)
+        {
+            _aviso = "Entre com seu token para reagir.";
+            return;
+        }
+
+        _aviso = null;
+        await _banco.WaitAsync();
+        try { await ReacaoSvc.AlternarAsync(PartidaId, eu, emoji, CancellationToken.None); }
+        catch (InvalidOperationException ex) { _aviso = ex.Message; }
+        finally { _banco.Release(); }
+
+        await CarregarAsync();
+        AoVivo.AvisarReacoes(PartidaId);
+    }
+
+    private void AoMudarReacoes(Guid partidaId)
+    {
+        if (!_iniciado || partidaId != PartidaId) return;
+        _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
+    }
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () =>
+    {
+        await DescobrirEuAsync();
+        await CarregarAsync();
+        _aviso = null;
+        StateHasChanged();
+    });
+
+    private static string? Dica(PartidaReacaoDto? r) => r is null ? null : string.Join(", ", r.Quem);
+
+    public void Dispose()
+    {
+        AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+        AoVivo.ReacoesMudaram -= AoMudarReacoes;
+        _banco.Dispose();
+    }
+}

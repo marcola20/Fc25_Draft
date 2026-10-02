@@ -345,7 +345,7 @@
                         <div class="list-group">
                             @foreach (var p in _rodadaAtual.Partidas)
                             {
-                            <div class="list-group-item py-2 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;flex-wrap:wrap;" @onclick="() => AbrirDetalhesPartida(p)">
+                            <div class="list-group-item py-3 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;flex-wrap:wrap;" @onclick="() => AbrirDetalhesPartida(p)">
                                 <div class="flex-grow-1 d-flex align-items-center justify-content-between gap-1 gap-md-3">
                                     <div class="d-flex align-items-center justify-content-end gap-1" style="flex:1;min-width:0;">
                                         <span class="fw-semibold text-end d-none d-md-inline small">@p.TimeCasaNome</span>
@@ -371,7 +371,9 @@
                                     @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="font-size:0.7rem;">Pen</span> }
                                     @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span title="Tem vídeo no telão" style="font-size:0.85rem;">📺</span> }
                                 </div>
-                                @if (p.Status == PartidaStatus.Agendada && NaTabela(p.TimeCasaId) is { } mandante && NaTabela(p.TimeForaId) is { } visitante)
+                                @* Sem jogo disputado o favorito não aparece: a linha vazia deixaria o jogo colado no topo. *@
+                                @if (p.Status == PartidaStatus.Agendada && NaTabela(p.TimeCasaId) is { } mandante && NaTabela(p.TimeForaId) is { } visitante
+                                     && (mandante.Jogos > 0 || visitante.Jogos > 0))
                                 {
                                     <div class="w-100">
                                         <FavoritoJogo PontosCasa="mandante.Pontos" JogosCasa="mandante.Jogos" PontosFora="visitante.Pontos" JogosFora="visitante.Jogos" />
@@ -849,6 +851,7 @@
                     else
                     {
                     <PartidaTelaoLink PartidaId="_partidaDetalhes.PartidaId" YoutubeVideoId="@_partidaDetalhes.YoutubeVideoId" OnAlterado="AtualizarAposVideo" />
+                    <ReacoesJogo PartidaId="_partidaDetalhes.PartidaId" Class="mb-3" />
                     <PartidaAbas PartidaId="_partidaDetalhes.PartidaId" CasaId="_partidaDetalhes.TimeCasaId" CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome" Eventos="_eventoPartida" Escalacoes="_escalacoesPartida" />
                     }
                 </div>

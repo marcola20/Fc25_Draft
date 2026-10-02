@@ -20,6 +20,9 @@ public sealed class TelaoJogoAoVivoService
     /// <summary>Alguém entrou ou saiu do telão do jogo.</summary>
     public event Action<Guid>? PublicoMudou;
 
+    /// <summary>Alguém marcou ou tirou um emoji de reação do jogo.</summary>
+    public event Action<Guid>? ReacoesMudaram;
+
     public int Assistindo(Guid partidaId) => _assistindo.GetValueOrDefault(partidaId);
 
     public void Entrar(Guid partidaId)
@@ -37,4 +40,6 @@ public sealed class TelaoJogoAoVivoService
     public void Publicar(PartidaChatMensagemDto mensagem) => MensagemEnviada?.Invoke(mensagem);
 
     public void Apagar(Guid partidaId, Guid mensagemId) => MensagemApagada?.Invoke(partidaId, mensagemId);
+
+    public void AvisarReacoes(Guid partidaId) => ReacoesMudaram?.Invoke(partidaId);
 }

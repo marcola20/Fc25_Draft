@@ -125,9 +125,9 @@
     gap: .8vh;
 }
 
-/* Maior 16:9 que cabe no espaço livre. */
+/* Maior 16:9 que cabe no espaço livre (sobra a faixa das reações embaixo). */
 .player {
-    width: min(100%, calc((100vh - 16vh) * 16 / 9));
+    width: min(100%, calc((100vh - 21vh) * 16 / 9));
     aspect-ratio: 16 / 9;
     border-radius: 1vh;
     overflow: hidden;
@@ -137,7 +137,19 @@
 
 .player iframe { width: 100%; height: 100%; border: 0; display: block; }
 
-.abrir-youtube { font-size: 1.5vh; opacity: .8; }
+.sob-video {
+    width: min(100%, calc((100vh - 21vh) * 16 / 9));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1vh 1vw;
+    font-size: 2vh;
+}
+
+.sob-video.sem-video-link { justify-content: center; }
+
+.abrir-youtube { font-size: 1.5vh; opacity: .8; margin-left: auto; }
 
 .sem-video {
     text-align: center;
@@ -240,7 +252,35 @@
     cursor: pointer;
 }
 
-.escrever button:disabled { opacity: .4; cursor: default; }
+.escrever button.vazio { opacity: .4; }
+
+.escrever .emojis {
+    background: transparent;
+    border: 1px solid var(--borda);
+    padding: 0 .5rem;
+    font-size: 1.1rem;
+}
+
+.escrever .emojis.aberta { border-color: var(--destaque); }
+
+.paleta {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: .2rem;
+    padding: .6vh .6vw;
+    border-top: 1px solid var(--borda);
+}
+
+.paleta button {
+    background: transparent;
+    border: 0;
+    border-radius: .4rem;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    cursor: pointer;
+}
+
+.paleta button:hover { background: var(--fundo); }
 
 .entrar, .erro {
     padding: .8vh .8vw;
@@ -299,7 +339,8 @@
     .gols .x { font-size: 1rem; }
 
     .corpo { grid-template-columns: 1fr; gap: 12px; }
-    .player { width: 100%; }
+    .player, .sob-video { width: 100%; }
+    .sob-video { font-size: 1rem; }
     .sem-video { font-size: 1rem; padding: 24px 0; }
     .sem-video .icone { font-size: 3rem; }
     .sem-video .suave { font-size: .85rem; }

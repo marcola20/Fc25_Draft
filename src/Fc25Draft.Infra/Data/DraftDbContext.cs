@@ -100,6 +100,7 @@ public class DraftDbContext : DbContext
     public DbSet<NotificacaoEnviada> NotificacoesEnviadas => Set<NotificacaoEnviada>();
     public DbSet<FotoJogador> FotosJogadores => Set<FotoJogador>();
     public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
+    public DbSet<PartidaReacao> PartidaReacoes => Set<PartidaReacao>();
     public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
     public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();
     public DbSet<LigaKnockoutJogo> LigaKnockoutJogos => Set<LigaKnockoutJogo>();

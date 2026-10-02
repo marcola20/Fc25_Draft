@@ -5,6 +5,7 @@
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Liga
 @inject ILigaPublicService LigaService
 @inject IPartidaChatService ChatSvc
 @inject IBolaoService BolaoSvc
@@ -96,8 +97,14 @@
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                 allowfullscreen></iframe>
                     </div>
-                    <a class="abrir-youtube" href="@YoutubeLink.Assistir(_jogo.YoutubeVideoId)" target="_blank" rel="noopener">Abrir no YouTube ↗</a>
                 }
+                <div class="sob-video @(string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId) ? "sem-video-link" : "")">
+                    <ReacoesJogo PartidaId="PartidaId" />
+                    @if (!string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId))
+                    {
+                        <a class="abrir-youtube" href="@YoutubeLink.Assistir(_jogo.YoutubeVideoId)" target="_blank" rel="noopener">Abrir no YouTube ↗</a>
+                    }
+                </div>
             </section>
 
             <aside class="lateral">
@@ -141,10 +148,22 @@
                     }
                     else
                     {
+                        @if (_paleta)
+                        {
+                            <div class="paleta">
+                                @foreach (var emoji in ReacoesPartida.Chat)
+                                {
+                                    <button type="button" @onclick="() => InserirEmojiAsync(emoji)">@emoji</button>
+                                }
+                            </div>
+                        }
+                        @* O campo não desabilita enquanto envia: desabilitado ele perde o foco e era preciso clicar de novo para escrever. *@
                         <form class="escrever" @onsubmit="EnviarAsync">
-                            <input type="text" @bind="_texto" @bind:event="oninput" maxlength="300"
-                                   placeholder="Comente como @_eu.Nome..." disabled="@_enviando" autocomplete="off" />
-                            <button type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">➤</button>
+                            <button type="button" class="emojis @(_paleta ? "aberta" : "")" title="Emojis" @onclick="AlternarPaletaAsync">😀</button>
+                            <input type="text" @ref="_campoRef" @bind="_texto" @bind:event="oninput" maxlength="@TamanhoMaximo"
+                                   placeholder="Comente como @_eu.Nome..." autocomplete="off" />
+                            @* Sem disabled: botão desabilitado bloqueia o Enter de quem digita antes do servidor responder. *@
+                            <button type="submit" class="@(string.IsNullOrWhiteSpace(_texto) ? "vazio" : "")">➤</button>
                         </form>
                         @if (_erro is not null)
                         {
@@ -212,6 +231,9 @@
     private bool _enviando;
     private string? _erro;
     private DateTime _ultimoEnvio = DateTime.MinValue;
+    private bool _paleta;
+    private ElementReference _campoRef;
+    private const int TamanhoMaximo = 300;
 
     private ElementReference _mensagensRef;
     private bool _entrou;
@@ -317,15 +339,38 @@
 
         _enviando = true;
         _erro = null;
+        var enviado = _texto;
         try
         {
-            var mensagem = await ChatSvc.EnviarAsync(PartidaId, _eu.TreinadorId, _texto, CancellationToken.None);
+            var mensagem = await ChatSvc.EnviarAsync(PartidaId, _eu.TreinadorId, enviado, CancellationToken.None);
             _ultimoEnvio = DateTime.UtcNow;
-            _texto = "";
+            // O campo segue liberado durante o envio: guarda o que foi digitado nesse meio tempo.
+            _texto = _texto.StartsWith(enviado, StringComparison.Ordinal) ? _texto[enviado.Length..].TrimStart() : _texto;
             AoVivo.Publicar(mensagem);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _enviando = false; }
+
+        await FocarCampoAsync();
+    }
+
+    private async Task AlternarPaletaAsync()
+    {
+        _paleta = !_paleta;
+        await FocarCampoAsync();
+    }
+
+    private async Task InserirEmojiAsync(string emoji)
+    {
+        if (_texto.Length + emoji.Length <= TamanhoMaximo)
+            _texto += emoji;
+        await FocarCampoAsync();
+    }
+
+    private async Task FocarCampoAsync()
+    {
+        try { await _campoRef.FocusAsync(); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException) { }
     }
 
     private async Task ApagarAsync(PartidaChatMensagemDto m)

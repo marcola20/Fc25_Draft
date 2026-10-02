@@ -30,3 +30,10 @@ public record PartidaChatMensagemDto(
     string? TimeNome,
     string Texto,
     DateTime EnviadaEm);
+
+/// <summary>Um emoji de reação do jogo: quantos marcaram, quem foi e se você está entre eles.</summary>
+public record PartidaReacaoDto(
+    string Emoji,
+    int Quantidade,
+    IReadOnlyList<string> Quem,
+    bool Minha);

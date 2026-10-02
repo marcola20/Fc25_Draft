@@ -1,0 +1,44 @@
+/* Em "em" para crescer junto com o texto de onde estiver (modal do jogo ou telão). */
+.reacoes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4em;
+}
+
+.reacao {
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    padding: .2em .65em;
+    border-radius: 2em;
+    border: 1px solid rgba(127, 127, 127, .35);
+    background: rgba(127, 127, 127, .12);
+    color: inherit;
+    font-size: 1em;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: transform .1s ease, background-color .15s ease;
+}
+
+.reacao:hover { background: rgba(127, 127, 127, .25); }
+.reacao:active { transform: scale(.92); }
+
+.reacao.zerada .emoji { opacity: .55; }
+.reacao.zerada:hover .emoji { opacity: 1; }
+
+.reacao.minha {
+    border-color: #f4d35e;
+    background: rgba(244, 211, 94, .2);
+}
+
+.qtd {
+    font-size: .85em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.aviso {
+    font-size: .8em;
+    opacity: .75;
+}
