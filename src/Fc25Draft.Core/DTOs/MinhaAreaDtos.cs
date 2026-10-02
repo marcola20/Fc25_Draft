@@ -33,6 +33,9 @@ public record MinhaAreaObservadoDto(
     // Preenchidos quando o jogador está num leilão ativo.
     decimal? LeilaoLanceAtual, string? LeilaoLiderNome, DateTime? LeilaoTerminaEm, bool LeilaoEuLidero);
 
+/// <summary>Coisa que o treinador precisa resolver, com o link de onde resolve.</summary>
+public record MinhaAreaPendenciaDto(string Texto, string Link);
+
 /// <summary>Jogador do time suspenso para o próximo jogo ou pendurado numa competição em andamento.</summary>
 public record MinhaAreaDisciplinaDto(string Competicao, string JogadorNome, bool Suspenso, string Detalhe);
 
@@ -50,7 +53,8 @@ public record MinhaAreaDto(
     IReadOnlyList<MinhaAreaObservadoDto> Observados,
     // Mínimo de elenco que vale para o time (o temporário dele, se houver, senão o geral).
     int ElencoMinimo = 0,
-    IReadOnlyList<MinhaAreaDisciplinaDto>? Disciplina = null)
+    IReadOnlyList<MinhaAreaDisciplinaDto>? Disciplina = null,
+    IReadOnlyList<MinhaAreaPendenciaDto>? Pendencias = null)
 {
     public decimal CaixaLivre => Caixa - CaixaBloqueado;
 

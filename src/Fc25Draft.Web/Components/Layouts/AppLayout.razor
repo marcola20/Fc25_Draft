@@ -27,7 +27,8 @@
                    HomeHref="@homeRoute"
                    ToggleSidebar="@ToggleSidebar"
                    SignIn="@OpenAdminModal"
-                   SignOut="@SignOutAsync" />
+                   SignOut="@SignOutAsync"
+                   AvisosTeamId="@quemEntrou?.TeamId" />
 
         @if (!string.IsNullOrEmpty(adminBannerMessage))
         {
@@ -391,6 +392,8 @@
         {
             await AdminAuth.EnsureInitializedAsync();
             authReady = true;
+            // Quem entrou pela página de login (ou saiu) também troca o rótulo e o sino de avisos.
+            await AtualizarQuemEntrouAsync();
             await RebuildMenuAsync();
             StateHasChanged();
         });

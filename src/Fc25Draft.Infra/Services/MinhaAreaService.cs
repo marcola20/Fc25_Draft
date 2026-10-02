@@ -35,6 +35,7 @@ public class MinhaAreaService : IMinhaAreaService
 
         var nomes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
         string? Nome(Guid? id) => id is Guid g && nomes.TryGetValue(g, out var n) ? n : null;
+        var (disciplina, suspensos) = await DisciplinaAsync(teamId, ct);
 
         return new MinhaAreaDto(
             teamId,
@@ -49,11 +50,79 @@ public class MinhaAreaService : IMinhaAreaService
             await EscolhaAutomaticaAsync(teamId, ct),
             await ObservadosAsync(teamId, Nome, ct),
             time.MinRosterSizeOverride ?? minimoGeral,
-            await DisciplinaAsync(teamId, ct));
+            disciplina,
+            await PendenciasAsync(teamId, suspensos, ct));
     }
 
-    /// <summary>Suspensos para o próximo jogo e pendurados do time nas Ligas e Copas em andamento.</summary>
-    private async Task<IReadOnlyList<MinhaAreaDisciplinaDto>> DisciplinaAsync(Guid teamId, CancellationToken ct)
+    /// <summary>
+    /// O que o treinador ainda precisa fazer: lista de protegidos do draft de expansão, pré-draft aberto
+    /// e escalação ativa com vaga vazia, jogador que saiu do elenco ou suspenso.
+    /// </summary>
+    private async Task<IReadOnlyList<MinhaAreaPendenciaDto>> PendenciasAsync(
+        Guid teamId, IReadOnlyDictionary<int, string> suspensos, CancellationToken ct)
+    {
+        var pendencias = new List<MinhaAreaPendenciaDto>();
+
+        // Draft de expansão com as listas de protegidos abertas: os times que já existiam precisam mandar a sua.
+        var expansao = await _db.Drafts.AsNoTracking()
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Select(d => new { d.DraftId, d.Tipo, d.ProtecaoEncerradaEm, d.ProtegidosPorTime })
+            .FirstOrDefaultAsync(ct);
+        if (expansao is { Tipo: Core.Enums.DraftTipo.Expansao, ProtecaoEncerradaEm: null }
+            && !await _db.DraftPicks.AnyAsync(p => p.DraftId == expansao.DraftId && p.TeamId == teamId, ct)
+            && !await _db.DraftProtecoes.AnyAsync(p => p.DraftId == expansao.DraftId && p.TeamId == teamId, ct))
+            pendencias.Add(new MinhaAreaPendenciaDto(
+                $"Mande sua lista de protegidos do draft de expansão ({expansao.ProtegidosPorTime} jogadores). Quem não mandar fica com os maiores overalls.",
+                "/draft/protecao"));
+
+        // Pré-draft aberto e o time ainda não montou a lista.
+        var preDraft = await _db.DraftWishlistEdicoes.AsNoTracking()
+            .Where(e => e.EncerradoEm == null)
+            .OrderByDescending(e => e.Numero)
+            .Select(e => (int?)e.Numero)
+            .FirstOrDefaultAsync(ct);
+        if (preDraft is int edicao && !await _db.DraftWishlistEntries.AnyAsync(w => w.Versao == edicao && w.TeamId == teamId, ct))
+            pendencias.Add(new MinhaAreaPendenciaDto("O pré-draft está aberto e você ainda não montou sua lista.", "/draft/pre-draft"));
+
+        // Escalação ativa: vaga de titular vazia, jogador que não é mais do elenco e suspenso no próximo jogo.
+        var linkEscalacao = $"/teams/{teamId}/lineups";
+        var escalacao = await _db.TeamLineups.AsNoTracking()
+            .Where(l => l.TeamId == teamId && l.IsActive)
+            .Select(l => new { l.Name, Slots = l.Slots.Select(s => new { s.IsBench, s.PlayerId, Nome = s.Player != null ? s.Player.Name : null }).ToList() })
+            .FirstOrDefaultAsync(ct);
+        if (escalacao is null)
+        {
+            pendencias.Add(new MinhaAreaPendenciaDto("Você não tem escalação ativa.", linkEscalacao));
+        }
+        else
+        {
+            var elenco = (await _db.TeamRosters.AsNoTracking().Where(r => r.TeamId == teamId).Select(r => r.PlayerId).ToListAsync(ct)).ToHashSet();
+            var titulares = escalacao.Slots.Where(s => !s.IsBench).ToList();
+
+            var vazias = titulares.Count(s => s.PlayerId is null);
+            if (vazias > 0)
+                pendencias.Add(new MinhaAreaPendenciaDto(
+                    $"A escalação \"{escalacao.Name}\" tem {vazias} vaga{(vazias == 1 ? "" : "s")} de titular sem jogador.", linkEscalacao));
+
+            var sairam = escalacao.Slots.Where(s => s.PlayerId is int id && !elenco.Contains(id)).Select(s => s.Nome ?? "?").ToList();
+            if (sairam.Count > 0)
+                pendencias.Add(new MinhaAreaPendenciaDto(
+                    $"A escalação \"{escalacao.Name}\" tem quem não é mais do elenco: {string.Join(", ", sairam)}.", linkEscalacao));
+
+            foreach (var s in titulares.Where(s => s.PlayerId is int id && suspensos.ContainsKey(id)))
+                pendencias.Add(new MinhaAreaPendenciaDto(
+                    $"{s.Nome} está escalado como titular, mas está suspenso ({suspensos[s.PlayerId!.Value]}).", linkEscalacao));
+        }
+
+        return pendencias;
+    }
+
+    /// <summary>
+    /// Suspensos para o próximo jogo e pendurados do time nas Ligas e Copas em andamento, e os suspensos
+    /// por jogador (para conferir a escalação).
+    /// </summary>
+    private async Task<(IReadOnlyList<MinhaAreaDisciplinaDto> Lista, IReadOnlyDictionary<int, string> Suspensos)> DisciplinaAsync(
+        Guid teamId, CancellationToken ct)
     {
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => (l.Tipo == Core.Enums.TipoCompetition.Liga || l.Tipo == Core.Enums.TipoCompetition.Copa)
@@ -63,9 +132,13 @@ public class MinhaAreaService : IMinhaAreaService
             .ToListAsync(ct);
 
         var lista = new List<MinhaAreaDisciplinaDto>();
+        var suspensos = new Dictionary<int, string>();
         foreach (var liga in ligas)
         {
             if (await DisciplinaDaCompeticao.CalcularAsync(_db, liga.LigaId, ct) is not { } d) continue;
+
+            foreach (var s in d.Suspensoes.Where(s => s.TimeId == teamId && !s.Cumprida))
+                suspensos.TryAdd(s.JogadorId, $"{liga.Nome}, {(s.JogoCumprido ?? "próximo jogo")}");
 
             lista.AddRange(d.Suspensoes
                 .Where(s => s.TimeId == teamId && !s.Cumprida)
@@ -75,7 +148,7 @@ public class MinhaAreaService : IMinhaAreaService
                 .Where(p => p.TimeId == teamId)
                 .Select(p => new MinhaAreaDisciplinaDto(liga.Nome, p.JogadorNome, false, $"{p.Amarelos} amarelos · o próximo suspende")));
         }
-        return lista;
+        return (lista, suspensos);
     }
 
     public async Task<bool> EstaObservandoAsync(string? token, int playerId, CancellationToken ct)

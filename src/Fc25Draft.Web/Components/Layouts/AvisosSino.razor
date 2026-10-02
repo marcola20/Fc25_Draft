@@ -1,0 +1,121 @@
+@using Fc25Draft.Infra.Data
+@implements IDisposable
+@inject IAvisosService AvisosSvc
+
+@* Sino de avisos do time de quem entrou: conta os não lidos e abre a lista; abrir marca tudo como lido. *@
+@if (TeamId is not null)
+{
+    <div class="position-relative me-2">
+        <button type="button" class="btn btn-sm btn-outline-light position-relative" @onclick="AlternarAsync"
+                aria-label="Avisos@(_naoLidos > 0 ? $" ({_naoLidos} novos)" : "")" title="Avisos">
+            🔔
+            @if (_naoLidos > 0)
+            {
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">@(_naoLidos > 9 ? "9+" : _naoLidos)</span>
+            }
+        </button>
+
+        @if (_aberto)
+        {
+            <div class="card shadow position-absolute end-0 mt-2 text-body" style="width: min(24rem, 92vw); z-index: 1060;">
+                <div class="card-header d-flex align-items-center">
+                    <strong>Avisos</strong>
+                    <a href="/minha-area" class="small ms-auto" @onclick="Fechar">Minha Área</a>
+                </div>
+                <ul class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+                    @foreach (var aviso in _avisos)
+                    {
+                        <li class="list-group-item small @(aviso.Lido ? "" : "bg-body-secondary")">
+                            <a class="text-body text-decoration-none d-flex gap-2" href="@(aviso.Link ?? "/minha-area")" @onclick="Fechar">
+                                <span>@Icone(aviso.Tipo)</span>
+                                <span class="flex-grow-1">
+                                    @aviso.Texto
+                                    <span class="d-block text-muted">@Quando(aviso.CriadoEmUtc)</span>
+                                </span>
+                            </a>
+                        </li>
+                    }
+                    @if (_avisos.Count == 0)
+                    {
+                        <li class="list-group-item small text-muted">Nenhum aviso.</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Time de quem entrou; nulo para visitante, admin sem clube ou quem está sem time.</summary>
+    [Parameter] public Guid? TeamId { get; set; }
+
+    private Guid? _carregadoPara;
+    private int _naoLidos;
+    private bool _aberto;
+    private IReadOnlyList<AvisoDto> _avisos = [];
+
+    protected override void OnInitialized() => DraftDbContext.AvisosGravados += OnAvisosGravados;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregadoPara == TeamId) return;
+        _carregadoPara = TeamId;
+        _aberto = false;
+        _naoLidos = TeamId is Guid id ? await AvisosSvc.ContarNaoLidosAsync(id, CancellationToken.None) : 0;
+    }
+
+    private async Task AlternarAsync()
+    {
+        if (TeamId is not Guid id) return;
+        _aberto = !_aberto;
+        if (!_aberto) return;
+
+        // Mostra os novos destacados e já marca como lidos.
+        _avisos = await AvisosSvc.ListarAsync(id, 20, CancellationToken.None);
+        if (_naoLidos > 0)
+        {
+            await AvisosSvc.MarcarTodosComoLidosAsync(id, CancellationToken.None);
+            _naoLidos = 0;
+        }
+    }
+
+    private void Fechar() => _aberto = false;
+
+    private void OnAvisosGravados(IReadOnlyCollection<Guid> times)
+    {
+        if (TeamId is not Guid id || !times.Contains(id)) return;
+        _ = InvokeAsync(async () =>
+        {
+            _naoLidos = await AvisosSvc.ContarNaoLidosAsync(id, CancellationToken.None);
+            if (_aberto) _avisos = await AvisosSvc.ListarAsync(id, 20, CancellationToken.None);
+            StateHasChanged();
+        });
+    }
+
+    public static string Icone(string tipo) => tipo switch
+    {
+        "PROPOSTA" => "📨",
+        "PROPOSTA_ACEITA" => "✅",
+        "PROPOSTA_RECUSADA" => "❌",
+        "PROPOSTA_CANCELADA" => "🚫",
+        "LANCE_SUPERADO" => "⚠️",
+        "LEILAO_VENCIDO" => "🏆",
+        "VENDA_LISTA" => "💰",
+        _ => "🔔"
+    };
+
+    /// <summary>"agora", "há 5 min", "há 3 h", "há 2 dias".</summary>
+    public static string Quando(DateTime utc)
+    {
+        var passou = DateTime.UtcNow - utc;
+        return passou.TotalMinutes switch
+        {
+            < 1 => "agora",
+            < 60 => $"há {(int)passou.TotalMinutes} min",
+            < 60 * 24 => $"há {(int)passou.TotalHours} h",
+            _ => $"há {(int)passou.TotalDays} dia{((int)passou.TotalDays == 1 ? "" : "s")}"
+        };
+    }
+
+    public void Dispose() => DraftDbContext.AvisosGravados -= OnAvisosGravados;
+}

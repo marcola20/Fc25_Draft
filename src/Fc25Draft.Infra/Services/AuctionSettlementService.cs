@@ -205,6 +205,9 @@ public class AuctionSettlementService : IAuctionSettlementService
             }
             ExtratoCaixa.Lancar(_dbContext, team.TeamId, -amount, ExtratoCaixa.Leilao,
                 $"Leilão: {item.Player.Name}", _timeProvider.GetUtcNow().UtcDateTime);
+            AvisosDoTime.Criar(_dbContext, team.TeamId, AvisosDoTime.LeilaoVencido,
+                $"Você levou {item.Player.Name} no leilão por {amount.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}.",
+                $"/teams/details/{team.TeamId}", _timeProvider.GetUtcNow().UtcDateTime);
 
             var player = await _dbContext.Players
                 .FirstOrDefaultAsync(p => p.PlayerId == item.PlayerId, ct)

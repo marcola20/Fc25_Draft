@@ -7,7 +7,22 @@ public class DraftDbContext : DbContext
 {
     public DraftDbContext(DbContextOptions<DraftDbContext> options) : base(options)
     {
+        // Avisos novos gravados: as telas abertas desses times atualizam o sino na hora.
+        SavedChanges += (_, _) =>
+        {
+            if (TimesComAvisoNovo.Count == 0) return;
+            var times = TimesComAvisoNovo.ToArray();
+            TimesComAvisoNovo.Clear();
+            AvisosGravados?.Invoke(times);
+        };
+        SaveChangesFailed += (_, _) => TimesComAvisoNovo.Clear();
     }
+
+    /// <summary>Times que ganharam aviso desde o último SaveChanges deste contexto.</summary>
+    internal HashSet<Guid> TimesComAvisoNovo { get; } = new();
+
+    /// <summary>Disparado depois de gravar avisos, com os times que os receberam.</summary>
+    public static event Action<IReadOnlyCollection<Guid>>? AvisosGravados;
 
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<Player> Players => Set<Player>();
@@ -61,6 +76,7 @@ public class DraftDbContext : DbContext
     public DbSet<LigaEscalacaoPartida> LigaEscalacoes => Set<LigaEscalacaoPartida>();
     public DbSet<LigaPartidaImportacao> LigaPartidaImportacoes => Set<LigaPartidaImportacao>();
     public DbSet<LigaNotaJogador> LigaNotasJogadores => Set<LigaNotaJogador>();
+    public DbSet<AvisoTime> AvisosTimes => Set<AvisoTime>();
     public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
     public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
     public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();

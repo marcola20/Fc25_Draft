@@ -31,6 +31,8 @@
                 </div>
             }
 
+            <AvisosSino TeamId="@AvisosTeamId" />
+
             <div class="app-header-status" role="status">
                 <span class="status-label">@AccessLabel</span>
                 @if (ShowAuthProgress)
@@ -67,4 +69,7 @@
     [Parameter] public EventCallback ToggleSidebar { get; set; }
     [Parameter] public EventCallback SignIn { get; set; }
     [Parameter] public EventCallback SignOut { get; set; }
+
+    /// <summary>Time de quem entrou, para o sino de avisos (nulo esconde o sino).</summary>
+    [Parameter] public Guid? AvisosTeamId { get; set; }
 }

@@ -164,6 +164,10 @@ public class TransferOfferService : ITransferOfferService
 
         offer.Players = offerPlayers;
 
+        AvisosDoTime.Criar(_db, toTeam.TeamId, AvisosDoTime.Proposta,
+            $"{(dto.ParentOfferId.HasValue ? "Contraproposta" : "Proposta")} do {fromTeam.TeamName}: {Resumo(offer, targetPlayers, offeredPlayers, fromTeam.TeamId)}",
+            "/minha-area", now);
+
         await _db.TransferOffers.AddAsync(offer, ct);
         await _db.SaveChangesAsync(ct);
 
@@ -219,10 +223,16 @@ public class TransferOfferService : ITransferOfferService
             await CancelConflictingOffersAsync(offer, ct);
         }
 
-        await _db.SaveChangesAsync(ct);
-
         var targetPlayers = offer.Players.Where(p => p.IsTarget).Select(p => p.Player).ToList();
         var offeredPlayers = offer.Players.Where(p => !p.IsTarget).Select(p => p.Player).ToList();
+
+        AvisosDoTime.Criar(_db, offer.FromTeamId,
+            response == OfferStatus.Accepted ? AvisosDoTime.PropostaAceita : AvisosDoTime.PropostaRecusada,
+            $"O {offer.ToTeam.TeamName} {(response == OfferStatus.Accepted ? "aceitou" : "recusou")} sua proposta: " +
+            Resumo(offer, targetPlayers, offeredPlayers, offer.FromTeamId),
+            $"/teams/details/{offer.FromTeamId}", now);
+
+        await _db.SaveChangesAsync(ct);
 
         return MapToDto(offer, offer.FromTeam, offer.ToTeam, targetPlayers, offeredPlayers);
     }
@@ -295,10 +305,14 @@ public class TransferOfferService : ITransferOfferService
         offer.Status = OfferStatus.Cancelled;
         offer.UpdatedAtUtc = now;
 
-        await _db.SaveChangesAsync(ct);
-
         var targetPlayers = offer.Players.Where(p => p.IsTarget).Select(p => p.Player).ToList();
         var offeredPlayers = offer.Players.Where(p => !p.IsTarget).Select(p => p.Player).ToList();
+
+        AvisosDoTime.Criar(_db, offer.ToTeamId, AvisosDoTime.PropostaCancelada,
+            $"O {offer.FromTeam.TeamName} retirou a proposta: {Resumo(offer, targetPlayers, offeredPlayers, offer.FromTeamId)}",
+            "/minha-area", now);
+
+        await _db.SaveChangesAsync(ct);
 
         return MapToDto(offer, offer.FromTeam, offer.ToTeam, targetPlayers, offeredPlayers);
     }
@@ -434,6 +448,10 @@ public class TransferOfferService : ITransferOfferService
         await ExecuteTransferAsync(offer, ct);
         await CancelConflictingOffersAsync(offer, ct);
 
+        AvisosDoTime.Criar(_db, seller.TeamId, AvisosDoTime.VendaPelaLista,
+            $"O {buyer.TeamName} comprou {roster.Player.Name} da sua lista de transferências por {price.ToString("C0", BrCulture)}",
+            $"/teams/details/{seller.TeamId}", now);
+
         try
         {
             await _db.SaveChangesAsync(ct);
@@ -458,6 +476,7 @@ public class TransferOfferService : ITransferOfferService
         // Find pending offers that involve any of these players
         var conflictingOffers = await _db.TransferOffers
             .Include(o => o.Players)
+            .Include(o => o.ToTeam)
             .Where(o => o.OfferId != acceptedOffer.OfferId
                 && o.Status == OfferStatus.Pending
                 && o.Players.Any(p => involvedPlayerIds.Contains(p.PlayerId)))
@@ -467,7 +486,23 @@ public class TransferOfferService : ITransferOfferService
         {
             offer.Status = OfferStatus.Cancelled;
             offer.UpdatedAtUtc = now;
+            AvisosDoTime.Criar(_db, offer.FromTeamId, AvisosDoTime.PropostaCancelada,
+                $"Sua proposta ao {offer.ToTeam.TeamName} foi cancelada: um jogador dela acabou de ser negociado.",
+                "/minha-area", now);
         }
+    }
+
+    /// <summary>Resumo da proposta do ponto de vista de quem a fez ("pede X, oferece Y, paga R$ 10 mi").</summary>
+    private static string Resumo(TransferOffer offer, IEnumerable<Player> alvos, IEnumerable<Player> oferecidos, Guid quemFez)
+    {
+        var partes = new List<string>();
+        var pedidos = string.Join(", ", alvos.Select(p => p.Name));
+        var dados = string.Join(", ", oferecidos.Select(p => p.Name));
+        if (pedidos.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empréstimo de " : "pede ") + pedidos);
+        if (dados.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empresta " : "oferece ") + dados);
+        if (offer.Money > 0)
+            partes.Add($"{(offer.MoneyPayerTeamId == quemFez ? "paga" : "pede")} {offer.Money.ToString("C0", BrCulture)}");
+        return partes.Count == 0 ? "sem jogadores nem dinheiro" : string.Join(", ", partes);
     }
 
     private IQueryable<TransferOffer> QueryOffers()

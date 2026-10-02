@@ -215,6 +215,10 @@ public class MarketService : IMarketService
                         ? previousTeam.TeamId.ToString()
                         : previousTeam.TeamName;
                     outbidNotes = string.Format(culture, "Time {0} foi superado no leilão de {1}.", previousTeamName, item.Player.Name);
+                    if (previousTeam.TeamId != team.TeamId)
+                        AvisosDoTime.Criar(_dbContext, previousTeam.TeamId, AvisosDoTime.LanceSuperado,
+                            $"Seu lance por {item.Player.Name} foi superado: o {team.TeamName} ofereceu {normalizedAmount.ToString("C0", culture)}.",
+                            "/mercado", nowUtc);
                 }
                 else
                 {
@@ -343,6 +347,9 @@ public class MarketService : IMarketService
             string? takeoverNotes = null;
             if (previousLeaderId.HasValue && previousLeaderId != team.TeamId)
             {
+                AvisosDoTime.Criar(_dbContext, previousLeaderId.Value, AvisosDoTime.LanceSuperado,
+                    $"O {team.TeamName} comprou {player.Name} na compra imediata; seu lance foi liberado.",
+                    "/mercado", _timeProvider.GetUtcNow().UtcDateTime);
                 takeoverNotes = previousLeaderTeam is not null
                     ? $"Time {(!string.IsNullOrWhiteSpace(previousLeaderTeam.TeamName) ? previousLeaderTeam.TeamName : previousLeaderTeam.TeamId.ToString())} foi superado na compra imediata."
                     : "Líder anterior não encontrado ao processar compra imediata.";

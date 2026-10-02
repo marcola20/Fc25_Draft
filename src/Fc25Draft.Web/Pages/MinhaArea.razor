@@ -7,7 +7,12 @@
 @inject ILigaPublicService LigaService
 @inject AdminAuthService AdminAuth
 @inject EscudoService Escudos
-@implements IDisposable
+@inject IAvisosService AvisosSvc
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.SignalR.Client
+@using Fc25Draft.Infra.Data
+@using Fc25Draft.Web.Components.Layouts
+@implements IAsyncDisposable
 
 <PageTitle>Minha Área</PageTitle>
 
@@ -76,6 +81,47 @@
                 <strong>Elenco abaixo do mínimo:</strong> o time tem @d.Elenco jogadores e o mínimo é @d.ElencoMinimo.
                 Até contratar @(d.ElencoMinimo - d.Elenco) jogador(es), vendas, empréstimos, trocas que diminuam o elenco
                 e vendas rápidas ficam bloqueadas.
+            </div>
+        }
+
+        @if (d.Pendencias is { Count: > 0 } pendencias)
+        {
+            <div class="card mb-3 border-warning">
+                <div class="card-header fw-bold">📋 Para resolver</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var p in pendencias)
+                    {
+                        <li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-2">
+                            <span>@p.Texto</span>
+                            <a class="btn btn-sm btn-outline-primary ms-auto" href="@p.Link">Resolver</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (_avisos.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <strong>🔔 Avisos</strong>
+                    @if (_avisos.Any(x => !x.Lido))
+                    {
+                        <button type="button" class="btn btn-sm btn-link ms-auto p-0" @onclick="MarcarAvisosComoLidosAsync">Marcar como lidos</button>
+                    }
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var aviso in _avisos)
+                    {
+                        <li class="list-group-item small @(aviso.Lido ? "" : "bg-body-secondary")">
+                            <a class="text-body text-decoration-none d-flex gap-2" href="@(aviso.Link ?? "/minha-area")">
+                                <span>@AvisosSino.Icone(aviso.Tipo)</span>
+                                <span class="flex-grow-1">@aviso.Texto</span>
+                                <span class="text-muted text-nowrap">@AvisosSino.Quando(aviso.CriadoEmUtc)</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
             </div>
         }
 
@@ -272,6 +318,8 @@
 @code {
     private MinhaAreaDto? _dados;
     private TimePerfilDto? _perfil;
+    private IReadOnlyList<AvisoDto> _avisos = [];
+    private HubConnection? _draftHub;
     private bool _authPronto;
     private bool _carregando;
     private string _tokenDigitado = string.Empty;
@@ -284,6 +332,40 @@
     protected override void OnInitialized()
     {
         AdminAuth.AuthenticationChanged += OnAuthChanged;
+        // Aviso novo do time (proposta, lance superado…): recarrega a Minha Área.
+        DraftDbContext.AvisosGravados += OnAvisosGravados;
+    }
+
+    private void OnAvisosGravados(IReadOnlyCollection<Guid> times)
+    {
+        if (_dados is null || !times.Contains(_dados.TeamId)) return;
+        _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
+    }
+
+    /// <summary>Cada escolha do draft atualiza o card (o "É a sua vez" aparece sem recarregar a página).</summary>
+    private async Task ConectarDraftAsync()
+    {
+        if (_draftHub is not null) return;
+        try
+        {
+            _draftHub = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/draft"))
+                .WithAutomaticReconnect()
+                .Build();
+            _draftHub.On("DraftAtualizado", () => InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); }));
+            await _draftHub.StartAsync();
+        }
+        catch
+        {
+            // Sem a conexão ao vivo, a página continua funcionando ao recarregar.
+        }
+    }
+
+    private async Task MarcarAvisosComoLidosAsync()
+    {
+        if (_dados is null) return;
+        await AvisosSvc.MarcarTodosComoLidosAsync(_dados.TeamId, CancellationToken.None);
+        _avisos = await AvisosSvc.ListarAsync(_dados.TeamId, 8, CancellationToken.None);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -297,6 +379,7 @@
             await CarregarAsync();
         }
         StateHasChanged();
+        await ConectarDraftAsync();
     }
 
     private async Task CarregarAsync()
@@ -308,6 +391,7 @@
         try
         {
             _dados = await MinhaAreaSvc.GetAsync(Token, CancellationToken.None);
+            _avisos = await AvisosSvc.ListarAsync(_dados.TeamId, 8, CancellationToken.None);
             try
             {
                 _perfil = await LigaService.GetPerfilTimeAsync(_dados.TeamId, CancellationToken.None);
@@ -364,5 +448,10 @@
         });
     }
 
-    public void Dispose() => AdminAuth.AuthenticationChanged -= OnAuthChanged;
+    public async ValueTask DisposeAsync()
+    {
+        AdminAuth.AuthenticationChanged -= OnAuthChanged;
+        DraftDbContext.AvisosGravados -= OnAvisosGravados;
+        if (_draftHub is not null) await _draftHub.DisposeAsync();
+    }
 }
