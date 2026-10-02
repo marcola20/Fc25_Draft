@@ -1,0 +1,236 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Utilities
+@inject EscudoService Escudos
+
+@* Posição de cada time ao fim de cada rodada. Todos em cinza; até 3 times em destaque, escolhidos
+   nos botões embaixo ou clicando na linha. Some antes da 2ª rodada disputada. *@
+@if (_rodadas.Count > 1)
+{
+    var total = Tabela.Count;
+    var largura = Esquerda + (_rodadas.Count - 1) * Passo(_rodadas.Count) + Direita;
+    var altura = Topo + total * Linha + Base;
+
+    <div class="card mt-3 grafico-posicao">
+        <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
+            <strong>📈 Posição rodada a rodada</strong>
+            <span class="small text-muted">Toque num time para destacar (até 3)</span>
+        </div>
+        <div class="card-body">
+            <div class="rolagem">
+                <svg viewBox="0 0 @Num(largura) @Num(altura)" style="max-width: @Num(largura * 1.5)px; min-width: @Num(largura * 0.85)px;" role="img"
+                     aria-label="Posição dos times na tabela da rodada @_rodadas[0] à rodada @_rodadas[^1]">
+                    @* Faixas das zonas (mesmas cores da tabela). *@
+                    @foreach (var faixa in Faixas(total))
+                    {
+                        <rect x="@Num(Esquerda - 8)" y="@Num(Topo + (faixa.De - 1) * Linha)"
+                              width="@Num(largura - Esquerda - Direita + 16)" height="@Num((faixa.Ate - faixa.De + 1) * Linha)"
+                              class="faixa @faixa.Classe" rx="4" />
+                    }
+
+                    @* Números das posições e das rodadas; cada coluna mostra a tabela daquela rodada ao passar o mouse. *@
+                    @for (var p = 1; p <= total; p++)
+                    {
+                        <g><text x="@Num(Esquerda - 14)" y="@Num(Y(p) + 4)" text-anchor="end" class="eixo">@p</text></g>
+                    }
+                    @for (var i = 0; i < _rodadas.Count; i++)
+                    {
+                        if (MostrarRotulo(i))
+                        {
+                            <g><text x="@Num(X(i))" y="@Num(altura - 8)" text-anchor="middle" class="eixo">@_rodadas[i]</text></g>
+                        }
+                        <rect x="@Num(X(i) - Passo(_rodadas.Count) / 2)" y="@Num(Topo)"
+                              width="@Num(Passo(_rodadas.Count))" height="@Num(total * Linha)" fill="transparent">
+                            <title>@DicaDaRodada(i)</title>
+                        </rect>
+                    }
+
+                    @* Todos os times, apagados. *@
+                    @foreach (var t in Tabela)
+                    {
+                        if (Cor(t.TimeId) is not null || !_posicoes.TryGetValue(t.TimeId, out var serie)) continue;
+                        var pontos = Pontos(serie);
+                        var time = t;
+                        <g class="time-linha" @onclick="() => Alternar(time.TimeId)">
+                            <polyline points="@pontos" class="apagada" />
+                            <polyline points="@pontos" class="alvo" />
+                            <title>@t.TimeNome · @(serie[^1].Posicao)º</title>
+                        </g>
+                    }
+
+                    @* Os destacados por cima, com marcador em cada rodada e o nome no fim. *@
+                    @for (var slot = 0; slot < _destaques.Length; slot++)
+                    {
+                        if (_destaques[slot] is not Guid id || !_posicoes.TryGetValue(id, out var serie)) continue;
+                        var time = Tabela.First(t => t.TimeId == id);
+                        var ultimo = serie[^1];
+                        <g class="time-linha serie-@(slot + 1)" @onclick="() => Alternar(id)">
+                            <polyline points="@Pontos(serie)" class="linha" />
+                            <polyline points="@Pontos(serie)" class="alvo" />
+                            @for (var i = 0; i < serie.Count; i++)
+                            {
+                                var s = serie[i];
+                                <circle cx="@Num(X(i))" cy="@Num(Y(s.Posicao))" r="4" class="marcador">
+                                    <title>@time.TimeNome · rodada @s.Rodada · @(s.Posicao)º · @s.Pontos pts</title>
+                                </circle>
+                            }
+                            <image href="@Escudos.GetEscudo(time.TimeNome)" x="@Num(X(serie.Count - 1) + 10)" y="@Num(Y(ultimo.Posicao) - 8)" width="16" height="16" />
+                            <text x="@Num(X(serie.Count - 1) + 30)" y="@Num(Y(ultimo.Posicao) + 4)" class="rotulo">@(ultimo.Posicao)º @time.TimeNome</text>
+                        </g>
+                    }
+                </svg>
+            </div>
+
+            <div class="d-flex flex-wrap gap-1 mt-2">
+                @foreach (var t in Tabela)
+                {
+                    var time = t;
+                    var cor = Cor(t.TimeId);
+                    <button type="button" class="btn btn-sm chip @(cor is null ? "btn-outline-secondary" : $"ativo {cor}")"
+                            @onclick="() => Alternar(time.TimeId)" aria-pressed="@(cor is not null ? "true" : "false")">
+                        <img src="@Escudos.GetEscudo(t.TimeNome)" alt="" width="16" height="16" />
+                        @t.TimeNome
+                    </button>
+                }
+            </div>
+
+            <div class="d-flex gap-3 flex-wrap mt-2 small text-muted">
+                @foreach (var zona in Faixas(total).Select(f => f.Zona).Distinct())
+                {
+                    <span><span class="badge @ZonaEstilo.Badge(zona) px-2">&nbsp;</span> @LigaZonas.Rotulo(zona)</span>
+                }
+            </div>
+
+            <details class="mt-2 small">
+                <summary class="text-muted">Ver em tabela</summary>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-borderless text-center mb-0">
+                        <thead>
+                            <tr>
+                                <th class="text-start">Time</th>
+                                @foreach (var r in _rodadas)
+                                {
+                                    <th>@r</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Tabela)
+                            {
+                                <tr>
+                                    <td class="text-start text-nowrap">@t.TimeNome</td>
+                                    @foreach (var s in _posicoes.GetValueOrDefault(t.TimeId) ?? [])
+                                    {
+                                        <td title="@s.Pontos pts">@s.Posicao</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LigaRodadaComPartidasDto> Rodadas { get; set; } = [];
+    /// <summary>A classificação já na ordem da tabela.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<LigaClassificacaoItemDto> Tabela { get; set; } = [];
+    [Parameter, EditorRequired] public Func<LigaClassificacaoItemDto, int> PosicaoOficial { get; set; } = t => t.Posicao;
+    [Parameter, EditorRequired] public LigaRegraZonas Regra { get; set; } = LigaRegraZonas.SoCampeao;
+
+    private const double Esquerda = 34, Direita = 150, Topo = 8, Base = 30, Linha = 20;
+    private static readonly CultureInfo Invariante = CultureInfo.InvariantCulture;
+
+    private IReadOnlyDictionary<Guid, IReadOnlyList<PosicaoNaRodada>> _posicoes = new Dictionary<Guid, IReadOnlyList<PosicaoNaRodada>>();
+    private List<int> _rodadas = [];
+    // A cor fica com o time: tirar um destaque não repinta os outros.
+    private readonly Guid?[] _destaques = new Guid?[3];
+    private object? _calculadoDe;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_calculadoDe, Rodadas) && _posicoes.Count == Tabela.Count) return;
+
+        _posicoes = PosicaoPorRodada.Calcular(Rodadas, Tabela, PosicaoOficial);
+        _rodadas = _posicoes.Values.FirstOrDefault()?.Select(p => p.Rodada).ToList() ?? [];
+        _calculadoDe = Rodadas;
+
+        // Começa com os três primeiros da tabela em destaque.
+        Array.Clear(_destaques);
+        for (var i = 0; i < Math.Min(3, Tabela.Count); i++)
+            _destaques[i] = Tabela[i].TimeId;
+    }
+
+    private void Alternar(Guid timeId)
+    {
+        var atual = Array.IndexOf(_destaques, timeId);
+        if (atual >= 0)
+        {
+            _destaques[atual] = null;
+            return;
+        }
+
+        // Com os 3 ocupados, o novo entra no lugar do primeiro.
+        var livre = Array.IndexOf(_destaques, null);
+        _destaques[livre < 0 ? 0 : livre] = timeId;
+    }
+
+    private string? Cor(Guid timeId)
+    {
+        var slot = Array.IndexOf(_destaques, timeId);
+        return slot < 0 ? null : $"serie-{slot + 1}";
+    }
+
+    // Rodadas espaçadas por igual; com muitas rodadas o gráfico fica mais largo e rola de lado no celular.
+    private static double Passo(int rodadas) => rodadas <= 10 ? 52 : rodadas <= 20 ? 34 : 26;
+
+    private double X(int i) => Esquerda + i * Passo(_rodadas.Count);
+
+    private static double Y(int posicao) => Topo + (posicao - 1) * Linha + Linha / 2;
+
+    private bool MostrarRotulo(int i) =>
+        _rodadas.Count <= 20 || i == 0 || i == _rodadas.Count - 1 || _rodadas[i] % 2 == 0;
+
+    private string Pontos(IReadOnlyList<PosicaoNaRodada> serie) =>
+        string.Join(" ", serie.Select((s, i) => $"{Num(X(i))},{Num(Y(s.Posicao))}"));
+
+    private string DicaDaRodada(int i)
+    {
+        var linhas = Tabela
+            .Select(t => (t.TimeNome, S: _posicoes.GetValueOrDefault(t.TimeId)?.ElementAtOrDefault(i)))
+            .Where(x => x.S is not null)
+            .OrderBy(x => x.S!.Posicao)
+            .Select(x => $"{x.S!.Posicao}º {x.TimeNome} · {x.S.Pontos} pts");
+        return $"Rodada {_rodadas[i]}\n{string.Join("\n", linhas)}";
+    }
+
+    private sealed record Faixa(int De, int Ate, ZonaClassificacao Zona, string Classe);
+
+    // Faixas contínuas de cada zona; o 1º sozinho (só campeão) não ganha faixa.
+    private IEnumerable<Faixa> Faixas(int total)
+    {
+        var p = 1;
+        while (p <= total)
+        {
+            var zona = LigaZonas.Zona(Regra, p, total);
+            var fim = p;
+            while (fim < total && LigaZonas.Zona(Regra, fim + 1, total) == zona) fim++;
+            if (zona is not (ZonaClassificacao.Nenhuma or ZonaClassificacao.Campeao))
+                yield return new Faixa(p, fim, zona, ClasseDaZona(zona));
+            p = fim + 1;
+        }
+    }
+
+    private static string ClasseDaZona(ZonaClassificacao zona) => zona switch
+    {
+        ZonaClassificacao.CampeaoComAcesso or ZonaClassificacao.AcessoDireto => "acesso",
+        ZonaClassificacao.PlayoffAcesso => "playoff-acesso",
+        ZonaClassificacao.PlayoffRebaixamento => "playoff-rebaixamento",
+        _ => "rebaixamento"
+    };
+
+    private static string Num(double v) => v.ToString("0.#", Invariante);
+}

@@ -1,0 +1,79 @@
+/* Cores dos 3 destaques: azul, laranja e verde-água (seguros para daltônicos juntos), um tom por tema. */
+.grafico-posicao {
+    --serie-1: #2a78d6;
+    --serie-2: #eb6834;
+    --serie-3: #1baf7a;
+}
+
+[data-bs-theme="dark"] .grafico-posicao {
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-3: #199e70;
+}
+
+.rolagem { overflow-x: auto; }
+.rolagem svg { display: block; width: 100%; height: auto; }
+
+.faixa.acesso { fill: var(--bs-success-bg-subtle); }
+.faixa.playoff-acesso { fill: var(--bs-info-bg-subtle); }
+.faixa.playoff-rebaixamento { fill: var(--bs-warning-bg-subtle); }
+.faixa.rebaixamento { fill: var(--bs-danger-bg-subtle); }
+
+.eixo { font-size: 11px; fill: var(--bs-secondary-color); }
+
+.time-linha { cursor: pointer; }
+
+.apagada {
+    fill: none;
+    stroke: var(--bs-secondary-color);
+    stroke-opacity: .28;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+
+.time-linha:hover .apagada { stroke-opacity: .8; stroke-width: 2; }
+
+/* Área de clique bem maior que a linha. */
+.alvo {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 10;
+}
+
+.linha {
+    fill: none;
+    stroke: var(--cor);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.marcador {
+    fill: var(--cor);
+    stroke: var(--bs-card-bg, var(--bs-body-bg));
+    stroke-width: 2;
+}
+
+.rotulo { font-size: 11px; font-weight: 600; fill: var(--bs-body-color); }
+
+.serie-1 { --cor: var(--serie-1); }
+.serie-2 { --cor: var(--serie-2); }
+.serie-3 { --cor: var(--serie-3); }
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    padding: .15rem .5rem;
+}
+
+.chip img { object-fit: contain; }
+
+.chip.ativo {
+    border: 1px solid var(--cor);
+    box-shadow: inset 3px 0 0 var(--cor);
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    font-weight: 600;
+}
