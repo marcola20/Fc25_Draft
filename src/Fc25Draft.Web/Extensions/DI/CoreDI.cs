@@ -72,6 +72,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IRetrospectivaService, RetrospectivaService>();
             services.AddComConexaoPropria<IPreviaService, PreviaService>();
             services.AddComConexaoPropria<IValorElencoService, ValorElencoService>();
+            services.AddComConexaoPropria<ICalendarioService, CalendarioService>();
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
             services.AddComConexaoPropria<IPremiacaoService, PremiacaoService>();
             services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();

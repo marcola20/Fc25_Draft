@@ -194,6 +194,7 @@ api.MapDraftEndpoints()
    .MapLigaEndpoints();
 
 app.MapFotosEndpoints();
+app.MapCalendarioEndpoints();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 app.MapHealthChecks("/health");

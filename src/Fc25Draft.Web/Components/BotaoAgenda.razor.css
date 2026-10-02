@@ -1,0 +1,14 @@
+.agenda-fundo {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.agenda-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1041;
+    min-width: 17rem;
+    margin-top: 0.25rem;
+}

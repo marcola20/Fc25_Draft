@@ -1,0 +1,36 @@
+@inject NavigationManager Nav
+
+@* Assinar os jogos do time na agenda do celular. O menu abre pelo Blazor (o site não carrega o JS do Bootstrap). *@
+<div class="position-relative d-inline-block">
+    <button type="button" class="btn @Classe" @onclick="() => _aberto = !_aberto" aria-expanded="@(_aberto ? "true" : "false")">
+        📅 Adicionar à agenda
+    </button>
+    @if (_aberto)
+    {
+        <div class="agenda-fundo" @onclick="() => _aberto = false"></div>
+        <div class="dropdown-menu show agenda-menu">
+            <a class="dropdown-item" href="@Webcal" @onclick="() => _aberto = false">🍎 iPhone, iPad ou Mac</a>
+            <a class="dropdown-item" href="@Google" target="_blank" rel="noopener" @onclick="() => _aberto = false">📆 Google Agenda (Android)</a>
+            <a class="dropdown-item" href="@Arquivo" download="cbfv-jogos.ics" @onclick="() => _aberto = false">⬇️ Baixar o arquivo .ics</a>
+            <div class="dropdown-divider"></div>
+            <div class="px-3 small text-muted">
+                Entram todos os jogos do time com dia marcado. A agenda se atualiza sozinha: jogo remarcado e placar
+                aparecem lá.
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+    [Parameter] public string Classe { get; set; } = "btn-outline-secondary";
+
+    private bool _aberto;
+
+    private string Arquivo => $"{Nav.BaseUri.TrimEnd('/')}/calendario/time/{TeamId}.ics";
+
+    // webcal:// faz o iPhone/Mac assinar (e atualizar) em vez de só importar uma vez.
+    private string Webcal => "webcal://" + new Uri(Arquivo).GetComponents(UriComponents.HostAndPort | UriComponents.PathAndQuery, UriFormat.UriEscaped);
+
+    private string Google => "https://calendar.google.com/calendar/render?cid=" + Uri.EscapeDataString(Webcal);
+}
