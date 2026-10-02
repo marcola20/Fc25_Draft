@@ -367,6 +367,28 @@
                         </div>
                     </ShareableCard>
 
+                    var suspensosDaRodada = _disciplina?.Suspensoes.Where(s => s.RodadaCumprida == _rodadaAtual.RodadaId).ToList() ?? [];
+                    @if (suspensosDaRodada.Count > 0)
+                    {
+                        <div class="card mt-3">
+                            <div class="card-header fw-bold">🟥 Suspensos nesta rodada</div>
+                            <ul class="list-group list-group-flush">
+                                @foreach (var s in suspensosDaRodada)
+                                {
+                                    <li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-1">
+                                        <img src="@EscudoUrl(s.TimeNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="fw-semibold">@s.JogadorNome</span>
+                                        <span class="text-muted small">@s.TimeNome · @s.Motivo (@s.JogoDoCartao)</span>
+                                        @if (s.Cumprida)
+                                        {
+                                            <span class="badge bg-secondary ms-auto">cumprida</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
                     @if (_selecoes.TryGetValue(_rodadaAtual.RodadaId, out var selecao) && selecao.Count > 0)
                     {
                         <div class="mt-4">
@@ -633,6 +655,48 @@
 
             @if (_statsTab == "cartoes")
             {
+                @if (_disciplina is not null)
+                {
+                    var aCumprir = _disciplina.Suspensoes.Where(s => !s.Cumprida).ToList();
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100">
+                                <div class="card-header fw-bold">🟥 Suspensos <span class="text-muted small fw-normal">· 3 amarelos ou vermelho = 1 jogo</span></div>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var s in aCumprir)
+                                    {
+                                        <li class="list-group-item py-1 small">
+                                            <span class="fw-semibold">@s.JogadorNome</span> <span class="text-muted">(@s.TimeNome)</span>
+                                            · @s.Motivo em @s.JogoDoCartao · fora @(s.JogoCumprido is null ? "do próximo jogo" : $"de {s.JogoCumprido}")
+                                        </li>
+                                    }
+                                    @if (aCumprir.Count == 0)
+                                    {
+                                        <li class="list-group-item text-muted small">Ninguém suspenso para o próximo jogo.</li>
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100">
+                                <div class="card-header fw-bold">🟨 Pendurados <span class="text-muted small fw-normal">· 2 amarelos</span></div>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var p in _disciplina.Pendurados)
+                                    {
+                                        <li class="list-group-item py-1 small">
+                                            <span class="fw-semibold">@p.JogadorNome</span> <span class="text-muted">(@p.TimeNome)</span>
+                                        </li>
+                                    }
+                                    @if (_disciplina.Pendurados.Count == 0)
+                                    {
+                                        <li class="list-group-item text-muted small">Nenhum pendurado.</li>
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                }
+
                 @if (!_cartoes.Any())
                 {
                     <div class="text-muted">Nenhum cartão registrado.</div>
@@ -848,6 +912,7 @@
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
     private IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>> _selecoes = new Dictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>();
     private IReadOnlyList<NotaMediaJogadorDto> _notas = Array.Empty<NotaMediaJogadorDto>();
+    private DisciplinaDto? _disciplina;
     private bool _todasAsNotas;
 
     /// <summary>Para entrar no ranking de notas: metade dos jogos de quem mais jogou com nota (arredondando para cima).</summary>
@@ -1031,6 +1096,7 @@
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
+        _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);
 
         _rodadaIdx = 0;
         for (int i = _rodadas.Count - 1; i >= 0; i--)

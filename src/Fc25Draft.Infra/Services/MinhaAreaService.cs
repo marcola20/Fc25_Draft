@@ -48,7 +48,34 @@ public class MinhaAreaService : IMinhaAreaService
             await DraftAsync(teamId, ct),
             await EscolhaAutomaticaAsync(teamId, ct),
             await ObservadosAsync(teamId, Nome, ct),
-            time.MinRosterSizeOverride ?? minimoGeral);
+            time.MinRosterSizeOverride ?? minimoGeral,
+            await DisciplinaAsync(teamId, ct));
+    }
+
+    /// <summary>Suspensos para o próximo jogo e pendurados do time nas Ligas e Copas em andamento.</summary>
+    private async Task<IReadOnlyList<MinhaAreaDisciplinaDto>> DisciplinaAsync(Guid teamId, CancellationToken ct)
+    {
+        var ligas = await _db.Ligas.AsNoTracking()
+            .Where(l => (l.Tipo == Core.Enums.TipoCompetition.Liga || l.Tipo == Core.Enums.TipoCompetition.Copa)
+                        && l.Status != Core.Enums.LigaStatus.Encerrada
+                        && l.Rodadas.Any(r => r.Partidas.Any(p => p.TimeCasaId == teamId || p.TimeForaId == teamId)))
+            .Select(l => new { l.LigaId, l.Nome })
+            .ToListAsync(ct);
+
+        var lista = new List<MinhaAreaDisciplinaDto>();
+        foreach (var liga in ligas)
+        {
+            if (await DisciplinaDaCompeticao.CalcularAsync(_db, liga.LigaId, ct) is not { } d) continue;
+
+            lista.AddRange(d.Suspensoes
+                .Where(s => s.TimeId == teamId && !s.Cumprida)
+                .Select(s => new MinhaAreaDisciplinaDto(liga.Nome, s.JogadorNome, true,
+                    $"{s.Motivo} ({s.JogoDoCartao}) · fora {(s.JogoCumprido is null ? "do próximo jogo" : $"de {s.JogoCumprido}")}")));
+            lista.AddRange(d.Pendurados
+                .Where(p => p.TimeId == teamId)
+                .Select(p => new MinhaAreaDisciplinaDto(liga.Nome, p.JogadorNome, false, $"{p.Amarelos} amarelos · o próximo suspende")));
+        }
+        return lista;
     }
 
     public async Task<bool> EstaObservandoAsync(string? token, int playerId, CancellationToken ct)

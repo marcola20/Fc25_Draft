@@ -68,6 +68,9 @@ public interface ILigaPublicService
     /// <summary>Chegadas e saídas do time, com o que gastou e recebeu.</summary>
     Task<TimeTransferenciasDto> GetTransferenciasTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Suspensões (3 amarelos ou vermelho) e pendurados da competição; nulo fora de Liga e Copa.</summary>
+    Task<DisciplinaDto?> GetDisciplinaAsync(Guid ligaId, CancellationToken ct);
+
     /// <summary>Extrato do caixa do time: cada entrada e saída, com o saldo depois de cada uma.</summary>
     Task<ExtratoTimeDto?> GetExtratoTimeAsync(Guid timeId, CancellationToken ct);
 

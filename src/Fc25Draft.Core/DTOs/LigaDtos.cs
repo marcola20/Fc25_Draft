@@ -153,6 +153,20 @@ public record PartidaEscalacaoJogadorDto(
     decimal? Nota = null,
     bool MelhorEmCampo = false);
 
+/// <summary>
+/// Suspensão automática (3 amarelos ou vermelho). <paramref name="JogoCumprido"/> nulo enquanto o próximo
+/// jogo do time na competição não existe; <paramref name="Cumprida"/> quando esse jogo já foi disputado.
+/// </summary>
+public record SuspensaoDto(
+    int JogadorId, string JogadorNome, Guid TimeId, string TimeNome,
+    string Motivo, string JogoDoCartao,
+    Guid? PartidaCumprida, Guid? RodadaCumprida, string? JogoCumprido, bool Cumprida);
+
+/// <summary>Jogador com 2 amarelos na competição: o próximo suspende.</summary>
+public record PenduradoDto(int JogadorId, string JogadorNome, Guid TimeId, string TimeNome, int Amarelos);
+
+public record DisciplinaDto(IReadOnlyList<SuspensaoDto> Suspensoes, IReadOnlyList<PenduradoDto> Pendurados);
+
 /// <summary>Um lançamento do extrato do caixa. <paramref name="Valor"/> com sinal: positivo entrou, negativo saiu.</summary>
 public record ExtratoLancamentoDto(DateTime DataUtc, string Origem, string? Descricao, decimal Valor, decimal SaldoDepois);
 

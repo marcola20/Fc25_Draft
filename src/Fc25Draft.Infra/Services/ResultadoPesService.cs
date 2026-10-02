@@ -296,6 +296,11 @@ public class ResultadoPesService : IResultadoPesService
         var naoIdentificados = new List<ResultadoPesNaoIdentificadoDto>();
         var avisos = new List<string>();
 
+        // Quem estava suspenso para este jogo (pelos cartões dos jogos anteriores).
+        var suspensosNoJogo = (await DisciplinaDaCompeticao.CalcularAsync(_db, liga.LigaId, ct))?.Suspensoes
+            .Where(s => s.PartidaCumprida == partidaId)
+            .ToList() ?? [];
+
         int? Casar(string ladoDoElenco, string? nome, string papel, int? minuto)
         {
             var c = NomesPes.Casar(nome, elenco[ladoDoElenco]);
@@ -418,8 +423,13 @@ public class ResultadoPesService : IResultadoPesService
 
         // Notas do PES por jogador (titulares e quem entrou): substituem as que havia.
         _db.LigaNotasJogadores.RemoveRange(await _db.LigaNotasJogadores.Where(x => x.PartidaId == partidaId).ToListAsync(ct));
-        _db.LigaNotasJogadores.AddRange(CasarNotas(partidaId, r, elenco,
-            new Dictionary<string, Guid> { [Casa] = partida.TimeCasaId, [Fora] = partida.TimeForaId }));
+        var notasDoJogo = CasarNotas(partidaId, r, elenco,
+            new Dictionary<string, Guid> { [Casa] = partida.TimeCasaId, [Fora] = partida.TimeForaId });
+        _db.LigaNotasJogadores.AddRange(notasDoJogo);
+
+        var emCampo = notasDoJogo.Select(n => n.JogadorId).Concat(novos.Select(e => e.JogadorId)).ToHashSet();
+        foreach (var s in suspensosNoJogo.Where(s => emCampo.Contains(s.JogadorId)))
+            avisos.Add($"{s.JogadorNome} ({s.TimeNome}) estava suspenso para este jogo ({s.Motivo} em {s.JogoDoCartao}) e entrou em campo.");
 
         // Placar e situação da partida.
         partida.GolsCasa = r.Casa!.Gols!.Value;

@@ -1493,6 +1493,9 @@ public class LigaPublicService : ILigaPublicService
         _ => $"Rodada {rodada}"
     };
 
+    public Task<DisciplinaDto?> GetDisciplinaAsync(Guid ligaId, CancellationToken ct) =>
+        DisciplinaDaCompeticao.CalcularAsync(_db, ligaId, ct);
+
     public async Task<ExtratoTimeDto?> GetExtratoTimeAsync(Guid timeId, CancellationToken ct)
     {
         var saldo = await _db.Teams.AsNoTracking()

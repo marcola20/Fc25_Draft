@@ -79,6 +79,24 @@
             </div>
         }
 
+        @if (d.Disciplina is { Count: > 0 } disciplina)
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-bold">🟥 Suspensos e pendurados</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var item in disciplina.OrderByDescending(x => x.Suspenso))
+                    {
+                        <li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-2">
+                            <span class="badge @(item.Suspenso ? "bg-danger" : "bg-warning text-dark")">@(item.Suspenso ? "Suspenso" : "Pendurado")</span>
+                            <span class="fw-semibold">@item.JogadorNome</span>
+                            <span class="text-muted small">@item.Detalhe</span>
+                            <span class="text-muted small ms-auto">@item.Competicao</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
         <TimeResumoFaixa Perfil="@_perfil" />
 
         <div class="row g-3">
