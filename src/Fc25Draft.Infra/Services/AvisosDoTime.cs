@@ -19,6 +19,7 @@ internal static class AvisosDoTime
     public const string Revenda = "REVENDA";
     public const string PropostaExpirada = "PROPOSTA_EXPIRADA";
     public const string CaixaNegativo = "CAIXA_NEGATIVO";
+    public const string Escalacao = "ESCALACAO";
 
     public static void Criar(DraftDbContext db, Guid teamId, string tipo, string texto, string? link, DateTime quando)
     {

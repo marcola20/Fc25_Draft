@@ -56,7 +56,7 @@ public class MinhaAreaService : IMinhaAreaService
 
     /// <summary>
     /// O que o treinador ainda precisa fazer: lista de protegidos do draft de expansão, pré-draft aberto
-    /// e escalação ativa com vaga vazia, jogador que saiu do elenco ou suspenso.
+    /// e escalação ativa com vaga vazia ou suspenso (quem sai do elenco já sai da escalação sozinho).
     /// </summary>
     private async Task<IReadOnlyList<MinhaAreaPendenciaDto>> PendenciasAsync(
         Guid teamId, IReadOnlyDictionary<int, string> suspensos, CancellationToken ct)
@@ -84,7 +84,7 @@ public class MinhaAreaService : IMinhaAreaService
         if (preDraft is int edicao && !await _db.DraftWishlistEntries.AnyAsync(w => w.Versao == edicao && w.TeamId == teamId, ct))
             pendencias.Add(new MinhaAreaPendenciaDto("O pré-draft está aberto e você ainda não montou sua lista.", "/draft/pre-draft"));
 
-        // Escalação ativa: vaga de titular vazia, jogador que não é mais do elenco e suspenso no próximo jogo.
+        // Escalação ativa: vaga de titular vazia e suspenso no próximo jogo.
         var linkEscalacao = $"/teams/{teamId}/lineups";
         var escalacao = await _db.TeamLineups.AsNoTracking()
             .Where(l => l.TeamId == teamId && l.IsActive)
@@ -96,18 +96,12 @@ public class MinhaAreaService : IMinhaAreaService
         }
         else
         {
-            var elenco = (await _db.TeamRosters.AsNoTracking().Where(r => r.TeamId == teamId).Select(r => r.PlayerId).ToListAsync(ct)).ToHashSet();
             var titulares = escalacao.Slots.Where(s => !s.IsBench).ToList();
 
             var vazias = titulares.Count(s => s.PlayerId is null);
             if (vazias > 0)
                 pendencias.Add(new MinhaAreaPendenciaDto(
                     $"A escalação \"{escalacao.Name}\" tem {vazias} vaga{(vazias == 1 ? "" : "s")} de titular sem jogador.", linkEscalacao));
-
-            var sairam = escalacao.Slots.Where(s => s.PlayerId is int id && !elenco.Contains(id)).Select(s => s.Nome ?? "?").ToList();
-            if (sairam.Count > 0)
-                pendencias.Add(new MinhaAreaPendenciaDto(
-                    $"A escalação \"{escalacao.Name}\" tem quem não é mais do elenco: {string.Join(", ", sairam)}.", linkEscalacao));
 
             foreach (var s in titulares.Where(s => s.PlayerId is int id && suspensos.ContainsKey(id)))
                 pendencias.Add(new MinhaAreaPendenciaDto(

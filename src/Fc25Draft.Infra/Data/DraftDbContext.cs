@@ -1,4 +1,5 @@
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fc25Draft.Infra.Data;
@@ -23,6 +24,19 @@ public class DraftDbContext : DbContext
 
     /// <summary>Disparado depois de gravar avisos, com os times que os receberam.</summary>
     public static event Action<IReadOnlyCollection<Guid>>? AvisosGravados;
+
+    // Quem sai do elenco sai das escalações do time no mesmo save (ver EscalacoesDeQuemSaiu).
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        await EscalacoesDeQuemSaiu.TirarAsync(this, cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EscalacoesDeQuemSaiu.TirarAsync(this, CancellationToken.None).GetAwaiter().GetResult();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
 
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<Player> Players => Set<Player>();
