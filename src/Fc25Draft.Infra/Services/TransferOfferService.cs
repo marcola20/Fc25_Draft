@@ -108,8 +108,8 @@ public class TransferOfferService : ITransferOfferService
         await EnsureNotOnLoanAsync(targetPlayers.Concat(offeredPlayers), ct);
 
         // Os alvos saem do time de destino e os oferecidos saem do time de origem.
-        await EnsureElencoMinimoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
-        await EnsureElencoMinimoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
 
         if (dto.ParentOfferId.HasValue)
         {
@@ -119,6 +119,10 @@ public class TransferOfferService : ITransferOfferService
 
             if (parent.Status != OfferStatus.Pending)
                 throw new InvalidOperationException("Só é possível contraofertar propostas pendentes.");
+
+            // Só quem recebeu a proposta contrapropõe, e para quem a mandou.
+            if (parent.ToTeamId != dto.FromTeamId || parent.FromTeamId != dto.ToTeamId)
+                throw new InvalidOperationException("Só o time que recebeu a proposta pode fazer a contraproposta, e para quem a mandou.");
 
             parent.Status = OfferStatus.Countered;
             parent.UpdatedAtUtc = now;
@@ -174,13 +178,38 @@ public class TransferOfferService : ITransferOfferService
         return MapToDto(offer, fromTeam, toTeam, targetPlayers, offeredPlayers);
     }
 
-    public async Task<TransferOfferListItemDto> RespondToOfferAsync(Guid offerId, Guid teamId, OfferStatus response, CancellationToken ct)
+    public Task<TransferOfferListItemDto> RespondToOfferAsync(Guid offerId, Guid teamId, OfferStatus response, CancellationToken ct)
     {
         if (response is not (OfferStatus.Accepted or OfferStatus.Rejected))
             throw new ArgumentException("Resposta inválida. Use Accepted ou Rejected.");
 
+        return EmTransacaoSerializavelAsync(() => ResponderAsync(offerId, teamId, response, ct), ct);
+    }
+
+    /// <summary>
+    /// Dinheiro e elencos de dois times mudam juntos. Em Serializable, duas operações ao mesmo tempo sobre
+    /// o mesmo time não gastam o mesmo saldo: o banco recusa uma delas, que é refeita (execution strategy)
+    /// já enxergando o que a outra gravou.
+    /// </summary>
+    private async Task<T> EmTransacaoSerializavelAsync<T>(Func<Task<T>> acao, CancellationToken ct)
+    {
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            // Nada do que já estava carregado neste contexto (saldo, elenco) vale para a tentativa.
+            _db.ChangeTracker.Clear();
+            await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+            var resultado = await acao();
+            await tx.CommitAsync(ct);
+            return resultado;
+        });
+    }
+
+    private async Task<TransferOfferListItemDto> ResponderAsync(Guid offerId, Guid teamId, OfferStatus response, CancellationToken ct)
+    {
         var offer = await _db.TransferOffers
             .Include(o => o.Players).ThenInclude(p => p.Player).ThenInclude(p => p.Position)
+            .Include(o => o.Players).ThenInclude(p => p.Player).ThenInclude(p => p.TeamRosters)
             .Include(o => o.FromTeam)
             .Include(o => o.ToTeam)
             .FirstOrDefaultAsync(o => o.OfferId == offerId, ct)
@@ -211,6 +240,15 @@ public class TransferOfferService : ITransferOfferService
             }
 
             await EnsureNotOnLoanAsync(offer.Players.Select(p => p.Player), ct);
+
+            // A proposta pode ser antiga: os pedidos ainda precisam ser de quem recebeu e os oferecidos de quem mandou.
+            var mudaram = offer.Players
+                .Where(p => !PlayerBelongsToTeam(p.Player, p.IsTarget ? offer.ToTeamId : offer.FromTeamId))
+                .Select(p => p.Player.Name)
+                .ToList();
+            if (mudaram.Count > 0)
+                throw new InvalidOperationException(
+                    $"A proposta não vale mais: {string.Join(", ", mudaram)} já não {(mudaram.Count == 1 ? "é" : "são")} do mesmo time. Recuse-a ou peça uma nova.");
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -338,20 +376,25 @@ public class TransferOfferService : ITransferOfferService
     }
 
     /// <summary>
-    /// Quem cede jogador não pode ficar abaixo do mínimo de elenco; quem já está abaixo do mínimo
-    /// só contrata (não vende, não empresta) até voltar a ele.
+    /// Quem cede jogador não pode ficar abaixo do mínimo de elenco (quem já está abaixo só contrata até
+    /// voltar a ele), e quem recebe não pode passar do máximo.
     /// </summary>
-    private async Task EnsureElencoMinimoAsync(TransferConfig cfg, Team team, int saem, int entram, CancellationToken ct)
+    private async Task EnsureElencoAsync(TransferConfig cfg, Team team, int saem, int entram, CancellationToken ct)
     {
-        if (saem == 0) return;
+        if (saem == entram) return;
 
         var elenco = await _db.TeamRosters.CountAsync(r => r.TeamId == team.TeamId, ct);
-        var minimo = cfg.MinRosterSizeFor(team);
-        if (elenco - saem + entram >= minimo) return;
+        var depois = elenco - saem + entram;
 
-        throw new InvalidOperationException(elenco < minimo
-            ? $"O {team.TeamName} está abaixo do mínimo de elenco ({elenco} de {minimo} jogadores): só pode contratar até voltar ao mínimo."
-            : $"O {team.TeamName} ficaria com menos de {minimo} jogadores.");
+        if (entram > saem && depois > cfg.MaxRosterSize)
+            throw new InvalidOperationException(
+                $"O {team.TeamName} ficaria com {depois} jogadores; o máximo é {cfg.MaxRosterSize}.");
+
+        var minimo = cfg.MinRosterSizeFor(team);
+        if (saem > entram && depois < minimo)
+            throw new InvalidOperationException(elenco < minimo
+                ? $"O {team.TeamName} está abaixo do mínimo de elenco ({elenco} de {minimo} jogadores): só pode contratar até voltar ao mínimo."
+                : $"O {team.TeamName} ficaria com menos de {minimo} jogadores.");
     }
 
     public async Task SetAskingPriceAsync(Guid teamId, Guid playerGuid, decimal? askingPrice, CancellationToken ct)
@@ -378,7 +421,7 @@ public class TransferOfferService : ITransferOfferService
         {
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
             var team = await _db.Teams.AsNoTracking().FirstAsync(t => t.TeamId == teamId, ct);
-            await EnsureElencoMinimoAsync(cfg, team, saem: 1, entram: 0, ct);
+            await EnsureElencoAsync(cfg, team, saem: 1, entram: 0, ct);
         }
 
         if (askingPrice is null)
@@ -396,7 +439,10 @@ public class TransferOfferService : ITransferOfferService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid buyerTeamId, Guid playerGuid, decimal expectedPrice, CancellationToken ct)
+    public Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid buyerTeamId, Guid playerGuid, decimal expectedPrice, CancellationToken ct) =>
+        EmTransacaoSerializavelAsync(() => ComprarDaListaAsync(buyerTeamId, playerGuid, expectedPrice, ct), ct);
+
+    private async Task<TransferOfferListItemDto> ComprarDaListaAsync(Guid buyerTeamId, Guid playerGuid, decimal expectedPrice, CancellationToken ct)
     {
         var roster = await _db.TeamRosters
             .Include(r => r.Player).ThenInclude(p => p.Position)
@@ -467,29 +513,9 @@ public class TransferOfferService : ITransferOfferService
 
     private async Task CancelConflictingOffersAsync(TransferOffer acceptedOffer, CancellationToken ct)
     {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        // Get all player IDs involved in the accepted offer
         var involvedPlayerIds = acceptedOffer.Players.Select(p => p.PlayerId).ToList();
-        if (involvedPlayerIds.Count == 0) return;
-
-        // Find pending offers that involve any of these players
-        var conflictingOffers = await _db.TransferOffers
-            .Include(o => o.Players)
-            .Include(o => o.ToTeam)
-            .Where(o => o.OfferId != acceptedOffer.OfferId
-                && o.Status == OfferStatus.Pending
-                && o.Players.Any(p => involvedPlayerIds.Contains(p.PlayerId)))
-            .ToListAsync(ct);
-
-        foreach (var offer in conflictingOffers)
-        {
-            offer.Status = OfferStatus.Cancelled;
-            offer.UpdatedAtUtc = now;
-            AvisosDoTime.Criar(_db, offer.FromTeamId, AvisosDoTime.PropostaCancelada,
-                $"Sua proposta ao {offer.ToTeam.TeamName} foi cancelada: um jogador dela acabou de ser negociado.",
-                "/minha-area", now);
-        }
+        await PropostasPendentes.CancelarComJogadoresAsync(_db, involvedPlayerIds, acceptedOffer.OfferId,
+            "um jogador dela acabou de ser negociado.", _timeProvider.GetUtcNow().UtcDateTime, ct);
     }
 
     /// <summary>Resumo da proposta do ponto de vista de quem a fez ("pede X, oferece Y, paga R$ 10 mi").</summary>
@@ -529,10 +555,10 @@ public class TransferOfferService : ITransferOfferService
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
 
-        // Valida o tamanho do elenco para os times manterem o mínimo de jogadores.
+        // Valida o tamanho do elenco para os times ficarem entre o mínimo e o máximo de jogadores.
         // targetPlayers saem de toTeam e entram em fromTeam; offeredPlayers saem de fromTeam e entram em toTeam.
-        await EnsureElencoMinimoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
-        await EnsureElencoMinimoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {

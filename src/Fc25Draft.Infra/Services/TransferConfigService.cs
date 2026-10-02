@@ -44,6 +44,7 @@ public class TransferConfigService : ITransferConfigService
         cfg.MaxTransfers = dto.MaxTransfers;
         cfg.MaxLoans = dto.MaxLoans;
         cfg.MinRosterSize = dto.MinRosterSize;
+        cfg.MaxRosterSize = dto.MaxRosterSize;
         cfg.QuickSellBloqueado = dto.QuickSellBloqueado;
         cfg.MercadoFechado = dto.MercadoFechado;
         cfg.AtualizadoEm = DateTime.UtcNow;
@@ -167,8 +168,9 @@ public class TransferConfigService : ITransferConfigService
         if (d.MaxTransfers < 0) throw new InvalidOperationException("O limite de transferências não pode ser negativo.");
         if (d.MaxLoans < 0) throw new InvalidOperationException("O limite de empréstimos não pode ser negativo.");
         if (d.MinRosterSize < 0) throw new InvalidOperationException("O mínimo de jogadores não pode ser negativo.");
+        if (d.MaxRosterSize < d.MinRosterSize) throw new InvalidOperationException("O máximo de jogadores não pode ser menor que o mínimo.");
     }
 
     private static TransferConfigDto ToDto(TransferConfig c) =>
-        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans, c.MercadoFechado);
+        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans, c.MercadoFechado, c.MaxRosterSize);
 }

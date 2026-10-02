@@ -21,7 +21,6 @@ namespace Fc25Draft.Infra.Services;
 
 public class MarketService : IMarketService
 {
-    private const int SquadLimit = 23;
 
     private readonly DraftDbContext _dbContext;
     private readonly IMarketCycleGenerator _cycleGenerator;
@@ -433,8 +432,10 @@ public class MarketService : IMarketService
         if (includeCurrentItem || currentLeaderTeamId != teamId)
             projected += 1;
 
-        if (projected > SquadLimit)
-            throw new MarketValidationException("O time atingiria o limite de 23 jogadores.");
+        var maximo = (await _dbContext.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                      ?? TransferConfig.Default()).MaxRosterSize;
+        if (projected > maximo)
+            throw new MarketValidationException($"O time atingiria o limite de {maximo} jogadores.");
     }
 
     private async Task SyncRosterAsync(Guid teamId, int playerId, CancellationToken ct)

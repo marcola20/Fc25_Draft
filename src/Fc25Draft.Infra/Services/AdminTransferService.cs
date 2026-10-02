@@ -181,6 +181,9 @@ public partial class AdminTransferService
         }, ct).ConfigureAwait(false);
     }
 
+    private async Task<int> MaximoDeElencoAsync(CancellationToken ct) =>
+        (await _dbContext.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? TransferConfig.Default()).MaxRosterSize;
+
     private static string FormatPlayerList(IReadOnlyCollection<Player> players)
         => players.Count == 0 ? "Sem jogadores" : string.Join(", ", players.Select(p => p.Name));
 
@@ -230,10 +233,11 @@ public partial class AdminTransferService
             if (hasActiveListings)
                 throw new InvalidOperationException("Remova o jogador do mercado antes de concluir a venda.");
 
+            var maximo = await MaximoDeElencoAsync(ctoken).ConfigureAwait(false);
             var currentBuyerCount = await _dbContext.Players
                 .CountAsync(p => p.CurrentTeamId == toTeamId, ctoken).ConfigureAwait(false);
-            if (currentBuyerCount + players.Count > 23)
-                throw new InvalidOperationException("O time comprador excederia o limite de 23 jogadores.");
+            if (currentBuyerCount + players.Count > maximo)
+                throw new InvalidOperationException($"O time comprador excederia o limite de {maximo} jogadores.");
 
             var availableBudget = decimal.Round(toTeam.Budget - toTeam.BudgetBlocked, 2, MidpointRounding.AwayFromZero);
             if (availableBudget < normalizedAmount)
@@ -246,6 +250,8 @@ public partial class AdminTransferService
             ExtratoCaixa.Lancar(_dbContext, fromTeam.TeamId, normalizedAmount, ExtratoCaixa.VendaAdmin, descricaoVenda, now);
 
             foreach (var player in players) player.CurrentTeamId = toTeamId;
+            await PropostasPendentes.CancelarComJogadoresAsync(_dbContext, playerNumericIds, null,
+                "a organização transferiu um jogador dela.", now, ctoken).ConfigureAwait(false);
 
             var rosterEntries = await _dbContext.TeamRosters
                 .Where(r => playerNumericIds.Contains(r.PlayerId))
@@ -392,10 +398,14 @@ public partial class AdminTransferService
             var teamAFinalCount = teamAPlayerCount - aEntities.Count + bEntities.Count;
             var teamBFinalCount = teamBPlayerCount - bEntities.Count + aEntities.Count;
 
-            if (teamAFinalCount > 23)
-                throw new InvalidOperationException("Time A excederia o limite de 23 jogadores.");
-            if (teamBFinalCount > 23)
-                throw new InvalidOperationException("Time B excederia o limite de 23 jogadores.");
+            var maximo = await MaximoDeElencoAsync(ctoken).ConfigureAwait(false);
+            if (teamAFinalCount > maximo)
+                throw new InvalidOperationException($"Time A excederia o limite de {maximo} jogadores.");
+            if (teamBFinalCount > maximo)
+                throw new InvalidOperationException($"Time B excederia o limite de {maximo} jogadores.");
+            await PropostasPendentes.CancelarComJogadoresAsync(_dbContext,
+                aEntities.Concat(bEntities).Select(p => p.PlayerId).ToList(), null,
+                "a organização trocou um jogador dela de time.", now, ctoken).ConfigureAwait(false);
 
             if (normalizedCashAdjust > 0m)
             {
@@ -582,7 +592,11 @@ public partial class AdminTransferService
 
             var currentToTeamCount = await _dbContext.Players.CountAsync(p => p.CurrentTeamId == toTeamId, ctoken).ConfigureAwait(false);
             var finalToTeamCount = currentToTeamCount + (fromTeamId != toTeamId ? 1 : 0);
-            if (finalToTeamCount > 23) throw new InvalidOperationException("O time de destino excederia o limite de 23 jogadores.");
+            var maximo = await MaximoDeElencoAsync(ctoken).ConfigureAwait(false);
+            if (finalToTeamCount > maximo) throw new InvalidOperationException($"O time de destino excederia o limite de {maximo} jogadores.");
+            if (fromTeamId != toTeamId)
+                await PropostasPendentes.CancelarComJogadoresAsync(_dbContext, new[] { player.PlayerId }, null,
+                    $"a organização mudou {player.Name} de time.", now, ctoken).ConfigureAwait(false);
 
             player.CurrentTeamId = toTeamId;
 

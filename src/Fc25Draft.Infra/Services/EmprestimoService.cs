@@ -45,6 +45,20 @@ public class EmprestimoService : IEmprestimoService
 
     public async Task<EmprestimoDto> ExercerOpcaoCompraAsync(Guid emprestimoId, string? teamToken, CancellationToken ct)
     {
+        // Mesmo esquema das propostas: em Serializable, duas compras ao mesmo tempo não gastam o mesmo saldo.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            _db.ChangeTracker.Clear();
+            await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+            var resultado = await ExercerOpcaoCompraCoreAsync(emprestimoId, teamToken, ct);
+            await tx.CommitAsync(ct);
+            return resultado;
+        });
+    }
+
+    private async Task<EmprestimoDto> ExercerOpcaoCompraCoreAsync(Guid emprestimoId, string? teamToken, CancellationToken ct)
+    {
         var teamId = await _db.TimeIdPorTokenAsync(teamToken, ct)
             ?? throw new UnauthorizedAccessException("Token do time inválido.");
 

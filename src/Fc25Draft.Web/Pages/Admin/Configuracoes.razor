@@ -167,6 +167,11 @@
                                     <input type="number" min="0" class="form-control" @bind="_minRoster" />
                                     <div class="form-text">Um time não pode ficar abaixo disto.</div>
                                 </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">Máximo de jogadores no elenco</label>
+                                    <input type="number" min="1" class="form-control" @bind="_maxRoster" />
+                                    <div class="form-text">Vale em propostas, lista de transferências, leilão e nas ações do admin.</div>
+                                </div>
                             </div>
 
                             <hr />
@@ -421,7 +426,7 @@
     private decimal _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35;
 
     // Transferências
-    private int _maxQuickSell, _maxTransfers, _minRoster, _maxLoans;
+    private int _maxQuickSell, _maxTransfers, _minRoster, _maxLoans, _maxRoster = 23;
     private int _maxQuickSellSalvo, _maxTransfersSalvo, _minRosterSalvo;
     private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
     private bool _mercadoFechado, _mercadoFechadoSalvo;
@@ -470,6 +475,7 @@
         _minRoster = t.MinRosterSize;
         _minRosterSalvo = t.MinRosterSize;
         _maxLoans = t.MaxLoans;
+        _maxRoster = t.MaxRosterSize;
         _quickSellBloqueado = t.QuickSellBloqueado;
         _quickSellBloqueadoSalvo = t.QuickSellBloqueado;
         _mercadoFechado = t.MercadoFechado;
@@ -634,7 +640,7 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans, _mercadoFechado), CancellationToken.None);
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans, _mercadoFechado, _maxRoster), CancellationToken.None);
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();

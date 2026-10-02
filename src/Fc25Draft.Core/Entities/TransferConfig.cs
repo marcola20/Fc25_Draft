@@ -19,6 +19,9 @@ public class TransferConfig
     /// <summary>Quantidade mínima de jogadores que um elenco deve manter.</summary>
     public int MinRosterSize { get; set; }
 
+    /// <summary>Quantidade máxima de jogadores no elenco (propostas, lista de transferências, leilão e admin).</summary>
+    public int MaxRosterSize { get; set; } = 23;
+
     /// <summary>Quando true, ninguém pode fazer venda rápida (o admin libera em /admin/configuracoes).</summary>
     public bool QuickSellBloqueado { get; set; } = true;
 
@@ -47,6 +50,7 @@ public class TransferConfig
         MaxTransfers = 5,
         MaxLoans = 3,
         MinRosterSize = 14,
+        MaxRosterSize = 23,
         QuickSellBloqueado = true
     };
 }

@@ -193,6 +193,8 @@ public class TeamQuickSellService : ITeamQuickSellService
                 team.QuickSellCount++;
                 ExtratoCaixa.Lancar(_dbContext, team.TeamId, payout, ExtratoCaixa.VendaRapida,
                     $"Venda rápida de {player.Name}", _timeProvider.GetUtcNow().UtcDateTime);
+                await PropostasPendentes.CancelarComJogadoresAsync(_dbContext, new[] { player.PlayerId }, null,
+                    $"{player.Name} foi vendido na venda rápida.", _timeProvider.GetUtcNow().UtcDateTime, ct).ConfigureAwait(false);
 
                 var historyNotes = BuildHistoryNotes(player.Name, oldOverall, newOverall, payout, evolucao);
                 var historyEntry = new TransferHistory
