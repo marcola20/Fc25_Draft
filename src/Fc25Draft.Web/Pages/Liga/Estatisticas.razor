@@ -42,7 +42,61 @@
             <li class="nav-item">
                 <button class="nav-link @(_tab == "cartoes" ? "active" : "")" @onclick='() => _tab = "cartoes"'>Cartões</button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "notas" ? "active" : "")" @onclick='() => _tab = "notas"'>Notas</button>
+            </li>
         </ul>
+
+        @if (_tab == "notas")
+        {
+            var minimo = MinimoDeJogos;
+            var lista = _notas.Where(n => _todasAsNotas || n.Jogos >= minimo).ToList();
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted">
+                <span>Média das notas do PES nos jogos importados.</span>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="todasNotas" @bind="_todasAsNotas" />
+                    <label class="form-check-label" for="todasNotas">
+                        Mostrar todos (sem o mínimo de @minimo jogo@(minimo == 1 ? "" : "s"))
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Jogador</th>
+                            <th>Pos.</th>
+                            <th>Time</th>
+                            <th class="text-center">Jogos</th>
+                            <th class="text-center">Média</th>
+                            <th class="text-center">Melhor nota</th>
+                            <th class="text-center" title="Melhor em campo">⭐</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < lista.Count; i++)
+                        {
+                            var n = lista[i];
+                            <tr>
+                                <td class="text-muted">@(i + 1)</td>
+                                <td class="fw-semibold"><a class="text-decoration-none" href="/players/details/@n.JogadorId">@n.JogadorNome</a></td>
+                                <td class="text-muted small">@n.Posicao</td>
+                                <td>@n.TimeNome</td>
+                                <td class="text-center">@n.Jogos</td>
+                                <td class="text-center"><span class="badge @NotaPes.Cor(n.Media)">@NotaPes.Media(n.Media)</span></td>
+                                <td class="text-center">@NotaPes.Texto(n.MelhorNota)</td>
+                                <td class="text-center">@(n.VezesMelhorEmCampo > 0 ? n.VezesMelhorEmCampo : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (lista.Count == 0)
+                {
+                    <div class="text-center text-muted py-3">Sem notas do PES nesta competição.</div>
+                }
+            </div>
+        }
 
         @if (_tab == "artilheiros")
         {
@@ -157,6 +211,11 @@
     private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
     private IReadOnlyList<LigaArtilheiroDto>? _artilheiros;
     private IReadOnlyList<LigaCartaoEstatDto>? _cartoes;
+    private IReadOnlyList<NotaMediaJogadorDto> _notas = Array.Empty<NotaMediaJogadorDto>();
+    private bool _todasAsNotas;
+
+    /// <summary>Para entrar no ranking: metade dos jogos de quem mais jogou com nota (arredondando para cima).</summary>
+    private int MinimoDeJogos => _notas.Count == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_notas.Max(n => n.Jogos) / 2.0));
     private bool _loading = true;
     private string _tab = "artilheiros";
 
@@ -184,5 +243,6 @@
         if (_liga is null) return;
         _artilheiros = await LigaService.GetArtilheirosAsync(_liga.LigaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(_liga.LigaId, CancellationToken.None);
+        _notas = await LigaService.GetMediasNotasAsync(_liga.LigaId, CancellationToken.None);
     }
 }

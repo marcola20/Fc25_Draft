@@ -366,6 +366,37 @@
                             }
                         </div>
                     </ShareableCard>
+
+                    @if (_selecoes.TryGetValue(_rodadaAtual.RodadaId, out var selecao) && selecao.Count > 0)
+                    {
+                        <ShareableCard Id="cap-selecao"
+                                       Titulo="@LigaNome"
+                                       Subtitulo='@($"Seleção da {(_rodadaAtual.Titulo ?? $"rodada {_rodadaAtual.Numero}")}")'
+                                       Arquivo='@($"cbfv-selecao-{_rodadaAtual.Numero}.png")'>
+                            <div class="card mt-3">
+                                <div class="card-header fw-bold">
+                                    ⭐ Seleção da rodada
+                                    <span class="text-muted small fw-normal">· 4-3-3 pelas notas do PES</span>
+                                </div>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var j in selecao)
+                                    {
+                                        <li class="list-group-item d-flex align-items-center gap-2 py-1">
+                                            <span class="badge bg-light text-dark border" style="min-width:2.7rem">@j.Posicao</span>
+                                            <img src="@EscudoUrl(j.TimeNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                            <a class="fw-semibold text-decoration-none text-truncate" href="/players/details/@j.JogadorId">@j.JogadorNome</a>
+                                            <span class="text-muted small text-truncate d-none d-sm-inline">@j.TimeNome</span>
+                                            @if (j.MelhorEmCampo)
+                                            {
+                                                <span title="Melhor em campo">⭐</span>
+                                            }
+                                            <span class="badge ms-auto @NotaPes.Cor(j.Nota)">@NotaPes.Texto(j.Nota)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        </ShareableCard>
+                    }
                 }
             }
             else
@@ -753,6 +784,7 @@
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
+    private IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>> _selecoes = new Dictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>();
 
     private bool _mostraDetalhesPartida = false;
     private bool _showEditor;
@@ -930,6 +962,7 @@
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
+        _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
 
         _rodadaIdx = 0;
         for (int i = _rodadas.Count - 1; i >= 0; i--)

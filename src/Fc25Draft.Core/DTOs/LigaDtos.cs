@@ -148,7 +148,32 @@ public record PartidaEscalacaoJogadorDto(
     string JogadorNome,
     string Posicao,
     bool Titular,
-    int Ordem);
+    int Ordem,
+    // Nota do PES no jogo (nula sem importação ou sem casar o nome).
+    decimal? Nota = null,
+    bool MelhorEmCampo = false);
+
+/// <summary>Jogador da seleção da rodada, escolhido pela nota do PES.</summary>
+public record SelecaoRodadaJogadorDto(
+    int JogadorId,
+    string JogadorNome,
+    string Posicao,
+    Guid TimeId,
+    string TimeNome,
+    decimal Nota,
+    bool MelhorEmCampo);
+
+/// <summary>Média das notas do PES de um jogador numa competição.</summary>
+public record NotaMediaJogadorDto(
+    int JogadorId,
+    string JogadorNome,
+    string Posicao,
+    // Time do jogo mais recente com nota.
+    string TimeNome,
+    int Jogos,
+    decimal Media,
+    decimal MelhorNota,
+    int VezesMelhorEmCampo);
 
 public record PartidaEscalacaoTimeDto(
     Guid TimeId,

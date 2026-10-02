@@ -416,6 +416,11 @@ public class ResultadoPesService : IResultadoPesService
             }));
         }
 
+        // Notas do PES por jogador (titulares e quem entrou): substituem as que havia.
+        _db.LigaNotasJogadores.RemoveRange(await _db.LigaNotasJogadores.Where(x => x.PartidaId == partidaId).ToListAsync(ct));
+        _db.LigaNotasJogadores.AddRange(CasarNotas(partidaId, r, elenco,
+            new Dictionary<string, Guid> { [Casa] = partida.TimeCasaId, [Fora] = partida.TimeForaId }));
+
         // Placar e situação da partida.
         partida.GolsCasa = r.Casa!.Gols!.Value;
         partida.GolsFora = r.Fora!.Gols!.Value;
@@ -496,6 +501,69 @@ public class ResultadoPesService : IResultadoPesService
             partida.GolsCasa, partida.GolsFora,
             situacao, simular, partida.Status.ToString(), novos.Count, titularesDasNotas,
             naoIdentificados, avisos);
+    }
+
+    public async Task<int> ReprocessarNotasAsync(bool somenteSemNotas, CancellationToken ct)
+    {
+        var importacoes = await _db.LigaPartidaImportacoes.AsNoTracking()
+            .Where(i => !somenteSemNotas || !_db.LigaNotasJogadores.Any(n => n.PartidaId == i.PartidaId))
+            .Select(i => new { i.PartidaId, i.Json, i.Partida.TimeCasaId, i.Partida.TimeForaId, i.Partida.Rodada.LigaId })
+            .ToListAsync(ct);
+
+        var gravadas = 0;
+        foreach (var imp in importacoes)
+        {
+            ResultadoPesRequest? r;
+            try { r = System.Text.Json.JsonSerializer.Deserialize<ResultadoPesRequest>(imp.Json); }
+            catch (System.Text.Json.JsonException) { continue; }
+            if (r?.Notas is null) continue;
+
+            var elenco = new Dictionary<string, List<NomesPes.Candidato>>
+            {
+                [Casa] = await CandidatosAsync(imp.TimeCasaId, imp.LigaId, ct),
+                [Fora] = await CandidatosAsync(imp.TimeForaId, imp.LigaId, ct),
+            };
+            var notas = CasarNotas(imp.PartidaId, r, elenco,
+                new Dictionary<string, Guid> { [Casa] = imp.TimeCasaId, [Fora] = imp.TimeForaId });
+
+            _db.LigaNotasJogadores.RemoveRange(await _db.LigaNotasJogadores.Where(x => x.PartidaId == imp.PartidaId).ToListAsync(ct));
+            _db.LigaNotasJogadores.AddRange(notas);
+            await _db.SaveChangesAsync(ct);
+            gravadas += notas.Count;
+        }
+
+        return gravadas;
+    }
+
+    /// <summary>
+    /// Notas do JSON casadas com quem podia estar em campo (o mesmo critério dos eventos). Nome que não
+    /// casa com segurança fica sem nota; quem não casou já aparece nos avisos da importação.
+    /// </summary>
+    private static List<LigaNotaJogador> CasarNotas(
+        Guid partidaId, ResultadoPesRequest r,
+        IReadOnlyDictionary<string, List<NomesPes.Candidato>> elenco,
+        IReadOnlyDictionary<string, Guid> timeDoLado)
+    {
+        var notas = new List<LigaNotaJogador>();
+        foreach (var lado in new[] { Casa, Fora })
+        {
+            foreach (var n in (lado == Casa ? r.Notas?.Casa : r.Notas?.Fora) ?? Array.Empty<ResultadoPesNota>())
+            {
+                if (n.Nota is not double nota || nota is < 0 or > 10) continue;
+                if (NomesPes.Casar(n.Jogador, elenco[lado]).Id is not int jogadorId) continue;
+                if (notas.Any(x => x.JogadorId == jogadorId)) continue;
+
+                notas.Add(new LigaNotaJogador
+                {
+                    PartidaId = partidaId,
+                    JogadorId = jogadorId,
+                    TimeId = timeDoLado[lado],
+                    Nota = Math.Round((decimal)nota, 1),
+                    MelhorEmCampo = n.MelhorEmCampo == true
+                });
+            }
+        }
+        return notas;
     }
 
     /// <summary>

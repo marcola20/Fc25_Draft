@@ -40,6 +40,19 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
 
+    // Notas do PES das importações que ainda não têm notas gravadas (as feitas antes de existir a tabela).
+    try
+    {
+        var notas = await scope.ServiceProvider.GetRequiredService<IResultadoPesService>()
+            .ReprocessarNotasAsync(somenteSemNotas: true, CancellationToken.None);
+        if (notas > 0)
+            app.Logger.LogInformation("Notas do PES extraídas dos JSONs já importados: {Notas}", notas);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao extrair as notas dos JSONs já importados");
+    }
+
     // Cria tabelas de loteria se ainda não existirem (sem migration)
     await db.Database.ExecuteSqlRawAsync("""
         CREATE TABLE IF NOT EXISTS "LigaLoterias" (

@@ -574,6 +574,54 @@ public class LigaPublicService : ILigaPublicService
             .Select(g => g.Key)
             .ToListAsync(ct)).ToHashSet();
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>> GetSelecoesDasRodadasAsync(Guid ligaId, CancellationToken ct)
+    {
+        var notas = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => n.Partida.Rodada.LigaId == ligaId)
+            .Select(n => new
+            {
+                n.Partida.RodadaId, n.JogadorId, n.Jogador.Name, n.Jogador.PositionId,
+                n.TimeId, TimeNome = n.Time.TeamName, n.Nota, n.MelhorEmCampo
+            })
+            .ToListAsync(ct);
+
+        return notas
+            .GroupBy(n => n.RodadaId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<SelecaoRodadaJogadorDto>)SelecaoDaRodada
+                    .Montar(g.Select(n => new NotaDoJogo(n.JogadorId, n.Name, n.PositionId, n.TimeId, n.TimeNome, n.Nota, n.MelhorEmCampo)))
+                    .Select(n => new SelecaoRodadaJogadorDto(
+                        n.JogadorId, n.Nome, n.PositionId.ToPositionSigla(), n.TimeId, n.TimeNome, n.Nota, n.MelhorEmCampo))
+                    .ToList());
+    }
+
+    public async Task<IReadOnlyList<NotaMediaJogadorDto>> GetMediasNotasAsync(Guid ligaId, CancellationToken ct)
+    {
+        var notas = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => n.Partida.Rodada.LigaId == ligaId)
+            .Select(n => new
+            {
+                n.JogadorId, n.Jogador.Name, n.Jogador.PositionId, TimeNome = n.Time.TeamName,
+                n.Nota, n.MelhorEmCampo, Quando = n.Partida.EncerradaEm ?? n.Partida.IniciadaEm
+            })
+            .ToListAsync(ct);
+
+        return notas
+            .GroupBy(n => n.JogadorId)
+            .Select(g =>
+            {
+                var ultimo = g.OrderByDescending(n => n.Quando).First();
+                return new NotaMediaJogadorDto(
+                    g.Key, ultimo.Name, ((int)ultimo.PositionId).ToPositionSigla(), ultimo.TimeNome,
+                    g.Count(), Math.Round(g.Average(n => n.Nota), 2), g.Max(n => n.Nota), g.Count(n => n.MelhorEmCampo));
+            })
+            .OrderByDescending(m => m.Media)
+            .ThenByDescending(m => m.Jogos)
+            .ThenBy(m => m.JogadorNome)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetJogosExtrasAsync(Guid ligaId, CancellationToken ct)
     {
         var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(l => l.LigaId == ligaId, ct);
@@ -726,6 +774,11 @@ public class LigaPublicService : ILigaPublicService
 
         var linhas = await EscalacaoPartidaLoader.CarregarAsync(_db, partida, ct);
         var eventos = await GetEventosPartidaAsync(partidaId, ct);
+        var notas = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => n.PartidaId == partidaId)
+            .ToDictionaryAsync(n => n.JogadorId, ct);
+        decimal? Nota(int jogadorId) => notas.TryGetValue(jogadorId, out var n) ? n.Nota : null;
+        bool Melhor(int jogadorId) => notas.TryGetValue(jogadorId, out var n) && n.MelhorEmCampo;
 
         PartidaEscalacaoTimeDto Montar(Guid timeId, string timeNome)
         {
@@ -734,7 +787,8 @@ public class LigaPublicService : ILigaPublicService
                 .OrderByDescending(l => l.Titular)
                 .ThenBy(l => l.Ordem)
                 .Select(l => new PartidaEscalacaoJogadorDto(
-                    l.JogadorId, l.JogadorNome, ((int)l.PositionId).ToPositionSigla(), l.Titular, l.Ordem))
+                    l.JogadorId, l.JogadorNome, ((int)l.PositionId).ToPositionSigla(), l.Titular, l.Ordem,
+                    Nota(l.JogadorId), Melhor(l.JogadorId)))
                 .ToList();
 
             // Quem entrou sem estar no banco registrado ainda aparece entre os reservas.
@@ -743,7 +797,8 @@ public class LigaPublicService : ILigaPublicService
             foreach (var sub in eventos.Where(e => e.Tipo == TipoEvento.Substituicao && e.TimeId == timeId))
             {
                 if (conhecidos.Add(sub.JogadorId))
-                    jogadores.Add(new PartidaEscalacaoJogadorDto(sub.JogadorId, sub.JogadorNome, "", false, ++ordem));
+                    jogadores.Add(new PartidaEscalacaoJogadorDto(sub.JogadorId, sub.JogadorNome, "", false, ++ordem,
+                        Nota(sub.JogadorId), Melhor(sub.JogadorId)));
             }
 
             return new PartidaEscalacaoTimeDto(timeId, timeNome, !linhas.Any(l => l.TimeId == timeId), jogadores);

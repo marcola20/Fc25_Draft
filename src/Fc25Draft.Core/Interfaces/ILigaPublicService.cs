@@ -23,6 +23,12 @@ public interface ILigaPublicService
     /// título e playoff de acesso (guardado na Série A; a Série B da mesma temporada mostra o mesmo jogo).
     /// </summary>
     Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetJogosExtrasAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Seleção de cada rodada da competição (4-3-3 pelas notas do PES), pela RodadaId.</summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>> GetSelecoesDasRodadasAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>Média das notas do PES de cada jogador na competição, da maior para a menor.</summary>
+    Task<IReadOnlyList<NotaMediaJogadorDto>> GetMediasNotasAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaGrupoTimeDto>> GetGruposAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaEventoDto>> GetEventosPartidaAsync(Guid partidaId, CancellationToken ct);
 

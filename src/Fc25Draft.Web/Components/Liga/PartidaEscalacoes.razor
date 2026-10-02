@@ -74,6 +74,14 @@ else
                     <div class="d-flex align-items-center gap-1">
                         <span class="nome text-truncate">@j.JogadorNome</span>
                         <span class="lances">@Lances(j.JogadorId)</span>
+                        @if (j.MelhorEmCampo)
+                        {
+                            <span title="Melhor em campo">⭐</span>
+                        }
+                        @if (j.Nota is decimal nota)
+                        {
+                            <span class="badge ms-auto @NotaPes.Cor(nota)" title="Nota do PES">@NotaPes.Texto(nota)</span>
+                        }
                     </div>
                     @foreach (var sub in Subs(j.JogadorId))
                     {

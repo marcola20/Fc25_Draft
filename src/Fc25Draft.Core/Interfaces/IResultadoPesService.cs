@@ -11,4 +11,10 @@ public interface IResultadoPesService
     /// Recusa com <see cref="Exceptions.ResultadoPesException"/> sem gravar nada.
     /// </summary>
     Task<ResultadoPesRespostaDto> ImportarAsync(ResultadoPesRequest request, string jsonBruto, bool simular, CancellationToken ct);
+
+    /// <summary>
+    /// Tira as notas dos JSONs já importados e grava por jogador. Com <paramref name="somenteSemNotas"/>,
+    /// só as partidas que ainda não têm nenhuma nota gravada. Retorna quantas notas foram gravadas.
+    /// </summary>
+    Task<int> ReprocessarNotasAsync(bool somenteSemNotas, CancellationToken ct);
 }
