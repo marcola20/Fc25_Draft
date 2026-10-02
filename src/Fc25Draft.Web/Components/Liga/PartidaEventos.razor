@@ -1,0 +1,117 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+
+@* Linha do tempo do jogo: mandante à esquerda, visitante à direita, o minuto no meio e o placar a cada gol. *@
+@if (Eventos.Count == 0)
+{
+    <div class="text-muted">Nenhum evento registrado.</div>
+    return;
+}
+
+<div class="partida-eventos">
+    <div class="partida-eventos-linha partida-eventos-times">
+        <span class="lado casa partida-eventos-casa">@CasaNome</span>
+        <span></span>
+        <span class="lado partida-eventos-fora">@ForaNome</span>
+    </div>
+    @foreach (var (ev, placar) in Linhas())
+    {
+        var casa = DaCasa(ev);
+        <div class="partida-eventos-linha">
+            <div class="lado casa">
+                @if (casa)
+                {
+                    @Lance(ev, placar)
+                }
+            </div>
+            <div class="minuto">
+                <span class="badge @CorDoMinuto(ev.Tipo)">@(ev.Minuto is int m ? $"{m}'" : "–")</span>
+            </div>
+            <div class="lado">
+                @if (!casa)
+                {
+                    @Lance(ev, placar)
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<LigaEventoDto> Eventos { get; set; } = Array.Empty<LigaEventoDto>();
+    [Parameter] public Guid? CasaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+
+    // O TimeId do gol contra é o time que ganhou o gol, então ele fica do lado de quem comemorou.
+    private bool DaCasa(LigaEventoDto ev) => CasaId is Guid id ? ev.TimeId == id : ev.TimeNome == CasaNome;
+
+    private static bool EhGol(TipoEvento tipo) => tipo is TipoEvento.Gol or TipoEvento.GolContra;
+
+    /// <summary>Eventos em ordem de minuto, com o placar depois de cada gol.</summary>
+    private IEnumerable<(LigaEventoDto Evento, string? Placar)> Linhas()
+    {
+        var (casa, fora) = (0, 0);
+        foreach (var ev in Eventos.OrderBy(e => e.Minuto ?? int.MaxValue).ThenBy(e => e.CriadoEm))
+        {
+            if (!EhGol(ev.Tipo))
+            {
+                yield return (ev, null);
+                continue;
+            }
+            if (DaCasa(ev)) casa++; else fora++;
+            yield return (ev, $"{casa}–{fora}");
+        }
+    }
+
+    private static string CorDoMinuto(TipoEvento tipo) => tipo switch
+    {
+        TipoEvento.Gol or TipoEvento.GolContra => "bg-primary",
+        TipoEvento.CartaoAmarelo => "bg-warning text-dark",
+        TipoEvento.CartaoVermelho => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static RenderFragment Lance(LigaEventoDto ev, string? placar) => __builder =>
+    {
+        switch (ev.Tipo)
+        {
+            case TipoEvento.Gol:
+            case TipoEvento.GolContra:
+                <div>
+                    <span>⚽</span>
+                    <a href="/players/details/@ev.JogadorId" class="fw-semibold text-body">@ev.JogadorNome</a>
+                    @if (ev.Tipo == TipoEvento.GolContra)
+                    {
+                        <span class="badge bg-danger">contra</span>
+                    }
+                    <span class="placar">@placar</span>
+                </div>
+                @if (!string.IsNullOrEmpty(ev.AssistenteNome))
+                {
+                    <div class="detalhe">assistência de @ev.AssistenteNome</div>
+                }
+                break;
+            case TipoEvento.CartaoAmarelo:
+            case TipoEvento.CartaoVermelho:
+                <div>
+                    <span>@(ev.Tipo == TipoEvento.CartaoAmarelo ? "🟨" : "🟥")</span>
+                    <a href="/players/details/@ev.JogadorId" class="text-body">@ev.JogadorNome</a>
+                </div>
+                break;
+            case TipoEvento.Substituicao:
+                <div>
+                    <span class="seta-entra">▲</span>
+                    <a href="/players/details/@ev.JogadorId" class="text-body">@ev.JogadorNome</a>
+                </div>
+                @if (ev.JogadorSaiuNome is not null)
+                {
+                    <div class="detalhe"><span class="seta-sai">▼</span> @ev.JogadorSaiuNome</div>
+                }
+                break;
+            default:
+                <div>@ev.JogadorNome</div>
+                break;
+        }
+    };
+}

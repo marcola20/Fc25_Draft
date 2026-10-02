@@ -1,0 +1,40 @@
+.partida-eventos-linha {
+    display: grid;
+    grid-template-columns: 1fr 3.5rem 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    font-size: 0.9rem;
+}
+
+.partida-eventos-times {
+    font-weight: 700;
+    border-bottom-width: 2px;
+}
+
+.partida-eventos-casa { color: var(--cbfv-azul); }
+.partida-eventos-fora { color: var(--cbfv-laranja); }
+
+.lado {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.lado.casa { text-align: right; }
+
+.minuto { text-align: center; }
+
+.placar {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-left: 0.25rem;
+}
+
+.detalhe {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+}
+
+.seta-entra { color: var(--bs-success); }
+.seta-sai { color: var(--bs-danger); }

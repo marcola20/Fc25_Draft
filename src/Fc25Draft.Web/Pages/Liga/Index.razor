@@ -598,7 +598,8 @@
                                     <tr style="height:40px;">
                                         <td class="fw-bold text-muted">@(i + 1)</td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                                            @n.JogadorNome <span class="text-muted small">@n.Posicao</span>
+                                            <FotoJogador PlayerId="@n.JogadorId" Tamanho="28" Classe="me-2" />
+                                            <a href="/players/details/@n.JogadorId" class="text-body">@n.JogadorNome</a> <span class="text-muted small">@n.Posicao</span>
                                         </td>
                                         <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(n.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
@@ -642,7 +643,10 @@
                                     r++;
                                     <tr style="height:40px;">
                                         <td style="width:35px;" class="fw-bold text-muted">@r</td>
-                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@a.JogadorNome</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <FotoJogador PlayerId="@a.JogadorId" Tamanho="28" Classe="me-2" />
+                                            <a href="/players/details/@a.JogadorId" class="text-body">@a.JogadorNome</a>
+                                        </td>
                                         <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             @if (a.TimeId != Guid.Empty)
                                             {
@@ -685,7 +689,10 @@
                                     ra++;
                                     <tr style="height:40px;">
                                         <td style="width:35px;" class="fw-bold text-muted">@ra</td>
-                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@a.JogadorNome</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <FotoJogador PlayerId="@a.JogadorId" Tamanho="28" Classe="me-2" />
+                                            <a href="/players/details/@a.JogadorId" class="text-body">@a.JogadorNome</a>
+                                        </td>
                                         <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             @if (a.TimeId != Guid.Empty)
                                             {
@@ -770,7 +777,10 @@
                                     rc++;
                                     <tr style="height:40px;">
                                         <td style="width:35px;" class="fw-bold text-muted">@rc</td>
-                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@c.JogadorNome</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <FotoJogador PlayerId="@c.JogadorId" Tamanho="28" Classe="me-2" />
+                                            <a href="/players/details/@c.JogadorId" class="text-body">@c.JogadorNome</a>
+                                        </td>
                                         <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             @if (c.TimeId != Guid.Empty)
                                             {
@@ -825,59 +835,7 @@
                     else
                     {
                     <PartidaTelaoLink PartidaId="_partidaDetalhes.PartidaId" YoutubeVideoId="@_partidaDetalhes.YoutubeVideoId" OnAlterado="AtualizarAposVideo" />
-                    <PartidaEscalacoes Dados="_escalacoesPartida">
-                    <Estatisticas>
-                    <PartidaNumeros PartidaId="_partidaDetalhes.PartidaId" CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome" />
-                    @if (_eventoPartida.Any())
-                    {
-                        var gols = _eventoPartida.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
-                        if (gols.Any())
-                        {
-                            <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
-                            <ul class="list-unstyled">
-                                @foreach (var gol in gols)
-                                {
-                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
-                                        <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        @if (gol.Minuto.HasValue) { <span class="badge bg-primary">@gol.Minuto'</span> }
-                                        <strong>@gol.JogadorNome</strong>
-                                        @if (gol.Tipo == TipoEvento.GolContra)
-                                        {
-                                            <span class="badge bg-danger">contra</span>
-                                        }
-                                        @if (!string.IsNullOrEmpty(gol.AssistenteNome))
-                                        {
-                                            <span class="text-muted small">Assistência: @gol.AssistenteNome</span>
-                                        }
-                                    </li>
-                                }
-                            </ul>
-                            <hr />
-                        }
-
-                        var cartoes = _eventoPartida.Where(e => e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho).ToList();
-                        if (cartoes.Any())
-                        {
-                            <h6 class="mb-3"><strong>🟨 Cartões</strong></h6>
-                            <ul class="list-unstyled">
-                                @foreach (var cartao in cartoes)
-                                {
-                                    <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
-                                        <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        @if (cartao.Minuto.HasValue) { <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span> }
-                                        <strong>@cartao.JogadorNome</strong>
-                                        <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
-                                    </li>
-                                }
-                            </ul>
-                        }
-                    }
-                    else
-                    {
-                        <div class="text-muted">Nenhum evento registrado.</div>
-                    }
-                    </Estatisticas>
-                    </PartidaEscalacoes>
+                    <PartidaAbas PartidaId="_partidaDetalhes.PartidaId" CasaId="_partidaDetalhes.TimeCasaId" CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome" Eventos="_eventoPartida" Escalacoes="_escalacoesPartida" />
                     }
                 </div>
                 <div class="modal-footer">

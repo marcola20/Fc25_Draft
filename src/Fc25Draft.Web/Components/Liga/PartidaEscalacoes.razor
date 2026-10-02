@@ -2,30 +2,8 @@
 @using Fc25Draft.Core.Enums
 @inject EscudoService Escudos
 
-@* Abas "Estatísticas | Escalação" do jogo. Sem Estatisticas, mostra só a escalação. *@
-@if (Dados is null)
-{
-    @Estatisticas
-    return;
-}
-
-@if (Estatisticas is not null)
-{
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <button type="button" class="nav-link @(_aba == Aba.Estatisticas ? "active" : "")" @onclick="() => _aba = Aba.Estatisticas">Estatísticas</button>
-        </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link @(_aba == Aba.Escalacao ? "active" : "")" @onclick="() => _aba = Aba.Escalacao">Escalação</button>
-        </li>
-    </ul>
-}
-
-@if (Estatisticas is not null && _aba == Aba.Estatisticas)
-{
-    @Estatisticas
-}
-else
+@* Formação dos dois times no jogo, com os lances de cada jogador. Nada enquanto carrega. *@
+@if (Dados is not null)
 {
     <div class="row g-3 escalacoes">
         @foreach (var time in new[] { Dados.Casa, Dados.Fora })
@@ -50,14 +28,7 @@ else
 }
 
 @code {
-    // Null enquanto carrega: mostra só as estatísticas, sem abas.
     [Parameter] public PartidaEscalacoesDto? Dados { get; set; }
-
-    /// <summary>Conteúdo da aba "Estatísticas" (gols, cartões…).</summary>
-    [Parameter] public RenderFragment? Estatisticas { get; set; }
-
-    private enum Aba { Estatisticas, Escalacao }
-    private Aba _aba = Aba.Estatisticas;
 
     private static string Min(int? minuto) => minuto.HasValue ? $" {minuto}'" : "";
 

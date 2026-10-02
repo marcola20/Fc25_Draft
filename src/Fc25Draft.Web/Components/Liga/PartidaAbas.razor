@@ -1,0 +1,81 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IEstatisticasPesService Estatisticas
+
+@* Abas do jogo: números do PES, eventos (gols, cartões, substituições) e formações. Só aparece aba com conteúdo. *@
+@if (_numeros is null)
+{
+    return;
+}
+
+@{
+    var abas = Abas();
+    var atual = _aba is Aba escolhida && abas.Contains(escolhida) ? escolhida : abas[0];
+}
+@if (abas.Count > 1)
+{
+    <ul class="nav nav-tabs mb-3">
+        @foreach (var aba in abas)
+        {
+            <li class="nav-item">
+                <button type="button" class="nav-link @(aba == atual ? "active" : "")" @onclick="() => _aba = aba">@Nome(aba)</button>
+            </li>
+        }
+    </ul>
+}
+
+@switch (atual)
+{
+    case Aba.Estatisticas:
+        <PartidaNumeros Numeros="_numeros" CasaNome="@CasaNome" ForaNome="@ForaNome" />
+        break;
+    case Aba.Eventos:
+        <PartidaEventos Eventos="Eventos" CasaId="@(CasaId ?? Escalacoes?.Casa.TimeId)" CasaNome="@CasaNome" ForaNome="@ForaNome" />
+        break;
+    case Aba.Formacoes:
+        <PartidaEscalacoes Dados="Escalacoes" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public Guid? CasaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+    [Parameter] public IReadOnlyList<LigaEventoDto> Eventos { get; set; } = Array.Empty<LigaEventoDto>();
+
+    // Null enquanto carrega (ou sem escalação): a aba Formações não aparece.
+    [Parameter] public PartidaEscalacoesDto? Escalacoes { get; set; }
+
+    private enum Aba { Estatisticas, Eventos, Formacoes }
+
+    // Null até a pessoa escolher: abre nas estatísticas quando o jogo veio do PES, senão nos eventos.
+    private Aba? _aba;
+    private IReadOnlyList<NumeroDaPartidaDto>? _numeros;
+    private Guid _carregada;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregada == PartidaId) return;
+        _carregada = PartidaId;
+        _aba = null;
+        _numeros = null;
+        _numeros = await Estatisticas.DaPartidaAsync(PartidaId, CancellationToken.None);
+    }
+
+    private List<Aba> Abas()
+    {
+        var abas = new List<Aba>();
+        if (_numeros is { Count: > 0 }) abas.Add(Aba.Estatisticas);
+        abas.Add(Aba.Eventos);
+        if (Escalacoes is not null) abas.Add(Aba.Formacoes);
+        return abas;
+    }
+
+    private static string Nome(Aba aba) => aba switch
+    {
+        Aba.Estatisticas => "Estatísticas",
+        Aba.Eventos => "Eventos do jogo",
+        _ => "Formações"
+    };
+}

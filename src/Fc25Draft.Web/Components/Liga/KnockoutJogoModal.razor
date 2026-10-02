@@ -53,59 +53,7 @@
                 else
                 {
                 <PartidaTelaoLink PartidaId="Jogo.PartidaId.Value" YoutubeVideoId="@Jogo.YoutubeVideoId" OnAlterado="() => OnAlterado.InvokeAsync()" />
-                <PartidaEscalacoes Dados="_escalacoes">
-                <Estatisticas>
-                <PartidaNumeros PartidaId="Jogo.PartidaId.Value" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" />
-                @if (_eventos.Any())
-                {
-                    var gols = _eventos.Where(e => e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra).ToList();
-                    if (gols.Any())
-                    {
-                        <h6 class="mb-3"><strong>⚽ Gols</strong></h6>
-                        <ul class="list-unstyled">
-                            @foreach (var gol in gols)
-                            {
-                                <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
-                                    <img src="@EscudoUrl(gol.TimeNome)" alt="" title="@gol.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                    @if (gol.Minuto.HasValue) { <span class="badge bg-primary">@gol.Minuto'</span> }
-                                    <strong>@gol.JogadorNome</strong>
-                                    @if (gol.Tipo == TipoEvento.GolContra)
-                                    {
-                                        <span class="badge bg-danger">contra</span>
-                                    }
-                                    @if (!string.IsNullOrEmpty(gol.AssistenteNome))
-                                    {
-                                        <span class="text-muted small">Assistência: @gol.AssistenteNome</span>
-                                    }
-                                </li>
-                            }
-                        </ul>
-                        <hr />
-                    }
-
-                    var cartoes = _eventos.Where(e => e.Tipo == TipoEvento.CartaoAmarelo || e.Tipo == TipoEvento.CartaoVermelho).ToList();
-                    if (cartoes.Any())
-                    {
-                        <h6 class="mb-3"><strong>🟨 Cartões</strong></h6>
-                        <ul class="list-unstyled">
-                            @foreach (var cartao in cartoes)
-                            {
-                                <li class="mb-2 d-flex align-items-center flex-wrap gap-1">
-                                    <img src="@EscudoUrl(cartao.TimeNome)" alt="" title="@cartao.TimeNome" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                    @if (cartao.Minuto.HasValue) { <span class="badge @(cartao.Tipo == TipoEvento.CartaoAmarelo ? "bg-warning text-dark" : "bg-danger")">@cartao.Minuto'</span> }
-                                    <strong>@cartao.JogadorNome</strong>
-                                    <span class="ms-1">@(cartao.Tipo == TipoEvento.CartaoAmarelo ? "🟨 Amarelo" : "🟥 Vermelho")</span>
-                                </li>
-                            }
-                        </ul>
-                    }
-                }
-                else
-                {
-                    <div class="text-muted">Nenhum evento registrado.</div>
-                }
-                </Estatisticas>
-                </PartidaEscalacoes>
+                <PartidaAbas PartidaId="Jogo.PartidaId.Value" CasaId="Jogo.TimeCasaId" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" Eventos="_eventos" Escalacoes="_escalacoes" />
                 }
             </div>
             <div class="modal-footer">

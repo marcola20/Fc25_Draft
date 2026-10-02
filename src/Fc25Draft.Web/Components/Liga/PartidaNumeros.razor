@@ -1,11 +1,10 @@
 @using System.Globalization
 @using Fc25Draft.Core.Interfaces
-@inject IEstatisticasPesService Estatisticas
 
 @* Números do PES da partida (posse, chutes, passes…) em barras lado a lado. Some quando o jogo não veio do PES. *@
-@if (_numeros is { Count: > 0 } numeros)
+@if (Numeros is { Count: > 0 } numeros)
 {
-    <div class="partida-numeros mb-3">
+    <div class="partida-numeros">
         <div class="partida-numeros-times">
             <span class="partida-numeros-casa">@CasaNome</span>
             <span class="text-muted small">números do PES</span>
@@ -28,23 +27,12 @@
             </div>
         }
     </div>
-    <hr />
 }
 
 @code {
-    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public IReadOnlyList<NumeroDaPartidaDto>? Numeros { get; set; }
     [Parameter] public string CasaNome { get; set; } = "";
     [Parameter] public string ForaNome { get; set; } = "";
-
-    private IReadOnlyList<NumeroDaPartidaDto>? _numeros;
-    private Guid _carregada;
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_carregada == PartidaId) return;
-        _carregada = PartidaId;
-        _numeros = await Estatisticas.DaPartidaAsync(PartidaId, CancellationToken.None);
-    }
 
     private static string Texto(decimal valor, bool percentual) =>
         valor.ToString(valor % 1 == 0 ? "0" : "0.0", CultureInfo.GetCultureInfo("pt-BR")) + (percentual ? "%" : "");
