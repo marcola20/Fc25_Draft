@@ -114,9 +114,9 @@
         var passou = DateTime.UtcNow - utc;
         return passou.TotalMinutes switch
         {
-            < 1 => "agora",
-            < 60 => $"há {(int)passou.TotalMinutes} min",
-            < 60 * 24 => $"há {(int)passou.TotalHours} h",
+            (< 1) => "agora",
+            (< 60) => $"há {(int)passou.TotalMinutes} min",
+            (< 60 * 24) => $"há {(int)passou.TotalHours} h",
             _ => $"há {(int)passou.TotalDays} dia{((int)passou.TotalDays == 1 ? "" : "s")}"
         };
     }

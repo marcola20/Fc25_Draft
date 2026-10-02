@@ -458,14 +458,14 @@
     private string DeltaLabel(TimeSim t) => Delta(t) switch
     {
         > 0 => $"▲{Delta(t)}",
-        < 0 => $"▼{-Delta(t)}",
+        (< 0) => $"▼{-Delta(t)}",
         _ => "–"
     };
 
     private string DeltaClass(TimeSim t) => Delta(t) switch
     {
         > 0 => "text-success fw-bold",
-        < 0 => "text-danger fw-bold",
+        (< 0) => "text-danger fw-bold",
         _ => "text-muted"
     };
 

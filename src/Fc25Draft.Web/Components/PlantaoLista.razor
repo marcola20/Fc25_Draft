@@ -33,9 +33,9 @@
         var dias = (BrazilTime.ConvertFromUtc(DateTime.UtcNow).Date - local.Date).Days;
         return dias switch
         {
-            <= 0 => $"hoje, {local:HH:mm}",
+            (<= 0) => $"hoje, {local:HH:mm}",
             1 => "ontem",
-            < 7 => $"há {dias} dias",
+            (< 7) => $"há {dias} dias",
             _ => local.ToString("dd/MM/yyyy")
         };
     }
