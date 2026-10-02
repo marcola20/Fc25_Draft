@@ -22,7 +22,7 @@
         <a href="/market/transfers" class="btn btn-sm btn-outline-secondary">📜 Histórico de transferências</a>
     </div>
     <p class="text-muted small mb-3">
-        Leilões do mercado e vendas entre times. Uma janela junta os ciclos abertos na mesma época.
+        Leilões do mercado, vendas entre times, trocas e empréstimos. Uma janela junta os ciclos abertos na mesma época.
     </p>
 
     @if (_loading)
@@ -33,7 +33,7 @@
     {
         <div class="alert alert-danger"><strong>Erro ao carregar o termômetro:</strong> @_erro</div>
     }
-    else if (_t is not null && _t.ItensLeiloados == 0 && _t.Transferencias == 0)
+    else if (_t is not null && _t.ItensLeiloados == 0 && _t.Transferencias == 0 && _movimentos.Count == 0)
     {
         <div class="alert alert-info">Nenhuma movimentação neste período.</div>
     }
@@ -202,6 +202,30 @@
                 }
             </div>
         </div>
+
+        @if (_movimentos.Count > 0)
+        {
+            <h5 class="mt-4">🔄 Chegadas e saídas</h5>
+            <p class="text-muted small mb-2">Quem chegou e quem saiu de cada time, de leilão a empréstimo.</p>
+            <div class="row g-3">
+                @foreach (var time in _movimentos)
+                {
+                    <div class="col-12 col-lg-6 col-xxl-4" @key="time.TimeId">
+                        <div class="card h-100">
+                            <div class="card-header d-flex align-items-center gap-2 py-2">
+                                <img src="@Escudos.GetEscudo(time.TimeNome)" alt="" width="22" height="22" style="object-fit: contain;" />
+                                <a href="/teams/details/@time.TimeId" class="fw-semibold text-primary me-auto">@time.TimeNome</a>
+                                <span class="small text-muted text-nowrap">⬇️ @time.Chegadas.Count · ⬆️ @time.Saidas.Count</span>
+                            </div>
+                            <div class="card-body py-2">
+                                @Lista("Chegaram", "text-success", time.Chegadas, chegando: true)
+                                @Lista("Saíram", "text-danger", time.Saidas, chegando: false)
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     }
 </div>
 
@@ -211,6 +235,7 @@
     private IReadOnlyList<TermometroJanelaDto> _janelas = Array.Empty<TermometroJanelaDto>();
     private int? _janela;
     private TermometroMercadoDto? _t;
+    private IReadOnlyList<TermometroChegadasSaidasDto> _movimentos = Array.Empty<TermometroChegadasSaidasDto>();
     private bool _loading = true;
     private string? _erro;
 
@@ -243,6 +268,7 @@
         try
         {
             _t = await TermometroSvc.CalcularAsync(_janela, CancellationToken.None);
+            _movimentos = await TermometroSvc.ChegadasESaidasAsync(_janela, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -268,6 +294,36 @@
     }
 
     private static string Agio(double razao) => $"{(razao - 1) * 100:+0;-0;0}%";
+
+    private static RenderFragment Lista(string titulo, string cor, IReadOnlyList<TermometroMovimentoDto> movimentos, bool chegando) => __builder =>
+    {
+        <div class="small fw-semibold @cor mt-1">@titulo</div>
+        @if (movimentos.Count == 0)
+        {
+            <div class="small text-muted mb-1">ninguém</div>
+        }
+        else
+        {
+            <ul class="list-unstyled small mb-1">
+                @foreach (var m in movimentos)
+                {
+                    <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+                        <div>
+                            <a href="/players/details/@m.PlayerId" class="text-primary">@m.JogadorNome</a>
+                            <span class="text-muted">· @m.Posicao · @m.Overall</span>
+                            <div class="text-muted">
+                                @m.Tipo@(m.OutroTimeNome is null ? "" : (chegando ? " · de " : " · para ") + m.OutroTimeNome)
+                            </div>
+                        </div>
+                        @if (m.Valor is decimal valor && valor > 0)
+                        {
+                            <span class="fw-semibold text-nowrap">@Moeda(valor)</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    };
 
     private static RenderFragment Numero(string rotulo, string valor, string detalhe) => __builder =>
     {

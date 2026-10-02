@@ -73,6 +73,76 @@ public class TermometroMercadoService : ITermometroMercadoService
         return TermometroMercado.Calcular(itens, lances, transferencias, nomes);
     }
 
+    public async Task<IReadOnlyList<TermometroChegadasSaidasDto>> ChegadasESaidasAsync(int? janela, CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        // Mesmo recorte do termômetro: leilão pelo ciclo da janela, o resto pela data.
+        var query = _db.TransferHistories.AsNoTracking().Where(t => t.Type != TransferType.None);
+        if (janela is int numero)
+        {
+            var escolhida = (await MontarJanelasAsync(ct)).FirstOrDefault(j => j.Dto.Numero == numero);
+            if (escolhida is null) return Array.Empty<TermometroChegadasSaidasDto>();
+            var cicloIds = escolhida.CicloIds;
+            var (inicio, fim) = (escolhida.Dto.Inicio, escolhida.Dto.Fim);
+            query = query.Where(t =>
+                t.Type == TransferType.MarketAuction
+                    ? t.CycleId != null && cicloIds.Contains(t.CycleId.Value)
+                    : t.PerformedAtUtc >= inicio && t.PerformedAtUtc <= fim);
+        }
+
+        var movimentos = await query
+            .Select(t => new
+            {
+                t.PerformedAtUtc, t.Type, t.PlayerId, t.Player.Name, Posicao = t.Player.Position.Name,
+                t.Player.Overall, t.FromTeamId, t.ToTeamId, t.Amount
+            })
+            .ToListAsync(ct);
+
+        var porTime = new Dictionary<Guid, (List<TermometroMovimentoDto> Chegadas, List<TermometroMovimentoDto> Saidas)>();
+        (List<TermometroMovimentoDto> Chegadas, List<TermometroMovimentoDto> Saidas) Do(Guid time)
+        {
+            if (!porTime.TryGetValue(time, out var listas))
+                porTime[time] = listas = (new List<TermometroMovimentoDto>(), new List<TermometroMovimentoDto>());
+            return listas;
+        }
+
+        foreach (var m in movimentos)
+        {
+            if (m.ToTeamId is Guid para)
+                Do(para).Chegadas.Add(new TermometroMovimentoDto(
+                    m.PerformedAtUtc, RotuloDoTipo(m.Type, chegando: true), m.PlayerId, m.Name, m.Posicao, m.Overall,
+                    m.FromTeamId, m.FromTeamId is Guid de ? nomes.GetValueOrDefault(de) : null, m.Amount));
+            if (m.FromTeamId is Guid de2)
+                Do(de2).Saidas.Add(new TermometroMovimentoDto(
+                    m.PerformedAtUtc, RotuloDoTipo(m.Type, chegando: false), m.PlayerId, m.Name, m.Posicao, m.Overall,
+                    m.ToTeamId, m.ToTeamId is Guid p2 ? nomes.GetValueOrDefault(p2) : null, m.Amount));
+        }
+
+        return porTime
+            .Where(t => nomes.ContainsKey(t.Key))
+            .Select(t => new TermometroChegadasSaidasDto(
+                t.Key, nomes[t.Key],
+                t.Value.Chegadas.OrderByDescending(m => m.Data).ToList(),
+                t.Value.Saidas.OrderByDescending(m => m.Data).ToList()))
+            .OrderByDescending(t => t.Chegadas.Count + t.Saidas.Count)
+            .ThenBy(t => t.TimeNome, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string RotuloDoTipo(TransferType tipo, bool chegando) => tipo switch
+    {
+        TransferType.MarketAuction => "Leilão",
+        TransferType.TeamSale => chegando ? "Compra" : "Venda",
+        TransferType.TeamTrade => "Troca",
+        TransferType.QuickSell => "Venda rápida",
+        TransferType.ExpansionDraft => "Draft de expansão",
+        TransferType.Loan => chegando ? "Empréstimo" : "Emprestado",
+        TransferType.LoanReturn => chegando ? "Volta de empréstimo" : "Fim de empréstimo",
+        TransferType.LoanPurchase => chegando ? "Compra (opção)" : "Venda (opção)",
+        _ => "Movimentação"
+    };
+
     private sealed record Janela(TermometroJanelaDto Dto, List<Guid> CicloIds);
 
     private async Task<List<Janela>> MontarJanelasAsync(CancellationToken ct)
