@@ -61,7 +61,8 @@
                         {
                             <li class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start gap-2">
-                                    <div>
+                                    <FotoJogador PlayerId="@d.PlayerId" Tamanho="40" Classe="" />
+                                    <div class="me-auto">
                                         <a href="/players/details/@d.PlayerId" class="fw-semibold text-primary">@d.JogadorNome</a>
                                         <span class="small text-muted">· @d.Posicao · @d.Overall</span>
                                         <div class="small text-muted">
@@ -101,11 +102,14 @@
                         @foreach (var c in _t.MaioresContratacoes)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
-                                <div class="ms-2 me-auto">
+                                <div class="ms-2 me-auto d-flex align-items-center">
+                                    <FotoJogador PlayerId="@c.PlayerId" Tamanho="40" Classe="me-2" />
+                                    <div>
                                     <a href="/players/details/@c.PlayerId" class="fw-semibold text-primary">@c.JogadorNome</a>
                                     <span class="small text-muted">· @c.Posicao</span>
                                     <div class="small text-muted">
                                         @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<strong class="text-body">@c.ParaTime</strong> · @BrazilTime.ConvertFromUtc(c.Data).ToString("dd/MM")
+                                    </div>
                                     </div>
                                 </div>
                                 <span class="fw-bold text-nowrap">@Moeda(c.Valor)</span>
@@ -166,7 +170,8 @@
                         @foreach (var p in _t.Pechinchas)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
-                                <div>
+                                <FotoJogador PlayerId="@p.PlayerId" Tamanho="40" Classe="" />
+                                <div class="me-auto">
                                     <a href="/players/details/@p.PlayerId" class="fw-semibold text-primary">@p.JogadorNome</a>
                                     <span class="small text-muted">· @p.Posicao · @p.Overall</span>
                                     <div class="small text-muted">@Moeda(p.PrecoFinal!.Value) · @p.VencedorNome</div>
@@ -308,7 +313,8 @@
                 @foreach (var m in movimentos)
                 {
                     <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
-                        <div>
+                        <FotoJogador PlayerId="@m.PlayerId" Tamanho="28" Classe="" />
+                        <div class="me-auto">
                             <a href="/players/details/@m.PlayerId" class="text-primary">@m.JogadorNome</a>
                             <span class="text-muted">· @m.Posicao · @m.Overall</span>
                             <div class="text-muted">

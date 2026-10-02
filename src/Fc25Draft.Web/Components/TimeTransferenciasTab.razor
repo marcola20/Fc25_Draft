@@ -71,7 +71,7 @@ else
                         <td>
                             <span class="badge @(m.Entrada ? "bg-success" : "bg-danger")">@(m.Entrada ? "Chegou" : "Saiu")</span>
                         </td>
-                        <td>@m.JogadorNome</td>
+                        <td class="text-nowrap"><FotoJogador PlayerId="@m.PlayerId" Tamanho="28" Classe="me-2" /><a href="/players/details/@m.PlayerId" class="text-body">@m.JogadorNome</a></td>
                         <td class="text-nowrap">@m.Tipo.ToDisplayName()</td>
                         <td>@(m.OutroTimeNome is null ? "—" : $"{(m.Entrada ? "de" : "para")} {m.OutroTimeNome}")</td>
                         <td class="text-end text-nowrap">@(m.Valor is decimal v ? Moeda(v) : "—")</td>

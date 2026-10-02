@@ -106,7 +106,7 @@ else
                         <tr>
                             <td class="fw-bold text-muted">@pos</td>
                             <td>
-                                @j.JogadorNome
+                                <FotoJogador PlayerId="@j.JogadorId" Tamanho="28" Classe="me-2" /><a href="/players/details/@j.JogadorId" class="text-body">@j.JogadorNome</a>
                                 @if (!j.NoElencoAtual)
                                 {
                                     <span class="badge bg-secondary ms-2" title="Não está mais no elenco">ex-jogador</span>

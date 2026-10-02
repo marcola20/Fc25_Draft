@@ -73,7 +73,7 @@
                         {
                             <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
                                 <td style="width:40px;" class="fw-bold text-muted">@idx</td>
-                                <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.JogadorNome</td>
+                                <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
                                 <td class="text-center fw-bold" style="width:90px;">@item.TotalGols</td>
                                 <td class="text-center text-muted" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
                                 <td class="text-center fw-bold" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>

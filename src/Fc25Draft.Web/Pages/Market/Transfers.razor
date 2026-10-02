@@ -122,7 +122,7 @@ else
             {
                 <tr>
                     <td class="text-nowrap">@BrazilTime.FormatDateTime(item.OccurredAtUtc)</td>
-                    <td class="fw-semibold">@item.PlayerName</td>
+                    <td class="fw-semibold text-nowrap"><FotoJogador PlayerId="@item.PlayerId" Tamanho="28" Classe="me-2" />@item.PlayerName</td>
                     <td>@FormatTeam(item.FromTeamName)</td>
                     <td>@FormatTeam(item.ToTeamName)</td>
                     <td class="text-nowrap">@FormatAmount(item.Amount)</td>

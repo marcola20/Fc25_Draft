@@ -37,6 +37,7 @@ public record TransferHistoryDto(
 public class TransferListItemDto
 {
     public Guid TransferId { get; set; }
+    public int PlayerId { get; set; }
     public string PlayerName { get; set; } = string.Empty;
     public string FromTeamName { get; set; } = string.Empty;
     public string ToTeamName { get; set; } = string.Empty;

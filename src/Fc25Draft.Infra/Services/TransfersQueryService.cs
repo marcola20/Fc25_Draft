@@ -103,6 +103,7 @@ public class TransfersQueryService : ITransfersQueryService
             .Select(h => new TransferListItemDto
             {
                 TransferId = h.TransferId,
+                PlayerId = h.PlayerId,
                 PlayerName = h.Player.Name,
                 FromTeamName = h.FromTeam != null ? h.FromTeam.TeamName : string.Empty,
                 ToTeamName = h.ToTeam != null ? h.ToTeam.TeamName : string.Empty,

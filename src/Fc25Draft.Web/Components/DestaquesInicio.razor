@@ -45,7 +45,9 @@
             var a = _dados.Artilheiros[0];
             <div class="col-12 col-md-6 col-xl-3">
                 <a href="/players/details/@a.JogadorId" class="card h-100 text-decoration-none text-body border-primary">
-                    <div class="card-body">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <FotoJogador PlayerId="@a.JogadorId" Tamanho="56" Classe="" />
+                        <div class="min-w-0">
                         <div class="small text-muted">⚽ Artilheiro da temporada</div>
                         <div class="fs-5 fw-bold mt-1">
                             @a.Nome
@@ -55,6 +57,7 @@
                             }
                         </div>
                         <div class="small text-muted mt-1">@a.Gols gols · @a.TimeNome</div>
+                        </div>
                     </div>
                 </a>
             </div>
@@ -64,7 +67,9 @@
         {
             <div class="col-12 col-md-6 col-xl-3">
                 <a href="/players/details/@t.JogadorId" class="card h-100 text-decoration-none text-body border-dark">
-                    <div class="card-body">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <FotoJogador PlayerId="@t.JogadorId" Tamanho="56" Classe="" />
+                        <div class="min-w-0">
                         <div class="small text-muted">💸 Maior transferência da semana</div>
                         <div class="fs-5 fw-bold mt-1">@t.JogadorNome</div>
                         <div class="small text-muted mt-1">
@@ -73,6 +78,7 @@
                             {
                                 <span class="ms-1">· @(t.DeTime is null ? "" : $"{t.DeTime} → ")@t.ParaTime</span>
                             }
+                        </div>
                         </div>
                     </div>
                 </a>

@@ -123,6 +123,7 @@
                         @foreach (var j in _r.MaisGolsNumaEdicao)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <FotoJogador PlayerId="@j.JogadorId" Tamanho="36" Classe="ms-2" />
                                 <div class="ms-2 me-auto">
                                     <a href="/players/details/@j.JogadorId" class="fw-semibold text-primary">@j.Nome</a>
                                     <div class="small text-muted">@j.TimeNome · @j.Competicao</div>
@@ -157,6 +158,7 @@
                                 {
                                     <tr>
                                         <td>
+                                            <FotoJogador PlayerId="@h.JogadorId" Tamanho="28" Classe="me-2" />
                                             <a href="/players/details/@h.JogadorId" class="fw-semibold text-primary">@h.Nome</a>
                                             <span class="text-muted small">(@h.TimeNome)</span>
                                         </td>
@@ -277,6 +279,7 @@
             @foreach (var j in itens)
             {
                 <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <FotoJogador PlayerId="@j.JogadorId" Tamanho="28" Classe="ms-2" />
                     <a href="/players/details/@j.JogadorId" class="ms-2 me-auto text-primary">@j.Nome</a>
                     <span class="badge bg-primary rounded-pill">@j.Valor @unidade</span>
                 </li>

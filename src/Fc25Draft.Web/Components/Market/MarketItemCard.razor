@@ -19,12 +19,15 @@
 <div class="card h-100 border-0 shadow-sm">
     <div class="card-body d-flex flex-column gap-3">
         <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start">
-            <div>
-                <h3 class="h5 mb-1">@Item.PlayerName</h3>
+            <div class="d-flex align-items-center gap-3">
+                <FotoJogador PlayerId="@Item.PlayerId" Tamanho="56" Classe="" />
+                <div>
+                    <h3 class="h5 mb-1"><a href="/players/details/@Item.PlayerId" class="text-body text-decoration-none">@Item.PlayerName</a></h3>
 
-                <div class="d-flex gap-2">
-                    <span class="badge bg-primary">@Item.PositionId.ToPositionName()</span>
-                    <span class="badge bg-secondary">OVR @Item.Overall</span>
+                    <div class="d-flex gap-2">
+                        <span class="badge bg-primary">@Item.PositionId.ToPositionName()</span>
+                        <span class="badge bg-secondary">OVR @Item.Overall</span>
+                    </div>
                 </div>
             </div>
 

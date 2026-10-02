@@ -167,7 +167,7 @@ else
                     @foreach (var j in Ordenados)
                     {
                         <tr>
-                            <td>@j.JogadorNome</td>
+                            <td class="text-nowrap"><FotoJogador PlayerId="@j.JogadorId" Tamanho="28" Classe="me-2" /><a href="/players/details/@j.JogadorId" class="text-body">@j.JogadorNome</a></td>
                             <td class="text-muted small">@j.Posicao</td>
                             <td class="text-center">@(j.CleanSheets?.ToString() ?? "—")</td>
                             <td class="text-center">@(j.Jogos?.ToString() ?? "-")</td>

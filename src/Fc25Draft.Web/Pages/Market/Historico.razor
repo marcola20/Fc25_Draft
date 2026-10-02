@@ -64,8 +64,13 @@ else
                         <div class="text-muted small">@BuildEventSummary(item)</div>
                     </td>
                     <td>
-                        <div class="fw-semibold">@item.PlayerName</div>
-                        <div class="text-muted small">@item.PositionName</div>
+                        <div class="d-flex align-items-center">
+                            <FotoJogador PlayerId="@item.PlayerId" Tamanho="32" Classe="me-2" />
+                            <div>
+                                <div class="fw-semibold">@item.PlayerName</div>
+                                <div class="text-muted small">@item.PositionName</div>
+                            </div>
+                        </div>
                     </td>
                     <td>@FormatTeam(item.TeamName, fallback:"Mercado")</td>
                     <td>@FormatTeam(item.TargetTeamName)</td>

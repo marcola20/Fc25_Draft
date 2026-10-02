@@ -165,7 +165,8 @@
                             {
                                 <li class="list-group-item @(l.EstouGanhando ? "" : "list-group-item-warning")">
                                     <div class="d-flex justify-content-between align-items-start gap-2">
-                                        <div>
+                                        <FotoJogador PlayerId="@l.PlayerId" Tamanho="40" Classe="" />
+                                        <div class="me-auto">
                                             <a href="/players/details/@l.PlayerId" class="fw-semibold text-primary">@l.JogadorNome</a>
                                             <span class="small text-muted">· @l.Posicao · @l.Overall</span>
                                             <div class="small">
@@ -288,7 +289,8 @@
                                 var emLeilao = o.LeilaoLanceAtual is not null;
                                 <li class="list-group-item @(emLeilao ? "list-group-item-warning" : "")">
                                     <div class="d-flex justify-content-between align-items-start gap-2">
-                                        <div>
+                                        <FotoJogador PlayerId="@o.PlayerId" Tamanho="40" Classe="" />
+                                        <div class="me-auto">
                                             <a href="/players/details/@o.PlayerId" class="fw-semibold text-primary">@o.Nome</a>
                                             <span class="small text-muted">· @o.Posicao · @o.Overall@(o.Idade is int idade ? $" · {idade} anos" : "")</span>
                                             @if (emLeilao)

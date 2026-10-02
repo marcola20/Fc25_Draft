@@ -113,7 +113,7 @@ else
                 @foreach (var item in Filtrados)
                 {
                     <tr>
-                        <td class="text-nowrap"><a href="/players/details/@item.PlayerId" class="text-primary">@item.Name</a></td>
+                        <td class="text-nowrap"><FotoJogador PlayerId="@item.PlayerId" Tamanho="28" Classe="me-2" /><a href="/players/details/@item.PlayerId" class="text-primary">@item.Name</a></td>
                         <td class="text-center">@item.Position</td>
                         <td class="text-center">@item.Overall</td>
                         <td class="text-center">@(item.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
