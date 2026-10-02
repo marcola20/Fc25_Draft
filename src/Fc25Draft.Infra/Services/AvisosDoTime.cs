@@ -14,6 +14,7 @@ internal static class AvisosDoTime
     public const string PropostaRecusada = "PROPOSTA_RECUSADA";
     public const string PropostaCancelada = "PROPOSTA_CANCELADA";
     public const string LanceSuperado = "LANCE_SUPERADO";
+    public const string LeilaoFechando = "LEILAO_FECHANDO";
     public const string LeilaoVencido = "LEILAO_VENCIDO";
     public const string VendaPelaLista = "VENDA_LISTA";
     public const string Revenda = "REVENDA";

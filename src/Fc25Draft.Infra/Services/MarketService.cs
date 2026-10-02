@@ -200,6 +200,7 @@ public class MarketService : IMarketService
             var previousLeaderId = item.CurrentLeaderTeamId;
             var previousAmount = item.CurrentLeaderAmount ?? 0m;
             string? outbidNotes = null;
+            Guid? avisarSuperado = null;
 
             if (previousLeaderId.HasValue)
             {
@@ -215,9 +216,7 @@ public class MarketService : IMarketService
                         : previousTeam.TeamName;
                     outbidNotes = string.Format(culture, "Time {0} foi superado no leilão de {1}.", previousTeamName, item.Player.Name);
                     if (previousTeam.TeamId != team.TeamId)
-                        AvisosDoTime.Criar(_dbContext, previousTeam.TeamId, AvisosDoTime.LanceSuperado,
-                            $"Seu lance por {item.Player.Name} foi superado: o {team.TeamName} ofereceu {normalizedAmount.ToString("C0", culture)}.",
-                            "/mercado", nowUtc);
+                        avisarSuperado = previousTeam.TeamId;
                 }
                 else
                 {
@@ -241,6 +240,16 @@ public class MarketService : IMarketService
             item.LastUpdateUtc = nowUtc;
 
             AdjustExpirationAfterBidUtc(item, previousLeaderId, nowUtc);
+
+            if (avisarSuperado is Guid superado)
+            {
+                var minimo = MarketPricing.ComputeRequiredMinBid(item.BasePrice, item.MinIncrement, normalizedAmount, item.BuyNowPrice);
+                var fecha = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(item.ExpiresAtUtc, DateTimeKind.Utc), HorarioDeBrasilia.Fuso);
+                AvisosDoTime.Criar(_dbContext, superado, AvisosDoTime.LanceSuperado,
+                    $"Seu lance por {item.Player.Name} foi superado: o {team.TeamName} ofereceu {normalizedAmount.ToString("C0", culture)}. " +
+                    $"Para voltar à frente: {minimo.ToString("C0", culture)} (fecha às {fecha:HH\\:mm}).",
+                    "/mercado", nowUtc);
+            }
 
             var bidNotes = string.Format(culture, "Lance de {0:C} em {1} registrado.", normalizedAmount, item.Player.Name);
             if (!string.IsNullOrWhiteSpace(outbidNotes))

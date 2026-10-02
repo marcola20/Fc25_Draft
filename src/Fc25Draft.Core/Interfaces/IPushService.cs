@@ -27,6 +27,11 @@ public interface IPushService
     /// <summary>Cria (uma vez) o aviso "é a sua vez" para o time da escolha atual do draft.</summary>
     Task AvisarVezNoDraftAsync(Guid draftId, string draftNome, int escolha, Guid timeId, CancellationToken ct);
 
+    /// <summary>
+    /// Avisa (uma vez por leilão) quem deu lance e não está na frente de um leilão que fecha em breve. Retorna quantos.
+    /// </summary>
+    Task<int> AvisarLeiloesFechandoAsync(CancellationToken ct);
+
     /// <summary>Lembra quem ainda não palpitou numa rodada do bolão que começa em breve. Retorna quantos.</summary>
     Task<int> LembrarBolaoAsync(CancellationToken ct);
 }

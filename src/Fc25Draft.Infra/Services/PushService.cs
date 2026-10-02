@@ -27,6 +27,9 @@ public class PushService : IPushService
     /// <summary>O lembrete do bolão sai para rodadas que começam dentro deste prazo.</summary>
     private static readonly TimeSpan AntecedenciaDoBolao = TimeSpan.FromHours(3);
 
+    /// <summary>O aviso "leilão fechando" sai quando falta isso (ou menos) para o leilão acabar.</summary>
+    private static readonly TimeSpan LeilaoFechando = TimeSpan.FromMinutes(15);
+
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
     private readonly DraftDbContext _db;
@@ -137,6 +140,50 @@ public class PushService : IPushService
         AvisosDoTime.Criar(_db, timeId, AvisosDoTime.VezNoDraft,
             $"É a sua vez no {draftNome}: escolha nº {escolha}.", "/draft/controle", Agora);
         await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<int> AvisarLeiloesFechandoAsync(CancellationToken ct)
+    {
+        var agora = Agora;
+        var limite = agora + LeilaoFechando;
+        var itens = await _db.MarketItems.AsNoTracking()
+            .Where(i => i.Status == MarketItemStatus.Active && i.CurrentLeaderTeamId != null
+                        && i.ExpiresAtUtc > agora && i.ExpiresAtUtc <= limite)
+            .Select(i => new
+            {
+                i.ItemId, i.ExpiresAtUtc, Jogador = i.Player.Name, i.CurrentLeaderTeamId, Lider = i.CurrentLeaderTeam!.TeamName,
+                i.CurrentLeaderAmount, i.BasePrice, i.MinIncrement, i.BuyNowPrice
+            })
+            .ToListAsync(ct);
+        if (itens.Count == 0) return 0;
+
+        var ids = itens.Select(i => i.ItemId).ToList();
+        var quemDeuLance = await _db.MarketBids.AsNoTracking()
+            .Where(b => ids.Contains(b.ItemId))
+            .Select(b => new { b.ItemId, b.TeamId })
+            .Distinct()
+            .ToListAsync(ct);
+
+        var brasil = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        var avisados = 0;
+        foreach (var item in itens)
+        {
+            var minutos = Math.Max(1, (int)Math.Ceiling((Utc(item.ExpiresAtUtc) - agora).TotalMinutes));
+            var minimo = MarketPricing.ComputeRequiredMinBid(item.BasePrice, item.MinIncrement, item.CurrentLeaderAmount, item.BuyNowPrice);
+
+            foreach (var time in quemDeuLance.Where(b => b.ItemId == item.ItemId && b.TeamId != item.CurrentLeaderTeamId).Select(b => b.TeamId))
+            {
+                if (!await MarcarAsync($"leilao-fechando:{item.ItemId}:{time}", ct)) continue;
+                AvisosDoTime.Criar(_db, time, AvisosDoTime.LeilaoFechando,
+                    $"O leilão de {item.Jogador} fecha em {minutos} min e o {item.Lider} está na frente com " +
+                    $"{(item.CurrentLeaderAmount ?? 0).ToString("C0", brasil)}. Para cobrir: {minimo.ToString("C0", brasil)}.",
+                    "/mercado", agora);
+                avisados++;
+            }
+        }
+
+        if (avisados > 0) await _db.SaveChangesAsync(ct);
+        return avisados;
     }
 
     public async Task<int> LembrarBolaoAsync(CancellationToken ct)
