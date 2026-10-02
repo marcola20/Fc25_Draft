@@ -56,6 +56,9 @@ public interface ILigaPublicService
     /// <summary>Jogos do time em todas as competições: forma, sequências, recordes, próximos jogos e confrontos.</summary>
     Task<TimePerfilDto> GetPerfilTimeAsync(Guid timeId, CancellationToken ct);
 
+    /// <summary>Artilheiros de um conjunto de partidas (os jogos de um confronto), do que mais marcou.</summary>
+    Task<IReadOnlyList<ArtilheiroDoConfrontoDto>> GetArtilheirosDasPartidasAsync(IReadOnlyCollection<Guid> partidaIds, CancellationToken ct);
+
     /// <summary>Recordes de todas as temporadas: jogos, sequências, campanhas e jogadores.</summary>
     Task<RecordesLigaDto> GetRecordesAsync(CancellationToken ct);
 

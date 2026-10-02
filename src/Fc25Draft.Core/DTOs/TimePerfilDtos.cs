@@ -30,10 +30,15 @@ public record TimeConfrontoDto(
     int Empates,
     int Derrotas,
     int GolsPro,
-    int GolsContra)
+    int GolsContra,
+    // Os jogos contra esse adversário, do mais recente para o mais antigo.
+    IReadOnlyList<TimePerfilJogoDto>? Partidas = null)
 {
     public int SaldoGols => GolsPro - GolsContra;
 }
+
+/// <summary>Quem marcou nos jogos de um confronto (dos dois lados).</summary>
+public record ArtilheiroDoConfrontoDto(int JogadorId, string Nome, Guid TimeId, string TimeNome, int Gols);
 
 public record TimePerfilDto(
     Guid TimeId,

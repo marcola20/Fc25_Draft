@@ -1,5 +1,7 @@
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Utilities
+@inject ILigaPublicService LigaService
 
 @if (Perfil is null)
 {
@@ -159,8 +161,14 @@ else
                 <tbody>
                     @foreach (var c in Perfil.Confrontos)
                     {
-                        <tr class="@(c.Vitorias > c.Derrotas ? "table-success" : c.Derrotas > c.Vitorias ? "table-danger" : "")">
-                            <td class="text-start"><a href="/teams/details/@c.AdversarioId" class="text-primary">@c.AdversarioNome</a></td>
+                        var confronto = c;
+                        var aberto = _aberto == c.AdversarioId;
+                        <tr class="@(c.Vitorias > c.Derrotas ? "table-success" : c.Derrotas > c.Vitorias ? "table-danger" : "")"
+                            style="cursor: pointer;" title="Ver os jogos do confronto" @onclick="() => AlternarAsync(confronto)">
+                            <td class="text-start text-nowrap">
+                                <span class="text-muted me-1" aria-hidden="true">@(aberto ? "▾" : "▸")</span>
+                                <a href="/teams/details/@c.AdversarioId" class="text-primary" @onclick:stopPropagation="true">@c.AdversarioNome</a>
+                            </td>
                             <td>@c.Jogos</td>
                             <td>@c.Vitorias</td>
                             <td>@c.Empates</td>
@@ -169,16 +177,101 @@ else
                             <td>@c.GolsContra</td>
                             <td class="fw-semibold">@(c.SaldoGols > 0 ? "+" : "")@c.SaldoGols</td>
                         </tr>
+                        @if (aberto)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-start bg-body-tertiary">
+                                    @DetalheDoConfronto(confronto)
+                                </td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
         </div>
-        <p class="text-muted small mb-0">Verde: leva vantagem no confronto. Vermelho: está em desvantagem.</p>
+        <p class="text-muted small mb-0">
+            Verde: leva vantagem no confronto. Vermelho: está em desvantagem. Toque num adversário para ver os jogos.
+        </p>
     }
 }
 
 @code {
     [Parameter] public TimePerfilDto? Perfil { get; set; }
+
+    // Confronto aberto na tabela e os artilheiros de cada um (buscados só quando abre).
+    private Guid? _aberto;
+    private readonly Dictionary<Guid, IReadOnlyList<ArtilheiroDoConfrontoDto>> _artilheiros = new();
+
+    private async Task AlternarAsync(TimeConfrontoDto confronto)
+    {
+        _aberto = _aberto == confronto.AdversarioId ? null : confronto.AdversarioId;
+        if (_aberto is null || _artilheiros.ContainsKey(confronto.AdversarioId)) return;
+
+        var partidas = (confronto.Partidas ?? []).Select(p => p.PartidaId).ToList();
+        _artilheiros[confronto.AdversarioId] = await LigaService.GetArtilheirosDasPartidasAsync(partidas, CancellationToken.None);
+    }
+
+    private RenderFragment DetalheDoConfronto(TimeConfrontoDto c) => __builder =>
+    {
+        var partidas = c.Partidas ?? [];
+        // Maior diferença de cada lado (W.O. não conta); no empate de diferença, mais gols e depois a mais recente.
+        var maiorVitoria = partidas.Where(j => j.Resultado == "V" && !j.IsWO)
+            .OrderByDescending(j => j.GolsPro - j.GolsContra).ThenByDescending(j => j.GolsPro).FirstOrDefault();
+        var maiorDerrota = partidas.Where(j => j.Resultado == "D" && !j.IsWO)
+            .OrderByDescending(j => j.GolsContra - j.GolsPro).ThenByDescending(j => j.GolsContra).FirstOrDefault();
+        _artilheiros.TryGetValue(c.AdversarioId, out var artilheiros);
+
+        <div class="row g-3 py-1">
+            <div class="col-12 col-md-7">
+                <div class="small fw-semibold text-muted mb-1">Jogos</div>
+                <table class="table table-sm align-middle mb-0 bg-transparent">
+                    <tbody>
+                        @foreach (var jogo in partidas)
+                        {
+                            <tr>
+                                <td style="width: 2.4rem;"><span class="badge @TimeJogoEstilo.Badge(jogo.Resultado)">@jogo.Resultado</span></td>
+                                <td class="text-nowrap fw-semibold">@TimeJogoEstilo.Placar(jogo)</td>
+                                <td>
+                                    <span class="small">@(jogo.EmCasa ? "em casa" : "fora")</span>
+                                    <div class="small text-muted">@jogo.Competicao · @jogo.Etapa</div>
+                                </td>
+                                <td class="small text-muted text-end text-nowrap">@(jogo.Data is DateTime d ? BrazilTime.FormatDateTime(d, "dd/MM/yy") : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-12 col-md-5">
+                <div class="small fw-semibold text-muted mb-1">Maiores placares</div>
+                <ul class="list-unstyled small mb-3">
+                    <li>🟢 Vitória: @(maiorVitoria is null ? "—" : $"{TimeJogoEstilo.Placar(maiorVitoria)} ({maiorVitoria.Competicao})")</li>
+                    <li>🔴 Derrota: @(maiorDerrota is null ? "—" : $"{TimeJogoEstilo.Placar(maiorDerrota)} ({maiorDerrota.Competicao})")</li>
+                </ul>
+                <div class="small fw-semibold text-muted mb-1">Artilheiros do confronto</div>
+                @if (artilheiros is null)
+                {
+                    <div class="small text-muted">Carregando…</div>
+                }
+                else if (artilheiros.Count == 0)
+                {
+                    <div class="small text-muted">Nenhum gol registrado.</div>
+                }
+                else
+                {
+                    <ul class="list-unstyled small mb-0">
+                        @foreach (var a in artilheiros)
+                        {
+                            <li>
+                                ⚽ <a href="/players/details/@a.JogadorId">@a.Nome</a>
+                                <span class="text-muted">(@a.TimeNome)</span>
+                                <strong class="ms-1">@a.Gols</strong>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    };
 
     private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 

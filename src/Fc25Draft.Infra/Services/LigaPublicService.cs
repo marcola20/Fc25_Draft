@@ -1240,6 +1240,25 @@ public class LigaPublicService : ILigaPublicService
             : $"Eliminado — {label}";
     }
 
+    public async Task<IReadOnlyList<ArtilheiroDoConfrontoDto>> GetArtilheirosDasPartidasAsync(
+        IReadOnlyCollection<Guid> partidaIds, CancellationToken ct)
+    {
+        if (partidaIds.Count == 0) return Array.Empty<ArtilheiroDoConfrontoDto>();
+
+        var gols = await _db.LigaEventos.AsNoTracking()
+            .Where(e => partidaIds.Contains(e.PartidaId) && e.Tipo == TipoEvento.Gol)
+            .GroupBy(e => new { e.JogadorId, e.Jogador.Name, e.TimeId, e.Time.TeamName })
+            .Select(g => new { g.Key.JogadorId, g.Key.Name, g.Key.TimeId, g.Key.TeamName, Gols = g.Count() })
+            .ToListAsync(ct);
+
+        return gols
+            .OrderByDescending(a => a.Gols)
+            .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .Select(a => new ArtilheiroDoConfrontoDto(a.JogadorId, a.Name, a.TimeId, a.TeamName, a.Gols))
+            .ToList();
+    }
+
     public async Task<TimePerfilDto> GetPerfilTimeAsync(Guid timeId, CancellationToken ct)
     {
         var nomes = await _db.Teams.AsNoTracking()

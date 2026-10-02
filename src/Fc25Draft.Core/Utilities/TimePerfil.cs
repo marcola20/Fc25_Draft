@@ -69,7 +69,8 @@ public static class TimePerfil
                 g.Count(j => j.Resultado == "E"),
                 g.Count(j => j.Resultado == "D"),
                 g.Sum(j => j.GolsPro!.Value),
-                g.Sum(j => j.GolsContra!.Value)))
+                g.Sum(j => j.GolsContra!.Value),
+                Enumerable.Reverse(g.ToList()).ToList()))
             .OrderByDescending(c => c.Jogos)
             .ThenByDescending(c => c.Vitorias)
             .ThenBy(c => c.AdversarioNome, StringComparer.OrdinalIgnoreCase)
