@@ -13,7 +13,8 @@ public class LayoutNavigationService
         {
             new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true),
             new("Plantão CBFV", "/plantao", "oi oi-bullhorn"),
-            new("Minha Área", "/minha-area", "oi oi-person")
+            new("Minha Área", "/minha-area", "oi oi-person"),
+            new("Manual do Técnico", "/manual", "oi oi-book")
         }),
         new("Times", new List<MenuItem>
         {
@@ -24,6 +25,7 @@ public class LayoutNavigationService
         {
             new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
             new("Informações do Draft", "/draft/info", "oi oi-document"),
+            new("Pré-Draft", "/draft/pre-draft", "oi oi-star"),
             new("Jogadores Protegidos", "/draft/protecao", "oi oi-shield"),
             new("Escolha Automática", "/draft/automatico", "oi oi-list-rich"),
             new("Picks do Draft", "/picks", "oi oi-tag"),
@@ -69,6 +71,7 @@ public class LayoutNavigationService
             new("Regulamento", "/admin/regulamento", "oi oi-document", RequiredRole: "Admin"),
             new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
+            new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star", RequiredRole: "Admin"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
             new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin"),
             new("Log de ações", "/admin/log-acoes", "oi oi-list", RequiredRole: "Admin"),
@@ -262,18 +265,6 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Classificação")
-            }
-        },
-        ["/liga/estatisticas"] = new PageDefinition
-        {
-            Route = "/liga/estatisticas",
-            Title = "Estatísticas",
-            Subtitle = "Artilheiros, Assistências e Cartões",
-            Breadcrumbs = new List<BreadcrumbSegment>
-            {
-                new("Início", "/home"),
-                new("Liga"),
-                new("Estatísticas")
             }
         },
         ["/liga/mata-mata"] = new PageDefinition

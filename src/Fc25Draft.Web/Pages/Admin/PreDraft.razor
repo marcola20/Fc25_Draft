@@ -12,7 +12,7 @@
 @implements IDisposable
 
 <PageHeader Title="Pré-Draft: votos"
-            Subtitle="Jogadores que apareceram nas listas de 8 enviadas pelos times. Visível apenas para administradores." />
+            Subtitle="@($"Jogadores que apareceram nas listas de {Fc25Draft.Core.Utilities.DraftWishlistRules.MaxJogadores} enviadas pelos times. Visível apenas para administradores.")" />
 
 @if (!authInitialized)
 {

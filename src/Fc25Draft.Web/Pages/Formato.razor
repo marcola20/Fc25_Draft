@@ -30,6 +30,19 @@
 
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
+    // Números das ligas contados das rodadas do calendário: em pontos corridos de turno único cada time
+    // joga uma vez com cada outro, então são rodadas + 1 times. Sem calendário, vale o formato atual.
+    private int Rodadas(Divisao divisao, int padrao)
+    {
+        var n = _calendario.Count(d => d.Divisao == divisao && d.Rodada is not null);
+        return n > 0 ? n : padrao;
+    }
+
+    private int RodadasA => Rodadas(Divisao.SerieA, 9);
+    private int TimesA => RodadasA + 1;
+    private int RodadasB => Rodadas(Divisao.SerieB, 7);
+    private int TimesB => RodadasB + 1;
+
     private static string Classe(DataDaTemporada data) => data switch
     {
         { EhJogo: false } => "fmt-cal-mercado",
@@ -52,11 +65,11 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-3">
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">10</div>
+                <div class="fmt-stat-number">@TimesA</div>
                 <div class="fmt-stat-label">Times</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">9</div>
+                <div class="fmt-stat-number">@RodadasA</div>
                 <div class="fmt-stat-label">Rodadas</div>
             </div>
             <div class="fmt-stat-card">
@@ -67,13 +80,9 @@
 
         <div class="fmt-card fmt-card-liga">
             <p class="fmt-desc">
-                Todos os <strong>10 times</strong> se enfrentam em <strong>pontos corridos</strong> ao longo de <strong>9 rodadas</strong>.
+                Todos os <strong>@TimesA times</strong> se enfrentam em <strong>pontos corridos</strong> ao longo de <strong>@RodadasA rodadas</strong>.
                 O primeiro colocado ao final é o <strong>campeão da Série A</strong>. O <strong>último cai</strong> para a Série B e o
-                <strong>9° disputa o playoff</strong> contra o 2° da Série B.
-            </p>
-            <p class="fmt-desc">
-                ⚠️ <strong>Nesta temporada de transição</strong>, com 12 times, <strong>caem 2 direto</strong> e não há playoff:
-                a Série A do ano que vem começa com 10.
+                <strong>@(TimesA - 1)° disputa o playoff</strong> contra o 2° da Série B.
             </p>
 
             <div class="fmt-tiebreak-section">
@@ -105,7 +114,7 @@
                 <div class="fmt-flow-icon">📋</div>
                 <div class="fmt-flow-content">
                     <strong>Todos contra Todos</strong>
-                    <span>9 rodadas · pontos corridos</span>
+                    <span>@RodadasA rodadas · pontos corridos</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>
@@ -138,7 +147,8 @@
 
         <div class="fmt-card fmt-card-liga">
             <p class="fmt-desc">
-                A <strong>Série B</strong> é a segunda divisão, disputada em <strong>pontos corridos</strong>.
+                A <strong>Série B</strong> é a segunda divisão: <strong>@TimesB times</strong> em <strong>pontos corridos</strong>,
+                ao longo de <strong>@RodadasB rodadas</strong>.
                 O <strong>campeão sobe direto</strong> e o <strong>2° disputa o playoff de acesso</strong>.
             </p>
             <p class="fmt-desc">
@@ -149,7 +159,7 @@
                 no fim, disputam uma <strong>mini liga</strong> (jogos extras entre eles).
             </p>
             <p class="fmt-desc">
-                O <strong>playoff de acesso</strong> é um <strong>jogo único</strong> entre o 2° da Série B e o 9° da Série A.
+                O <strong>playoff de acesso</strong> é um <strong>jogo único</strong> entre o 2° da Série B e o @(TimesA - 1)° da Série A.
                 Quem vencer joga a Série A na temporada seguinte. Em caso de empate, a vaga sai nos <strong>pênaltis</strong>.
             </p>
         </div>
@@ -167,7 +177,7 @@
                 <div class="fmt-flow-icon">⚔️</div>
                 <div class="fmt-flow-content">
                     <strong>Playoff de acesso</strong>
-                    <span>2° da B x 9° da A · jogo único</span>
+                    <span>2° da B x @(TimesA - 1)° da A · jogo único</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>
@@ -193,7 +203,9 @@
         <div class="fmt-card fmt-card-liga">
             <p class="fmt-desc">
                 <strong>Jogo único</strong> entre o <strong>campeão da Série A</strong> e o <strong>campeão da Copa</strong> da temporada.
-                Empatou, vai para os <strong>pênaltis</strong>. Se o mesmo time vencer as duas competições, não há Supercopa.
+                Empatou, vai para os <strong>pênaltis</strong>. Se o mesmo time vencer as duas competições, o
+                <strong>vice da Série A</strong> e o <strong>vice da Copa</strong> fazem uma semifinal, e quem vencer
+                enfrenta o campeão das duas na final.
             </p>
         </div>
     </section>
@@ -345,14 +357,14 @@
                 <div class="fmt-flow-icon">📋</div>
                 <div class="fmt-flow-content">
                     <strong>Fase de Grupos</strong>
-                    <span>4 grupos de 4 · 3 rodadas dentro do grupo</span>
+                    <span>4 grupos de 4 e 5 · 4 rodadas</span>
                 </div>
             </div>
             <div class="fmt-flow-connector">→</div>
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon">⚔️</div>
                 <div class="fmt-flow-content">
-                    <strong>Semifinais</strong>
+                    <strong>Quartas e Semifinais</strong>
                     <span>Top 2 de cada grupo</span>
                 </div>
             </div>

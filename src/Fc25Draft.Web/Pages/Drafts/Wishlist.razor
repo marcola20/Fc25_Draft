@@ -16,7 +16,7 @@
 
 @implements IDisposable
 
-<PageHeader Title="Pré-Draft: meus 8 jogadores"
+<PageHeader Title="@($"Pré-Draft: meus {MaxJogadores} jogadores")"
             Subtitle="@($"Escolha os {MaxJogadores} jogadores mais interessantes para o draft (overall de {OverallMinimo} a {OverallMaximo}) e envie a lista do seu time.")"
             Actions="@BuildHeaderActions()" />
 
