@@ -1,23 +1,47 @@
 @using Microsoft.AspNetCore.Components
+@inject LayoutState LayoutState
+@implements IDisposable
 
-<div class="page-header">
-    <div class="page-header-texts">
-        <h2>@Title</h2>
-        @if (!string.IsNullOrWhiteSpace(Subtitle))
+@* O cabeçalho do topo já mostra o título da página (e o subtítulo, quando tem): aqui só aparece o que
+   ele ainda não mostrou — o título, quando o topo está sem; o subtítulo, quando é diferente; e as ações. *@
+@if (MostrarTitulo || MostrarSubtitulo || Actions is not null)
+{
+    <div class="page-header @(MostrarTitulo ? "" : "page-header-compacto")">
+        @if (MostrarTitulo || MostrarSubtitulo)
         {
-            <p class="lead">@Subtitle</p>
+            <div class="page-header-texts">
+                @if (MostrarTitulo)
+                {
+                    <h2>@Title</h2>
+                }
+                @if (MostrarSubtitulo)
+                {
+                    <p class="lead">@Subtitle</p>
+                }
+            </div>
+        }
+        @if (Actions is not null)
+        {
+            <div class="page-header-actions">
+                @Actions
+            </div>
         }
     </div>
-    @if (Actions is not null)
-    {
-        <div class="page-header-actions">
-            @Actions
-        </div>
-    }
-</div>
+}
 
 @code {
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+
+    private bool MostrarTitulo => string.IsNullOrWhiteSpace(LayoutState.Title);
+
+    private bool MostrarSubtitulo => !string.IsNullOrWhiteSpace(Subtitle)
+        && !string.Equals(Subtitle, LayoutState.Subtitle, StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized() => LayoutState.StateChanged += OnLayoutStateChanged;
+
+    private void OnLayoutStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => LayoutState.StateChanged -= OnLayoutStateChanged;
 }

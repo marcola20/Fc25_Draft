@@ -6,7 +6,6 @@
 
 <div class="container-fluid py-3" style="max-width: 900px;">
     <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-        <h1 class="h3 mb-0">📰 Plantão CBFV</h1>
         <div class="btn-group btn-group-sm" role="group" aria-label="Filtro">
             <button type="button" class="btn @(_filtro is null ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(null)">Tudo</button>
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Jogo ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">⚽ Jogos</button>

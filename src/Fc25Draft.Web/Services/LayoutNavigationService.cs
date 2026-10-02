@@ -7,6 +7,8 @@ namespace Fc25Draft.Web.Services;
 
 public class LayoutNavigationService
 {
+    // Menu por assunto. O título de cada item vira o título do cabeçalho e o caminho "Início › grupo ›
+    // página" das telas que não têm PageDefinition própria (ver GetPageDefinition).
     private static readonly IReadOnlyList<MenuGroup> MenuDefinition = new List<MenuGroup>
     {
         new("Início", new List<MenuItem>
@@ -16,10 +18,34 @@ public class LayoutNavigationService
             new("Minha Área", "/minha-area", "oi oi-person"),
             new("Manual do Técnico", "/manual", "oi oi-book")
         }),
-        new("Times", new List<MenuItem>
+        new("Competições", new List<MenuItem>
+        {
+            new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
+            new("Bolão da rodada", "/bolao", "oi oi-target", MatchPrefix: true),
+            new("Power Ranking", "/power-ranking", "oi oi-pulse"),
+            new("Simulação", "/liga/simulacao", "oi oi-calculator"),
+            new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
+            new("Edições", "/liga/edicoes", "oi oi-calendar"),
+            new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
+            new("Regulamento", "/regulamento", "oi oi-document"),
+            new("Premiação", "/premiacao", "oi oi-dollar")
+        }),
+        new("Clubes e Jogadores", new List<MenuItem>
         {
             new("Elencos", "/times/elencos", "oi oi-people"),
-            new("Cadastro de Times", "/teams", "oi oi-plus", RequiredRole: "Admin")
+            new("Jogadores", "/players", "oi oi-person"),
+            new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
+            new("Treinadores", "/treinadores", "oi oi-briefcase"),
+            new("Valor de Elenco", "/times/caixa", "oi oi-dollar"),
+            new("Como o overall é calculado", "/overall", "oi oi-calculator")
+        }),
+        new("Mercado", new List<MenuItem>
+        {
+            new("Leilão", "/mercado", "oi oi-cart"),
+            new("Lista de Transferências", "/mercado/lista", "oi oi-tag"),
+            new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
+            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
+            new("Histórico de Lances", "/mercado/historico", "oi oi-clock")
         }),
         new("Draft", new List<MenuItem>
         {
@@ -31,52 +57,41 @@ public class LayoutNavigationService
             new("Picks do Draft", "/picks", "oi oi-tag"),
             new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
-        new("Mercado de Transferências", new List<MenuItem>
+        new("História", new List<MenuItem>
         {
-            new("Mercado", "/mercado", "oi oi-cart", MatchPrefix: true),
-            new("Lista de Transferências", "/mercado/lista", "oi oi-tag"),
-            new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
-            new("Jogadores", "/players", "oi oi-person"),
-            new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
-            new("Como o overall é calculado", "/overall", "oi oi-calculator"),
-            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
-            new("Valor de Elenco", "/times/caixa", "oi oi-dollar")
-        }),
-        new("Liga", new List<MenuItem>
-        {
-            new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
-            new("Edições", "/liga/edicoes", "oi oi-calendar"),
-            new("Simulação", "/liga/simulacao", "oi oi-calculator"),
-            new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
-            new("Hall of Fame", "/hall-of-fame", "oi oi-badge"),
-            new("Treinadores", "/treinadores", "oi oi-person"),
-            new("Bolão da rodada", "/bolao", "oi oi-target"),
-            new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart"),
-            new("Power Ranking", "/power-ranking", "oi oi-pulse"),
+            new("Hall da Fama", "/hall-of-fame", "oi oi-badge"),
             new("Recordes", "/liga/recordes", "oi oi-star"),
-            new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
-            new("Premiação", "/premiacao", "oi oi-dollar"),
-            new("Regulamento", "/regulamento", "oi oi-document")
+            new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart")
         }),
-        new("Admin", new List<MenuItem>
+        new("Admin · Temporada e Liga", new List<MenuItem>
         {
-            new("Negociações", "/admin/negociacoes", "oi oi-loop", RequiredRole: "Admin"),
-            new("Gerenciar Ciclos", "/admin/ciclos", "oi oi-cog", RequiredRole: "Admin"),
-            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people", RequiredRole: "Admin"),
-            new("Gerenciar Liga", "/admin/liga", "oi oi-wrench", RequiredRole: "Admin"),
-            new("Gerenciar Hall of Fame", "/admin/hall-of-fame", "oi oi-badge", RequiredRole: "Admin"),
-            new("Treinadores", "/admin/treinadores", "oi oi-person", RequiredRole: "Admin"),
-            new("Resumo da rodada", "/admin/resumo-rodada", "oi oi-comment-square", RequiredRole: "Admin"),
-            new("Premiação", "/admin/premiacao", "oi oi-dollar", RequiredRole: "Admin"),
-            new("Regulamento", "/admin/regulamento", "oi oi-document", RequiredRole: "Admin"),
-            new("Loteria do Draft", "/admin/loteria", "oi oi-random", RequiredRole: "Admin"),
-            new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus", RequiredRole: "Admin"),
-            new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star", RequiredRole: "Admin"),
-            new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular", RequiredRole: "Admin"),
-            new("Configurações", "/admin/configuracoes", "oi oi-cog", RequiredRole: "Admin"),
-            new("Log de ações", "/admin/log-acoes", "oi oi-list", RequiredRole: "Admin"),
+            new("Gerenciar Liga", "/admin/liga", "oi oi-wrench"),
+            new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular"),
+            new("Resumo da Rodada", "/admin/resumo-rodada", "oi oi-comment-square"),
+            new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
+            new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
+            new("Gerenciar Regulamento", "/admin/regulamento", "oi oi-document")
+        }, RequiredRole: "Admin", CollapseByDefault: true),
+        new("Admin · Mercado", new List<MenuItem>
+        {
+            new("Negociações", "/admin/negociacoes", "oi oi-loop"),
+            new("Ciclos do Leilão", "/admin/ciclos", "oi oi-cog"),
+            new("Log de Ações", "/admin/log-acoes", "oi oi-list")
+        }, RequiredRole: "Admin", CollapseByDefault: true),
+        new("Admin · Draft", new List<MenuItem>
+        {
+            new("Rodar a Loteria", "/admin/loteria", "oi oi-random"),
+            new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus"),
+            new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star")
+        }, RequiredRole: "Admin", CollapseByDefault: true),
+        new("Admin · Pessoas e Sistema", new List<MenuItem>
+        {
+            new("Gerenciar Treinadores", "/admin/treinadores", "oi oi-person"),
+            new("Cadastro de Times", "/teams", "oi oi-plus"),
+            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people"),
+            new("Configurações", "/admin/configuracoes", "oi oi-cog"),
             new("Administradores", "/admin/administradores", "oi oi-key", RequiredRole: "AdminPrincipal")
-        }, RequiredRole: "Admin")
+        }, RequiredRole: "Admin", CollapseByDefault: true)
     };
 
     private static readonly Dictionary<string, PageDefinition> PageDefinitions = new(StringComparer.OrdinalIgnoreCase)
@@ -166,7 +181,7 @@ public class LayoutNavigationService
         ["/admin/loteria"] = new PageDefinition
         {
             Route = "/admin/loteria",
-            Title = "Loteria do Draft",
+            Title = "Rodar a Loteria",
             Subtitle = "Controle do sorteio — Admin",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -222,7 +237,7 @@ public class LayoutNavigationService
         ["/admin/regulamento"] = new PageDefinition
         {
             Route = "/admin/regulamento",
-            Title = "Regulamento",
+            Title = "Gerenciar Regulamento",
             Subtitle = "Texto por temporada — Admin",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -234,7 +249,7 @@ public class LayoutNavigationService
         ["/admin/premiacao"] = new PageDefinition
         {
             Route = "/admin/premiacao",
-            Title = "Premiação",
+            Title = "Gerenciar Premiação",
             Subtitle = "Valores por temporada e pagamento no caixa — Admin",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -356,7 +371,7 @@ public class LayoutNavigationService
         ["/admin/resumo-rodada"] = new PageDefinition
         {
             Route = "/admin/resumo-rodada",
-            Title = "Resumo da rodada",
+            Title = "Resumo da Rodada",
             Subtitle = "O texto pronto para colar no grupo",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -405,7 +420,7 @@ public class LayoutNavigationService
         ["/admin/log-acoes"] = new PageDefinition
         {
             Route = "/admin/log-acoes",
-            Title = "Log de ações",
+            Title = "Log de Ações",
             Subtitle = "O que a organização fez no mercado",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -429,7 +444,7 @@ public class LayoutNavigationService
         ["/admin/treinadores"] = new PageDefinition
         {
             Route = "/admin/treinadores",
-            Title = "Treinadores",
+            Title = "Gerenciar Treinadores",
             Subtitle = "Cadastro das pessoas da liga e das passagens pelos clubes",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
@@ -441,13 +456,13 @@ public class LayoutNavigationService
         ["/hall-of-fame"] = new PageDefinition
         {
             Route = "/hall-of-fame",
-            Title = "Hall of Fame",
+            Title = "Hall da Fama",
             Subtitle = "Os campeões de todas as competições",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
                 new("Liga"),
-                new("Hall of Fame")
+                new("Hall da Fama")
             }
         },
         ["/liga/recordes"] = new PageDefinition
@@ -511,13 +526,13 @@ public class LayoutNavigationService
         ["/admin/hall-of-fame"] = new PageDefinition
         {
             Route = "/admin/hall-of-fame",
-            Title = "Gerenciar Hall of Fame",
+            Title = "Gerenciar Hall da Fama",
             Subtitle = "Administração dos campeões — Admin",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
                 new("Admin"),
-                new("Hall of Fame")
+                new("Hall da Fama")
             }
         }
     };
@@ -560,12 +575,27 @@ public class LayoutNavigationService
             route = "/" + route;
         }
 
-        if (PageDefinitions.TryGetValue(route, out var definition))
+        PageDefinitions.TryGetValue(route, out var definition);
+
+        // Página do menu: o caminho segue o grupo do menu e, sem definição própria, o título vem do item.
+        var doMenu = MenuDefinition
+            .SelectMany(g => g.Items.Select(i => (Grupo: g.Title, Item: i)))
+            .FirstOrDefault(x => string.Equals(x.Item.Href, route, StringComparison.OrdinalIgnoreCase));
+        if (doMenu.Item is null)
         {
             return definition;
         }
 
-        return null;
+        var titulo = string.IsNullOrWhiteSpace(definition?.Title) ? doMenu.Item.Title : definition.Title;
+        return new PageDefinition
+        {
+            Route = route,
+            Title = titulo,
+            Subtitle = definition?.Subtitle,
+            Breadcrumbs = route.Equals("/home", StringComparison.OrdinalIgnoreCase)
+                ? new List<BreadcrumbSegment> { new("Início") }
+                : new List<BreadcrumbSegment> { new("Início", "/home"), new(doMenu.Grupo), new(titulo) }
+        };
     }
 
     /// <summary>
@@ -575,13 +605,9 @@ public class LayoutNavigationService
     public (string Titulo, string? Descricao)? DescreverRota(string? route)
     {
         var definicao = GetPageDefinition(route);
-        if (definicao is not null && !string.IsNullOrWhiteSpace(definicao.Title))
-            return (definicao.Title, definicao.Subtitle);
-
-        var item = MenuDefinition
-            .SelectMany(g => g.Items)
-            .FirstOrDefault(i => i.RequiredRole is null && string.Equals(i.Href, route, StringComparison.OrdinalIgnoreCase));
-        return item is null ? null : (item.Title, null);
+        return definicao is null || string.IsNullOrWhiteSpace(definicao.Title)
+            ? null
+            : (definicao.Title, definicao.Subtitle);
     }
 
     public bool HasRoute(string route)

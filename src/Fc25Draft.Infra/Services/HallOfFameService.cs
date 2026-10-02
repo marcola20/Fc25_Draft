@@ -54,7 +54,7 @@ public class HallOfFameService : IHallOfFameService
     public async Task<HallOfFameEntryDto> UpdateAsync(Guid id, HallOfFameUpdateRequest request, CancellationToken ct)
     {
         var entry = await _db.HallOfFame.FirstOrDefaultAsync(x => x.HallOfFameId == id, ct)
-            ?? throw new InvalidOperationException("Entrada do Hall of Fame não encontrada.");
+            ?? throw new InvalidOperationException("Entrada do Hall da Fama não encontrada.");
 
         entry.Descricao = NormalizarDescricao(request.Descricao);
         entry.Tipo = request.Tipo;
@@ -73,7 +73,7 @@ public class HallOfFameService : IHallOfFameService
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         var entry = await _db.HallOfFame.FirstOrDefaultAsync(x => x.HallOfFameId == id, ct)
-            ?? throw new InvalidOperationException("Entrada do Hall of Fame não encontrada.");
+            ?? throw new InvalidOperationException("Entrada do Hall da Fama não encontrada.");
 
         _db.HallOfFame.Remove(entry);
         await _db.SaveChangesAsync(ct);

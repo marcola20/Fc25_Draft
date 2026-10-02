@@ -7,7 +7,7 @@
 @inject IHallOfFameService HallOfFameService
 @inject EscudoService EscudoService
 
-<PageTitle>Hall of Fame - Campeões</PageTitle>
+<PageTitle>Hall da Fama - Campeões</PageTitle>
 
 <div class="container-fluid py-3">
     @if (_loading)
@@ -16,15 +16,10 @@
     }
     else if (_erro is not null)
     {
-        <div class="alert alert-danger"><strong>Erro ao carregar o Hall of Fame:</strong> @_erro</div>
+        <div class="alert alert-danger"><strong>Erro ao carregar o Hall da Fama:</strong> @_erro</div>
     }
     else
     {
-        <div class="mb-4 text-center">
-            <h1 class="h3 mb-1">🏆 Hall of Fame</h1>
-            <p class="text-muted mb-0">Os campeões de todas as competições</p>
-        </div>
-
         @if (!_entradas.Any())
         {
             <div class="alert alert-info text-center">Nenhum campeão registrado ainda.</div>

@@ -1,0 +1,26 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+@* Atalhos fixos no rodapé do celular para as páginas mais usadas; some no computador (CSS). *@
+<nav class="barra-inferior" aria-label="Atalhos">
+    @foreach (var atalho in Atalhos)
+    {
+        <NavLink class="barra-inferior-item" href="@atalho.Href"
+                 Match="@(atalho.Prefixo ? NavLinkMatch.Prefix : NavLinkMatch.All)">
+            <span class="@atalho.Icone" aria-hidden="true"></span>
+            <span class="barra-inferior-texto">@atalho.Texto</span>
+        </NavLink>
+    }
+</nav>
+
+@code {
+    private sealed record Atalho(string Texto, string Href, string Icone, bool Prefixo = false);
+
+    private static readonly Atalho[] Atalhos =
+    [
+        new("Início", "/home", "oi oi-home"),
+        new("Liga", "/liga", "oi oi-list-rich", Prefixo: true),
+        new("Mercado", "/mercado", "oi oi-cart", Prefixo: true),
+        new("Bolão", "/bolao", "oi oi-target", Prefixo: true),
+        new("Minha Área", "/minha-area", "oi oi-person"),
+    ];
+}

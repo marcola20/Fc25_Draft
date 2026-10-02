@@ -9,7 +9,6 @@
 
 <div class="container-fluid py-3">
     <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-        <h1 class="h3 mb-0">🌡️ Termômetro do Mercado</h1>
         @if (_janelas.Count > 0)
         {
             <select class="form-select form-select-sm w-auto" value="@(_janela?.ToString() ?? "")" @onchange="TrocarJanelaAsync" disabled="@_loading">

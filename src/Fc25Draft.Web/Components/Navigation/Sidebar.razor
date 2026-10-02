@@ -1,5 +1,7 @@
 @using Fc25Draft.Web.Models.Navigation
 @using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Navigation
+@implements IDisposable
 
 <nav class="app-sidebar" aria-label="Seções do sistema">
     <div class="sidebar-logo">
@@ -58,13 +60,29 @@
 
     private HashSet<string> expandedGroups = new();
 
-    protected override void OnInitialized()
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    // O menu chega depois (montado quando o login é conhecido): abre o grupo da página atual.
+    protected override void OnParametersSet() => AbrirGrupoDaPagina();
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        InvokeAsync(() => { AbrirGrupoDaPagina(); StateHasChanged(); });
+
+    /// <summary>Abre o grupo que tem a página aberta (sem fechar os que a pessoa abriu); sem nenhum, o primeiro.</summary>
+    private void AbrirGrupoDaPagina()
     {
-        // Expandir primeiro grupo por padrão
-        if (MenuGroups?.Count > 0)
-        {
+        if (MenuGroups is not { Count: > 0 }) return;
+
+        var caminho = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        var grupo = MenuGroups.FirstOrDefault(g => g.Items.Any(i =>
+                        string.Equals(i.Href, caminho, StringComparison.OrdinalIgnoreCase)))
+                    ?? MenuGroups.FirstOrDefault(g => g.Items.Any(i =>
+                        i.MatchPrefix && caminho.StartsWith(i.Href + "/", StringComparison.OrdinalIgnoreCase)));
+
+        if (grupo is not null)
+            expandedGroups.Add(grupo.Title);
+        else if (expandedGroups.Count == 0)
             expandedGroups.Add(MenuGroups[0].Title);
-        }
     }
 
     private void ToggleGroup(string groupTitle)
@@ -78,4 +96,6 @@
             expandedGroups.Add(groupTitle);
         }
     }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

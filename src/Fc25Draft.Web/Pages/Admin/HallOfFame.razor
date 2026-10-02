@@ -10,10 +10,10 @@
 @inject ITreinadorService TreinadorSvc
 @inject EscudoService EscudoService
 
-<PageTitle>Administração do Hall of Fame</PageTitle>
+<PageTitle>Administração do Hall da Fama</PageTitle>
 
 <div class="container-fluid py-3">
-    <h1 class="h3 mb-3">Hall of Fame — Campeões</h1>
+    <h1 class="h3 mb-3">Hall da Fama — Campeões</h1>
 
     @if (!string.IsNullOrEmpty(_erro))
     {
@@ -194,7 +194,7 @@
                     <button type="button" class="btn-close" @onclick="() => _entradaParaExcluir = null"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Remover <strong>@_entradaParaExcluir.TimeCampeao</strong> (@_entradaParaExcluir.Descricao) do Hall of Fame?</p>
+                    <p>Remover <strong>@_entradaParaExcluir.TimeCampeao</strong> (@_entradaParaExcluir.Descricao) do Hall da Fama?</p>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => _entradaParaExcluir = null" disabled="@_saving">Cancelar</button>

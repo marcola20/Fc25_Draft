@@ -60,6 +60,11 @@
         flex-direction: column;
     }
 
+    /* Espaço para a barra de atalhos fixa no rodapé não cobrir o fim da página. */
+    .app-content {
+        padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    }
+
     .app-sidebar-container {
         position: fixed;
         inset: 0 auto 0 0;
