@@ -5,9 +5,11 @@
 @* Campo de busca de jogador pelo nome: mostra até 8 resultados e devolve o escolhido. *@
 
 <div class="position-relative">
-    <input class="form-control"
+    @* Campo não controlado (sem value="@..."): no Blazor Server o re-render apagaria letras de quem digita rápido.
+       O @key recria o campo vazio depois de escolher um jogador. *@
+    <input @key="_campoKey"
+           class="form-control"
            placeholder="@Placeholder"
-           value="@_termo"
            @oninput="OnInputAsync"
            autocomplete="off" />
 
@@ -36,6 +38,7 @@
     private const int MaxResultados = 8;
 
     private string _termo = string.Empty;
+    private int _campoKey;
     private List<PlayerListItemDto> _resultados = new();
     private bool _semResultado;
     private CancellationTokenSource? _busca;
@@ -72,6 +75,7 @@
     private async Task EscolherAsync(PlayerListItemDto jogador)
     {
         _termo = string.Empty;
+        _campoKey++;
         _resultados.Clear();
         await OnEscolhido.InvokeAsync(jogador);
     }

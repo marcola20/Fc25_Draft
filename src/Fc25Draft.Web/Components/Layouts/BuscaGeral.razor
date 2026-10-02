@@ -16,8 +16,10 @@
     <div class="busca-painel" role="dialog" aria-label="Buscar">
         <div class="busca-campo">
             <span class="oi oi-magnifying-glass text-muted" aria-hidden="true"></span>
-            <input @ref="_campo" type="search" class="form-control border-0 shadow-none" placeholder="Nome do jogador, do time ou do técnico"
-                   value="@_termo" @oninput="DigitouAsync" @onkeydown="Tecla" autocomplete="off" />
+            @* Campo não controlado (sem value="@..."): no Blazor Server o re-render apagaria letras de quem digita rápido.
+               O painel é recriado a cada abertura, então o campo já começa vazio. *@
+            <input @ref="_campo" type="text" inputmode="search" enterkeyhint="search" class="form-control border-0 shadow-none"
+                   placeholder="Nome do jogador, do time ou do técnico" @oninput="DigitouAsync" @onkeydown="Tecla" autocomplete="off" />
             <button type="button" class="btn-close" @onclick="Fechar" aria-label="Fechar"></button>
         </div>
 
@@ -89,6 +91,10 @@
 
     private void Abrir()
     {
+        _termo = "";
+        _resultado = BuscaResultadoDto.Vazio;
+        _selecionado = 0;
+        _buscando = false;
         _aberta = true;
         _focar = true;
     }
