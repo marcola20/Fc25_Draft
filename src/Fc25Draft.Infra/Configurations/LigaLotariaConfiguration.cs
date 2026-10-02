@@ -26,5 +26,6 @@ public class LigaLotariaPickConfiguration : IEntityTypeConfiguration<LigaLoteria
         b.ToTable("LigaLoteriaPicks");
         b.HasKey(x => x.PickId);
         b.Property(x => x.TimeNome).IsRequired().HasMaxLength(200);
+        b.Property(x => x.Origem).HasMaxLength(100);
     }
 }

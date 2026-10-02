@@ -1412,6 +1412,24 @@ public class LigaAdminService : ILigaAdminService
             .Select(x => x.TimeId)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> GetPosicoesTabelaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)
+            ?? throw new InvalidOperationException("Liga não encontrada.");
+
+        var classifs = await _db.LigaClassificacoes.AsNoTracking()
+            .Where(x => x.LigaId == ligaId)
+            .ToListAsync(ct);
+
+        if (liga.Divisao != Divisao.SerieB)
+            return classifs.ToDictionary(c => c.TimeId, c => c.Posicao);
+
+        var confrontos = await CarregarConfrontosAsync(ligaId, ct);
+        var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
+        var blocos = LigaDesempate.BlocosSerieB(classifs, c => c.TimeId, StatsDaClassificacao, confrontos, decisivos);
+        return LigaDesempate.PosicoesSerieB(blocos, c => c.TimeId);
+    }
+
     public async Task<LigaDto> DefinirConfrontoFinalAsync(Guid ligaId, Guid? timeAId, Guid? timeBId, CancellationToken ct)
     {
         var liga = await _db.Ligas.FirstOrDefaultAsync(x => x.LigaId == ligaId, ct)

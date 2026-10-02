@@ -119,11 +119,11 @@ using (var scope = app.Services.CreateScope())
 
         var revealed = rodada == 2 ? r2 : r1;
         state.Revealed.AddRange(revealed.Select(p =>
-            new LotteryPickItem(p.PickNumero, p.TimeId, p.TimeNome, p.Posicao)));
+            new LotteryPickItem(p.PickNumero, p.TimeId, p.TimeNome, p.Posicao, p.Origem)));
 
         if (r1.Count > 0 && rodada == 2)
             state.Round1Results = r1.Select(p =>
-                new LotteryPickItem(p.PickNumero, p.TimeId, p.TimeNome, p.Posicao)).ToList();
+                new LotteryPickItem(p.PickNumero, p.TimeId, p.TimeNome, p.Posicao, p.Origem)).ToList();
 
         lotteryService.Start(state);
     }

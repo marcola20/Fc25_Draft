@@ -108,10 +108,10 @@
         IReadOnlyList<PickRow> R2,
         LotterySection R2Loteria);
 
-    // ── Regra atual: 12 times, uma divisão ──────────────────────────────────
-    private static readonly RegraPicks RegraAtual = new(
-        Aba: "Próximo draft",
-        AbaSub: "12 times · regra atual",
+    // ── Regra anterior: 12 times, uma divisão (drafts de 2008 e 2009) ───────
+    private static readonly RegraPicks RegraDozeTimes = new(
+        Aba: "Regra anterior",
+        AbaSub: "12 times · até o draft de 2009",
         Intro: "O draft tem dois rounds: o Round 1 segue a classificação final da Liga e o Round 2 segue o desempenho na Copa. Nos dois, quem foi pior escolhe antes.",
         R1Desc: "Baseado na classificação final da fase de Liga (pontos corridos). O pior time da Liga tem a maior chance de ficar com a pick #1.",
         R1: new List<PickRow>
@@ -165,10 +165,10 @@
             ],
             new("Dentro de cada bloco as picks são sorteadas em sequência, sem reposição. Pior posição na Copa = maior chance de pick antecipada.")));
 
-    // ── Com Série A e Série B: 18 times ─────────────────────────────────────
+    // ── Com Série A e Série B: 18 times (a partir do draft de 2010) ─────────
     private static readonly RegraPicks RegraSerieB = new(
-        Aba: "Com Série B",
-        AbaSub: "18 times · a partir do draft seguinte",
+        Aba: "Próximo draft",
+        AbaSub: "18 times · Série A e Série B",
         Intro: "Com Série A (10 times) e Série B (8 times), cada round tem 18 picks. No Round 1 a Série B escolhe antes da Série A. No Round 2 vale só a campanha na Copa, sem separar divisão. Conta a divisão em que o time jogou a temporada, e o playoff de acesso não muda as picks.",
         R1Desc: "Classificação única: os 8 da Série B vêm todos antes dos 10 da Série A. O pior da Série B tem a maior chance de ficar com a pick #1.",
         R1: new List<PickRow>
@@ -229,9 +229,9 @@
             ],
             new("Dentro de cada bloco as picks são sorteadas em sequência, sem reposição. Aqui a divisão não conta: time da Série A e da Série B concorrem igual.")));
 
-    private static readonly IReadOnlyList<RegraPicks> Regras = [RegraAtual, RegraSerieB];
+    private static readonly IReadOnlyList<RegraPicks> Regras = [RegraSerieB, RegraDozeTimes];
 
-    private RegraPicks _regra = RegraAtual;
+    private RegraPicks _regra = RegraSerieB;
 
     private static RenderFragment TabelaPicks((string Cabecalho, IReadOnlyList<PickRow> Rows) t) => __builder =>
     {

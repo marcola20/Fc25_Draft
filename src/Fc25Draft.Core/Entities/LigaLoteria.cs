@@ -21,5 +21,8 @@ public class LigaLoteriaPick
     public string TimeNome { get; set; } = "";
     public int Posicao { get; set; }
 
+    /// <summary>De onde veio a pick (ex.: "8º da Série B", "Eliminado nas quartas"). Nulo nas loterias antigas.</summary>
+    public string? Origem { get; set; }
+
     public LigaLoteria Loteria { get; set; } = null!;
 }

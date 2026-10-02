@@ -1,5 +1,6 @@
 @page "/loteria"
 @implements IDisposable
+@using Fc25Draft.Core.Utilities
 @inject LotteryStateService LotteryService
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -68,7 +69,7 @@
                             <span class="lottery-final-pick @(pick.PickNumero == 1 ? "lottery-final-pick-gold" : "")">#@pick.PickNumero</span>
                             <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
                             <span class="lottery-final-name">@pick.TimeNome</span>
-                            <span class="lottery-final-pos">@pick.Posicao°</span>
+                            <span class="lottery-final-pos">@pick.OrigemTexto</span>
                         </div>
                     }
                 </div>
@@ -87,6 +88,7 @@
                                 <span class="lottery-final-pick">#@pick.PickNumero</span>
                                 <img src="@EscudoUrl(pick.TimeNome)" alt="" class="lottery-final-escudo" onerror="this.style.display='none'" />
                                 <span class="lottery-final-name">@pick.TimeNome</span>
+                                <span class="lottery-final-pos">@pick.OrigemTexto</span>
                             </div>
                         }
                     </div>
@@ -105,7 +107,7 @@
                             var pick = s.Revealed[i];
                             bool isLatest    = i == s.Revealed.Count - 1;
                             bool isPick1     = pick.PickNumero == 1 && s.Rodada == 1;
-                            bool isZone      = pick.PickNumero <= 4 && s.Rodada == 1 && !isPick1;
+                            bool isZone      = pick.PickNumero <= LoteriaDraft.PicksSorteadasRound1 && s.Rodada == 1 && !isPick1;
 
                             string cardClass = isLatest
                                 ? (isPick1 ? "lottery-card-latest lottery-card-pick1"
@@ -129,10 +131,7 @@
                                         <div class="lottery-card-zone-label">🎲 Concorreu ao Pick #1</div>
                                     }
                                 </div>
-                                @if (s.Rodada == 1)
-                                {
-                                    <div class="lottery-card-pos">@pick.Posicao° colocado</div>
-                                }
+                                <div class="lottery-card-pos">@pick.OrigemTexto</div>
                             </div>
                         }
                     </div>

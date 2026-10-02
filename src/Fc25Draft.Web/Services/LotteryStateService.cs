@@ -1,6 +1,10 @@
 namespace Fc25Draft.Web.Services;
 
-public sealed record LotteryPickItem(int PickNumero, Guid TimeId, string TimeNome, int Posicao);
+/// <param name="Origem">De onde veio a pick (ex.: "8º da Série B"); nulo nas loterias antigas, que só tinham a posição.</param>
+public sealed record LotteryPickItem(int PickNumero, Guid TimeId, string TimeNome, int Posicao, string? Origem = null)
+{
+    public string OrigemTexto => Origem ?? $"{Posicao}º colocado";
+}
 
 public sealed class LotteryState
 {

@@ -90,6 +90,12 @@ public interface ILigaAdminService
     Task<IReadOnlyList<Guid>> ListTimesLigaAsync(Guid ligaId, CancellationToken ct);
     Task ConfigurarTimesLigaAsync(Guid ligaId, IReadOnlyList<Guid> teamIds, CancellationToken ct);
 
+    /// <summary>
+    /// Posição de cada time na tabela, já com os jogos decisivos e a mini liga. Na Série B quem segue
+    /// empatado divide a posição (1, 2, 2, 4); nas outras ligas é a posição gravada.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, int>> GetPosicoesTabelaAsync(Guid ligaId, CancellationToken ct);
+
     /// <summary>Define (ou limpa, com nulos) o confronto que deve fechar a temporada na última rodada.</summary>
     Task<LigaDto> DefinirConfrontoFinalAsync(Guid ligaId, Guid? timeAId, Guid? timeBId, CancellationToken ct);
 

@@ -2,6 +2,7 @@
 @implements IDisposable
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Utilities
 @using Fc25Draft.Infra.Data
 @using Microsoft.EntityFrameworkCore
 @attribute [Authorize(Roles = "Admin")]
@@ -50,48 +51,52 @@
         <div class="card mb-3">
             <div class="card-header fw-bold">Configurar Loteria</div>
             <div class="card-body">
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label fw-semibold">🏆 Liga <span class="text-muted fw-normal">(Round 1)</span></label>
-                        @if (_ligas is null)
-                        {
-                            <div class="text-muted">Carregando...</div>
-                        }
-                        else if (_ligas.Count == 0)
-                        {
-                            <div class="alert alert-info mb-0">Nenhuma liga cadastrada.</div>
-                        }
-                        else
-                        {
-                            <select class="form-select" @bind="_ligaIdSelecionada">
-                                <option value="">— Selecione a Liga —</option>
-                                @foreach (var l in _ligas)
+                <p class="text-muted small">
+                    Regra com Série A (@LoteriaDraft.TimesSerieA times) e Série B (@LoteriaDraft.TimesSerieB times), a mesma de <a href="/picks" target="_blank">Picks do Draft</a>.
+                    Round 1: a Série B escolhe antes da A, e do 3º ao 8º da B disputam as picks 1–@LoteriaDraft.PicksSorteadasRound1 na loteria.
+                    Round 2: só a campanha na Copa.
+                </p>
+                @if (_ligas is null)
+                {
+                    <div class="text-muted">Carregando...</div>
+                }
+                else
+                {
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">🏆 Série A <span class="text-muted fw-normal">(Round 1)</span></label>
+                            <select class="form-select" @bind="_serieAId">
+                                <option value="">— Selecione —</option>
+                                @foreach (var l in Ligas(TipoCompetition.Liga, Divisao.SerieA))
                                 {
                                     <option value="@l.LigaId">@l.Nome</option>
                                 }
                             </select>
-                        }
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label fw-semibold">🥇 Copa <span class="text-muted fw-normal">(Round 2 — opcional)</span></label>
-                        @if (_ligas is null)
-                        {
-                            <div class="text-muted">Carregando...</div>
-                        }
-                        else
-                        {
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">🥈 Série B <span class="text-muted fw-normal">(Round 1)</span></label>
+                            <select class="form-select" @bind="_serieBId">
+                                <option value="">— Selecione —</option>
+                                @foreach (var l in Ligas(TipoCompetition.Liga, Divisao.SerieB))
+                                {
+                                    <option value="@l.LigaId">@l.Nome</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">🥇 Copa <span class="text-muted fw-normal">(Round 2)</span></label>
                             <select class="form-select" @bind="_copaIdSelecionada">
-                                <option value="">— Selecione a Copa —</option>
-                                @foreach (var l in _ligas)
+                                <option value="">— Selecione —</option>
+                                @foreach (var l in Ligas(TipoCompetition.Copa, null))
                                 {
                                     <option value="@l.LigaId">@l.Nome</option>
                                 }
                             </select>
-                        }
+                        </div>
                     </div>
-                </div>
+                }
                 <button class="btn btn-success fw-semibold"
-                        disabled="@(_ligaIdSelecionada == Guid.Empty || _carregando)"
+                        disabled="@(_serieAId == Guid.Empty || _serieBId == Guid.Empty || _carregando)"
                         @onclick="IniciarLoteria">
                     🚀 Começar Loteria
                 </button>
@@ -235,7 +240,7 @@
                                             <span class="badge @(pick.PickNumero == 1 ? "bg-warning text-dark" : "bg-primary")">#@pick.PickNumero</span>
                                             <img src="@EscudoUrl(pick.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display='none'" />
                                             <span class="fw-semibold flex-grow-1">@pick.TimeNome</span>
-                                            <span class="text-muted" style="font-size:.75rem">@pick.Posicao°</span>
+                                            <span class="text-muted" style="font-size:.75rem">@pick.OrigemTexto</span>
                                         </div>
                                     }
                                 </div>
@@ -272,7 +277,8 @@
                                         <div class="list-group-item d-flex align-items-center gap-2 py-2">
                                             <span class="badge bg-warning text-dark">#@pick.PickNumero</span>
                                             <img src="@EscudoUrl(pick.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display='none'" />
-                                            <span class="fw-semibold">@pick.TimeNome</span>
+                                            <span class="fw-semibold flex-grow-1">@pick.TimeNome</span>
+                                            <span class="text-muted" style="font-size:.75rem">@pick.OrigemTexto</span>
                                         </div>
                                     }
                                 </div>
@@ -302,7 +308,8 @@
 
 @code {
     private IReadOnlyList<LigaDto>? _ligas;
-    private Guid _ligaIdSelecionada;
+    private Guid _serieAId;
+    private Guid _serieBId;
     private Guid _copaIdSelecionada;
     private string? _erro;
     private string? _ok;
@@ -318,7 +325,11 @@
     {
         LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/loteria"));
         LotteryService.OnChange += HandleChange;
-        try { _ligas = await AdminSvc.ListAsync(CancellationToken.None); }
+        try
+        {
+            _ligas = await AdminSvc.ListAsync(CancellationToken.None);
+            SelecionarUltimaTemporada();
+        }
         catch (Exception ex) { _erro = ex.Message; }
 
         await PreencherComPlanoAsync();
@@ -352,90 +363,75 @@
     private async void HandleChange() => await InvokeAsync(StateHasChanged);
     public void Dispose() => LotteryService.OnChange -= HandleChange;
 
+    private IEnumerable<LigaDto> Ligas(TipoCompetition tipo, Divisao? divisao) =>
+        (_ligas ?? [])
+            .Where(l => l.Tipo == tipo && (divisao is null || l.Divisao == divisao))
+            .OrderByDescending(l => l.Temporada)
+            .ThenBy(l => l.Nome);
+
+    /// <summary>Já deixa escolhidas a Série A, a Série B e a Copa da temporada mais recente.</summary>
+    private void SelecionarUltimaTemporada()
+    {
+        var temporada = Ligas(TipoCompetition.Liga, Divisao.SerieB).FirstOrDefault()?.Temporada;
+        if (temporada is null) return;
+
+        Guid DaTemporada(TipoCompetition tipo, Divisao? divisao) =>
+            Ligas(tipo, divisao).FirstOrDefault(l => l.Temporada == temporada)?.LigaId ?? Guid.Empty;
+
+        _serieAId = DaTemporada(TipoCompetition.Liga, Divisao.SerieA);
+        _serieBId = DaTemporada(TipoCompetition.Liga, Divisao.SerieB);
+        _copaIdSelecionada = DaTemporada(TipoCompetition.Copa, null);
+    }
+
     private async Task IniciarLoteria()
     {
-        if (_ligaIdSelecionada == Guid.Empty) return;
         _carregando = true; _erro = null;
         try
         {
-            var liga = _ligas?.FirstOrDefault(l => l.LigaId == _ligaIdSelecionada);
-            if (liga is null) { _erro = "Liga não encontrada."; return; }
+            var serieA = _ligas?.FirstOrDefault(l => l.LigaId == _serieAId);
+            var serieB = _ligas?.FirstOrDefault(l => l.LigaId == _serieBId);
+            if (serieA is null || serieB is null) { _erro = "Selecione a Série A e a Série B."; return; }
+            if (serieA.Temporada != serieB.Temporada) { _erro = "A Série A e a Série B precisam ser da mesma temporada."; return; }
+
+            // A ordem sai da tabela final: com a liga em andamento ainda faltam jogos ou desempates.
+            var emAndamento = new[] { serieA, serieB }.Where(l => l.Status != LigaStatus.Encerrada).Select(l => l.Nome).ToList();
+            if (emAndamento.Count > 0) { _erro = $"Encerre antes da loteria: {string.Join(" e ", emAndamento)}."; return; }
 
             LigaDto? copaLiga = _copaIdSelecionada != Guid.Empty
                 ? _ligas?.FirstOrDefault(l => l.LigaId == _copaIdSelecionada)
                 : null;
 
-            var classif = await PublicSvc.GetClassificacaoAsync(_ligaIdSelecionada, CancellationToken.None);
-            if (classif.Count < 12) { _erro = "Classificação incompleta (mínimo 12 times)."; return; }
-
-            // sorted[0]=1°(melhor)  sorted[11]=12°(pior)
-            var sorted = classif.OrderBy(c => c.Posicao).ToList();
-
-            var allPicks = new List<LotteryPickItem>();
-            var rng = new Random();
-
-            // ── Picks 1-4: loteria ponderada entre 12°/11°/10°/9° (pesos 35/35/15/15) ──
-            var pool = new List<(Guid Id, string Nome, int Pos, int Peso)>
-            {
-                (sorted[11].TimeId, sorted[11].TimeNome, sorted[11].Posicao, 35), // 12°
-                (sorted[10].TimeId, sorted[10].TimeNome, sorted[10].Posicao, 35), // 11°
-                (sorted[9].TimeId,  sorted[9].TimeNome,  sorted[9].Posicao,  15), // 10°
-                (sorted[8].TimeId,  sorted[8].TimeNome,  sorted[8].Posicao,  15), //  9°
-            };
-            for (int pick = 1; pick <= 4; pick++)
-            {
-                if (pool.Count == 1)
-                {
-                    allPicks.Add(new LotteryPickItem(pick, pool[0].Id, pool[0].Nome, pool[0].Pos));
-                    pool.RemoveAt(0); break;
-                }
-                int total = pool.Sum(e => e.Peso), acum = 0, idx = 0;
-                int rollW = rng.Next(total);
-                for (int i = 0; i < pool.Count; i++) { acum += pool[i].Peso; if (rollW < acum) { idx = i; break; } }
-                allPicks.Add(new LotteryPickItem(pick, pool[idx].Id, pool[idx].Nome, pool[idx].Pos));
-                pool.RemoveAt(idx);
-            }
-
-            // ── Picks 5-6: 50/50 entre 8° e 7° ──
-            var p56 = new[] { sorted[7], sorted[6] };
-            if (rng.Next(2) == 1) (p56[0], p56[1]) = (p56[1], p56[0]);
-            allPicks.Add(new LotteryPickItem(5, p56[0].TimeId, p56[0].TimeNome, p56[0].Posicao));
-            allPicks.Add(new LotteryPickItem(6, p56[1].TimeId, p56[1].TimeNome, p56[1].Posicao));
-
-            // ── Picks 7-8: 50/50 entre 6° e 5° ──
-            var p78 = new[] { sorted[5], sorted[4] };
-            if (rng.Next(2) == 1) (p78[0], p78[1]) = (p78[1], p78[0]);
-            allPicks.Add(new LotteryPickItem(7, p78[0].TimeId, p78[0].TimeNome, p78[0].Posicao));
-            allPicks.Add(new LotteryPickItem(8, p78[1].TimeId, p78[1].TimeNome, p78[1].Posicao));
-
-            // ── Picks 9-10: 50/50 entre 4° e 3° ──
-            var p910 = new[] { sorted[3], sorted[2] };
-            if (rng.Next(2) == 1) (p910[0], p910[1]) = (p910[1], p910[0]);
-            allPicks.Add(new LotteryPickItem(9,  p910[0].TimeId, p910[0].TimeNome, p910[0].Posicao));
-            allPicks.Add(new LotteryPickItem(10, p910[1].TimeId, p910[1].TimeNome, p910[1].Posicao));
-
-            // ── Picks 11-12: 50/50 entre 2° e 1° ──
-            var p1112 = new[] { sorted[1], sorted[0] };
-            if (rng.Next(2) == 1) (p1112[0], p1112[1]) = (p1112[1], p1112[0]);
-            allPicks.Add(new LotteryPickItem(11, p1112[0].TimeId, p1112[0].TimeNome, p1112[0].Posicao));
-            allPicks.Add(new LotteryPickItem(12, p1112[1].TimeId, p1112[1].TimeNome, p1112[1].Posicao));
-
-            // Revelação: pick #12 primeiro → pick #1 por último (máximo drama)
-            allPicks = allPicks.OrderByDescending(p => p.PickNumero).ToList();
+            var picks = LoteriaDraft.Round1(await TabelaAsync(serieA.LigaId), await TabelaAsync(serieB.LigaId), Random.Shared);
 
             LotteryService.Start(new LotteryState
             {
-                LigaId       = _ligaIdSelecionada,
-                LigaNome     = liga.Nome,
+                LigaId       = serieA.LigaId,
+                LigaNome     = $"Temporada {serieA.Temporada}",
                 CopaLigaId   = copaLiga?.LigaId,
                 CopaLigaNome = copaLiga?.Nome ?? "",
                 Rodada       = 1,
-                Pending      = allPicks
+                Pending      = ParaRevelar(picks)
             });
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
+
+    /// <summary>Tabela da divisão com a posição que vale (na Série B, empatados dividem a posição).</summary>
+    private async Task<List<TimeNaTabela>> TabelaAsync(Guid ligaId)
+    {
+        var classif = await PublicSvc.GetClassificacaoAsync(ligaId, CancellationToken.None);
+        var posicoes = await AdminSvc.GetPosicoesTabelaAsync(ligaId, CancellationToken.None);
+        return classif
+            .Select(c => new TimeNaTabela(c.TimeId, c.TimeNome, posicoes.GetValueOrDefault(c.TimeId, c.Posicao)))
+            .ToList();
+    }
+
+    /// <summary>Revelação: a última pick primeiro e a #1 por último (máximo drama).</summary>
+    private static List<LotteryPickItem> ParaRevelar(IEnumerable<PickLoteria> picks) =>
+        picks.OrderByDescending(p => p.Pick)
+            .Select(p => new LotteryPickItem(p.Pick, p.TimeId, p.TimeNome, p.Posicao, p.Origem))
+            .ToList();
 
     private void RevealNext() => LotteryService.RevealNext();
 
@@ -456,96 +452,36 @@
             var classif  = await PublicSvc.GetClassificacaoAsync(copaId, CancellationToken.None);
             var knockout = await PublicSvc.GetKnockoutAsync(copaId, CancellationToken.None);
 
-            var classifByTeam = classif.ToDictionary(c => c.TimeId);
-            string GetNome(Guid id) => classifByTeam.TryGetValue(id, out var c) ? c.TimeNome : "?";
-            int    GetPos(Guid id)  => classifByTeam.TryGetValue(id, out var c) ? c.Posicao  : 0;
-
-            Guid? Loser(FaseKnockout fase)
-            {
-                var j = knockout.FirstOrDefault(x => x.Fase == fase);
-                if (j?.VencedorId == null) return null;
-                return j.TimeCasaId == j.VencedorId ? j.TimeForaId : j.TimeCasaId;
-            }
-            Guid? Winner(FaseKnockout fase) => knockout.FirstOrDefault(x => x.Fase == fase)?.VencedorId;
-
-            // Times no bracket = participantes das semis (4 times)
-            var bracketTeams = new HashSet<Guid>(
-                new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 }
-                    .SelectMany(f =>
-                    {
-                        var j = knockout.FirstOrDefault(x => x.Fase == f);
-                        if (j is null) return Enumerable.Empty<Guid>();
-                        return new[] { j.TimeCasaId, j.TimeForaId }
-                            .Where(id => id.HasValue).Select(id => id!.Value);
-                    }));
-
-            // Eliminados na fase de grupos = todos exceto bracket, pior campanha primeiro
-            var groupElims = classif
-                .Where(c => !bracketTeams.Contains(c.TimeId))
-                .OrderByDescending(c => c.Posicao)
+            // Posição dentro do grupo: a tabela gravada já vem na ordem de cada grupo.
+            var copa = classif
+                .Where(c => c.Grupo is not null)
+                .GroupBy(c => c.Grupo!.Value)
+                .SelectMany(g => g.OrderBy(c => c.Posicao).Select((c, i) => new TimeNaCopa(
+                    c.TimeId, c.TimeNome, g.Key, i + 1, c.Pontos, c.Jogos, c.SaldoGols, c.GolsPro)))
                 .ToList();
 
-            if (groupElims.Count < 8) { _erro = "Menos de 8 times eliminados na fase de grupos da Copa."; return; }
-
-            var allPicks = new List<LotteryPickItem>();
-            var rng = new Random();
-
-            // ── Picks 1-4: loteria ponderada entre os 4 piores eliminados (35/35/15/15) ──
-            var pool14 = groupElims.Take(4)
-                .Select((c, i) => (c.TimeId, c.TimeNome, c.Posicao, Peso: i < 2 ? 35 : 15))
-                .ToList();
-            for (int pick = 1; pick <= 4; pick++)
+            LigaKnockoutJogoDto Jogo(FaseKnockout fase)
             {
-                if (pool14.Count == 1)
-                {
-                    allPicks.Add(new LotteryPickItem(pick, pool14[0].TimeId, pool14[0].TimeNome, pool14[0].Posicao));
-                    pool14.Clear(); break;
-                }
-                int total = pool14.Sum(e => e.Peso), acum = 0, idx = 0;
-                int rollA = rng.Next(total);
-                for (int i = 0; i < pool14.Count; i++) { acum += pool14[i].Peso; if (rollA < acum) { idx = i; break; } }
-                allPicks.Add(new LotteryPickItem(pick, pool14[idx].TimeId, pool14[idx].TimeNome, pool14[idx].Posicao));
-                pool14.RemoveAt(idx);
+                var j = knockout.FirstOrDefault(x => x.Fase == fase)
+                    ?? throw new InvalidOperationException($"A Copa ainda não tem o mata-mata completo (falta {fase}).");
+                if (j.VencedorId is null || j.TimeCasaId is null || j.TimeForaId is null)
+                    throw new InvalidOperationException($"A Copa ainda não terminou: falta o resultado de {j.FaseLabel}.");
+                return j;
+            }
+            Guid Perdedor(FaseKnockout fase)
+            {
+                var j = Jogo(fase);
+                return j.TimeCasaId == j.VencedorId ? j.TimeForaId!.Value : j.TimeCasaId!.Value;
             }
 
-            // ── Picks 5-8: loteria ponderada entre os 4 seguintes (35/35/15/15) ──
-            var pool58 = groupElims.Skip(4).Take(4)
-                .Select((c, i) => (c.TimeId, c.TimeNome, c.Posicao, Peso: i < 2 ? 35 : 15))
-                .ToList();
-            for (int pick = 5; pick <= 8; pick++)
-            {
-                if (pool58.Count == 1)
-                {
-                    allPicks.Add(new LotteryPickItem(pick, pool58[0].TimeId, pool58[0].TimeNome, pool58[0].Posicao));
-                    pool58.Clear(); break;
-                }
-                int total = pool58.Sum(e => e.Peso), acum = 0, idx = 0;
-                int rollB = rng.Next(total);
-                for (int i = 0; i < pool58.Count; i++) { acum += pool58[i].Peso; if (rollB < acum) { idx = i; break; } }
-                allPicks.Add(new LotteryPickItem(pick, pool58[idx].TimeId, pool58[idx].TimeNome, pool58[idx].Posicao));
-                pool58.RemoveAt(idx);
-            }
+            var chave = new ChaveCopa(
+                [Perdedor(FaseKnockout.QF1), Perdedor(FaseKnockout.QF2), Perdedor(FaseKnockout.QF3), Perdedor(FaseKnockout.QF4)],
+                [Perdedor(FaseKnockout.Semi1), Perdedor(FaseKnockout.Semi2)],
+                Perdedor(FaseKnockout.Final),
+                Jogo(FaseKnockout.Final).VencedorId!.Value);
 
-            // ── Picks 9-10: perdedores das semis (pior campanha Copa → pick 9) ──
-            var semiLosers = new[] { Loser(FaseKnockout.Semi1), Loser(FaseKnockout.Semi2) }
-                .Where(x => x.HasValue).Select(x => x!.Value)
-                .OrderByDescending(id => GetPos(id)).ToList();
-            for (int i = 0; i < semiLosers.Count; i++)
-                allPicks.Add(new LotteryPickItem(9 + i, semiLosers[i], GetNome(semiLosers[i]), GetPos(semiLosers[i])));
-
-            // ── Pick 11: vice-campeão Copa ──
-            var vice = Loser(FaseKnockout.Final);
-            if (vice.HasValue)
-                allPicks.Add(new LotteryPickItem(11, vice.Value, GetNome(vice.Value), GetPos(vice.Value)));
-
-            // ── Pick 12: campeão Copa ──
-            var champ = Winner(FaseKnockout.Final);
-            if (champ.HasValue)
-                allPicks.Add(new LotteryPickItem(12, champ.Value, GetNome(champ.Value), GetPos(champ.Value)));
-
-            // Revelação: pick #12 primeiro → pick #1 por último
-            var round2 = allPicks.OrderByDescending(p => p.PickNumero).ToList();
-            LotteryService.AdvanceToRound2(round2);
+            var picks = LoteriaDraft.Round2(copa, chave, Random.Shared);
+            LotteryService.AdvanceToRound2(ParaRevelar(picks));
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
@@ -582,12 +518,12 @@
             // Round 1: salvo em Round1Results (se teve round 2) ou em Revealed (se encerrou no round 1)
             var r1 = s.Round1Results.Count > 0 ? s.Round1Results : (s.Rodada == 1 ? s.Revealed : new());
             foreach (var p in r1)
-                loteria.Picks.Add(new LigaLoteriaPick { PickId = Guid.NewGuid(), LoteraiaId = loteria.LoteraiaId, Rodada = 1, PickNumero = p.PickNumero, TimeId = p.TimeId, TimeNome = p.TimeNome, Posicao = p.Posicao });
+                loteria.Picks.Add(new LigaLoteriaPick { PickId = Guid.NewGuid(), LoteraiaId = loteria.LoteraiaId, Rodada = 1, PickNumero = p.PickNumero, TimeId = p.TimeId, TimeNome = p.TimeNome, Posicao = p.Posicao, Origem = p.Origem });
 
             // Round 2
             if (s.Rodada == 2)
                 foreach (var p in s.Revealed)
-                    loteria.Picks.Add(new LigaLoteriaPick { PickId = Guid.NewGuid(), LoteraiaId = loteria.LoteraiaId, Rodada = 2, PickNumero = p.PickNumero, TimeId = p.TimeId, TimeNome = p.TimeNome, Posicao = p.Posicao });
+                    loteria.Picks.Add(new LigaLoteriaPick { PickId = Guid.NewGuid(), LoteraiaId = loteria.LoteraiaId, Rodada = 2, PickNumero = p.PickNumero, TimeId = p.TimeId, TimeNome = p.TimeNome, Posicao = p.Posicao, Origem = p.Origem });
 
             Db.LigaLoterias.Add(loteria);
             await Db.SaveChangesAsync(CancellationToken.None);
@@ -599,8 +535,7 @@
     private void Reset()
     {
         LotteryService.Reset();
-        _ligaIdSelecionada = Guid.Empty;
-        _copaIdSelecionada = Guid.Empty;
+        SelecionarUltimaTemporada();
         _ok = null; _erro = null;
     }
 
