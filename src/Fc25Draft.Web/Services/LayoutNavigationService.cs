@@ -23,6 +23,7 @@ public class LayoutNavigationService
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Bolão da rodada", "/bolao", "oi oi-target", MatchPrefix: true),
             new("Power Ranking", "/power-ranking", "oi oi-pulse"),
+            new("Reta final", "/liga/reta-final", "oi oi-flag"),
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
             new("Edições", "/liga/edicoes", "oi oi-calendar"),
@@ -304,6 +305,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Liga")
+            }
+        },
+        ["/liga/reta-final"] = new PageDefinition
+        {
+            Route = "/liga/reta-final",
+            Title = "Reta final",
+            Subtitle = "Quem ainda pode o quê",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Reta final")
             }
         },
         ["/liga/simulacao"] = new PageDefinition

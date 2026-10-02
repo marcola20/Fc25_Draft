@@ -1,0 +1,212 @@
+@page "/liga/reta-final"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Models.Navigation
+@inject ILigaPublicService LigaService
+@inject EscudoService Escudos
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Reta final</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        @if (_ligas.Count > 0)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="TrocarLigaAsync" disabled="@_loading">
+                @foreach (var l in _ligas)
+                {
+                    <option value="@l.LigaId" selected="@(l.LigaId == _liga?.LigaId)">@l.Nome (@LigaLabels.Competicao(l.Tipo, l.Divisao))</option>
+                }
+            </select>
+        }
+        @if (_liga is not null)
+        {
+            <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simular placares</a>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_liga is null)
+    {
+        <div class="alert alert-warning">Nenhuma liga ativa no momento.</div>
+    }
+    else if (_liga.Tipo != TipoCompetition.Liga)
+    {
+        <div class="alert alert-info">A calculadora vale para as ligas de pontos corridos. Escolha uma liga acima.</div>
+    }
+    else if (_r is null || _r.Linhas.Count == 0)
+    {
+        <div class="alert alert-info">Classificação ainda não disponível para esta liga.</div>
+    }
+    else
+    {
+        <p class="text-muted small mb-3">
+            @if (_r.JogosRestantes == 0)
+            {
+                <span>Todos os jogos já foram disputados: a tabela de hoje é a final.</span>
+            }
+            else
+            {
+                <span>
+                    Faltam <strong>@_r.JogosRestantes jogos</strong>. "Garante com X pts" é o que o time precisa fazer sozinho,
+                    mesmo que os rivais vençam tudo. A chance sai de @_r.Simulacoes.ToString("N0", Brasil) sorteios dos jogos que
+                    faltam, com cada jogo pendendo para quem tem a melhor campanha. Empate em pontos não conta como garantido.
+                </span>
+            }
+        </p>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:38px;">#</th>
+                        <th>Time</th>
+                        <th class="text-center" title="Pontos">Pts</th>
+                        <th class="text-center" title="Jogos que faltam">Faltam</th>
+                        <th class="text-center" title="Pontos se vencer todos os jogos que faltam">Máx.</th>
+                        @foreach (var o in _r.Objetivos)
+                        {
+                            <th class="text-center">@o.Nome</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var linha in _r.Linhas)
+                    {
+                        <tr>
+                            <td class="fw-bold text-muted">@linha.Posicao</td>
+                            <td class="text-nowrap">
+                                <img src="@Escudos.GetEscudo(linha.Time.Nome)" alt="" width="22" height="22" class="me-1" style="object-fit: contain;" />
+                                <a href="/teams/details/@linha.Time.TimeId" class="text-body">@linha.Time.Nome</a>
+                            </td>
+                            <td class="text-center fw-bold">@linha.Time.Pontos</td>
+                            <td class="text-center">@linha.JogosRestantes</td>
+                            <td class="text-center text-muted">@linha.PontosMaximos</td>
+                            @foreach (var meta in linha.Metas)
+                            {
+                                <td class="text-center">@Celula(meta, linha.JogosRestantes)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 small text-muted">
+            <span><span class="badge bg-success">garantido</span> já é dele</span>
+            <span><span class="badge bg-primary">garante com X pts</span> depende só dele</span>
+            <span><span class="badge bg-warning text-dark">precisa de ajuda</span> depende de outros resultados</span>
+            <span><span class="text-muted">—</span> não alcança mais</span>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
+    private LigaDto? _liga;
+    private RetaFinalResultado? _r;
+    private bool _loading = true;
+
+    /// <summary>Liga a abrir, vinda do botão da página da Liga.</summary>
+    [SupplyParameterFromQuery(Name = "liga")] public Guid? LigaQuery { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
+        _liga = _ligas.FirstOrDefault(l => l.LigaId == LigaQuery)
+                ?? await LigaService.GetAtualAsync(CancellationToken.None)
+                ?? _ligas.FirstOrDefault(l => l.Tipo == TipoCompetition.Liga)
+                ?? _ligas.FirstOrDefault();
+        await CarregarAsync();
+    }
+
+    private async Task TrocarLigaAsync(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+        _liga = _ligas.FirstOrDefault(l => l.LigaId == id);
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _loading = true;
+        _r = null;
+        AtualizarCabecalho();
+        try
+        {
+            if (_liga is not { Tipo: TipoCompetition.Liga } liga) return;
+
+            var classificacao = await LigaService.GetClassificacaoAsync(liga.LigaId, CancellationToken.None);
+            var rodadas = await LigaService.GetRodadasComPartidasAsync(liga.LigaId, CancellationToken.None);
+
+            // Rodadas de verdade (sem o mata-mata nem o jogo decisivo); o que não terminou ainda vale pontos.
+            var restantes = rodadas
+                .Where(r => r.Numero > 0 && !r.Desempate)
+                .SelectMany(r => r.Partidas)
+                .Where(p => p.Status != PartidaStatus.Encerrada)
+                .Select(p => new RetaFinalJogo(p.TimeCasaId, p.TimeForaId))
+                .ToList();
+
+            var tabela = classificacao
+                .OrderBy(c => c.Posicao)
+                .Select(c => new RetaFinalTime(c.TimeId, c.TimeNome, c.Pontos, c.Jogos, c.Vitorias, c.SaldoGols))
+                .ToList();
+
+            var objetivos = CalculadoraRetaFinal.Objetivos(LigaRegraZonas.De(liga), tabela.Count);
+            // O sorteio é pesado o bastante para não rodar no circuito do Blazor.
+            _r = await Task.Run(() => CalculadoraRetaFinal.Calcular(tabela, restantes, objetivos));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void AtualizarCabecalho() =>
+        LayoutState.SetPage(
+            NavigationService.GetPageDefinition("/liga/reta-final"),
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Reta final")
+            },
+            subtitle: _liga is null ? "Quem ainda pode o quê" : $"Quem ainda pode o quê — {_liga.Nome}");
+
+    private static string Chance(double chance) => chance switch
+    {
+        >= 0.995 => "99%",
+        (< 0.005) => "<1%",
+        _ => (chance * 100).ToString("0", Brasil) + "%"
+    };
+
+    private static RenderFragment Celula(RetaFinalMeta meta, int faltam) => __builder =>
+    {
+        switch (meta.Situacao)
+        {
+            case SituacaoObjetivo.Garantido:
+                <span class="badge bg-success">garantido</span>
+                break;
+            case SituacaoObjetivo.Impossivel:
+                <span class="text-muted">—</span>
+                break;
+            case SituacaoObjetivo.DependeDeSi:
+                <span class="badge bg-primary" title="Garante sozinho com @meta.PontosParaGarantir pontos dos @(faltam * 3) que ainda disputa">garante com @meta.PontosParaGarantir pts</span>
+                <div class="small text-muted">@Chance(meta.Chance)</div>
+                break;
+            default:
+                <span class="badge bg-warning text-dark">precisa de ajuda</span>
+                <div class="small text-muted">@Chance(meta.Chance)</div>
+                break;
+        }
+    };
+}

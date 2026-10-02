@@ -64,6 +64,10 @@
             }
             <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary">📚 Edições</a>
             <a href="/liga/historico" class="btn btn-sm btn-outline-secondary">📊 Histórico</a>
+            @if (_liga.Tipo == TipoCompetition.Liga)
+            {
+                <a href="@($"/liga/reta-final?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🏁 Reta final</a>
+            }
             <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simulação</a>
         </div>
         <p class="text-muted small mb-3">
