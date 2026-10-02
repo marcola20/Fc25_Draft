@@ -1,0 +1,111 @@
+@using System.Globalization
+@using Fc25Draft.Core.Interfaces
+
+@* Raio-x antes do jogo: chance de cada resultado, os dois times lado a lado e o confronto direto. *@
+@if (Previa is { } pv)
+{
+    @if (pv.TemTabela)
+    {
+        <FavoritoJogo PontosCasa="pv.Casa.Pontos!.Value" JogosCasa="pv.Casa.Jogos!.Value"
+                      PontosFora="pv.Fora.Pontos!.Value" JogosFora="pv.Fora.Jogos!.Value" />
+    }
+
+    <div class="previa mt-2">
+        <div class="previa-linha previa-times">
+            <span class="lado casa previa-casa">@pv.Casa.Nome</span>
+            <span></span>
+            <span class="lado previa-fora">@pv.Fora.Nome</span>
+        </div>
+
+        @if (pv.TemTabela)
+        {
+            @Linha("Na tabela", Tabela(pv.Casa), Tabela(pv.Fora))
+            @Linha("Gols (pró:contra)", $"{pv.Casa.GolsPro}:{pv.Casa.GolsContra}", $"{pv.Fora.GolsPro}:{pv.Fora.GolsContra}")
+        }
+
+        <div class="previa-linha">
+            <div class="lado casa"><FormaBolinhas Jogos="pv.Casa.Forma" /></div>
+            <div class="rotulo">Últimos 5</div>
+            <div class="lado"><FormaBolinhas Jogos="pv.Fora.Forma" /></div>
+        </div>
+
+        @if (pv.Casa.Sequencia is not null || pv.Fora.Sequencia is not null)
+        {
+            @Linha("Momento", pv.Casa.Sequencia ?? "—", pv.Fora.Sequencia ?? "—")
+        }
+
+        @if (pv.Casa.Artilheiro is not null || pv.Fora.Artilheiro is not null)
+        {
+            @Linha("Artilheiro", Artilheiro(pv.Casa), Artilheiro(pv.Fora))
+        }
+
+        @if (pv.Casa.Numeros is { } nc && pv.Fora.Numeros is { } nf)
+        {
+            @Linha("Posse média", $"{nc.Posse.ToString("0", Brasil)}%", $"{nf.Posse.ToString("0", Brasil)}%")
+            @Linha("Chutes por jogo", nc.ChutesPorJogo.ToString("0.#", Brasil), nf.ChutesPorJogo.ToString("0.#", Brasil))
+            @if (nc.AcertoDePasses is decimal pc && nf.AcertoDePasses is decimal pf)
+            {
+                @Linha("Acerto de passes", $"{pc.ToString("0", Brasil)}%", $"{pf.ToString("0", Brasil)}%")
+            }
+        }
+
+        @if (pv.Casa.Suspensos.Count + pv.Fora.Suspensos.Count > 0)
+        {
+            @Linha("🟥 Suspensos", Nomes(pv.Casa.Suspensos), Nomes(pv.Fora.Suspensos))
+        }
+        @if (pv.Casa.Pendurados.Count + pv.Fora.Pendurados.Count > 0)
+        {
+            @Linha("🟨 Pendurados", Nomes(pv.Casa.Pendurados), Nomes(pv.Fora.Pendurados))
+        }
+    </div>
+
+    <h6 class="mt-4 mb-2">🆚 Confronto direto</h6>
+    @if (pv.Confronto.Jogos == 0)
+    {
+        <div class="text-muted small">Primeiro encontro entre os dois.</div>
+    }
+    else
+    {
+        var c = pv.Confronto;
+        <div class="previa-confronto mb-2">
+            <div><div class="valor previa-casa">@c.VitoriasCasa</div><div class="small text-muted">@pv.Casa.Nome</div></div>
+            <div><div class="valor">@c.Empates</div><div class="small text-muted">empate@(c.Empates == 1 ? "" : "s")</div></div>
+            <div><div class="valor previa-fora">@c.VitoriasFora</div><div class="small text-muted">@pv.Fora.Nome</div></div>
+        </div>
+        <div class="small text-muted text-center mb-2">
+            @c.Jogos jogo@(c.Jogos == 1 ? "" : "s") · gols @c.GolsCasa x @c.GolsFora
+        </div>
+        <ul class="list-unstyled small mb-0">
+            @foreach (var j in c.Ultimos)
+            {
+                <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+                    <span class="text-muted text-nowrap">@(j.Data?.ToString("dd/MM/yy", Brasil) ?? "")</span>
+                    <span class="text-center flex-grow-1">@j.Mandante <strong>@j.GolsMandante x @j.GolsVisitante</strong> @j.Visitante</span>
+                    <span class="text-muted text-truncate" style="max-width: 40%;">@j.Competicao</span>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public PreviaDto? Previa { get; set; }
+
+    private static string Tabela(PreviaTimeDto t) => $"{t.Posicao}º · {t.Pontos} pt{(t.Pontos == 1 ? "" : "s")}";
+
+    private static string Artilheiro(PreviaTimeDto t) =>
+        t.Artilheiro is null ? "—" : $"{t.Artilheiro} ({t.ArtilheiroGols})";
+
+    private static string Nomes(IReadOnlyList<string> nomes) => nomes.Count == 0 ? "—" : string.Join(", ", nomes);
+
+    private static RenderFragment Linha(string rotulo, string casa, string fora) => __builder =>
+    {
+        <div class="previa-linha">
+            <div class="lado casa">@casa</div>
+            <div class="rotulo">@rotulo</div>
+            <div class="lado">@fora</div>
+        </div>
+    };
+}

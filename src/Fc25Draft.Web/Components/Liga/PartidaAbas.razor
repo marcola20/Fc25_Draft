@@ -1,8 +1,10 @@
-@using Fc25Draft.Core.DTOs
+﻿@using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @inject IEstatisticasPesService Estatisticas
+@inject IPreviaService Previas
 
-@* Abas do jogo: números do PES, eventos (gols, cartões, substituições) e formações. Só aparece aba com conteúdo. *@
+@* Abas do jogo: prévia (antes de terminar), números do PES, eventos (gols, cartões, substituições) e formações.
+   Só aparece aba com conteúdo. *@
 @if (_numeros is null)
 {
     return;
@@ -26,6 +28,9 @@
 
 @switch (atual)
 {
+    case Aba.Previa:
+        <PartidaPrevia Previa="_previa" />
+        break;
     case Aba.Estatisticas:
         <PartidaNumeros Numeros="_numeros" CasaNome="@CasaNome" ForaNome="@ForaNome" />
         break;
@@ -47,11 +52,12 @@
     // Null enquanto carrega (ou sem escalação): a aba Formações não aparece.
     [Parameter] public PartidaEscalacoesDto? Escalacoes { get; set; }
 
-    private enum Aba { Estatisticas, Eventos, Formacoes }
+    private enum Aba { Previa, Estatisticas, Eventos, Formacoes }
 
-    // Null até a pessoa escolher: abre nas estatísticas quando o jogo veio do PES, senão nos eventos.
+    // Null até a pessoa escolher: abre na prévia antes do jogo, nas estatísticas quando veio do PES, senão nos eventos.
     private Aba? _aba;
     private IReadOnlyList<NumeroDaPartidaDto>? _numeros;
+    private PreviaDto? _previa;
     private Guid _carregada;
 
     protected override async Task OnParametersSetAsync()
@@ -60,20 +66,24 @@
         _carregada = PartidaId;
         _aba = null;
         _numeros = null;
+        _previa = await Previas.MontarAsync(PartidaId, CancellationToken.None);
         _numeros = await Estatisticas.DaPartidaAsync(PartidaId, CancellationToken.None);
     }
 
     private List<Aba> Abas()
     {
         var abas = new List<Aba>();
+        if (_previa is not null) abas.Add(Aba.Previa);
         if (_numeros is { Count: > 0 }) abas.Add(Aba.Estatisticas);
-        abas.Add(Aba.Eventos);
+        // Antes do jogo, sem nenhum lance, a aba de eventos só diria "nenhum evento".
+        if (_previa is null || Eventos.Count > 0) abas.Add(Aba.Eventos);
         if (Escalacoes is not null) abas.Add(Aba.Formacoes);
         return abas;
     }
 
     private static string Nome(Aba aba) => aba switch
     {
+        Aba.Previa => "Prévia",
         Aba.Estatisticas => "Estatísticas",
         Aba.Eventos => "Eventos do jogo",
         _ => "Formações"

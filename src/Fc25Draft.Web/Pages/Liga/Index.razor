@@ -831,7 +831,7 @@
                     <h5 class="modal-title">
                         <img src="@EscudoUrl(_partidaDetalhes.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
                         @_partidaDetalhes.TimeCasaNome
-                        <span class="text-muted mx-2">@_partidaDetalhes.GolsCasa – @_partidaDetalhes.GolsFora</span>
+                        <span class="text-muted mx-2">@(_partidaDetalhes.Status == PartidaStatus.Agendada ? "x" : $"{_partidaDetalhes.GolsCasa} – {_partidaDetalhes.GolsFora}")</span>
                         @_partidaDetalhes.TimeForaNome
                         <img src="@EscudoUrl(_partidaDetalhes.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
                     </h5>
