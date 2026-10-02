@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http.Headers;
+using Fc25Draft.Web.Security;
 using Microsoft.AspNetCore.Components;
 
 namespace Fc25Draft.Web.Services;
@@ -24,6 +25,7 @@ public class ApiClientFactory
     {
         var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(_navigationManager.BaseUri);
+        ChamadaInterna.Marcar(client);
 
         client.DefaultRequestHeaders.AcceptLanguage.Clear();
         client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("pt-BR"));

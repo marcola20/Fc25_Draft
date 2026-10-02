@@ -1,4 +1,5 @@
 @using Fc25Draft.Web.Components.Layouts
+@inject OrigemDoCliente Origem
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AdminRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
@@ -11,3 +12,13 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    /// <summary>IP de quem abriu o site (vem do _Host): chave do limite de tentativas de login.</summary>
+    [Parameter] public string? IpDoCliente { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(IpDoCliente)) Origem.Ip = IpDoCliente;
+    }
+}

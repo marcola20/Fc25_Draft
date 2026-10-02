@@ -74,14 +74,14 @@
 
         try
         {
-            var sucesso = await AdminAuth.SignInAsync(_token);
-            if (sucesso)
+            var resultado = await AdminAuth.EntrarAsync(_token);
+            if (resultado.Sucesso)
             {
                 Navigation.NavigateTo(Destino, forceLoad: false);
             }
             else
             {
-                _erro = "Token inválido. Tente novamente.";
+                _erro = resultado.Mensagem;
                 _token = string.Empty;
             }
         }

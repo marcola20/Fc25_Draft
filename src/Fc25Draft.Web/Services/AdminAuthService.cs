@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using Fc25Draft.Web.Security;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -15,17 +16,23 @@ public class AdminAuthService
     private readonly IJSRuntime _jsRuntime;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly NavigationManager _navigationManager;
+    private readonly LimiteDeTentativas _limite;
+    private readonly OrigemDoCliente _origem;
     private string? _token;
     private bool _initialized;
 
     public AdminAuthService(
         IJSRuntime jsRuntime,
         IHttpClientFactory httpClientFactory,
-        NavigationManager navigationManager)
+        NavigationManager navigationManager,
+        LimiteDeTentativas limite,
+        OrigemDoCliente origem)
     {
         _jsRuntime = jsRuntime;
         _httpClientFactory = httpClientFactory;
         _navigationManager = navigationManager;
+        _limite = limite;
+        _origem = origem;
     }
 
     public event Action? AuthenticationChanged;
@@ -103,6 +110,33 @@ public class AdminAuthService
         return _token;
     }
 
+    /// <summary>
+    /// Login digitado pela pessoa: passa pelo limite de tentativas (3 tokens errados bloqueiam o IP por
+    /// 15 minutos) e devolve a mensagem para mostrar, com quantas tentativas restam.
+    /// </summary>
+    public async Task<ResultadoDoLogin> EntrarAsync(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return new(false, "Informe o seu token.");
+
+        if (_limite.BloqueadoPor(_origem.Ip) is TimeSpan falta)
+            return new(false, LimiteDeTentativas.MensagemDeBloqueio(falta));
+
+        var normalizedToken = token.Trim();
+        var result = await ValidateTokenAsync(normalizedToken);
+        if (!result.IsValid)
+        {
+            // Falha de rede ou do servidor não é chute: não gasta tentativa.
+            return result.Recusado
+                ? new(false, LimiteDeTentativas.MensagemDeErro(_limite.RegistrarErro(_origem.Ip)))
+                : new(false, "Não foi possível validar o token. Tente novamente.");
+        }
+
+        await AplicarAsync(normalizedToken, result.IsAdmin, result.IsPrincipal);
+        return new(true, null);
+    }
+
+    /// <summary>Entra com um token que o próprio sistema acabou de gerar (sem limite de tentativas).</summary>
     public async Task<bool> SignInAsync(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -113,9 +147,15 @@ public class AdminAuthService
         if (!result.IsValid)
             return false;
 
+        await AplicarAsync(normalizedToken, result.IsAdmin, result.IsPrincipal);
+        return true;
+    }
+
+    private async Task AplicarAsync(string normalizedToken, bool isAdmin, bool isPrincipal)
+    {
         _token = normalizedToken;
-        IsAdmin = result.IsAdmin;
-        IsPrincipal = result.IsPrincipal;
+        IsAdmin = isAdmin;
+        IsPrincipal = isPrincipal;
 
         try
         {
@@ -128,7 +168,6 @@ public class AdminAuthService
 
         _initialized = true;
         AuthenticationChanged?.Invoke();
-        return true;
     }
 
     public async Task SignOutAsync()
@@ -143,24 +182,27 @@ public class AdminAuthService
         AuthenticationChanged?.Invoke();
     }
 
-    private async Task<(bool IsValid, bool IsAdmin, bool IsPrincipal)> ValidateTokenAsync(string token)
+    /// <summary><c>Recusado</c>: a API disse que o token não vale (não foi falha de rede).</summary>
+    private async Task<(bool IsValid, bool IsAdmin, bool IsPrincipal, bool Recusado)> ValidateTokenAsync(string token)
     {
         try
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri(_navigationManager.BaseUri);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            ChamadaInterna.Marcar(client);
 
             using var response = await client.GetAsync("api/auth/me");
             if (!response.IsSuccessStatusCode)
-                return (false, false, false);
+                return (false, false, false,
+                    response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden);
 
             var data = await response.Content.ReadFromJsonAsync<AuthMeResponse>();
-            return (true, data?.IsAdmin ?? false, data?.IsPrincipal ?? false);
+            return (true, data?.IsAdmin ?? false, data?.IsPrincipal ?? false, false);
         }
         catch (Exception)
         {
-            return (false, false, false);
+            return (false, false, false, false);
         }
     }
 
@@ -178,3 +220,5 @@ public class AdminAuthService
 
     private sealed record AuthMeResponse(bool IsAdmin, bool IsPrincipal);
 }
+
+public sealed record ResultadoDoLogin(bool Sucesso, string? Mensagem);

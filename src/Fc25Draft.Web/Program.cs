@@ -155,16 +155,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// No Render o site só recebe pedidos pelo proxy dele, que não é local: sem limpar as listas de proxies
+// conhecidos o X-Forwarded-For é ignorado e todo mundo aparece com o IP do proxy (e dividiria o mesmo
+// limite de tentativas de login). Com ForwardLimit 1 vale só o último IP da lista, o que o proxy acrescentou.
+var forwardedOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    ForwardLimit = 1
+};
+forwardedOptions.KnownNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<LimiteDeTentativasMiddleware>();
 app.UseAuthorization();
 
 app.MapHub<DraftHub>("/hubs/draft");

@@ -49,7 +49,7 @@
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
 <body>
-    <component type="typeof(App)" render-mode="ServerPrerendered" />
+    <component type="typeof(App)" render-mode="ServerPrerendered" param-IpDoCliente="@(HttpContext.Connection.RemoteIpAddress?.ToString())" />
 
     <div id="blazor-error-ui">
         <environment include="Staging,Production">

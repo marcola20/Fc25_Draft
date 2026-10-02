@@ -1319,7 +1319,7 @@ else
             RefreshLayoutHeader();
             StateHasChangedSafe();
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             _teamTokenError = ex.Message;
         }

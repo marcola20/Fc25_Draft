@@ -38,9 +38,9 @@ public class TeamAccessService
         if (string.IsNullOrWhiteSpace(token))
             throw new ArgumentException("Token inválido.", nameof(token));
 
-        var success = await _authService.SignInAsync(token);
-        if (!success)
-            throw new InvalidOperationException("Token inválido ou não encontrado.");
+        var resultado = await _authService.EntrarAsync(token);
+        if (!resultado.Sucesso)
+            throw new InvalidOperationException(resultado.Mensagem ?? "Token inválido ou não encontrado.");
     }
 
     public async Task ClearTokenAsync()
