@@ -231,7 +231,7 @@ else
     private async Task AtualizarFotoAsync()
     {
         _foto = await Fotos.InfoAsync(player!.PlayerId, CancellationToken.None);
-        _versaoFoto = DateTime.UtcNow.Ticks.ToString("x");
+        _versaoFoto = _foto.Versao;
     }
     private Aba _aba;
 
@@ -307,6 +307,7 @@ else
             {
                 _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
+                _versaoFoto = _foto.Versao;
             }
         }
         catch (Exception ex)

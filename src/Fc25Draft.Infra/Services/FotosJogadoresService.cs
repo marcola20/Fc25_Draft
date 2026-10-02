@@ -33,11 +33,13 @@ public class FotosJogadoresService : IFotosJogadoresService
 
     public async Task<FotoJogadorInfo> InfoAsync(int playerId, CancellationToken ct)
     {
-        var origem = await _db.FotosJogadores.AsNoTracking()
+        var foto = await _db.FotosJogadores.AsNoTracking()
             .Where(f => f.PlayerId == playerId)
-            .Select(f => f.Origem)
+            .Select(f => new { f.Origem, f.AtualizadaEm })
             .FirstOrDefaultAsync(ct);
-        return new FotoJogadorInfo(origem is not null, origem);
+        return foto is null
+            ? new FotoJogadorInfo(false, null, "0")
+            : new FotoJogadorInfo(true, foto.Origem, foto.AtualizadaEm.Ticks.ToString("x"));
     }
 
     public async Task<IReadOnlyList<int>> PesIdsParaImportarAsync(CancellationToken ct) =>

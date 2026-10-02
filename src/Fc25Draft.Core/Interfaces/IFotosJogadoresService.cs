@@ -5,7 +5,8 @@ public record FotoJogadorArquivo(byte[] Imagem, string ContentType, DateTime Atu
 /// <summary>Uma foto do PES enviada pelo script de importação (imagem em base64).</summary>
 public record FotoPesRequest(int PesId, string ImagemBase64);
 
-public record FotoJogadorInfo(bool TemFoto, string? Origem);
+// Versao muda a cada troca (vai no endereço da imagem, para o navegador não mostrar a do cache).
+public record FotoJogadorInfo(bool TemFoto, string? Origem, string Versao);
 
 /// <summary>Fotos dos jogadores: importadas do PES ou trocadas à mão pelo admin.</summary>
 public interface IFotosJogadoresService

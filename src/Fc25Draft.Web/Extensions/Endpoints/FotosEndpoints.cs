@@ -10,11 +10,14 @@ public static class FotosEndpoints
 
     public static IEndpointRouteBuilder MapFotosEndpoints(this IEndpointRouteBuilder app)
     {
-        // Sem foto vai a silhueta, com o mesmo cache: a tela não precisa saber quem tem foto.
+        // Sem foto vai a silhueta: a tela não precisa saber quem tem foto. Com ?v= (a versão da foto) o
+        // endereço muda a cada troca, então pode ficar no cache para sempre; sem versão (listas), só 1 minuto.
         app.MapGet("/fotos/jogadores/{playerId:int}", async (
             int playerId, HttpContext ctx, IFotosJogadoresService fotos, IWebHostEnvironment env, CancellationToken ct) =>
         {
-            ctx.Response.Headers.CacheControl = "public, max-age=600";
+            ctx.Response.Headers.CacheControl = ctx.Request.Query.ContainsKey("v")
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=60";
             var foto = await fotos.ObterAsync(playerId, ct);
             if (foto is null)
             {
