@@ -1,0 +1,52 @@
+.matriz table { font-size: .8rem; }
+
+.matriz th, .matriz td { padding: 3px; }
+
+/* Nome do mandante fica parado enquanto a matriz rola de lado. */
+.time {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bs-body-bg);
+    min-width: 9.5rem;
+}
+
+.time img { object-fit: contain; margin-right: .25rem; vertical-align: -4px; }
+
+.coluna { min-width: 46px; }
+.coluna img { object-fit: contain; }
+
+.diagonal { background: var(--bs-tertiary-bg); }
+
+.celula { white-space: nowrap; }
+
+.placar {
+    display: inline-block;
+    min-width: 36px;
+    border: 0;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    color: var(--bs-body-color);
+    background: transparent;
+}
+
+.celula .placar + .placar { margin-left: 2px; }
+
+.placar:hover { outline: 2px solid var(--bs-border-color); }
+
+.placar.v { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.placar.e { background: var(--bs-secondary-bg-subtle); color: var(--bs-secondary-text-emphasis); }
+.placar.d { background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
+.placar.ao-vivo { background: var(--bs-warning-bg-subtle); color: var(--bs-warning-text-emphasis); }
+.placar.a-jogar { color: var(--bs-secondary-color); font-weight: 400; font-size: .7rem; }
+
+.placar.legenda { cursor: default; font-size: .7rem; min-width: 30px; text-align: center; }
+.placar.legenda:hover { outline: 0; }
+
+@media (max-width: 576px) {
+    .time { min-width: 0; }
+    .time .nome { display: none; }
+}

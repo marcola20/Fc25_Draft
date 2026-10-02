@@ -90,6 +90,12 @@
                         <button class="nav-link @(_tab == "knockout" ? "active" : "")" @onclick='() => _tab = "knockout"'>Mata-Mata</button>
                     </li>
                 }
+                @if (_liga.Tipo == TipoCompetition.Liga)
+                {
+                    <li class="nav-item">
+                        <button class="nav-link @(_tab == "matriz" ? "active" : "")" @onclick='() => _tab = "matriz"'>Confrontos</button>
+                    </li>
+                }
                 <li class="nav-item">
                     <button class="nav-link @(_tab == "stats" ? "active" : "")" @onclick='() => _tab = "stats"'>Estatísticas</button>
                 </li>
@@ -227,7 +233,7 @@
                         <table class="table table-hover align-middle" style="font-size:0.875rem;">
                             <thead class="table-dark">
                                 <tr>
-                                    <th style="width:40px;">#</th>
+                                    <th style="width:64px;" title="Posição e quanto mudou desde a rodada passada">#</th>
                                     <th>Time</th>
                                     <th class="text-center" title="Pontos" style="width:40px;">Pts</th>
                                     <th class="text-center" title="Jogos" style="width:35px;">J</th>
@@ -244,8 +250,13 @@
                                 @foreach (var item in _classif)
                                 {
                                     <tr class="@GetRowClass(item)" style="height:44px;">
-                                        <td style="width:40px;">
+                                        <td class="text-nowrap" style="width:64px;">
                                             <span class="badge @GetBadgeClass(item)">@Posicao(item)</span>
+                                            @if (Variacao(item.TimeId) is int v && v != 0)
+                                            {
+                                                <span class="fw-bold ms-1 @(v > 0 ? "text-success" : "text-danger")" style="font-size:.7rem;"
+                                                      title="@(v > 0 ? "Subiu" : "Caiu") @Math.Abs(v) @(Math.Abs(v) == 1 ? "posição" : "posições") desde a rodada passada">@(v > 0 ? "▲" : "▼")@Math.Abs(v)</span>
+                                            }
                                         </td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <img src="@EscudoUrl(item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
@@ -280,7 +291,7 @@
                     </div>
                 </ShareableCard>
 
-                <PosicaoRodadaGrafico Rodadas="_rodadas" Tabela="_classif" PosicaoOficial="Posicao" Regra="_regra" />
+                <PosicaoRodadaGrafico Posicoes="_posicoesPorRodada" Tabela="_classif" Regra="_regra" />
             }
 
             <!-- Matches/Rounds -->
@@ -509,6 +520,12 @@
                 }
                 </ShareableCard>
             }
+        }
+
+        <!-- ── Confrontos (matriz de resultados da Liga) ── -->
+        @if (_tab == "matriz")
+        {
+            <MatrizResultados Rodadas="_rodadas" Tabela="_classif" OnAbrir="AbrirDetalhesPartida" />
         }
 
         <!-- ── Estatísticas ── -->
@@ -949,6 +966,13 @@
     private JogosDecisivos _decisivos = JogosDecisivos.Nenhum;
     private HashSet<Guid> _empatados = new();
     private Dictionary<Guid, int>? _posicoes;
+
+    // Posição de cada time ao fim de cada rodada (gráfico e setas da tabela da Liga).
+    private IReadOnlyDictionary<Guid, IReadOnlyList<PosicaoNaRodada>> _posicoesPorRodada = new Dictionary<Guid, IReadOnlyList<PosicaoNaRodada>>();
+
+    /// <summary>Posições ganhas (positivo) ou perdidas desde a rodada anterior; nulo sem duas rodadas.</summary>
+    private int? Variacao(Guid timeId) =>
+        _posicoesPorRodada.TryGetValue(timeId, out var serie) && serie.Count > 1 ? serie[^2].Posicao - serie[^1].Posicao : null;
     private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
@@ -1178,6 +1202,9 @@
             _posicoes = null;
             _empatados = LigaDesempate.EmpatadosNoTopo(_classif, false, c => c.TimeId, CopaStats, confrontos, _decisivos);
         }
+        _posicoesPorRodada = _liga?.Tipo == TipoCompetition.Liga
+            ? PosicaoPorRodada.Calcular(_rodadas, _classif, Posicao)
+            : new Dictionary<Guid, IReadOnlyList<PosicaoNaRodada>>();
         _knockoutJogos = await LigaService.GetKnockoutAsync(ligaId, CancellationToken.None);
         _tituloNoMataMata = _liga?.Tipo == TipoCompetition.Liga && _knockoutJogos.Count > 0;
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);

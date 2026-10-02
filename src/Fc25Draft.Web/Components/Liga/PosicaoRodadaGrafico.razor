@@ -135,10 +135,10 @@
 }
 
 @code {
-    [Parameter, EditorRequired] public IReadOnlyList<LigaRodadaComPartidasDto> Rodadas { get; set; } = [];
+    /// <summary>Saída de <see cref="PosicaoPorRodada.Calcular"/> (a página já calcula para as setas da tabela).</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<Guid, IReadOnlyList<PosicaoNaRodada>> Posicoes { get; set; } = new Dictionary<Guid, IReadOnlyList<PosicaoNaRodada>>();
     /// <summary>A classificação já na ordem da tabela.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<LigaClassificacaoItemDto> Tabela { get; set; } = [];
-    [Parameter, EditorRequired] public Func<LigaClassificacaoItemDto, int> PosicaoOficial { get; set; } = t => t.Posicao;
     [Parameter, EditorRequired] public LigaRegraZonas Regra { get; set; } = LigaRegraZonas.SoCampeao;
 
     private const double Esquerda = 34, Direita = 150, Topo = 8, Base = 30, Linha = 20;
@@ -148,15 +148,13 @@
     private List<int> _rodadas = [];
     // A cor fica com o time: tirar um destaque não repinta os outros.
     private readonly Guid?[] _destaques = new Guid?[3];
-    private object? _calculadoDe;
 
     protected override void OnParametersSet()
     {
-        if (ReferenceEquals(_calculadoDe, Rodadas) && _posicoes.Count == Tabela.Count) return;
+        if (ReferenceEquals(_posicoes, Posicoes)) return;
 
-        _posicoes = PosicaoPorRodada.Calcular(Rodadas, Tabela, PosicaoOficial);
+        _posicoes = Posicoes;
         _rodadas = _posicoes.Values.FirstOrDefault()?.Select(p => p.Rodada).ToList() ?? [];
-        _calculadoDe = Rodadas;
 
         // Começa com os três primeiros da tabela em destaque.
         Array.Clear(_destaques);
