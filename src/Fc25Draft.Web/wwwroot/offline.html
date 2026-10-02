@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D1B2A" />
+    <title>Sem conexão · CBFV</title>
+    <style>
+        html, body { height: 100%; margin: 0; }
+        body {
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            background: #0d1b2a; color: #f1f3f5; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            padding: 1.5rem; box-sizing: border-box;
+        }
+        img { width: 96px; height: 96px; border-radius: 20px; }
+        h1 { font-size: 1.4rem; margin: 1rem 0 .5rem; }
+        p { color: #adb5bd; margin: 0 0 1.25rem; }
+        button {
+            background: #f4d35e; color: #0d1b2a; border: 0; border-radius: .5rem;
+            padding: .6rem 1.4rem; font-weight: 600; font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <img src="/icons/icon-192.png" alt="CBFV" />
+        <h1>Sem conexão</h1>
+        <p>O site da CBFV precisa de internet. Confira a conexão e tente de novo.</p>
+        <button type="button" onclick="location.reload()">Tentar de novo</button>
+    </div>
+</body>
+</html>

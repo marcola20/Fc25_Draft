@@ -4,7 +4,7 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 1.5rem;
-    background: #fff;
+    background: var(--bs-body-bg);
     border-radius: 1rem;
     box-shadow: 0 8px 24px rgba(27, 38, 59, 0.08);
     margin-bottom: 1.5rem;
@@ -13,12 +13,12 @@
 .page-header-texts h2 {
     margin: 0;
     font-size: 1.75rem;
-    color: #1b263b;
+    color: var(--bs-emphasis-color);
 }
 
 .page-header-texts .lead {
     margin: 0.25rem 0 0;
-    color: #5c677d;
+    color: var(--bs-secondary-color);
 }
 
 .page-header-actions {

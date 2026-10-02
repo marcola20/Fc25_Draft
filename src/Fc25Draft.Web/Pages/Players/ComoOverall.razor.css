@@ -16,7 +16,7 @@
 }
 
 .peso-barra {
-    background: var(--bs-secondary-bg, #e9ecef);
+    background: var(--bs-secondary-bg);
     border-radius: 3px;
     height: 10px;
     overflow: hidden;

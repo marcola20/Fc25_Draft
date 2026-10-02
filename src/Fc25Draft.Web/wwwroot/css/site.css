@@ -173,13 +173,13 @@ a, .btn-link {
 /* Cartão capturado pelo html2canvas. Na tela é transparente/sem borda;
    quando renderizado para imagem ganha fundo branco + moldura. */
 .share-capture {
-    background: #ffffff;
+    background: var(--bs-body-bg);
 }
 
 .share-capture.share-rendering {
     padding: 16px 18px 12px;
     border-radius: 14px;
-    border: 1px solid #e6e6e6;
+    border: 1px solid var(--bs-border-color);
 }
 
     /* Tabelas largas não devem ser cortadas na imagem gerada. */
@@ -239,10 +239,10 @@ a, .btn-link {
 .share-footer {
     margin-top: 12px;
     padding-top: 8px;
-    border-top: 1px solid #e6e6e6;
+    border-top: 1px solid var(--bs-border-color);
     text-align: center;
     font-size: .72rem;
-    color: #64748b;
+    color: var(--bs-secondary-color);
     font-weight: 600;
     letter-spacing: .3px;
 }
@@ -297,7 +297,7 @@ a, .btn-link {
 }
 
 .escalacoes .seta-entra {
-    color: #198754;
+    color: var(--cbfv-verde);
     font-size: 0.75rem;
 }
 
@@ -305,4 +305,66 @@ a, .btn-link {
     padding-left: 0;
     font-size: 0.75rem;
     line-height: 1.2;
+}
+
+/* ── Modo escuro ───────────────────────────────────────────────────────────────
+   O Bootstrap 5.3 troca as cores sozinho com data-bs-theme="dark" (no <html>, pelo botão do topo).
+   Estas classes continuam claras no escuro e aqui viram as do tema. */
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--bs-tertiary-bg) !important;
+}
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--bs-body-bg) !important;
+}
+[data-bs-theme="dark"] .bg-light.text-dark,
+[data-bs-theme="dark"] .bg-light .text-dark {
+    color: var(--bs-body-color) !important;
+}
+[data-bs-theme="dark"] .table-light {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-bg: var(--bs-tertiary-bg);
+    --bs-table-border-color: var(--bs-border-color);
+    --bs-table-striped-bg: var(--bs-secondary-bg);
+    --bs-table-hover-bg: var(--bs-secondary-bg);
+    color: var(--bs-table-color);
+    border-color: var(--bs-table-border-color);
+}
+/* Linhas coloridas das tabelas (zonas da classificação etc.): no 5.3 elas ficam claras no escuro. */
+[data-bs-theme="dark"] .table-primary { --bs-table-bg: var(--bs-primary-bg-subtle); }
+[data-bs-theme="dark"] .table-secondary { --bs-table-bg: var(--bs-secondary-bg-subtle); }
+[data-bs-theme="dark"] .table-success { --bs-table-bg: var(--bs-success-bg-subtle); }
+[data-bs-theme="dark"] .table-danger { --bs-table-bg: var(--bs-danger-bg-subtle); }
+[data-bs-theme="dark"] .table-warning { --bs-table-bg: var(--bs-warning-bg-subtle); }
+[data-bs-theme="dark"] .table-info { --bs-table-bg: var(--bs-info-bg-subtle); }
+[data-bs-theme="dark"] :is(.table-primary, .table-secondary, .table-success, .table-danger, .table-warning, .table-info) {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-border-color: var(--bs-border-color);
+    --bs-table-striped-bg: var(--bs-secondary-bg);
+    --bs-table-striped-color: var(--bs-body-color);
+    --bs-table-hover-bg: var(--bs-secondary-bg);
+    --bs-table-hover-color: var(--bs-body-color);
+    color: var(--bs-table-color);
+    border-color: var(--bs-table-border-color);
+}
+
+/* Cores de destaque usadas como texto: iguais no claro, mais claras no escuro para ter contraste. */
+:root {
+    --cbfv-roxo: #7c3aed;
+    --cbfv-dourado: #8a6400;
+    --cbfv-ouro: #a07800;
+    --cbfv-laranja: #c06800;
+    --cbfv-azul: #0d6efd;
+    --cbfv-verde: #198754;
+    --cbfv-teal: #0d9488;
+    --cbfv-rosa: #d63384;
+}
+[data-bs-theme="dark"] {
+    --cbfv-roxo: #b197fc;
+    --cbfv-dourado: #e9c46a;
+    --cbfv-ouro: #f0c75e;
+    --cbfv-laranja: #ffa94d;
+    --cbfv-azul: #6ea8fe;
+    --cbfv-verde: #75b798;
+    --cbfv-teal: #5eead4;
+    --cbfv-rosa: #f783ac;
 }

@@ -484,19 +484,19 @@
         font-size: 1.3rem;
         font-weight: 700;
         margin: 0;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
         letter-spacing: -0.01em;
     }
 
     .fmt-divider {
-        border-color: var(--bs-border-color, #dee2e6);
+        border-color: var(--bs-border-color);
         margin: 2rem 0;
         opacity: 0.4;
     }
 
     .fmt-card {
-        background: var(--bs-body-bg, #fff);
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 0.5rem;
         padding: 1.1rem 1.25rem;
         margin-bottom: 1rem;
@@ -506,7 +506,7 @@
 
     .fmt-desc {
         font-size: 0.92rem;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         margin-bottom: 1rem;
         line-height: 1.6;
     }
@@ -521,8 +521,8 @@
     }
 
     .fmt-stat-card {
-        background: var(--bs-body-bg, #fff);
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 0.6rem;
         padding: 1.25rem 1rem;
         text-align: center;
@@ -539,7 +539,7 @@
     .fmt-stat-label {
         font-size: 0.78rem;
         font-weight: 600;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         margin-top: 0.3rem;
@@ -555,7 +555,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         margin-bottom: 0.75rem;
     }
 
@@ -570,9 +570,9 @@
         flex: 1;
         min-width: 220px;
         padding: 0.85rem 1rem;
-        background: var(--bs-secondary-bg, #f8f9fa);
+        background: var(--bs-secondary-bg);
         border-radius: 0.5rem;
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        border: 1px solid var(--bs-border-color);
     }
 
     .fmt-tiebreak-badge {
@@ -586,11 +586,11 @@
     }
 
     .fmt-badge-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
-    .fmt-badge-purple { background: rgba(124,58,237,0.12); color: #7c3aed; }
+    .fmt-badge-purple { background: rgba(124,58,237,0.12); color: var(--cbfv-roxo); }
 
     .fmt-tiebreak-content { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
-    .fmt-tiebreak-content strong { font-weight: 700; color: var(--bs-emphasis-color, #212529); }
-    .fmt-tiebreak-content span   { font-size: 0.8rem; color: var(--bs-secondary-color, #6c757d); line-height: 1.5; }
+    .fmt-tiebreak-content strong { font-weight: 700; color: var(--bs-emphasis-color); }
+    .fmt-tiebreak-content span   { font-size: 0.8rem; color: var(--bs-secondary-color); line-height: 1.5; }
 
     .fmt-copa-phase { margin-bottom: 1.25rem; }
 
@@ -602,7 +602,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         margin-bottom: 0.75rem;
     }
 
@@ -628,8 +628,8 @@
     }
 
     .fmt-group-card {
-        background: var(--bs-body-bg, #fff);
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 0.6rem;
         overflow: hidden;
         box-shadow: 0 1px 4px rgba(0,0,0,0.05);
@@ -656,18 +656,18 @@
         align-items: center;
         gap: 0.5rem;
         font-size: 0.83rem;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
     }
 
     .fmt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .fmt-dot-a    { background: #0d6efd; }
     .fmt-dot-b    { background: #7c3aed; }
 
-    .fmt-group-desc { font-size: 0.78rem; color: var(--bs-secondary-color, #6c757d); margin-bottom: 0.5rem; line-height: 1.5; }
+    .fmt-group-desc { font-size: 0.78rem; color: var(--bs-secondary-color); margin-bottom: 0.5rem; line-height: 1.5; }
     .fmt-group-advance { display: flex; }
 
     .fmt-advance-badge {
-        background: color-mix(in srgb, var(--bs-success, #198754) 10%, var(--bs-body-bg, #fff));
+        background: color-mix(in srgb, var(--bs-success, #198754) 10%, var(--bs-body-bg));
         border: 1px solid color-mix(in srgb, var(--bs-success, #198754) 30%, transparent);
         color: var(--bs-success, #198754);
         border-radius: 999px;
@@ -689,10 +689,10 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
     }
 
-    .fmt-groups-vs-arrow { font-size: 1.5rem; color: var(--bs-secondary-color, #6c757d); font-weight: 700; }
+    .fmt-groups-vs-arrow { font-size: 1.5rem; color: var(--bs-secondary-color); font-weight: 700; }
 
     .fmt-knockout-bracket {
         display: grid;
@@ -712,14 +712,14 @@
     .fmt-knockout-arrow {
         font-size: 1.3rem;
         font-weight: 700;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         flex-shrink: 0;
         text-align: center;
     }
 
     .fmt-ko-match {
-        background: var(--bs-body-bg, #fff);
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 0.6rem;
         padding: 0.9rem 1rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.05);
@@ -734,7 +734,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         margin-bottom: 0.65rem;
     }
 
@@ -746,15 +746,15 @@
         gap: 0.55rem;
         padding: 0.35rem 0.6rem;
         border-radius: 0.4rem;
-        background: var(--bs-secondary-bg, #f8f9fa);
+        background: var(--bs-secondary-bg);
     }
 
     .fmt-ko-seed { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
-    .fmt-seed-a  { color: #0d6efd; }
-    .fmt-seed-b  { color: #7c3aed; }
+    .fmt-seed-a  { color: var(--cbfv-azul); }
+    .fmt-seed-b  { color: var(--cbfv-roxo); }
 
-    .fmt-ko-name { font-size: 0.83rem; font-weight: 600; color: var(--bs-emphasis-color, #212529); }
-    .fmt-ko-vs   { text-align: center; font-size: 0.65rem; font-weight: 800; color: var(--bs-secondary-color, #6c757d); letter-spacing: 0.08em; }
+    .fmt-ko-name { font-size: 0.83rem; font-weight: 600; color: var(--bs-emphasis-color); }
+    .fmt-ko-vs   { text-align: center; font-size: 0.65rem; font-weight: 800; color: var(--bs-secondary-color); letter-spacing: 0.08em; }
 
     .fmt-ko-result {
         margin-top: 0.6rem;
@@ -762,11 +762,11 @@
         flex-direction: column;
         gap: 0.15rem;
         padding-top: 0.55rem;
-        border-top: 1px solid var(--bs-border-color, #dee2e6);
+        border-top: 1px solid var(--bs-border-color);
     }
 
     .fmt-result-win      { font-size: 0.76rem; color: var(--bs-success, #198754); font-weight: 600; }
-    .fmt-result-champion { color: #a07800; font-weight: 700; font-size: 0.82rem; }
+    .fmt-result-champion { color: var(--cbfv-ouro); font-weight: 700; font-size: 0.82rem; }
     .fmt-result-lose     { font-size: 0.76rem; color: var(--bs-danger, #dc3545); font-weight: 500; }
 
     .fmt-flow {
@@ -775,9 +775,9 @@
         gap: 0.5rem;
         flex-wrap: wrap;
         padding: 1.25rem 1rem;
-        background: var(--bs-secondary-bg, #f8f9fa);
+        background: var(--bs-secondary-bg);
         border-radius: 0.6rem;
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        border: 1px solid var(--bs-border-color);
         margin-top: 1rem;
     }
 
@@ -786,19 +786,19 @@
         align-items: center;
         gap: 0.6rem;
         padding: 0.5rem 0.8rem;
-        background: var(--bs-body-bg, #fff);
+        background: var(--bs-body-bg);
         border-radius: 0.5rem;
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        border: 1px solid var(--bs-border-color);
         flex: 1;
         min-width: 130px;
     }
 
     .fmt-flow-icon           { font-size: 1.4rem; flex-shrink: 0; }
     .fmt-flow-content        { display: flex; flex-direction: column; gap: 0.05rem; }
-    .fmt-flow-content strong { font-size: 0.88rem; font-weight: 700; color: var(--bs-emphasis-color, #212529); }
-    .fmt-flow-content span   { font-size: 0.73rem; color: var(--bs-secondary-color, #6c757d); }
+    .fmt-flow-content strong { font-size: 0.88rem; font-weight: 700; color: var(--bs-emphasis-color); }
+    .fmt-flow-content span   { font-size: 0.73rem; color: var(--bs-secondary-color); }
 
-    .fmt-flow-connector { font-size: 1.1rem; color: var(--bs-secondary-color, #6c757d); flex-shrink: 0; font-weight: 700; }
+    .fmt-flow-connector { font-size: 1.1rem; color: var(--bs-secondary-color); flex-shrink: 0; font-weight: 700; }
 
     @@media (max-width: 600px) {
         .fmt-flow           { flex-direction: column; }
@@ -820,7 +820,7 @@
         gap: 0.4rem;
         font-size: 0.78rem;
         font-weight: 600;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
     }
 
     .fmt-cal-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -842,9 +842,9 @@
         align-items: center;
         gap: 0.7rem;
         padding: 0.65rem 0.85rem;
-        background: var(--bs-body-bg, #fff);
-        border: 1px solid var(--bs-border-color, #dee2e6);
-        border-left: 4px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-left: 4px solid var(--bs-border-color);
         border-radius: 0.55rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
@@ -867,33 +867,33 @@
         gap: 0.05rem;
         font-size: 0.86rem;
         font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
         line-height: 1.25;
     }
 
     .fmt-cal-comp small {
         font-size: 0.7rem;
         font-weight: 500;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
     }
 
     .fmt-cal-liga    { border-left-color: #0d6efd; }
-    .fmt-cal-liga    .fmt-cal-num { background: rgba(13,110,253,0.12); color: #0d6efd; }
+    .fmt-cal-liga    .fmt-cal-num { background: rgba(13,110,253,0.12); color: var(--cbfv-azul); }
 
     .fmt-cal-copa    { border-left-color: #7c3aed; }
-    .fmt-cal-copa    .fmt-cal-num { background: rgba(124,58,237,0.12); color: #7c3aed; }
+    .fmt-cal-copa    .fmt-cal-num { background: rgba(124,58,237,0.12); color: var(--cbfv-roxo); }
 
     .fmt-cal-special { border-left-color: #0d9488; }
-    .fmt-cal-special .fmt-cal-num { background: rgba(13,148,136,0.14); color: #0d9488; }
+    .fmt-cal-special .fmt-cal-num { background: rgba(13,148,136,0.14); color: var(--cbfv-teal); }
 
     .fmt-cal-semi    { border-left-color: #d63384; }
-    .fmt-cal-semi    .fmt-cal-num { background: rgba(214,51,132,0.14); color: #d63384; }
+    .fmt-cal-semi    .fmt-cal-num { background: rgba(214,51,132,0.14); color: var(--cbfv-rosa); }
 
-    .fmt-cal-data { color: var(--bs-secondary-color, #6c757d); font-weight: 600; text-transform: capitalize; }
+    .fmt-cal-data { color: var(--bs-secondary-color); font-weight: 600; text-transform: capitalize; }
 
     .fmt-cal-mercado { border-left-color: #f97316; }
-    .fmt-cal-mercado .fmt-cal-num { background: rgba(249,115,22,0.14); color: #c2540a; }
+    .fmt-cal-mercado .fmt-cal-num { background: rgba(249,115,22,0.14); color: var(--cbfv-laranja); }
 
     .fmt-cal-final   { border-left-color: #a07800; box-shadow: 0 2px 10px rgba(160,120,0,0.16); }
-    .fmt-cal-final   .fmt-cal-num { background: rgba(160,120,0,0.15); color: #a07800; }
+    .fmt-cal-final   .fmt-cal-num { background: rgba(160,120,0,0.15); color: var(--cbfv-ouro); }
 </style>

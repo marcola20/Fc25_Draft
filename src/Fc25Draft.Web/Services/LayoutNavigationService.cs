@@ -568,6 +568,22 @@ public class LayoutNavigationService
         return null;
     }
 
+    /// <summary>
+    /// Título e descrição da prévia do link de uma rota (WhatsApp etc.): a definição da página ou, sem
+    /// ela, o item do menu com esse endereço. Nulo quando a rota não é conhecida.
+    /// </summary>
+    public (string Titulo, string? Descricao)? DescreverRota(string? route)
+    {
+        var definicao = GetPageDefinition(route);
+        if (definicao is not null && !string.IsNullOrWhiteSpace(definicao.Title))
+            return (definicao.Title, definicao.Subtitle);
+
+        var item = MenuDefinition
+            .SelectMany(g => g.Items)
+            .FirstOrDefault(i => i.RequiredRole is null && string.Equals(i.Href, route, StringComparison.OrdinalIgnoreCase));
+        return item is null ? null : (item.Title, null);
+    }
+
     public bool HasRoute(string route)
     {
         if (string.IsNullOrWhiteSpace(route))

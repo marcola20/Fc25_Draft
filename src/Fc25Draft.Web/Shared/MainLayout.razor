@@ -1,8 +1,32 @@
 @inherits LayoutComponentBase
 @using Fc25Draft.Web.Components.Layouts
+@inject NavigationManager Nav
+@inject PreviaDosLinks Previas
 
-<PageTitle>CBFV</PageTitle>
+@* O título da aba no HTML pré-renderizado; no navegador, o PageTitle de cada página manda. *@
+<PageTitle>@(_previa?.Titulo is string titulo ? $"{titulo} · CBFV" : "CBFV")</PageTitle>
+
+@* Prévia do link (WhatsApp etc.) da página atual, montada pela rota. Fica só aqui: no HTML
+   pré-renderizado uma prévia posta pela página não substituiria esta. *@
+<PreviaDoLink Titulo="@_previa?.Titulo" Descricao="@_previa?.Descricao" Imagem="@_previa?.Imagem" />
 
 <AppLayout Body="@Body" />
 
 <ToastContainer />
+
+@code {
+    private Previa? _previa;
+    private string? _previaDe;
+
+    // O layout recebe parâmetros de novo a cada navegação (o Body muda); só remonta se a URL mudou.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_previaDe == Nav.Uri) return;
+        _previaDe = Nav.Uri;
+
+        var relativo = Nav.ToBaseRelativePath(Nav.Uri).Split('#')[0];
+        var partes = relativo.Split('?', 2);
+        var caminho = "/" + partes[0].TrimEnd('/');
+        _previa = await Previas.MontarAsync(caminho, partes.Length > 1 ? partes[1] : null, CancellationToken.None);
+    }
+}

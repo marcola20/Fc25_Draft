@@ -9,11 +9,11 @@
 }
 
 .app-breadcrumbs .breadcrumb-item + .breadcrumb-item::before {
-    color: #6c757d;
+    color: var(--bs-secondary-color);
 }
 
 .app-breadcrumbs a {
-    color: #1b263b;
+    color: var(--bs-emphasis-color);
     text-decoration: none;
 }
 

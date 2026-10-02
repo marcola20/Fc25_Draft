@@ -189,6 +189,8 @@ window.fc25ShareImage = (function () {
                 onclone: function (clonedDoc) {
                     const clonedEl = clonedDoc.getElementById(elementId);
                     if (!clonedEl) return;
+                    // A imagem compartilhada sai sempre no tema claro, mesmo com o site no escuro.
+                    clonedDoc.documentElement.setAttribute('data-bs-theme', 'light');
                     clonedEl.style.width = RENDER_WIDTH + 'px';
                     clonedEl.style.maxWidth = RENDER_WIDTH + 'px';
                     clonedEl.style.margin = '0';

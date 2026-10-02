@@ -11,8 +11,8 @@
 }
 
 .dashboard-card-icon {
-    background-color: #e0e5ec;
-    color: #1b263b;
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-emphasis-color);
     width: 44px;
     height: 44px;
     display: inline-flex;

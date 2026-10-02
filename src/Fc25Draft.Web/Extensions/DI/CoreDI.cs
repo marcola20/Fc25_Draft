@@ -82,6 +82,7 @@ namespace Fc25Draft.Web.Extensions.DI
             // Web layer
             services.AddScoped<AdminAuthService>();
             services.AddScoped<OrigemDoCliente>();
+            services.AddScoped<PreviaDosLinks>();
             services.AddSingleton<Fc25Draft.Web.Security.LimiteDeTentativas>();
             services.AddScoped<ApiClientFactory>();
             services.AddScoped<PlayersApiClient>();

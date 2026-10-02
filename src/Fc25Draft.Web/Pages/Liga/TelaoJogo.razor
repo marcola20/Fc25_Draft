@@ -17,6 +17,15 @@
 
 <PageTitle>@Titulo</PageTitle>
 
+@if (_jogo is not null)
+{
+    <PreviaDoLink Titulo="@(_jogo.Status == PartidaStatus.Agendada
+                              ? $"{_jogo.TimeCasaNome} x {_jogo.TimeForaNome}"
+                              : $"{_jogo.TimeCasaNome} {_jogo.GolsCasa} x {_jogo.GolsFora} {_jogo.TimeForaNome}")"
+                  Descricao="@($"{_jogo.LigaNome} · {_jogo.Rotulo} · {(_jogo.Status switch { PartidaStatus.Encerrada => "encerrado", PartidaStatus.EmAndamento => "ao vivo", _ => "a jogar" })}.")"
+                  Imagem="@Escudos.GetEscudo(_jogo.TimeCasaNome)" />
+}
+
 <div class="telao-jogo">
     @if (_carregando)
     {

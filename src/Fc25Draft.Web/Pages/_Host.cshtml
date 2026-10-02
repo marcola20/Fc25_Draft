@@ -2,14 +2,6 @@
 @using Microsoft.AspNetCore.Components.Web
 @namespace Fc25Draft.Web.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
-@{
-    // URL canônica pública (WhatsApp/redes exigem URL absoluta e estável em https).
-    var baseUrl = "https://cbfv-app.onrender.com";
-    var ogImage = $"{baseUrl}/images/og-cover.png?v=1";
-    var siteTitle = "CBFV";
-    var siteDesc = "Acompanhe a CBFV: classificação, rodadas, mata-mata, estatísticas, draft e mercado de transferências.";
-}
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -17,35 +9,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="~/" />
 
-    <title>@siteTitle</title>
-    <meta name="description" content="@siteDesc" />
     <meta name="theme-color" content="#0D1B2A" />
+    <meta name="color-scheme" content="light dark" />
 
-    <!-- Open Graph (WhatsApp / Facebook / etc.) -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="CBFV" />
-    <meta property="og:title" content="@siteTitle" />
-    <meta property="og:description" content="@siteDesc" />
-    <meta property="og:url" content="@baseUrl/" />
-    <meta property="og:image" content="@ogImage" />
-    <meta property="og:image:secure_url" content="@ogImage" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="CBFV" />
-    <meta property="og:locale" content="pt_BR" />
+    @* Tema: escolhido no botão do topo (guardado no navegador) ou, sem escolha, o do sistema.
+       Roda antes do CSS para a página não piscar clara ao abrir no modo escuro. *@
+    <script>
+        (function () {
+            var chave = 'cbfv-tema';
+            var escuroNoSistema = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+            function salvo() { try { return localStorage.getItem(chave); } catch (e) { return null; } }
+            function aplicar() {
+                var t = salvo();
+                var escuro = t === 'escuro' || (t !== 'claro' && !!escuroNoSistema && escuroNoSistema.matches);
+                document.documentElement.setAttribute('data-bs-theme', escuro ? 'dark' : 'light');
+            }
+            aplicar();
+            if (escuroNoSistema && escuroNoSistema.addEventListener) escuroNoSistema.addEventListener('change', aplicar);
+            window.cbfvTema = {
+                escuro: function () { return document.documentElement.getAttribute('data-bs-theme') === 'dark'; },
+                alternar: function () {
+                    try { localStorage.setItem(chave, this.escuro() ? 'claro' : 'escuro'); } catch (e) { }
+                    aplicar();
+                    return this.escuro();
+                }
+            };
+        })();
+    </script>
 
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="@siteTitle" />
-    <meta name="twitter:description" content="@siteDesc" />
-    <meta name="twitter:image" content="@ogImage" />
+    @* App instalável no celular (PWA). A prévia dos links (Open Graph) vem de cada página, no HeadOutlet. *@
+    <link rel="manifest" href="manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="CBFV" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" asp-append-version="true" />
     <link href="css/site.css" rel="stylesheet" asp-append-version="true" />
     <link href="Fc25Draft.Web.styles.css" rel="stylesheet" asp-append-version="true" />
     <link rel="icon" type="image/png" href="favicon.png?v=2" />
-    <link rel="apple-touch-icon" href="favicon.png?v=2" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
 <body>
@@ -65,5 +68,11 @@
     <script src="js/html2canvas.min.js"></script>
     <script src="js/app.js" asp-append-version="true"></script>
     <script src="_framework/blazor.server.js"></script>
+    <script>
+        // Service worker do app instalado: só mostra uma página de "sem conexão" quando a rede cai.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js'); });
+        }
+    </script>
 </body>
 </html>

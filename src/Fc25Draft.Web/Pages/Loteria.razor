@@ -191,12 +191,12 @@
     .lottery-waiting h2 {
         font-size: 1.6rem;
         font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
         margin-bottom: 0.6rem;
     }
 
     .lottery-waiting p {
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         font-size: 1rem;
     }
 
@@ -215,7 +215,7 @@
     }
 
     .lottery-liga-badge {
-        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 12%, var(--bs-body-bg, #fff));
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 12%, var(--bs-body-bg));
         color: var(--bs-primary, #0d6efd);
         border: 1px solid color-mix(in srgb, var(--bs-primary, #0d6efd) 30%, transparent);
         border-radius: 999px;
@@ -226,8 +226,8 @@
     }
 
     .lottery-round-badge {
-        background: color-mix(in srgb, #198754 12%, var(--bs-body-bg, #fff));
-        color: #198754;
+        background: color-mix(in srgb, #198754 12%, var(--bs-body-bg));
+        color: var(--cbfv-verde);
         border: 1px solid color-mix(in srgb, #198754 30%, transparent);
         border-radius: 999px;
         font-size: 0.78rem;
@@ -236,28 +236,28 @@
     }
 
     .lottery-round-2 {
-        background: color-mix(in srgb, #a07800 12%, var(--bs-body-bg, #fff));
-        color: #8a6400;
+        background: color-mix(in srgb, #a07800 12%, var(--bs-body-bg));
+        color: var(--cbfv-dourado);
         border-color: color-mix(in srgb, #a07800 30%, transparent);
     }
 
     .lottery-title {
         font-size: 2rem;
         font-weight: 800;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
         letter-spacing: -0.02em;
         margin: 0 0 0.4rem;
     }
 
     .lottery-subtitle {
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         font-size: 0.92rem;
         margin: 0;
     }
 
     .lottery-finished-label {
         font-weight: 600;
-        color: #198754;
+        color: var(--cbfv-verde);
     }
 
     /* ─ Stage ─ */
@@ -280,12 +280,12 @@
         gap: 1rem;
         border-radius: 0.75rem;
         padding: 0.8rem 1.1rem;
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        border: 1px solid var(--bs-border-color);
         transition: all 0.3s ease;
     }
 
     .lottery-card-latest {
-        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 10%, var(--bs-body-bg, #fff));
+        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 10%, var(--bs-body-bg));
         border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 50%, transparent);
         border-left: 4px solid var(--bs-primary, #0d6efd);
         box-shadow: 0 0 0 0 color-mix(in srgb, var(--bs-primary, #0d6efd) 40%, transparent);
@@ -294,21 +294,21 @@
     }
 
     .lottery-card-done {
-        background: var(--bs-secondary-bg, #f8f9fa);
+        background: var(--bs-secondary-bg);
         opacity: 0.7;
         transition: opacity 0.3s;
     }
 
     /* ─ Lottery zone done (picks 2-4, already revealed, not latest) ─ */
     .lottery-card-done-zone {
-        background: color-mix(in srgb, #8b5cf6 6%, var(--bs-secondary-bg, #f8f9fa)) !important;
+        background: color-mix(in srgb, #8b5cf6 6%, var(--bs-secondary-bg)) !important;
         border-left: 2px solid color-mix(in srgb, #8b5cf6 35%, transparent) !important;
         opacity: 0.75;
     }
 
     /* ─ Pick #1 done ─ */
     .lottery-card-done-pick1 {
-        background: color-mix(in srgb, #e5a000 8%, var(--bs-secondary-bg, #f8f9fa)) !important;
+        background: color-mix(in srgb, #e5a000 8%, var(--bs-secondary-bg)) !important;
         border-left: 2px solid color-mix(in srgb, #e5a000 40%, transparent) !important;
         opacity: 0.85;
     }
@@ -407,17 +407,17 @@
     }
 
     .lottery-pick-gold {
-        color: #a07800 !important;
+        color: var(--cbfv-ouro) !important;
         font-size: 1.5rem !important;
     }
 
     .lottery-pick-purple {
-        color: #7c3aed !important;
+        color: var(--cbfv-roxo) !important;
         font-size: 1.45rem !important;
     }
 
     .lottery-card-done .lottery-card-pick {
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         font-size: 1rem;
     }
 
@@ -445,7 +445,7 @@
     .lottery-card-name {
         font-size: 1.15rem;
         font-weight: 700;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
     }
 
     .lottery-card-done .lottery-card-name {
@@ -456,14 +456,14 @@
     .lottery-card-zone-label {
         font-size: 0.69rem;
         font-weight: 700;
-        color: #7c3aed;
+        color: var(--cbfv-roxo);
         letter-spacing: 0.04em;
         text-transform: uppercase;
     }
 
     .lottery-card-pos {
         font-size: 0.78rem;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         font-weight: 600;
         white-space: nowrap;
     }
@@ -476,12 +476,12 @@
 
     .lottery-pending-badge {
         display: inline-block;
-        background: var(--bs-secondary-bg, #f8f9fa);
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        background: var(--bs-secondary-bg);
+        border: 1px solid var(--bs-border-color);
         border-radius: 999px;
         font-size: 0.78rem;
         font-weight: 600;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         padding: 0.25rem 0.85rem;
     }
 
@@ -494,23 +494,23 @@
 
     /* ─ Final board ─ */
     .lottery-final-board {
-        border: 1px solid var(--bs-border-color, #dee2e6);
+        border: 1px solid var(--bs-border-color);
         border-radius: 0.75rem;
         overflow: hidden;
     }
 
     .lottery-final-header {
-        background: var(--bs-secondary-bg, #f8f9fa);
+        background: var(--bs-secondary-bg);
         padding: 0.65rem 1rem;
         font-size: 0.8rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+        border-bottom: 1px solid var(--bs-border-color);
     }
 
     .lottery-final-row {
@@ -518,7 +518,7 @@
         align-items: center;
         gap: 0.85rem;
         padding: 0.6rem 1rem;
-        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+        border-bottom: 1px solid var(--bs-border-color);
     }
 
     .lottery-final-row:last-child { border-bottom: none; }
@@ -541,16 +541,16 @@
         flex: 1;
         font-size: 0.92rem;
         font-weight: 600;
-        color: var(--bs-emphasis-color, #212529);
+        color: var(--bs-emphasis-color);
     }
 
     .lottery-final-pos {
         font-size: 0.75rem;
-        color: var(--bs-secondary-color, #6c757d);
+        color: var(--bs-secondary-color);
     }
 
     .lottery-final-pick-gold {
-        color: #a07800 !important;
+        color: var(--cbfv-ouro) !important;
         font-weight: 900;
     }
 </style>

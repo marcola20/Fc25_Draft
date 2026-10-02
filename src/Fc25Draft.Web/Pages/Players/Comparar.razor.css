@@ -31,7 +31,7 @@
     align-items: center;
     gap: .75rem;
     padding: .55rem 0;
-    border-bottom: 1px solid #eef0f3;
+    border-bottom: 1px solid var(--bs-border-color);
 }
 
     .duelo:last-child {
@@ -47,12 +47,12 @@
     .duelo .rotulo {
         text-align: center;
         font-size: .85rem;
-        color: #6c757d;
+        color: var(--bs-secondary-color);
     }
 
     .duelo .barra {
         height: 10px;
-        background: #f1f3f5;
+        background: var(--bs-tertiary-bg);
         border-radius: 5px;
         overflow: hidden;
         display: flex;
@@ -77,7 +77,7 @@
 }
 
 .cor-neutra {
-    background: #ced4da;
+    background: var(--bs-secondary-bg);
 }
 
 .vence-a {

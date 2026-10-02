@@ -1,0 +1,30 @@
+@* Alterna entre claro e escuro. A escolha fica no navegador (cbfvTema, no _Host); sem escolha vale o
+   tema do sistema. Antes do primeiro render no navegador o ícone ainda não sabe o tema e fica oculto. *@
+@inject IJSRuntime JS
+
+<button type="button" class="btn btn-sm btn-outline-light me-2 @(_escuro is null ? "invisible" : "")"
+        @onclick="AlternarAsync"
+        title="@(_escuro == true ? "Usar tema claro" : "Usar tema escuro")"
+        aria-label="@(_escuro == true ? "Usar tema claro" : "Usar tema escuro")">
+    @(_escuro == true ? "☀️" : "🌙")
+</button>
+
+@code {
+    private bool? _escuro;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _escuro = await JS.InvokeAsync<bool>("cbfvTema.escuro");
+            StateHasChanged();
+        }
+        catch (JSException)
+        {
+            // Sem o script do tema (ex.: página fora do _Host) o botão some.
+        }
+    }
+
+    private async Task AlternarAsync() => _escuro = await JS.InvokeAsync<bool>("cbfvTema.alternar");
+}

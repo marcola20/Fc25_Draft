@@ -1,0 +1,54 @@
+@* Prévia do link no WhatsApp e redes (Open Graph). O conteúdo vai para o <head> já na página
+   pré-renderizada, que é o que o robô do WhatsApp lê (ele não roda o Blazor). Uma por layout: no HTML
+   pré-renderizado uma segunda (na página) não substitui a primeira. O MainLayout monta a dele pela
+   rota (PreviaDosLinks); o telão, que tem layout próprio, põe a sua. *@
+@inject NavigationManager Nav
+
+<HeadContent>
+    <meta name="description" content="@DescricaoFinal" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CBFV" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="@TituloFinal" />
+    <meta property="og:description" content="@DescricaoFinal" />
+    <meta property="og:url" content="@Absoluta(Nav.Uri)" />
+    <meta property="og:image" content="@Absoluta(Imagem ?? CapaPadrao)" />
+    @if (Imagem is null)
+    {
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+    }
+    <meta property="og:image:alt" content="@TituloFinal" />
+    <meta name="twitter:card" content="@(Imagem is null ? "summary_large_image" : "summary")" />
+    <meta name="twitter:title" content="@TituloFinal" />
+    <meta name="twitter:description" content="@DescricaoFinal" />
+    <meta name="twitter:image" content="@Absoluta(Imagem ?? CapaPadrao)" />
+</HeadContent>
+
+@code {
+    private const string CapaPadrao = "/images/og-cover.png?v=1";
+    private const string DescricaoPadrao =
+        "Acompanhe a CBFV: classificação, rodadas, mata-mata, estatísticas, draft e mercado de transferências.";
+
+    /// <summary>Título da prévia; vira "Título · CBFV". Sem título fica só "CBFV".</summary>
+    [Parameter] public string? Titulo { get; set; }
+
+    [Parameter] public string? Descricao { get; set; }
+
+    /// <summary>Imagem própria (ex.: escudo do time), relativa ao site. Sem ela vai a capa da CBFV.</summary>
+    [Parameter] public string? Imagem { get; set; }
+
+    private string TituloFinal => string.IsNullOrWhiteSpace(Titulo) ? "CBFV" : $"{Titulo} · CBFV";
+
+    private string DescricaoFinal => string.IsNullOrWhiteSpace(Descricao) ? DescricaoPadrao : Descricao;
+
+    // O WhatsApp exige endereço absoluto; fora do PC local, sempre em https.
+    private string Absoluta(string caminho)
+    {
+        var url = new Uri(new Uri(Nav.BaseUri), caminho);
+        if (url.Scheme == Uri.UriSchemeHttp && !url.IsLoopback)
+            url = new UriBuilder(url) { Scheme = Uri.UriSchemeHttps, Port = -1 }.Uri;
+        return url.AbsoluteUri;
+    }
+}

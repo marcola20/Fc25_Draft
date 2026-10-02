@@ -9,8 +9,8 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .05em;
-    color: #6c757d;
-    border-bottom: 1px solid #eef0f3;
+    color: var(--bs-secondary-color);
+    border-bottom: 1px solid var(--bs-border-color);
     padding-bottom: .25rem;
     margin-bottom: .25rem;
 }
@@ -48,10 +48,10 @@
 
 .atr-70 {
     background: #ffc107;
-    color: #212529;
+    color: var(--bs-body-color);
 }
 
 .atr-baixo {
-    background: #e9ecef;
-    color: #495057;
+    background: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
 }
