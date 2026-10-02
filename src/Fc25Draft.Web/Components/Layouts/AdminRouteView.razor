@@ -1,0 +1,54 @@
+@using System.Collections.Concurrent
+@using System.Reflection
+@implements IDisposable
+@inject AdminAuthService AdminAuth
+
+@* Página com [Authorize(Roles = "Admin")] só é montada para quem o servidor confirmou como admin.
+   Antes disso (pré-render, token ainda não lido ou visitante comum) entra AcessoRestrito no lugar,
+   dentro do mesmo layout — a página nem chega a carregar os dados. *@
+<RouteView RouteData="@_rotaEfetiva" DefaultLayout="@DefaultLayout" />
+
+@code {
+    private static readonly ConcurrentDictionary<Type, bool> ExigeAdminCache = new();
+    private static readonly IReadOnlyDictionary<string, object?> SemParametros = new Dictionary<string, object?>();
+
+    [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
+    [Parameter] public Type? DefaultLayout { get; set; }
+
+    private RouteData _rotaEfetiva = default!;
+
+    protected override void OnInitialized()
+    {
+        AdminAuth.AuthenticationChanged += AoMudarLogin;
+    }
+
+    protected override void OnParametersSet() => AtualizarRota();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // O AppLayout já inicializa o login; aqui é só garantia para layouts que não fazem isso.
+        if (firstRender && !AdminAuth.IsInitialized)
+            await AdminAuth.EnsureInitializedAsync();
+    }
+
+    private void AoMudarLogin() => _ = InvokeAsync(() =>
+    {
+        AtualizarRota();
+        StateHasChanged();
+    });
+
+    private void AtualizarRota()
+    {
+        _rotaEfetiva = !ExigeAdmin(RouteData.PageType) || AdminAuth.IsAdmin
+            ? RouteData
+            : new RouteData(typeof(AcessoRestrito), SemParametros);
+    }
+
+    private static bool ExigeAdmin(Type pagina) => ExigeAdminCache.GetOrAdd(pagina, tipo =>
+        tipo.GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .Any(a => (a.Roles ?? "")
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Contains("Admin", StringComparer.OrdinalIgnoreCase)));
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoMudarLogin;
+}

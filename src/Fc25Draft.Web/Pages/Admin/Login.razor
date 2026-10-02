@@ -52,6 +52,14 @@
 </div>
 
 @code {
+    /// <summary>Página de admin que mandou para cá; só caminhos do próprio site.</summary>
+    [SupplyParameterFromQuery(Name = "voltar")] public string? Voltar { get; set; }
+
+    private string Destino =>
+        !string.IsNullOrEmpty(Voltar) && Voltar.StartsWith('/') && !Voltar.StartsWith("//") && !Voltar.StartsWith("/\\")
+            ? Voltar
+            : "/admin/liga";
+
     private string _token = string.Empty;
     private string? _erro;
     private bool _carregando;
@@ -69,7 +77,7 @@
             var sucesso = await AdminAuth.SignInAsync(_token);
             if (sucesso)
             {
-                Navigation.NavigateTo("/admin/liga", forceLoad: false);
+                Navigation.NavigateTo(Destino, forceLoad: false);
             }
             else
             {

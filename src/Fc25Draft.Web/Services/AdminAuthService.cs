@@ -32,6 +32,9 @@ public class AdminAuthService
 
     public bool IsAuthenticated => !string.IsNullOrWhiteSpace(_token);
 
+    /// <summary>Já leu e validou o token guardado no navegador (no pré-render ainda é false).</summary>
+    public bool IsInitialized => _initialized;
+
     public bool IsAdmin { get; private set; }
 
     /// <summary>O dono da liga: só ele gerencia os outros administradores.</summary>

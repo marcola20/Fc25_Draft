@@ -1,0 +1,27 @@
+@inject AdminAuthService AdminAuth
+@inject NavigationManager Navigation
+
+<PageTitle>Área restrita</PageTitle>
+
+<div class="container py-5">
+    @if (!AdminAuth.IsInitialized)
+    {
+        <div class="text-center text-muted">
+            <div class="spinner-border mb-2" role="status"></div>
+            <div class="small">Verificando acesso…</div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning mx-auto" role="alert" style="max-width: 32rem;">
+            <h2 class="h5 mb-2">Área restrita</h2>
+            <p class="mb-3">Esta página é só para administradores.</p>
+            <a class="btn btn-sm btn-primary" href="@LinkLogin">Entrar como administrador</a>
+        </div>
+    }
+</div>
+
+@code {
+    private string LinkLogin =>
+        "/admin/login?voltar=" + Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri));
+}
