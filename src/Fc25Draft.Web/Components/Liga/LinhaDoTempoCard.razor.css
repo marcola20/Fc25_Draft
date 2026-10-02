@@ -1,0 +1,49 @@
+/* Linha vertical à esquerda com um marco por rodada. */
+.rodadas {
+    list-style: none;
+    margin: 0 0 .75rem;
+    padding: 0 0 0 1.1rem;
+    border-left: 2px solid var(--bs-border-color);
+}
+
+.rodada { position: relative; padding-bottom: .9rem; }
+.rodada:last-child { padding-bottom: 0; }
+
+.rodada::before {
+    content: "";
+    position: absolute;
+    left: calc(-1.1rem - 6px);
+    top: .3rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bs-primary);
+    box-shadow: 0 0 0 3px var(--bs-card-bg, var(--bs-body-bg));
+}
+
+.marco {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--bs-secondary-color);
+    margin-bottom: .3rem;
+}
+
+.fatos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+
+.fato {
+    display: flex;
+    align-items: flex-start;
+    gap: .45rem;
+    font-size: .9rem;
+    padding: .2rem .4rem;
+    border-radius: .4rem;
+}
+
+.fato.com-jogo { cursor: pointer; }
+.fato.com-jogo:hover { background: var(--bs-tertiary-bg); }
+
+.icone { width: 1.3rem; text-align: center; flex-shrink: 0; }
+.fato img { object-fit: contain; flex-shrink: 0; margin-top: 1px; }
+.texto { min-width: 0; }
