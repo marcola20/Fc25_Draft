@@ -32,6 +32,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddHostedService<NotificacoesService>();
             services.AddScoped<DraftAdminService>();
             services.AddComConexaoPropria<ITeamService, TeamService>();
+            services.AddComConexaoPropria<IBuscaService, BuscaService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IBasePesService, BasePesService>();
             services.AddComConexaoPropria<ISincronizacaoPesService, SincronizacaoPesService>();

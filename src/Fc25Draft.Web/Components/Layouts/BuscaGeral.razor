@@ -1,0 +1,180 @@
+@using Fc25Draft.Core.Interfaces
+@implements IDisposable
+@inject IBuscaService Busca
+@inject EscudoService Escudos
+@inject NavigationManager Nav
+
+@* Busca do topo: jogador pelo nome, time pelo nome ou pelo técnico. Setas escolhem, Enter abre, Esc fecha. *@
+<button type="button" class="busca-botao" @onclick="Abrir" aria-label="Buscar jogador ou time">
+    <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
+    <span class="busca-botao-texto">Buscar jogador ou time</span>
+</button>
+
+@if (_aberta)
+{
+    <div class="busca-fundo" @onclick="Fechar"></div>
+    <div class="busca-painel" role="dialog" aria-label="Buscar">
+        <div class="busca-campo">
+            <span class="oi oi-magnifying-glass text-muted" aria-hidden="true"></span>
+            <input @ref="_campo" type="search" class="form-control border-0 shadow-none" placeholder="Nome do jogador, do time ou do técnico"
+                   value="@_termo" @oninput="DigitouAsync" @onkeydown="Tecla" autocomplete="off" />
+            <button type="button" class="btn-close" @onclick="Fechar" aria-label="Fechar"></button>
+        </div>
+
+        <div class="busca-resultados">
+            @if (_termo.Trim().Length < 2)
+            {
+                <div class="busca-dica">Digite pelo menos 2 letras.</div>
+            }
+            else if (_buscando && _resultado.Nada)
+            {
+                <div class="busca-dica"><span class="spinner-border spinner-border-sm me-2"></span>Buscando…</div>
+            }
+            else if (_resultado.Nada)
+            {
+                <div class="busca-dica">Nada encontrado para “@_termo.Trim()”.</div>
+            }
+            else
+            {
+                var indice = 0;
+                @if (_resultado.Jogadores.Count > 0)
+                {
+                    <div class="busca-grupo">Jogadores</div>
+                    @foreach (var j in _resultado.Jogadores)
+                    {
+                        var i = indice++;
+                        <a href="/players/details/@j.PlayerId" class="busca-item @(i == _selecionado ? "ativo" : "")" @onclick="Fechar" @onmouseover="() => _selecionado = i">
+                            <FotoJogador PlayerId="@j.PlayerId" Tamanho="36" />
+                            <div class="busca-item-texto">
+                                <div class="fw-semibold text-truncate">@j.Nome</div>
+                                <div class="small text-muted text-truncate">@j.Posicao · @j.Overall@(j.TimeNome is null ? "" : $" · {j.TimeNome}")</div>
+                            </div>
+                        </a>
+                    }
+                }
+                @if (_resultado.Times.Count > 0)
+                {
+                    <div class="busca-grupo">Times</div>
+                    @foreach (var t in _resultado.Times)
+                    {
+                        var i = indice++;
+                        <a href="/teams/details/@t.TimeId" class="busca-item @(i == _selecionado ? "ativo" : "")" @onclick="Fechar" @onmouseover="() => _selecionado = i">
+                            <img src="@Escudos.GetEscudo(t.Nome)" alt="" width="36" height="36" style="object-fit: contain;" />
+                            <div class="busca-item-texto">
+                                <div class="fw-semibold text-truncate">@t.Nome</div>
+                                @if (!string.IsNullOrWhiteSpace(t.Tecnico))
+                                {
+                                    <div class="small text-muted text-truncate">Técnico: @t.Tecnico</div>
+                                }
+                            </div>
+                        </a>
+                    }
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _aberta;
+    private string _termo = "";
+    private bool _buscando;
+    private int _selecionado;
+    private BuscaResultadoDto _resultado = BuscaResultadoDto.Vazio;
+    private ElementReference _campo;
+    private bool _focar;
+    private CancellationTokenSource? _digitando;
+
+    protected override void OnInitialized() => Nav.LocationChanged += AoNavegar;
+
+    private void Abrir()
+    {
+        _aberta = true;
+        _focar = true;
+    }
+
+    private void Fechar()
+    {
+        _aberta = false;
+        _digitando?.Cancel();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focar || !_aberta) return;
+        _focar = false;
+        try { await _campo.FocusAsync(); } catch (Exception ex) when (ex is JSException or InvalidOperationException) { }
+    }
+
+    private async Task DigitouAsync(ChangeEventArgs e)
+    {
+        _termo = e.Value?.ToString() ?? "";
+        _digitando?.Cancel();
+        _digitando?.Dispose();
+        var ct = (_digitando = new CancellationTokenSource()).Token;
+
+        if (_termo.Trim().Length < 2)
+        {
+            _resultado = BuscaResultadoDto.Vazio;
+            return;
+        }
+
+        // Espera a pessoa parar de digitar antes de ir ao banco.
+        _buscando = true;
+        try
+        {
+            await Task.Delay(200, ct);
+            var resultado = await Busca.BuscarAsync(_termo, ct);
+            if (ct.IsCancellationRequested) return;
+            _resultado = resultado;
+            _selecionado = 0;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested) _buscando = false;
+        }
+    }
+
+    private void Tecla(KeyboardEventArgs e)
+    {
+        var total = _resultado.Jogadores.Count + _resultado.Times.Count;
+        switch (e.Key)
+        {
+            case "Escape":
+                Fechar();
+                break;
+            case "ArrowDown" when total > 0:
+                _selecionado = (_selecionado + 1) % total;
+                break;
+            case "ArrowUp" when total > 0:
+                _selecionado = (_selecionado - 1 + total) % total;
+                break;
+            case "Enter" when total > 0:
+                var i = Math.Clamp(_selecionado, 0, total - 1);
+                var destino = i < _resultado.Jogadores.Count
+                    ? $"/players/details/{_resultado.Jogadores[i].PlayerId}"
+                    : $"/teams/details/{_resultado.Times[i - _resultado.Jogadores.Count].TimeId}";
+                Fechar();
+                Nav.NavigateTo(destino);
+                break;
+        }
+    }
+
+    private void AoNavegar(object? sender, LocationChangedEventArgs e)
+    {
+        if (!_aberta) return;
+        _aberta = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= AoNavegar;
+        _digitando?.Cancel();
+        _digitando?.Dispose();
+    }
+}

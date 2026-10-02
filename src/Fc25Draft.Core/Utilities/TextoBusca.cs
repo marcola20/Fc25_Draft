@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Fc25Draft.Web.Utilities;
+namespace Fc25Draft.Core.Utilities;
 
 /// <summary>
 /// Normalização usada nas buscas "LIKE" das telas: comparação sem diferenciar
