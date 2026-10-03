@@ -129,4 +129,97 @@ public static class AlbumFigurinhas
 
     /// <summary>"#007": o número como vem impresso.</summary>
     public static string NumeroImpresso(int numero) => $"#{numero:000}";
+
+    // ---- Pacotes ganhos ----
+
+    /// <summary>X inicial do bolão: 1 pacote a cada X pontos (≈ 3 placares cravados ou 6 resultados certos).</summary>
+    public const int PontosBolaoPorPacotePadrao = 30;
+
+    /// <summary>Pacote do dia: um por pessoa por data de Brasília.</summary>
+    public static string ChaveDiario(DateTime diaEmBrasilia) => $"diario:{diaEmBrasilia:yyyy-MM-dd}";
+
+    public static string ChaveVitoria(Guid partidaId) => $"vitoria:{partidaId:N}";
+
+    /// <summary>O n-ésimo pacote do bolão da temporada (1, 2, 3…).</summary>
+    public static string ChaveBolao(int temporada, int n) => $"bolao:{temporada}:{n}";
+
+    /// <summary>Quantos pacotes do bolão os pontos já valem.</summary>
+    public static int PacotesDoBolao(int pontos, int pontosPorPacote) =>
+        pontosPorPacote <= 0 || pontos <= 0 ? 0 : pontos / pontosPorPacote;
+
+    public static string MotivoVitoria(string adversario) => $"Vitória sobre o {adversario}";
+
+    public static string MotivoBolao(int pontos, int temporada) => $"{pontos} pontos no bolão de {temporada}";
+
+    /// <summary>De onde veio o pacote, em poucas palavras, para a lista dos fechados.</summary>
+    public static string DeOndeVeio(string origem, string? motivo) => origem switch
+    {
+        PacoteGanho.OrigemDiario => "Pacote do dia",
+        PacoteGanho.OrigemVitoria => motivo ?? "Vitória",
+        PacoteGanho.OrigemBolao => motivo is null ? "Bolão" : $"Bolão · {motivo}",
+        PacoteGanho.OrigemAdmin => motivo is null ? "Da organização" : $"Da organização · {motivo}",
+        _ => motivo ?? origem
+    };
+
+    /// <summary>
+    /// Texto do aviso no celular. Um pacote diz de onde veio ("Você ganhou 1 pacote pela vitória sobre o
+    /// Grêmio"); vários viram um aviso só ("Você ganhou 3 pacotes: 2 por vitórias e 1 do bolão").
+    /// </summary>
+    public static string AvisoDePacotes(IReadOnlyList<(string Origem, string? Motivo)> pacotes)
+    {
+        if (pacotes.Count == 0) return string.Empty;
+
+        if (pacotes.Count == 1)
+        {
+            var (origem, motivo) = pacotes[0];
+            return origem switch
+            {
+                PacoteGanho.OrigemVitoria when motivo is not null => $"Você ganhou 1 pacote pela {Minuscula(motivo)}.",
+                PacoteGanho.OrigemBolao when motivo is not null => $"Você ganhou 1 pacote pelos {motivo}.",
+                PacoteGanho.OrigemAdmin when motivo is not null => $"Você ganhou 1 pacote da organização: {motivo}.",
+                PacoteGanho.OrigemAdmin => "Você ganhou 1 pacote da organização.",
+                _ => "Você ganhou 1 pacote."
+            };
+        }
+
+        var origens = pacotes.Select(p => p.Origem).Distinct().ToList();
+        if (origens.Count == 1)
+        {
+            var de = origens[0] switch
+            {
+                PacoteGanho.OrigemVitoria => " por vitórias",
+                PacoteGanho.OrigemBolao => " do bolão",
+                PacoteGanho.OrigemAdmin => " da organização",
+                _ => ""
+            };
+            return $"Você ganhou {pacotes.Count} pacotes{de}.";
+        }
+
+        var partes = pacotes
+            .GroupBy(p => p.Origem)
+            .OrderBy(g => g.Key switch
+            {
+                PacoteGanho.OrigemVitoria => 0,
+                PacoteGanho.OrigemBolao => 1,
+                PacoteGanho.OrigemAdmin => 2,
+                _ => 3
+            })
+            .Select(g => (g.Key, g.Count()) switch
+            {
+                (PacoteGanho.OrigemVitoria, 1) => "1 por vitória",
+                (PacoteGanho.OrigemVitoria, var n) => $"{n} por vitórias",
+                (PacoteGanho.OrigemBolao, var n) => $"{n} do bolão",
+                (PacoteGanho.OrigemAdmin, var n) => $"{n} da organização",
+                (_, var n) => $"{n} {(n == 1 ? "outro" : "outros")}"
+            })
+            .ToList();
+
+        var detalhe = partes.Count == 1
+            ? partes[0]
+            : string.Join(", ", partes.Take(partes.Count - 1)) + " e " + partes[^1];
+        return $"Você ganhou {pacotes.Count} pacotes: {detalhe}.";
+    }
+
+    private static string Minuscula(string texto) =>
+        texto.Length == 0 ? texto : char.ToLowerInvariant(texto[0]) + texto[1..];
 }

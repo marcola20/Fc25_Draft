@@ -7,6 +7,7 @@ using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -147,6 +148,12 @@ public class AlbumService : IAlbumService
             .Select(f => f.TreinadorId)
             .Distinct()
             .CountAsync(ct);
+        var porOrigem = await _db.PacotesGanhos.AsNoTracking()
+            .Where(p => p.AlbumId == albumId)
+            .GroupBy(p => p.Origem)
+            .Select(g => new { g.Key, Quantos = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Quantos, ct);
+        var pontosPorPacote = await _db.Albuns.Where(a => a.AlbumId == albumId).Select(a => a.PontosBolaoPorPacote).FirstAsync(ct);
 
         var notas = await NotasDaTemporadaAsync(album.Temporada - 1, jogadores.Select(f => f.PlayerId!.Value).ToList(), ct);
         var brilhantes = BrilhantesPorClube(jogadores.Select(f => (f.TeamId, f.PlayerId!.Value, f.Overall ?? 0, f.NomeImpresso)));
@@ -164,7 +171,9 @@ public class AlbumService : IAlbumService
             pacotes?.Abertos ?? 0,
             colecionadores,
             figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria).ToList(),
-            candidatos);
+            candidatos,
+            pontosPorPacote,
+            porOrigem);
     }
 
     public async Task SalvarLendariasAsync(Guid albumId, IReadOnlyList<LendariaEscolhaDto> lendarias, string? adminToken, CancellationToken ct)
@@ -298,18 +307,253 @@ public class AlbumService : IAlbumService
                 .ToList()))
             .ToList();
 
-        var paraAbrir = await _db.PacotesGanhos.AsNoTracking()
-            .CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null
-                             && (p.AlbumId == album.AlbumId || (p.AlbumId == null && album.Ativo)), ct);
+        var fechados = (await _db.PacotesGanhos.AsNoTracking()
+                .Where(p => p.TreinadorId == treinadorId && p.AbertoEm == null
+                            && (p.AlbumId == album.AlbumId || (p.AlbumId == null && album.Ativo)))
+                .OrderBy(p => p.CriadoEm).ThenBy(p => p.PacoteId)
+                .Select(p => new { p.PacoteId, p.Origem, p.Motivo, p.CriadoEm })
+                .ToListAsync(ct))
+            .Select(p => new PacoteFechadoDto(p.PacoteId, p.Origem, AlbumFigurinhas.DeOndeVeio(p.Origem, p.Motivo), p.CriadoEm))
+            .ToList();
 
         return new MeuAlbumDto(
             album,
             paginas,
             Contar(figurinhas.Select(f => f.Raridade)),
             Contar(figurinhas.Where(f => minhas.ContainsKey(f.FigurinhaId)).Select(f => f.Raridade)),
-            paraAbrir,
-            minhas.Values.Sum(m => m.Quantidade - 1));
+            fechados,
+            minhas.Values.Sum(m => m.Quantidade - 1),
+            album.Ativo && !await JaPegouOPacoteDoDiaAsync(treinadorId, ct));
     }
+
+    public async Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct)
+    {
+        var album = await AtivoAsync(ct);
+        if (album is null) return null;
+
+        var minhas = await _db.FigurinhasDosTreinadores.AsNoTracking()
+            .Where(f => f.TreinadorId == treinadorId && f.Figurinha.AlbumId == album.AlbumId)
+            .GroupBy(_ => 1)
+            .Select(g => new { Coladas = g.Count(), Repetidas = g.Sum(f => f.Quantidade - 1) })
+            .FirstOrDefaultAsync(ct);
+        var paraAbrir = await _db.PacotesGanhos.AsNoTracking()
+            .CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null
+                             && (p.AlbumId == album.AlbumId || p.AlbumId == null), ct);
+
+        return new AlbumResumoDoTreinadorDto(album, minhas?.Coladas ?? 0, minhas?.Repetidas ?? 0, paraAbrir,
+            !await JaPegouOPacoteDoDiaAsync(treinadorId, ct));
+    }
+
+    public async Task<bool> PegarPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct)
+    {
+        var albumId = await _db.Albuns.Where(a => a.Ativo).Select(a => (Guid?)a.AlbumId).FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("O álbum ainda não foi lançado.");
+        if (!await _db.Treinadores.AnyAsync(t => t.TreinadorId == treinadorId, ct))
+            throw new InvalidOperationException("Pessoa não encontrada.");
+
+        var chave = AlbumFigurinhas.ChaveDiario(Hoje);
+        if (await _db.PacotesGanhos.AnyAsync(p => p.TreinadorId == treinadorId && p.Chave == chave, ct))
+            return false;
+
+        _db.PacotesGanhos.Add(NovoPacote(treinadorId, albumId, PacoteGanho.OrigemDiario, chave, null));
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException ex) when (ChaveRepetida(ex))
+        {
+            // Dois cliques ao mesmo tempo: o outro já pegou.
+            _db.ChangeTracker.Clear();
+            return false;
+        }
+    }
+
+    /// <summary>Data de hoje em Brasília: o pacote do dia vira à meia-noite de lá.</summary>
+    private DateTime Hoje => HorarioDeBrasilia.Agora(_time).Date;
+
+    private async Task<bool> JaPegouOPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct)
+    {
+        var chave = AlbumFigurinhas.ChaveDiario(Hoje);
+        return await _db.PacotesGanhos.AsNoTracking().AnyAsync(p => p.TreinadorId == treinadorId && p.Chave == chave, ct);
+    }
+
+    // ---------------------------------------------------------------- Reconciliação
+
+    public async Task SalvarPontosBolaoAsync(Guid albumId, int pontosPorPacote, string? adminToken, CancellationToken ct)
+    {
+        if (pontosPorPacote < 1 || pontosPorPacote > 1000)
+            throw new InvalidOperationException("Use de 1 a 1000 pontos por pacote.");
+        var album = await _db.Albuns.FirstOrDefaultAsync(a => a.AlbumId == albumId, ct)
+            ?? throw new InvalidOperationException("Álbum não encontrado.");
+        if (album.PontosBolaoPorPacote == pontosPorPacote) return;
+
+        var antes = album.PontosBolaoPorPacote;
+        album.PontosBolaoPorPacote = pontosPorPacote;
+        await RegistrarAsync(AdminActionType.AjustarPontosBolao, adminToken, new { album = album.Nome, antes, depois = pontosPorPacote }, ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<ReconciliacaoPacotesDto> ReconciliarAsync(CancellationToken ct)
+    {
+        var album = await _db.Albuns.AsNoTracking()
+            .Where(a => a.Ativo)
+            .Select(a => new { a.AlbumId, a.Temporada, a.LancadoEm, a.PontosBolaoPorPacote })
+            .FirstOrDefaultAsync(ct);
+        if (album is null) return new ReconciliacaoPacotesDto(0, 0);
+
+        // Só jogos encerrados depois do lançamento: o que veio antes não dá pacote.
+        var jogos = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null && p.EncerradaEm >= album.LancadoEm)
+            .Select(p => new JogoEncerrado(
+                p.PartidaId, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
+                p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId,
+                p.Rodada.DataHora, p.EncerradaEm!.Value, p.Rodada.Liga.Temporada))
+            .ToListAsync(ct);
+
+        var vitorias = await PacotesDeVitoriaAsync(album.AlbumId, jogos, ct);
+        var bolao = await PacotesDoBolaoAsync(album.AlbumId, album.Temporada, album.PontosBolaoPorPacote,
+            jogos.Where(j => j.Temporada == album.Temporada).ToList(), ct);
+        return new ReconciliacaoPacotesDto(vitorias, bolao);
+    }
+
+    private sealed record JogoEncerrado(
+        Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora,
+        int GolsCasa, int GolsFora, bool TemPenaltis, Guid? PenaltisVencedorId,
+        DateTime? Marcado, DateTime EncerradaEm, int? Temporada);
+
+    /// <summary>
+    /// 1 pacote por vitória para cada pessoa (treinador e auxiliar) com passagem no clube vencedor no dia
+    /// do jogo. Empate sem pênaltis não dá pacote; W.O. conta como vitória de quem não fez W.O.
+    /// </summary>
+    private async Task<int> PacotesDeVitoriaAsync(Guid albumId, List<JogoEncerrado> jogos, CancellationToken ct)
+    {
+        var vencedores = jogos
+            .Select(j => (Jogo: j, Vencedor: Vencedor(j)))
+            .Where(x => x.Vencedor is not null)
+            .Select(x => (x.Jogo, x.Vencedor!.Value.Time, x.Vencedor!.Value.Adversario, Dia: DiaDoJogo(x.Jogo)))
+            .ToList();
+        if (vencedores.Count == 0) return 0;
+
+        var times = vencedores.Select(v => v.Time).Distinct().ToList();
+        var passagens = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => times.Contains(p.TimeId))
+            .Select(p => new { p.TreinadorId, p.TimeId, p.Desde, p.Ate })
+            .ToListAsync(ct);
+        var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemVitoria, ct);
+
+        var criados = 0;
+        foreach (var v in vencedores)
+        {
+            var chave = AlbumFigurinhas.ChaveVitoria(v.Jogo.PartidaId);
+            var pessoas = passagens
+                .Where(p => p.TimeId == v.Time && p.Desde.Date <= v.Dia && (p.Ate == null || p.Ate.Value.Date >= v.Dia))
+                .Select(p => p.TreinadorId)
+                .Distinct();
+            foreach (var pessoa in pessoas)
+            {
+                if (!jaTem.Add((pessoa, chave))) continue;
+                _db.PacotesGanhos.Add(NovoPacote(pessoa, albumId, PacoteGanho.OrigemVitoria, chave,
+                    AlbumFigurinhas.MotivoVitoria(v.Adversario)));
+                criados++;
+            }
+        }
+
+        return await GravarAsync(criados, ct);
+    }
+
+    private static (Guid Time, string Adversario)? Vencedor(JogoEncerrado j)
+    {
+        if (j.GolsCasa > j.GolsFora) return (j.CasaId, j.Fora);
+        if (j.GolsFora > j.GolsCasa) return (j.ForaId, j.Casa);
+        if (j.TemPenaltis && j.PenaltisVencedorId == j.CasaId) return (j.CasaId, j.Fora);
+        if (j.TemPenaltis && j.PenaltisVencedorId == j.ForaId) return (j.ForaId, j.Casa);
+        return null;
+    }
+
+    /// <summary>O dia do jogo: o marcado na rodada (horário de Brasília); sem data, o dia em que foi encerrado.</summary>
+    private static DateTime DiaDoJogo(JogoEncerrado j) =>
+        (j.Marcado ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(j.EncerradaEm, DateTimeKind.Utc), HorarioDeBrasilia.Fuso)).Date;
+
+    /// <summary>
+    /// Pontos do bolão na temporada do álbum (mesma conta do bolão, só jogos encerrados depois do
+    /// lançamento) ÷ X = pacotes devidos; cria os que faltam. Pacote já dado nunca é tirado.
+    /// </summary>
+    private async Task<int> PacotesDoBolaoAsync(Guid albumId, int temporada, int pontosPorPacote, List<JogoEncerrado> jogos, CancellationToken ct)
+    {
+        if (jogos.Count == 0) return 0;
+
+        var placares = jogos.ToDictionary(j => j.PartidaId);
+        var ids = placares.Keys.ToList();
+        var palpites = await _db.BolaoPalpites.AsNoTracking()
+            .Where(p => ids.Contains(p.PartidaId))
+            .Select(p => new { p.TreinadorId, p.PartidaId, p.GolsCasa, p.GolsFora })
+            .ToListAsync(ct);
+
+        var pontos = palpites
+            .GroupBy(p => p.TreinadorId)
+            .Select(g => (Pessoa: g.Key, Pontos: g.Sum(p => BolaoPontuacao.Calcular(
+                p.GolsCasa, p.GolsFora, placares[p.PartidaId].GolsCasa, placares[p.PartidaId].GolsFora))))
+            .ToList();
+        var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemBolao, ct);
+
+        var criados = 0;
+        foreach (var (pessoa, total) in pontos)
+        {
+            var devidos = AlbumFigurinhas.PacotesDoBolao(total, pontosPorPacote);
+            for (var n = 1; n <= devidos; n++)
+            {
+                var chave = AlbumFigurinhas.ChaveBolao(temporada, n);
+                if (!jaTem.Add((pessoa, chave))) continue;
+                _db.PacotesGanhos.Add(NovoPacote(pessoa, albumId, PacoteGanho.OrigemBolao, chave,
+                    AlbumFigurinhas.MotivoBolao(n * pontosPorPacote, temporada)));
+                criados++;
+            }
+        }
+
+        return await GravarAsync(criados, ct);
+    }
+
+    private async Task<HashSet<(Guid, string)>> ChavesExistentesAsync(string origem, CancellationToken ct) =>
+        (await _db.PacotesGanhos.AsNoTracking()
+            .Where(p => p.Origem == origem)
+            .Select(p => new { p.TreinadorId, p.Chave })
+            .ToListAsync(ct))
+        .Select(p => (p.TreinadorId, p.Chave))
+        .ToHashSet();
+
+    /// <summary>
+    /// Grava o que a reconciliação criou. Se outra execução gravou a mesma chave no meio do caminho, o
+    /// índice único recusa tudo e a próxima rodada recomeça do que já está no banco.
+    /// </summary>
+    private async Task<int> GravarAsync(int criados, CancellationToken ct)
+    {
+        if (criados == 0) return 0;
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return criados;
+        }
+        catch (DbUpdateException ex) when (ChaveRepetida(ex))
+        {
+            _db.ChangeTracker.Clear();
+            return 0;
+        }
+    }
+
+    private static bool ChaveRepetida(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    private PacoteGanho NovoPacote(Guid treinadorId, Guid albumId, string origem, string chave, string? motivo) => new()
+    {
+        PacoteId = Guid.NewGuid(),
+        TreinadorId = treinadorId,
+        AlbumId = albumId,
+        Origem = origem,
+        Chave = chave,
+        Motivo = motivo,
+        CriadoEm = Agora
+    };
 
     public async Task<PacoteAbertoDto> AbrirPacoteAsync(Guid treinadorId, CancellationToken ct)
     {

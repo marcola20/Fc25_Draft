@@ -12,5 +12,6 @@ public enum AdminActionType
     CancelOffer = 7,
     LancarAlbum = 8,
     DarPacotes = 9,
-    AjustarLendarias = 10
+    AjustarLendarias = 10,
+    AjustarPontosBolao = 11
 }

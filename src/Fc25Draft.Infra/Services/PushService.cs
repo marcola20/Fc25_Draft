@@ -14,7 +14,8 @@ namespace Fc25Draft.Infra.Services;
 
 /// <summary>
 /// Notificações no celular (Web Push): guarda os aparelhos de cada pessoa e envia os avisos dos times,
-/// a vez no draft e o lembrete do bolão. Aparelho que o serviço de push diz que não existe mais sai sozinho.
+/// a vez no draft, o lembrete do bolão e os pacotes do álbum. Aparelho que o serviço de push diz que não existe
+/// mais sai sozinho.
 /// </summary>
 public class PushService : IPushService
 {
@@ -29,6 +30,9 @@ public class PushService : IPushService
 
     /// <summary>O aviso "leilão fechando" sai quando falta isso (ou menos) para o leilão acabar.</summary>
     private static readonly TimeSpan LeilaoFechando = TimeSpan.FromMinutes(15);
+
+    /// <summary>Pacote do álbum mais velho que isso não vira notificação.</summary>
+    private static readonly TimeSpan PacoteRecente = TimeSpan.FromDays(1);
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
@@ -223,6 +227,54 @@ public class PushService : IPushService
 
         return lembrados;
     }
+
+    public async Task<int> AvisarPacotesGanhosAsync(CancellationToken ct)
+    {
+        var pessoas = await _db.InscricoesPush.AsNoTracking()
+            .Where(i => i.Treinador.Ativo)
+            .Select(i => i.TreinadorId)
+            .Distinct()
+            .ToListAsync(ct);
+        if (pessoas.Count == 0) return 0;
+
+        // O pacote do dia a pessoa pega no site, não precisa de aviso. Pacote antigo (o site ficou fora do
+        // ar, ou a pessoa ativou as notificações agora) também não.
+        var desde = Agora - PacoteRecente;
+        var pacotes = await _db.PacotesGanhos.AsNoTracking()
+            .Where(p => p.AbertoEm == null && p.Origem != PacoteGanho.OrigemDiario && p.CriadoEm >= desde
+                        && pessoas.Contains(p.TreinadorId))
+            .OrderBy(p => p.CriadoEm)
+            .Select(p => new { p.PacoteId, p.TreinadorId, p.Origem, p.Motivo })
+            .ToListAsync(ct);
+        if (pacotes.Count == 0) return 0;
+
+        var chaves = pacotes.Select(p => ChaveDoPacote(p.PacoteId)).ToList();
+        var avisados = (await _db.NotificacoesEnviadas.AsNoTracking()
+                .Where(n => chaves.Contains(n.Chave))
+                .Select(n => n.Chave)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var pessoasAvisadas = 0;
+        foreach (var daPessoa in pacotes.Where(p => !avisados.Contains(ChaveDoPacote(p.PacoteId))).GroupBy(p => p.TreinadorId))
+        {
+            var novos = new List<(string, string?)>();
+            foreach (var p in daPessoa)
+                if (await MarcarAsync(ChaveDoPacote(p.PacoteId), ct))
+                    novos.Add((p.Origem, p.Motivo));
+            if (novos.Count == 0) continue;
+
+            var inscricoes = await _db.InscricoesPush.Where(i => i.TreinadorId == daPessoa.Key).ToListAsync(ct);
+            await EnviarAsync(inscricoes, new Notificacao(
+                "🎴 Álbum de figurinhas", AlbumFigurinhas.AvisoDePacotes(novos), "/album", "album-pacotes"), ct);
+            await _db.SaveChangesAsync(ct);
+            pessoasAvisadas++;
+        }
+
+        return pessoasAvisadas;
+    }
+
+    private static string ChaveDoPacote(Guid pacoteId) => $"pacote:{pacoteId:N}";
 
     // ── Bastidores ──────────────────────────────────────────────────────────────────────────────────
 

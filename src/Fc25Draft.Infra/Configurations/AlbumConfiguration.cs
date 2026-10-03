@@ -1,4 +1,5 @@
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,6 +13,7 @@ public class AlbumConfiguration : IEntityTypeConfiguration<Album>
         b.HasKey(x => x.AlbumId);
 
         b.Property(x => x.Nome).HasMaxLength(80).IsRequired();
+        b.Property(x => x.PontosBolaoPorPacote).HasDefaultValue(AlbumFigurinhas.PontosBolaoPorPacotePadrao);
 
         // Um álbum por temporada.
         b.HasIndex(x => x.Temporada).IsUnique();
@@ -70,6 +72,7 @@ public class PacoteGanhoConfiguration : IEntityTypeConfiguration<PacoteGanho>
         // Reconciliar de novo nunca dá pacote em dobro.
         b.HasIndex(x => new { x.TreinadorId, x.Chave }).IsUnique();
         b.HasIndex(x => new { x.TreinadorId, x.AbertoEm });
+        b.HasIndex(x => x.Origem);
 
         b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.SetNull);

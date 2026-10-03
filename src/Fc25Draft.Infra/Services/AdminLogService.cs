@@ -60,6 +60,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.LancarAlbum => "Lançou o álbum de figurinhas",
         AdminActionType.DarPacotes => "Deu pacotes do álbum",
         AdminActionType.AjustarLendarias => "Trocou as lendárias do álbum",
+        AdminActionType.AjustarPontosBolao => "Mudou os pontos do bolão por pacote",
         _ => tipo.ToString()
     };
 
@@ -88,6 +89,8 @@ public class AdminLogService : IAdminLogService
         "clubes" => "Clubes",
         "figurinhas" => "Figurinhas",
         "lendarias" => "Lendárias",
+        "antes" => "Antes",
+        "depois" => "Depois",
         _ => chave
     };
 

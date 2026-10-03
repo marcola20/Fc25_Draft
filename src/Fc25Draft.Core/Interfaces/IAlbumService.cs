@@ -38,10 +38,27 @@ public interface IAlbumService
 
     Task<IReadOnlyList<PacotesDoTreinadorDto>> PacotesPorTreinadorAsync(CancellationToken ct);
 
+    /// <summary>Muda o X do bolão do álbum (1 pacote a cada X pontos). Fica no log de ações.</summary>
+    Task SalvarPontosBolaoAsync(Guid albumId, int pontosPorPacote, string? adminToken, CancellationToken ct);
+
+    /// <summary>
+    /// Dá os pacotes que faltam pelas vitórias e pelo bolão desde o lançamento do álbum ativo. Rodar de
+    /// novo não duplica nada (a chave de cada pacote é única por pessoa).
+    /// </summary>
+    Task<ReconciliacaoPacotesDto> ReconciliarAsync(CancellationToken ct);
+
     // ---- A pessoa ----
 
     /// <summary>O álbum da pessoa (o ativo, se <paramref name="albumId"/> vier nulo).</summary>
     Task<MeuAlbumDto?> MeuAlbumAsync(Guid treinadorId, Guid? albumId, CancellationToken ct);
+
+    /// <summary>Números do álbum ativo da pessoa (cartão da Minha Área); nulo sem álbum lançado.</summary>
+    Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct);
+
+    /// <summary>
+    /// Dá o pacote do dia (data de Brasília). Falso se a pessoa já pegou o de hoje.
+    /// </summary>
+    Task<bool> PegarPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct);
 
     /// <summary>Abre o pacote mais antigo da pessoa: sorteia no servidor e cola as novas.</summary>
     Task<PacoteAbertoDto> AbrirPacoteAsync(Guid treinadorId, CancellationToken ct);

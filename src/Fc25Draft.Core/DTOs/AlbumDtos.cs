@@ -53,12 +53,31 @@ public record MeuAlbumDto(
     IReadOnlyList<PaginaDoAlbumDto> Paginas,
     AlbumContagemDto TotalPorRaridade,
     AlbumContagemDto ColadasPorRaridade,
-    int PacotesParaAbrir,
-    int Repetidas)
+    IReadOnlyList<PacoteFechadoDto> Fechados,
+    int Repetidas,
+    bool PacoteDoDiaDisponivel)
 {
+    public int PacotesParaAbrir => Fechados.Count;
+
     public int Total => TotalPorRaridade.Total;
     public int Coladas => ColadasPorRaridade.Total;
     public int Percentual => Total == 0 ? 0 : (int)Math.Floor(Coladas * 100.0 / Total);
+}
+
+/// <summary>Um pacote ainda fechado e de onde ele veio, na ordem em que vai ser aberto.</summary>
+public record PacoteFechadoDto(Guid PacoteId, string Origem, string DeOndeVeio, DateTime CriadoEm);
+
+/// <summary>O álbum da pessoa em números, para o cartão da Minha Área.</summary>
+public record AlbumResumoDoTreinadorDto(AlbumDto Album, int Coladas, int Repetidas, int PacotesParaAbrir, bool PacoteDoDiaDisponivel)
+{
+    public int Total => Album.TotalFigurinhas;
+    public int Percentual => Total == 0 ? 0 : (int)Math.Floor(Coladas * 100.0 / Total);
+}
+
+/// <summary>Pacotes criados por uma rodada da reconciliação.</summary>
+public record ReconciliacaoPacotesDto(int Vitorias, int Bolao)
+{
+    public int Total => Vitorias + Bolao;
 }
 
 /// <summary>Uma figurinha que saiu no pacote: nova (foi colada) ou repetida.</summary>
@@ -111,7 +130,9 @@ public record AlbumAdminDto(
     int PacotesAbertos,
     int Colecionadores,
     IReadOnlyList<FigurinhaDto> Lendarias,
-    IReadOnlyList<CandidatoLendariaDto> Candidatos)
+    IReadOnlyList<CandidatoLendariaDto> Candidatos,
+    int PontosBolaoPorPacote,
+    IReadOnlyDictionary<string, int> PacotesPorOrigem)
 {
     /// <summary>Depois do primeiro pacote aberto as lendárias ficam travadas.</summary>
     public bool LendariasTravadas => PacotesAbertos > 0;

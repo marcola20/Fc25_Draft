@@ -30,6 +30,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddHostedService<DraftRelogioService>();
             services.AddHostedService<PropostasExpiradasService>();
             services.AddHostedService<NotificacoesService>();
+            services.AddHostedService<PacotesDoAlbumService>();
             services.AddScoped<DraftAdminService>();
             services.AddComConexaoPropria<ITeamService, TeamService>();
             services.AddComConexaoPropria<IBuscaService, BuscaService>();

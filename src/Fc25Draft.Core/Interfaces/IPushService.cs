@@ -34,4 +34,10 @@ public interface IPushService
 
     /// <summary>Lembra quem ainda não palpitou numa rodada do bolão que começa em breve. Retorna quantos.</summary>
     Task<int> LembrarBolaoAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Avisa (uma vez por pacote) quem ganhou pacote do álbum por vitória, bolão ou da organização; vários
+    /// pacotes da mesma pessoa viram um aviso só. Retorna quantas pessoas foram avisadas.
+    /// </summary>
+    Task<int> AvisarPacotesGanhosAsync(CancellationToken ct);
 }

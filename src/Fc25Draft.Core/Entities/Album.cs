@@ -1,3 +1,5 @@
+using Fc25Draft.Core.Utilities;
+
 namespace Fc25Draft.Core.Entities;
 
 /// <summary>Figurinha de jogador ou do escudo do clube (a que abre a página).</summary>
@@ -31,6 +33,12 @@ public class Album
 
     /// <summary>O álbum que está valendo: é nele que os pacotes abrem. Os antigos ficam como coleção.</summary>
     public bool Ativo { get; set; }
+
+    /// <summary>
+    /// X do bolão: a cada X pontos na temporada do álbum a pessoa ganha 1 pacote. Mudar não tira pacote
+    /// de ninguém; baixar faz a próxima reconciliação dar os que passaram a ser devidos.
+    /// </summary>
+    public int PontosBolaoPorPacote { get; set; } = AlbumFigurinhas.PontosBolaoPorPacotePadrao;
 
     public ICollection<Figurinha> Figurinhas { get; set; } = new List<Figurinha>();
 }
