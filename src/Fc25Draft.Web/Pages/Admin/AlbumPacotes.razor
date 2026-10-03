@@ -1,0 +1,147 @@
+@page "/admin/album/pacotes"
+@attribute [Authorize(Roles = "Admin")]
+@inject IAlbumService AlbumSvc
+@inject AdminAuthService AdminAuth
+
+<PageTitle>Dar pacotes — Admin</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1000px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        @if (_ativo is null)
+        {
+            <div class="alert alert-warning small">
+                Nenhum álbum lançado ainda. Os pacotes dados agora ficam guardados e abrem no álbum quando ele sair.
+                <a href="/admin/album">Lançar o álbum</a>
+            </div>
+        }
+
+        <div class="card mb-3">
+            <div class="card-header fw-bold">🎁 Dar pacotes</div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label">Para quem</label>
+                        <select class="form-select" @bind="_treinadorId">
+                            <option value="">Escolha…</option>
+                            @foreach (var t in _lista)
+                            {
+                                <option value="@t.TreinadorId">@t.Nome@(t.TimeAtual is null ? "" : $" · {t.TimeAtual}")@(t.Ativo ? "" : " (fora da liga)")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-4 col-md-2">
+                        <label class="form-label">Pacotes</label>
+                        <input type="number" class="form-control" min="1" max="50" @bind="_quantidade" />
+                    </div>
+                    <div class="col-8 col-md-3">
+                        <label class="form-label">Motivo</label>
+                        <input class="form-control" maxlength="200" placeholder="Ex.: prêmio da rodada" @bind="_motivo" />
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button class="btn btn-success w-100" disabled="@(_salvando || string.IsNullOrEmpty(_treinadorId))" @onclick="DarAsync">Dar</button>
+                    </div>
+                </div>
+                <p class="small text-muted mb-0 mt-2">O sorteio das figurinhas é feito quando a pessoa abre o pacote. Fica registrado no Log de Ações.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header fw-bold">Pacotes de cada pessoa@(_ativo is null ? "" : $" · {_ativo.Nome}")</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pessoa</th>
+                            <th>Clube</th>
+                            <th class="text-center">Para abrir</th>
+                            <th class="text-center">Abertos</th>
+                            <th class="text-center">Coladas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in _lista)
+                        {
+                            <tr class="@(t.Ativo ? "" : "text-muted")" style="cursor: pointer;" @onclick="() => _treinadorId = t.TreinadorId.ToString()">
+                                <td>@t.Nome</td>
+                                <td class="small">@(t.TimeAtual ?? "—")</td>
+                                <td class="text-center">@(t.ParaAbrir > 0 ? t.ParaAbrir.ToString() : "—")</td>
+                                <td class="text-center">@(t.Abertos > 0 ? t.Abertos.ToString() : "—")</td>
+                                <td class="text-center">
+                                    @if (_ativo is not null && t.Coladas > 0)
+                                    {
+                                        <span>@t.Coladas<span class="text-muted small">/@_ativo.TotalFigurinhas</span></span>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    private AlbumDto? _ativo;
+    private IReadOnlyList<PacotesDoTreinadorDto> _lista = Array.Empty<PacotesDoTreinadorDto>();
+
+    private string _treinadorId = string.Empty;
+    private int _quantidade = 1;
+    private string? _motivo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        _carregando = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _ativo = await AlbumSvc.AtivoAsync(CancellationToken.None);
+            _lista = await AlbumSvc.PacotesPorTreinadorAsync(CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task DarAsync()
+    {
+        if (!Guid.TryParse(_treinadorId, out var id)) return;
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            var dados = await AlbumSvc.DarPacotesAsync(id, _quantidade, _motivo, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            var nome = _lista.FirstOrDefault(t => t.TreinadorId == id)?.Nome;
+            await CarregarAsync();
+            _ok = $"{dados} pacote{(dados == 1 ? "" : "s")} para {nome}.";
+            _motivo = null;
+            _quantidade = 1;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

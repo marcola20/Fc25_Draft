@@ -1,0 +1,106 @@
+@using Fc25Draft.Core.Utilities
+@inject EscudoService Escudos
+
+@* A figurinha do álbum, em HTML/CSS: escala com a largura e não depende de imagem pronta. Vazia, vira a
+   vaga do álbum (número e nome em cinza, como no álbum de verdade). *@
+@if (Vazia)
+{
+    <div class="carta vaga @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : "")" style="--w: @(Largura)px"
+         title="@Titulo">
+        <span class="vaga-num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
+        <span class="vaga-nome">@Figurinha.NomeImpresso</span>
+        @if (Figurinha.PosicaoSigla is not null)
+        {
+            <span class="vaga-pos">@Figurinha.PosicaoSigla</span>
+        }
+    </div>
+}
+else
+{
+    <div class="carta r-@Figurinha.Raridade.ToString().ToLowerInvariant() @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : "t-jogador")"
+         style="--w: @(Largura)px" title="@Titulo">
+        <div class="moldura">
+            @if (Figurinha.Raridade == RaridadeFigurinha.Lendaria && SeloLendaria is not null)
+            {
+                <div class="selo">★ @SeloLendaria</div>
+            }
+            <div class="topo">
+                @if (Figurinha.Tipo == TipoFigurinha.Jogador)
+                {
+                    <div class="ovr">
+                        <span class="ovr-n">@Figurinha.Overall</span>
+                        <span class="ovr-pos">@Figurinha.PosicaoSigla</span>
+                    </div>
+                }
+                <span class="num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
+            </div>
+
+            @if (Figurinha.Tipo == TipoFigurinha.Escudo)
+            {
+                <div class="escudo-grande">
+                    <img src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="@Figurinha.TimeNome" loading="lazy" />
+                </div>
+            }
+            else
+            {
+                <div class="foto">
+                    <FotoJogador PlayerId="@Figurinha.PlayerId!.Value" Tamanho="@((int)(Largura * 0.78))" Alt="@Figurinha.NomeImpresso" Lazy="@Lazy" />
+                </div>
+            }
+
+            <div class="faixa">
+                @if (Figurinha.Tipo == TipoFigurinha.Jogador)
+                {
+                    <img class="escudo-mini" src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="" loading="lazy" />
+                }
+                <span class="nome @ClasseDoNome">@Figurinha.NomeImpresso</span>
+            </div>
+            @if (Figurinha.Destaque is not null)
+            {
+                <div class="destaque">@Figurinha.Destaque</div>
+            }
+            <div class="brilho" aria-hidden="true"></div>
+        </div>
+
+        @if (Nova)
+        {
+            <span class="marca-nova">NOVA</span>
+        }
+        @if (Quantidade > 1)
+        {
+            <span class="marca-qtd" title="@(Quantidade - 1) repetida(s)">×@Quantidade</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public FigurinhaDto Figurinha { get; set; } = null!;
+
+    /// <summary>Largura em pixels; o resto da carta acompanha.</summary>
+    [Parameter] public int Largura { get; set; } = 140;
+
+    /// <summary>Vaga ainda sem a figurinha.</summary>
+    [Parameter] public bool Vazia { get; set; }
+
+    /// <summary>Quantas a pessoa tem; acima de 1 aparece o ×N das repetidas.</summary>
+    [Parameter] public int Quantidade { get; set; }
+
+    [Parameter] public bool Nova { get; set; }
+
+    /// <summary>Texto do selo da lendária ("Melhores de 2009").</summary>
+    [Parameter] public string? SeloLendaria { get; set; }
+
+    [Parameter] public bool Lazy { get; set; } = true;
+
+    // Nome comprido diminui a letra em vez de cortar.
+    private string ClasseDoNome => Figurinha.NomeImpresso.Length switch
+    {
+        > 13 => "nome-muito-longo",
+        > 10 => "nome-longo",
+        _ => ""
+    };
+
+    private string Titulo => Figurinha.Tipo == TipoFigurinha.Escudo
+        ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · Escudo do {Figurinha.TimeNome}"
+        : $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.NomeImpresso} ({Figurinha.PosicaoSigla}, {Figurinha.Overall}) · {Figurinha.TimeNome}";
+}

@@ -1,0 +1,291 @@
+@page "/admin/album"
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Album
+@attribute [Authorize(Roles = "Admin")]
+@inject IAlbumService AlbumSvc
+@inject ILigaTemporadaService TemporadaSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Álbum de Figurinhas — Admin</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1200px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <label class="form-label mb-0">Temporada</label>
+            <select class="form-select w-auto" value="@_temporada" @onchange="TrocarTemporadaAsync">
+                @foreach (var t in _temporadas)
+                {
+                    var album = _albuns.FirstOrDefault(a => a.Temporada == t);
+                    <option value="@t">@t@(album is null ? " · sem álbum" : album.Ativo ? " · álbum ativo" : " · álbum antigo")</option>
+                }
+            </select>
+            <a href="/admin/album/pacotes" class="btn btn-outline-secondary">🎁 Dar pacotes</a>
+            <a href="/admin/album/sem-foto" class="btn btn-outline-secondary">📷 Sem foto</a>
+            <a href="/album" class="btn btn-outline-secondary" target="_blank">Ver o álbum</a>
+        </div>
+
+        @if (_admin is { } ad)
+        {
+            @* ---- Álbum já lançado ---- *@
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                    <strong>🎴 @ad.Album.Nome</strong>
+                    @if (ad.Album.Ativo)
+                    {
+                        <span class="badge text-bg-success">Ativo</span>
+                    }
+                    <span class="small text-muted ms-auto">Lançado em @BrazilTime.FormatDateTime(ad.Album.LancadoEm)</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 text-center">
+                        <div class="col-6 col-md-2"><div class="h4 mb-0">@ad.Clubes</div><div class="small text-muted">clubes</div></div>
+                        <div class="col-6 col-md-2"><div class="h4 mb-0">@ad.PorRaridade.Total</div><div class="small text-muted">figurinhas</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Comuns</div><div class="small text-muted">comuns</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Brilhantes</div><div class="small text-muted">✨ brilhantes</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
+                        <div class="col-6 col-md-2">
+                            <a href="/admin/album/sem-foto" class="text-decoration-none">
+                                <div class="h5 mb-0 @(ad.SemFoto > 0 ? "text-warning" : "text-success")">@ad.SemFoto</div>
+                                <div class="small text-muted">sem foto</div>
+                            </a>
+                        </div>
+                    </div>
+                    <hr />
+                    <div class="small text-muted">
+                        @ad.PacotesDados pacotes dados · @ad.PacotesAbertos abertos · @ad.Colecionadores colecionador@(ad.Colecionadores == 1 ? "" : "es")
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-bold">★ Lendárias — Melhores de @(ad.Album.Temporada - 1)</div>
+                <div class="card-body">
+                    @if (ad.LendariasTravadas)
+                    {
+                        <div class="alert alert-secondary small py-2">Já abriram pacote deste álbum: as lendárias estão travadas.</div>
+                    }
+                    <LendariasEditor Candidatos="@ad.Candidatos" Escolhidas="@_escolhidas" Temporada="@ad.Album.Temporada" Travado="@ad.LendariasTravadas" />
+                    @if (!ad.LendariasTravadas)
+                    {
+                        <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="SalvarLendariasAsync">💾 Salvar lendárias</button>
+                        <span class="small text-muted ms-2">Dá para trocar até o primeiro pacote ser aberto.</span>
+                    }
+                    @if (ad.Lendarias.Count > 0)
+                    {
+                        <div class="grade-cartas mt-3">
+                            @foreach (var f in ad.Lendarias)
+                            {
+                                <CartaFigurinha Figurinha="@f" Largura="120" SeloLendaria="@($"Melhores de {ad.Album.Temporada - 1}")" />
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (_previa is { } pv)
+        {
+            @* ---- Prévia do lançamento ---- *@
+            var contagem = Contagem(pv);
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Prévia do álbum de @pv.Temporada</div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        O álbum é um retrato dos elencos <strong>de hoje</strong>: nome, posição, overall e clube ficam como estão
+                        no lançamento, e transferência depois não muda nada. Clubes: @pv.OrigemDosClubes.
+                    </p>
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-6 col-md-2"><div class="h4 mb-0">@pv.Clubes.Count</div><div class="small text-muted">clubes</div></div>
+                        <div class="col-6 col-md-2"><div class="h4 mb-0">@contagem.Total</div><div class="small text-muted">figurinhas</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Comuns</div><div class="small text-muted">comuns</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Brilhantes</div><div class="small text-muted">✨ brilhantes</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
+                        <div class="col-6 col-md-2"><div class="h5 mb-0 @(pv.SemFoto > 0 ? "text-warning" : "text-success")">@pv.SemFoto</div><div class="small text-muted">sem foto</div></div>
+                    </div>
+                    <p class="small text-muted mb-2">
+                        Brilhantes: o escudo de cada clube e os @AlbumFigurinhas.BrilhantesPorClube maiores overalls de cada elenco.
+                        Sem foto a figurinha sai com a silhueta — dá para completar as fotos depois do lançamento.
+                    </p>
+                    <details>
+                        <summary class="small">Ver os clubes</summary>
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>#</th><th>Clube</th><th>Divisão</th><th class="text-center">Jogadores</th><th class="text-center">Sem foto</th></tr></thead>
+                                <tbody>
+                                    @{ var i = 0; }
+                                    @foreach (var c in pv.Clubes)
+                                    {
+                                        <tr>
+                                            <td class="text-muted">@(++i)</td>
+                                            <td>@c.Nome</td>
+                                            <td>@(c.Divisao ?? "—")</td>
+                                            <td class="text-center">@c.Jogadores</td>
+                                            <td class="text-center @(c.SemFoto > 0 ? "text-warning" : "")">@c.SemFoto</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-bold">★ Lendárias — Melhores de @(pv.Temporada - 1)</div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        Sugestão: maiores médias de nota do PES em @(pv.Temporada - 1) (mínimo de @AlbumFigurinhas.MinimoJogosParaSugestao jogos;
+                        faltando gente, entra quem tem menos jogos e depois os maiores overalls). Troque quem quiser.
+                    </p>
+                    <LendariasEditor Candidatos="@pv.Candidatos" Escolhidas="@_escolhidas" Temporada="@pv.Temporada" OnChange="StateHasChanged" />
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body d-flex flex-wrap align-items-end gap-2">
+                    <div>
+                        <label class="form-label">Nome do álbum</label>
+                        <input class="form-control" style="min-width: 260px;" @bind="_nome" placeholder="@pv.NomeSugerido" />
+                    </div>
+                    <button class="btn btn-success" disabled="@(_salvando || pv.Clubes.Count == 0)" @onclick="LancarAsync">🚀 Lançar o álbum</button>
+                    <button class="btn btn-outline-secondary" disabled="@_salvando" @onclick="PreviaAsync">Atualizar prévia</button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private IReadOnlyList<AlbumDto> _albuns = Array.Empty<AlbumDto>();
+    private int _temporada;
+
+    private AlbumAdminDto? _admin;
+    private AlbumPreviaDto? _previa;
+    private List<LendariasEditor.Escolha> _escolhidas = new();
+    private string? _nome;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _albuns = await AlbumSvc.ListarAsync(CancellationToken.None);
+            _temporadas = (await TemporadaSvc.ListTemporadasAsync(CancellationToken.None))
+                .Concat(_albuns.Select(a => a.Temporada))
+                .Distinct()
+                .OrderByDescending(t => t)
+                .ToList();
+            if (_temporadas.Count == 0) _temporadas = new[] { DateTime.Today.Year };
+            _temporada = _temporadas[0];
+            await CarregarTemporadaAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task TrocarTemporadaAsync(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var t)) return;
+        _temporada = t;
+        _ok = null;
+        await CarregarTemporadaAsync();
+    }
+
+    private async Task CarregarTemporadaAsync()
+    {
+        _admin = null;
+        _previa = null;
+        _escolhidas = new();
+        try
+        {
+            var album = _albuns.FirstOrDefault(a => a.Temporada == _temporada);
+            if (album is not null)
+            {
+                _admin = await AlbumSvc.GetAdminAsync(album.AlbumId, CancellationToken.None);
+                _escolhidas = _admin?.Lendarias
+                    .Select(f => new LendariasEditor.Escolha { PlayerId = f.PlayerId!.Value, Destaque = f.Destaque })
+                    .ToList() ?? new();
+            }
+            else
+            {
+                await PreviaAsync();
+            }
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task PreviaAsync()
+    {
+        _previa = await AlbumSvc.PreviaAsync(_temporada, CancellationToken.None);
+        // Mantém o que o admin já escolheu ao atualizar; na primeira vez, vêm as sugestões.
+        if (_escolhidas.Count == 0)
+            _escolhidas = _previa.Sugeridas.Select(c => new LendariasEditor.Escolha { PlayerId = c.PlayerId }).ToList();
+        else
+            _escolhidas.RemoveAll(e => _previa.Candidatos.All(c => c.PlayerId != e.PlayerId));
+    }
+
+    /// <summary>Contagem por raridade com as lendárias escolhidas na tela.</summary>
+    private AlbumContagemDto Contagem(AlbumPreviaDto pv)
+    {
+        var lendarias = _escolhidas.Select(e => e.PlayerId).ToHashSet();
+        var jogadores = pv.Candidatos.Where(c => !lendarias.Contains(c.PlayerId)).ToList();
+        var brilhantes = jogadores.Count(c => c.RaridadeBase == RaridadeFigurinha.Brilhante) + pv.Clubes.Count;
+        return new AlbumContagemDto(jogadores.Count(c => c.RaridadeBase == RaridadeFigurinha.Comum), brilhantes, lendarias.Count);
+    }
+
+    private List<LendariaEscolhaDto> Escolhas() =>
+        _escolhidas.Select(e => new LendariaEscolhaDto(e.PlayerId, e.Destaque)).ToList();
+
+    private async Task LancarAsync()
+    {
+        if (_previa is null) return;
+        var nome = string.IsNullOrWhiteSpace(_nome) ? _previa.NomeSugerido : _nome.Trim();
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Lançar o {nome} com {Contagem(_previa).Total} figurinhas? Os elencos de hoje ficam congelados no álbum.")) return;
+
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            var album = await AlbumSvc.LancarAsync(_temporada, nome, Escolhas(), await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            _albuns = await AlbumSvc.ListarAsync(CancellationToken.None);
+            await CarregarTemporadaAsync();
+            _ok = $"{album.Nome} lançado com {album.TotalFigurinhas} figurinhas.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task SalvarLendariasAsync()
+    {
+        if (_admin is null) return;
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await AlbumSvc.SalvarLendariasAsync(_admin.Album.AlbumId, Escolhas(), await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            await CarregarTemporadaAsync();
+            _ok = "Lendárias salvas.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

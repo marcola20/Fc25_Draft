@@ -139,6 +139,20 @@ raridade; tela admin de figurinhas sem foto.
 **Pronto quando:** o admin gera o álbum no banco local, dá 3 pacotes a um treinador de teste, ele
 abre, as figurinhas aparecem coladas e as repetidas contadas.
 
+**Feito (03/10/2026).** Como ficou, para as próximas fases:
+- Entidades em `Fc25Draft.Core/Entities/Album.cs` (`Album`, `Figurinha`, `FigurinhaDoTreinador`,
+  `PacoteGanho`); migração `AlbumDeFigurinhas`. O `PacoteGanho` guarda as figurinhas que saíram
+  (`Figurinhas`, `uuid[]`) e um `Motivo` em texto, em vez de uma tabela `PacoteAberto`.
+  `FigurinhaDoTreinador.Nova` marca a colada que a pessoa ainda não viu na página do clube.
+- Regras e números em `Core/Utilities/AlbumFigurinhas.cs` (montagem, sorteio, constantes);
+  serviço `IAlbumService`/`AlbumService`. Abrir pacote trava a linha do treinador (`FOR UPDATE`)
+  para dois cliques não abrirem o mesmo pacote.
+- Telas: `/album` (página do clube em `/album?clube={teamId}`), `/admin/album` (prévia, lançar e
+  lendárias), `/admin/album/pacotes`, `/admin/album/sem-foto`. Componente `Components/Album/CartaFigurinha`.
+  Menu: grupo "Álbum" e "Admin · Álbum". Log de ações: `LancarAlbum`, `DarPacotes`, `AjustarLendarias`.
+- Lançar outro álbum desativa o anterior. As lendárias podem ser trocadas no lugar enquanto nenhum
+  pacote do álbum foi aberto (quem sai volta a brilhante ou comum pela regra do clube).
+
 ### Fase 2 — Ganhar pacotes
 Livro-razão `PacoteGanho`; pacote do dia; reconciliação em segundo plano de vitórias e bolão;
 aviso no celular; cartão na Minha Área; ajuste do X do bolão no admin.

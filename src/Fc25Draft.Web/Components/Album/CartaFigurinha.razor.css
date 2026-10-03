@@ -1,0 +1,266 @@
+/* Tudo em em: a fonte acompanha a largura (--w) e a carta inteira escala junto. */
+.carta {
+    --fundo: linear-gradient(165deg, #f7f9fb 0%, #e2e8ee 100%);
+    --borda: #c3ccd5;
+    --texto: #1f2933;
+    --texto-suave: #5b6772;
+    --faixa: #1f2933;
+    --faixa-texto: #fff;
+    --foto-fundo: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 70%);
+
+    /* --w vem da página; --w-max (da grade, no celular) encolhe a carta para caber duas por linha. */
+    --w-real: min(var(--w), var(--w-max, 1000px));
+    position: relative;
+    width: var(--w-real);
+    aspect-ratio: 5 / 7;
+    font-size: calc(var(--w-real) / 11);
+    line-height: 1.1;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+[data-bs-theme="dark"] .carta {
+    --fundo: linear-gradient(165deg, #2f363e 0%, #1c2126 100%);
+    --borda: #46505a;
+    --texto: #eef1f4;
+    --texto-suave: #a7b1ba;
+    --faixa: #0e1114;
+    --foto-fundo: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 70%);
+}
+
+.moldura {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-radius: .7em;
+    border: .22em solid var(--borda);
+    background: var(--fundo);
+    color: var(--texto);
+    overflow: hidden;
+    box-shadow: 0 .15em .5em rgba(0, 0, 0, .18);
+}
+
+.topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: .35em .45em 0;
+    position: relative;
+    z-index: 2;
+}
+
+.ovr { display: flex; flex-direction: column; align-items: center; }
+.ovr-n { font-size: 1.9em; font-weight: 800; letter-spacing: -.03em; }
+.ovr-pos { font-size: .8em; font-weight: 700; color: var(--texto-suave); }
+.num { font-size: .85em; font-weight: 700; color: var(--texto-suave); margin-left: auto; }
+
+.foto {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    margin-top: -1.9em;
+    background: var(--foto-fundo);
+    overflow: hidden;
+}
+
+.foto ::deep .foto-jogador {
+    border-radius: 0;
+    background: transparent;
+    object-fit: cover;
+    object-position: top center;
+    max-height: 100%;
+    width: 78% !important;
+    height: auto !important;
+    aspect-ratio: 1;
+}
+
+.escudo-grande {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: .4em 1em;
+    background: var(--foto-fundo);
+}
+
+.escudo-grande img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 .2em .3em rgba(0, 0, 0, .3)); }
+
+.faixa {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    padding: .38em .45em;
+    background: var(--faixa);
+    color: var(--faixa-texto);
+    position: relative;
+    z-index: 2;
+}
+
+.escudo-mini { width: 1.35em; height: 1.35em; object-fit: contain; flex-shrink: 0; }
+
+.nome {
+    font-size: .92em;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.nome-longo { font-size: .76em; letter-spacing: 0; }
+.nome-muito-longo { font-size: .64em; letter-spacing: 0; }
+
+.t-escudo .faixa { justify-content: center; }
+
+.destaque {
+    font-size: .68em;
+    font-style: italic;
+    text-align: center;
+    padding: .25em .5em .35em;
+    background: var(--faixa);
+    color: var(--destaque, #f5d36b);
+    position: relative;
+    z-index: 2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.brilho { display: none; }
+
+/* ---- Brilhante: borda dourada e brilho holográfico ---- */
+.r-brilhante {
+    --fundo: linear-gradient(165deg, #fff8e1 0%, #f3dc94 55%, #e7c25a 100%);
+    --borda: #c9971c;
+    --texto: #3d2c00;
+    --texto-suave: #7a5a10;
+    --faixa: linear-gradient(90deg, #8a6400, #c9971c, #8a6400);
+}
+
+[data-bs-theme="dark"] .r-brilhante {
+    --fundo: linear-gradient(165deg, #4a3c18 0%, #2f2610 60%, #1f190a 100%);
+    --borda: #e0b23c;
+    --texto: #fff3cf;
+    --texto-suave: #e9c46a;
+    --faixa: linear-gradient(90deg, #6b4e00, #b8860b, #6b4e00);
+}
+
+.r-brilhante .moldura { box-shadow: 0 0 0 .08em #fff6 inset, 0 .2em .7em rgba(201, 151, 28, .45); }
+
+.r-brilhante .brilho,
+.r-lendaria .brilho {
+    display: block;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    border-radius: inherit;
+    background: linear-gradient(115deg,
+        transparent 25%,
+        rgba(255, 255, 255, .55) 42%,
+        rgba(255, 220, 130, .35) 50%,
+        rgba(140, 220, 255, .25) 56%,
+        transparent 70%);
+    background-size: 250% 250%;
+    background-position: 30% 30%;
+    mix-blend-mode: soft-light;
+}
+
+/* ---- Lendária: moldura especial e holográfico animado ---- */
+.r-lendaria {
+    --fundo: linear-gradient(165deg, #3b1670 0%, #1e0a3c 55%, #0f0420 100%);
+    --borda: #e9c46a;
+    --texto: #fff;
+    --texto-suave: #e9c46a;
+    --faixa: linear-gradient(90deg, #1a0833, #5b21b6, #1a0833);
+    --foto-fundo: radial-gradient(circle at 50% 35%, rgba(233, 196, 106, .35), rgba(233, 196, 106, 0) 70%);
+}
+
+.r-lendaria .moldura {
+    border-width: .26em;
+    box-shadow: 0 0 0 .14em #1e0a3c inset, 0 0 0 .22em #e9c46a inset, 0 .25em .9em rgba(124, 58, 237, .55);
+}
+
+.r-lendaria .brilho {
+    background: linear-gradient(115deg,
+        transparent 15%,
+        rgba(255, 0, 128, .45) 30%,
+        rgba(255, 220, 0, .45) 40%,
+        rgba(0, 255, 170, .45) 50%,
+        rgba(0, 170, 255, .45) 60%,
+        rgba(190, 0, 255, .45) 70%,
+        transparent 85%);
+    background-size: 300% 300%;
+    mix-blend-mode: color-dodge;
+    opacity: .55;
+    animation: holo 6s ease-in-out infinite alternate;
+}
+
+.selo {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    font-size: .6em;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    white-space: nowrap;
+    padding: .15em .7em .2em;
+    border-radius: 0 0 .6em .6em;
+    background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b);
+    color: #2a1a00;
+}
+
+.r-lendaria .topo { padding-top: 1em; }
+
+@keyframes holo {
+    from { background-position: 0% 0%; }
+    to { background-position: 100% 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .r-lendaria .brilho { animation: none; }
+}
+
+/* ---- Marcas ---- */
+.marca-nova,
+.marca-qtd {
+    position: absolute;
+    z-index: 5;
+    font-size: .7em;
+    font-weight: 800;
+    padding: .15em .45em;
+    border-radius: 1em;
+    box-shadow: 0 .1em .3em rgba(0, 0, 0, .3);
+}
+
+.marca-nova { top: -.5em; left: -.4em; background: #dc3545; color: #fff; letter-spacing: .04em; }
+.marca-qtd { bottom: -.5em; right: -.4em; background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); }
+
+/* ---- Vaga vazia ---- */
+.vaga {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: .3em;
+    padding: .5em;
+    text-align: center;
+    border-radius: .7em;
+    border: .15em dashed var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+}
+
+.vaga-num { font-size: 1.6em; font-weight: 800; opacity: .75; }
+.vaga-nome { font-size: .85em; font-weight: 700; text-transform: uppercase; opacity: .8; overflow-wrap: anywhere; }
+.vaga-pos { font-size: .75em; opacity: .7; }
+.vaga.t-escudo { border-style: double; border-width: .3em; }

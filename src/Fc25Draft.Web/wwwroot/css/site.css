@@ -377,3 +377,14 @@ a, .btn-link {
     flex-shrink: 0;
     vertical-align: middle;
 }
+
+/* Álbum de figurinhas: grade de cartas que quebra sozinha conforme a largura. */
+.grade-cartas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem .9rem;
+}
+
+@media (max-width: 575.98px) {
+    .grade-cartas { justify-content: center; gap: .9rem .6rem; --w-max: calc((100vw - 7.5rem) / 2); }
+}

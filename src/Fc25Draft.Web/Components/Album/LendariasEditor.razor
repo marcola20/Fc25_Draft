@@ -1,0 +1,135 @@
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+
+@* Escolha das lendárias do álbum: até 10 jogadores do álbum, cada um com um texto curto opcional. *@
+<div class="lendarias-editor">
+    @if (Escolhidas.Count == 0)
+    {
+        <div class="text-muted small mb-2">Nenhuma lendária escolhida.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>Jogador</th>
+                        <th class="text-center">OVR</th>
+                        <th class="text-center" title="Média de nota do PES na temporada passada">Média @(Temporada - 1)</th>
+                        <th style="min-width: 220px;">Texto da figurinha (opcional)</th>
+                        @if (!Travado)
+                        {
+                            <th></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Escolhidas)
+                    {
+                        var c = Candidato(e.PlayerId);
+                        <tr @key="e.PlayerId">
+                            <td>
+                                <div class="fw-semibold">@(c?.Nome ?? $"#{e.PlayerId}")</div>
+                                <div class="small text-muted">@c?.PosicaoSigla · @c?.TimeNome</div>
+                            </td>
+                            <td class="text-center">@c?.Overall</td>
+                            <td class="text-center small">@Media(c)</td>
+                            <td>
+                                <input class="form-control form-control-sm" maxlength="@AlbumFigurinhas.TamanhoDestaque" placeholder="Ex.: Artilheiro de @(Temporada - 1)"
+                                       value="@e.Destaque" disabled="@Travado" @onchange="ev => e.Destaque = ev.Value?.ToString()" />
+                            </td>
+                            @if (!Travado)
+                            {
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" title="Tirar" @onclick="() => Tirar(e)">✕</button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (!Travado && Escolhidas.Count < AlbumFigurinhas.MaximoLendarias)
+    {
+        <div class="position-relative" style="max-width: 420px;">
+            <input type="search" class="form-control form-control-sm" placeholder="Adicionar jogador do álbum…"
+                   value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
+            @if (Achados.Count > 0)
+            {
+                <div class="list-group position-absolute w-100 shadow-sm" style="z-index: 10;">
+                    @foreach (var c in Achados)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action py-1 small" @onclick="() => Adicionar(c)">
+                            <strong>@c.Nome</strong> · @c.PosicaoSigla @c.Overall · @c.TimeNome
+                            @if (c.MediaNota is not null)
+                            {
+                                <span class="text-muted">· média @Media(c)</span>
+                            }
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+    <div class="small text-muted mt-1">@Escolhidas.Count de @AlbumFigurinhas.MaximoLendarias lendárias.</div>
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    /// <summary>Uma lendária sendo editada na tela.</summary>
+    public sealed class Escolha
+    {
+        public int PlayerId { get; init; }
+        public string? Destaque { get; set; }
+    }
+
+    [Parameter, EditorRequired] public IReadOnlyList<CandidatoLendariaDto> Candidatos { get; set; } = Array.Empty<CandidatoLendariaDto>();
+
+    /// <summary>A lista é editada aqui mesmo; <see cref="OnChange"/> avisa quando entra ou sai alguém.</summary>
+    [Parameter, EditorRequired] public List<Escolha> Escolhidas { get; set; } = new();
+
+    [Parameter] public int Temporada { get; set; }
+
+    [Parameter] public bool Travado { get; set; }
+
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    private string _busca = string.Empty;
+
+    private CandidatoLendariaDto? Candidato(int playerId) => Candidatos.FirstOrDefault(c => c.PlayerId == playerId);
+
+    private static string Media(CandidatoLendariaDto? c) =>
+        c?.MediaNota is { } m ? $"{m.ToString("0.00", Br)} ({c.Jogos} j)" : "—";
+
+    private List<CandidatoLendariaDto> Achados
+    {
+        get
+        {
+            var termo = TextoBusca.Normalizar(_busca);
+            if (termo.Length < 2) return new();
+            return Candidatos
+                .Where(c => Escolhidas.All(e => e.PlayerId != c.PlayerId))
+                .Where(c => TextoBusca.Normalizar(c.Nome).Contains(termo) || TextoBusca.Normalizar(c.TimeNome).Contains(termo))
+                .OrderByDescending(c => c.Overall)
+                .Take(8)
+                .ToList();
+        }
+    }
+
+    private async Task Adicionar(CandidatoLendariaDto c)
+    {
+        if (Escolhidas.Count >= AlbumFigurinhas.MaximoLendarias) return;
+        Escolhidas.Add(new Escolha { PlayerId = c.PlayerId });
+        _busca = string.Empty;
+        await OnChange.InvokeAsync();
+    }
+
+    private async Task Tirar(Escolha e)
+    {
+        Escolhidas.Remove(e);
+        await OnChange.InvokeAsync();
+    }
+}

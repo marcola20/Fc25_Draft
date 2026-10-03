@@ -58,6 +58,10 @@ public class LayoutNavigationService
             new("Picks do Draft", "/picks", "oi oi-tag"),
             new("Loteria do Draft", "/loteria", "oi oi-random")
         }),
+        new("Álbum", new List<MenuItem>
+        {
+            new("Álbum de Figurinhas", "/album", "oi oi-image")
+        }),
         new("História", new List<MenuItem>
         {
             new("Hall da Fama", "/hall-of-fame", "oi oi-badge"),
@@ -84,6 +88,12 @@ public class LayoutNavigationService
             new("Rodar a Loteria", "/admin/loteria", "oi oi-random"),
             new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus"),
             new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star")
+        }, RequiredRole: "Admin", CollapseByDefault: true),
+        new("Admin · Álbum", new List<MenuItem>
+        {
+            new("Lançar o Álbum", "/admin/album", "oi oi-image"),
+            new("Dar Pacotes", "/admin/album/pacotes", "oi oi-box"),
+            new("Figurinhas sem Foto", "/admin/album/sem-foto", "oi oi-camera-slr")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Sistema", new List<MenuItem>
         {
@@ -535,6 +545,30 @@ public class LayoutNavigationService
                 new("Liga"),
                 new("Power Ranking")
             }
+        },
+        ["/album"] = new PageDefinition
+        {
+            Route = "/album",
+            Title = "Álbum de Figurinhas",
+            Subtitle = "Abra pacotes, cole e complete as páginas dos clubes"
+        },
+        ["/admin/album"] = new PageDefinition
+        {
+            Route = "/admin/album",
+            Title = "Lançar o Álbum",
+            Subtitle = "Álbum de figurinhas da temporada e as lendárias — Admin"
+        },
+        ["/admin/album/pacotes"] = new PageDefinition
+        {
+            Route = "/admin/album/pacotes",
+            Title = "Dar Pacotes",
+            Subtitle = "Pacotes do álbum para testes e premiação — Admin"
+        },
+        ["/admin/album/sem-foto"] = new PageDefinition
+        {
+            Route = "/admin/album/sem-foto",
+            Title = "Figurinhas sem Foto",
+            Subtitle = "Jogadores do álbum que ainda saem com a silhueta — Admin"
         },
         ["/admin/hall-of-fame"] = new PageDefinition
         {

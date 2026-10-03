@@ -1,0 +1,295 @@
+@page "/album"
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Album
+@inject IAlbumService AlbumSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject EscudoService Escudos
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Álbum de Figurinhas</PageTitle>
+
+<div class="container-fluid py-3 album-pagina" style="max-width: 1200px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_eu is null)
+    {
+        <div class="alert alert-info">
+            Entre com o seu token (botão <strong>Login</strong> no topo) para ver o seu álbum. O álbum é por pessoa —
+            treinador e auxiliar colecionam separado, e quem troca de clube leva o álbum.
+        </div>
+    }
+    else if (_album is null)
+    {
+        <div class="alert alert-secondary">O álbum desta temporada ainda não foi lançado. Quando sair, ele aparece aqui.</div>
+    }
+    else
+    {
+        var a = _album;
+
+        @* ---- Capa ---- *@
+        <div class="card capa mb-3">
+            <div class="card-body d-flex flex-wrap gap-4 align-items-center">
+                <div class="flex-grow-1" style="min-width: 240px;">
+                    <div class="text-muted small text-uppercase fw-semibold">Temporada @a.Album.Temporada</div>
+                    <h1 class="h3 mb-2">🎴 @a.Album.Nome</h1>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span><strong>@a.Coladas</strong> de @a.Total figurinhas</span>
+                        <span class="fw-semibold">@a.Percentual%</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-valuenow="@a.Percentual" aria-valuemin="0" aria-valuemax="100" style="height: .7rem;">
+                        <div class="progress-bar bg-success" style="width: @(a.Percentual)%"></div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3 mt-2 small">
+                        <span class="raridade-chip comum">Comuns <strong>@a.ColadasPorRaridade.Comuns</strong>/@a.TotalPorRaridade.Comuns</span>
+                        <span class="raridade-chip brilhante">✨ Brilhantes <strong>@a.ColadasPorRaridade.Brilhantes</strong>/@a.TotalPorRaridade.Brilhantes</span>
+                        @if (a.TotalPorRaridade.Lendarias > 0)
+                        {
+                            <span class="raridade-chip lendaria">★ Lendárias <strong>@a.ColadasPorRaridade.Lendarias</strong>/@a.TotalPorRaridade.Lendarias</span>
+                        }
+                        <span class="text-muted">🔁 @a.Repetidas repetida@(a.Repetidas == 1 ? "" : "s")</span>
+                    </div>
+                </div>
+                <div class="text-center pacotes">
+                    <div class="pacote-icone" aria-hidden="true">🎁</div>
+                    <div class="fw-bold fs-4 lh-1">@a.PacotesParaAbrir</div>
+                    <div class="small text-muted mb-2">pacote@(a.PacotesParaAbrir == 1 ? "" : "s") para abrir</div>
+                    <button class="btn btn-primary" disabled="@(a.PacotesParaAbrir == 0 || _abrindo)" @onclick="AbrirAsync">
+                        @(_abrindo ? "Abrindo…" : "Abrir pacote")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* ---- Pacote aberto ---- *@
+        @if (_aberto is { } p)
+        {
+            <div class="card mb-3 pacote-aberto">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <strong>🎁 Pacote aberto</strong>
+                    @if (p.Motivo is not null)
+                    {
+                        <span class="small text-muted">· @p.Motivo</span>
+                    }
+                    <span class="small text-muted ms-auto">
+                        @p.Figurinhas.Count(f => f.Nova) nova@(p.Figurinhas.Count(f => f.Nova) == 1 ? "" : "s") ·
+                        @p.Figurinhas.Count(f => !f.Nova) repetida@(p.Figurinhas.Count(f => !f.Nova) == 1 ? "" : "s")
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="grade-cartas justify-content-center">
+                        @foreach (var t in p.Figurinhas)
+                        {
+                            <div class="d-flex flex-column align-items-center gap-2">
+                                <CartaFigurinha Figurinha="@t.Figurinha" Largura="150" Nova="@t.Nova" Lazy="false"
+                                                SeloLendaria="@Selo" />
+                                <span class="small @(t.Nova ? "text-success fw-semibold" : "text-muted")">
+                                    @(t.Nova ? "Colada no álbum" : $"Repetida (agora tem {t.QuantidadeAgora})")
+                                </span>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-center gap-2 mt-3">
+                        @if (p.PacotesRestantes > 0)
+                        {
+                            <button class="btn btn-primary" disabled="@_abrindo" @onclick="AbrirAsync">Abrir o próximo (@p.PacotesRestantes)</button>
+                        }
+                        <button class="btn btn-outline-secondary" @onclick="() => _aberto = null">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ---- Filtros ---- *@
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+            <input type="search" class="form-control" style="max-width: 280px;" placeholder="Buscar jogador ou número"
+                   value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="soFaltam" checked="@_soFaltam" @onchange="e => _soFaltam = e.Value is true" />
+                <label class="form-check-label" for="soFaltam">Só as que faltam</label>
+            </div>
+            @if (_pagina is not null)
+            {
+                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Índice</a>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_busca))
+        {
+            var achadas = Filtrar(a.Paginas.SelectMany(pg => pg.Vagas)).Where(Bate).ToList();
+            <h2 class="h6 text-muted mb-2">@achadas.Count figurinha@(achadas.Count == 1 ? "" : "s") para “@_busca”</h2>
+            <div class="grade-cartas">
+                @foreach (var v in achadas.Take(60))
+                {
+                    <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="@(!v.Colada)" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo" />
+                }
+            </div>
+        }
+        else if (_pagina is { } pg)
+        {
+            @* ---- Página do clube ---- *@
+            var indice = a.Paginas.ToList().FindIndex(x => x.TeamId == pg.TeamId);
+            var anterior = indice > 0 ? a.Paginas[indice - 1] : null;
+            var proxima = indice < a.Paginas.Count - 1 ? a.Paginas[indice + 1] : null;
+
+            <div class="card pagina-clube">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <img src="@Escudos.GetEscudo(pg.TimeNome)" alt="" width="36" height="36" style="object-fit: contain;" />
+                    <div class="me-auto">
+                        <div class="fw-bold">@pg.TimeNome</div>
+                        <div class="small text-muted">
+                            @pg.Coladas de @pg.Total · @pg.Percentual%
+                            @if (pg.Completa)
+                            {
+                                <span class="badge text-bg-success ms-1">✓ Página completa</span>
+                            }
+                        </div>
+                    </div>
+                    @if (anterior is not null)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="/album?clube=@anterior.TeamId" title="@anterior.TimeNome">‹ Anterior</a>
+                    }
+                    @if (proxima is not null)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="/album?clube=@proxima.TeamId" title="@proxima.TimeNome">Próxima ›</a>
+                    }
+                </div>
+                <div class="card-body">
+                    @{ var vagas = Filtrar(pg.Vagas).ToList(); }
+                    @if (vagas.Count == 0)
+                    {
+                        <div class="text-muted">Não falta nenhuma. 🎉</div>
+                    }
+                    <div class="grade-cartas">
+                        @foreach (var v in vagas)
+                        {
+                            <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="@(!v.Colada)" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo" />
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            @* ---- Índice ---- *@
+            <div class="indice">
+                @foreach (var pagina in a.Paginas)
+                {
+                    <a class="indice-item card text-reset text-decoration-none @(pagina.Completa ? "completa" : "")" href="/album?clube=@pagina.TeamId">
+                        <div class="card-body d-flex align-items-center gap-2 p-2">
+                            <img src="@Escudos.GetEscudo(pagina.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" loading="lazy" />
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-semibold text-truncate">@pagina.TimeNome</div>
+                                <div class="progress mt-1" style="height: .35rem;">
+                                    <div class="progress-bar @(pagina.Completa ? "bg-success" : "")" style="width: @(pagina.Percentual)%"></div>
+                                </div>
+                                <div class="small text-muted mt-1">@pagina.Coladas/@pagina.Total</div>
+                            </div>
+                            @if (pagina.Completa)
+                            {
+                                <span class="selo-completa" title="Página completa">✓</span>
+                            }
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "clube")]
+    public Guid? Clube { get; set; }
+
+    private bool _carregando = true;
+    private bool _abrindo;
+    private string? _erro;
+
+    private TreinadorDto? _eu;
+    private MeuAlbumDto? _album;
+    private PacoteAbertoDto? _aberto;
+    private PaginaDoAlbumDto? _pagina;
+
+    private string _busca = string.Empty;
+    private bool _soFaltam;
+
+    private string? Selo => _album is null ? null : $"Melhores de {_album.Album.Temporada - 1}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        await CarregarAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_carregando) await AbrirPaginaAsync();
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+            _album = _eu is null ? null : await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+
+        await AbrirPaginaAsync();
+    }
+
+    /// <summary>A página do clube pedida no endereço. As novas que aparecem nela deixam de ser novas da próxima vez.</summary>
+    private async Task AbrirPaginaAsync()
+    {
+        _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+        if (_pagina is null || _eu is null) return;
+
+        var novas = _pagina.Vagas.Where(v => v.Nova).Select(v => v.Figurinha.FigurinhaId).ToList();
+        if (novas.Count == 0) return;
+        try { await AlbumSvc.MarcarVistasAsync(_eu.TreinadorId, novas, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task AbrirAsync()
+    {
+        if (_eu is null) return;
+        _abrindo = true;
+        _erro = null;
+        try
+        {
+            _aberto = await AlbumSvc.AbrirPacoteAsync(_eu.TreinadorId, CancellationToken.None);
+            _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
+            _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _abrindo = false; }
+    }
+
+    private IEnumerable<VagaDoAlbumDto> Filtrar(IEnumerable<VagaDoAlbumDto> vagas) =>
+        _soFaltam ? vagas.Where(v => !v.Colada) : vagas;
+
+    private bool Bate(VagaDoAlbumDto v)
+    {
+        var termo = _busca.Trim().TrimStart('#');
+        if (termo.Length == 0) return true;
+        if (int.TryParse(termo, out var numero)) return v.Figurinha.Numero == numero;
+        var normal = TextoBusca.Normalizar(termo);
+        return TextoBusca.Normalizar(v.Figurinha.NomeImpresso).Contains(normal) || TextoBusca.Normalizar(v.Figurinha.TimeNome).Contains(normal);
+    }
+}

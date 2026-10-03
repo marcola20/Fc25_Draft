@@ -1,0 +1,122 @@
+@page "/admin/album/sem-foto"
+@using Fc25Draft.Core.Utilities
+@attribute [Authorize(Roles = "Admin")]
+@inject IAlbumService AlbumSvc
+@inject EscudoService Escudos
+
+<PageTitle>Figurinhas sem foto — Admin</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1000px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_albuns.Count == 0)
+    {
+        <div class="alert alert-secondary">Nenhum álbum lançado ainda. <a href="/admin/album">Lançar o álbum</a></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <select class="form-select w-auto" value="@_albumId" @onchange="TrocarAlbumAsync">
+                @foreach (var a in _albuns)
+                {
+                    <option value="@a.AlbumId">@a.Nome</option>
+                }
+            </select>
+            <input type="search" class="form-control" style="max-width: 240px;" placeholder="Filtrar jogador ou clube"
+                   value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
+            <span class="small text-muted ms-auto">
+                Abre o jogador e troca a foto por lá (botão de trocar foto na ficha). A figurinha usa a foto de hoje.
+            </span>
+        </div>
+
+        @if (_semFoto.Count == 0)
+        {
+            <div class="alert alert-success">Todo mundo do álbum tem foto. 🎉</div>
+        }
+        else
+        {
+            var filtrados = _semFoto.Where(Bate).ToList();
+            <p class="small text-muted">@_semFoto.Count jogador@(_semFoto.Count == 1 ? "" : "es") sem foto.</p>
+            @foreach (var clube in filtrados.GroupBy(f => (f.TeamId, f.TimeNome)))
+            {
+                <div class="card mb-2">
+                    <div class="card-header py-2 d-flex align-items-center gap-2">
+                        <img src="@Escudos.GetEscudo(clube.Key.TimeNome)" alt="" width="22" height="22" style="object-fit: contain;" />
+                        <strong>@clube.Key.TimeNome</strong>
+                        <span class="badge text-bg-warning ms-auto">@clube.Count()</span>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var f in clube)
+                        {
+                            <li class="list-group-item d-flex align-items-center gap-2 py-1">
+                                <span class="text-muted small" style="width: 3.2rem;">@AlbumFigurinhas.NumeroImpresso(f.Numero)</span>
+                                <span class="badge text-bg-secondary" style="width: 2.6rem;">@f.PosicaoSigla</span>
+                                <span class="flex-grow-1">
+                                    @f.Nome <span class="text-muted small">· @f.Overall</span>
+                                    @if (f.Raridade == RaridadeFigurinha.Lendaria)
+                                    {
+                                        <span class="badge text-bg-dark ms-1">★ lendária</span>
+                                    }
+                                    else if (f.Raridade == RaridadeFigurinha.Brilhante)
+                                    {
+                                        <span class="badge text-bg-warning ms-1">✨ brilhante</span>
+                                    }
+                                </span>
+                                <a class="btn btn-sm btn-outline-primary" href="/players/details/@f.PlayerId" target="_blank">Trocar foto</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private string? _erro;
+
+    private IReadOnlyList<AlbumDto> _albuns = Array.Empty<AlbumDto>();
+    private Guid _albumId;
+    private IReadOnlyList<FigurinhaSemFotoDto> _semFoto = Array.Empty<FigurinhaSemFotoDto>();
+    private string _busca = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _albuns = await AlbumSvc.ListarAsync(CancellationToken.None);
+            var inicial = _albuns.FirstOrDefault(a => a.Ativo) ?? _albuns.FirstOrDefault();
+            if (inicial is not null)
+            {
+                _albumId = inicial.AlbumId;
+                _semFoto = await AlbumSvc.SemFotoAsync(_albumId, CancellationToken.None);
+            }
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task TrocarAlbumAsync(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+        _albumId = id;
+        try { _semFoto = await AlbumSvc.SemFotoAsync(id, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private bool Bate(FigurinhaSemFotoDto f)
+    {
+        var termo = TextoBusca.Normalizar(_busca);
+        return termo.Length == 0
+               || TextoBusca.Normalizar(f.Nome).Contains(termo)
+               || TextoBusca.Normalizar(f.TimeNome).Contains(termo);
+    }
+}

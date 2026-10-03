@@ -1,0 +1,46 @@
+.capa {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(25, 135, 84, .12), transparent 55%),
+        var(--bs-card-bg, var(--bs-body-bg));
+}
+
+.pacotes { min-width: 150px; }
+.pacote-icone { font-size: 2.2rem; line-height: 1; margin-bottom: .2rem; }
+
+.raridade-chip {
+    padding: .1rem .55rem;
+    border-radius: 1rem;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+}
+
+.raridade-chip.brilhante { border-color: #c9971c; color: var(--cbfv-dourado); }
+.raridade-chip.lendaria { border-color: var(--cbfv-roxo); color: var(--cbfv-roxo); }
+
+.pacote-aberto { border-color: #c9971c; }
+
+/* Índice: um cartão por clube. */
+.indice {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: .6rem;
+}
+
+.indice-item { transition: transform .12s ease, box-shadow .12s ease; }
+.indice-item:hover { transform: translateY(-2px); box-shadow: 0 .3rem .8rem rgba(0, 0, 0, .12); }
+.indice-item.completa { border-color: var(--bs-success); }
+
+.selo-completa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--bs-success);
+    color: #fff;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.min-w-0 { min-width: 0; }
