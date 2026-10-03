@@ -155,15 +155,16 @@ public static class LigaEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
         });
 
-        // Resultado simulado no PES 2021 (JSON do Auto_PES21). ?simular=true confere sem gravar.
-        admin.MapPost("/resultados-pes", async (JsonElement corpo, bool? simular, IResultadoPesService svc, CancellationToken ct) =>
+        // Resultado simulado no PES 2021 (JSON do Auto_PES21). ?simular=true confere sem gravar;
+        // ?partida=<id> (reenvio) = partida que recebeu o envio anterior do mesmo JSON.
+        admin.MapPost("/resultados-pes", async (JsonElement corpo, bool? simular, Guid? partida, IResultadoPesService svc, CancellationToken ct) =>
         {
             ResultadoPesRequest? request;
             try { request = corpo.Deserialize<ResultadoPesRequest>(); }
             catch (JsonException ex) { return Results.BadRequest(new { message = $"JSON inválido: {ex.Message}" }); }
             if (request is null) return Results.BadRequest(new { message = "JSON vazio." });
 
-            try { return Results.Ok(await svc.ImportarAsync(request, corpo.GetRawText(), simular ?? false, ct)); }
+            try { return Results.Ok(await svc.ImportarAsync(request, corpo.GetRawText(), partida, simular ?? false, ct)); }
             catch (ResultadoPesException ex)
             {
                 var body = new { message = ex.Message, candidatos = ex.Candidatos };
