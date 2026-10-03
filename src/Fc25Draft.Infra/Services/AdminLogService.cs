@@ -57,6 +57,9 @@ public class AdminLogService : IAdminLogService
         AdminActionType.MovePlayer => "Moveu jogador",
         AdminActionType.ResetMarketItemBids => "Zerou os lances de um item",
         AdminActionType.CancelOffer => "Cancelou proposta",
+        AdminActionType.LancarAlbum => "Lançou o álbum de figurinhas",
+        AdminActionType.DarPacotes => "Deu pacotes do álbum",
+        AdminActionType.AjustarLendarias => "Trocou as lendárias do álbum",
         _ => tipo.ToString()
     };
 
@@ -79,6 +82,12 @@ public class AdminLogService : IAdminLogService
         "removedbids" => "Lances removidos",
         "previousleaderteamid" => "Quem liderava",
         "releasedamount" => "Valor liberado",
+        "album" => "Álbum",
+        "treinador" => "Para",
+        "quantidade" => "Pacotes",
+        "clubes" => "Clubes",
+        "figurinhas" => "Figurinhas",
+        "lendarias" => "Lendárias",
         _ => chave
     };
 

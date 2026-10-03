@@ -117,6 +117,11 @@ public class DraftDbContext : DbContext
     public DbSet<DraftWishlistEdicao> DraftWishlistEdicoes => Set<DraftWishlistEdicao>();
     public DbSet<DraftWishlistEntry> DraftWishlistEntries => Set<DraftWishlistEntry>();
 
+    public DbSet<Album> Albuns => Set<Album>();
+    public DbSet<Figurinha> Figurinhas => Set<Figurinha>();
+    public DbSet<FigurinhaDoTreinador> FigurinhasDosTreinadores => Set<FigurinhaDoTreinador>();
+    public DbSet<PacoteGanho> PacotesGanhos => Set<PacoteGanho>();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.HasPostgresExtension("unaccent");

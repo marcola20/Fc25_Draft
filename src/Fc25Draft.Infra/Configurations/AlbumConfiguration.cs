@@ -1,0 +1,77 @@
+using Fc25Draft.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Fc25Draft.Infra.Configurations;
+
+public class AlbumConfiguration : IEntityTypeConfiguration<Album>
+{
+    public void Configure(EntityTypeBuilder<Album> b)
+    {
+        b.ToTable("Albuns");
+        b.HasKey(x => x.AlbumId);
+
+        b.Property(x => x.Nome).HasMaxLength(80).IsRequired();
+
+        // Um álbum por temporada.
+        b.HasIndex(x => x.Temporada).IsUnique();
+
+        b.HasMany(x => x.Figurinhas)
+            .WithOne(x => x.Album)
+            .HasForeignKey(x => x.AlbumId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class FigurinhaConfiguration : IEntityTypeConfiguration<Figurinha>
+{
+    public void Configure(EntityTypeBuilder<Figurinha> b)
+    {
+        b.ToTable("Figurinhas");
+        b.HasKey(x => x.FigurinhaId);
+
+        b.Property(x => x.NomeImpresso).HasMaxLength(120).IsRequired();
+        b.Property(x => x.PosicaoSigla).HasMaxLength(5);
+        b.Property(x => x.Destaque).HasMaxLength(80);
+
+        b.HasIndex(x => new { x.AlbumId, x.Numero }).IsUnique();
+        b.HasIndex(x => new { x.AlbumId, x.Raridade });
+
+        b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Jogador).WithMany().HasForeignKey(x => x.PlayerId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class FigurinhaDoTreinadorConfiguration : IEntityTypeConfiguration<FigurinhaDoTreinador>
+{
+    public void Configure(EntityTypeBuilder<FigurinhaDoTreinador> b)
+    {
+        b.ToTable("FigurinhasDosTreinadores");
+        b.HasKey(x => new { x.TreinadorId, x.FigurinhaId });
+
+        b.HasIndex(x => x.FigurinhaId);
+
+        b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Figurinha).WithMany().HasForeignKey(x => x.FigurinhaId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class PacoteGanhoConfiguration : IEntityTypeConfiguration<PacoteGanho>
+{
+    public void Configure(EntityTypeBuilder<PacoteGanho> b)
+    {
+        b.ToTable("PacotesGanhos");
+        b.HasKey(x => x.PacoteId);
+
+        b.Property(x => x.Origem).HasMaxLength(20).IsRequired();
+        b.Property(x => x.Chave).HasMaxLength(80).IsRequired();
+        b.Property(x => x.Motivo).HasMaxLength(200);
+
+        // Reconciliar de novo nunca dá pacote em dobro.
+        b.HasIndex(x => new { x.TreinadorId, x.Chave }).IsUnique();
+        b.HasIndex(x => new { x.TreinadorId, x.AbertoEm });
+
+        b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

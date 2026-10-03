@@ -9,5 +9,8 @@ public enum AdminActionType
     SwapPlayers = 4,
     MovePlayer = 5,
     ResetMarketItemBids = 6,
-    CancelOffer = 7
+    CancelOffer = 7,
+    LancarAlbum = 8,
+    DarPacotes = 9,
+    AjustarLendarias = 10
 }
