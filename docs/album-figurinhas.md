@@ -19,6 +19,7 @@ treinadores e quem completa páginas e o álbum ganha selo e lugar no Hall da Fa
 | Dono das figurinhas | A **pessoa** (`Treinador`), não o clube — igual ao bolão. Treinador e auxiliar têm álbuns separados; quem troca de clube leva o álbum. |
 | Como ganha pacote | **1 por dia** (resgatado no site) · **bolão: 1 a cada X pontos** · **vitória do seu time: 1 pacote**. O admin também pode dar pacotes (testes, premiação). |
 | Prêmio | **Selo** por página completa e **Hall da Fama** (seção Colecionadores) para quem completa o álbum. Não mexe no caixa dos times. |
+| Técnicos no álbum | Treinador e auxiliar de cada clube viram figurinha especial "Técnico" (sorteada como brilhante), com a foto e o perfil que a própria pessoa monta (Fase 5). |
 
 ## Como o álbum é montado
 
@@ -231,6 +232,48 @@ repetidas (ex.: 6 repetidas → 1 pacote).
   Fulano", Nova proposta; `?aba=` abre direto numa aba), link com contador de propostas esperando resposta
   na capa do `/album` e no cartão da Minha Área (`TrocasEsperando` no `MeuAlbumDto` e no resumo), item
   "Trocas" no menu do Álbum.
+
+### Fase 5 — Perfil do treinador e figurinha de técnico
+Decisões (04/10/2026): **treinador e auxiliar** viram figurinha; raridade **especial "Técnico"**
+(visual próprio, sorteada como brilhante); perfil **editado livremente** pela pessoa, com o admin
+podendo apagar o que passar do ponto; esquema favorito numa **lista fixa**.
+
+**Perfil**
+- Entidade `PerfilTreinador` (uma por `Treinador`, tabela própria para não pesar a `Treinadores`):
+  `Apelido` (até 30), `Frase` (frase de efeito, até 120), `Esquema` (da lista fixa), foto (`Imagem`,
+  `ContentType`, `FotoAtualizadaEm`) e `AtualizadoEm`.
+- Lista fixa de esquemas em Core (ex.: 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 3-4-3, 5-3-2, 4-1-2-1-2,
+  4-5-1, 4-1-4-1, 5-4-1), cada um com as posições para desenhar um **campinho** (componente SVG
+  reaproveitado no perfil e na figurinha).
+- Foto no mesmo esquema da foto de jogador: `GET /fotos/treinadores/{treinadorId}` (anônimo, `?v=` para
+  cache longo), silhueta própria quando não tem foto, limite de 300 KB WebP/PNG/JPEG. No envio, recortar
+  quadrado e reduzir no navegador antes de subir (ver como a troca de foto de jogador já faz, se fizer).
+  Componente `FotoTreinador` no molde do `FotoJogador`.
+- Nome na tela: onde o espaço é curto (chat, rankings) mostra o apelido, se tiver, com o nome completo
+  na dica; no perfil e na figurinha aparecem os dois.
+- Edição: cartão "Meu perfil" na Minha Área (foto, apelido, frase, esquema com prévia do campinho).
+- Admin: em `/admin/treinadores`, apagar foto, apelido ou frase de alguém, com registro no Log de Ações.
+- Onde aparece: chat do telão (foto ao lado do nome), página do time (cartão da comissão técnica com
+  foto, apelido, frase e campinho), carreira do treinador, ranking do bolão, colecionadores e trocas do
+  álbum. A coletiva, quando existir, usa o mesmo componente.
+
+**Figurinha de técnico**
+- `TipoFigurinha.Treinador`, com `Figurinha.TreinadorId` e o papel (técnico ou auxiliar) do lançamento.
+  Para o sorteio conta como **brilhante**; o visual é próprio (moldura de técnico, prancheta, campinho
+  do esquema favorito, frase no rodapé).
+- Na página do clube: escudo, técnico, auxiliar e depois o elenco. Entram as pessoas com passagem aberta
+  no clube no lançamento; quem está sem clube não ganha figurinha.
+- Retrato do momento só para clube, papel e nome; foto, apelido, frase e esquema são lidos na hora, então
+  quem atualizar o perfil depois do lançamento atualiza a figurinha.
+- Só vale para álbuns lançados depois desta fase (não mexer na numeração de álbum já lançado). A prévia do
+  `/admin/album` mostra quantos técnicos entram e quantos estão sem foto; a tela de sem foto lista os
+  técnicos também, com link para o admin avisar ou apagar.
+- Tirar a própria figurinha no pacote ganha um destaque ("Você se tirou!").
+
+**Pronto quando:** no banco local, um treinador de teste monta o perfil com foto, apelido, frase e
+esquema; tudo aparece no chat do telão, na página do time e na carreira; o admin apaga a frase e ela
+some; relançar o álbum 2010 local põe técnico e auxiliar na página do clube com o visual de técnico;
+abrir pacotes até sair uma figurinha de técnico mostra a foto atual do perfil; celular sem rolagem para o lado.
 
 ## Ideias para depois
 
