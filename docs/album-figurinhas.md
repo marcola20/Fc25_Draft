@@ -159,6 +159,26 @@ aviso no celular; cartão na Minha Área; ajuste do X do bolão no admin.
 **Pronto quando:** encerrar um jogo no banco local dá pacote aos dois do clube vencedor, rodar a
 reconciliação duas vezes não duplica, e o pacote do dia só sai uma vez por dia.
 
+**Feito (03/10/2026).** Como ficou, para as próximas fases:
+- Chaves e textos em `AlbumFigurinhas` (`ChaveDiario`, `ChaveVitoria`, `ChaveBolao`, `DeOndeVeio`,
+  `AvisoDePacotes`). Pacote do dia: `IAlbumService.PegarPacoteDoDiaAsync`, data de Brasília
+  (`HorarioDeBrasilia`, o equivalente do `BrazilTime` no Core/Infra); clique duplo cai no índice único.
+- Reconciliação: `IAlbumService.ReconciliarAsync`, chamada pelo `PacotesDoAlbumService` (Web/Services,
+  a cada 5 min) e pelo botão "Conferir vitórias e bolão agora" em `/admin/album/pacotes`. Conta só
+  partidas `Encerrada` com `EncerradaEm >= LancadoEm` do álbum ativo. Vencedor pelo placar ou pelos
+  pênaltis; empate não dá pacote; W.O. entra pelo placar de 2x0. Dia do jogo = `DataHora` da rodada
+  (Brasília) ou, sem data, o dia do encerramento. Bolão: só jogos da temporada do álbum encerrados
+  depois do lançamento, mesma conta do `BolaoPontuacao` (sem pênaltis).
+- X do bolão: coluna `Album.PontosBolaoPorPacote` (padrão 30), editada em `/admin/album` e registrada
+  no log (`AjustarPontosBolao`). O projeto não tem tabela genérica de configurações (cada assunto tem a
+  sua linha única, como `TransferConfig`), e o X é por álbum/temporada, então ficou no próprio álbum.
+  Mudar o X nunca tira pacote; baixar dá os que passaram a ser devidos.
+- Aviso no celular: `IPushService.AvisarPacotesGanhosAsync`, uma marca `pacote:{id}` por pacote em
+  `NotificacoesEnviadas`, um aviso por pessoa juntando os novos. Não avisa o pacote do dia (a pessoa
+  pegou no site), pacote já aberto nem pacote com mais de 1 dia.
+- Telas: botão do pacote do dia e lista "Fechados" (de onde veio cada um) na capa do `/album`;
+  cartão `Components/Album/AlbumCartao` na Minha Área.
+
 ### Fase 3 — Experiência
 Animação de abrir pacote, holográfico, compartilhar a carta, feed "últimas raras tiradas",
 ranking de colecionadores, selos de página completa, Hall da Fama (Colecionadores).

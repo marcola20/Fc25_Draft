@@ -12,6 +12,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Fc25Draft.Infra.Data
 @using Fc25Draft.Web.Components.Layouts
+@using Fc25Draft.Web.Components.Album
 @implements IAsyncDisposable
 
 <PageTitle>Minha Área</PageTitle>
@@ -100,6 +101,8 @@
                 </ul>
             </div>
         }
+
+        <AlbumCartao />
 
         <NotificacoesCelular />
 

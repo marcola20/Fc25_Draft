@@ -15,6 +15,10 @@
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
     }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
 
     @if (_carregando)
     {
@@ -65,8 +69,37 @@
                     <button class="btn btn-primary" disabled="@(a.PacotesParaAbrir == 0 || _abrindo)" @onclick="AbrirAsync">
                         @(_abrindo ? "Abrindo…" : "Abrir pacote")
                     </button>
+                    @if (a.PacoteDoDiaDisponivel)
+                    {
+                        <button class="btn btn-outline-success d-block w-100 mt-2" disabled="@_pegandoDoDia" @onclick="PegarDoDiaAsync">
+                            🌅 Pegar o pacote do dia
+                        </button>
+                    }
+                    else if (a.Album.Ativo)
+                    {
+                        <div class="small text-muted mt-2">Pacote do dia pego ✓<br />Amanhã tem outro.</div>
+                    }
                 </div>
             </div>
+            @if (a.Fechados.Count > 0)
+            {
+                @* De onde veio cada pacote fechado, na ordem em que vão ser abertos. *@
+                var grupos = a.Fechados
+                    .GroupBy(f => f.DeOndeVeio)
+                    .Select(g => (Texto: g.Key, Origem: g.First().Origem, Quantos: g.Count()))
+                    .ToList();
+                <div class="card-footer bg-transparent small">
+                    <span class="text-muted me-1">Fechados:</span>
+                    @foreach (var g in grupos.Take(MaximoDeOrigens))
+                    {
+                        <span class="pacote-origem @g.Origem">@IconeDaOrigem(g.Origem) @g.Texto@(g.Quantos > 1 ? $" ×{g.Quantos}" : "")</span>
+                    }
+                    @if (grupos.Count > MaximoDeOrigens)
+                    {
+                        <span class="text-muted">e mais @(grupos.Skip(MaximoDeOrigens).Sum(g => g.Quantos))</span>
+                    }
+                </div>
+            }
         </div>
 
         @* ---- Pacote aberto ---- *@
@@ -75,10 +108,7 @@
             <div class="card mb-3 pacote-aberto">
                 <div class="card-header d-flex flex-wrap align-items-center gap-2">
                     <strong>🎁 Pacote aberto</strong>
-                    @if (p.Motivo is not null)
-                    {
-                        <span class="small text-muted">· @p.Motivo</span>
-                    }
+                    <span class="small text-muted">· @IconeDaOrigem(p.Origem) @AlbumFigurinhas.DeOndeVeio(p.Origem, p.Motivo)</span>
                     <span class="small text-muted ms-auto">
                         @p.Figurinhas.Count(f => f.Nova) nova@(p.Figurinhas.Count(f => f.Nova) == 1 ? "" : "s") ·
                         @p.Figurinhas.Count(f => !f.Nova) repetida@(p.Figurinhas.Count(f => !f.Nova) == 1 ? "" : "s")
@@ -210,8 +240,12 @@
     public Guid? Clube { get; set; }
 
     private bool _carregando = true;
+    private const int MaximoDeOrigens = 12;
+
     private bool _abrindo;
+    private bool _pegandoDoDia;
     private string? _erro;
+    private string? _ok;
 
     private TreinadorDto? _eu;
     private MeuAlbumDto? _album;
@@ -266,11 +300,37 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
+    private async Task PegarDoDiaAsync()
+    {
+        if (_eu is null) return;
+        _pegandoDoDia = true;
+        _erro = null;
+        try
+        {
+            var ganhou = await AlbumSvc.PegarPacoteDoDiaAsync(_eu.TreinadorId, CancellationToken.None);
+            _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
+            _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+            _ok = ganhou ? "Pacote do dia na mão. É só abrir!" : "Você já pegou o pacote de hoje. Amanhã tem outro.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _pegandoDoDia = false; }
+    }
+
+    private static string IconeDaOrigem(string origem) => origem switch
+    {
+        PacoteGanho.OrigemDiario => "🌅",
+        PacoteGanho.OrigemVitoria => "🏆",
+        PacoteGanho.OrigemBolao => "🎯",
+        PacoteGanho.OrigemAdmin => "🎁",
+        _ => "🎴"
+    };
+
     private async Task AbrirAsync()
     {
         if (_eu is null) return;
         _abrindo = true;
         _erro = null;
+        _ok = null;
         try
         {
             _aberto = await AlbumSvc.AbrirPacoteAsync(_eu.TreinadorId, CancellationToken.None);

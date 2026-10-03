@@ -68,7 +68,32 @@
                     <hr />
                     <div class="small text-muted">
                         @ad.PacotesDados pacotes dados · @ad.PacotesAbertos abertos · @ad.Colecionadores colecionador@(ad.Colecionadores == 1 ? "" : "es")
+                        @if (ad.PacotesPorOrigem.Count > 0)
+                        {
+                            <span>
+                                (@string.Join(" · ", ad.PacotesPorOrigem.OrderByDescending(o => o.Value).Select(o => $"{o.Value} {NomeDaOrigem(o.Key)}")))
+                            </span>
+                        }
                     </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-bold">🎯 Pacotes do bolão</div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                        <div>
+                            <label class="form-label">Pontos por pacote</label>
+                            <input type="number" class="form-control" style="width: 8rem;" min="1" max="1000" @bind="_pontosBolao" />
+                        </div>
+                        <button class="btn btn-success" disabled="@(_salvando || _pontosBolao == ad.PontosBolaoPorPacote)" @onclick="SalvarPontosBolaoAsync">💾 Salvar</button>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">
+                        A cada @ad.PontosBolaoPorPacote pontos no bolão de @ad.Album.Temporada (só jogos encerrados depois do
+                        lançamento) a pessoa ganha 1 pacote. Mudar não tira pacote de ninguém: baixando, a próxima reconciliação
+                        (a cada 5 minutos) dá os que passaram a ser devidos. Vitórias dão 1 pacote ao treinador e ao auxiliar
+                        do vencedor; o pacote do dia sai uma vez por dia por pessoa.
+                    </p>
                 </div>
             </div>
 
@@ -182,6 +207,7 @@
     private AlbumPreviaDto? _previa;
     private List<LendariasEditor.Escolha> _escolhidas = new();
     private string? _nome;
+    private int _pontosBolao;
 
     protected override async Task OnInitializedAsync()
     {
@@ -220,6 +246,7 @@
             if (album is not null)
             {
                 _admin = await AlbumSvc.GetAdminAsync(album.AlbumId, CancellationToken.None);
+                _pontosBolao = _admin?.PontosBolaoPorPacote ?? 0;
                 _escolhidas = _admin?.Lendarias
                     .Select(f => new LendariasEditor.Escolha { PlayerId = f.PlayerId!.Value, Destaque = f.Destaque })
                     .ToList() ?? new();
@@ -273,6 +300,30 @@
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }
     }
+
+    private async Task SalvarPontosBolaoAsync()
+    {
+        if (_admin is null) return;
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await AlbumSvc.SalvarPontosBolaoAsync(_admin.Album.AlbumId, _pontosBolao, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            await CarregarTemporadaAsync();
+            _ok = $"Agora é 1 pacote a cada {_pontosBolao} pontos no bolão.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private static string NomeDaOrigem(string origem) => origem switch
+    {
+        PacoteGanho.OrigemDiario => "do dia",
+        PacoteGanho.OrigemVitoria => "por vitória",
+        PacoteGanho.OrigemBolao => "do bolão",
+        PacoteGanho.OrigemAdmin => "da organização",
+        _ => origem
+    };
 
     private async Task SalvarLendariasAsync()
     {
