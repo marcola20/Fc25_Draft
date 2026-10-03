@@ -248,6 +248,24 @@ public class ResultadoPesService : IResultadoPesService
         if (candidatos.Count > 1 && candidatos.FirstOrDefault(c => partidaAnterior is not null && c.PartidaId == partidaAnterior) is { } anterior)
             candidatos = [anterior];
 
+        // Reenvio sem o id (o primeiro envio gravou, mas a resposta não chegou ao script): a
+        // partida que já tem este vídeo. Sem isto ela, já encerrada, perderia para a do mesmo par
+        // ainda não jogada na outra competição, e o jogo entraria nas duas.
+        if (candidatos.Count > 1)
+        {
+            var ids = candidatos.Where(c => c.PartidaId is not null).Select(c => c.PartidaId!.Value).ToList();
+            var importadas = await _db.LigaPartidaImportacoes.AsNoTracking()
+                .Where(i => ids.Contains(i.PartidaId))
+                .Select(i => new { i.PartidaId, i.Video, i.Json })
+                .ToListAsync(ct);
+            var comEsteVideo = importadas
+                .Where(i => MesmoVideo(i.Video, GravadoEm(i.Json), r))
+                .Select(i => i.PartidaId)
+                .ToHashSet();
+            if (comEsteVideo.Count == 1)
+                candidatos = candidatos.Where(c => c.PartidaId is Guid id && comEsteVideo.Contains(id)).ToList();
+        }
+
         // O mesmo par pode ter o jogo da rodada e um jogo extra (decisivo, mini liga, mata-mata):
         // o nome do vídeo diz se é extra; senão vale a rodada do JSON.
         if (candidatos.Count > 1)
@@ -290,6 +308,27 @@ public class ResultadoPesService : IResultadoPesService
                 $"A rodada não confere: o JSON diz rodada {rodada}, mas {jogo} é da rodada {achada.Numero} ({achada.Liga}).");
 
         return achada;
+    }
+
+    /// <summary>
+    /// O JSON importado antes veio do mesmo vídeo? Pela data de gravação quando os dois a têm
+    /// (o nome pode se repetir se o vídeo antigo saiu da pasta); senão, pelo nome do vídeo.
+    /// </summary>
+    private static bool MesmoVideo(string? videoImportado, string? gravadoEmImportado, ResultadoPesRequest r) =>
+        gravadoEmImportado is not null && r.GravadoEm is not null
+            ? gravadoEmImportado == r.GravadoEm
+            : !string.IsNullOrWhiteSpace(r.Video) && string.Equals(videoImportado, r.Video, StringComparison.OrdinalIgnoreCase);
+
+    private static string? GravadoEm(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("gravado_em", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                ? v.GetString()
+                : null;
+        }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     // ── Gravação ──────────────────────────────────────────────────────────────
