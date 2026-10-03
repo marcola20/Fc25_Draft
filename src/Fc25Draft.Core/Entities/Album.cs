@@ -111,6 +111,7 @@ public class PacoteGanho
     public const string OrigemDiario = "diario";
     public const string OrigemVitoria = "vitoria";
     public const string OrigemBolao = "bolao";
+    public const string OrigemReciclagem = "reciclagem";
 
     public Guid PacoteId { get; set; }
     public Guid TreinadorId { get; set; }
@@ -162,4 +163,70 @@ public class AlbumConquista
     public Treinador Treinador { get; set; } = null!;
     public Album Album { get; set; } = null!;
     public Team? Time { get; set; }
+}
+
+public enum StatusTroca
+{
+    /// <summary>Esperando a resposta de quem recebeu (até <see cref="TrocaFigurinhas.ExpiraEm"/>).</summary>
+    Pendente = 1,
+    Aceita = 2,
+    Recusada = 3,
+
+    /// <summary>Quem propôs desistiu.</summary>
+    Cancelada = 4,
+
+    /// <summary>Passou do prazo sem resposta.</summary>
+    Expirada = 5,
+
+    /// <summary>Na hora de aceitar alguém não tinha mais a repetida (o motivo fica em <see cref="TrocaFigurinhas.Motivo"/>).</summary>
+    NaoValeMais = 6,
+
+    /// <summary>Quem recebeu respondeu com outra proposta (a nova aponta para esta).</summary>
+    Contraproposta = 7
+}
+
+/// <summary>
+/// Proposta de troca de figurinhas entre duas pessoas. Só repetidas entram (quem dá precisa ter pelo menos
+/// 2), então o álbum colado nunca perde figurinha. O aceite move tudo numa transação só.
+/// </summary>
+public class TrocaFigurinhas
+{
+    public Guid TrocaId { get; set; }
+    public Guid AlbumId { get; set; }
+
+    /// <summary>Quem propôs: dá as <c>Oferecida</c> e recebe as pedidas.</summary>
+    public Guid DeTreinadorId { get; set; }
+
+    /// <summary>Quem recebeu a proposta e responde.</summary>
+    public Guid ParaTreinadorId { get; set; }
+
+    public StatusTroca Status { get; set; }
+
+    public DateTime CriadaEm { get; set; }
+    public DateTime ExpiraEm { get; set; }
+    public DateTime? RespondidaEm { get; set; }
+
+    /// <summary>Por que não vale mais (ou outro detalhe do fim da proposta).</summary>
+    public string? Motivo { get; set; }
+
+    /// <summary>A proposta que esta responde, quando é contraproposta.</summary>
+    public Guid? ContrapropostaDeId { get; set; }
+
+    public Album Album { get; set; } = null!;
+    public Treinador De { get; set; } = null!;
+    public Treinador Para { get; set; } = null!;
+    public ICollection<TrocaFigurinhaItem> Itens { get; set; } = new List<TrocaFigurinhaItem>();
+}
+
+/// <summary>Uma figurinha da troca (uma cópia): oferecida por quem propôs ou pedida a quem recebeu.</summary>
+public class TrocaFigurinhaItem
+{
+    public Guid TrocaId { get; set; }
+    public Guid FigurinhaId { get; set; }
+
+    /// <summary>Verdadeiro: sai de quem propôs. Falso: sai de quem recebeu (é o que foi pedido).</summary>
+    public bool Oferecida { get; set; }
+
+    public TrocaFigurinhas Troca { get; set; } = null!;
+    public Figurinha Figurinha { get; set; } = null!;
 }

@@ -15,7 +15,7 @@ namespace Fc25Draft.Infra.Services;
 /// Álbum de figurinhas. O admin lança o álbum da temporada a partir dos elencos dos clubes da liga (retrato
 /// do dia) e dá pacotes; cada pessoa abre os dela e o sorteio é feito aqui, na hora de abrir.
 /// </summary>
-public class AlbumService : IAlbumService
+public partial class AlbumService : IAlbumService
 {
     private const int MaximoPacotesPorVez = 50;
 
@@ -324,7 +324,8 @@ public class AlbumService : IAlbumService
             fechados,
             minhas.Values.Sum(m => m.Quantidade - 1),
             album.Ativo && !await JaPegouOPacoteDoDiaAsync(treinadorId, ct),
-            await ConquistasAsync(treinadorId, album.AlbumId, ct));
+            await ConquistasAsync(treinadorId, album.AlbumId, ct),
+            await TrocasEsperandoAsync(treinadorId, ct));
     }
 
     public async Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct)
@@ -342,7 +343,8 @@ public class AlbumService : IAlbumService
                              && (p.AlbumId == album.AlbumId || p.AlbumId == null), ct);
 
         return new AlbumResumoDoTreinadorDto(album, minhas?.Coladas ?? 0, minhas?.Repetidas ?? 0, paraAbrir,
-            !await JaPegouOPacoteDoDiaAsync(treinadorId, ct), await ConquistasAsync(treinadorId, album.AlbumId, ct));
+            !await JaPegouOPacoteDoDiaAsync(treinadorId, ct), await ConquistasAsync(treinadorId, album.AlbumId, ct),
+            await TrocasEsperandoAsync(treinadorId, ct));
     }
 
     public async Task<bool> PegarPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct)

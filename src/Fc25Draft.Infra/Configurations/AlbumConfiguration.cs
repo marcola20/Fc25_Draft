@@ -95,3 +95,37 @@ public class AlbumConquistaConfiguration : IEntityTypeConfiguration<AlbumConquis
         b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class TrocaFigurinhasConfiguration : IEntityTypeConfiguration<TrocaFigurinhas>
+{
+    public void Configure(EntityTypeBuilder<TrocaFigurinhas> b)
+    {
+        b.ToTable("TrocasFigurinhas");
+        b.HasKey(x => x.TrocaId);
+
+        b.Property(x => x.Motivo).HasMaxLength(300);
+
+        b.HasIndex(x => new { x.ParaTreinadorId, x.Status });
+        b.HasIndex(x => new { x.DeTreinadorId, x.Status });
+        b.HasIndex(x => new { x.Status, x.ExpiraEm });
+
+        b.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.De).WithMany().HasForeignKey(x => x.DeTreinadorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Para).WithMany().HasForeignKey(x => x.ParaTreinadorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<TrocaFigurinhas>().WithMany().HasForeignKey(x => x.ContrapropostaDeId).OnDelete(DeleteBehavior.SetNull);
+
+        b.HasMany(x => x.Itens).WithOne(x => x.Troca).HasForeignKey(x => x.TrocaId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class TrocaFigurinhaItemConfiguration : IEntityTypeConfiguration<TrocaFigurinhaItem>
+{
+    public void Configure(EntityTypeBuilder<TrocaFigurinhaItem> b)
+    {
+        b.ToTable("TrocasFigurinhasItens");
+        // Uma cópia de cada figurinha por lado.
+        b.HasKey(x => new { x.TrocaId, x.FigurinhaId, x.Oferecida });
+
+        b.HasOne(x => x.Figurinha).WithMany().HasForeignKey(x => x.FigurinhaId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

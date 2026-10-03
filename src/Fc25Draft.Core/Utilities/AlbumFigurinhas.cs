@@ -150,6 +150,24 @@ public static class AlbumFigurinhas
 
     public static string MotivoVitoria(string adversario) => $"Vitória sobre o {adversario}";
 
+    // ---- Trocas e reciclagem ----
+
+    /// <summary>Repetidas que viram 1 pacote novo na reciclagem.</summary>
+    public const int RepetidasPorPacote = 6;
+
+    /// <summary>Prazo para responder uma proposta de troca.</summary>
+    public static readonly TimeSpan PrazoDaTroca = TimeSpan.FromHours(48);
+
+    /// <summary>Figurinhas no máximo de cada lado de uma proposta.</summary>
+    public const int MaximoPorLadoDaTroca = 10;
+
+    public static string ChaveReciclagem(Guid pacoteId) => $"reciclagem:{pacoteId:N}";
+
+    public static string MotivoReciclagem => $"{RepetidasPorPacote} repetidas recicladas";
+
+    /// <summary>"2 por 1": quantas a pessoa dá e quantas recebe, do ponto de vista de quem propôs.</summary>
+    public static string Placar(int oferecidas, int pedidas) => $"{oferecidas} por {pedidas}";
+
     public static string MotivoBolao(int pontos, int temporada) => $"{pontos} pontos no bolão de {temporada}";
 
     /// <summary>De onde veio o pacote, em poucas palavras, para a lista dos fechados.</summary>
@@ -159,6 +177,7 @@ public static class AlbumFigurinhas
         PacoteGanho.OrigemVitoria => motivo ?? "Vitória",
         PacoteGanho.OrigemBolao => motivo is null ? "Bolão" : $"Bolão · {motivo}",
         PacoteGanho.OrigemAdmin => motivo is null ? "Da organização" : $"Da organização · {motivo}",
+        PacoteGanho.OrigemReciclagem => "Reciclagem de repetidas",
         _ => motivo ?? origem
     };
 
@@ -253,6 +272,37 @@ public static class AlbumFigurinhas
             .ThenByDescending(c => c.Nova)
             .ThenByDescending(c => c.Figurinha.Overall ?? 0)
             .First().Figurinha;
+
+    /// <summary>
+    /// Texto do aviso de troca para quem precisa saber: proposta (ou contraproposta) recebida, aceita ou
+    /// recusada. Vários de uma vez viram "3 novidades nas suas trocas".
+    /// </summary>
+    public static string AvisoDeTrocas(IReadOnlyList<(string Evento, string Quem, int Oferecidas, int Pedidas)> eventos)
+    {
+        if (eventos.Count == 0) return string.Empty;
+        if (eventos.Count > 1) return $"🔁 {eventos.Count} novidades nas suas trocas de figurinhas.";
+
+        var (evento, quem, oferecidas, pedidas) = eventos[0];
+        return evento switch
+        {
+            EventoTroca.Recebida => $"🔁 {quem} te propôs uma troca: {Figurinhas(oferecidas)} dele por {pedidas} sua{(pedidas == 1 ? "" : "s")}.",
+            EventoTroca.Contraproposta => $"🔁 {quem} fez uma contraproposta: {Figurinhas(oferecidas)} dele por {pedidas} sua{(pedidas == 1 ? "" : "s")}.",
+            EventoTroca.Aceita => $"✅ {quem} aceitou a sua troca. As figurinhas já estão no seu álbum.",
+            EventoTroca.Recusada => $"❌ {quem} recusou a sua troca.",
+            _ => "🔁 Novidade nas suas trocas de figurinhas."
+        };
+    }
+
+    private static string Figurinhas(int n) => n == 1 ? "1 figurinha" : $"{n} figurinhas";
+
+    /// <summary>Os acontecimentos de uma troca que viram aviso no celular.</summary>
+    public static class EventoTroca
+    {
+        public const string Recebida = "recebida";
+        public const string Contraproposta = "contraproposta";
+        public const string Aceita = "aceita";
+        public const string Recusada = "recusada";
+    }
 
     private static string Minuscula(string texto) =>
         texto.Length == 0 ? texto : char.ToLowerInvariant(texto[0]) + texto[1..];

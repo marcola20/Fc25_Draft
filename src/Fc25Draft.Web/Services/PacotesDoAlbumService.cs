@@ -5,8 +5,9 @@ namespace Fc25Draft.Web.Services;
 
 /// <summary>
 /// Pacotes do álbum em segundo plano: a cada 5 min dá os que faltam pelas vitórias e pelo bolão (o
-/// livro-razão de pacotes não deixa duplicar) e avisa no celular quem ganhou pacote ou selo. Selo novo
-/// (página ou álbum completo) adianta a rodada, para o aviso sair na hora.
+/// livro-razão de pacotes não deixa duplicar), expira as propostas de troca vencidas e avisa no celular
+/// quem ganhou pacote ou selo e quem tem novidade nas trocas. Selo novo e proposta nova ou respondida
+/// adiantam a rodada, para o aviso sair na hora.
 /// </summary>
 public class PacotesDoAlbumService : BackgroundService
 {
@@ -25,6 +26,7 @@ public class PacotesDoAlbumService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         AlbumService.ConquistasGravadas += Acordar;
+        AlbumService.TrocasMudaram += Acordar;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -44,10 +46,11 @@ public class PacotesDoAlbumService : BackgroundService
         finally
         {
             AlbumService.ConquistasGravadas -= Acordar;
+            AlbumService.TrocasMudaram -= Acordar;
         }
     }
 
-    // Selo novo: adianta a próxima rodada (sem empilhar sinais).
+    // Selo novo ou troca mexida: adianta a próxima rodada (sem empilhar sinais).
     private void Acordar()
     {
         if (_acordar.CurrentCount == 0)
@@ -67,6 +70,8 @@ public class PacotesDoAlbumService : BackgroundService
         });
         await TentarAsync("aviso de pacotes", s => s.GetRequiredService<IPushService>().AvisarPacotesGanhosAsync(ct));
         await TentarAsync("aviso de selos", s => s.GetRequiredService<IPushService>().AvisarConquistasDoAlbumAsync(ct));
+        await TentarAsync("trocas vencidas", s => s.GetRequiredService<IAlbumService>().ExpirarTrocasAsync(ct));
+        await TentarAsync("aviso de trocas", s => s.GetRequiredService<IPushService>().AvisarTrocasAsync(ct));
 
         async Task TentarAsync(string parte, Func<IServiceProvider, Task> acao)
         {

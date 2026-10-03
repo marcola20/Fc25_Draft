@@ -72,6 +72,41 @@ public interface IAlbumService
     /// <summary>Quem completou cada álbum, para o Hall da Fama (Colecionadores).</summary>
     Task<IReadOnlyList<AlbumCompletoDto>> AlbunsCompletosAsync(CancellationToken ct);
 
+    // ---- Trocas ----
+
+    /// <summary>Repetidas, o que falta, propostas (recebidas, enviadas e histórico) e sugestões da pessoa.</summary>
+    Task<TrocasDoTreinadorDto?> TrocasAsync(Guid treinadorId, CancellationToken ct);
+
+    /// <summary>As repetidas dos dois para montar uma proposta com <paramref name="outroId"/>.</summary>
+    Task<MontarTrocaDto?> MontarTrocaAsync(Guid treinadorId, Guid outroId, CancellationToken ct);
+
+    /// <summary>
+    /// Propõe uma troca: <paramref name="oferecidas"/> são repetidas de quem propõe; <paramref name="pedidas"/>,
+    /// repetidas do outro. Com <paramref name="contrapropostaDe"/>, responde uma proposta recebida.
+    /// </summary>
+    Task<TrocaDto> ProporTrocaAsync(Guid deId, Guid paraId, IReadOnlyList<Guid> oferecidas, IReadOnlyList<Guid> pedidas,
+        Guid? contrapropostaDe, CancellationToken ct);
+
+    /// <summary>
+    /// Aceita a proposta (só quem recebeu). Trava os dois, confere de novo as repetidas e move tudo numa
+    /// transação só; se alguém não tiver mais, a proposta vira "não vale mais" e a mensagem diz por quê.
+    /// </summary>
+    Task<ResultadoDaTrocaDto> AceitarTrocaAsync(Guid trocaId, Guid treinadorId, CancellationToken ct);
+
+    Task RecusarTrocaAsync(Guid trocaId, Guid treinadorId, CancellationToken ct);
+
+    /// <summary>Quem propôs desiste (só enquanto está pendente).</summary>
+    Task CancelarTrocaAsync(Guid trocaId, Guid treinadorId, CancellationToken ct);
+
+    /// <summary>Marca como expiradas as propostas que passaram do prazo. Retorna quantas.</summary>
+    Task<int> ExpirarTrocasAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Troca <see cref="Core.Utilities.AlbumFigurinhas.RepetidasPorPacote"/> repetidas escolhidas (pode repetir a mesma
+    /// figurinha se tiver cópias) por 1 pacote novo.
+    /// </summary>
+    Task ReciclarAsync(Guid treinadorId, IReadOnlyList<Guid> figurinhas, CancellationToken ct);
+
     /// <summary>Tira a marca de nova das figurinhas que a pessoa já viu na página.</summary>
     Task MarcarVistasAsync(Guid treinadorId, IReadOnlyCollection<Guid> figurinhas, CancellationToken ct);
 }

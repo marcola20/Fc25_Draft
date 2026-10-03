@@ -46,4 +46,10 @@ public interface IPushService
     /// aviso só. Retorna quantas pessoas foram avisadas.
     /// </summary>
     Task<int> AvisarConquistasDoAlbumAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Avisa (uma vez por acontecimento) quem recebeu proposta ou contraproposta de troca e quem teve a
+    /// proposta aceita ou recusada; várias novidades da mesma pessoa viram um aviso só.
+    /// </summary>
+    Task<int> AvisarTrocasAsync(CancellationToken ct);
 }

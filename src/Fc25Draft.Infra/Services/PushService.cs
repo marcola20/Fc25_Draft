@@ -237,11 +237,11 @@ public class PushService : IPushService
             .ToListAsync(ct);
         if (pessoas.Count == 0) return 0;
 
-        // O pacote do dia a pessoa pega no site, não precisa de aviso. Pacote antigo (o site ficou fora do
+        // O pacote do dia e o da reciclagem a pessoa pega no site, não precisam de aviso. Pacote antigo (o site ficou fora do
         // ar, ou a pessoa ativou as notificações agora) também não.
         var desde = Agora - PacoteRecente;
         var pacotes = await _db.PacotesGanhos.AsNoTracking()
-            .Where(p => p.AbertoEm == null && p.Origem != PacoteGanho.OrigemDiario && p.CriadoEm >= desde
+            .Where(p => p.AbertoEm == null && p.Origem != PacoteGanho.OrigemDiario && p.Origem != PacoteGanho.OrigemReciclagem && p.CriadoEm >= desde
                         && pessoas.Contains(p.TreinadorId))
             .OrderBy(p => p.CriadoEm)
             .Select(p => new { p.PacoteId, p.TreinadorId, p.Origem, p.Motivo })
@@ -323,6 +323,72 @@ public class PushService : IPushService
     }
 
     private static string ChaveDaConquista(Guid conquistaId) => $"conquista:{conquistaId:N}";
+
+    public async Task<int> AvisarTrocasAsync(CancellationToken ct)
+    {
+        var pessoas = (await _db.InscricoesPush.AsNoTracking()
+                .Where(i => i.Treinador.Ativo)
+                .Select(i => i.TreinadorId)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
+        if (pessoas.Count == 0) return 0;
+
+        var desde = Agora - PacoteRecente;
+        var trocas = await _db.TrocasFigurinhas.AsNoTracking()
+            .Where(t => t.CriadaEm >= desde || t.RespondidaEm >= desde)
+            .Select(t => new
+            {
+                t.TrocaId, t.DeTreinadorId, DeNome = t.De.Nome, t.ParaTreinadorId, ParaNome = t.Para.Nome,
+                t.Status, t.ContrapropostaDeId, t.CriadaEm,
+                Oferecidas = t.Itens.Count(i => i.Oferecida),
+                Pedidas = t.Itens.Count(i => !i.Oferecida)
+            })
+            .ToListAsync(ct);
+
+        // Quem precisa saber de quê: proposta (ou contraproposta) nova para quem recebeu; aceite e recusa
+        // para quem propôs. Proposta já respondida antes do aviso sair não vira aviso de "recebida".
+        var eventos = new List<(Guid Pessoa, string Chave, string Evento, string Quem, int Oferecidas, int Pedidas)>();
+        foreach (var t in trocas)
+        {
+            if (t.Status == StatusTroca.Pendente && t.CriadaEm >= desde)
+                eventos.Add((t.ParaTreinadorId, $"troca:{t.TrocaId:N}:recebida",
+                    t.ContrapropostaDeId is null ? AlbumFigurinhas.EventoTroca.Recebida : AlbumFigurinhas.EventoTroca.Contraproposta,
+                    t.DeNome, t.Oferecidas, t.Pedidas));
+            else if (t.Status == StatusTroca.Aceita)
+                eventos.Add((t.DeTreinadorId, $"troca:{t.TrocaId:N}:aceita", AlbumFigurinhas.EventoTroca.Aceita, t.ParaNome, t.Oferecidas, t.Pedidas));
+            else if (t.Status == StatusTroca.Recusada)
+                eventos.Add((t.DeTreinadorId, $"troca:{t.TrocaId:N}:recusada", AlbumFigurinhas.EventoTroca.Recusada, t.ParaNome, t.Oferecidas, t.Pedidas));
+        }
+
+        eventos = eventos.Where(e => pessoas.Contains(e.Pessoa)).ToList();
+        if (eventos.Count == 0) return 0;
+
+        var chaves = eventos.Select(e => e.Chave).ToList();
+        var avisados = (await _db.NotificacoesEnviadas.AsNoTracking()
+                .Where(n => chaves.Contains(n.Chave))
+                .Select(n => n.Chave)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var pessoasAvisadas = 0;
+        foreach (var daPessoa in eventos.Where(e => !avisados.Contains(e.Chave)).GroupBy(e => e.Pessoa))
+        {
+            var novos = new List<(string, string, int, int)>();
+            foreach (var e in daPessoa)
+                if (await MarcarAsync(e.Chave, ct))
+                    novos.Add((e.Evento, e.Quem, e.Oferecidas, e.Pedidas));
+            if (novos.Count == 0) continue;
+
+            var inscricoes = await _db.InscricoesPush.Where(i => i.TreinadorId == daPessoa.Key).ToListAsync(ct);
+            await EnviarAsync(inscricoes, new Notificacao(
+                "🎴 Trocas de figurinhas", AlbumFigurinhas.AvisoDeTrocas(novos), "/album/trocas", "album-trocas"), ct);
+            await _db.SaveChangesAsync(ct);
+            pessoasAvisadas++;
+        }
+
+        return pessoasAvisadas;
+    }
 
     // ── Bastidores ──────────────────────────────────────────────────────────────────────────────────
 

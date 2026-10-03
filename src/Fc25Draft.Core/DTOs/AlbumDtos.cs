@@ -56,7 +56,8 @@ public record MeuAlbumDto(
     IReadOnlyList<PacoteFechadoDto> Fechados,
     int Repetidas,
     bool PacoteDoDiaDisponivel,
-    IReadOnlyList<ConquistaAlbumDto> Conquistas)
+    IReadOnlyList<ConquistaAlbumDto> Conquistas,
+    int TrocasEsperando)
 {
     public int PacotesParaAbrir => Fechados.Count;
 
@@ -77,7 +78,7 @@ public record PacoteFechadoDto(Guid PacoteId, string Origem, string DeOndeVeio, 
 /// <summary>O álbum da pessoa em números, para o cartão da Minha Área.</summary>
 public record AlbumResumoDoTreinadorDto(
     AlbumDto Album, int Coladas, int Repetidas, int PacotesParaAbrir, bool PacoteDoDiaDisponivel,
-    IReadOnlyList<ConquistaAlbumDto> Conquistas)
+    IReadOnlyList<ConquistaAlbumDto> Conquistas, int TrocasEsperando)
 {
     public IReadOnlyList<ConquistaAlbumDto> PaginasCompletas =>
         Conquistas.Where(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta).ToList();
@@ -124,6 +125,71 @@ public record ColecionadorDto(
 }
 
 public record ColecionadoresDto(AlbumDto Album, IReadOnlyList<ColecionadorDto> Linhas);
+
+// ---- Trocas ----
+
+public record PessoaDaTrocaDto(Guid TreinadorId, string Nome);
+
+/// <summary>Uma proposta de troca. Oferecidas saem de quem propôs; pedidas, de quem recebeu.</summary>
+public record TrocaDto(
+    Guid TrocaId,
+    PessoaDaTrocaDto De,
+    PessoaDaTrocaDto Para,
+    StatusTroca Status,
+    DateTime CriadaEm,
+    DateTime ExpiraEm,
+    DateTime? RespondidaEm,
+    string? Motivo,
+    Guid? ContrapropostaDeId,
+    IReadOnlyList<FigurinhaDto> Oferecidas,
+    IReadOnlyList<FigurinhaDto> Pedidas)
+{
+    public bool Pendente => Status == StatusTroca.Pendente;
+}
+
+/// <summary>Uma repetida: a figurinha e quantas cópias a pessoa tem (a colada conta, então troca até Quantidade - 1).</summary>
+public record RepetidaDto(FigurinhaDto Figurinha, int Quantidade)
+{
+    public int Sobrando => Quantidade - 1;
+}
+
+/// <summary>Uma figurinha que falta e quem a tem repetida.</summary>
+public record FaltaDto(FigurinhaDto Figurinha, IReadOnlyList<PessoaDaTrocaDto> QuemTemRepetida);
+
+/// <summary>"Fulano tem 3 que você precisa e precisa de 2 suas".</summary>
+public record SugestaoDeTrocaDto(
+    PessoaDaTrocaDto Pessoa,
+    IReadOnlyList<FigurinhaDto> EleTemQueVocePrecisa,
+    IReadOnlyList<FigurinhaDto> VoceTemQueElePrecisa)
+{
+    /// <summary>Quantas dá para trocar uma por uma.</summary>
+    public int Encaixe => Math.Min(EleTemQueVocePrecisa.Count, VoceTemQueElePrecisa.Count);
+}
+
+/// <summary>Tudo da página de trocas de uma pessoa.</summary>
+public record TrocasDoTreinadorDto(
+    AlbumDto Album,
+    IReadOnlyList<RepetidaDto> MinhasRepetidas,
+    IReadOnlyList<FaltaDto> Faltam,
+    IReadOnlyList<TrocaDto> Recebidas,
+    IReadOnlyList<TrocaDto> Enviadas,
+    IReadOnlyList<TrocaDto> Historico,
+    IReadOnlyList<SugestaoDeTrocaDto> Sugestoes,
+    IReadOnlyList<PessoaDaTrocaDto> Colecionadores)
+{
+    public int RepetidasSobrando => MinhasRepetidas.Sum(r => r.Sobrando);
+}
+
+/// <summary>Para montar uma proposta com outra pessoa: as repetidas de cada um, marcando o que interessa ao outro.</summary>
+public record MontarTrocaDto(
+    PessoaDaTrocaDto Outro,
+    IReadOnlyList<RepetidaDto> MinhasRepetidas,
+    IReadOnlyList<RepetidaDto> RepetidasDele,
+    IReadOnlySet<Guid> EleNaoTem,
+    IReadOnlySet<Guid> EuNaoTenho);
+
+/// <summary>O que aconteceu ao aceitar: se as figurinhas trocaram de mão e, se não, por quê.</summary>
+public record ResultadoDaTrocaDto(bool Executou, string Mensagem, IReadOnlyList<FigurinhaDto> Recebidas, IReadOnlyList<ConquistaAlbumDto> Conquistas);
 
 /// <summary>Quem completou um álbum (Hall da Fama · Colecionadores), na ordem em que completou.</summary>
 public record AlbumCompletoDto(int Ordem, Guid TreinadorId, string Nome, string AlbumNome, int Temporada, DateTime Em);
