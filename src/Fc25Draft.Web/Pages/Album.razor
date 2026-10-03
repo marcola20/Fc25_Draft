@@ -47,7 +47,14 @@
                     <div class="text-muted small text-uppercase fw-semibold">Temporada @a.Album.Temporada</div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                         <h1 class="h3 mb-0">🎴 @a.Album.Nome</h1>
-                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary ms-auto">🏅 Colecionadores</a>
+                        <a href="/album/trocas" class="btn btn-sm btn-outline-primary ms-auto position-relative">
+                            🔁 Trocas
+                            @if (a.TrocasEsperando > 0)
+                            {
+                                <span class="badge rounded-pill text-bg-danger" title="Propostas esperando a sua resposta">@a.TrocasEsperando</span>
+                            }
+                        </a>
+                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary">🏅 Colecionadores</a>
                     </div>
                     @if (a.AlbumCompleto is { } completo)
                     {

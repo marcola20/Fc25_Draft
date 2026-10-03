@@ -1,0 +1,58 @@
+/* Abas que quebram linha no celular (sem rolar a página para o lado). */
+.abas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding-bottom: .4rem;
+}
+
+.aba {
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border-radius: 2rem;
+    padding: .25rem .8rem;
+    font-size: .9rem;
+}
+
+.aba.ativa {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+}
+
+.aba.ativa .text-muted { color: rgba(255, 255, 255, .75) !important; }
+
+/* Proposta: o que vai de um lado e do outro. */
+.lados {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+}
+
+.lado { min-width: 0; }
+.lado-titulo { font-size: .75rem; text-transform: uppercase; color: var(--bs-secondary-color); margin-bottom: .2rem; }
+.seta { font-size: 1.4rem; color: var(--bs-secondary-color); }
+
+/* Repetidas: a figurinha é um botão no modo reciclar. */
+.repetida { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+
+.carta-botao {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    border-radius: .7rem;
+}
+
+.carta-botao:disabled { opacity: 1; cursor: default; }
+.carta-botao:not(:disabled) { cursor: pointer; }
+.repetida.escolhida .carta-botao { outline: 3px solid var(--bs-success); outline-offset: 3px; }
+
+.reciclagem { border-color: var(--bs-success-border-subtle); }
+
+/* Listas de escolha da proposta: rolam por dentro quando são longas. */
+.escolha { max-height: 22rem; overflow-y: auto; }
+.escolha label { cursor: pointer; }

@@ -1,0 +1,648 @@
+@page "/album/trocas"
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Album
+@using Fc25Draft.Web.Components.Layouts
+@inject IAlbumService AlbumSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Trocas de Figurinhas</PageTitle>
+
+<div class="container-fluid py-3 trocas-pagina" style="max-width: 1100px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_ok
+            @if (_recebidasNaTroca.Count > 0)
+            {
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    @foreach (var f in _recebidasNaTroca)
+                    {
+                        <CartaFigurinha Figurinha="@f" Largura="70" Nova="true" SeloLendaria="@Selo" />
+                    }
+                </div>
+            }
+            @foreach (var c in _selosNaTroca)
+            {
+                <div class="fw-semibold mt-2">@(c.Tipo == TipoConquistaAlbum.AlbumCompleto ? "🏆 Você completou o álbum!" : $"🏅 Página do {c.TimeNome} completa!")</div>
+            }
+            <button type="button" class="btn-close" @onclick="LimparOk"></button>
+        </div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_eu is null)
+    {
+        <div class="alert alert-info">Entre com o seu token (botão <strong>Login</strong> no topo) para trocar figurinhas.</div>
+    }
+    else if (_dados is null)
+    {
+        <div class="alert alert-secondary">O álbum desta temporada ainda não foi lançado.</div>
+    }
+    else
+    {
+        var d = _dados;
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <h1 class="h4 mb-0">🔁 Trocas · @d.Album.Nome</h1>
+            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Meu álbum</a>
+        </div>
+        <p class="small text-muted">
+            Só repetida entra em troca: a figurinha colada no seu álbum nunca sai. A proposta vale por 48 horas.
+        </p>
+
+        <div class="abas mb-3" role="tablist">
+            <button type="button" role="tab" class="aba @(_aba == Aba.Propostas ? "ativa" : "")" @onclick="() => _aba = Aba.Propostas">
+                Propostas
+                @if (d.Recebidas.Count > 0)
+                {
+                    <span class="badge text-bg-danger">@d.Recebidas.Count</span>
+                }
+            </button>
+            <button type="button" role="tab" class="aba @(_aba == Aba.Sugestoes ? "ativa" : "")" @onclick="() => _aba = Aba.Sugestoes">Sugestões</button>
+            <button type="button" role="tab" class="aba @(_aba == Aba.Repetidas ? "ativa" : "")" @onclick="() => _aba = Aba.Repetidas">
+                Repetidas <span class="text-muted small">@d.RepetidasSobrando</span>
+            </button>
+            <button type="button" role="tab" class="aba @(_aba == Aba.Faltam ? "ativa" : "")" @onclick="() => _aba = Aba.Faltam">
+                Faltam <span class="text-muted small">@d.Faltam.Count</span>
+            </button>
+            <button type="button" role="tab" class="aba @(_aba == Aba.Nova ? "ativa" : "")" @onclick="() => _aba = Aba.Nova">+ Nova proposta</button>
+        </div>
+
+        @switch (_aba)
+        {
+            case Aba.Propostas:
+                <h2 class="h6 text-muted">Recebidas</h2>
+                @if (d.Recebidas.Count == 0)
+                {
+                    <p class="small text-muted">Nenhuma proposta esperando a sua resposta.</p>
+                }
+                @foreach (var t in d.Recebidas)
+                {
+                    var troca = t;
+                    <div class="card mb-2 proposta">
+                        <div class="card-body p-2">
+                            <div class="small mb-1">
+                                <strong>@t.De.Nome</strong> @(t.ContrapropostaDeId is null ? "propõe" : "fez uma contraproposta") · expira @Prazo(t.ExpiraEm)
+                            </div>
+                            <div class="lados">
+                                <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Oferecidas)</div>
+                                <div class="seta" aria-hidden="true">⇄</div>
+                                <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Pedidas)</div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="() => AceitarAsync(troca)">Aceitar</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_ocupado" @onclick="() => RecusarAsync(troca)">Recusar</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="() => ContrapropostaAsync(troca)">Contraproposta</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <h2 class="h6 text-muted mt-3">Enviadas</h2>
+                @if (d.Enviadas.Count == 0)
+                {
+                    <p class="small text-muted">Nenhuma proposta sua esperando resposta.</p>
+                }
+                @foreach (var t in d.Enviadas)
+                {
+                    var troca = t;
+                    <div class="card mb-2 proposta">
+                        <div class="card-body p-2">
+                            <div class="small mb-1">Para <strong>@t.Para.Nome</strong> · expira @Prazo(t.ExpiraEm)</div>
+                            <div class="lados">
+                                <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Oferecidas)</div>
+                                <div class="seta" aria-hidden="true">⇄</div>
+                                <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Pedidas)</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" disabled="@_ocupado" @onclick="() => CancelarAsync(troca)">Cancelar proposta</button>
+                        </div>
+                    </div>
+                }
+
+                <h2 class="h6 text-muted mt-3">Histórico</h2>
+                @if (d.Historico.Count == 0)
+                {
+                    <p class="small text-muted">Nenhuma troca ainda.</p>
+                }
+                else
+                {
+                    <ul class="list-group mb-3">
+                        @foreach (var t in d.Historico)
+                        {
+                            var eu = t.De.TreinadorId == _eu.TreinadorId;
+                            <li class="list-group-item small">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge @StatusClasse(t.Status)">@StatusTexto(t.Status)</span>
+                                    <span>@(eu ? $"Você → {t.Para.Nome}" : $"{t.De.Nome} → você")</span>
+                                    <span class="text-muted">
+                                        @(eu ? $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count}" : $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count} suas")
+                                    </span>
+                                    <span class="text-muted ms-auto">@AvisosSino.Quando(t.RespondidaEm ?? t.CriadaEm)</span>
+                                </div>
+                                <div class="text-muted text-truncate" title="@Nomes(t)">@Nomes(t)</div>
+                                @if (t.Motivo is not null)
+                                {
+                                    <div class="text-danger">@t.Motivo</div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                break;
+
+            case Aba.Sugestoes:
+                @if (d.Sugestoes.Count == 0)
+                {
+                    <p class="small text-muted">Ninguém tem repetida que falta no seu álbum agora. Abra mais pacotes e volte aqui!</p>
+                }
+                @foreach (var s in d.Sugestoes)
+                {
+                    var sugestao = s;
+                    <div class="card mb-2">
+                        <div class="card-body p-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    <strong>@s.Pessoa.Nome</strong> tem <strong>@s.EleTemQueVocePrecisa.Count</strong> que você precisa
+                                    @if (s.VoceTemQueElePrecisa.Count > 0)
+                                    {
+                                        <span>e precisa de <strong>@s.VoceTemQueElePrecisa.Count</strong> suas</span>
+                                    }
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary" @onclick="() => MontarDaSugestaoAsync(sugestao)">Montar proposta</button>
+                            </div>
+                            <div class="small text-muted mt-1 text-truncate" title="@string.Join(", ", s.EleTemQueVocePrecisa.Select(Rotulo))">
+                                Ele tem: @string.Join(", ", s.EleTemQueVocePrecisa.Take(6).Select(Rotulo))@(s.EleTemQueVocePrecisa.Count > 6 ? "…" : "")
+                            </div>
+                            @if (s.VoceTemQueElePrecisa.Count > 0)
+                            {
+                                <div class="small text-muted text-truncate" title="@string.Join(", ", s.VoceTemQueElePrecisa.Select(Rotulo))">
+                                    Ele precisa: @string.Join(", ", s.VoceTemQueElePrecisa.Take(6).Select(Rotulo))@(s.VoceTemQueElePrecisa.Count > 6 ? "…" : "")
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                break;
+
+            case Aba.Repetidas:
+                <div class="card mb-3 reciclagem">
+                    <div class="card-body p-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="flex-grow-1 small">
+                                ♻️ <strong>Reciclar:</strong> @AlbumFigurinhas.RepetidasPorPacote repetidas quaisquer viram 1 pacote novo.
+                                @if (_reciclando)
+                                {
+                                    <span>Toque nas repetidas para escolher — <strong>@_reciclar.Values.Sum()/@AlbumFigurinhas.RepetidasPorPacote</strong>.</span>
+                                }
+                            </div>
+                            @if (!_reciclando)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-success" disabled="@(d.RepetidasSobrando < AlbumFigurinhas.RepetidasPorPacote)"
+                                        @onclick="() => { _reciclando = true; _reciclar.Clear(); }">Escolher repetidas</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-success" disabled="@(_ocupado || _reciclar.Values.Sum() != AlbumFigurinhas.RepetidasPorPacote)" @onclick="ReciclarAsync">
+                                    Reciclar por 1 pacote
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => { _reciclando = false; _reciclar.Clear(); }">Cancelar</button>
+                            }
+                        </div>
+                        @if (d.RepetidasSobrando < AlbumFigurinhas.RepetidasPorPacote && !_reciclando)
+                        {
+                            <div class="small text-muted mt-1">Você tem @d.RepetidasSobrando repetida@(d.RepetidasSobrando == 1 ? "" : "s"); precisa de @AlbumFigurinhas.RepetidasPorPacote.</div>
+                        }
+                    </div>
+                </div>
+                @if (d.MinhasRepetidas.Count == 0)
+                {
+                    <p class="small text-muted">Você ainda não tem repetidas.</p>
+                }
+                <div class="grade-cartas">
+                    @foreach (var r in d.MinhasRepetidas)
+                    {
+                        var rep = r;
+                        var escolhidas = _reciclar.GetValueOrDefault(r.Figurinha.FigurinhaId);
+                        <div class="repetida @(escolhidas > 0 ? "escolhida" : "")">
+                            <button type="button" class="carta-botao" disabled="@(!_reciclando)" @onclick="() => EscolherParaReciclar(rep)"
+                                    title="@(_reciclando ? "Escolher para reciclar" : Rotulo(r.Figurinha))">
+                                <CartaFigurinha Figurinha="@r.Figurinha" Largura="96" Quantidade="@r.Quantidade" SeloLendaria="@Selo" />
+                            </button>
+                            <div class="small text-muted text-center">
+                                @if (escolhidas > 0)
+                                {
+                                    <span class="text-success fw-semibold">♻️ @escolhidas</span>
+                                    <button type="button" class="btn btn-link btn-sm p-0 ms-1" @onclick="() => TirarDaReciclagem(rep)">tirar</button>
+                                }
+                                else
+                                {
+                                    <span>@r.Sobrando sobrando</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case Aba.Faltam:
+                @if (d.Faltam.Count == 0)
+                {
+                    <p class="small text-muted">Não falta nenhuma. 🎉</p>
+                }
+                else
+                {
+                    <ul class="list-group mb-3">
+                        @foreach (var f in d.Faltam.Take(_faltamVisiveis))
+                        {
+                            var falta = f;
+                            <li class="list-group-item py-1 small d-flex flex-wrap align-items-center gap-2">
+                                <span class="text-muted" style="width: 3rem;">@AlbumFigurinhas.NumeroImpresso(f.Figurinha.Numero)</span>
+                                <span class="flex-grow-1">
+                                    @Rotulo(f.Figurinha) <span class="text-muted">· @f.Figurinha.TimeNome</span>
+                                    @RaridadeChip(f.Figurinha)
+                                </span>
+                                @if (f.QuemTemRepetida.Count == 0)
+                                {
+                                    <span class="text-muted">ninguém tem repetida</span>
+                                }
+                                else
+                                {
+                                    @foreach (var p in f.QuemTemRepetida.Take(3))
+                                    {
+                                        var pessoa = p;
+                                        <button type="button" class="btn btn-sm btn-outline-primary py-0" title="Pedir para @p.Nome"
+                                                @onclick="() => PedirAsync(pessoa, falta.Figurinha)">@p.Nome</button>
+                                    }
+                                    @if (f.QuemTemRepetida.Count > 3)
+                                    {
+                                        <span class="text-muted">+@(f.QuemTemRepetida.Count - 3)</span>
+                                    }
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (d.Faltam.Count > _faltamVisiveis)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @onclick="() => _faltamVisiveis += 60">Ver mais (@(d.Faltam.Count - _faltamVisiveis))</button>
+                    }
+                }
+                break;
+
+            case Aba.Nova:
+                <div class="card mb-3">
+                    <div class="card-body p-2">
+                        @if (_contraDe is { } contra)
+                        {
+                            <div class="alert alert-info py-1 small mb-2">Contraproposta para a proposta de <strong>@contra.De.Nome</strong>. Ao enviar, a proposta dele fecha.</div>
+                        }
+                        <div class="d-flex flex-wrap align-items-end gap-2 mb-2">
+                            <div>
+                                <label class="form-label small mb-0" for="trocarCom">Trocar com</label>
+                                <select id="trocarCom" class="form-select form-select-sm" value="@(_montar?.Outro.TreinadorId.ToString() ?? "")"
+                                        disabled="@(_contraDe is not null)" @onchange="EscolherPessoaAsync">
+                                    <option value="">Escolha…</option>
+                                    @foreach (var p in d.Colecionadores)
+                                    {
+                                        <option value="@p.TreinadorId">@p.Nome</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (_montar is not null)
+                            {
+                                <div class="small">Você dá <strong>@_dar.Count</strong> · pede <strong>@_pedir.Count</strong></div>
+                                <button type="button" class="btn btn-sm btn-success ms-auto" disabled="@(_ocupado || _dar.Count == 0 || _pedir.Count == 0)" @onclick="EnviarAsync">
+                                    Enviar proposta
+                                </button>
+                            }
+                        </div>
+
+                        @if (_montar is { } m)
+                        {
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
+                                    <div class="fw-semibold small mb-1">Você dá (suas repetidas)</div>
+                                    @if (m.MinhasRepetidas.Count == 0)
+                                    {
+                                        <p class="small text-muted">Você não tem repetidas.</p>
+                                    }
+                                    <ul class="list-group escolha">
+                                        @foreach (var r in m.MinhasRepetidas.OrderByDescending(r => m.EleNaoTem.Contains(r.Figurinha.FigurinhaId)).ThenBy(r => r.Figurinha.Numero))
+                                        {
+                                            var id = r.Figurinha.FigurinhaId;
+                                            <li class="list-group-item py-1">
+                                                <label class="d-flex align-items-center gap-2 small mb-0">
+                                                    <input type="checkbox" class="form-check-input mt-0" checked="@_dar.Contains(id)" @onchange="e => Marcar(_dar, id, e)" />
+                                                    <span class="flex-grow-1">@AlbumFigurinhas.NumeroImpresso(r.Figurinha.Numero) @Rotulo(r.Figurinha) @RaridadeChip(r.Figurinha)</span>
+                                                    @if (m.EleNaoTem.Contains(id))
+                                                    {
+                                                        <span class="badge text-bg-warning">ele precisa</span>
+                                                    }
+                                                    <span class="text-muted">×@r.Quantidade</span>
+                                                </label>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div class="fw-semibold small mb-1">Você pede (repetidas de @m.Outro.Nome)</div>
+                                    @if (m.RepetidasDele.Count == 0)
+                                    {
+                                        <p class="small text-muted">@m.Outro.Nome não tem repetidas.</p>
+                                    }
+                                    <ul class="list-group escolha">
+                                        @foreach (var r in m.RepetidasDele.OrderByDescending(r => m.EuNaoTenho.Contains(r.Figurinha.FigurinhaId)).ThenBy(r => r.Figurinha.Numero))
+                                        {
+                                            var id = r.Figurinha.FigurinhaId;
+                                            <li class="list-group-item py-1">
+                                                <label class="d-flex align-items-center gap-2 small mb-0">
+                                                    <input type="checkbox" class="form-check-input mt-0" checked="@_pedir.Contains(id)" @onchange="e => Marcar(_pedir, id, e)" />
+                                                    <span class="flex-grow-1">@AlbumFigurinhas.NumeroImpresso(r.Figurinha.Numero) @Rotulo(r.Figurinha) @RaridadeChip(r.Figurinha)</span>
+                                                    @if (m.EuNaoTenho.Contains(id))
+                                                    {
+                                                        <span class="badge text-bg-success">falta pra você</span>
+                                                    }
+                                                    <span class="text-muted">×@r.Quantidade</span>
+                                                </label>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+        }
+    }
+</div>
+
+@code {
+    private enum Aba { Propostas, Sugestoes, Repetidas, Faltam, Nova }
+
+    [SupplyParameterFromQuery(Name = "aba")]
+    public string? AbaInicial { get; set; }
+
+    private bool _carregando = true;
+    private bool _ocupado;
+    private string? _erro, _ok;
+    private IReadOnlyList<FigurinhaDto> _recebidasNaTroca = Array.Empty<FigurinhaDto>();
+    private IReadOnlyList<ConquistaAlbumDto> _selosNaTroca = Array.Empty<ConquistaAlbumDto>();
+
+    private Aba _aba = Aba.Propostas;
+    private TreinadorDto? _eu;
+    private TrocasDoTreinadorDto? _dados;
+    private int _faltamVisiveis = 60;
+
+    // Montando proposta
+    private MontarTrocaDto? _montar;
+    private TrocaDto? _contraDe;
+    private readonly HashSet<Guid> _dar = new();
+    private readonly HashSet<Guid> _pedir = new();
+
+    // Reciclagem: quantas cópias de cada figurinha vão.
+    private bool _reciclando;
+    private readonly Dictionary<Guid, int> _reciclar = new();
+
+    private string? Selo => _dados is null ? null : $"Melhores de {_dados.Album.Temporada - 1}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _aba = AbaInicial switch
+        {
+            "sugestoes" => Aba.Sugestoes,
+            "repetidas" => Aba.Repetidas,
+            "faltam" => Aba.Faltam,
+            "nova" => Aba.Nova,
+            _ => Aba.Propostas
+        };
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        await CarregarAsync();
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+            _dados = _eu is null ? null : await AlbumSvc.TrocasAsync(_eu.TreinadorId, CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task RecarregarAsync() => _dados = await AlbumSvc.TrocasAsync(_eu!.TreinadorId, CancellationToken.None);
+
+    private void LimparOk()
+    {
+        _ok = null;
+        _recebidasNaTroca = Array.Empty<FigurinhaDto>();
+        _selosNaTroca = Array.Empty<ConquistaAlbumDto>();
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao)
+    {
+        _ocupado = true;
+        _erro = null;
+        LimparOk();
+        try { await acao(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally
+        {
+            _ocupado = false;
+            try { await RecarregarAsync(); } catch (Exception ex) { _erro ??= ex.Message; }
+        }
+    }
+
+    // ---- Propostas
+
+    private Task AceitarAsync(TrocaDto t) => ExecutarAsync(async () =>
+    {
+        var r = await AlbumSvc.AceitarTrocaAsync(t.TrocaId, _eu!.TreinadorId, CancellationToken.None);
+        if (r.Executou)
+        {
+            _ok = r.Mensagem;
+            _recebidasNaTroca = r.Recebidas;
+            _selosNaTroca = r.Conquistas;
+        }
+        else
+        {
+            _erro = r.Mensagem;
+        }
+    });
+
+    private async Task RecusarAsync(TrocaDto t)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Recusar a proposta de {t.De.Nome}?")) return;
+        await ExecutarAsync(async () =>
+        {
+            await AlbumSvc.RecusarTrocaAsync(t.TrocaId, _eu!.TreinadorId, CancellationToken.None);
+            _ok = "Proposta recusada.";
+        });
+    }
+
+    private Task CancelarAsync(TrocaDto t) => ExecutarAsync(async () =>
+    {
+        await AlbumSvc.CancelarTrocaAsync(t.TrocaId, _eu!.TreinadorId, CancellationToken.None);
+        _ok = "Proposta cancelada.";
+    });
+
+    /// <summary>Contraproposta: o editor já vem com a proposta invertida (o que ele ofereceu eu peço, e vice-versa).</summary>
+    private async Task ContrapropostaAsync(TrocaDto t)
+    {
+        await AbrirEditorAsync(t.De.TreinadorId);
+        if (_montar is null) return;
+        _contraDe = t;
+        _dar.Clear();
+        _pedir.Clear();
+        foreach (var f in t.Pedidas.Where(f => _montar.MinhasRepetidas.Any(r => r.Figurinha.FigurinhaId == f.FigurinhaId))) _dar.Add(f.FigurinhaId);
+        foreach (var f in t.Oferecidas.Where(f => _montar.RepetidasDele.Any(r => r.Figurinha.FigurinhaId == f.FigurinhaId))) _pedir.Add(f.FigurinhaId);
+        _aba = Aba.Nova;
+    }
+
+    // ---- Montar proposta
+
+    private async Task AbrirEditorAsync(Guid outroId)
+    {
+        _erro = null;
+        _contraDe = null;
+        _dar.Clear();
+        _pedir.Clear();
+        try { _montar = await AlbumSvc.MontarTrocaAsync(_eu!.TreinadorId, outroId, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task EscolherPessoaAsync(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) await AbrirEditorAsync(id);
+        else _montar = null;
+    }
+
+    /// <summary>Da sugestão: uma por uma, as que ele tem e eu preciso pelas que eu tenho e ele precisa.</summary>
+    private async Task MontarDaSugestaoAsync(SugestaoDeTrocaDto s)
+    {
+        await AbrirEditorAsync(s.Pessoa.TreinadorId);
+        var quantas = Math.Max(1, s.Encaixe);
+        foreach (var f in s.EleTemQueVocePrecisa.Take(quantas)) _pedir.Add(f.FigurinhaId);
+        foreach (var f in s.VoceTemQueElePrecisa.Take(quantas)) _dar.Add(f.FigurinhaId);
+        _aba = Aba.Nova;
+    }
+
+    private async Task PedirAsync(PessoaDaTrocaDto pessoa, FigurinhaDto figurinha)
+    {
+        await AbrirEditorAsync(pessoa.TreinadorId);
+        _pedir.Add(figurinha.FigurinhaId);
+        _aba = Aba.Nova;
+    }
+
+    private static void Marcar(HashSet<Guid> lado, Guid id, ChangeEventArgs e)
+    {
+        if (e.Value is true) lado.Add(id); else lado.Remove(id);
+    }
+
+    private Task EnviarAsync() => ExecutarAsync(async () =>
+    {
+        var m = _montar!;
+        await AlbumSvc.ProporTrocaAsync(_eu!.TreinadorId, m.Outro.TreinadorId, _dar.ToList(), _pedir.ToList(), _contraDe?.TrocaId, CancellationToken.None);
+        _ok = _contraDe is null ? $"Proposta enviada para {m.Outro.Nome}." : $"Contraproposta enviada para {m.Outro.Nome}.";
+        _montar = null;
+        _contraDe = null;
+        _dar.Clear();
+        _pedir.Clear();
+        _aba = Aba.Propostas;
+    });
+
+    // ---- Reciclagem
+
+    private void EscolherParaReciclar(RepetidaDto r)
+    {
+        if (!_reciclando || _reciclar.Values.Sum() >= AlbumFigurinhas.RepetidasPorPacote) return;
+        var ja = _reciclar.GetValueOrDefault(r.Figurinha.FigurinhaId);
+        if (ja < r.Sobrando) _reciclar[r.Figurinha.FigurinhaId] = ja + 1;
+    }
+
+    private void TirarDaReciclagem(RepetidaDto r)
+    {
+        var ja = _reciclar.GetValueOrDefault(r.Figurinha.FigurinhaId);
+        if (ja <= 1) _reciclar.Remove(r.Figurinha.FigurinhaId); else _reciclar[r.Figurinha.FigurinhaId] = ja - 1;
+    }
+
+    private Task ReciclarAsync() => ExecutarAsync(async () =>
+    {
+        var lista = _reciclar.SelectMany(p => Enumerable.Repeat(p.Key, p.Value)).ToList();
+        await AlbumSvc.ReciclarAsync(_eu!.TreinadorId, lista, CancellationToken.None);
+        _reciclando = false;
+        _reciclar.Clear();
+        _ok = "♻️ Reciclado! 1 pacote novo esperando no álbum.";
+    });
+
+    // ---- Apoio de tela
+
+    private RenderFragment Cartas(IReadOnlyList<FigurinhaDto> figurinhas) => __builder =>
+    {
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var f in figurinhas)
+            {
+                <CartaFigurinha Figurinha="@f" Largura="64" SeloLendaria="@Selo" />
+            }
+        </div>
+    };
+
+    private static RenderFragment RaridadeChip(FigurinhaDto f) => __builder =>
+    {
+        @if (f.Raridade == RaridadeFigurinha.Lendaria)
+        {
+            <span class="badge text-bg-dark ms-1">★</span>
+        }
+        else if (f.Raridade == RaridadeFigurinha.Brilhante)
+        {
+            <span class="badge text-bg-warning ms-1">✨</span>
+        }
+    };
+
+    private static string Rotulo(FigurinhaDto f) => f.Tipo == TipoFigurinha.Escudo ? $"Escudo do {f.TimeNome}" : f.NomeImpresso;
+
+    private static string Nomes(TrocaDto t) =>
+        $"{string.Join(", ", t.Oferecidas.Select(Rotulo))} ⇄ {string.Join(", ", t.Pedidas.Select(Rotulo))}";
+
+    private static string Prazo(DateTime expiraEm)
+    {
+        var falta = expiraEm - DateTime.UtcNow;
+        if (falta <= TimeSpan.Zero) return "agora";
+        return falta.TotalHours >= 1 ? $"em {(int)falta.TotalHours}h" : $"em {Math.Max(1, (int)falta.TotalMinutes)} min";
+    }
+
+    private static string StatusTexto(StatusTroca s) => s switch
+    {
+        StatusTroca.Aceita => "Aceita",
+        StatusTroca.Recusada => "Recusada",
+        StatusTroca.Cancelada => "Cancelada",
+        StatusTroca.Expirada => "Expirou",
+        StatusTroca.NaoValeMais => "Não vale mais",
+        StatusTroca.Contraproposta => "Contraproposta",
+        _ => "Esperando"
+    };
+
+    private static string StatusClasse(StatusTroca s) => s switch
+    {
+        StatusTroca.Aceita => "text-bg-success",
+        StatusTroca.Recusada or StatusTroca.NaoValeMais => "text-bg-danger",
+        StatusTroca.Contraproposta => "text-bg-info",
+        _ => "text-bg-secondary"
+    };
+}

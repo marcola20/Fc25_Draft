@@ -61,6 +61,13 @@
                     <button class="btn btn-sm btn-success" disabled="@_pegando" @onclick="PegarAsync">🌅 Pegar o pacote do dia</button>
                 }
                 <a href="/album" class="btn btn-sm btn-outline-primary">@(r.PacotesParaAbrir > 0 ? "Abrir pacotes" : "Ver o álbum")</a>
+                <a href="/album/trocas" class="btn btn-sm @(r.TrocasEsperando > 0 ? "btn-warning" : "btn-outline-secondary")">
+                    🔁 Trocas
+                    @if (r.TrocasEsperando > 0)
+                    {
+                        <span class="badge rounded-pill text-bg-danger" title="Propostas esperando a sua resposta">@r.TrocasEsperando</span>
+                    }
+                </a>
             </div>
         </div>
     </div>

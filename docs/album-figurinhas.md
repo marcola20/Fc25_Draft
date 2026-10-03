@@ -209,6 +209,29 @@ Monte de repetidas; proposta de troca entre treinadores (aceite atômico, sem pe
 corrida); sugestões automáticas ("Fulano tem 3 que você precisa e precisa de 2 suas"); reciclar
 repetidas (ex.: 6 repetidas → 1 pacote).
 
+**Feito (03/10/2026).** Como ficou:
+- Regra de ouro: só repetida sai da mão de alguém (quem dá precisa ter `Quantidade >= 2` na hora de
+  propor e de novo na hora de aceitar). O álbum colado nunca perde figurinha, então os selos seguem valendo.
+- Entidades em `Album.cs`: `TrocaFigurinhas` (status `Pendente`, `Aceita`, `Recusada`, `Cancelada`,
+  `Expirada`, `NaoValeMais`, `Contraproposta`; `Motivo`; `ContrapropostaDeId`) e `TrocaFigurinhaItem`
+  (uma cópia por figurinha por lado; `Oferecida` = sai de quem propôs). Migração `TrocasDeFigurinhas`.
+- Serviço em `AlbumService.Trocas.cs` (a classe virou `partial`). Aceite: trava as duas pessoas na linha
+  do `Treinadores` sempre na ordem do id (`FOR UPDATE`, as mesmas travas de abrir pacote e reciclar), relê a
+  proposta depois da trava (a segunda aba recebe "Essa proposta já foi aceita"), confere as repetidas,
+  move tudo na mesma transação e grava selo com o mesmo `GravarConquistasAsync` da abertura de pacote.
+  Recusar, cancelar e a contraproposta (que fecha a original) usam `UPDATE ... WHERE Status = Pendente`.
+- Prazo de 48 h (`AlbumFigurinhas.PrazoDaTroca`): a proposta vencida já aparece como expirada na tela e o
+  `PacotesDoAlbumService` grava `Expirada` (`ExpirarTrocasAsync`).
+- Reciclagem: `ReciclarAsync`, exatamente `RepetidasPorPacote` (6) cópias sobrando, 1 `PacoteGanho` com
+  origem `reciclagem` e chave `reciclagem:{id}` (não vira aviso no celular, como o pacote do dia).
+- Aviso no celular: `IPushService.AvisarTrocasAsync`, marca `troca:{id}:{recebida|aceita|recusada}`; a
+  contraproposta chega como "recebida" com o texto de contraproposta. O evento `AlbumService.TrocasMudaram`
+  acorda o serviço para o aviso sair na hora.
+- Telas: `/album/trocas` (abas Propostas, Sugestões, Repetidas com reciclagem, Faltam com "pedir para
+  Fulano", Nova proposta; `?aba=` abre direto numa aba), link com contador de propostas esperando resposta
+  na capa do `/album` e no cartão da Minha Área (`TrocasEsperando` no `MeuAlbumDto` e no resumo), item
+  "Trocas" no menu do Álbum.
+
 ## Ideias para depois
 
 Páginas especiais (lendas do Hall da Fama, treinadores, momentos da temporada da linha do tempo),
