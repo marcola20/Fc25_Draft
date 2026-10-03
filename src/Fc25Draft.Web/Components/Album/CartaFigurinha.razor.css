@@ -168,9 +168,36 @@
         rgba(140, 220, 255, .25) 56%,
         transparent 70%);
     background-size: 250% 250%;
-    background-position: 30% 30%;
+    /* O reflexo segue o mouse (--px/--py, do cbfvHolo no app.js) ou o giroscópio do celular (--gpx/--gpy). */
+    background-position: calc(var(--px, var(--gpx, 30)) * 1%) calc(var(--py, var(--gpy, 30)) * 1%);
     mix-blend-mode: soft-light;
 }
+
+/* Brilho de luz no ponto do mouse. */
+.r-brilhante .brilho::after,
+.r-lendaria .brilho::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at calc(var(--px, 50) * 1%) calc(var(--py, 50) * 1%),
+        rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 45%);
+    mix-blend-mode: overlay;
+    opacity: 0;
+    transition: opacity .2s;
+}
+
+.holo-ativo .brilho::after { opacity: 1; }
+
+/* A carta inclina na direção do mouse (ou do celular). */
+.r-brilhante .moldura,
+.r-lendaria .moldura {
+    transform: perspective(40em) rotateX(var(--rx, var(--grx, 0deg))) rotateY(var(--ry, var(--gry, 0deg)));
+    transition: transform .3s ease-out;
+    will-change: transform;
+}
+
+.holo-ativo .moldura { transition: transform .08s linear; }
 
 /* ---- Lendária: moldura especial e holográfico animado ---- */
 .r-lendaria {
@@ -197,10 +224,15 @@
         rgba(190, 0, 255, .45) 70%,
         transparent 85%);
     background-size: 300% 300%;
+    background-position: calc(var(--px, var(--gpx, 30)) * 1%) calc(var(--py, var(--gpy, 30)) * 1%);
     mix-blend-mode: color-dodge;
     opacity: .55;
     animation: holo 6s ease-in-out infinite alternate;
 }
+
+/* Com a mão (mouse ou celular) mexendo, o reflexo para de andar sozinho e segue o movimento. */
+.r-lendaria.holo-ativo .brilho,
+.holo-giroscopio .r-lendaria .brilho { animation: none; }
 
 .selo {
     position: absolute;
@@ -228,6 +260,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .r-lendaria .brilho { animation: none; }
+    .r-brilhante .moldura, .r-lendaria .moldura { transform: none; transition: none; }
 }
 
 /* ---- Marcas ---- */
@@ -264,3 +297,6 @@
 .vaga-nome { font-size: .85em; font-weight: 700; text-transform: uppercase; opacity: .8; overflow-wrap: anywhere; }
 .vaga-pos { font-size: .75em; opacity: .7; }
 .vaga.t-escudo { border-style: double; border-width: .3em; }
+
+/* Na imagem de compartilhar o reflexo não funciona (a captura não mistura cores): sai a carta limpa. */
+.share-rendering .brilho { display: none; }

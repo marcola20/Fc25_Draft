@@ -1,0 +1,122 @@
+@page "/album/colecionadores"
+@inject IAlbumService AlbumSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject EscudoService Escudos
+@implements IDisposable
+
+<PageTitle>Colecionadores do Álbum</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1000px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger">@_erro</div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_dados is null)
+    {
+        <div class="alert alert-secondary">O álbum desta temporada ainda não foi lançado.</div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 class="h4 mb-0">🏅 @_dados.Album.Nome</h1>
+            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Meu álbum</a>
+        </div>
+        <p class="small text-muted">
+            Quem completou o álbum fica na frente, na ordem em que completou. Depois, quem tem mais figurinhas
+            diferentes coladas, mais lendárias e mais figurinhas no total (com as repetidas).
+            🏅 é página completa; 🏆, álbum completo.
+        </p>
+
+        @if (_dados.Linhas.Count == 0)
+        {
+            <div class="alert alert-info">Ninguém abriu pacote ainda. O primeiro a abrir já sai na frente!</div>
+        }
+        else
+        {
+            <div class="card">
+                <ul class="list-group list-group-flush ranking">
+                    @foreach (var l in _dados.Linhas)
+                    {
+                        var eu = l.TreinadorId == _eu;
+                        <li class="list-group-item @(eu ? "eu" : "")" @key="l.TreinadorId">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="posicao @(l.Posicao <= 3 ? $"p{l.Posicao}" : "")">@l.Posicao</span>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                                        <span class="fw-semibold text-truncate">
+                                            <a href="/treinadores/@l.TreinadorId" class="text-reset text-decoration-none">@l.Nome</a>
+                                        </span>
+                                        @if (eu)
+                                        {
+                                            <span class="badge text-bg-primary">você</span>
+                                        }
+                                        @if (l.AlbumCompletoEm is { } em)
+                                        {
+                                            <span class="badge selo-trofeu" title="Álbum completo em @BrazilTime.FormatDateTime(em, "dd/MM/yyyy")">🏆 Completo</span>
+                                        }
+                                        <span class="small text-muted text-truncate">@l.TimeAtual</span>
+                                    </div>
+                                    <div class="progress mt-1" style="height: .4rem;" role="progressbar" aria-label="Progresso de @l.Nome"
+                                         aria-valuenow="@l.Percentual" aria-valuemin="0" aria-valuemax="100">
+                                        <div class="progress-bar @(l.AlbumCompletoEm is null ? "" : "bg-warning")" style="width: @(l.Percentual)%"></div>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-3 small text-muted mt-1">
+                                        <span><strong class="text-body">@l.Percentual%</strong> · @l.Coladas/@l.TotalDoAlbum</span>
+                                        <span title="Figurinhas no total, com as repetidas">🎴 @l.TotalDeFigurinhas</span>
+                                        <span title="Lendárias coladas">★ @l.Lendarias</span>
+                                        @if (l.PaginasCompletas.Count > 0)
+                                        {
+                                            <span class="selos" title="Páginas completas: @string.Join(", ", l.PaginasCompletas.Select(p => p.TimeNome))">
+                                                🏅 @l.PaginasCompletas.Count
+                                                @foreach (var p in l.PaginasCompletas.Take(6))
+                                                {
+                                                    <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" width="16" height="16" loading="lazy" />
+                                                }
+                                            </span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private string? _erro;
+    private ColecionadoresDto? _dados;
+    private Guid? _eu;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        await CarregarAsync();
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _dados = await AlbumSvc.ColecionadoresAsync(CancellationToken.None);
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token) ? null : (await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None))?.TreinadorId;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+}

@@ -1,6 +1,7 @@
 @page "/album"
 @using Fc25Draft.Core.Utilities
 @using Fc25Draft.Web.Components.Album
+@using Fc25Draft.Web.Components.Layouts
 @inject IAlbumService AlbumSvc
 @inject ITreinadorService TreinadorSvc
 @inject AdminAuthService AdminAuth
@@ -44,7 +45,14 @@
             <div class="card-body d-flex flex-wrap gap-4 align-items-center">
                 <div class="flex-grow-1" style="min-width: 240px;">
                     <div class="text-muted small text-uppercase fw-semibold">Temporada @a.Album.Temporada</div>
-                    <h1 class="h3 mb-2">🎴 @a.Album.Nome</h1>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h1 class="h3 mb-0">🎴 @a.Album.Nome</h1>
+                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary ms-auto">🏅 Colecionadores</a>
+                    </div>
+                    @if (a.AlbumCompleto is { } completo)
+                    {
+                        <div class="album-completo mb-2">🏆 Álbum completo em @BrazilTime.FormatDateTime(completo.Em, "dd/MM/yyyy") — seu nome está no <a href="/hall-of-fame#colecionadores">Hall da Fama</a>.</div>
+                    }
                     <div class="d-flex justify-content-between small mb-1">
                         <span><strong>@a.Coladas</strong> de @a.Total figurinhas</span>
                         <span class="fw-semibold">@a.Percentual%</span>
@@ -102,37 +110,34 @@
             }
         </div>
 
-        @* ---- Pacote aberto ---- *@
+        @* ---- Pacote aberto: a abertura em tela cheia ---- *@
         @if (_aberto is { } p)
         {
-            <div class="card mb-3 pacote-aberto">
-                <div class="card-header d-flex flex-wrap align-items-center gap-2">
-                    <strong>🎁 Pacote aberto</strong>
-                    <span class="small text-muted">· @IconeDaOrigem(p.Origem) @AlbumFigurinhas.DeOndeVeio(p.Origem, p.Motivo)</span>
-                    <span class="small text-muted ms-auto">
-                        @p.Figurinhas.Count(f => f.Nova) nova@(p.Figurinhas.Count(f => f.Nova) == 1 ? "" : "s") ·
-                        @p.Figurinhas.Count(f => !f.Nova) repetida@(p.Figurinhas.Count(f => !f.Nova) == 1 ? "" : "s")
-                    </span>
+            <AberturaDePacote Pacote="@p" AlbumNome="@a.Album.Nome" SeloLendaria="@Selo" Abrindo="@_abrindo"
+                              OnFechar="() => _aberto = null" OnProximo="AbrirAsync"
+                              OnCompartilhar="f => _compartilhar = f" />
+        }
+        <CompartilharCarta Figurinha="@_compartilhar" AlbumNome="@a.Album.Nome" SeloLendaria="@Selo" Quem="@_eu.Nome"
+                           OnFechar="() => _compartilhar = null" />
+
+        @* ---- Últimas raras tiradas (de todo mundo) ---- *@
+        @if (_raras.Count > 0 && _pagina is null && string.IsNullOrWhiteSpace(_busca))
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-baseline gap-2">
+                    <strong>✨ Últimas raras tiradas</strong>
+                    <span class="small text-muted">brilhantes e lendárias que saíram nos pacotes</span>
                 </div>
-                <div class="card-body">
-                    <div class="grade-cartas justify-content-center">
-                        @foreach (var t in p.Figurinhas)
+                <div class="card-body py-2">
+                    <div class="faixa-raras">
+                        @foreach (var r in _raras)
                         {
-                            <div class="d-flex flex-column align-items-center gap-2">
-                                <CartaFigurinha Figurinha="@t.Figurinha" Largura="150" Nova="@t.Nova" Lazy="false"
-                                                SeloLendaria="@Selo" />
-                                <span class="small @(t.Nova ? "text-success fw-semibold" : "text-muted")">
-                                    @(t.Nova ? "Colada no álbum" : $"Repetida (agora tem {t.QuantidadeAgora})")
-                                </span>
+                            <div class="rara @(r.TreinadorId == _eu.TreinadorId ? "minha" : "")">
+                                <CartaFigurinha Figurinha="@r.Figurinha" Largura="92" SeloLendaria="@Selo" />
+                                <div class="rara-quem text-truncate" title="@r.Nome">@(r.TreinadorId == _eu.TreinadorId ? "Você" : r.Nome)</div>
+                                <div class="rara-quando">@AvisosSino.Quando(r.Quando)</div>
                             </div>
                         }
-                    </div>
-                    <div class="d-flex justify-content-center gap-2 mt-3">
-                        @if (p.PacotesRestantes > 0)
-                        {
-                            <button class="btn btn-primary" disabled="@_abrindo" @onclick="AbrirAsync">Abrir o próximo (@p.PacotesRestantes)</button>
-                        }
-                        <button class="btn btn-outline-secondary" @onclick="() => _aberto = null">Fechar</button>
                     </div>
                 </div>
             </div>
@@ -177,7 +182,11 @@
                         <div class="fw-bold">@pg.TimeNome</div>
                         <div class="small text-muted">
                             @pg.Coladas de @pg.Total · @pg.Percentual%
-                            @if (pg.Completa)
+                            @if (a.SeloDaPagina(pg.TeamId) is { } seloDaPagina)
+                            {
+                                <span class="badge selo-badge ms-1" title="Completa em @BrazilTime.FormatDateTime(seloDaPagina.Em, "dd/MM/yyyy")">🏅 Página completa</span>
+                            }
+                            else if (pg.Completa)
                             {
                                 <span class="badge text-bg-success ms-1">✓ Página completa</span>
                             }
@@ -201,9 +210,23 @@
                     <div class="grade-cartas">
                         @foreach (var v in vagas)
                         {
-                            <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="@(!v.Colada)" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo" />
+                            @if (v.Colada)
+                            {
+                                var colada = v.Figurinha;
+                                <button type="button" class="carta-botao" @key="v.Figurinha.FigurinhaId" title="Compartilhar" @onclick="() => _compartilhar = colada">
+                                    <CartaFigurinha Figurinha="@v.Figurinha" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo" />
+                                </button>
+                            }
+                            else
+                            {
+                                <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="true" />
+                            }
                         }
                     </div>
+                    @if (pg.Coladas > 0)
+                    {
+                        <div class="small text-muted mt-2">Toque numa figurinha colada para compartilhar.</div>
+                    }
                 </div>
             </div>
         }
@@ -213,6 +236,7 @@
             <div class="indice">
                 @foreach (var pagina in a.Paginas)
                 {
+                    var selo = a.SeloDaPagina(pagina.TeamId);
                     <a class="indice-item card text-reset text-decoration-none @(pagina.Completa ? "completa" : "")" href="/album?clube=@pagina.TeamId">
                         <div class="card-body d-flex align-items-center gap-2 p-2">
                             <img src="@Escudos.GetEscudo(pagina.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" loading="lazy" />
@@ -223,7 +247,11 @@
                                 </div>
                                 <div class="small text-muted mt-1">@pagina.Coladas/@pagina.Total</div>
                             </div>
-                            @if (pagina.Completa)
+                            @if (selo is not null)
+                            {
+                                <span class="selo-pagina" title="Página completa em @BrazilTime.FormatDateTime(selo.Em, "dd/MM/yyyy")">🏅</span>
+                            }
+                            else if (pagina.Completa)
                             {
                                 <span class="selo-completa" title="Página completa">✓</span>
                             }
@@ -250,6 +278,10 @@
     private TreinadorDto? _eu;
     private MeuAlbumDto? _album;
     private PacoteAbertoDto? _aberto;
+    private FigurinhaDto? _compartilhar;
+    private IReadOnlyList<RaraTiradaDto> _raras = Array.Empty<RaraTiradaDto>();
+
+    private const int RarasNaCapa = 12;
     private PaginaDoAlbumDto? _pagina;
 
     private string _busca = string.Empty;
@@ -281,6 +313,7 @@
             var token = await AdminAuth.GetTokenAsync();
             _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
             _album = _eu is null ? null : await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
+            _raras = _album is null ? Array.Empty<RaraTiradaDto>() : await AlbumSvc.UltimasRarasAsync(RarasNaCapa, CancellationToken.None);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
@@ -335,6 +368,7 @@
         {
             _aberto = await AlbumSvc.AbrirPacoteAsync(_eu.TreinadorId, CancellationToken.None);
             _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
+            _raras = await AlbumSvc.UltimasRarasAsync(RarasNaCapa, CancellationToken.None);
             _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
         }
         catch (Exception ex) { _erro = ex.Message; }

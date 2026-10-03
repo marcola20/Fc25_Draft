@@ -60,7 +60,8 @@ public class LayoutNavigationService
         }),
         new("Álbum", new List<MenuItem>
         {
-            new("Álbum de Figurinhas", "/album", "oi oi-image")
+            new("Álbum de Figurinhas", "/album", "oi oi-image"),
+            new("Colecionadores", "/album/colecionadores", "oi oi-badge")
         }),
         new("História", new List<MenuItem>
         {
@@ -551,6 +552,12 @@ public class LayoutNavigationService
             Route = "/album",
             Title = "Álbum de Figurinhas",
             Subtitle = "Abra pacotes, cole e complete as páginas dos clubes"
+        },
+        ["/album/colecionadores"] = new PageDefinition
+        {
+            Route = "/album/colecionadores",
+            Title = "Colecionadores",
+            Subtitle = "Quem está mais perto de completar o álbum"
         },
         ["/admin/album"] = new PageDefinition
         {

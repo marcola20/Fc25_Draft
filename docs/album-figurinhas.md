@@ -183,6 +183,27 @@ reconciliação duas vezes não duplica, e o pacote do dia só sai uma vez por d
 Animação de abrir pacote, holográfico, compartilhar a carta, feed "últimas raras tiradas",
 ranking de colecionadores, selos de página completa, Hall da Fama (Colecionadores).
 
+**Feito (03/10/2026).** Como ficou, para a próxima fase:
+- Selos: entidade `AlbumConquista` (em `Album.cs`; `PaginaCompleta` com `TeamId`, `AlbumCompleto` com
+  `TeamId` nulo), índice único com `NULLS NOT DISTINCT`, migração `SelosDoAlbum`. Gravados dentro da
+  transação do `AbrirPacoteAsync` (`GravarConquistasAsync`), só quando entra figurinha nova; o
+  `PacoteAbertoDto.Conquistas` traz os selos do pacote. Atenção para a Fase 4: o selo não sai mais,
+  mesmo que uma troca tire figurinha colada.
+- Aviso no celular do selo: `IPushService.AvisarConquistasDoAlbumAsync` (marca `conquista:{id}`); o
+  evento `AlbumService.ConquistasGravadas` acorda o `PacotesDoAlbumService` para o aviso sair na hora.
+- Abertura: `Components/Album/AberturaDePacote` (tela cheia; rasgar, cartas viradas, virar uma a uma ou
+  todas, clarão na brilhante, confete e tela piscando na lendária). Mostra as cartas do `PacoteAbertoDto`,
+  as mesmas gravadas no `PacoteGanho`. Com `prefers-reduced-motion` as cartas já vêm abertas (o C#
+  pergunta ao `cbfvHolo.movimentoReduzido()` e o CSS desliga as animações).
+- Holográfico: `window.cbfvHolo` no `app.js` põe `--px/--py/--rx/--ry` na carta sob o mouse e
+  `--gpx/--gpy/--grx/--gry` na raiz pelo giroscópio (só onde não pede permissão, ou seja, não no iPhone).
+- Compartilhar: `Components/Album/CompartilharCarta` (prévia + `ShareableCard`, que ganhou o parâmetro
+  `Link`); frases e "melhor do pacote" em `AlbumFigurinhas`. Na página do clube, tocar numa colada abre.
+  Na imagem o reflexo some (`.share-rendering .brilho`), porque o html2canvas não mistura cores.
+- Telas: feed "Últimas raras tiradas" na capa (`UltimasRarasAsync`, só brilhantes de jogador e
+  lendárias), `/album/colecionadores` (`ColecionadoresAsync`), selos no índice, na Minha Área e no
+  ranking, seção "Colecionadores" no `/hall-of-fame` (`AlbunsCompletosAsync`, âncora `#colecionadores`).
+
 ### Fase 4 — Trocas
 Monte de repetidas; proposta de troca entre treinadores (aceite atômico, sem perder figurinha em
 corrida); sugestões automáticas ("Fulano tem 3 que você precisa e precisa de 2 suas"); reciclar

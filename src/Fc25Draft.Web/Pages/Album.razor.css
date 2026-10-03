@@ -17,7 +17,6 @@
 .raridade-chip.brilhante { border-color: #c9971c; color: var(--cbfv-dourado); }
 .raridade-chip.lendaria { border-color: var(--cbfv-roxo); color: var(--cbfv-roxo); }
 
-.pacote-aberto { border-color: #c9971c; }
 
 /* Índice: um cartão por clube. */
 .indice {
@@ -60,3 +59,52 @@
 .pacote-origem.bolao { border-color: var(--cbfv-azul); }
 .pacote-origem.diario { border-color: var(--cbfv-laranja); }
 .pacote-origem.admin { border-color: var(--cbfv-roxo); }
+
+/* Selos */
+.selo-pagina {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff3c4, #e9c46a 55%, #b8860b);
+    box-shadow: 0 0 0 2px rgba(184, 134, 11, .35);
+    flex-shrink: 0;
+}
+
+.selo-badge { background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b); color: #2a1a00; }
+
+.album-completo {
+    padding: .35rem .7rem;
+    border-radius: .5rem;
+    font-weight: 600;
+    background: linear-gradient(90deg, rgba(184, 134, 11, .18), rgba(245, 211, 107, .3), rgba(184, 134, 11, .18));
+    border: 1px solid #c9971c;
+}
+
+/* Últimas raras: uma faixa que rola para o lado dentro do cartão (a página não rola). */
+.faixa-raras {
+    display: flex;
+    gap: .8rem;
+    overflow-x: auto;
+    padding: .5rem .2rem .6rem;
+    scrollbar-width: thin;
+}
+
+.rara { flex: 0 0 auto; width: 96px; display: flex; flex-direction: column; align-items: center; gap: .25rem; }
+.rara-quem { max-width: 96px; font-size: .78rem; font-weight: 600; }
+.rara-quando { font-size: .7rem; color: var(--bs-secondary-color); }
+.rara.minha .rara-quem { color: var(--bs-success); }
+
+/* Figurinha colada é um botão (abre o compartilhar), sem cara de botão. */
+.carta-botao {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    border-radius: .7rem;
+    cursor: pointer;
+}
+
+.carta-botao:focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 3px; }

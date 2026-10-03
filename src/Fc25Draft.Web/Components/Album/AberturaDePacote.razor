@@ -1,0 +1,231 @@
+@using Fc25Draft.Core.Utilities
+@inject IJSRuntime JS
+
+@* Abertura do pacote: o pacote rasga, as 5 cartas chegam viradas e a pessoa vira uma a uma (ou todas).
+   Brilhante brilha ao virar; lendária vem com festa. O sorteio já foi feito no servidor: as cartas são as
+   gravadas no PacoteGanho, na mesma ordem. Com "menos movimento" no sistema, as cartas já vêm abertas. *@
+<div class="abertura-fundo @(_festa ? "festa" : "")" role="dialog" aria-modal="true" aria-label="Pacote aberto">
+    <div class="abertura">
+        <div class="abertura-topo">
+            <span class="small">🎁 @AlbumFigurinhas.DeOndeVeio(Pacote.Origem, Pacote.Motivo)</span>
+            <button type="button" class="btn-close btn-close-white ms-auto" aria-label="Fechar" @onclick="OnFechar"></button>
+        </div>
+
+        @if (_fase != Fase.Cartas)
+        {
+            <div class="pacote-palco">
+                <button type="button" class="pacote-fechado @(_fase == Fase.Rasgando ? "rasgando" : "")" @onclick="RasgarAsync"
+                        aria-label="Rasgar o pacote">
+                    <span class="pacote-tira" aria-hidden="true"></span>
+                    <span class="pacote-corpo">
+                        <span class="pacote-marca">CBFV</span>
+                        <span class="pacote-nome">@AlbumNome</span>
+                        <span class="pacote-qtd">@Pacote.Figurinhas.Count figurinhas</span>
+                    </span>
+                </button>
+                <div class="dica">Toque no pacote para rasgar</div>
+            </div>
+        }
+        else
+        {
+            <div class="cartas grade-cartas justify-content-center">
+                @for (var i = 0; i < Pacote.Figurinhas.Count; i++)
+                {
+                    var indice = i;
+                    var t = Pacote.Figurinhas[i];
+                    var virada = _viradas.Contains(i);
+                    <div class="carta-do-pacote">
+                        <div class="flip r-@t.Figurinha.Raridade.ToString().ToLowerInvariant() @(virada ? "virada" : "") @(_dandoCartas ? "entrando" : "")"
+                             style="--i: @i; --w: @(Largura)px; --atraso-virar: @(_virandoTodas ? (_ordemDeVirar.IndexOf(i) * 220) : 0)ms"
+                             role="button" tabindex="0" aria-pressed="@(virada ? "true" : "false")"
+                             aria-label="@(virada ? t.Figurinha.NomeImpresso : $"Virar a carta {i + 1}")"
+                             @onclick="() => Virar(indice)" @onkeydown="e => TeclaAsync(e, indice)">
+                            <div class="flip-miolo">
+                                <div class="flip-face verso" aria-hidden="true">
+                                    <span class="verso-marca">CBFV</span>
+                                    <span class="verso-estrela">★</span>
+                                </div>
+                                <div class="flip-face frente">
+                                    <CartaFigurinha Figurinha="@t.Figurinha" Largura="@Largura" Nova="@t.Nova" Quantidade="@t.QuantidadeAgora"
+                                                    SeloLendaria="@SeloLendaria" Lazy="false" />
+                                </div>
+                            </div>
+                            @if (virada && t.Figurinha.Raridade == RaridadeFigurinha.Lendaria)
+                            {
+                                <div class="confete" aria-hidden="true">
+                                    @for (var c = 0; c < Confetes; c++)
+                                    {
+                                        <span style="--x: @((c * 37 % 100) - 50); --d: @(c * 23 % 400)ms; --c: @Cores[c % Cores.Length]; --g: @(c * 53 % 360)deg"></span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <div class="legenda @(virada ? "visivel" : "")">
+                            @if (t.Nova)
+                            {
+                                <span class="text-success fw-semibold">Colada no álbum</span>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">Repetida · agora ×@t.QuantidadeAgora</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (!TodasViradas)
+            {
+                <div class="text-center mt-3">
+                    <button type="button" class="btn btn-light" @onclick="VirarTodas">Virar todas</button>
+                    <div class="dica mt-2">Toque numa carta para virar</div>
+                </div>
+            }
+            else
+            {
+                @foreach (var c in Pacote.Conquistas)
+                {
+                    <div class="conquista">
+                        @if (c.Tipo == TipoConquistaAlbum.AlbumCompleto)
+                        {
+                            <span>🏆 Você completou o @AlbumNome! Seu nome está no Hall da Fama.</span>
+                        }
+                        else
+                        {
+                            <span>🏅 Página do @c.TimeNome completa!</span>
+                        }
+                    </div>
+                }
+                <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+                    <button type="button" class="btn btn-success" @onclick="CompartilharAsync">📷 Compartilhar a melhor</button>
+                    @if (Pacote.PacotesRestantes > 0)
+                    {
+                        <button type="button" class="btn btn-primary" disabled="@Abrindo" @onclick="OnProximo">
+                            @(Abrindo ? "Abrindo…" : $"Abrir o próximo ({Pacote.PacotesRestantes})")
+                        </button>
+                    }
+                    <button type="button" class="btn btn-outline-light" @onclick="OnFechar">Fechar</button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private enum Fase { Fechado, Rasgando, Cartas }
+
+    private const int Largura = 150;
+    private const int Confetes = 28;
+    private static readonly string[] Cores = { "#f5d36b", "#b197fc", "#f783ac", "#5eead4", "#ffa94d", "#6ea8fe" };
+
+    [Parameter, EditorRequired] public PacoteAbertoDto Pacote { get; set; } = null!;
+    [Parameter, EditorRequired] public string AlbumNome { get; set; } = string.Empty;
+    [Parameter] public string? SeloLendaria { get; set; }
+
+    /// <summary>O próximo pacote está sendo aberto no servidor.</summary>
+    [Parameter] public bool Abrindo { get; set; }
+
+    [Parameter] public EventCallback OnFechar { get; set; }
+    [Parameter] public EventCallback OnProximo { get; set; }
+    [Parameter] public EventCallback<FigurinhaDto> OnCompartilhar { get; set; }
+
+    private Fase _fase = Fase.Fechado;
+    private readonly HashSet<int> _viradas = new();
+    private List<int> _ordemDeVirar = new();
+    private bool _virandoTodas;
+    private bool _dandoCartas;
+    private bool _festa;
+    private bool _reduzido;
+    private Guid _pacoteAtual;
+
+    private bool TodasViradas => _viradas.Count == Pacote.Figurinhas.Count;
+
+    protected override void OnParametersSet()
+    {
+        // Pacote novo ("Abrir o próximo"): começa de novo, com o pacote fechado.
+        if (Pacote.PacoteId == _pacoteAtual) return;
+        _pacoteAtual = Pacote.PacoteId;
+        _viradas.Clear();
+        _virandoTodas = false;
+        _festa = false;
+        _fase = _reduzido ? Fase.Cartas : Fase.Fechado;
+        if (_reduzido) VirarTudoSemAnimacao();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { _reduzido = await JS.InvokeAsync<bool>("cbfvHolo.movimentoReduzido"); }
+        catch (JSException) { _reduzido = false; }
+
+        if (_reduzido)
+        {
+            _fase = Fase.Cartas;
+            VirarTudoSemAnimacao();
+            StateHasChanged();
+        }
+    }
+
+    private void VirarTudoSemAnimacao()
+    {
+        for (var i = 0; i < Pacote.Figurinhas.Count; i++) _viradas.Add(i);
+    }
+
+    private async Task RasgarAsync()
+    {
+        if (_fase != Fase.Fechado) return;
+        _fase = Fase.Rasgando;
+        StateHasChanged();
+        await Task.Delay(650);
+        _fase = Fase.Cartas;
+        _dandoCartas = true;
+        StateHasChanged();
+        await Task.Delay(900);
+        _dandoCartas = false;
+    }
+
+    private void Virar(int i)
+    {
+        if (!_viradas.Add(i)) return;
+        _virandoTodas = false;
+        if (Pacote.Figurinhas[i].Figurinha.Raridade == RaridadeFigurinha.Lendaria) _ = FestaAsync();
+    }
+
+    private async Task TeclaAsync(KeyboardEventArgs e, int i)
+    {
+        if (e.Key is "Enter" or " ") Virar(i);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>Vira as que faltam em sequência (a mais rara por último, para o suspense).</summary>
+    private void VirarTodas()
+    {
+        _ordemDeVirar = Enumerable.Range(0, Pacote.Figurinhas.Count)
+            .Where(i => !_viradas.Contains(i))
+            .OrderBy(i => Pacote.Figurinhas[i].Figurinha.Raridade)
+            .ThenBy(i => i)
+            .ToList();
+        _virandoTodas = true;
+        foreach (var i in _ordemDeVirar) _viradas.Add(i);
+        if (Pacote.Figurinhas.Any(f => f.Figurinha.Raridade == RaridadeFigurinha.Lendaria))
+            _ = FestaAsync(_ordemDeVirar.Count * 220);
+    }
+
+    /// <summary>Lendária virada: a tela pisca dourado por um instante.</summary>
+    private async Task FestaAsync(int atraso = 0)
+    {
+        if (_reduzido) return;
+        if (atraso > 0) await Task.Delay(atraso);
+        _festa = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(1600);
+        _festa = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CompartilharAsync()
+    {
+        var melhor = AlbumFigurinhas.MelhorDoPacote(Pacote.Figurinhas.Select(f => (f.Figurinha, f.Nova)).ToList());
+        await OnCompartilhar.InvokeAsync(melhor);
+    }
+}

@@ -1,0 +1,289 @@
+/* Tela cheia escura por cima do site: é o momento do pacote. */
+.abertura-fundo {
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: radial-gradient(circle at 50% 30%, #1e2a44 0%, #0b1020 70%);
+    color: #fff;
+    animation: aparecer .25s ease-out;
+}
+
+.abertura {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1rem 1rem 2.5rem;
+}
+
+.abertura-topo {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, .8);
+}
+
+.dica { text-align: center; font-size: .85rem; color: rgba(255, 255, 255, .6); }
+
+/* Lendária virada: a tela pisca dourado. */
+.abertura-fundo.festa { animation: festa 1.6s ease-out; }
+
+@keyframes festa {
+    0% { background: radial-gradient(circle at 50% 40%, #6d28d9 0%, #0b1020 70%); }
+    15% { background: radial-gradient(circle at 50% 40%, #f5d36b 0%, #7c3aed 35%, #0b1020 75%); }
+    100% { background: radial-gradient(circle at 50% 30%, #1e2a44 0%, #0b1020 70%); }
+}
+
+@keyframes aparecer {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ---- O pacote fechado ---- */
+.pacote-palco {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 2rem;
+}
+
+.pacote-fechado {
+    position: relative;
+    width: min(230px, 62vw);
+    aspect-ratio: 5 / 7.4;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    animation: balancar 2.4s ease-in-out infinite;
+}
+
+.pacote-corpo,
+.pacote-tira {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-radius: .8rem;
+    background:
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, .06) 0 10px, transparent 10px 20px),
+        linear-gradient(160deg, #198754 0%, #0f5132 55%, #0a3622 100%);
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .5), inset 0 0 0 3px #f5d36b;
+}
+
+.pacote-corpo {
+    top: 14%;
+    bottom: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    color: #fff;
+}
+
+/* A tira de cima é a que rasga: serrilhada embaixo, voa para longe. */
+.pacote-tira {
+    top: 0;
+    height: 14%;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    clip-path: polygon(0 0, 100% 0, 100% 80%, 95% 100%, 90% 80%, 85% 100%, 80% 80%, 75% 100%, 70% 80%, 65% 100%, 60% 80%, 55% 100%, 50% 80%,
+        45% 100%, 40% 80%, 35% 100%, 30% 80%, 25% 100%, 20% 80%, 15% 100%, 10% 80%, 5% 100%, 0 80%);
+    transform-origin: 0% 100%;
+}
+
+.pacote-marca {
+    font-size: 2.4rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    color: #f5d36b;
+    text-shadow: 0 .15rem 0 rgba(0, 0, 0, .35);
+}
+
+.pacote-nome { font-weight: 700; font-size: 1rem; }
+.pacote-qtd { font-size: .8rem; opacity: .8; }
+
+.pacote-fechado.rasgando { animation: tremer .25s linear 2; }
+.pacote-fechado.rasgando .pacote-tira { animation: rasgar .6s cubic-bezier(.5, -.3, .8, .4) forwards; }
+.pacote-fechado.rasgando .pacote-corpo { animation: abrir .6s ease-in .25s forwards; }
+
+@keyframes balancar {
+    0%, 100% { transform: rotate(-2deg) translateY(0); }
+    50% { transform: rotate(2deg) translateY(-6px); }
+}
+
+@keyframes tremer {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px) rotate(-1deg); }
+    75% { transform: translateX(4px) rotate(1deg); }
+}
+
+@keyframes rasgar {
+    to { transform: translate(140%, -60%) rotate(35deg); opacity: 0; }
+}
+
+@keyframes abrir {
+    to { transform: scale(1.08); opacity: 0; filter: brightness(2); }
+}
+
+/* ---- As cartas ---- */
+.cartas { gap: 1.2rem .9rem; }
+
+.carta-do-pacote { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+
+.flip {
+    --w-real: min(var(--w), var(--w-max, 1000px));
+    position: relative;
+    width: var(--w-real);
+    aspect-ratio: 5 / 7;
+    perspective: 60em;
+    cursor: pointer;
+    border-radius: .7rem;
+    outline-offset: 4px;
+}
+
+.flip.entrando { animation: dar .55s cubic-bezier(.2, .8, .3, 1.2) both; animation-delay: calc(var(--i) * 90ms); }
+
+@keyframes dar {
+    from { transform: translateY(-40vh) scale(.4) rotate(-12deg); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
+.flip-miolo {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .65s cubic-bezier(.3, .7, .3, 1);
+    transition-delay: var(--atraso-virar, 0ms);
+}
+
+.flip.virada .flip-miolo { transform: rotateY(180deg); }
+.flip:not(.virada):hover .flip-miolo { transform: rotateY(12deg) translateY(-4px); }
+
+.flip-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.flip-face.frente { transform: rotateY(180deg); }
+
+/* O verso: igual para todas, para não entregar a raridade antes de virar. */
+.verso {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    border-radius: .7rem;
+    border: 4px solid #f5d36b;
+    background:
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, .07) 0 8px, transparent 8px 16px),
+        radial-gradient(circle at 50% 40%, #1f7a4d, #0a3622 75%);
+    box-shadow: 0 .6rem 1.4rem rgba(0, 0, 0, .45);
+}
+
+.verso-marca { font-size: calc(var(--w-real) / 6); font-weight: 900; letter-spacing: .08em; color: #f5d36b; }
+.verso-estrela { font-size: calc(var(--w-real) / 7); color: rgba(245, 211, 107, .8); }
+
+/* Brilhante: um clarão dourado ao virar. */
+.flip.r-brilhante.virada::after,
+.flip.r-lendaria.virada::after {
+    content: "";
+    position: absolute;
+    inset: -30%;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(245, 211, 107, .85) 0%, rgba(245, 211, 107, 0) 65%);
+    animation: clarao 1s ease-out forwards;
+    animation-delay: calc(var(--atraso-virar, 0ms) + .3s);
+    opacity: 0;
+}
+
+.flip.r-lendaria.virada::after {
+    inset: -60%;
+    background: radial-gradient(circle, rgba(255, 255, 255, .95) 0%, rgba(177, 151, 252, .8) 25%, rgba(124, 58, 237, 0) 65%);
+    animation-duration: 1.4s;
+}
+
+.flip.r-brilhante.virada .flip-miolo,
+.flip.r-lendaria.virada .flip-miolo { animation: pulso 1.2s ease-out; animation-delay: calc(var(--atraso-virar, 0ms) + .5s); }
+
+@keyframes clarao {
+    0% { transform: scale(.3); opacity: 0; }
+    30% { opacity: 1; }
+    100% { transform: scale(1.3); opacity: 0; }
+}
+
+@keyframes pulso {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(245, 211, 107, 0)); }
+    40% { filter: drop-shadow(0 0 1.2rem rgba(245, 211, 107, .9)); }
+}
+
+/* Lendária: confete. */
+.confete {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.confete span {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    width: 8px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--c);
+    opacity: 0;
+    animation: confete 1.6s ease-out forwards;
+    animation-delay: calc(var(--atraso-virar, 0ms) + .4s + var(--d));
+}
+
+@keyframes confete {
+    0% { transform: translate(-50%, 0) rotate(0); opacity: 1; }
+    100% { transform: translate(calc(var(--x) * 4px), 46vh) rotate(var(--g)) rotate(540deg); opacity: 0; }
+}
+
+.legenda { font-size: .8rem; min-height: 1.2em; opacity: 0; transition: opacity .3s; transition-delay: calc(var(--atraso-virar, 0ms) + .5s); }
+.legenda.visivel { opacity: 1; }
+
+.legenda .text-body-secondary { color: rgba(255, 255, 255, .65) !important; }
+.legenda .text-success { color: #75d7a4 !important; }
+
+.conquista {
+    margin: 1.2rem auto 0;
+    max-width: 520px;
+    text-align: center;
+    padding: .6rem 1rem;
+    border-radius: 2rem;
+    font-weight: 700;
+    color: #2a1a00;
+    background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b);
+    animation: aparecer .5s ease-out;
+}
+
+/* Menos movimento: nada de rasgar, voar, girar nem confete — as cartas aparecem abertas. */
+@media (prefers-reduced-motion: reduce) {
+    .abertura-fundo,
+    .abertura-fundo.festa,
+    .pacote-fechado,
+    .flip.entrando,
+    .conquista { animation: none; }
+
+    .flip-miolo,
+    .legenda { transition: none; }
+
+    .flip.r-brilhante.virada::after,
+    .flip.r-lendaria.virada::after,
+    .confete { display: none; }
+
+    .flip.virada .flip-miolo { animation: none; }
+}

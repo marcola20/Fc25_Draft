@@ -6,6 +6,7 @@
 @using Fc25Draft.Web.Services
 @inject IHallOfFameService HallOfFameService
 @inject EscudoService EscudoService
+@inject IAlbumService AlbumSvc
 
 <PageTitle>Hall da Fama - Campeões</PageTitle>
 
@@ -78,6 +79,37 @@
                 </div>
             }
         }
+
+        @* Quem completou o álbum de figurinhas: vem dos selos do álbum, não das competições. *@
+        @if (_colecionadores.Count > 0)
+        {
+            <div class="mb-4" id="colecionadores">
+                <h2 class="h5 border-bottom pb-2 mb-3">🎴 Colecionadores <span class="text-muted">(@_colecionadores.Count)</span></h2>
+                <div class="row g-3">
+                    @foreach (var c in _colecionadores)
+                    {
+                        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                            <div class="card h-100 shadow-sm text-center">
+                                <div class="card-body">
+                                    <div style="font-size: 2.6rem; line-height: 1;" class="mb-2">@(c.Ordem == 1 ? "🏆" : "🎴")</div>
+                                    <h3 class="h6 mb-1">
+                                        <a href="/treinadores/@c.TreinadorId" class="text-decoration-none">@c.Nome</a>
+                                    </h3>
+                                    <p class="text-muted small mb-2">
+                                        Completou o álbum em @BrazilTime.FormatDateTime(c.Em, "dd/MM/yyyy")
+                                        @(c.Ordem == 1 ? " — o primeiro!" : $" — {c.Ordem}º a completar")
+                                    </p>
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <span class="badge bg-dark">@c.AlbumNome</span>
+                                        <span class="badge bg-secondary">@c.Temporada</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -85,6 +117,7 @@
     private bool _loading = true;
     private string? _erro;
     private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
+    private IReadOnlyList<AlbumCompletoDto> _colecionadores = Array.Empty<AlbumCompletoDto>();
 
     private static readonly TipoCompetition[] _ordemTipos =
         { TipoCompetition.Liga, TipoCompetition.Copa, TipoCompetition.Supercopa };
@@ -94,6 +127,7 @@
         try
         {
             _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
+            _colecionadores = await AlbumSvc.AlbunsCompletosAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {

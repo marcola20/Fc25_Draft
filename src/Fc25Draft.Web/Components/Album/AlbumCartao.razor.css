@@ -1,0 +1,10 @@
+.selos-cartao { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.selos-cartao img { object-fit: contain; }
+
+.selo-trofeu {
+    padding: .05rem .5rem;
+    border-radius: 1rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b);
+    color: #2a1a00;
+}

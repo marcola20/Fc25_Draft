@@ -1,0 +1,28 @@
+.posicao {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 800;
+    background: var(--bs-tertiary-bg);
+}
+
+.posicao.p1 { background: linear-gradient(135deg, #f5d36b, #b8860b); color: #2a1a00; }
+.posicao.p2 { background: linear-gradient(135deg, #e9ecef, #adb5bd); color: #212529; }
+.posicao.p3 { background: linear-gradient(135deg, #f0b27a, #a0522d); color: #fff; }
+
+/* Quem está logado aparece marcado. */
+.ranking .eu {
+    background: var(--bs-primary-bg-subtle);
+    border-left: 4px solid var(--bs-primary);
+}
+
+.selo-trofeu { background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b); color: #2a1a00; }
+
+.selos { display: inline-flex; align-items: center; gap: .2rem; flex-wrap: wrap; }
+.selos img { object-fit: contain; }
+
+.min-w-0 { min-width: 0; }

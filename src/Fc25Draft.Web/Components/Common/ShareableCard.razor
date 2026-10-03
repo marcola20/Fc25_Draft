@@ -48,14 +48,17 @@
     [Parameter] public string? Subtitulo { get; set; }
     [Parameter] public string Arquivo { get; set; } = "cbfv.png";
     [Parameter] public bool MostrarBotao { get; set; } = true;
+
+    /// <summary>Página do site que vai junto na legenda (o padrão é a Liga).</summary>
+    [Parameter] public string Link { get; set; } = "/liga";
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private bool _sharing;
 
     // Legenda enviada junto da imagem (vira legenda da foto no WhatsApp do celular).
     private string Caption => string.IsNullOrWhiteSpace(Subtitulo)
-        ? $"{Titulo}\nhttps://cbfv-app.onrender.com/liga"
-        : $"{Titulo} — {Subtitulo}\nhttps://cbfv-app.onrender.com/liga";
+        ? $"{Titulo}\nhttps://cbfv-app.onrender.com{Link}"
+        : $"{Titulo} — {Subtitulo}\nhttps://cbfv-app.onrender.com{Link}";
 
     public async Task Share()
     {

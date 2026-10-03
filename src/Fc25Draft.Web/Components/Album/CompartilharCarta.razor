@@ -1,0 +1,40 @@
+@using Fc25Draft.Core.Utilities
+
+@* Prévia da imagem para compartilhar uma figurinha: a carta grande com a frase ("Tirei o Totti lendário
+   no Álbum CBFV 2010!"). O botão do ShareableCard gera o PNG e abre o compartilhar do celular. *@
+@if (Figurinha is { } f)
+{
+    <div class="compartilhar-fundo" role="dialog" aria-modal="true" aria-label="Compartilhar a figurinha" @onclick="OnFechar">
+        <div class="compartilhar-caixa" @onclick:stopPropagation="true">
+            <div class="d-flex align-items-center mb-2">
+                <strong>📷 Compartilhar a figurinha</strong>
+                <button type="button" class="btn-close ms-auto" aria-label="Fechar" @onclick="OnFechar"></button>
+            </div>
+            @* A frase vai no cabeçalho da imagem e na legenda do WhatsApp; na arte fica só a carta. *@
+            <ShareableCard Id="@($"figurinha-{f.FigurinhaId:N}")" Titulo="@AlbumNome" Subtitulo="@Frase(f)"
+                           Arquivo="@($"figurinha-{f.Numero:000}.png")" Link="/album">
+                <div class="compartilhar-arte">
+                    <CartaFigurinha Figurinha="@f" Largura="240" SeloLendaria="@SeloLendaria" Lazy="false" />
+                    @if (!string.IsNullOrWhiteSpace(Quem))
+                    {
+                        <div class="compartilhar-quem">Álbum de @Quem</div>
+                    }
+                </div>
+            </ShareableCard>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>A carta a compartilhar; nulo esconde a janela.</summary>
+    [Parameter] public FigurinhaDto? Figurinha { get; set; }
+    [Parameter, EditorRequired] public string AlbumNome { get; set; } = string.Empty;
+    [Parameter] public string? SeloLendaria { get; set; }
+
+    /// <summary>Nome de quem colou (vai na imagem).</summary>
+    [Parameter] public string? Quem { get; set; }
+
+    [Parameter] public EventCallback OnFechar { get; set; }
+
+    private string Frase(FigurinhaDto f) => AlbumFigurinhas.FraseDeCompartilhar(f, AlbumNome);
+}

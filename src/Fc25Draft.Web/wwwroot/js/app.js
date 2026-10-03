@@ -376,3 +376,96 @@ window.cbfvFoto = {
         }
     }
 };
+
+// Álbum de figurinhas: o holográfico das brilhantes e lendárias segue o mouse (a carta inclina e o
+// reflexo anda) e, no celular, o giroscópio — só onde o navegador entrega sem pedir permissão (o iPhone
+// pede; lá fica o brilho que anda sozinho). Escuta no documento inteiro: vale para qualquer carta que
+// aparecer, sem ligar nada por carta.
+window.cbfvHolo = (function () {
+    const SELETOR = '.carta.r-brilhante, .carta.r-lendaria';
+    const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const INCLINACAO = 14; // graus no canto da carta
+    let atual = null;
+    let ultimo = null;
+    let quadro = 0;
+
+    function soltar(el) {
+        el.classList.remove('holo-ativo');
+        ['--px', '--py', '--rx', '--ry'].forEach(function (p) { el.style.removeProperty(p); });
+    }
+
+    function aplicar() {
+        quadro = 0;
+        const e = ultimo;
+        if (!e) return;
+        const el = e.target && e.target.closest ? e.target.closest(SELETOR) : null;
+        if (atual && atual !== el) { soltar(atual); atual = null; }
+        if (!el) return;
+
+        const r = el.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        if (x < 0 || x > 1 || y < 0 || y > 1) { soltar(el); return; }
+
+        atual = el;
+        el.classList.add('holo-ativo');
+        el.style.setProperty('--px', (x * 100).toFixed(1));
+        el.style.setProperty('--py', (y * 100).toFixed(1));
+        if (!reduzido.matches) {
+            el.style.setProperty('--rx', ((0.5 - y) * INCLINACAO).toFixed(2) + 'deg');
+            el.style.setProperty('--ry', ((x - 0.5) * INCLINACAO).toFixed(2) + 'deg');
+        }
+    }
+
+    document.addEventListener('pointermove', function (e) {
+        if (e.pointerType === 'touch') return;
+        ultimo = e;
+        if (!quadro) quadro = requestAnimationFrame(aplicar);
+    }, { passive: true });
+
+    // Saiu da janela: a carta volta ao lugar.
+    document.addEventListener('pointerout', function (e) {
+        if (!e.relatedTarget && atual) { soltar(atual); atual = null; }
+    });
+
+    const temGiroscopio = 'DeviceOrientationEvent' in window
+        && typeof DeviceOrientationEvent.requestPermission !== 'function'
+        && window.matchMedia('(pointer: coarse)').matches;
+
+    if (temGiroscopio) {
+        const raiz = document.documentElement;
+        let base = null;
+        let quadroGiro = 0;
+        let leitura = null;
+        const limite = function (v) { return Math.max(-20, Math.min(20, v)); };
+
+        function aplicarGiro() {
+            quadroGiro = 0;
+            const e = leitura;
+            if (!base) base = { b: e.beta, g: e.gamma };
+            // A posição "parada" vai acompanhando devagar o jeito que a pessoa segura o celular.
+            base.b += (e.beta - base.b) * 0.02;
+            base.g += (e.gamma - base.g) * 0.02;
+            const db = limite(e.beta - base.b);
+            const dg = limite(e.gamma - base.g);
+            raiz.classList.add('holo-giroscopio');
+            raiz.style.setProperty('--gpx', (50 + dg * 2.5).toFixed(1));
+            raiz.style.setProperty('--gpy', (50 + db * 2.5).toFixed(1));
+            if (!reduzido.matches) {
+                raiz.style.setProperty('--grx', (-db * 0.4).toFixed(2) + 'deg');
+                raiz.style.setProperty('--gry', (dg * 0.4).toFixed(2) + 'deg');
+            }
+        }
+
+        window.addEventListener('deviceorientation', function (e) {
+            if (e.beta == null || e.gamma == null) return;
+            leitura = e;
+            if (!quadroGiro) quadroGiro = requestAnimationFrame(aplicarGiro);
+        }, { passive: true });
+    }
+
+    return {
+        /** Se o sistema pediu menos movimento (o pacote abre sem animação). */
+        movimentoReduzido: function () { return reduzido.matches; }
+    };
+})();
