@@ -12,7 +12,8 @@ namespace Fc25Draft.Infra.Services;
 /// <summary>
 /// Importa o JSON de uma partida simulada no PES 2021. A partida é achada pelo par ordenado
 /// mandante x visitante — único numa competição de pontos corridos, já que o returno inverte
-/// o mando — e nunca por adivinhação: nada encontrado ou mais de um candidato é erro.
+/// o mando. Quando o par se repete em outra competição (Liga e Copa), vale o jogo ainda não
+/// jogado com a data marcada mais perto de agora; nada encontrado ou empate nessa regra é erro.
 /// Vale para Liga, Copa (grupos e mata-mata) e Supercopa, e também para os jogos fora das
 /// rodadas normais (mini liga, jogos decisivos e playoff de acesso). Jogo que precisa de
 /// vencedor e termina empatado fica em andamento para registrar os pênaltis na tela.
@@ -40,10 +41,10 @@ public class ResultadoPesService : IResultadoPesService
     }
 
     public async Task<ResultadoPesRespostaDto> ImportarAsync(
-        ResultadoPesRequest request, string jsonBruto, bool simular, CancellationToken ct)
+        ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, bool simular, CancellationToken ct)
     {
         Validar(request);
-        var alvo = await AcharPartidaAsync(request, ct);
+        var alvo = await AcharPartidaAsync(request, partidaAnterior, ct);
 
         ResultadoPesRespostaDto resposta = null!;
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -129,10 +130,12 @@ public class ResultadoPesService : IResultadoPesService
     /// <summary>
     /// Partida candidata. <see cref="PartidaId"/> é nulo no jogo de mata-mata cuja partida ainda
     /// não foi criada (a importação cria). <see cref="Extra"/> = fora das rodadas normais.
+    /// <see cref="DataHora"/> = data marcada da rodada (horário de Brasília), quando há.
     /// </summary>
     private sealed record Alvo(
         Guid? PartidaId, Guid? KnockoutJogoId, int Numero, bool Desempate,
-        string Liga, TipoCompetition Tipo, Divisao? Divisao, bool Extra, string Onde);
+        string Liga, TipoCompetition Tipo, Divisao? Divisao, bool Extra, string Onde,
+        bool Encerrada, DateTime? DataHora);
 
     private static string OndeNaLiga(int numero, bool desempate) => numero switch
     {
@@ -150,7 +153,7 @@ public class ResultadoPesService : IResultadoPesService
         _ => "play-in"
     };
 
-    private async Task<Alvo> AcharPartidaAsync(ResultadoPesRequest r, CancellationToken ct)
+    private async Task<Alvo> AcharPartidaAsync(ResultadoPesRequest r, Guid? partidaAnterior, CancellationToken ct)
     {
         var competicao = LerCompeticao(r.Video);
         Divisao? divisao = r.Serie?.Trim().ToUpperInvariant() switch
@@ -180,7 +183,7 @@ public class ResultadoPesService : IResultadoPesService
             var partidas = await _db.LigaPartidas.AsNoTracking()
                 .Where(p => p.TimeCasaId == mandante && p.TimeForaId == visitante
                             && p.Rodada.Liga.Status != LigaStatus.Encerrada)
-                .Select(p => new { p.PartidaId, p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
+                .Select(p => new { p.PartidaId, p.Status, p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.DataHora, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
                 .ToListAsync(ct);
 
             var ids = partidas.Select(p => p.PartidaId).ToList();
@@ -199,15 +202,17 @@ public class ResultadoPesService : IResultadoPesService
             var alvos = new List<Alvo>();
             foreach (var p in partidas)
             {
+                var encerrada = p.Status == PartidaStatus.Encerrada;
                 if (doMataMata.TryGetValue(p.PartidaId, out var ko))
-                    alvos.Add(new Alvo(p.PartidaId, ko.KnockoutJogoId, p.Numero, p.Desempate, p.Nome, p.Tipo, p.Divisao, true, OndeNoMataMata(ko.Fase)));
+                    alvos.Add(new Alvo(p.PartidaId, ko.KnockoutJogoId, p.Numero, p.Desempate, p.Nome, p.Tipo, p.Divisao, true,
+                        OndeNoMataMata(ko.Fase), encerrada, p.DataHora));
                 else if (p.Numero > 0 || p.Tipo == TipoCompetition.Liga)
                     // Na Copa a rodada 0 só tem partidas do mata-mata; sem jogo ligado, não é de ninguém.
                     alvos.Add(new Alvo(p.PartidaId, null, p.Numero, p.Desempate, p.Nome, p.Tipo, p.Divisao,
-                        p.Numero <= 0 || p.Desempate, OndeNaLiga(p.Numero, p.Desempate)));
+                        p.Numero <= 0 || p.Desempate, OndeNaLiga(p.Numero, p.Desempate), encerrada, p.DataHora));
             }
             alvos.AddRange(semPartida.Select(k =>
-                new Alvo(null, k.KnockoutJogoId, 0, false, k.Nome, k.Tipo, k.Divisao, true, OndeNoMataMata(k.Fase))));
+                new Alvo(null, k.KnockoutJogoId, 0, false, k.Nome, k.Tipo, k.Divisao, true, OndeNoMataMata(k.Fase), false, null)));
 
             return alvos
                 .Where(a => competicao switch
@@ -238,8 +243,13 @@ public class ResultadoPesService : IResultadoPesService
                 $"Nenhuma partida aberta {jogo}{ondeSerie}.{dica}");
         }
 
+        // Reenvio (JSON corrigido ou reextraído): fica na partida que recebeu o envio anterior,
+        // mesmo já encerrada e mesmo havendo outra do mesmo par mais perto de agora.
+        if (candidatos.Count > 1 && candidatos.FirstOrDefault(c => partidaAnterior is not null && c.PartidaId == partidaAnterior) is { } anterior)
+            candidatos = [anterior];
+
         // O mesmo par pode ter o jogo da rodada e um jogo extra (decisivo, mini liga, mata-mata):
-        // o nome do vídeo diz se é extra; senão vale a rodada do JSON. Nunca se escolhe no chute.
+        // o nome do vídeo diz se é extra; senão vale a rodada do JSON.
         if (candidatos.Count > 1)
         {
             var filtrados = VideoDeJogoExtra(r.Video)
@@ -250,11 +260,29 @@ public class ResultadoPesService : IResultadoPesService
             if (filtrados.Count > 0) candidatos = filtrados;
         }
 
+        // O par se repete em outra competição (Liga e Copa): vale o jogo ainda não jogado com a
+        // data marcada mais perto de agora — é o que está sendo simulado.
+        if (candidatos.Count > 1)
+        {
+            var abertos = candidatos.Where(c => !c.Encerrada).ToList();
+            if (abertos.Count > 0) candidatos = abertos;
+
+            var agora = HorarioDeBrasilia.Agora(_time);
+            var porData = candidatos
+                .Where(c => c.DataHora is not null)
+                .Select(c => (Alvo: c, Distancia: (c.DataHora!.Value - agora).Duration()))
+                .OrderBy(x => x.Distancia)
+                .ToList();
+            if (porData.Count == 1 || (porData.Count > 1 && porData[0].Distancia < porData[1].Distancia))
+                candidatos = [porData[0].Alvo];
+        }
+
         if (candidatos.Count > 1)
             throw new ResultadoPesException(ResultadoPesErro.Ambiguo,
-                $"Mais de uma partida possível para {jogo}{ondeSerie}; cite no nome do vídeo a competição (\"Série A\", \"Copa\", \"Supercopa\") "
+                $"Mais de uma partida possível para {jogo}{ondeSerie} e nenhuma com data marcada mais perto de agora; "
+                + "cite no nome do vídeo a competição (\"Série A\", \"Copa\", \"Supercopa\") "
                 + "e, se for jogo decisivo, mini liga, playoff ou mata-mata, diga isso também (ou informe a rodada no JSON).",
-                candidatos.Select(c => $"{c.Liga} · {c.Onde}").ToList());
+                candidatos.Select(c => $"{c.Liga} · {c.Onde}" + (c.DataHora is DateTime d ? $" · {d:dd/MM HH:mm}" : "")).ToList());
 
         var achada = candidatos[0];
         if (r.Rodada is int rodada && achada.Tipo == TipoCompetition.Liga && !achada.Extra && rodada != achada.Numero)
