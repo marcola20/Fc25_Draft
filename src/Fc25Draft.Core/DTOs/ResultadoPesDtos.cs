@@ -13,7 +13,9 @@ public record ResultadoPesRequest(
     [property: JsonPropertyName("fora")] ResultadoPesTime? Fora,
     [property: JsonPropertyName("eventos")] IReadOnlyList<ResultadoPesEvento>? Eventos,
     [property: JsonPropertyName("notas")] ResultadoPesNotas? Notas,
-    [property: JsonPropertyName("status")] string? Status);
+    [property: JsonPropertyName("status")] string? Status,
+    // Quando o vídeo foi gravado (data do arquivo): identifica o vídeo mesmo com o nome repetido.
+    [property: JsonPropertyName("gravado_em")] string? GravadoEm = null);
 
 public record ResultadoPesTime(
     [property: JsonPropertyName("time")] string? Time,
