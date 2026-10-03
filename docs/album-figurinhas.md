@@ -39,9 +39,16 @@ treinadores e quem completa páginas e o álbum ganha selo e lugar no Hall da Fa
 |---|---|---|
 | Comum | todos os jogadores | figurinha normal |
 | Brilhante | escudo de cada clube + os 3 maiores overalls de cada clube | borda dourada e brilho holográfico |
-| Lendária | os 10 maiores overalls da liga inteira | holográfico animado + moldura especial |
+| Lendária | **os 10 melhores jogadores da temporada passada, escolhidos pelo admin** | holográfico animado + moldura especial + selo "Melhores de 2009" |
 
 Uma figurinha tem uma raridade só (a mais alta que se aplicar).
+
+**Escolha das lendárias:** na tela de gerar o álbum, o admin escolhe até 10 jogadores entre os que
+estão no álbum (estão num elenco da liga no lançamento). A lista já vem **pré-preenchida com
+sugestões** — maiores médias de nota do PES da temporada anterior (`LigaNotasJogadores`, com mínimo
+de jogos) — e o admin troca quem quiser. A figurinha lendária ganha um texto curto opcional que o
+admin escreve ("Artilheiro de 2009", "Campeão invicto com o Santos"), impresso no verso/rodapé.
+Dá para ajustar as lendárias até o primeiro pacote ser aberto; depois disso ficam travadas.
 
 ### Pacotinho
 
@@ -104,7 +111,8 @@ bonito. Precisa ficar bom no tema claro e no escuro.
 
 - `Album(AlbumId, Nome, Temporada, LancadoEm, Ativo)`
 - `Figurinha(FigurinhaId, AlbumId, Numero, Tipo [Jogador|Escudo], Raridade [Comum|Brilhante|Lendaria],
-  TeamId, PlayerId?, NomeImpresso, PosicaoSigla?, Overall?, Ordem)` — retrato do momento do lançamento.
+  TeamId, PlayerId?, NomeImpresso, PosicaoSigla?, Overall?, Destaque?, Ordem)` — retrato do momento do
+  lançamento; `Destaque` é o texto da lendária escrito pelo admin.
 - `FigurinhaDoTreinador(TreinadorId, FigurinhaId, Quantidade, PrimeiraEm)` — `Quantidade - 1` = repetidas.
 - `PacoteGanho(Id, TreinadorId, AlbumId?, Origem, Chave, CriadoEm, AbertoEm?)`
 - `PacoteAberto(PacoteId, TreinadorId, AbertoEm, FigurinhasJson)` — histórico e feed (ou colunas no próprio `PacoteGanho`).
@@ -124,7 +132,8 @@ Menu: `LayoutNavigationService.MenuDefinition`. Textos e nomes em português, co
 
 ### Fase 1 — Álbum de pé
 Entidades e migração; geração do álbum da temporada pelo admin (com prévia: quantos clubes,
-figurinhas por raridade, quantas sem foto); componente da figurinha; página /album com capa,
+figurinhas por raridade, quantas sem foto, e a escolha das 10 lendárias com sugestões pelas notas
+da temporada passada); componente da figurinha; página /album com capa,
 índice e páginas dos clubes; admin dá pacotes; abrir pacote (sem animação ainda) com sorteio por
 raridade; tela admin de figurinhas sem foto.
 **Pronto quando:** o admin gera o álbum no banco local, dá 3 pacotes a um treinador de teste, ele
