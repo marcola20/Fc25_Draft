@@ -40,4 +40,10 @@ public interface IPushService
     /// pacotes da mesma pessoa viram um aviso só. Retorna quantas pessoas foram avisadas.
     /// </summary>
     Task<int> AvisarPacotesGanhosAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Avisa (uma vez por selo) quem completou página ou o álbum; vários selos da mesma pessoa viram um
+    /// aviso só. Retorna quantas pessoas foram avisadas.
+    /// </summary>
+    Task<int> AvisarConquistasDoAlbumAsync(CancellationToken ct);
 }

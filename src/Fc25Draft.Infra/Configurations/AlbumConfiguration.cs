@@ -78,3 +78,20 @@ public class PacoteGanhoConfiguration : IEntityTypeConfiguration<PacoteGanho>
         b.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.SetNull);
     }
 }
+
+public class AlbumConquistaConfiguration : IEntityTypeConfiguration<AlbumConquista>
+{
+    public void Configure(EntityTypeBuilder<AlbumConquista> b)
+    {
+        b.ToTable("AlbumConquistas");
+        b.HasKey(x => x.ConquistaId);
+
+        // Um selo de cada por pessoa: a página de cada clube e o álbum (TeamId nulo) uma vez só.
+        b.HasIndex(x => new { x.TreinadorId, x.AlbumId, x.Tipo, x.TeamId }).IsUnique().AreNullsDistinct(false);
+        b.HasIndex(x => new { x.AlbumId, x.Tipo, x.Em });
+
+        b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

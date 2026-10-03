@@ -1,10 +1,12 @@
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Infra.Services;
 
 namespace Fc25Draft.Web.Services;
 
 /// <summary>
 /// Pacotes do álbum em segundo plano: a cada 5 min dá os que faltam pelas vitórias e pelo bolão (o
-/// livro-razão de pacotes não deixa duplicar) e avisa no celular quem ganhou.
+/// livro-razão de pacotes não deixa duplicar) e avisa no celular quem ganhou pacote ou selo. Selo novo
+/// (página ou álbum completo) adianta a rodada, para o aviso sair na hora.
 /// </summary>
 public class PacotesDoAlbumService : BackgroundService
 {
@@ -12,6 +14,7 @@ public class PacotesDoAlbumService : BackgroundService
 
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<PacotesDoAlbumService> _logger;
+    private readonly SemaphoreSlim _acordar = new(0, 1);
 
     public PacotesDoAlbumService(IServiceScopeFactory scopes, ILogger<PacotesDoAlbumService> logger)
     {
@@ -21,31 +24,49 @@ public class PacotesDoAlbumService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        AlbumService.ConquistasGravadas += Acordar;
+        try
         {
-            await RodarAsync(stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await RodarAsync(stoppingToken);
 
-            try
-            {
-                await Task.Delay(Intervalo, stoppingToken);
+                try
+                {
+                    await _acordar.WaitAsync(Intervalo, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+        }
+        finally
+        {
+            AlbumService.ConquistasGravadas -= Acordar;
+        }
+    }
+
+    // Selo novo: adianta a próxima rodada (sem empilhar sinais).
+    private void Acordar()
+    {
+        if (_acordar.CurrentCount == 0)
+        {
+            try { _acordar.Release(); } catch (SemaphoreFullException) { }
         }
     }
 
     private async Task RodarAsync(CancellationToken ct)
     {
-        // Uma falha numa parte não pode parar a outra nem o serviço.
+        // Uma falha numa parte não pode parar as outras nem o serviço.
         await TentarAsync("reconciliação", async s =>
         {
             var criados = await s.GetRequiredService<IAlbumService>().ReconciliarAsync(ct);
             if (criados.Total > 0)
                 _logger.LogInformation("Pacotes do álbum: {Vitorias} por vitória e {Bolao} do bolão", criados.Vitorias, criados.Bolao);
         });
-        await TentarAsync("aviso no celular", s => s.GetRequiredService<IPushService>().AvisarPacotesGanhosAsync(ct));
+        await TentarAsync("aviso de pacotes", s => s.GetRequiredService<IPushService>().AvisarPacotesGanhosAsync(ct));
+        await TentarAsync("aviso de selos", s => s.GetRequiredService<IPushService>().AvisarConquistasDoAlbumAsync(ct));
 
         async Task TentarAsync(string parte, Func<IServiceProvider, Task> acao)
         {

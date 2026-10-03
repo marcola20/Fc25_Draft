@@ -323,7 +323,8 @@ public class AlbumService : IAlbumService
             Contar(figurinhas.Where(f => minhas.ContainsKey(f.FigurinhaId)).Select(f => f.Raridade)),
             fechados,
             minhas.Values.Sum(m => m.Quantidade - 1),
-            album.Ativo && !await JaPegouOPacoteDoDiaAsync(treinadorId, ct));
+            album.Ativo && !await JaPegouOPacoteDoDiaAsync(treinadorId, ct),
+            await ConquistasAsync(treinadorId, album.AlbumId, ct));
     }
 
     public async Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct)
@@ -341,7 +342,7 @@ public class AlbumService : IAlbumService
                              && (p.AlbumId == album.AlbumId || p.AlbumId == null), ct);
 
         return new AlbumResumoDoTreinadorDto(album, minhas?.Coladas ?? 0, minhas?.Repetidas ?? 0, paraAbrir,
-            !await JaPegouOPacoteDoDiaAsync(treinadorId, ct));
+            !await JaPegouOPacoteDoDiaAsync(treinadorId, ct), await ConquistasAsync(treinadorId, album.AlbumId, ct));
     }
 
     public async Task<bool> PegarPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct)
@@ -626,11 +627,195 @@ public class AlbumService : IAlbumService
             pacote.Figurinhas = sorteadas.ToArray();
             await _db.SaveChangesAsync(ct);
 
+            var conquistas = await GravarConquistasAsync(treinadorId, albumId, figurinhas,
+                tiradas.Where(t => t.Nova).Select(t => t.Figurinha.TeamId).ToHashSet(), agora, ct);
+
             var restantes = await _db.PacotesGanhos.CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null, ct);
             await tx.CommitAsync(ct);
 
-            return new PacoteAbertoDto(pacote.PacoteId, pacote.Origem, pacote.Motivo, tiradas, restantes);
+            if (conquistas.Count > 0) ConquistasGravadas?.Invoke();
+            return new PacoteAbertoDto(pacote.PacoteId, pacote.Origem, pacote.Motivo, tiradas, restantes, conquistas);
         });
+    }
+
+    /// <summary>Disparado depois de gravar selo novo (página ou álbum completo), para o aviso no celular sair logo.</summary>
+    public static event Action? ConquistasGravadas;
+
+    /// <summary>
+    /// Selos que as figurinhas novas deste pacote fecharam: a página de cada clube que ficou completa e o
+    /// álbum inteiro. Roda dentro da transação do pacote (com a pessoa travada), então cada selo sai uma vez.
+    /// </summary>
+    private async Task<List<ConquistaAlbumDto>> GravarConquistasAsync(
+        Guid treinadorId, Guid albumId, List<FigurinhaDto> figurinhas, HashSet<Guid> timesComNova, DateTime agora, CancellationToken ct)
+    {
+        if (timesComNova.Count == 0) return new();
+
+        var coladasPorTime = (await _db.FigurinhasDosTreinadores.AsNoTracking()
+                .Where(f => f.TreinadorId == treinadorId && f.Figurinha.AlbumId == albumId)
+                .Select(f => f.Figurinha.TeamId)
+                .ToListAsync(ct))
+            .GroupBy(t => t)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var totalPorTime = figurinhas.GroupBy(f => f.TeamId).ToDictionary(g => g.Key, g => (Nome: g.First().TimeNome, Total: g.Count()));
+        var jaTem = (await _db.AlbumConquistas.AsNoTracking()
+                .Where(c => c.TreinadorId == treinadorId && c.AlbumId == albumId)
+                .Select(c => new { c.Tipo, c.TeamId })
+                .ToListAsync(ct))
+            .Select(c => (c.Tipo, c.TeamId))
+            .ToHashSet();
+
+        var novas = new List<ConquistaAlbumDto>();
+        void Gravar(TipoConquistaAlbum tipo, Guid? teamId, string? timeNome)
+        {
+            if (!jaTem.Add((tipo, teamId))) return;
+            _db.AlbumConquistas.Add(new AlbumConquista
+            {
+                ConquistaId = Guid.NewGuid(),
+                TreinadorId = treinadorId,
+                AlbumId = albumId,
+                Tipo = tipo,
+                TeamId = teamId,
+                Em = agora
+            });
+            novas.Add(new ConquistaAlbumDto(tipo, teamId, timeNome, agora));
+        }
+
+        foreach (var teamId in timesComNova.OrderBy(t => figurinhas.First(f => f.TeamId == t).Numero))
+        {
+            var (nome, total) = totalPorTime[teamId];
+            if (coladasPorTime.GetValueOrDefault(teamId) == total)
+                Gravar(TipoConquistaAlbum.PaginaCompleta, teamId, nome);
+        }
+
+        if (coladasPorTime.Values.Sum() == figurinhas.Count)
+            Gravar(TipoConquistaAlbum.AlbumCompleto, null, null);
+
+        if (novas.Count > 0) await _db.SaveChangesAsync(ct);
+        return novas;
+    }
+
+    private async Task<List<ConquistaAlbumDto>> ConquistasAsync(Guid treinadorId, Guid albumId, CancellationToken ct) =>
+        await _db.AlbumConquistas.AsNoTracking()
+            .Where(c => c.TreinadorId == treinadorId && c.AlbumId == albumId)
+            .OrderBy(c => c.Em)
+            .Select(c => new ConquistaAlbumDto(c.Tipo, c.TeamId, c.Time != null ? c.Time.TeamName : null, c.Em))
+            .ToListAsync(ct);
+
+    // ---------------------------------------------------------------- Feed, ranking e Hall da Fama
+
+    public async Task<IReadOnlyList<RaraTiradaDto>> UltimasRarasAsync(int quantas, CancellationToken ct)
+    {
+        var albumId = await _db.Albuns.Where(a => a.Ativo).Select(a => (Guid?)a.AlbumId).FirstOrDefaultAsync(ct);
+        if (albumId is null || quantas <= 0) return Array.Empty<RaraTiradaDto>();
+
+        var raras = (await _db.Figurinhas.AsNoTracking()
+                .Where(f => f.AlbumId == albumId && (f.Raridade == RaridadeFigurinha.Lendaria
+                                                     || (f.Raridade == RaridadeFigurinha.Brilhante && f.Tipo == TipoFigurinha.Jogador)))
+                .Select(f => f.FigurinhaId)
+                .ToListAsync(ct))
+            .ToHashSet();
+        if (raras.Count == 0) return Array.Empty<RaraTiradaDto>();
+
+        // Os pacotes abertos mais recentes bastam: cada um traz até 5 cartas, e quase todo pacote tem uma rara.
+        var pacotes = await _db.PacotesGanhos.AsNoTracking()
+            .Where(p => p.AlbumId == albumId && p.AbertoEm != null && p.Figurinhas != null)
+            .OrderByDescending(p => p.AbertoEm)
+            .Take(quantas * 3)
+            .Select(p => new { p.TreinadorId, p.Treinador.Nome, Quando = p.AbertoEm!.Value, p.Figurinhas })
+            .ToListAsync(ct);
+
+        var tiradas = pacotes
+            .SelectMany(p => p.Figurinhas!.Where(raras.Contains).Distinct().Select(id => (p.TreinadorId, p.Nome, p.Quando, Id: id)))
+            .Take(quantas)
+            .ToList();
+        var ids = tiradas.Select(t => t.Id).Distinct().ToList();
+        var porId = (await FigurinhasAsync(albumId.Value, ct)).Where(f => ids.Contains(f.FigurinhaId)).ToDictionary(f => f.FigurinhaId);
+
+        return tiradas.Select(t => new RaraTiradaDto(t.TreinadorId, t.Nome, porId[t.Id], t.Quando)).ToList();
+    }
+
+    public async Task<ColecionadoresDto?> ColecionadoresAsync(CancellationToken ct)
+    {
+        var album = await AtivoAsync(ct);
+        if (album is null) return null;
+
+        var porPessoa = await _db.FigurinhasDosTreinadores.AsNoTracking()
+            .Where(f => f.Figurinha.AlbumId == album.AlbumId)
+            .GroupBy(f => f.TreinadorId)
+            .Select(g => new
+            {
+                TreinadorId = g.Key,
+                Coladas = g.Count(),
+                Total = g.Sum(f => f.Quantidade),
+                Lendarias = g.Count(f => f.Figurinha.Raridade == RaridadeFigurinha.Lendaria)
+            })
+            .ToListAsync(ct);
+        if (porPessoa.Count == 0) return new ColecionadoresDto(album, Array.Empty<ColecionadorDto>());
+
+        var ids = porPessoa.Select(p => p.TreinadorId).ToList();
+        var pessoas = await _db.Treinadores.AsNoTracking()
+            .Where(t => ids.Contains(t.TreinadorId))
+            .Select(t => new
+            {
+                t.TreinadorId,
+                t.Nome,
+                TimeAtual = t.Passagens.Where(p => p.Ate == null).Select(p => p.Time.TeamName).FirstOrDefault()
+            })
+            .ToDictionaryAsync(t => t.TreinadorId, ct);
+        var conquistas = (await _db.AlbumConquistas.AsNoTracking()
+                .Where(c => c.AlbumId == album.AlbumId)
+                .OrderBy(c => c.Em)
+                .Select(c => new { c.TreinadorId, Dto = new ConquistaAlbumDto(c.Tipo, c.TeamId, c.Time != null ? c.Time.TeamName : null, c.Em) })
+                .ToListAsync(ct))
+            .ToLookup(c => c.TreinadorId, c => c.Dto);
+
+        var linhas = porPessoa
+            .Select(p => new
+            {
+                p.TreinadorId,
+                p.Coladas,
+                p.Total,
+                p.Lendarias,
+                Paginas = conquistas[p.TreinadorId].Where(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta).ToList(),
+                Completo = conquistas[p.TreinadorId].FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.AlbumCompleto)?.Em
+            })
+            // Quem completou primeiro fica na frente; depois quem tem mais coladas, mais lendárias e mais figurinhas.
+            .OrderBy(l => l.Completo ?? DateTime.MaxValue)
+            .ThenByDescending(l => l.Coladas)
+            .ThenByDescending(l => l.Lendarias)
+            .ThenByDescending(l => l.Total)
+            .ThenBy(l => pessoas.GetValueOrDefault(l.TreinadorId)?.Nome, StringComparer.CurrentCulture)
+            .ToList();
+
+        var resultado = new List<ColecionadorDto>(linhas.Count);
+        for (var i = 0; i < linhas.Count; i++)
+        {
+            var l = linhas[i];
+            // Empate em tudo divide a posição.
+            var posicao = i > 0 && l.Completo is null && linhas[i - 1].Completo is null
+                          && l.Coladas == linhas[i - 1].Coladas && l.Lendarias == linhas[i - 1].Lendarias && l.Total == linhas[i - 1].Total
+                ? resultado[i - 1].Posicao
+                : i + 1;
+            var pessoa = pessoas.GetValueOrDefault(l.TreinadorId);
+            resultado.Add(new ColecionadorDto(posicao, l.TreinadorId, pessoa?.Nome ?? "?", pessoa?.TimeAtual,
+                l.Coladas, l.Total, l.Lendarias, l.Paginas, l.Completo, album.TotalFigurinhas));
+        }
+
+        return new ColecionadoresDto(album, resultado);
+    }
+
+    public async Task<IReadOnlyList<AlbumCompletoDto>> AlbunsCompletosAsync(CancellationToken ct)
+    {
+        var completos = await _db.AlbumConquistas.AsNoTracking()
+            .Where(c => c.Tipo == TipoConquistaAlbum.AlbumCompleto)
+            .OrderByDescending(c => c.Album.Temporada).ThenBy(c => c.Em)
+            .Select(c => new { c.TreinadorId, c.Treinador.Nome, AlbumNome = c.Album.Nome, c.Album.Temporada, c.AlbumId, c.Em })
+            .ToListAsync(ct);
+
+        return completos
+            .GroupBy(c => c.AlbumId)
+            .SelectMany(g => g.Select((c, i) => new AlbumCompletoDto(i + 1, c.TreinadorId, c.Nome, c.AlbumNome, c.Temporada, c.Em)))
+            .ToList();
     }
 
     public async Task MarcarVistasAsync(Guid treinadorId, IReadOnlyCollection<Guid> figurinhas, CancellationToken ct)

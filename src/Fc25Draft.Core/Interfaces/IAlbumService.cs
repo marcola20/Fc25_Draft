@@ -63,6 +63,15 @@ public interface IAlbumService
     /// <summary>Abre o pacote mais antigo da pessoa: sorteia no servidor e cola as novas.</summary>
     Task<PacoteAbertoDto> AbrirPacoteAsync(Guid treinadorId, CancellationToken ct);
 
+    /// <summary>As últimas raras tiradas no álbum ativo (brilhantes de jogador e lendárias), da mais nova.</summary>
+    Task<IReadOnlyList<RaraTiradaDto>> UltimasRarasAsync(int quantas, CancellationToken ct);
+
+    /// <summary>Ranking de colecionadores do álbum ativo; nulo sem álbum lançado.</summary>
+    Task<ColecionadoresDto?> ColecionadoresAsync(CancellationToken ct);
+
+    /// <summary>Quem completou cada álbum, para o Hall da Fama (Colecionadores).</summary>
+    Task<IReadOnlyList<AlbumCompletoDto>> AlbunsCompletosAsync(CancellationToken ct);
+
     /// <summary>Tira a marca de nova das figurinhas que a pessoa já viu na página.</summary>
     Task MarcarVistasAsync(Guid treinadorId, IReadOnlyCollection<Guid> figurinhas, CancellationToken ct);
 }

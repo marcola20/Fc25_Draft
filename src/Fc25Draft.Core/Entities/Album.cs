@@ -133,3 +133,33 @@ public class PacoteGanho
     public Treinador Treinador { get; set; } = null!;
     public Album? Album { get; set; }
 }
+
+public enum TipoConquistaAlbum
+{
+    /// <summary>Todas as figurinhas de um clube coladas.</summary>
+    PaginaCompleta = 1,
+
+    /// <summary>O álbum inteiro colado: vai para o Hall da Fama (Colecionadores).</summary>
+    AlbumCompleto = 2
+}
+
+/// <summary>
+/// Selo do álbum: página completa (com o clube) ou álbum completo. Gravado uma vez só, quando entra a
+/// figurinha que completa; não sai mais.
+/// </summary>
+public class AlbumConquista
+{
+    public Guid ConquistaId { get; set; }
+    public Guid TreinadorId { get; set; }
+    public Guid AlbumId { get; set; }
+    public TipoConquistaAlbum Tipo { get; set; }
+
+    /// <summary>O clube da página; nulo no álbum completo.</summary>
+    public Guid? TeamId { get; set; }
+
+    public DateTime Em { get; set; }
+
+    public Treinador Treinador { get; set; } = null!;
+    public Album Album { get; set; } = null!;
+    public Team? Time { get; set; }
+}

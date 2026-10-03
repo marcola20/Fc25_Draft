@@ -276,6 +276,54 @@ public class PushService : IPushService
 
     private static string ChaveDoPacote(Guid pacoteId) => $"pacote:{pacoteId:N}";
 
+    public async Task<int> AvisarConquistasDoAlbumAsync(CancellationToken ct)
+    {
+        var pessoas = await _db.InscricoesPush.AsNoTracking()
+            .Where(i => i.Treinador.Ativo)
+            .Select(i => i.TreinadorId)
+            .Distinct()
+            .ToListAsync(ct);
+        if (pessoas.Count == 0) return 0;
+
+        var desde = Agora - PacoteRecente;
+        var conquistas = await _db.AlbumConquistas.AsNoTracking()
+            .Where(c => c.Em >= desde && pessoas.Contains(c.TreinadorId))
+            .OrderBy(c => c.Em)
+            .Select(c => new { c.ConquistaId, c.TreinadorId, c.Tipo, Time = c.Time != null ? c.Time.TeamName : null, AlbumNome = c.Album.Nome })
+            .ToListAsync(ct);
+        if (conquistas.Count == 0) return 0;
+
+        var chaves = conquistas.Select(c => ChaveDaConquista(c.ConquistaId)).ToList();
+        var avisadas = (await _db.NotificacoesEnviadas.AsNoTracking()
+                .Where(n => chaves.Contains(n.Chave))
+                .Select(n => n.Chave)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var pessoasAvisadas = 0;
+        foreach (var daPessoa in conquistas.Where(c => !avisadas.Contains(ChaveDaConquista(c.ConquistaId))).GroupBy(c => c.TreinadorId))
+        {
+            var novas = new List<(TipoConquistaAlbum Tipo, string? Time, string AlbumNome)>();
+            foreach (var c in daPessoa)
+                if (await MarcarAsync(ChaveDaConquista(c.ConquistaId), ct))
+                    novas.Add((c.Tipo, c.Time, c.AlbumNome));
+            if (novas.Count == 0) continue;
+
+            var texto = AlbumFigurinhas.AvisoDeConquistas(
+                novas[0].AlbumNome,
+                novas.Any(n => n.Tipo == TipoConquistaAlbum.AlbumCompleto),
+                novas.Where(n => n.Tipo == TipoConquistaAlbum.PaginaCompleta && n.Time is not null).Select(n => n.Time!).ToList());
+            var inscricoes = await _db.InscricoesPush.Where(i => i.TreinadorId == daPessoa.Key).ToListAsync(ct);
+            await EnviarAsync(inscricoes, new Notificacao("🎴 Álbum de figurinhas", texto, "/album", "album-conquistas"), ct);
+            await _db.SaveChangesAsync(ct);
+            pessoasAvisadas++;
+        }
+
+        return pessoasAvisadas;
+    }
+
+    private static string ChaveDaConquista(Guid conquistaId) => $"conquista:{conquistaId:N}";
+
     // ── Bastidores ──────────────────────────────────────────────────────────────────────────────────
 
     private sealed record Notificacao(string Titulo, string Texto, string Link, string Marca);

@@ -1,3 +1,4 @@
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Extensions;
 
@@ -219,6 +220,39 @@ public static class AlbumFigurinhas
             : string.Join(", ", partes.Take(partes.Count - 1)) + " e " + partes[^1];
         return $"Você ganhou {pacotes.Count} pacotes: {detalhe}.";
     }
+
+    /// <summary>
+    /// Texto do aviso de selo: o álbum completo fala mais alto; páginas viram "Página do Santos completa!" ou,
+    /// várias de uma vez, "3 páginas completas: Santos, Grêmio e Vasco."
+    /// </summary>
+    public static string AvisoDeConquistas(string albumNome, bool albumCompleto, IReadOnlyList<string> paginas)
+    {
+        if (albumCompleto) return $"🏆 Você completou o {albumNome}! Seu nome está no Hall da Fama.";
+        if (paginas.Count == 0) return string.Empty;
+        if (paginas.Count == 1) return $"🏅 Página do {paginas[0]} completa!";
+        var lista = string.Join(", ", paginas.Take(paginas.Count - 1)) + " e " + paginas[^1];
+        return $"🏅 {paginas.Count} páginas completas: {lista}.";
+    }
+
+    /// <summary>
+    /// Frase do compartilhamento da carta: "Tirei o Totti lendário no Álbum CBFV 2010!".
+    /// </summary>
+    public static string FraseDeCompartilhar(FigurinhaDto f, string albumNome) => (f.Tipo, f.Raridade) switch
+    {
+        (TipoFigurinha.Escudo, _) => $"Colei o escudo brilhante do {f.TimeNome} no {albumNome}!",
+        (_, RaridadeFigurinha.Lendaria) => $"Tirei o {f.NomeImpresso} lendário no {albumNome}!",
+        (_, RaridadeFigurinha.Brilhante) => $"Tirei o {f.NomeImpresso} brilhante no {albumNome}!",
+        _ => $"Colei o {f.NomeImpresso} no {albumNome}!"
+    };
+
+    /// <summary>A melhor carta do pacote para compartilhar: a mais rara, a nova antes da repetida, o maior overall.</summary>
+    public static FigurinhaDto MelhorDoPacote(IReadOnlyList<(FigurinhaDto Figurinha, bool Nova)> cartas) =>
+        cartas
+            .OrderByDescending(c => c.Figurinha.Raridade)
+            .ThenByDescending(c => c.Figurinha.Tipo == TipoFigurinha.Jogador)
+            .ThenByDescending(c => c.Nova)
+            .ThenByDescending(c => c.Figurinha.Overall ?? 0)
+            .First().Figurinha;
 
     private static string Minuscula(string texto) =>
         texto.Length == 0 ? texto : char.ToLowerInvariant(texto[0]) + texto[1..];

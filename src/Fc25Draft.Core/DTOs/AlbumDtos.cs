@@ -55,9 +55,16 @@ public record MeuAlbumDto(
     AlbumContagemDto ColadasPorRaridade,
     IReadOnlyList<PacoteFechadoDto> Fechados,
     int Repetidas,
-    bool PacoteDoDiaDisponivel)
+    bool PacoteDoDiaDisponivel,
+    IReadOnlyList<ConquistaAlbumDto> Conquistas)
 {
     public int PacotesParaAbrir => Fechados.Count;
+
+    public ConquistaAlbumDto? AlbumCompleto => Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.AlbumCompleto);
+
+    /// <summary>O selo da página do clube, se a pessoa já completou.</summary>
+    public ConquistaAlbumDto? SeloDaPagina(Guid teamId) =>
+        Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta && c.TeamId == teamId);
 
     public int Total => TotalPorRaridade.Total;
     public int Coladas => ColadasPorRaridade.Total;
@@ -68,8 +75,15 @@ public record MeuAlbumDto(
 public record PacoteFechadoDto(Guid PacoteId, string Origem, string DeOndeVeio, DateTime CriadoEm);
 
 /// <summary>O álbum da pessoa em números, para o cartão da Minha Área.</summary>
-public record AlbumResumoDoTreinadorDto(AlbumDto Album, int Coladas, int Repetidas, int PacotesParaAbrir, bool PacoteDoDiaDisponivel)
+public record AlbumResumoDoTreinadorDto(
+    AlbumDto Album, int Coladas, int Repetidas, int PacotesParaAbrir, bool PacoteDoDiaDisponivel,
+    IReadOnlyList<ConquistaAlbumDto> Conquistas)
 {
+    public IReadOnlyList<ConquistaAlbumDto> PaginasCompletas =>
+        Conquistas.Where(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta).ToList();
+
+    public ConquistaAlbumDto? AlbumCompleto => Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.AlbumCompleto);
+
     public int Total => Album.TotalFigurinhas;
     public int Percentual => Total == 0 ? 0 : (int)Math.Floor(Coladas * 100.0 / Total);
 }
@@ -83,7 +97,36 @@ public record ReconciliacaoPacotesDto(int Vitorias, int Bolao)
 /// <summary>Uma figurinha que saiu no pacote: nova (foi colada) ou repetida.</summary>
 public record FigurinhaTiradaDto(FigurinhaDto Figurinha, bool Nova, int QuantidadeAgora);
 
-public record PacoteAbertoDto(Guid PacoteId, string Origem, string? Motivo, IReadOnlyList<FigurinhaTiradaDto> Figurinhas, int PacotesRestantes);
+public record PacoteAbertoDto(
+    Guid PacoteId, string Origem, string? Motivo, IReadOnlyList<FigurinhaTiradaDto> Figurinhas, int PacotesRestantes,
+    IReadOnlyList<ConquistaAlbumDto> Conquistas);
+
+/// <summary>Um selo do álbum: página completa (com o clube) ou álbum completo.</summary>
+public record ConquistaAlbumDto(TipoConquistaAlbum Tipo, Guid? TeamId, string? TimeNome, DateTime Em);
+
+/// <summary>Uma figurinha rara (brilhante de jogador ou lendária) que alguém tirou num pacote.</summary>
+public record RaraTiradaDto(Guid TreinadorId, string Nome, FigurinhaDto Figurinha, DateTime Quando);
+
+/// <summary>Uma linha do ranking de colecionadores do álbum.</summary>
+public record ColecionadorDto(
+    int Posicao,
+    Guid TreinadorId,
+    string Nome,
+    string? TimeAtual,
+    int Coladas,
+    int TotalDeFigurinhas,
+    int Lendarias,
+    IReadOnlyList<ConquistaAlbumDto> PaginasCompletas,
+    DateTime? AlbumCompletoEm,
+    int TotalDoAlbum)
+{
+    public int Percentual => TotalDoAlbum == 0 ? 0 : (int)Math.Floor(Coladas * 100.0 / TotalDoAlbum);
+}
+
+public record ColecionadoresDto(AlbumDto Album, IReadOnlyList<ColecionadorDto> Linhas);
+
+/// <summary>Quem completou um álbum (Hall da Fama · Colecionadores), na ordem em que completou.</summary>
+public record AlbumCompletoDto(int Ordem, Guid TreinadorId, string Nome, string AlbumNome, int Temporada, DateTime Em);
 
 // ---- Admin ----
 

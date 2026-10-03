@@ -121,6 +121,7 @@ public class DraftDbContext : DbContext
     public DbSet<Figurinha> Figurinhas => Set<Figurinha>();
     public DbSet<FigurinhaDoTreinador> FigurinhasDosTreinadores => Set<FigurinhaDoTreinador>();
     public DbSet<PacoteGanho> PacotesGanhos => Set<PacoteGanho>();
+    public DbSet<AlbumConquista> AlbumConquistas => Set<AlbumConquista>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
