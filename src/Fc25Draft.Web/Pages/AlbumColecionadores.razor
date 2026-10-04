@@ -1,5 +1,6 @@
 @page "/album/colecionadores"
 @inject IAlbumService AlbumSvc
+@inject IPerfilTreinadorService PerfilSvc
 @inject ITreinadorService TreinadorSvc
 @inject AdminAuthService AdminAuth
 @inject EscudoService Escudos
@@ -47,10 +48,12 @@
                         <li class="list-group-item @(eu ? "eu" : "")" @key="l.TreinadorId">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="posicao @(l.Posicao <= 3 ? $"p{l.Posicao}" : "")">@l.Posicao</span>
+                                @{ var perfil = _perfis.GetValueOrDefault(l.TreinadorId); }
+                                <FotoTreinador TreinadorId="@l.TreinadorId" Tamanho="32" Versao="@perfil?.VersaoFoto" Alt="" />
                                 <div class="flex-grow-1 min-w-0">
                                     <div class="d-flex align-items-baseline gap-2 flex-wrap">
                                         <span class="fw-semibold text-truncate">
-                                            <a href="/treinadores/@l.TreinadorId" class="text-reset text-decoration-none">@l.Nome</a>
+                                            <a href="/treinadores/@l.TreinadorId" class="text-reset text-decoration-none"><NomeTreinador Nome="@l.Nome" Apelido="@perfil?.Apelido" /></a>
                                         </span>
                                         @if (eu)
                                         {
@@ -96,6 +99,7 @@
     private string? _erro;
     private ColecionadoresDto? _dados;
     private Guid? _eu;
+    private Dictionary<Guid, PerfilTreinadorDto> _perfis = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,6 +116,7 @@
         try
         {
             _dados = await AlbumSvc.ColecionadoresAsync(CancellationToken.None);
+            _perfis = _dados is null ? new() : (await PerfilSvc.VariosAsync(_dados.Linhas.Select(l => l.TreinadorId), CancellationToken.None)).ToDictionary(p => p.Key, p => p.Value);
             await AdminAuth.EnsureInitializedAsync();
             var token = await AdminAuth.GetTokenAsync();
             _eu = string.IsNullOrWhiteSpace(token) ? null : (await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None))?.TreinadorId;

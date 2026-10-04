@@ -1,0 +1,20 @@
+.perfil-corpo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.perfil-foto {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .3rem;
+    width: 120px;
+}
+
+.perfil-campos { flex: 1 1 240px; min-width: 0; }
+
+@media (max-width: 575.98px) {
+    .perfil-foto { width: 100%; }
+}

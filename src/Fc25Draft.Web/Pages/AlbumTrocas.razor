@@ -3,6 +3,7 @@
 @using Fc25Draft.Web.Components.Album
 @using Fc25Draft.Web.Components.Layouts
 @inject IAlbumService AlbumSvc
+@inject IPerfilTreinadorService PerfilSvc
 @inject ITreinadorService TreinadorSvc
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JS
@@ -91,7 +92,7 @@
                     <div class="card mb-2 proposta">
                         <div class="card-body p-2">
                             <div class="small mb-1">
-                                <strong>@t.De.Nome</strong> @(t.ContrapropostaDeId is null ? "propõe" : "fez uma contraproposta") · expira @Prazo(t.ExpiraEm)
+                                @Quem(t.De) @(t.ContrapropostaDeId is null ? "propõe" : "fez uma contraproposta") · expira @Prazo(t.ExpiraEm)
                             </div>
                             <div class="lados">
                                 <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Oferecidas)</div>
@@ -117,7 +118,7 @@
                     var troca = t;
                     <div class="card mb-2 proposta">
                         <div class="card-body p-2">
-                            <div class="small mb-1">Para <strong>@t.Para.Nome</strong> · expira @Prazo(t.ExpiraEm)</div>
+                            <div class="small mb-1">Para @Quem(t.Para) · expira @Prazo(t.ExpiraEm)</div>
                             <div class="lados">
                                 <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Oferecidas)</div>
                                 <div class="seta" aria-hidden="true">⇄</div>
@@ -142,7 +143,7 @@
                             <li class="list-group-item small">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="badge @StatusClasse(t.Status)">@StatusTexto(t.Status)</span>
-                                    <span>@(eu ? $"Você → {t.Para.Nome}" : $"{t.De.Nome} → você")</span>
+                                    <span>@if (eu) { <span>Você → </span>@Quem(t.Para) } else { @Quem(t.De)<span> → você</span> }</span>
                                     <span class="text-muted">
                                         @(eu ? $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count}" : $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count} suas")
                                     </span>
@@ -171,7 +172,7 @@
                         <div class="card-body p-2">
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <div class="flex-grow-1">
-                                    <strong>@s.Pessoa.Nome</strong> tem <strong>@s.EleTemQueVocePrecisa.Count</strong> que você precisa
+                                    @Quem(s.Pessoa) tem <strong>@s.EleTemQueVocePrecisa.Count</strong> que você precisa
                                     @if (s.VoceTemQueElePrecisa.Count > 0)
                                     {
                                         <span>e precisa de <strong>@s.VoceTemQueElePrecisa.Count</strong> suas</span>
@@ -280,7 +281,7 @@
                                     {
                                         var pessoa = p;
                                         <button type="button" class="btn btn-sm btn-outline-primary py-0" title="Pedir para @p.Nome"
-                                                @onclick="() => PedirAsync(pessoa, falta.Figurinha)">@p.Nome</button>
+                                                @onclick="() => PedirAsync(pessoa, falta.Figurinha)">@NomeCurto(p)</button>
                                     }
                                     @if (f.QuemTemRepetida.Count > 3)
                                     {
@@ -312,7 +313,7 @@
                                     <option value="">Escolha…</option>
                                     @foreach (var p in d.Colecionadores)
                                     {
-                                        <option value="@p.TreinadorId">@p.Nome</option>
+                                        <option value="@p.TreinadorId">@NomeCurto(p)@(NomeCurto(p) != p.Nome ? $" ({p.Nome})" : "")</option>
                                     }
                                 </select>
                             </div>
@@ -441,12 +442,45 @@
             var token = await AdminAuth.GetTokenAsync();
             _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
             _dados = _eu is null ? null : await AlbumSvc.TrocasAsync(_eu.TreinadorId, CancellationToken.None);
+            await CarregarPerfisAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
 
-    private async Task RecarregarAsync() => _dados = await AlbumSvc.TrocasAsync(_eu!.TreinadorId, CancellationToken.None);
+    private async Task RecarregarAsync()
+    {
+        _dados = await AlbumSvc.TrocasAsync(_eu!.TreinadorId, CancellationToken.None);
+        await CarregarPerfisAsync();
+    }
+
+    // Foto e apelido das pessoas que aparecem na página.
+    private readonly Dictionary<Guid, PerfilTreinadorDto> _perfis = new();
+
+    private async Task CarregarPerfisAsync()
+    {
+        if (_dados is null) return;
+        var ids = _dados.Colecionadores.Select(p => p.TreinadorId)
+            .Concat(_dados.Recebidas.Concat(_dados.Enviadas).Concat(_dados.Historico).SelectMany(t => new[] { t.De.TreinadorId, t.Para.TreinadorId }))
+            .Where(id => !_perfis.ContainsKey(id))
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0) return;
+        foreach (var (id, perfil) in await PerfilSvc.VariosAsync(ids, CancellationToken.None))
+            _perfis[id] = perfil;
+    }
+
+    private string NomeCurto(PessoaDaTrocaDto p) => _perfis.GetValueOrDefault(p.TreinadorId)?.NomeCurto ?? p.Nome;
+
+    /// <summary>Foto pequena e o nome curto (apelido), com o nome completo na dica.</summary>
+    private RenderFragment Quem(PessoaDaTrocaDto p) => __builder =>
+    {
+        var perfil = _perfis.GetValueOrDefault(p.TreinadorId);
+        <span class="quem">
+            <FotoTreinador TreinadorId="@p.TreinadorId" Tamanho="20" Versao="@perfil?.VersaoFoto" Alt="" />
+            <strong><NomeTreinador Nome="@p.Nome" Apelido="@perfil?.Apelido" /></strong>
+        </span>
+    };
 
     private void LimparOk()
     {
@@ -615,7 +649,12 @@
         }
     };
 
-    private static string Rotulo(FigurinhaDto f) => f.Tipo == TipoFigurinha.Escudo ? $"Escudo do {f.TimeNome}" : f.NomeImpresso;
+    private static string Rotulo(FigurinhaDto f) => f.Tipo switch
+    {
+        TipoFigurinha.Escudo => $"Escudo do {f.TimeNome}",
+        TipoFigurinha.Treinador => $"{f.PapelTexto} {f.Perfil?.NomeCurto ?? f.NomeImpresso}",
+        _ => f.NomeImpresso
+    };
 
     private static string Nomes(TrocaDto t) =>
         $"{string.Join(", ", t.Oferecidas.Select(Rotulo))} ⇄ {string.Join(", ", t.Pedidas.Select(Rotulo))}";

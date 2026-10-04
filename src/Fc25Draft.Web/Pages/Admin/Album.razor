@@ -60,11 +60,18 @@
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
                         <div class="col-6 col-md-2">
                             <a href="/admin/album/sem-foto" class="text-decoration-none">
-                                <div class="h5 mb-0 @(ad.SemFoto > 0 ? "text-warning" : "text-success")">@ad.SemFoto</div>
+                                <div class="h5 mb-0 @(ad.SemFoto + ad.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@(ad.SemFoto + ad.TecnicosSemFoto)</div>
                                 <div class="small text-muted">sem foto</div>
                             </a>
                         </div>
                     </div>
+                    @if (ad.Tecnicos > 0)
+                    {
+                        <div class="small mt-2">
+                            🧑‍💼 <strong>@ad.Tecnicos</strong> figurinha@(ad.Tecnicos == 1 ? "" : "s") de técnico (contam como brilhantes) ·
+                            <span class="@(ad.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@ad.TecnicosSemFoto sem foto no perfil</span>
+                        </div>
+                    }
                     <hr />
                     <div class="small text-muted">
                         @ad.PacotesDados pacotes dados · @ad.PacotesAbertos abertos · @ad.Colecionadores colecionador@(ad.Colecionadores == 1 ? "" : "es")
@@ -139,17 +146,23 @@
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Comuns</div><div class="small text-muted">comuns</div></div>
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Brilhantes</div><div class="small text-muted">✨ brilhantes</div></div>
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
-                        <div class="col-6 col-md-2"><div class="h5 mb-0 @(pv.SemFoto > 0 ? "text-warning" : "text-success")">@pv.SemFoto</div><div class="small text-muted">sem foto</div></div>
+                        <div class="col-6 col-md-2"><div class="h5 mb-0 @(pv.SemFoto + pv.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@(pv.SemFoto + pv.TecnicosSemFoto)</div><div class="small text-muted">sem foto</div></div>
+                    </div>
+                    <div class="small mb-2">
+                        🧑‍💼 <strong>@pv.Tecnicos</strong> técnico@(pv.Tecnicos == 1 ? "" : "s") e auxiliar@(pv.Tecnicos == 1 ? "" : "es") entram
+                        (quem tem passagem aberta no clube), logo depois do escudo ·
+                        <span class="@(pv.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@pv.TecnicosSemFoto sem foto no perfil</span>
                     </div>
                     <p class="small text-muted mb-2">
-                        Brilhantes: o escudo de cada clube e os @AlbumFigurinhas.BrilhantesPorClube maiores overalls de cada elenco.
+                        Brilhantes: o escudo de cada clube, os técnicos e os @AlbumFigurinhas.BrilhantesPorClube maiores overalls de cada elenco.
+                        A foto, o apelido, a frase e o esquema do técnico vêm do perfil na hora: quem atualizar depois atualiza a figurinha.
                         Sem foto a figurinha sai com a silhueta — dá para completar as fotos depois do lançamento.
                     </p>
                     <details>
                         <summary class="small">Ver os clubes</summary>
                         <div class="table-responsive mt-2">
                             <table class="table table-sm mb-0">
-                                <thead><tr><th>#</th><th>Clube</th><th>Divisão</th><th class="text-center">Jogadores</th><th class="text-center">Sem foto</th></tr></thead>
+                                <thead><tr><th>#</th><th>Clube</th><th>Divisão</th><th class="text-center">Técnicos</th><th class="text-center">Jogadores</th><th class="text-center">Sem foto</th></tr></thead>
                                 <tbody>
                                     @{ var i = 0; }
                                     @foreach (var c in pv.Clubes)
@@ -158,8 +171,9 @@
                                             <td class="text-muted">@(++i)</td>
                                             <td>@c.Nome</td>
                                             <td>@(c.Divisao ?? "—")</td>
+                                            <td class="text-center">@c.Tecnicos</td>
                                             <td class="text-center">@c.Jogadores</td>
-                                            <td class="text-center @(c.SemFoto > 0 ? "text-warning" : "")">@c.SemFoto</td>
+                                            <td class="text-center @(c.SemFoto + c.TecnicosSemFoto > 0 ? "text-warning" : "")">@(c.SemFoto + c.TecnicosSemFoto)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -274,7 +288,8 @@
     {
         var lendarias = _escolhidas.Select(e => e.PlayerId).ToHashSet();
         var jogadores = pv.Candidatos.Where(c => !lendarias.Contains(c.PlayerId)).ToList();
-        var brilhantes = jogadores.Count(c => c.RaridadeBase == RaridadeFigurinha.Brilhante) + pv.Clubes.Count;
+        // Brilhantes: os maiores overalls, o escudo de cada clube e as figurinhas de técnico.
+        var brilhantes = jogadores.Count(c => c.RaridadeBase == RaridadeFigurinha.Brilhante) + pv.Clubes.Count + pv.Tecnicos;
         return new AlbumContagemDto(jogadores.Count(c => c.RaridadeBase == RaridadeFigurinha.Comum), brilhantes, lendarias.Count);
     }
 

@@ -275,6 +275,30 @@ esquema; tudo aparece no chat do telão, na página do time e na carreira; o adm
 some; relançar o álbum 2010 local põe técnico e auxiliar na página do clube com o visual de técnico;
 abrir pacotes até sair uma figurinha de técnico mostra a foto atual do perfil; celular sem rolagem para o lado.
 
+**Feito (03/10/2026).** Como ficou:
+- Perfil: entidade `PerfilTreinador` (`Core/Entities/PerfilTreinador.cs`, tabela `PerfisTreinadores`, chave =
+  `TreinadorId`), migração `PerfilDoTreinador`. Serviço `IPerfilTreinadorService`/`PerfilTreinadorService`
+  (`VariosAsync` para listas, sem trazer a imagem; `ComissaoTecnicaAsync`; `ApagarPeloAdminAsync` com
+  `AdminActionType.ApagarPerfilTreinador`, o texto apagado fica no log). Esquemas em
+  `Core/Utilities/EsquemasTaticos.cs` (10 da lista, coordenadas de 0 a 100).
+- Foto: `GET /fotos/treinadores/{id}` no `FotosEndpoints`, silhueta `images/treinador-sem-foto.svg`. O
+  `cbfvFoto.ler(input, lado)` do `app.js` recorta o quadrado e reduz no navegador (320 px para treinador)
+  até caber na mensagem do Blazor (~28 KB em base64); o servidor aceita até 300 KB. A detecção do tipo
+  da imagem foi para `Infra/Services/TipoDeImagem.cs` (usada também pela foto de jogador).
+- Componentes em `Components/Treinador`: `FotoTreinador`, `NomeTreinador` (a forma única do nome: apelido
+  com o nome completo na dica; `Completo` mostra os dois), `CampinhoEsquema` (SVG), `PerfilCartao`,
+  `ComissaoTecnica` e `MeuPerfilCartao` (Minha Área). Aparece no chat do telão, na página do time
+  (comissão técnica), na carreira, no ranking do bolão, em colecionadores e nas trocas do álbum. Admin
+  apaga foto, apelido ou frase em `/admin/treinadores`.
+- Figurinha de técnico: `TipoFigurinha.Treinador`, `Figurinha.TreinadorId` (SetNull se a pessoa for
+  excluída) e `Figurinha.Papel`; `PosicaoSigla` guarda "TÉC"/"AUX". A `Raridade` é `Brilhante` (sorteio e
+  contagem), o visual sai de `r-tecnico`/`t-treinador` no `CartaFigurinha`. O `FigurinhasAsync` traz o
+  perfil de agora em `FigurinhaDto.Perfil`. Entra quem tem passagem aberta no clube no lançamento, logo
+  depois do escudo (técnico antes do auxiliar). Álbum já lançado não muda: a figurinha só nasce no
+  lançamento. A prévia e a tela admin contam técnicos e técnicos sem foto; a tela de sem foto lista os
+  técnicos com link para o perfil. "Você se tirou!" na abertura (`AberturaDePacote.EuId`), com festa.
+- O álbum 2010 local foi relançado nesta fase (337 figurinhas, 22 técnicos).
+
 ## Ideias para depois
 
 Páginas especiais (lendas do Hall da Fama, treinadores, momentos da temporada da linha do tempo),

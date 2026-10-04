@@ -1,0 +1,142 @@
+@using Fc25Draft.Core.Utilities
+@inject IPerfilTreinadorService PerfilSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JS
+
+@* "Meu perfil" na Minha Área: a própria pessoa monta foto, apelido, frase e esquema favorito. É o que aparece
+   no chat do telão, na comissão técnica do clube, na carreira, nos rankings e na figurinha de técnico. *@
+@if (_perfil is { } p)
+{
+    <div class="card mb-3 meu-perfil">
+        <div class="card-header d-flex align-items-center gap-2">
+            <strong>🧑‍💼 Meu perfil</strong>
+            <span class="small text-muted ms-auto d-none d-sm-inline">Aparece no telão, no clube, na carreira e na figurinha de técnico</span>
+        </div>
+        <div class="card-body">
+            <div class="perfil-corpo">
+                <div class="perfil-foto">
+                    <FotoTreinador TreinadorId="@p.TreinadorId" Tamanho="96" Versao="@p.VersaoFoto" Alt="@p.Nome" Lazy="false" />
+                    <div class="d-flex flex-wrap justify-content-center gap-2 small">
+                        <label class="btn btn-link btn-sm p-0">
+                            📷 @(p.TemFoto ? "Trocar" : "Pôr foto")
+                            <input type="file" id="fotoTreinadorArquivo" accept="image/*" class="d-none" @onchange="TrocarFotoAsync" />
+                        </label>
+                        @if (p.TemFoto)
+                        {
+                            <button type="button" class="btn btn-link btn-sm p-0 text-danger" disabled="@_ocupado" @onclick="RemoverFotoAsync">Tirar</button>
+                        }
+                    </div>
+                    <div class="small text-muted text-center">A foto é cortada em quadrado.</div>
+                </div>
+
+                <div class="perfil-campos">
+                    <div class="mb-2">
+                        <label class="form-label small mb-0" for="perfilApelido">Apelido <span class="text-muted">(até @PerfilTreinador.TamanhoApelido letras)</span></label>
+                        <input id="perfilApelido" class="form-control form-control-sm" maxlength="@PerfilTreinador.TamanhoApelido"
+                               placeholder="Como te chamam na liga" @bind="_apelido" @bind:event="oninput" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-0" for="perfilFrase">Frase de efeito <span class="text-muted">(@(_frase?.Length ?? 0)/@PerfilTreinador.TamanhoFrase)</span></label>
+                        <textarea id="perfilFrase" class="form-control form-control-sm" rows="2" maxlength="@PerfilTreinador.TamanhoFrase"
+                                  placeholder="Ex.: Quem não faz, leva." @bind="_frase" @bind:event="oninput"></textarea>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-end gap-3">
+                        <div>
+                            <label class="form-label small mb-0" for="perfilEsquema">Esquema favorito</label>
+                            <select id="perfilEsquema" class="form-select form-select-sm" @bind="_esquema">
+                                <option value="">Nenhum</option>
+                                @foreach (var e in EsquemasTaticos.Todos)
+                                {
+                                    <option value="@e.Nome">@e.Nome</option>
+                                }
+                            </select>
+                        </div>
+                        <CampinhoEsquema Esquema="@_esquema" Largura="70" />
+                    </div>
+                    <div class="small text-muted mt-2">
+                        Nas listas você aparece como <strong>@(string.IsNullOrWhiteSpace(_apelido) ? p.Nome : _apelido.Trim())</strong>.
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                        <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="SalvarAsync">💾 Salvar perfil</button>
+                        @if (_mensagem is not null)
+                        {
+                            <span class="small @(_falhou ? "text-danger" : "text-success")">@_mensagem</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PerfilTreinadorDto? _perfil;
+    private string? _apelido, _frase, _esquema;
+    private bool _ocupado, _falhou;
+    private string? _mensagem;
+
+    private sealed record FotoLida(string Base64, string Tipo);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var token = await AdminAuth.GetTokenAsync();
+            var eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+            if (eu is null) return;
+            Mostrar(await PerfilSvc.GetAsync(eu.TreinadorId, CancellationToken.None));
+            StateHasChanged();
+        }
+        catch
+        {
+            // O cartão é um extra: se falhar, a Minha Área continua sem ele.
+        }
+    }
+
+    private void Mostrar(PerfilTreinadorDto? perfil)
+    {
+        _perfil = perfil;
+        _apelido = perfil?.Apelido;
+        _frase = perfil?.Frase;
+        _esquema = perfil?.Esquema ?? string.Empty;
+    }
+
+    private async Task ExecutarAsync(Func<Task<string>> acao)
+    {
+        _ocupado = true;
+        _falhou = false;
+        _mensagem = null;
+        try { _mensagem = await acao(); }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException or FormatException)
+        {
+            _falhou = true;
+            _mensagem = ex is JSException ? "Não foi possível ler a imagem escolhida." : ex.Message;
+        }
+        finally { _ocupado = false; }
+    }
+
+    private Task SalvarAsync() => ExecutarAsync(async () =>
+    {
+        var salvo = await PerfilSvc.SalvarAsync(_perfil!.TreinadorId, new PerfilSalvarRequest(_apelido, _frase, _esquema), CancellationToken.None);
+        Mostrar(salvo);
+        return "Perfil salvo.";
+    });
+
+    private Task TrocarFotoAsync(ChangeEventArgs _) => ExecutarAsync(async () =>
+    {
+        // Recorta e reduz no navegador antes de subir (320 px, bom para a figurinha).
+        var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", "fotoTreinadorArquivo", 320);
+        if (lida is null) return "Nenhuma foto escolhida.";
+        var salvo = await PerfilSvc.TrocarFotoAsync(_perfil!.TreinadorId, Convert.FromBase64String(lida.Base64), CancellationToken.None);
+        _perfil = salvo;
+        return "Foto trocada.";
+    });
+
+    private Task RemoverFotoAsync() => ExecutarAsync(async () =>
+    {
+        _perfil = await PerfilSvc.RemoverFotoAsync(_perfil!.TreinadorId, CancellationToken.None);
+        return "Foto tirada.";
+    });
+}

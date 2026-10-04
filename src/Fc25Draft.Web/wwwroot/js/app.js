@@ -341,8 +341,11 @@ window.cbfvPush = (function () {
 
 // Foto do jogador escolhida pelo admin: recorta no centro, reduz para 160×160 e comprime (WebP, ou JPEG
 // onde o navegador não gera WebP) para caber na conexão do Blazor (~32 KB por mensagem).
+// Lê a foto escolhida, recorta o quadrado do meio e reduz no navegador (lado em px, 160 para jogador e
+// 320 para treinador), em WebP (ou JPEG), até caber na mensagem do Blazor (~28 KB em base64).
 window.cbfvFoto = {
-    ler: async function (inputId) {
+    ler: async function (inputId, lado) {
+        lado = lado || 160;
         const input = document.getElementById(inputId);
         const arquivo = input && input.files && input.files[0];
         if (!arquivo) return null;
@@ -355,13 +358,13 @@ window.cbfvFoto = {
                 i.onerror = erro;
                 i.src = url;
             });
-            const lado = Math.min(img.naturalWidth, img.naturalHeight);
+            const menor = Math.min(img.naturalWidth, img.naturalHeight);
             const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 160;
+            canvas.width = canvas.height = lado;
             canvas.getContext('2d').drawImage(img,
-                (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, 160, 160);
+                (img.naturalWidth - menor) / 2, (img.naturalHeight - menor) / 2, menor, menor, 0, 0, lado, lado);
 
-            for (const qualidade of [0.85, 0.7, 0.55]) {
+            for (const qualidade of [0.85, 0.7, 0.55, 0.4]) {
                 let dados = canvas.toDataURL('image/webp', qualidade);
                 if (!dados.startsWith('data:image/webp')) dados = canvas.toDataURL('image/jpeg', qualidade);
                 const base64 = dados.substring(dados.indexOf(',') + 1);
@@ -382,7 +385,7 @@ window.cbfvFoto = {
 // pede; lá fica o brilho que anda sozinho). Escuta no documento inteiro: vale para qualquer carta que
 // aparecer, sem ligar nada por carta.
 window.cbfvHolo = (function () {
-    const SELETOR = '.carta.r-brilhante, .carta.r-lendaria';
+    const SELETOR = '.carta.r-brilhante, .carta.r-lendaria, .carta.r-tecnico';
     const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)');
     const INCLINACAO = 14; // graus no canto da carta
     let atual = null;

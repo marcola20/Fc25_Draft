@@ -7,6 +7,8 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject ITreinadorService TreinadorSvc
 @inject ITeamService TeamSvc
+@inject IPerfilTreinadorService PerfilSvc
+@inject AdminAuthService AdminAuth
 @inject IJSRuntime JSRuntime
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -87,12 +89,44 @@
                         @foreach (var t in _treinadores)
                         {
                             <tr class="@(t.Ativo ? "" : "text-muted")">
+                                @{ var perfil = _perfis.GetValueOrDefault(t.TreinadorId); }
                                 <td>
-                                    <a href="/treinadores/@t.TreinadorId" class="fw-semibold">@t.Nome</a>
-                                    @if (!t.Ativo)
-                                    {
-                                        <span class="badge bg-secondary ms-1">fora da liga</span>
-                                    }
+                                    <div class="d-flex align-items-start gap-2">
+                                        <FotoTreinador TreinadorId="@t.TreinadorId" Tamanho="32" Versao="@perfil?.VersaoFoto" Alt="" />
+                                        <div style="min-width: 0;">
+                                            <a href="/treinadores/@t.TreinadorId" class="fw-semibold">@t.Nome</a>
+                                            @if (!t.Ativo)
+                                            {
+                                                <span class="badge bg-secondary ms-1">fora da liga</span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(perfil?.Apelido))
+                                            {
+                                                <div class="small text-muted">apelido: <strong>@perfil.Apelido</strong></div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(perfil?.Frase))
+                                            {
+                                                <div class="small text-muted fst-italic text-truncate" style="max-width: 18rem;" title="@perfil.Frase">“@perfil.Frase”</div>
+                                            }
+                                            @if (perfil is { TemFoto: true } || !string.IsNullOrWhiteSpace(perfil?.Apelido) || !string.IsNullOrWhiteSpace(perfil?.Frase))
+                                            {
+                                                <div class="d-flex flex-wrap gap-2 small">
+                                                    <span class="text-muted">apagar:</span>
+                                                    @if (perfil!.TemFoto)
+                                                    {
+                                                        <button type="button" class="btn btn-link btn-sm p-0 text-danger" disabled="@_salvando" @onclick="() => ApagarDoPerfil(t, CampoDoPerfil.Foto)">foto</button>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(perfil.Apelido))
+                                                    {
+                                                        <button type="button" class="btn btn-link btn-sm p-0 text-danger" disabled="@_salvando" @onclick="() => ApagarDoPerfil(t, CampoDoPerfil.Apelido)">apelido</button>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(perfil.Frase))
+                                                    {
+                                                        <button type="button" class="btn btn-link btn-sm p-0 text-danger" disabled="@_salvando" @onclick="() => ApagarDoPerfil(t, CampoDoPerfil.Frase)">frase</button>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     @if (t.Hoje is { } hoje)
@@ -191,6 +225,23 @@
     private bool _salvando;
     private string? _erro, _ok;
     private bool _verInativos;
+    private Dictionary<Guid, PerfilTreinadorDto> _perfis = new();
+
+    /// <summary>Apaga a foto, o apelido ou a frase do perfil de alguém (fica no Log de Ações).</summary>
+    private async Task ApagarDoPerfil(TreinadorDto t, CampoDoPerfil campo)
+    {
+        var oQue = campo switch { CampoDoPerfil.Foto => "a foto", CampoDoPerfil.Apelido => "o apelido", _ => "a frase" };
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Apagar {oQue} do perfil de {t.Nome}?")) return;
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            _perfis[t.TreinadorId] = await PerfilSvc.ApagarPeloAdminAsync(t.TreinadorId, campo, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            _ok = $"Pronto, apagou {oQue} de {t.Nome}.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
 
     private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
     private IReadOnlyList<Team> _times = Array.Empty<Team>();
@@ -222,6 +273,8 @@
         try
         {
             _treinadores = await TreinadorSvc.ListAsync(_verInativos, CancellationToken.None);
+            _perfis = (await PerfilSvc.VariosAsync(_treinadores.Select(t => t.TreinadorId), CancellationToken.None))
+                .ToDictionary(p => p.Key, p => p.Value);
             var (times, _) = await TeamSvc.SearchAsync(null, 1, 200);
             _times = times.OrderBy(t => t.TeamName).ToList();
         }

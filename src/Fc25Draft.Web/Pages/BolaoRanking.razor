@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
 @inject IBolaoService BolaoSvc
+@inject IPerfilTreinadorService PerfilSvc
 @inject EscudoService EscudoService
 @inject NavigationManager Navigation
 
@@ -76,6 +77,7 @@
             {
                 _daRodada = await BolaoSvc.RodadaAsync(rodadaId, null, CancellationToken.None);
                 _rankingDaRodada = await BolaoSvc.RankingDaRodadaAsync(rodadaId, CancellationToken.None);
+                await CarregarPerfisAsync(_rankingDaRodada);
             }
         }
         catch (Exception ex) { _erro = ex.Message; }
@@ -88,8 +90,22 @@
         await CarregarRanking();
     }
 
-    private async Task CarregarRanking() =>
+    private async Task CarregarRanking()
+    {
         _ranking = await BolaoSvc.RankingAsync(_temporada, CancellationToken.None);
+        await CarregarPerfisAsync(_ranking);
+    }
+
+    // Foto e apelido de quem está no ranking.
+    private readonly Dictionary<Guid, PerfilTreinadorDto> _perfis = new();
+
+    private async Task CarregarPerfisAsync(IEnumerable<BolaoRankingLinhaDto> linhas)
+    {
+        var faltam = linhas.Select(l => l.TreinadorId).Where(id => !_perfis.ContainsKey(id)).ToList();
+        if (faltam.Count == 0) return;
+        foreach (var (id, perfil) in await PerfilSvc.VariosAsync(faltam, CancellationToken.None))
+            _perfis[id] = perfil;
+    }
 
     private RenderFragment Tabela(IReadOnlyList<BolaoRankingLinhaDto> linhas) =>@<div>
         @if (linhas.Count == 0)
@@ -121,7 +137,9 @@
                                     {
                                         <img src="@EscudoService.GetEscudo(time)" alt="" style="width:22px;height:22px;object-fit:contain;" class="me-1" />
                                     }
-                                    <a href="/treinadores/@linha.TreinadorId">@linha.Nome</a>
+                                    @{ var perfil = _perfis.GetValueOrDefault(linha.TreinadorId); }
+                                    <FotoTreinador TreinadorId="@linha.TreinadorId" Tamanho="24" Versao="@perfil?.VersaoFoto" Alt="" Classe="me-1" />
+                                    <a href="/treinadores/@linha.TreinadorId"><NomeTreinador Nome="@linha.Nome" Apelido="@perfil?.Apelido" /></a>
                                     <span class="text-muted small">@(linha.TimeNome ?? "sem clube")</span>
                                 </td>
                                 <td class="text-center fw-bold">@linha.Pontos</td>

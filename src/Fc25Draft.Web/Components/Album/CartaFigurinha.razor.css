@@ -66,12 +66,14 @@
     overflow: hidden;
 }
 
-.foto ::deep .foto-jogador {
+.foto ::deep .foto-jogador,
+.foto ::deep .foto-treinador {
     border-radius: 0;
     background: transparent;
     object-fit: cover;
     object-position: top center;
     max-height: 100%;
+    box-shadow: none;
     width: 78% !important;
     height: auto !important;
     aspect-ratio: 1;
@@ -300,3 +302,114 @@
 
 /* Na imagem de compartilhar o reflexo não funciona (a captura não mistura cores): sai a carta limpa. */
 .share-rendering .brilho { display: none; }
+
+/* ---- Técnico: prancheta verde com prendedor, campinho do esquema e a frase ---- */
+.r-tecnico {
+    --fundo:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 1.1em),
+        linear-gradient(165deg, #2f8a5f 0%, #1c5e3f 55%, #123f2a 100%);
+    --borda: #c9d6cf;
+    --texto: #f3faf6;
+    --texto-suave: #cfe9da;
+    --faixa: linear-gradient(90deg, #0b2a1c, #17573a, #0b2a1c);
+    --foto-fundo: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 70%);
+}
+
+[data-bs-theme="dark"] .r-tecnico { --borda: #8fb3a1; }
+
+.r-tecnico .moldura {
+    border-width: .26em;
+    box-shadow: 0 0 0 .1em rgba(255, 255, 255, .35) inset, 0 .25em .8em rgba(25, 135, 84, .45);
+}
+
+/* O prendedor da prancheta, no alto. */
+.prendedor {
+    position: absolute;
+    top: .15em;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32%;
+    height: .9em;
+    border-radius: .3em .3em .5em .5em;
+    background: linear-gradient(180deg, #e9eef0, #9aa7ad);
+    box-shadow: 0 .1em .2em rgba(0, 0, 0, .35);
+    z-index: 4;
+}
+
+.r-tecnico .topo { padding-top: .5em; }
+
+.papel { display: flex; flex-direction: column; align-items: flex-start; gap: .1em; }
+.papel-sigla {
+    font-size: .95em;
+    font-weight: 900;
+    letter-spacing: .06em;
+    padding: .05em .4em;
+    border-radius: .3em;
+    background: #f5d36b;
+    color: #2a1a00;
+}
+.papel-esquema { font-size: .75em; font-weight: 700; color: var(--texto-suave); }
+
+.r-tecnico .foto { position: relative; }
+
+.campinho-canto {
+    position: absolute;
+    right: .35em;
+    bottom: .35em;
+    border-radius: .3em;
+    box-shadow: 0 .1em .3em rgba(0, 0, 0, .45);
+    line-height: 0;
+}
+
+.rodape-tecnico {
+    background: var(--faixa);
+    color: var(--texto-suave);
+    padding: 0 .5em .35em;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+
+.rodape-tecnico .nome-completo {
+    font-size: .62em;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rodape-tecnico .frase {
+    font-size: .6em;
+    font-style: italic;
+    line-height: 1.2;
+    color: #fff;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Reflexo prateado discreto, que segue o mouse como nas brilhantes. */
+.r-tecnico .brilho {
+    display: block;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .35) 45%, rgba(200, 255, 225, .2) 52%, transparent 65%);
+    background-size: 250% 250%;
+    background-position: calc(var(--px, var(--gpx, 30)) * 1%) calc(var(--py, var(--gpy, 30)) * 1%);
+    mix-blend-mode: soft-light;
+}
+
+.r-tecnico .moldura {
+    transform: perspective(40em) rotateX(var(--rx, var(--grx, 0deg))) rotateY(var(--ry, var(--gry, 0deg)));
+    transition: transform .3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .r-tecnico .moldura { transform: none; transition: none; }
+}
+
+.vaga.t-treinador { border-color: rgba(25, 135, 84, .55); }

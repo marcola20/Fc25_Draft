@@ -56,3 +56,5 @@
 /* Listas de escolha da proposta: rolam por dentro quando são longas. */
 .escolha { max-height: 22rem; overflow-y: auto; }
 .escolha label { cursor: pointer; }
+
+.quem { display: inline-flex; align-items: center; gap: .25rem; }

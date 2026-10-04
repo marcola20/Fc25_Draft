@@ -1,0 +1,32 @@
+@* A forma única de mostrar o nome de uma pessoa da liga: onde o espaço é curto vai o apelido (se tiver), com
+   o nome completo na dica; com Completo, vão os dois ("Fulano · Apelido"). *@
+@if (Completo && !string.IsNullOrWhiteSpace(Apelido) && Apelido != Nome)
+{
+    <span class="nome-treinador @Classe">@Nome <span class="apelido">“@Apelido”</span></span>
+}
+else
+{
+    <span class="nome-treinador @Classe" title="@(Curto != Nome ? Nome : null)">@Curto</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Nome { get; set; } = string.Empty;
+    [Parameter] public string? Apelido { get; set; }
+
+    /// <summary>Mostra nome e apelido juntos (perfil, carreira).</summary>
+    [Parameter] public bool Completo { get; set; }
+
+    [Parameter] public string? Classe { get; set; }
+
+    /// <summary>Atalho: passa o perfil inteiro em vez de Nome e Apelido.</summary>
+    [Parameter] public PerfilTreinadorDto? Perfil { get; set; }
+
+    private string Curto => string.IsNullOrWhiteSpace(Apelido) ? Nome : Apelido!;
+
+    protected override void OnParametersSet()
+    {
+        if (Perfil is null) return;
+        Nome = Perfil.Nome;
+        Apelido = Perfil.Apelido;
+    }
+}

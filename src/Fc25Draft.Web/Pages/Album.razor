@@ -120,7 +120,7 @@
         @* ---- Pacote aberto: a abertura em tela cheia ---- *@
         @if (_aberto is { } p)
         {
-            <AberturaDePacote Pacote="@p" AlbumNome="@a.Album.Nome" SeloLendaria="@Selo" Abrindo="@_abrindo"
+            <AberturaDePacote Pacote="@p" AlbumNome="@a.Album.Nome" SeloLendaria="@Selo" Abrindo="@_abrindo" EuId="@_eu.TreinadorId"
                               OnFechar="() => _aberto = null" OnProximo="AbrirAsync"
                               OnCompartilhar="f => _compartilhar = f" />
         }

@@ -61,6 +61,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.DarPacotes => "Deu pacotes do álbum",
         AdminActionType.AjustarLendarias => "Trocou as lendárias do álbum",
         AdminActionType.AjustarPontosBolao => "Mudou os pontos do bolão por pacote",
+        AdminActionType.ApagarPerfilTreinador => "Apagou parte do perfil de um treinador",
         _ => tipo.ToString()
     };
 
@@ -84,12 +85,14 @@ public class AdminLogService : IAdminLogService
         "previousleaderteamid" => "Quem liderava",
         "releasedamount" => "Valor liberado",
         "album" => "Álbum",
-        "treinador" => "Para",
+        "treinador" => "Treinador",
         "quantidade" => "Pacotes",
         "clubes" => "Clubes",
         "figurinhas" => "Figurinhas",
         "lendarias" => "Lendárias",
         "antes" => "Antes",
+        "campo" => "O que",
+        "apagado" => "Texto apagado",
         "depois" => "Depois",
         _ => chave
     };

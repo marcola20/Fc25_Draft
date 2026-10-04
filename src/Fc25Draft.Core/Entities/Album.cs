@@ -2,11 +2,14 @@ using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Core.Entities;
 
-/// <summary>Figurinha de jogador ou do escudo do clube (a que abre a página).</summary>
+/// <summary>Figurinha de jogador, do escudo do clube (a que abre a página) ou do técnico/auxiliar.</summary>
 public enum TipoFigurinha
 {
     Jogador = 1,
-    Escudo = 2
+    Escudo = 2,
+
+    /// <summary>Técnico ou auxiliar do clube no lançamento. Sorteada como brilhante, com visual próprio.</summary>
+    Treinador = 3
 }
 
 /// <summary>Raridade da figurinha. Cada uma tem só uma, a mais alta que se aplicar.</summary>
@@ -61,8 +64,17 @@ public class Figurinha
     /// <summary>Clube da página.</summary>
     public Guid TeamId { get; set; }
 
-    /// <summary>Nulo na figurinha do escudo.</summary>
+    /// <summary>Nulo na figurinha do escudo e na de técnico.</summary>
     public int? PlayerId { get; set; }
+
+    /// <summary>
+    /// A pessoa da figurinha de técnico. Clube, papel e nome são o retrato do lançamento; foto, apelido,
+    /// frase e esquema vêm do perfil na hora de mostrar.
+    /// </summary>
+    public Guid? TreinadorId { get; set; }
+
+    /// <summary>Técnico ou auxiliar, no lançamento (só na figurinha de técnico).</summary>
+    public PapelTreinador? Papel { get; set; }
 
     public string NomeImpresso { get; set; } = null!;
 
@@ -80,6 +92,7 @@ public class Figurinha
     public Album Album { get; set; } = null!;
     public Team Time { get; set; } = null!;
     public Player? Jogador { get; set; }
+    public Treinador? Treinador { get; set; }
 }
 
 /// <summary>As figurinhas que a pessoa já tirou. <c>Quantidade - 1</c> são as repetidas.</summary>

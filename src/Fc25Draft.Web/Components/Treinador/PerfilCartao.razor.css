@@ -1,0 +1,14 @@
+.perfil-cartao {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    min-width: 0;
+}
+
+.perfil-texto { flex: 1; min-width: 0; }
+
+.frase {
+    font-style: italic;
+    color: var(--bs-secondary-color);
+    overflow-wrap: anywhere;
+}

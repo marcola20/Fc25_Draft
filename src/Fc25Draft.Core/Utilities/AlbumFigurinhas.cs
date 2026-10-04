@@ -29,7 +29,10 @@ public static class AlbumFigurinhas
 
     public const int TamanhoDestaque = 80;
 
-    public sealed record ClubeDoAlbum(Guid TeamId, string Nome);
+    /// <summary>Técnico ou auxiliar com passagem aberta no clube no lançamento.</summary>
+    public sealed record TecnicoDoAlbum(Guid TreinadorId, string Nome, PapelTreinador Papel);
+
+    public sealed record ClubeDoAlbum(Guid TeamId, string Nome, IReadOnlyList<TecnicoDoAlbum>? Tecnicos = null);
 
     public sealed record JogadorDoAlbum(int PlayerId, string Nome, int PositionId, int Overall, Guid TeamId);
 
@@ -44,11 +47,14 @@ public static class AlbumFigurinhas
         string? PosicaoSigla,
         int? Overall,
         string? Destaque,
-        int Ordem);
+        int Ordem,
+        Guid? TreinadorId = null,
+        PapelTreinador? Papel = null);
 
     /// <summary>
-    /// Monta o álbum: uma página por clube, na ordem recebida, com o escudo e depois o elenco por posição
-    /// (GOL, ZAG, LE… na ordem do <c>PositionType</c>) e, dentro da posição, por overall. Numeração corrida.
+    /// Monta o álbum: uma página por clube, na ordem recebida, com o escudo, o técnico e o auxiliar (quem
+    /// tem passagem aberta) e depois o elenco por posição (GOL, ZAG, LE… na ordem do <c>PositionType</c>) e,
+    /// dentro da posição, por overall. Numeração corrida. A figurinha de técnico é sorteada como brilhante.
     /// </summary>
     public static IReadOnlyList<FigurinhaMontada> Montar(
         IReadOnlyList<ClubeDoAlbum> clubes,
@@ -64,10 +70,17 @@ public static class AlbumFigurinhas
             resultado.Add(new FigurinhaMontada(++numero, TipoFigurinha.Escudo, RaridadeFigurinha.Brilhante,
                 clube.TeamId, null, clube.Nome, null, null, null, 0));
 
+            var ordem = 0;
+            foreach (var t in (clube.Tecnicos ?? Array.Empty<TecnicoDoAlbum>()).OrderBy(t => t.Papel))
+            {
+                resultado.Add(new FigurinhaMontada(++numero, TipoFigurinha.Treinador, RaridadeFigurinha.Brilhante,
+                    clube.TeamId, null, t.Nome, t.Papel == PapelTreinador.Auxiliar ? "AUX" : "TÉC", null, null, ++ordem,
+                    t.TreinadorId, t.Papel));
+            }
+
             var elenco = porClube[clube.TeamId].ToList();
             var brilhantes = MaioresOveralls(elenco.Select(j => (j.PlayerId, j.Overall, j.Nome)));
 
-            var ordem = 0;
             foreach (var j in elenco.OrderBy(j => j.PositionId).ThenByDescending(j => j.Overall).ThenBy(j => j.Nome, StringComparer.CurrentCulture))
             {
                 var lendaria = lendarias.TryGetValue(j.PlayerId, out var destaque);
@@ -259,6 +272,7 @@ public static class AlbumFigurinhas
     public static string FraseDeCompartilhar(FigurinhaDto f, string albumNome) => (f.Tipo, f.Raridade) switch
     {
         (TipoFigurinha.Escudo, _) => $"Colei o escudo brilhante do {f.TimeNome} no {albumNome}!",
+        (TipoFigurinha.Treinador, _) => $"Tirei o {(f.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "técnico")} {f.Perfil?.NomeCurto ?? f.NomeImpresso} do {f.TimeNome} no {albumNome}!",
         (_, RaridadeFigurinha.Lendaria) => $"Tirei o {f.NomeImpresso} lendário no {albumNome}!",
         (_, RaridadeFigurinha.Brilhante) => $"Tirei o {f.NomeImpresso} brilhante no {albumNome}!",
         _ => $"Colei o {f.NomeImpresso} no {albumNome}!"

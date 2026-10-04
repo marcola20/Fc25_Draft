@@ -287,3 +287,12 @@
 
     .flip.virada .flip-miolo { animation: none; }
 }
+
+/* Tirou a própria figurinha de técnico. */
+.voce-se-tirou {
+    font-weight: 800;
+    padding: .1rem .55rem;
+    border-radius: 1rem;
+    color: #2a1a00;
+    background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b);
+}

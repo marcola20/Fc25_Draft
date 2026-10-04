@@ -5,6 +5,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Models.Navigation
 @inject ITreinadorService TreinadorSvc
+@inject IPerfilTreinadorService PerfilSvc
 @inject EscudoService EscudoService
 @inject LayoutState LayoutState
 
@@ -26,15 +27,29 @@
     else
     {
         <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
-            {
-                <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:56px;height:56px;object-fit:contain;" />
-            }
-            <div>
-                <h1 class="h3 mb-0">@_carreira.Nome</h1>
-                <div class="text-muted small">@Situacao()</div>
+            <FotoTreinador TreinadorId="@_carreira.TreinadorId" Tamanho="72" Versao="@_perfil?.VersaoFoto" Alt="@_carreira.Nome" />
+            <div class="flex-grow-1" style="min-width: 0;">
+                <h1 class="h3 mb-0"><NomeTreinador Nome="@_carreira.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
+                <div class="text-muted small d-flex align-items-center gap-1 flex-wrap">
+                    @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
+                    {
+                        <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:20px;height:20px;object-fit:contain;" />
+                    }
+                    @Situacao()
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_perfil?.Frase))
+                {
+                    <div class="fst-italic text-body-secondary mt-1" style="overflow-wrap: anywhere;">“@_perfil.Frase”</div>
+                }
             </div>
-            <a href="/treinadores" class="btn btn-sm btn-outline-secondary ms-auto">👔 Todos os treinadores</a>
+            @if (_perfil?.Esquema is { } esquema)
+            {
+                <div class="text-center small text-muted">
+                    <CampinhoEsquema Esquema="@esquema" Largura="64" />
+                    <div>@esquema</div>
+                </div>
+            }
+            <a href="/treinadores" class="btn btn-sm btn-outline-secondary">👔 Todos os treinadores</a>
         </div>
 
         <div class="row g-3 mb-4">
@@ -196,6 +211,8 @@
 </div>
 
 @code {
+    private PerfilTreinadorDto? _perfil;
+
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
     [Parameter] public Guid TreinadorId { get; set; }
@@ -211,6 +228,7 @@
         try
         {
             _carreira = await TreinadorSvc.GetCarreiraAsync(TreinadorId, CancellationToken.None);
+            _perfil = _carreira is null ? null : await PerfilSvc.GetAsync(TreinadorId, CancellationToken.None);
             AtualizarCabecalho();
         }
         catch (Exception ex) { _erro = ex.Message; }

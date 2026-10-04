@@ -143,12 +143,5 @@ public class FotosJogadoresService : IFotosJogadoresService
         return tipo.Length > 0;
     }
 
-    // Pelo começo do arquivo, não pelo que o cliente diz.
-    private static string? Tipo(byte[] b) => b switch
-    {
-        [(byte)'R', (byte)'I', (byte)'F', (byte)'F', _, _, _, _, (byte)'W', (byte)'E', (byte)'B', (byte)'P', ..] => "image/webp",
-        [0x89, (byte)'P', (byte)'N', (byte)'G', ..] => "image/png",
-        [0xFF, 0xD8, 0xFF, ..] => "image/jpeg",
-        _ => null
-    };
+    private static string? Tipo(byte[] b) => TipoDeImagem.Detectar(b);
 }

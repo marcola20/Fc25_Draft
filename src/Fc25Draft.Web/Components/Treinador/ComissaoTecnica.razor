@@ -1,0 +1,32 @@
+@inject IPerfilTreinadorService PerfilSvc
+
+@* Cartão da comissão técnica do clube: quem tem passagem aberta hoje, com o perfil. *@
+@if (_comissao.Count > 0)
+{
+    <div class="card mb-3">
+        <div class="card-header fw-bold">🧑‍💼 Comissão técnica</div>
+        <ul class="list-group list-group-flush">
+            @foreach (var c in _comissao)
+            {
+                <li class="list-group-item">
+                    <PerfilCartao Perfil="@c.Perfil" Papel="@c.Papel" />
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private IReadOnlyList<ComissaoTecnicaDto> _comissao = Array.Empty<ComissaoTecnicaDto>();
+    private Guid _carregado;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TeamId == _carregado) return;
+        _carregado = TeamId;
+        try { _comissao = await PerfilSvc.ComissaoTecnicaAsync(TeamId, CancellationToken.None); }
+        catch { _comissao = Array.Empty<ComissaoTecnicaDto>(); }
+    }
+}

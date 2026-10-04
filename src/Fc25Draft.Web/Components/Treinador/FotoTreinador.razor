@@ -1,0 +1,26 @@
+@* Foto do treinador (ou a silhueta de técnico, quando não tem): no molde do FotoJogador, o servidor decide. *@
+<img src="@Src"
+     alt="@Alt" loading="@(Lazy ? "lazy" : "eager")" decoding="async"
+     class="foto-treinador @Classe"
+     style="width: @(Tamanho)px; height: @(Tamanho)px;" />
+
+@code {
+    [Parameter, EditorRequired] public Guid TreinadorId { get; set; }
+
+    /// <summary>Lado em pixels.</summary>
+    [Parameter] public int Tamanho { get; set; } = 28;
+
+    [Parameter] public string? Classe { get; set; }
+
+    [Parameter] public string Alt { get; set; } = "";
+
+    /// <summary>Falso para carregar na hora (imagem que vai virar figura para compartilhar).</summary>
+    [Parameter] public bool Lazy { get; set; } = true;
+
+    /// <summary>Muda quando a foto é trocada (<c>PerfilTreinadorDto.VersaoFoto</c>), para o navegador não mostrar a antiga.</summary>
+    [Parameter] public string? Versao { get; set; }
+
+    private string Src => string.IsNullOrEmpty(Versao) || Versao == "0"
+        ? $"/fotos/treinadores/{TreinadorId}"
+        : $"/fotos/treinadores/{TreinadorId}?v={Versao}";
+}

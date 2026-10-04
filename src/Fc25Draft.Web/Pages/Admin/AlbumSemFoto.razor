@@ -33,6 +33,7 @@
                    value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
             <span class="small text-muted ms-auto">
                 Abre o jogador e troca a foto por lá (botão de trocar foto na ficha). A figurinha usa a foto de hoje.
+                Técnico (TÉC/AUX) põe a foto no perfil, na Minha Área.
             </span>
         </div>
 
@@ -43,7 +44,7 @@
         else
         {
             var filtrados = _semFoto.Where(Bate).ToList();
-            <p class="small text-muted">@_semFoto.Count jogador@(_semFoto.Count == 1 ? "" : "es") sem foto.</p>
+            <p class="small text-muted">@_semFoto.Count figurinha@(_semFoto.Count == 1 ? "" : "s") sem foto.</p>
             @foreach (var clube in filtrados.GroupBy(f => (f.TeamId, f.TimeNome)))
             {
                 <div class="card mb-2">
@@ -59,7 +60,11 @@
                                 <span class="text-muted small" style="width: 3.2rem;">@AlbumFigurinhas.NumeroImpresso(f.Numero)</span>
                                 <span class="badge text-bg-secondary" style="width: 2.6rem;">@f.PosicaoSigla</span>
                                 <span class="flex-grow-1">
-                                    @f.Nome <span class="text-muted small">· @f.Overall</span>
+                                    @f.Nome
+                                    @if (f.Overall is not null)
+                                    {
+                                        <span class="text-muted small">· @f.Overall</span>
+                                    }
                                     @if (f.Raridade == RaridadeFigurinha.Lendaria)
                                     {
                                         <span class="badge text-bg-dark ms-1">★ lendária</span>
@@ -69,7 +74,15 @@
                                         <span class="badge text-bg-warning ms-1">✨ brilhante</span>
                                     }
                                 </span>
-                                <a class="btn btn-sm btn-outline-primary" href="/players/details/@f.PlayerId" target="_blank">Trocar foto</a>
+                                @if (f.TreinadorId is { } pessoa)
+                                {
+                                    @* A foto do técnico é a do perfil, que a própria pessoa coloca: o admin avisa ou apaga o que não servir. *@
+                                    <a class="btn btn-sm btn-outline-secondary" href="/admin/treinadores" target="_blank" title="A foto é a do perfil da pessoa">Perfil</a>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="/players/details/@f.PlayerId" target="_blank">Trocar foto</a>
+                                }
                             </li>
                         }
                     </ul>

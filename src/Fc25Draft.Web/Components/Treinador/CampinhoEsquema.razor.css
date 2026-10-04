@@ -1,0 +1,5 @@
+.campinho { display: block; flex-shrink: 0; }
+.gramado { fill: #1f7a4d; }
+.linhas { fill: none; stroke: rgba(255, 255, 255, .55); stroke-width: .9; }
+.jogador { fill: #fff; stroke: #0a3622; stroke-width: .8; }
+.jogador.goleiro { fill: #f5d36b; }

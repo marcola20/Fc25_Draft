@@ -15,7 +15,14 @@ public record FigurinhaDto(
     string? PosicaoSigla,
     int? Overall,
     string? Destaque,
-    int Ordem);
+    int Ordem,
+    Guid? TreinadorId = null,
+    PapelTreinador? Papel = null,
+    PerfilTreinadorDto? Perfil = null)
+{
+    /// <summary>"Técnico" ou "Auxiliar", na figurinha de técnico.</summary>
+    public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
+}
 
 public record AlbumDto(Guid AlbumId, string Nome, int Temporada, DateTime LancadoEm, bool Ativo, int TotalFigurinhas);
 
@@ -214,7 +221,7 @@ public record CandidatoLendariaDto(
     int Jogos,
     RaridadeFigurinha RaridadeBase);
 
-public record AlbumPreviaClubeDto(Guid TeamId, string Nome, string? Divisao, int Jogadores, int SemFoto);
+public record AlbumPreviaClubeDto(Guid TeamId, string Nome, string? Divisao, int Jogadores, int SemFoto, int Tecnicos = 0, int TecnicosSemFoto = 0);
 
 /// <summary>
 /// O que o álbum da temporada vai ter se for lançado agora. A contagem por raridade sai dos candidatos
@@ -227,7 +234,12 @@ public record AlbumPreviaDto(
     IReadOnlyList<AlbumPreviaClubeDto> Clubes,
     int SemFoto,
     IReadOnlyList<CandidatoLendariaDto> Sugeridas,
-    IReadOnlyList<CandidatoLendariaDto> Candidatos);
+    IReadOnlyList<CandidatoLendariaDto> Candidatos)
+{
+    /// <summary>Técnicos e auxiliares que entram (figurinha de técnico, sorteada como brilhante).</summary>
+    public int Tecnicos => Clubes.Sum(c => c.Tecnicos);
+    public int TecnicosSemFoto => Clubes.Sum(c => c.TecnicosSemFoto);
+}
 
 /// <summary>O álbum lançado, visto pelo admin.</summary>
 public record AlbumAdminDto(
@@ -241,13 +253,17 @@ public record AlbumAdminDto(
     IReadOnlyList<FigurinhaDto> Lendarias,
     IReadOnlyList<CandidatoLendariaDto> Candidatos,
     int PontosBolaoPorPacote,
-    IReadOnlyDictionary<string, int> PacotesPorOrigem)
+    IReadOnlyDictionary<string, int> PacotesPorOrigem,
+    int Tecnicos = 0,
+    int TecnicosSemFoto = 0)
 {
     /// <summary>Depois do primeiro pacote aberto as lendárias ficam travadas.</summary>
     public bool LendariasTravadas => PacotesAbertos > 0;
 }
 
-public record FigurinhaSemFotoDto(int PlayerId, int Numero, string Nome, Guid TeamId, string TimeNome, string? PosicaoSigla, int? Overall, RaridadeFigurinha Raridade);
+/// <summary>Figurinha sem foto: de jogador (com <c>PlayerId</c>) ou de técnico (com <c>TreinadorId</c>).</summary>
+public record FigurinhaSemFotoDto(int? PlayerId, int Numero, string Nome, Guid TeamId, string TimeNome, string? PosicaoSigla, int? Overall,
+    RaridadeFigurinha Raridade, Guid? TreinadorId = null);
 
 /// <summary>Pacotes de uma pessoa, para a tela de dar pacotes.</summary>
 public record PacotesDoTreinadorDto(Guid TreinadorId, string Nome, string? TimeAtual, bool Ativo, int ParaAbrir, int Abertos, int Coladas);

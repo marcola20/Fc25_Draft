@@ -61,7 +61,11 @@
                             }
                         </div>
                         <div class="legenda @(virada ? "visivel" : "")">
-                            @if (t.Nova)
+                            @if (EuId is { } eu && t.Figurinha.TreinadorId == eu)
+                            {
+                                <span class="voce-se-tirou">🤳 Você se tirou!</span>
+                            }
+                            else if (t.Nova)
                             {
                                 <span class="text-success fw-semibold">Colada no álbum</span>
                             }
@@ -121,6 +125,9 @@
     [Parameter, EditorRequired] public PacoteAbertoDto Pacote { get; set; } = null!;
     [Parameter, EditorRequired] public string AlbumNome { get; set; } = string.Empty;
     [Parameter] public string? SeloLendaria { get; set; }
+
+    /// <summary>Quem está abrindo: tirar a própria figurinha de técnico ganha destaque.</summary>
+    [Parameter] public Guid? EuId { get; set; }
 
     /// <summary>O próximo pacote está sendo aberto no servidor.</summary>
     [Parameter] public bool Abrindo { get; set; }
@@ -188,8 +195,10 @@
     {
         if (!_viradas.Add(i)) return;
         _virandoTodas = false;
-        if (Pacote.Figurinhas[i].Figurinha.Raridade == RaridadeFigurinha.Lendaria) _ = FestaAsync();
+        if (Pacote.Figurinhas[i].Figurinha.Raridade == RaridadeFigurinha.Lendaria || SouEu(i)) _ = FestaAsync();
     }
+
+    private bool SouEu(int i) => EuId is { } eu && Pacote.Figurinhas[i].Figurinha.TreinadorId == eu;
 
     private async Task TeclaAsync(KeyboardEventArgs e, int i)
     {
@@ -207,7 +216,8 @@
             .ToList();
         _virandoTodas = true;
         foreach (var i in _ordemDeVirar) _viradas.Add(i);
-        if (Pacote.Figurinhas.Any(f => f.Figurinha.Raridade == RaridadeFigurinha.Lendaria))
+        if (Pacote.Figurinhas.Any(f => f.Figurinha.Raridade == RaridadeFigurinha.Lendaria)
+            || Enumerable.Range(0, Pacote.Figurinhas.Count).Any(SouEu))
             _ = FestaAsync(_ordemDeVirar.Count * 220);
     }
 

@@ -3,10 +3,11 @@ using Microsoft.Net.Http.Headers;
 
 namespace Fc25Draft.Web.Extensions.Endpoints;
 
-/// <summary>Fotos dos jogadores: a imagem pública e a importação do PES pelo script (admin).</summary>
+/// <summary>Fotos dos jogadores (a imagem pública e a importação do PES pelo script) e dos treinadores.</summary>
 public static class FotosEndpoints
 {
     private static byte[]? _semFoto;
+    private static byte[]? _treinadorSemFoto;
 
     public static IEndpointRouteBuilder MapFotosEndpoints(this IEndpointRouteBuilder app)
     {
@@ -23,6 +24,25 @@ public static class FotosEndpoints
             {
                 _semFoto ??= await File.ReadAllBytesAsync(Path.Combine(env.WebRootPath, "images", "jogador-sem-foto.svg"), ct);
                 return Results.File(_semFoto, "image/svg+xml");
+            }
+
+            return Results.File(foto.Imagem, foto.ContentType,
+                lastModified: DateTime.SpecifyKind(foto.AtualizadaEm, DateTimeKind.Utc),
+                entityTag: new EntityTagHeaderValue($"\"{foto.AtualizadaEm.Ticks:x}\""));
+        }).AllowAnonymous();
+
+        // Foto do treinador (a do perfil, que a própria pessoa coloca), no mesmo esquema da do jogador.
+        app.MapGet("/fotos/treinadores/{treinadorId:guid}", async (
+            Guid treinadorId, HttpContext ctx, IPerfilTreinadorService perfis, IWebHostEnvironment env, CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = ctx.Request.Query.ContainsKey("v")
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=60";
+            var foto = await perfis.ObterFotoAsync(treinadorId, ct);
+            if (foto is null)
+            {
+                _treinadorSemFoto ??= await File.ReadAllBytesAsync(Path.Combine(env.WebRootPath, "images", "treinador-sem-foto.svg"), ct);
+                return Results.File(_treinadorSemFoto, "image/svg+xml");
             }
 
             return Results.File(foto.Imagem, foto.ContentType,

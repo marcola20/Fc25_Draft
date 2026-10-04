@@ -10,6 +10,7 @@
 @inject IPartidaChatService ChatSvc
 @inject IBolaoService BolaoSvc
 @inject ITreinadorService TreinadorSvc
+@inject IPerfilTreinadorService PerfilSvc
 @inject AdminAuthService AdminAuth
 @inject TelaoJogoAoVivoService AoVivo
 @inject EscudoService Escudos
@@ -123,12 +124,14 @@
                         @foreach (var m in _mensagens)
                         {
                             <div class="mensagem @(m.TreinadorId == _eu?.TreinadorId ? "minha" : "")">
+                                @{ var perfil = _perfis.GetValueOrDefault(m.TreinadorId); }
                                 <div class="cabeca">
+                                    <FotoTreinador TreinadorId="@m.TreinadorId" Tamanho="22" Versao="@perfil?.VersaoFoto" Alt="" />
                                     @if (!string.IsNullOrWhiteSpace(m.TimeNome))
                                     {
                                         <img src="@Escudos.GetEscudo(m.TimeNome)" alt="" title="@m.TimeNome" />
                                     }
-                                    <span class="autor">@m.Autor</span>
+                                    <span class="autor"><NomeTreinador Nome="@m.Autor" Apelido="@perfil?.Apelido" /></span>
                                     <span class="hora">@BrazilTime.FormatDateTime(m.EnviadaEm, "HH:mm")</span>
                                     @if (AdminAuth.IsAdmin)
                                     {
@@ -245,7 +248,10 @@
     {
         _jogo = await LigaService.GetTelaoJogoAsync(PartidaId, CancellationToken.None);
         if (_jogo is not null)
+        {
             _mensagens = (await ChatSvc.ListarAsync(PartidaId, MensagensNaTela, CancellationToken.None)).ToList();
+            await CarregarPerfisAsync(_mensagens.Select(m => m.TreinadorId));
+        }
         _assistindo = AoVivo.Assistindo(PartidaId);
         _carregando = false;
         _rolarChat = true;
@@ -297,14 +303,41 @@
     private void AoReceberMensagem(PartidaChatMensagemDto m)
     {
         if (m.PartidaId != PartidaId) return;
-        _ = InvokeAsync(() =>
+        _ = InvokeAsync(async () =>
         {
             if (_mensagens.Any(x => x.MensagemId == m.MensagemId)) return;
             _mensagens.Add(m);
             if (_mensagens.Count > MensagensNaTela) _mensagens.RemoveAt(0);
             _rolarChat = true;
             StateHasChanged();
+            // Quem falou pela primeira vez: busca a foto e o apelido e mostra de novo.
+            if (!_perfis.ContainsKey(m.TreinadorId))
+            {
+                await CarregarPerfisAsync(new[] { m.TreinadorId });
+                StateHasChanged();
+            }
         });
+    }
+
+    // Foto e apelido de quem fala no chat. Uma busca por vez (o serviço tem um contexto só).
+    private readonly Dictionary<Guid, PerfilTreinadorDto> _perfis = new();
+    private readonly SemaphoreSlim _buscandoPerfis = new(1, 1);
+
+    private async Task CarregarPerfisAsync(IEnumerable<Guid> ids)
+    {
+        var faltam = ids.Where(id => !_perfis.ContainsKey(id)).Distinct().ToList();
+        if (faltam.Count == 0) return;
+        await _buscandoPerfis.WaitAsync();
+        try
+        {
+            foreach (var (id, perfil) in await PerfilSvc.VariosAsync(faltam, CancellationToken.None))
+                _perfis[id] = perfil;
+        }
+        catch
+        {
+            // Sem perfil o chat continua, só com o nome.
+        }
+        finally { _buscandoPerfis.Release(); }
     }
 
     private void AoApagarMensagem(Guid partidaId, Guid mensagemId)

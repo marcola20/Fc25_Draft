@@ -41,6 +41,8 @@ public class FigurinhaConfiguration : IEntityTypeConfiguration<Figurinha>
 
         b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Jogador).WithMany().HasForeignKey(x => x.PlayerId).OnDelete(DeleteBehavior.Restrict);
+        // Pessoa excluída: a figurinha fica com o nome do lançamento, sem o perfil.
+        b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.SetNull);
     }
 }
 

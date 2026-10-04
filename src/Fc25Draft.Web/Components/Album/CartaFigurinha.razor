@@ -2,10 +2,11 @@
 @inject EscudoService Escudos
 
 @* A figurinha do álbum, em HTML/CSS: escala com a largura e não depende de imagem pronta. Vazia, vira a
-   vaga do álbum (número e nome em cinza, como no álbum de verdade). *@
+   vaga do álbum (número e nome em cinza, como no álbum de verdade). A de técnico tem visual próprio
+   (prancheta, campinho do esquema favorito e a frase) e mostra o perfil de agora. *@
 @if (Vazia)
 {
-    <div class="carta vaga @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : "")" style="--w: @(Largura)px"
+    <div class="carta vaga @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : Figurinha.Tipo == TipoFigurinha.Treinador ? "t-treinador" : "")" style="--w: @(Largura)px"
          title="@Titulo">
         <span class="vaga-num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
         <span class="vaga-nome">@Figurinha.NomeImpresso</span>
@@ -17,9 +18,13 @@
 }
 else
 {
-    <div class="carta r-@Figurinha.Raridade.ToString().ToLowerInvariant() @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : "t-jogador")"
+    <div class="carta @ClasseDaRaridade @ClasseDoTipo"
          style="--w: @(Largura)px" title="@Titulo">
         <div class="moldura">
+            @if (Figurinha.Tipo == TipoFigurinha.Treinador)
+            {
+                <span class="prendedor" aria-hidden="true"></span>
+            }
             @if (Figurinha.Raridade == RaridadeFigurinha.Lendaria && SeloLendaria is not null)
             {
                 <div class="selo">★ @SeloLendaria</div>
@@ -32,6 +37,16 @@ else
                         <span class="ovr-pos">@Figurinha.PosicaoSigla</span>
                     </div>
                 }
+                else if (Figurinha.Tipo == TipoFigurinha.Treinador)
+                {
+                    <div class="papel">
+                        <span class="papel-sigla">@Figurinha.PosicaoSigla</span>
+                        @if (Perfil?.Esquema is { } esquema)
+                        {
+                            <span class="papel-esquema">@esquema</span>
+                        }
+                    </div>
+                }
                 <span class="num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
             </div>
 
@@ -39,6 +54,19 @@ else
             {
                 <div class="escudo-grande">
                     <img src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="@Figurinha.TimeNome" loading="lazy" />
+                </div>
+            }
+            else if (Figurinha.Tipo == TipoFigurinha.Treinador)
+            {
+                <div class="foto">
+                    @if (Figurinha.TreinadorId is { } pessoa)
+                    {
+                        <FotoTreinador TreinadorId="@pessoa" Tamanho="@((int)(Largura * 0.78))" Versao="@Perfil?.VersaoFoto" Alt="@Figurinha.NomeImpresso" Lazy="@Lazy" />
+                    }
+                    @if (Perfil?.Esquema is not null)
+                    {
+                        <span class="campinho-canto"><CampinhoEsquema Esquema="@Perfil.Esquema" Largura="@((int)(Largura * 0.24))" /></span>
+                    }
                 </div>
             }
             else
@@ -49,12 +77,29 @@ else
             }
 
             <div class="faixa">
-                @if (Figurinha.Tipo == TipoFigurinha.Jogador)
+                @if (Figurinha.Tipo != TipoFigurinha.Escudo)
                 {
                     <img class="escudo-mini" src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="" loading="lazy" />
                 }
-                <span class="nome @ClasseDoNome">@Figurinha.NomeImpresso</span>
+                <span class="nome @ClasseDoNome">@NomeNaCarta</span>
             </div>
+            @if (Figurinha.Tipo == TipoFigurinha.Treinador)
+            {
+                <div class="rodape-tecnico">
+                    @if (NomeNaCarta != Figurinha.NomeImpresso)
+                    {
+                        <div class="nome-completo">@Figurinha.NomeImpresso · @Figurinha.PapelTexto</div>
+                    }
+                    else
+                    {
+                        <div class="nome-completo">@Figurinha.PapelTexto do @Figurinha.TimeNome</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Perfil?.Frase))
+                    {
+                        <div class="frase">“@Perfil.Frase”</div>
+                    }
+                </div>
+            }
             @if (Figurinha.Destaque is not null)
             {
                 <div class="destaque">@Figurinha.Destaque</div>
@@ -92,8 +137,27 @@ else
 
     [Parameter] public bool Lazy { get; set; } = true;
 
+    private PerfilTreinadorDto? Perfil => Figurinha.Perfil;
+
+    /// <summary>Na de técnico vai o apelido (se tiver); o nome completo fica embaixo.</summary>
+    private string NomeNaCarta => Figurinha.Tipo == TipoFigurinha.Treinador && !string.IsNullOrWhiteSpace(Perfil?.Apelido)
+        ? Perfil!.Apelido!
+        : Figurinha.NomeImpresso;
+
+    // A de técnico é sorteada como brilhante, mas tem a cara dela.
+    private string ClasseDaRaridade => Figurinha.Tipo == TipoFigurinha.Treinador
+        ? "r-tecnico"
+        : $"r-{Figurinha.Raridade.ToString().ToLowerInvariant()}";
+
+    private string ClasseDoTipo => Figurinha.Tipo switch
+    {
+        TipoFigurinha.Escudo => "t-escudo",
+        TipoFigurinha.Treinador => "t-treinador",
+        _ => "t-jogador"
+    };
+
     // Nome comprido diminui a letra em vez de cortar.
-    private string ClasseDoNome => Figurinha.NomeImpresso.Length switch
+    private string ClasseDoNome => NomeNaCarta.Length switch
     {
         > 13 => "nome-muito-longo",
         > 10 => "nome-longo",
@@ -102,5 +166,7 @@ else
 
     private string Titulo => Figurinha.Tipo == TipoFigurinha.Escudo
         ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · Escudo do {Figurinha.TimeNome}"
+        : Figurinha.Tipo == TipoFigurinha.Treinador
+        ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.PapelTexto} {Figurinha.NomeImpresso} · {Figurinha.TimeNome}"
         : $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.NomeImpresso} ({Figurinha.PosicaoSigla}, {Figurinha.Overall}) · {Figurinha.TimeNome}";
 }
