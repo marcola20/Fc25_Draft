@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <!--
+    Molde das fotos das figurinhas do Álbum CBFV (jogador e técnico): 600×600 px.
+    Use como camada de cima, com a foto embaixo; esconda o molde antes de exportar.
+    Exporte quadrado, 600×600, em WebP (até 300 KB), de preferência com o fundo recortado (transparente).
+  -->
+  <title>Molde da foto da figurinha CBFV (600×600)</title>
+
+  <!-- Áreas que a carta cobre: evite rosto e detalhes importantes nelas (medidas aproximadas). -->
+  <g fill="#e53935" fill-opacity="0.18" stroke="#e53935" stroke-opacity="0.7" stroke-width="2" stroke-dasharray="6 4">
+    <rect x="0" y="0" width="100" height="130" />
+    <rect x="525" y="0" width="75" height="70" />
+    <rect x="475" y="330" width="125" height="250" />
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e53935" font-weight="bold">
+    <text x="8" y="22">OVERALL</text>
+    <text x="8" y="38" font-weight="normal">e posição</text>
+    <text x="531" y="22">Nº DA</text>
+    <text x="531" y="38">CARTA</text>
+    <text x="482" y="352">CAMPINHO</text>
+    <text x="482" y="368" font-weight="normal">só na carta</text>
+    <text x="482" y="384" font-weight="normal">de técnico</text>
+  </g>
+
+  <!-- Borda e eixo do meio. -->
+  <g fill="none" stroke="#00acc1" stroke-width="2">
+    <rect x="1" y="1" width="598" height="598" stroke-opacity="0.8" />
+    <line x1="300" y1="0" x2="300" y2="600" stroke-dasharray="4 6" stroke-opacity="0.6" />
+  </g>
+
+  <!-- Linhas-guia do busto (rótulos nas laterais, fora da cabeça). -->
+  <g stroke="#00acc1" stroke-width="2" stroke-opacity="0.9">
+    <line x1="100" y1="60" x2="525" y2="60" />
+    <line x1="0" y1="200" x2="600" y2="200" stroke-dasharray="10 6" />
+    <line x1="0" y1="290" x2="600" y2="290" />
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#00838f" font-weight="bold">
+    <text x="518" y="54" text-anchor="end">topo da cabeça (~60 px)</text>
+    <text x="8" y="193">olhos</text>
+    <text x="8" y="219" font-weight="normal" font-size="12">~1/3 da altura</text>
+    <text x="8" y="283">queixo</text>
+    <text x="8" y="306" font-weight="normal" font-size="12">~metade</text>
+    <text x="8" y="572">corte embaixo: meio do peito</text>
+    <text x="8" y="590" font-weight="normal" font-size="12">ombros encostando nas laterais</text>
+  </g>
+
+  <!-- Silhueta de referência: cabeça, pescoço e ombros. -->
+  <g fill="none" stroke="#00acc1" stroke-width="3" stroke-opacity="0.75" stroke-dasharray="12 6">
+    <ellipse cx="300" cy="176" rx="92" ry="116" />
+    <path d="M 258 288 L 252 360 Q 120 372 40 420 Q 8 440 0 470" />
+    <path d="M 342 288 L 348 360 Q 480 372 560 420 Q 592 440 600 470" />
+  </g>
+</svg>

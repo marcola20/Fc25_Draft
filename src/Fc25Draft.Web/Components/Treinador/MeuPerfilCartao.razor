@@ -126,8 +126,8 @@
 
     private Task TrocarFotoAsync(ChangeEventArgs _) => ExecutarAsync(async () =>
     {
-        // Recorta e reduz no navegador antes de subir (320 px, bom para a figurinha).
-        var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", "fotoTreinadorArquivo", 320);
+        // Recorta e reduz no navegador antes de subir (até 600 px, a medida da figurinha).
+        var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", "fotoTreinadorArquivo", 600);
         if (lida is null) return "Nenhuma foto escolhida.";
         var salvo = await PerfilSvc.TrocarFotoAsync(_perfil!.TreinadorId, Convert.FromBase64String(lida.Base64), CancellationToken.None);
         _perfil = salvo;

@@ -29,7 +29,10 @@ builder.Services
 
 builder.Services.AddAuthorization(o => o.AddPolicy("AdminOnly", p => p.RequireRole("Admin")));
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor(o => o.DetailedErrors = builder.Environment.IsDevelopment());
+// A foto que sobe (jogador e perfil do treinador, até 300 KB) chega pela conexão do Blazor, que por padrão
+// recusa mensagem acima de 32 KB.
+builder.Services.AddServerSideBlazor(o => o.DetailedErrors = builder.Environment.IsDevelopment())
+    .AddHubOptions(o => o.MaximumReceiveMessageSize = 512 * 1024);
 builder.Services.AddBlazoredToast();
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 

@@ -277,8 +277,12 @@ public partial class AlbumService
             var figurinhas = await FigurinhasAsync(troca.AlbumId, ct);
             var porId = figurinhas.ToDictionary(f => f.FigurinhaId);
             var nomes = await PessoasAtivasAsync(new[] { de, para }, ct, incluirInativos: true);
+            var ativos = await PessoasAtivasAsync(new[] { de, para }, ct);
             var quantidades = posses.ToDictionary(p => p.Key, p => p.Value.Quantidade);
-            var motivo = PrimeiraQueNaoERepetida(troca.Itens.Where(i => i.Oferecida).Select(i => i.FigurinhaId).ToList(), de, quantidades, porId, nomes[de])
+            // Quem saiu da liga não troca mais (propor já recusa; a proposta feita antes de sair também cai).
+            var motivo = !ativos.ContainsKey(de) ? $"{nomes[de]} não está mais na liga."
+                : !ativos.ContainsKey(para) ? "Você não está mais na liga."
+                : PrimeiraQueNaoERepetida(troca.Itens.Where(i => i.Oferecida).Select(i => i.FigurinhaId).ToList(), de, quantidades, porId, nomes[de])
                          ?? PrimeiraQueNaoERepetida(troca.Itens.Where(i => !i.Oferecida).Select(i => i.FigurinhaId).ToList(), para, quantidades, porId, "Você");
             if (motivo is not null)
                 return await EncerrarAsync(troca, StatusTroca.NaoValeMais, motivo, agora, tx, ct);

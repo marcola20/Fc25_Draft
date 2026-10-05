@@ -339,13 +339,14 @@ window.cbfvPush = (function () {
     };
 })();
 
-// Foto do jogador escolhida pelo admin: recorta no centro, reduz para 160×160 e comprime (WebP, ou JPEG
-// onde o navegador não gera WebP) para caber na conexão do Blazor (~32 KB por mensagem).
-// Lê a foto escolhida, recorta o quadrado do meio e reduz no navegador (lado em px, 160 para jogador e
-// 320 para treinador), em WebP (ou JPEG), até caber na mensagem do Blazor (~28 KB em base64).
+// Foto do jogador (admin) ou do treinador (perfil): até 600×600, a mesma medida das figurinhas do álbum.
+// Arquivo já quadrado, de até 600 px e até 300 KB, sobe do jeito que veio (a foto editada não é recomprimida).
+// Fora isso, recorta o quadrado do meio, reduz e comprime: WebP; onde o navegador não gera WebP, PNG para
+// não perder o fundo transparente e, se ainda ficar grande, JPEG sobre fundo branco.
 window.cbfvFoto = {
     ler: async function (inputId, lado) {
-        lado = lado || 160;
+        lado = lado || 600;
+        const LIMITE = 300 * 1024; // o mesmo do servidor
         const input = document.getElementById(inputId);
         const arquivo = input && input.files && input.files[0];
         if (!arquivo) return null;
@@ -358,19 +359,46 @@ window.cbfvFoto = {
                 i.onerror = erro;
                 i.src = url;
             });
-            const menor = Math.min(img.naturalWidth, img.naturalHeight);
-            const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = lado;
-            canvas.getContext('2d').drawImage(img,
-                (img.naturalWidth - menor) / 2, (img.naturalHeight - menor) / 2, menor, menor, 0, 0, lado, lado);
 
+            const tiposAceitos = ['image/webp', 'image/png', 'image/jpeg'];
+            if (img.naturalWidth === img.naturalHeight && img.naturalWidth <= lado
+                && arquivo.size <= LIMITE && tiposAceitos.includes(arquivo.type)) {
+                const dados = await new Promise((ok, erro) => {
+                    const leitor = new FileReader();
+                    leitor.onload = () => ok(leitor.result);
+                    leitor.onerror = erro;
+                    leitor.readAsDataURL(arquivo);
+                });
+                return { base64: dados.substring(dados.indexOf(',') + 1), tipo: arquivo.type };
+            }
+
+            const menor = Math.min(img.naturalWidth, img.naturalHeight);
+            const tamanho = Math.min(lado, menor);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = tamanho;
+            const ctx = canvas.getContext('2d');
+            const desenhar = () => ctx.drawImage(img,
+                (img.naturalWidth - menor) / 2, (img.naturalHeight - menor) / 2, menor, menor, 0, 0, tamanho, tamanho);
+            desenhar();
+
+            const cabe = dados => dados.length - dados.indexOf(',') - 1 <= LIMITE * 4 / 3;
+            const resultado = dados => ({ base64: dados.substring(dados.indexOf(',') + 1), tipo: dados.substring(5, dados.indexOf(';')) });
+
+            for (const qualidade of [0.9, 0.8, 0.7, 0.55, 0.4]) {
+                const webp = canvas.toDataURL('image/webp', qualidade);
+                if (!webp.startsWith('data:image/webp')) break;
+                if (cabe(webp)) return resultado(webp);
+            }
+
+            const png = canvas.toDataURL('image/png');
+            if (png.startsWith('data:image/png') && cabe(png)) return resultado(png);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, tamanho, tamanho);
+            desenhar();
             for (const qualidade of [0.85, 0.7, 0.55, 0.4]) {
-                let dados = canvas.toDataURL('image/webp', qualidade);
-                if (!dados.startsWith('data:image/webp')) dados = canvas.toDataURL('image/jpeg', qualidade);
-                const base64 = dados.substring(dados.indexOf(',') + 1);
-                if (base64.length < 28000) {
-                    return { base64: base64, tipo: dados.substring(5, dados.indexOf(';')) };
-                }
+                const jpeg = canvas.toDataURL('image/jpeg', qualidade);
+                if (cabe(jpeg)) return resultado(jpeg);
             }
             throw new Error('Imagem grande demais mesmo comprimida.');
         } finally {

@@ -124,6 +124,11 @@ public partial class AlbumService : IAlbumService
         }
 
         _db.Albuns.Add(album);
+
+        // Pacote ainda fechado do álbum anterior vale para o novo: ninguém fica com pacote que não abre mais.
+        foreach (var fechado in await _db.PacotesGanhos.Where(p => p.AbertoEm == null && p.AlbumId != null).ToListAsync(ct))
+            fechado.AlbumId = album.AlbumId;
+
         await RegistrarAsync(AdminActionType.LancarAlbum, adminToken, new
         {
             album = album.Nome,
@@ -437,7 +442,7 @@ public partial class AlbumService : IAlbumService
                 p.Rodada.DataHora, p.EncerradaEm!.Value, p.Rodada.Liga.Temporada))
             .ToListAsync(ct);
 
-        var vitorias = await PacotesDeVitoriaAsync(album.AlbumId, jogos, ct);
+        var vitorias = await PacotesDeVitoriaAsync(album.AlbumId, album.LancadoEm, jogos, ct);
         var bolao = await PacotesDoBolaoAsync(album.AlbumId, album.Temporada, album.PontosBolaoPorPacote,
             jogos.Where(j => j.Temporada == album.Temporada).ToList(), ct);
         return new ReconciliacaoPacotesDto(vitorias, bolao);
@@ -452,14 +457,14 @@ public partial class AlbumService : IAlbumService
     /// 1 pacote por vitória para cada pessoa (treinador e auxiliar) com passagem no clube vencedor no dia
     /// do jogo. Empate sem pênaltis não dá pacote; W.O. conta como vitória de quem não fez W.O.
     /// </summary>
-    private async Task<int> PacotesDeVitoriaAsync(Guid albumId, List<JogoEncerrado> jogos, CancellationToken ct)
+    private async Task<int> PacotesDeVitoriaAsync(Guid albumId, DateTime lancadoEm, List<JogoEncerrado> jogos, CancellationToken ct)
     {
         var vencedores = jogos
             .Select(j => (Jogo: j, Vencedor: Vencedor(j)))
             .Where(x => x.Vencedor is not null)
             .Select(x => (x.Jogo, x.Vencedor!.Value.Time, x.Vencedor!.Value.Adversario, Dia: DiaDoJogo(x.Jogo)))
             .ToList();
-        if (vencedores.Count == 0) return 0;
+        var devidos = new HashSet<(Guid, string)>();
 
         var times = vencedores.Select(v => v.Time).Distinct().ToList();
         var passagens = await _db.TreinadorPassagens.AsNoTracking()
@@ -472,12 +477,15 @@ public partial class AlbumService : IAlbumService
         foreach (var v in vencedores)
         {
             var chave = AlbumFigurinhas.ChaveVitoria(v.Jogo.PartidaId);
+            // Mesma regra da carreira (TreinadorService): quem chega assume depois do jogo do dia e quem sai
+            // leva o jogo do dia da saída, então a vitória tem um dono só.
             var pessoas = passagens
-                .Where(p => p.TimeId == v.Time && p.Desde.Date <= v.Dia && (p.Ate == null || p.Ate.Value.Date >= v.Dia))
+                .Where(p => p.TimeId == v.Time && p.Desde.Date < v.Dia && (p.Ate == null || p.Ate.Value.Date >= v.Dia))
                 .Select(p => p.TreinadorId)
                 .Distinct();
             foreach (var pessoa in pessoas)
             {
+                devidos.Add((pessoa, chave));
                 if (!jaTem.Add((pessoa, chave))) continue;
                 _db.PacotesGanhos.Add(NovoPacote(pessoa, albumId, PacoteGanho.OrigemVitoria, chave,
                     AlbumFigurinhas.MotivoVitoria(v.Adversario)));
@@ -485,7 +493,18 @@ public partial class AlbumService : IAlbumService
             }
         }
 
-        return await GravarAsync(criados, ct);
+        // Placar corrigido (o vencedor mudou ou virou empate) ou jogo reaberto: o pacote ainda fechado de quem
+        // não ganhou mais sai. O que já foi aberto fica, porque as figurinhas já estão no álbum. Só os criados
+        // depois do lançamento: os que vieram fechados do álbum anterior não são deste cálculo.
+        var semDireito = (await _db.PacotesGanhos
+                .Where(p => p.AlbumId == albumId && p.Origem == PacoteGanho.OrigemVitoria && p.AbertoEm == null
+                            && p.CriadoEm >= lancadoEm)
+                .ToListAsync(ct))
+            .Where(p => !devidos.Contains((p.TreinadorId, p.Chave)))
+            .ToList();
+        _db.PacotesGanhos.RemoveRange(semDireito);
+
+        return await GravarAsync(criados + semDireito.Count, ct) == 0 ? 0 : criados;
     }
 
     private static (Guid Time, string Adversario)? Vencedor(JogoEncerrado j)
@@ -594,15 +613,14 @@ public partial class AlbumService : IAlbumService
             await _db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT 1 FROM \"Treinadores\" WHERE \"TreinadorId\" = {treinadorId} FOR UPDATE", ct);
 
+            // Só o álbum que vale: o pacote dado antes do lançamento (sem álbum) abre nele também.
+            var albumId = await _db.Albuns.Where(a => a.Ativo).Select(a => (Guid?)a.AlbumId).FirstOrDefaultAsync(ct)
+                ?? throw new InvalidOperationException("O álbum ainda não foi lançado. Guarde o pacote para quando sair.");
             var pacote = await _db.PacotesGanhos
-                .Where(p => p.TreinadorId == treinadorId && p.AbertoEm == null)
+                .Where(p => p.TreinadorId == treinadorId && p.AbertoEm == null && (p.AlbumId == albumId || p.AlbumId == null))
                 .OrderBy(p => p.CriadoEm).ThenBy(p => p.PacoteId)
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Você não tem pacote para abrir.");
-
-            var albumId = pacote.AlbumId
-                ?? await _db.Albuns.Where(a => a.Ativo).Select(a => (Guid?)a.AlbumId).FirstOrDefaultAsync(ct)
-                ?? throw new InvalidOperationException("O álbum ainda não foi lançado. Guarde o pacote para quando sair.");
 
             var figurinhas = await FigurinhasAsync(albumId, ct);
             if (figurinhas.Count == 0)
@@ -655,7 +673,8 @@ public partial class AlbumService : IAlbumService
             var conquistas = await GravarConquistasAsync(treinadorId, albumId, figurinhas,
                 tiradas.Where(t => t.Nova).Select(t => t.Figurinha.TeamId).ToHashSet(), agora, ct);
 
-            var restantes = await _db.PacotesGanhos.CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null, ct);
+            var restantes = await _db.PacotesGanhos.CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null
+                                                                     && (p.AlbumId == albumId || p.AlbumId == null), ct);
             await tx.CommitAsync(ct);
 
             if (conquistas.Count > 0) ConquistasGravadas?.Invoke();
