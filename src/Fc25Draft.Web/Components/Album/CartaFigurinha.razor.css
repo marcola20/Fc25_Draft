@@ -41,12 +41,16 @@
     box-shadow: 0 .15em .5em rgba(0, 0, 0, .18);
 }
 
+/* O topo (overall, posição, número) flutua por cima: a foto começa no alto da carta, atrás dele. */
 .topo {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     padding: .35em .45em 0;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 2;
 }
 
@@ -55,14 +59,13 @@
 .ovr-pos { font-size: .8em; font-weight: 700; color: var(--texto-suave); }
 .num { font-size: .85em; font-weight: 700; color: var(--texto-suave); margin-left: auto; }
 
-/* A foto ocupa a janela inteira, de borda a borda (foto com fundo próprio não vira um quadrinho no meio);
-   recortada, o fundo da carta aparece por trás. Em cima, um degradê escuro para o overall e o número
-   continuarem legíveis sobre qualquer foto. */
+/* A foto ocupa a janela inteira, do alto da carta até a faixa do nome, de borda a borda (foto com fundo
+   próprio não vira um quadrinho no meio); recortada, o fundo da carta aparece por trás. Em cima, um degradê
+   escuro para o overall, o número e o selo continuarem legíveis sobre qualquer foto. */
 .foto {
     flex: 1;
     min-height: 0;
     position: relative;
-    margin-top: -2.3em;
     background: var(--foto-fundo);
     overflow: hidden;
 }
@@ -103,7 +106,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: .4em 1em;
+    /* Em cima, o espaço do topo que flutua (o número da figurinha). */
+    padding: 1.6em 1em .4em;
     background: var(--foto-fundo);
 }
 
