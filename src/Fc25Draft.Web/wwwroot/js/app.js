@@ -339,14 +339,16 @@ window.cbfvPush = (function () {
     };
 })();
 
-// Foto do jogador (admin) ou do treinador (perfil): até 600×600, a mesma medida das figurinhas do álbum.
-// Arquivo já quadrado, de até 600 px e até 300 KB, sobe do jeito que veio (a foto editada não é recomprimida).
-// Fora isso, recorta o quadrado do meio, reduz e comprime: WebP; onde o navegador não gera WebP, PNG para
-// não perder o fundo transparente e, se ainda ficar grande, JPEG sobre fundo branco.
+// Foto do jogador (admin) ou do treinador (perfil): em pé, 4:5, até 600×750 — a medida da janela da figurinha.
+// Arquivo já em 4:5, de até 600 de largura e até 300 KB, sobe do jeito que veio (a foto editada não é
+// recomprimida). Fora isso, recorta para 4:5 (no meio na largura; na altura puxado para cima, onde fica o
+// rosto), reduz e comprime: WebP; onde o navegador não gera WebP, PNG para não perder o fundo transparente e,
+// se ainda ficar grande, JPEG sobre fundo branco.
 window.cbfvFoto = {
-    ler: async function (inputId, lado) {
-        lado = lado || 600;
+    ler: async function (inputId, largura) {
+        largura = largura || 600;
         const LIMITE = 300 * 1024; // o mesmo do servidor
+        const PROPORCAO = 4 / 5;   // largura ÷ altura
         const input = document.getElementById(inputId);
         const arquivo = input && input.files && input.files[0];
         if (!arquivo) return null;
@@ -359,9 +361,10 @@ window.cbfvFoto = {
                 i.onerror = erro;
                 i.src = url;
             });
+            const w = img.naturalWidth, h = img.naturalHeight;
 
             const tiposAceitos = ['image/webp', 'image/png', 'image/jpeg'];
-            if (img.naturalWidth === img.naturalHeight && img.naturalWidth <= lado
+            if (Math.abs(w / h - PROPORCAO) < 0.01 && w <= largura
                 && arquivo.size <= LIMITE && tiposAceitos.includes(arquivo.type)) {
                 const dados = await new Promise((ok, erro) => {
                     const leitor = new FileReader();
@@ -372,13 +375,20 @@ window.cbfvFoto = {
                 return { base64: dados.substring(dados.indexOf(',') + 1), tipo: arquivo.type };
             }
 
-            const menor = Math.min(img.naturalWidth, img.naturalHeight);
-            const tamanho = Math.min(lado, menor);
+            // Recorte 4:5: sobra na largura sai igual dos dois lados; sobra na altura sai mais de baixo.
+            let cw = w, ch = h;
+            if (w / h > PROPORCAO) cw = Math.round(h * PROPORCAO);
+            else ch = Math.round(w / PROPORCAO);
+            const sx = (w - cw) / 2;
+            const sy = (h - ch) * 0.25;
+
+            const saidaW = Math.min(largura, cw);
+            const saidaH = Math.round(saidaW / PROPORCAO);
             const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = tamanho;
+            canvas.width = saidaW;
+            canvas.height = saidaH;
             const ctx = canvas.getContext('2d');
-            const desenhar = () => ctx.drawImage(img,
-                (img.naturalWidth - menor) / 2, (img.naturalHeight - menor) / 2, menor, menor, 0, 0, tamanho, tamanho);
+            const desenhar = () => ctx.drawImage(img, sx, sy, cw, ch, 0, 0, saidaW, saidaH);
             desenhar();
 
             const cabe = dados => dados.length - dados.indexOf(',') - 1 <= LIMITE * 4 / 3;
@@ -394,7 +404,7 @@ window.cbfvFoto = {
             if (png.startsWith('data:image/png') && cabe(png)) return resultado(png);
 
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, tamanho, tamanho);
+            ctx.fillRect(0, 0, saidaW, saidaH);
             desenhar();
             for (const qualidade of [0.85, 0.7, 0.55, 0.4]) {
                 const jpeg = canvas.toDataURL('image/jpeg', qualidade);

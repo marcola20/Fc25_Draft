@@ -1,12 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 600 600">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1280" viewBox="0 0 600 750">
   <!--
-    Referência de enquadramento para gerar a foto da figurinha no Gemini (exportada em PNG ao lado).
-    Mesmas proporções do molde de 600×600: topo da cabeça a ~10%, olhos a ~1/3, queixo perto da metade,
-    corte no meio do peito e ombros encostando nas laterais. Sem texto de propósito: a IA não copia letras.
+    Referência de enquadramento para gerar a foto da figurinha no Gemini (exportada em PNG ao lado), em pé 4:5.
+    Mesmas proporções do molde de 600×750: cinza liso acima da cabeça (faixa do topo da carta), topo da cabeça a
+    ~20%, olhos a ~37%, queixo a ~54%, ombros encostando nas laterais e corte no meio do peito. Sem texto: a IA
+    não copia letras.
   -->
-  <rect width="600" height="600" fill="#e6e6e6" />
+  <rect width="600" height="750" fill="#e6e6e6" />
   <g fill="#8c8c8c">
-    <ellipse cx="300" cy="176" rx="92" ry="116" />
-    <path d="M 258 270 L 252 360 Q 120 372 40 420 Q 8 440 0 470 L 0 600 L 600 600 L 600 470 Q 592 440 560 420 Q 480 372 348 360 L 342 270 Z" />
+    <ellipse cx="300" cy="278" rx="92" ry="126" />
+    <path d="M 258 380 L 252 470 Q 120 482 40 530 Q 8 550 0 580 L 0 750 L 600 750 L 600 580 Q 592 550 560 530 Q 480 482 348 470 L 342 380 Z" />
   </g>
 </svg>

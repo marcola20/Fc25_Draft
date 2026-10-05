@@ -1,53 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750">
   <!--
-    Molde das fotos das figurinhas do Álbum CBFV (jogador e técnico): 600×600 px.
+    Molde das fotos das figurinhas do Álbum CBFV (jogador e técnico): 600×750 px, em pé (4:5).
     Use como camada de cima, com a foto embaixo; esconda o molde antes de exportar.
-    Exporte quadrado, 600×600, em WebP (até 300 KB), de preferência com o fundo recortado (transparente).
+    Exporte 600×750 em WebP (até 300 KB). Fundo cinza-claro liso ou recortado (transparente).
   -->
-  <title>Molde da foto da figurinha CBFV (600×600)</title>
+  <title>Molde da foto da figurinha CBFV (600×750)</title>
 
-  <!-- Áreas que a carta cobre: evite rosto e detalhes importantes nelas (medidas aproximadas). -->
-  <g fill="#e53935" fill-opacity="0.18" stroke="#e53935" stroke-opacity="0.7" stroke-width="2" stroke-dasharray="6 4">
-    <rect x="0" y="0" width="100" height="130" />
-    <rect x="525" y="0" width="75" height="70" />
-    <rect x="475" y="330" width="125" height="250" />
-  </g>
-  <g font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e53935" font-weight="bold">
-    <text x="8" y="22">OVERALL</text>
-    <text x="8" y="38" font-weight="normal">e posição</text>
-    <text x="531" y="22">Nº DA</text>
-    <text x="531" y="38">CARTA</text>
-    <text x="482" y="352">CAMPINHO</text>
-    <text x="482" y="368" font-weight="normal">só na carta</text>
-    <text x="482" y="384" font-weight="normal">de técnico</text>
+  <!-- Faixa do topo: na carta, o overall, a posição, o número e o selo das lendárias ficam por cima dela. -->
+  <rect x="0" y="0" width="600" height="135" fill="#e53935" fill-opacity="0.12" stroke="#e53935" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="6 4" />
+  <!-- Pode sumir na lendária com texto (a janela dela é mais baixa). -->
+  <rect x="0" y="565" width="600" height="185" fill="#fb8c00" fill-opacity="0.10" stroke="#fb8c00" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="6 4" />
+  <!-- Campinho do esquema, só na carta de técnico. -->
+  <rect x="470" y="420" width="130" height="250" fill="#e53935" fill-opacity="0.12" stroke="#e53935" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="6 4" />
+  <g font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold">
+    <text x="8" y="22" fill="#e53935">FAIXA DO TOPO: overall, posição, nº e selo ficam por cima</text>
+    <text x="8" y="38" fill="#e53935" font-weight="normal">deixe só cinza (ou o alto do cabelo) aqui</text>
+    <text x="8" y="742" fill="#ef6c00" font-weight="normal">pode ser cortada na lendária com texto: nada importante aqui</text>
+    <text x="478" y="440" fill="#e53935">CAMPINHO</text>
+    <text x="478" y="456" fill="#e53935" font-weight="normal">só técnico</text>
   </g>
 
   <!-- Borda e eixo do meio. -->
   <g fill="none" stroke="#00acc1" stroke-width="2">
-    <rect x="1" y="1" width="598" height="598" stroke-opacity="0.8" />
-    <line x1="300" y1="0" x2="300" y2="600" stroke-dasharray="4 6" stroke-opacity="0.6" />
+    <rect x="1" y="1" width="598" height="748" stroke-opacity="0.8" />
+    <line x1="300" y1="0" x2="300" y2="750" stroke-dasharray="4 6" stroke-opacity="0.6" />
   </g>
 
-  <!-- Linhas-guia do busto (rótulos nas laterais, fora da cabeça). -->
+  <!-- Linhas-guia do busto. -->
   <g stroke="#00acc1" stroke-width="2" stroke-opacity="0.9">
-    <line x1="100" y1="60" x2="525" y2="60" />
-    <line x1="0" y1="200" x2="600" y2="200" stroke-dasharray="10 6" />
-    <line x1="0" y1="290" x2="600" y2="290" />
+    <line x1="0" y1="150" x2="600" y2="150" />
+    <line x1="0" y1="275" x2="600" y2="275" stroke-dasharray="10 6" />
+    <line x1="0" y1="405" x2="600" y2="405" />
   </g>
   <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#00838f" font-weight="bold">
-    <text x="518" y="54" text-anchor="end">topo da cabeça (~60 px)</text>
-    <text x="8" y="193">olhos</text>
-    <text x="8" y="219" font-weight="normal" font-size="12">~1/3 da altura</text>
-    <text x="8" y="283">queixo</text>
-    <text x="8" y="306" font-weight="normal" font-size="12">~metade</text>
-    <text x="8" y="572">corte embaixo: meio do peito</text>
-    <text x="8" y="590" font-weight="normal" font-size="12">ombros encostando nas laterais</text>
+    <text x="8" y="168">topo da cabeça</text>
+    <text x="8" y="184" font-weight="normal" font-size="12">~20% (150 px)</text>
+    <text x="8" y="268">olhos</text>
+    <text x="8" y="294" font-weight="normal" font-size="12">~37%</text>
+    <text x="8" y="398">queixo</text>
+    <text x="8" y="422" font-weight="normal" font-size="12">~54%</text>
   </g>
 
-  <!-- Silhueta de referência: cabeça, pescoço e ombros. -->
+  <!-- Silhueta de referência: cabeça, pescoço e ombros (encostando nas laterais). -->
   <g fill="none" stroke="#00acc1" stroke-width="3" stroke-opacity="0.75" stroke-dasharray="12 6">
-    <ellipse cx="300" cy="176" rx="92" ry="116" />
-    <path d="M 258 288 L 252 360 Q 120 372 40 420 Q 8 440 0 470" />
-    <path d="M 342 288 L 348 360 Q 480 372 560 420 Q 592 440 600 470" />
+    <ellipse cx="300" cy="278" rx="92" ry="126" />
+    <path d="M 258 395 L 252 470 Q 120 482 40 530 Q 8 550 0 580" />
+    <path d="M 342 395 L 348 470 Q 480 482 560 530 Q 592 550 600 580" />
   </g>
 </svg>

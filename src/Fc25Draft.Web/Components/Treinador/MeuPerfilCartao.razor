@@ -27,7 +27,7 @@
                             <button type="button" class="btn btn-link btn-sm p-0 text-danger" disabled="@_ocupado" @onclick="RemoverFotoAsync">Tirar</button>
                         }
                     </div>
-                    <div class="small text-muted text-center">A foto é cortada em quadrado.</div>
+                    <div class="small text-muted text-center">A foto fica em pé (4:5), com espaço acima da cabeça.</div>
                 </div>
 
                 <div class="perfil-campos">
@@ -126,7 +126,7 @@
 
     private Task TrocarFotoAsync(ChangeEventArgs _) => ExecutarAsync(async () =>
     {
-        // Recorta e reduz no navegador antes de subir (até 600 px, a medida da figurinha).
+        // Recorta (4:5, em pé) e reduz no navegador antes de subir (até 600×750, a medida da figurinha).
         var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", "fotoTreinadorArquivo", 600);
         if (lida is null) return "Nenhuma foto escolhida.";
         var salvo = await PerfilSvc.TrocarFotoAsync(_perfil!.TreinadorId, Convert.FromBase64String(lida.Base64), CancellationToken.None);

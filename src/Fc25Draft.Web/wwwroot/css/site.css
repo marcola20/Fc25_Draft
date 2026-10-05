@@ -369,10 +369,12 @@ a, .btn-link {
     --cbfv-rosa: #f783ac;
 }
 
-/* Foto do jogador: redonda, recortada no centro; a silhueta aparece quando não tem foto. */
+/* Foto do jogador: redonda; a silhueta aparece quando não tem foto. A foto é em pé (4:5, com espaço acima da
+   cabeça, para a figurinha): o recorte puxado um pouco para cima deixa o rosto no meio da bolinha. */
 .foto-jogador {
     border-radius: 50%;
     object-fit: cover;
+    object-position: center 15%;
     background-color: var(--bs-tertiary-bg);
     flex-shrink: 0;
     vertical-align: middle;
@@ -382,6 +384,7 @@ a, .btn-link {
 .foto-treinador {
     border-radius: 50%;
     object-fit: cover;
+    object-position: center 15%;
     background-color: var(--bs-tertiary-bg);
     box-shadow: 0 0 0 2px rgba(25, 135, 84, .55);
     flex-shrink: 0;

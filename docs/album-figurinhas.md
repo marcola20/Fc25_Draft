@@ -304,15 +304,19 @@ abrir pacotes até sair uma figurinha de técnico mostra a foto atual do perfil;
 ## Fotos das figurinhas
 
 Medida e enquadramento das fotos (jogador e técnico), para o álbum ficar padronizado:
-- **600×600 px, quadrada, WebP (até 300 KB)**, de preferência com o fundo recortado (transparente): o fundo
-  da carta aparece por trás. Arquivo já quadrado, de até 600 px e até 300 KB, sobe intacto; maior que isso,
-  o navegador recorta o quadrado do meio, reduz para 600 px e comprime mantendo a transparência
-  (`cbfvFoto.ler` em `app.js`; a conexão do Blazor aceita mensagens de até 512 KB por causa disso).
-- **Busto**: topo da cabeça a ~10% (60 px), olhos a ~1/3 da altura, queixo perto da metade, corte no meio
-  do peito, ombros encostando nas laterais, rosto centralizado. Mesmo zoom em todas.
-- A carta cobre o canto de cima à esquerda (overall), o de cima à direita (número) e, na carta de técnico,
-  o canto de baixo à direita (campinho).
-- Moldes: `docs/molde-foto-figurinha-600.svg` (linhas-guia para editar no Photoshop/Photopea) e
+- **600×750 px, em pé (4:5), WebP (até 300 KB)**, com fundo cinza-claro liso ou recortado (transparente).
+  A foto ocupa a janela inteira da carta, de borda a borda. Arquivo já em 4:5, de até 600 de largura e até
+  300 KB, sobe intacto; fora disso o navegador recorta para 4:5 (na altura, puxado para cima), reduz e
+  comprime mantendo a transparência (`cbfvFoto.ler` em `app.js`; a conexão do Blazor aceita mensagens de até
+  512 KB por causa disso). Foto quadrada antiga continua funcionando.
+- **Busto com cinza em cima**: os ~18% de cima ficam só com cinza (ou o alto do cabelo), porque o overall, a
+  posição, o número e o selo das lendárias ficam por cima dessa faixa. Topo da cabeça a ~20% (150 px), olhos
+  a ~37%, queixo a ~54%, ombros encostando nas laterais, corte no meio do peito. Mesmo zoom em todas.
+- Na lendária com texto a janela é mais baixa e o pé da foto (~25% de baixo) some; na de técnico, o campinho
+  cobre o canto de baixo à direita.
+- Nos avatares redondos (listas, ficha do jogador) a foto é recortada com o rosto no meio (`object-position`
+  a 15% da altura).
+- Moldes: `docs/molde-foto-figurinha-600.svg` (600×750, linhas-guia para editar no Photoshop/Photopea) e
   `docs/molde-gemini-figurinha.png` (só a silhueta, como referência de enquadramento para gerar no Gemini).
 - A figurinha lê a foto na hora: foto colocada depois aparece em quem já colou (jogador em até 1 minuto,
   pelo cache do navegador; técnico na hora).
