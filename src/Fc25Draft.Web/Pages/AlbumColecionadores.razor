@@ -111,8 +111,14 @@
 
     private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
 
+    // Uma ida ao banco por vez nesta tela. Na primeira carga o login termina de inicializar no meio do
+    // caminho e avisa (AuthenticationChanged), o que pede outra carga; sem a fila, as duas usariam o mesmo
+    // DbContext ao mesmo tempo ("A second operation was started on this context instance...").
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
     private async Task CarregarAsync()
     {
+        await _umaPorVez.WaitAsync();
         try
         {
             _dados = await AlbumSvc.ColecionadoresAsync(CancellationToken.None);
@@ -122,6 +128,10 @@
             _eu = string.IsNullOrWhiteSpace(token) ? null : (await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None))?.TreinadorId;
         }
         catch (Exception ex) { _erro = ex.Message; }
-        finally { _carregando = false; }
+        finally
+        {
+            _carregando = false;
+            _umaPorVez.Release();
+        }
     }
 }

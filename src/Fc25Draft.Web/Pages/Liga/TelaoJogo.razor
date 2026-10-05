@@ -413,10 +413,21 @@
         AoVivo.Apagar(PartidaId, m.MensagemId);
     }
 
+    // Dois toques rápidos na aba esperam a mesma busca: duas buscas ao mesmo tempo no mesmo DbContext
+    // derrubam a tela ("A second operation was started on this context instance...").
+    private Task<IReadOnlyList<BolaoPalpiteDeAlguemDto>>? _buscandoPalpites;
+
     private async Task AbrirPalpites()
     {
         _aba = Aba.Palpites;
-        _palpites ??= await BolaoSvc.PalpitesDoJogoAsync(PartidaId, CancellationToken.None);
+        if (_palpites is not null) return;
+        _buscandoPalpites ??= BolaoSvc.PalpitesDoJogoAsync(PartidaId, CancellationToken.None);
+        try { _palpites = await _buscandoPalpites; }
+        catch
+        {
+            _buscandoPalpites = null; // deixa tentar de novo no próximo toque
+            throw;
+        }
     }
 
     private async Task TelaCheiaAsync()
