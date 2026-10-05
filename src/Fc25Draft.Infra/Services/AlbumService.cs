@@ -172,8 +172,10 @@ public partial class AlbumService : IAlbumService
 
         var notas = await NotasDaTemporadaAsync(album.Temporada - 1, jogadores.Select(f => f.PlayerId!.Value).ToList(), ct);
         var brilhantes = BrilhantesPorClube(jogadores.Select(f => (f.TeamId, f.PlayerId!.Value, f.Overall ?? 0, f.NomeImpresso)));
+        var donos = await DonosPorJogadorAsync(albumId, ct);
         var candidatos = jogadores
-            .Select(f => Candidato(f.PlayerId!.Value, f.NomeImpresso, f.TeamId, f.TimeNome, f.PosicaoSigla ?? "?", f.Overall ?? 0, notas, brilhantes))
+            .Select(f => Candidato(f.PlayerId!.Value, f.NomeImpresso, f.TeamId, f.TimeNome, f.PosicaoSigla ?? "?", f.Overall ?? 0, notas, brilhantes)
+                with { Donos = donos.GetValueOrDefault(f.PlayerId!.Value) })
             .OrderBy(c => c.Nome, StringComparer.CurrentCulture)
             .ToList();
 
@@ -197,13 +199,24 @@ public partial class AlbumService : IAlbumService
     {
         var album = await _db.Albuns.FirstOrDefaultAsync(a => a.AlbumId == albumId, ct)
             ?? throw new InvalidOperationException("Álbum não encontrado.");
-        if (await _db.PacotesGanhos.AnyAsync(p => p.AlbumId == albumId && p.AbertoEm != null, ct))
-            throw new InvalidOperationException("Já abriram pacote deste álbum: as lendárias estão travadas.");
 
         var figurinhas = await _db.Figurinhas
             .Where(f => f.AlbumId == albumId && f.Tipo == TipoFigurinha.Jogador)
             .ToListAsync(ct);
         var escolhidas = ValidarLendarias(lendarias, figurinhas.Select(f => f.PlayerId!.Value).ToHashSet());
+
+        // Lendária que já saiu para alguém fica: quem tirou não perde a raridade. As outras trocam à vontade,
+        // e quem já tinha o jogador que entra (comum ou brilhante) passa a ter a lendária.
+        var donos = await DonosPorJogadorAsync(albumId, ct);
+        var presas = figurinhas
+            .Where(f => f.Raridade == RaridadeFigurinha.Lendaria && !escolhidas.ContainsKey(f.PlayerId!.Value)
+                        && donos.GetValueOrDefault(f.PlayerId!.Value) > 0)
+            .Select(f => f.NomeImpresso)
+            .ToList();
+        if (presas.Count > 0)
+            throw new InvalidOperationException(presas.Count == 1
+                ? $"{presas[0]} já saiu em pacote e não pode deixar de ser lendária."
+                : $"{string.Join(", ", presas)} já saíram em pacote e não podem deixar de ser lendárias.");
 
         // A raridade de quem deixa de ser lendária volta a ser a de antes: brilhante se estiver entre os
         // maiores overalls do clube no álbum.
@@ -986,6 +999,14 @@ public partial class AlbumService : IAlbumService
             .OrderBy(c => c.Nome, StringComparer.CurrentCulture)
             .ToList();
     }
+
+    /// <summary>Quantas pessoas já têm a figurinha de cada jogador do álbum.</summary>
+    private async Task<Dictionary<int, int>> DonosPorJogadorAsync(Guid albumId, CancellationToken ct) =>
+        await _db.FigurinhasDosTreinadores.AsNoTracking()
+            .Where(f => f.Figurinha.AlbumId == albumId && f.Figurinha.PlayerId != null)
+            .GroupBy(f => f.Figurinha.PlayerId!.Value)
+            .Select(g => new { PlayerId = g.Key, Donos = g.Count() })
+            .ToDictionaryAsync(x => x.PlayerId, x => x.Donos, ct);
 
     private static CandidatoLendariaDto Candidato(
         int playerId, string nome, Guid teamId, string timeNome, string posicao, int overall,

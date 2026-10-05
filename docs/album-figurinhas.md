@@ -49,7 +49,9 @@ estão no álbum (estão num elenco da liga no lançamento). A lista já vem **p
 sugestões** — maiores médias de nota do PES da temporada anterior (`LigaNotasJogadores`, com mínimo
 de jogos) — e o admin troca quem quiser. A figurinha lendária ganha um texto curto opcional que o
 admin escreve ("Artilheiro de 2009", "Campeão invicto com o Santos"), impresso no verso/rodapé.
-Dá para ajustar as lendárias até o primeiro pacote ser aberto; depois disso ficam travadas.
+Dá para trocar uma lendária a qualquer hora enquanto ninguém a tiver tirado; a que já saiu em pacote fica
+(quem tirou não perde a raridade). Se o jogador que entra já saiu para alguém como comum ou brilhante, a tela
+avisa e ele vira lendária para quem tem.
 
 ### Pacotinho
 

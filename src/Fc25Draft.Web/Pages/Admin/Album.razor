@@ -107,16 +107,10 @@
             <div class="card mb-3">
                 <div class="card-header fw-bold">★ Lendárias — Melhores de @(ad.Album.Temporada - 1)</div>
                 <div class="card-body">
-                    @if (ad.LendariasTravadas)
-                    {
-                        <div class="alert alert-secondary small py-2">Já abriram pacote deste álbum: as lendárias estão travadas.</div>
-                    }
-                    <LendariasEditor Candidatos="@ad.Candidatos" Escolhidas="@_escolhidas" Temporada="@ad.Album.Temporada" Travado="@ad.LendariasTravadas" />
-                    @if (!ad.LendariasTravadas)
-                    {
-                        <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="SalvarLendariasAsync">💾 Salvar lendárias</button>
-                        <span class="small text-muted ms-2">Dá para trocar até o primeiro pacote ser aberto.</span>
-                    }
+                    <LendariasEditor Candidatos="@ad.Candidatos" Escolhidas="@_escolhidas" Temporada="@ad.Album.Temporada"
+                                     Fixas="@ad.LendariasFixas" OnChange="StateHasChanged" />
+                    <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="SalvarLendariasAsync">💾 Salvar lendárias</button>
+                    <div class="small text-muted mt-1">A lendária que já saiu em pacote (🔒) fica; as outras dá para trocar a qualquer hora.</div>
                     @if (ad.Lendarias.Count > 0)
                     {
                         <div class="grade-cartas mt-3">

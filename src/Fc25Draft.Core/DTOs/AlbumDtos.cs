@@ -219,7 +219,9 @@ public record CandidatoLendariaDto(
     int Overall,
     decimal? MediaNota,
     int Jogos,
-    RaridadeFigurinha RaridadeBase);
+    RaridadeFigurinha RaridadeBase,
+    /// <summary>Quantas pessoas já têm a figurinha dele (álbum lançado; na prévia é sempre 0).</summary>
+    int Donos = 0);
 
 public record AlbumPreviaClubeDto(Guid TeamId, string Nome, string? Divisao, int Jogadores, int SemFoto, int Tecnicos = 0, int TecnicosSemFoto = 0);
 
@@ -257,8 +259,11 @@ public record AlbumAdminDto(
     int Tecnicos = 0,
     int TecnicosSemFoto = 0)
 {
-    /// <summary>Depois do primeiro pacote aberto as lendárias ficam travadas.</summary>
-    public bool LendariasTravadas => PacotesAbertos > 0;
+    /// <summary>Lendárias que já saíram para alguém: não podem mais deixar de ser lendárias.</summary>
+    public IReadOnlySet<int> LendariasFixas => Lendarias
+        .Where(f => f.PlayerId is not null && Candidatos.Any(c => c.PlayerId == f.PlayerId && c.Donos > 0))
+        .Select(f => f.PlayerId!.Value)
+        .ToHashSet();
 }
 
 /// <summary>Figurinha sem foto: de jogador (com <c>PlayerId</c>) ou de técnico (com <c>TreinadorId</c>).</summary>

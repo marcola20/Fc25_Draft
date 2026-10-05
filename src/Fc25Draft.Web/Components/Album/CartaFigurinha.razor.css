@@ -55,28 +55,46 @@
 .ovr-pos { font-size: .8em; font-weight: 700; color: var(--texto-suave); }
 .num { font-size: .85em; font-weight: 700; color: var(--texto-suave); margin-left: auto; }
 
+/* A foto ocupa a janela inteira, de borda a borda (foto com fundo próprio não vira um quadrinho no meio);
+   recortada, o fundo da carta aparece por trás. Em cima, um degradê escuro para o overall e o número
+   continuarem legíveis sobre qualquer foto. */
 .foto {
     flex: 1;
     min-height: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    margin-top: -1.9em;
+    position: relative;
+    margin-top: -2.3em;
     background: var(--foto-fundo);
     overflow: hidden;
 }
 
 .foto ::deep .foto-jogador,
 .foto ::deep .foto-treinador {
+    position: absolute;
+    inset: 0;
     border-radius: 0;
     background: transparent;
     object-fit: cover;
-    object-position: top center;
-    max-height: 100%;
+    object-position: center top;
     box-shadow: none;
-    width: 78% !important;
-    height: auto !important;
-    aspect-ratio: 1;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.foto::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, 0) 28%, rgba(0, 0, 0, 0) 82%, rgba(0, 0, 0, .3) 100%);
+    pointer-events: none;
+}
+
+/* Sobre a foto, o topo fica claro com sombra (jogador e técnico); no escudo continua com a cor da raridade. */
+.t-jogador .topo,
+.t-treinador .topo {
+    --texto: #fff;
+    --texto-suave: rgba(255, 255, 255, .85);
+    color: #fff;
+    text-shadow: 0 .05em .2em rgba(0, 0, 0, .7);
 }
 
 .escudo-grande {
