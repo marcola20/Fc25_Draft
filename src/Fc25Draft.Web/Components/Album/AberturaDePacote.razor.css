@@ -139,7 +139,7 @@
     --w-real: min(var(--w), var(--w-max, 1000px));
     position: relative;
     width: var(--w-real);
-    aspect-ratio: 5 / 7;
+    aspect-ratio: 5 / 7.7; /* a mesma da CartaFigurinha */
     perspective: 60em;
     cursor: pointer;
     border-radius: .7rem;
