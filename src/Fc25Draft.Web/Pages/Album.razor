@@ -311,8 +311,14 @@
 
     private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
 
+    // Uma ida ao banco por vez nesta tela. Na primeira carga o login termina de inicializar no meio do
+    // caminho e avisa (AuthenticationChanged), o que pede outra carga; sem a fila, as duas usariam o mesmo
+    // DbContext ao mesmo tempo ("A second operation was started on this context instance...").
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
     private async Task CarregarAsync()
     {
+        await _umaPorVez.WaitAsync();
         _carregando = true;
         try
         {
@@ -323,7 +329,11 @@
             _raras = _album is null ? Array.Empty<RaraTiradaDto>() : await AlbumSvc.UltimasRarasAsync(RarasNaCapa, CancellationToken.None);
         }
         catch (Exception ex) { _erro = ex.Message; }
-        finally { _carregando = false; }
+        finally
+        {
+            _carregando = false;
+            _umaPorVez.Release();
+        }
 
         await AbrirPaginaAsync();
     }
@@ -336,8 +346,10 @@
 
         var novas = _pagina.Vagas.Where(v => v.Nova).Select(v => v.Figurinha.FigurinhaId).ToList();
         if (novas.Count == 0) return;
+        await _umaPorVez.WaitAsync();
         try { await AlbumSvc.MarcarVistasAsync(_eu.TreinadorId, novas, CancellationToken.None); }
         catch (Exception ex) { _erro = ex.Message; }
+        finally { _umaPorVez.Release(); }
     }
 
     private async Task PegarDoDiaAsync()
@@ -345,6 +357,7 @@
         if (_eu is null) return;
         _pegandoDoDia = true;
         _erro = null;
+        await _umaPorVez.WaitAsync();
         try
         {
             var ganhou = await AlbumSvc.PegarPacoteDoDiaAsync(_eu.TreinadorId, CancellationToken.None);
@@ -353,7 +366,11 @@
             _ok = ganhou ? "Pacote do dia na mão. É só abrir!" : "Você já pegou o pacote de hoje. Amanhã tem outro.";
         }
         catch (Exception ex) { _erro = ex.Message; }
-        finally { _pegandoDoDia = false; }
+        finally
+        {
+            _pegandoDoDia = false;
+            _umaPorVez.Release();
+        }
     }
 
     private static string IconeDaOrigem(string origem) => origem switch
@@ -371,6 +388,7 @@
         _abrindo = true;
         _erro = null;
         _ok = null;
+        await _umaPorVez.WaitAsync();
         try
         {
             _aberto = await AlbumSvc.AbrirPacoteAsync(_eu.TreinadorId, CancellationToken.None);
@@ -379,7 +397,11 @@
             _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
         }
         catch (Exception ex) { _erro = ex.Message; }
-        finally { _abrindo = false; }
+        finally
+        {
+            _abrindo = false;
+            _umaPorVez.Release();
+        }
     }
 
     private IEnumerable<VagaDoAlbumDto> Filtrar(IEnumerable<VagaDoAlbumDto> vagas) =>

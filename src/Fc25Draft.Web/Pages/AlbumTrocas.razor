@@ -433,8 +433,14 @@
 
     private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
 
+    // Uma ida ao banco por vez nesta tela. Na primeira carga o login termina de inicializar no meio do
+    // caminho e avisa (AuthenticationChanged), o que pede outra carga; sem a fila, as duas usariam o mesmo
+    // DbContext ao mesmo tempo ("A second operation was started on this context instance...").
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
     private async Task CarregarAsync()
     {
+        await _umaPorVez.WaitAsync();
         _carregando = true;
         try
         {
@@ -445,7 +451,11 @@
             await CarregarPerfisAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
-        finally { _carregando = false; }
+        finally
+        {
+            _carregando = false;
+            _umaPorVez.Release();
+        }
     }
 
     private async Task RecarregarAsync()
@@ -494,12 +504,14 @@
         _ocupado = true;
         _erro = null;
         LimparOk();
+        await _umaPorVez.WaitAsync();
         try { await acao(); }
         catch (Exception ex) { _erro = ex.Message; }
         finally
         {
             _ocupado = false;
             try { await RecarregarAsync(); } catch (Exception ex) { _erro ??= ex.Message; }
+            _umaPorVez.Release();
         }
     }
 
@@ -557,8 +569,10 @@
         _contraDe = null;
         _dar.Clear();
         _pedir.Clear();
+        await _umaPorVez.WaitAsync();
         try { _montar = await AlbumSvc.MontarTrocaAsync(_eu!.TreinadorId, outroId, CancellationToken.None); }
         catch (Exception ex) { _erro = ex.Message; }
+        finally { _umaPorVez.Release(); }
     }
 
     private async Task EscolherPessoaAsync(ChangeEventArgs e)
