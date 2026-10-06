@@ -40,8 +40,8 @@ public static class DiretoriaCriterios
     public const double K = 12;
 
     public const double LimitePrestigiado = 80;
-    public const double LimiteEstavel = 60;
-    public const double LimiteSobObservacao = 40;
+    public const double LimiteEstavel = 50;
+    public const double LimiteSobObservacao = 35;
     public const double LimitePressionado = 20;
 }
 

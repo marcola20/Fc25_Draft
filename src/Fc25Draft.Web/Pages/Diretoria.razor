@@ -105,7 +105,13 @@
                         <ul class="mb-0 ps-3">
                             <li>Todo time começa a temporada com @DiretoriaCriterios.ConfiancaInicial.ToString("0").</li>
                             <li>A cada jogo: @DiretoriaCriterios.K.ToString("0") × (resultado − chance de vencer pelo rating Elo). Ganhar de time forte rende mais; goleada pesa mais.</li>
-                            <li>Faixas: 80+ prestigiado, 60 estável, 40 sob observação, 20 pressionado, abaixo de 20 cadeira balançando.</li>
+                            <li>
+                                Faixas: @DiretoriaCriterios.LimitePrestigiado.ToString("0")+ prestigiado,
+                                @DiretoriaCriterios.LimiteEstavel.ToString("0") estável,
+                                @DiretoriaCriterios.LimiteSobObservacao.ToString("0") sob observação,
+                                @DiretoriaCriterios.LimitePressionado.ToString("0") pressionado,
+                                abaixo de @DiretoriaCriterios.LimitePressionado.ToString("0") cadeira balançando.
+                            </li>
                             <li>Pênaltis contam como empate; W.O. não entra.</li>
                         </ul>
                     </div>
