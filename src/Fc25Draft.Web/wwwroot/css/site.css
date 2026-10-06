@@ -163,6 +163,12 @@ a, .btn-link {
     cursor: default;
 }
 
+/* Modal com rolagem no corpo: o arrasto no celular não "vaza" para a página de trás. */
+.modal,
+.modal-dialog-scrollable .modal-body {
+    overscroll-behavior: contain;
+}
+
 /* ── Compartilhar imagem (tabela / rodada) ───────────────────── */
 
 /* Elementos que só aparecem na imagem gerada (cabeçalho/rodapé de marca). */
