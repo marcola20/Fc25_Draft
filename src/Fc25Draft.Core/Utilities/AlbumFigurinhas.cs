@@ -167,7 +167,7 @@ public static class AlbumFigurinhas
     /// <summary>O n-ésimo pacote (1, 2, 3) de um jogo do time da pessoa.</summary>
     public static string ChaveJogo(Guid partidaId, int n) => $"jogo:{partidaId:N}:{n}";
 
-    /// <summary>Quem está sem clube ganha 1 pacote em cada dia com jogo (data de Brasília).</summary>
+    /// <summary>Todo mundo (com clube ou sem) ganha 1 pacote em cada dia com jogo (data de Brasília).</summary>
     public static string ChaveDiaDeJogo(DateTime diaEmBrasilia) => $"diadejogo:{diaEmBrasilia:yyyy-MM-dd}";
 
     public static string MotivoDiaDeJogo(DateTime diaEmBrasilia) => $"Dia de jogo · {diaEmBrasilia:dd/MM}";

@@ -47,6 +47,12 @@ public interface IAlbumService
     /// </summary>
     Task<ReconciliacaoPacotesDto> ReconciliarAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Passa a contar também os jogos da temporada do álbum encerrados antes do lançamento (fica no log) e
+    /// já dá os pacotes que faltam. Rodar de novo só reconcilia.
+    /// </summary>
+    Task<ReconciliacaoPacotesDto> ContarJogosAntesDoLancamentoAsync(string? adminToken, CancellationToken ct);
+
     // ---- A pessoa ----
 
     /// <summary>O álbum da pessoa (o ativo, se <paramref name="albumId"/> vier nulo).</summary>

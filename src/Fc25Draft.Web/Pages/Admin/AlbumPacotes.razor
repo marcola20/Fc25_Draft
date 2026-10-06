@@ -69,6 +69,30 @@
             </div>
         </div>
 
+        @if (_ativo is not null)
+        {
+            <div class="card mb-3">
+                <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                    @if (_ativo.ContaJogosAntesDoLancamento)
+                    {
+                        <div class="flex-grow-1 small text-muted">
+                            ✓ Os jogos de @_ativo.Temporada encerrados antes do lançamento do álbum também dão pacote
+                            (jogo, dia de jogo e bolão). A conferência de cima já inclui esses jogos.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="flex-grow-1 small text-muted">
+                            Os jogos de @_ativo.Temporada que acabaram antes do lançamento do álbum
+                            (@BrazilTime.FormatDateTime(_ativo.LancadoEm, "dd/MM")) ainda não deram pacote. Isto passa a contar esses
+                            jogos e já dá a todo mundo o que falta: pacotes dos jogos, do dia de jogo e do bolão. Não tem volta.
+                        </div>
+                        <button class="btn btn-outline-success" disabled="@_salvando" @onclick="ContarJogosAntesAsync">🎁 Dar os pacotes dos jogos antes do lançamento</button>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="card">
             <div class="card-header fw-bold">Pacotes de cada pessoa@(_ativo is null ? "" : $" · {_ativo.Nome}")</div>
             <div class="table-responsive">
@@ -137,6 +161,22 @@
         catch (Exception ex) { _erro = ex.Message; }
     }
 
+    private async Task ContarJogosAntesAsync()
+    {
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            var r = await AlbumSvc.ContarJogosAntesDoLancamentoAsync(await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            await CarregarAsync();
+            _ok = r.Total == 0
+                ? "Pronto: os jogos antes do lançamento passam a contar (nenhum pacote faltando)."
+                : $"{r.Total} pacote{(r.Total == 1 ? "" : "s")} novo{(r.Total == 1 ? "" : "s")}: {r.Jogos} pelos jogos, {r.DiasDeJogo} de dia de jogo e {r.Bolao} do bolão.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
     private async Task ReconciliarAsync()
     {
         _salvando = true;
@@ -147,7 +187,7 @@
             await CarregarAsync();
             _ok = r.Total == 0
                 ? "Tudo em dia: nenhum pacote faltando."
-                : $"{r.Total} pacote{(r.Total == 1 ? "" : "s")} novo{(r.Total == 1 ? "" : "s")}: {r.Jogos} pelos jogos, {r.DiasDeJogo} de dia de jogo (sem clube) e {r.Bolao} do bolão.";
+                : $"{r.Total} pacote{(r.Total == 1 ? "" : "s")} novo{(r.Total == 1 ? "" : "s")}: {r.Jogos} pelos jogos, {r.DiasDeJogo} de dia de jogo e {r.Bolao} do bolão.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

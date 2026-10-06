@@ -43,6 +43,12 @@ public class Album
     /// </summary>
     public int PontosBolaoPorPacote { get; set; } = AlbumFigurinhas.PontosBolaoPorPacotePadrao;
 
+    /// <summary>
+    /// Os jogos da temporada encerrados antes do lançamento também dão pacote (jogo, dia de jogo e bolão).
+    /// Ligado pelo admin, uma vez só; desligar tiraria pacotes fechados, então não tem volta.
+    /// </summary>
+    public bool ContaJogosAntesDoLancamento { get; set; }
+
     public ICollection<Figurinha> Figurinhas { get; set; } = new List<Figurinha>();
 }
 

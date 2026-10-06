@@ -24,7 +24,8 @@ public record FigurinhaDto(
     public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
 }
 
-public record AlbumDto(Guid AlbumId, string Nome, int Temporada, DateTime LancadoEm, bool Ativo, int TotalFigurinhas);
+public record AlbumDto(Guid AlbumId, string Nome, int Temporada, DateTime LancadoEm, bool Ativo, int TotalFigurinhas,
+    bool ContaJogosAntesDoLancamento = false);
 
 /// <summary>Contagem por raridade (total do álbum ou o que a pessoa já colou).</summary>
 public record AlbumContagemDto(int Comuns, int Brilhantes, int Lendarias)

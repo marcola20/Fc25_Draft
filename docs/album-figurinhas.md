@@ -17,7 +17,7 @@ treinadores e quem completa páginas e o álbum ganha selo e lugar no Hall da Fa
 | Quem entra no álbum | Os **elencos dos clubes da liga** no momento em que o álbum da temporada é lançado. Todo jogador entra, com ou sem foto. |
 | Foto | A figurinha usa a foto do jogador (`/fotos/jogadores/{playerId}`); sem foto aparece a silhueta. Admin tem uma tela para ver quem está sem foto e completar. A meta é todo mundo com foto. |
 | Dono das figurinhas | A **pessoa** (`Treinador`), não o clube — igual ao bolão. Treinador e auxiliar têm álbuns separados; quem troca de clube leva o álbum. |
-| Como ganha pacote | **2 por dia** (resgatados no site) · **bolão: 1 a cada X pontos** · **todo jogo do seu time: vitória 3, empate 2, derrota 1** · **sem clube: 1 por dia com jogo** (era 1 por dia e 1 por vitória até 06/10/2026). O admin também pode dar pacotes (testes, premiação). |
+| Como ganha pacote | **2 por dia** (resgatados no site) · **bolão: 1 a cada X pontos** · **todo jogo do seu time: vitória 3, empate 2, derrota 1** · **todo mundo: 1 por dia com jogo** (era 1 por dia e 1 por vitória até 06/10/2026). O admin também pode dar pacotes (testes, premiação). |
 | Prêmio | **Selo** por página completa e **Hall da Fama** (seção Colecionadores) para quem completa o álbum. Não mexe no caixa dos times. |
 | Técnicos no álbum | Treinador e auxiliar de cada clube viram figurinha especial "Técnico" (sorteada como brilhante), com a foto e o perfil que a própria pessoa monta (Fase 5). |
 
@@ -196,9 +196,14 @@ para completar. Agora são ~125 por pessoa (~1,9× o álbum):
   lançamento.
 - Pênaltis decidem vitória e derrota. Placar corrigido tira os pacotes fechados que deixaram de ser
   devidos (como antes); os abertos ficam.
-- Sem clube (ex.: o admin): 1 pacote em cada dia com jogo encerrado (data de Brasília), origem
-  `diadejogo`, chave `diadejogo:{yyyy-MM-dd}`, para toda pessoa `Ativo` sem passagem valendo naquele dia
-  (mesma regra dos jogos). Nunca é tirado.
+- Dia de jogo: 1 pacote em cada dia com jogo encerrado (data de Brasília) para **toda** pessoa `Ativo`,
+  com clube ou sem (quem não tem time também ganha). Origem `diadejogo`, chave `diadejogo:{yyyy-MM-dd}`.
+  Nunca é tirado.
+- Jogos antes do lançamento: `Album.ContaJogosAntesDoLancamento` (migração `JogosAntesDoLancamento`).
+  Ligada pelo botão "Dar os pacotes dos jogos antes do lançamento" em `/admin/album/pacotes`
+  (`ContarJogosAntesDoLancamentoAsync`, log `ContarJogosAntesDoLancamento`), a reconciliação passa a contar
+  também os jogos da temporada do álbum encerrados antes do lançamento (jogo, dia de jogo e bolão). Não
+  tem volta: desligar tiraria pacotes fechados. Motivo: o álbum de 2010 saiu com 3 rodadas já jogadas.
 - Aviso no celular: os pacotes de um jogo só dizem qual foi ("Você ganhou 3 pacotes pela vitória sobre o
   Grêmio"); de vários jogos, "pelos jogos".
 

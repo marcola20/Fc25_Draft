@@ -33,14 +33,14 @@ public partial class AlbumService : IAlbumService
     public async Task<IReadOnlyList<AlbumDto>> ListarAsync(CancellationToken ct) =>
         await _db.Albuns.AsNoTracking()
             .OrderByDescending(a => a.Temporada)
-            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count))
+            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count, a.ContaJogosAntesDoLancamento))
             .ToListAsync(ct);
 
     public async Task<AlbumDto?> AtivoAsync(CancellationToken ct) =>
         await _db.Albuns.AsNoTracking()
             .Where(a => a.Ativo)
             .OrderByDescending(a => a.Temporada)
-            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count))
+            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count, a.ContaJogosAntesDoLancamento))
             .FirstOrDefaultAsync(ct);
 
     // ---------------------------------------------------------------- Admin
@@ -145,7 +145,7 @@ public partial class AlbumService : IAlbumService
     {
         var album = await _db.Albuns.AsNoTracking()
             .Where(a => a.AlbumId == albumId)
-            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count))
+            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count, a.ContaJogosAntesDoLancamento))
             .FirstOrDefaultAsync(ct);
         if (album is null) return null;
 
@@ -328,7 +328,7 @@ public partial class AlbumService : IAlbumService
         var album = await _db.Albuns.AsNoTracking()
             .Where(a => albumId == null ? a.Ativo : a.AlbumId == albumId)
             .OrderByDescending(a => a.Temporada)
-            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count))
+            .Select(a => new AlbumDto(a.AlbumId, a.Nome, a.Temporada, a.LancadoEm, a.Ativo, a.Figurinhas.Count, a.ContaJogosAntesDoLancamento))
             .FirstOrDefaultAsync(ct);
         if (album is null) return null;
 
@@ -440,17 +440,34 @@ public partial class AlbumService : IAlbumService
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task<ReconciliacaoPacotesDto> ContarJogosAntesDoLancamentoAsync(string? adminToken, CancellationToken ct)
+    {
+        var album = await _db.Albuns.FirstOrDefaultAsync(a => a.Ativo, ct)
+            ?? throw new InvalidOperationException("O álbum ainda não foi lançado.");
+        if (!album.ContaJogosAntesDoLancamento)
+        {
+            album.ContaJogosAntesDoLancamento = true;
+            await RegistrarAsync(AdminActionType.ContarJogosAntesDoLancamento, adminToken, new { album = album.Nome }, ct);
+            await _db.SaveChangesAsync(ct);
+        }
+        _db.ChangeTracker.Clear();
+        return await ReconciliarAsync(ct);
+    }
+
     public async Task<ReconciliacaoPacotesDto> ReconciliarAsync(CancellationToken ct)
     {
         var album = await _db.Albuns.AsNoTracking()
             .Where(a => a.Ativo)
-            .Select(a => new { a.AlbumId, a.Temporada, a.LancadoEm, a.PontosBolaoPorPacote })
+            .Select(a => new { a.AlbumId, a.Temporada, a.LancadoEm, a.PontosBolaoPorPacote, a.ContaJogosAntesDoLancamento })
             .FirstOrDefaultAsync(ct);
         if (album is null) return new ReconciliacaoPacotesDto(0, 0, 0);
 
-        // Só jogos encerrados depois do lançamento: o que veio antes não dá pacote.
+        // Só jogos encerrados depois do lançamento, a não ser que o admin tenha mandado contar também os da
+        // temporada que acabaram antes.
         var jogos = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null && p.EncerradaEm >= album.LancadoEm)
+            .Where(p => p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null
+                        && (p.EncerradaEm >= album.LancadoEm
+                            || (album.ContaJogosAntesDoLancamento && p.Rodada.Liga.Temporada == album.Temporada)))
             .Select(p => new JogoEncerrado(
                 p.PartidaId, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
                 p.GolsCasa, p.GolsFora, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId,
@@ -458,7 +475,7 @@ public partial class AlbumService : IAlbumService
             .ToListAsync(ct);
 
         var porJogos = await PacotesDosJogosAsync(album.AlbumId, album.LancadoEm, jogos, ct);
-        var diasDeJogo = await PacotesDeQuemEstaSemClubeAsync(album.AlbumId, jogos, ct);
+        var diasDeJogo = await PacotesDoDiaDeJogoAsync(album.AlbumId, jogos, ct);
         var bolao = await PacotesDoBolaoAsync(album.AlbumId, album.Temporada, album.PontosBolaoPorPacote,
             jogos.Where(j => j.Temporada == album.Temporada).ToList(), ct);
         return new ReconciliacaoPacotesDto(porJogos, diasDeJogo, bolao);
@@ -525,10 +542,9 @@ public partial class AlbumService : IAlbumService
     }
 
     /// <summary>
-    /// 1 pacote por dia com jogo para cada pessoa ativa sem clube naquele dia (pela mesma regra de passagem dos
-    /// jogos), para quem não tem time não ficar de fora. Nunca é tirado.
+    /// 1 pacote por dia com jogo (data de Brasília) para toda pessoa ativa, com clube ou sem. Nunca é tirado.
     /// </summary>
-    private async Task<int> PacotesDeQuemEstaSemClubeAsync(Guid albumId, List<JogoEncerrado> jogos, CancellationToken ct)
+    private async Task<int> PacotesDoDiaDeJogoAsync(Guid albumId, List<JogoEncerrado> jogos, CancellationToken ct)
     {
         var dias = jogos.Select(DiaDoJogo).Distinct().ToList();
         if (dias.Count == 0) return 0;
@@ -537,10 +553,6 @@ public partial class AlbumService : IAlbumService
             .Where(t => t.Ativo)
             .Select(t => new { t.TreinadorId, t.CriadoEm })
             .ToListAsync(ct);
-        var passagens = (await _db.TreinadorPassagens.AsNoTracking()
-                .Select(p => new { p.TreinadorId, p.Desde, p.Ate })
-                .ToListAsync(ct))
-            .ToLookup(p => p.TreinadorId);
         var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemDiaDeJogo, ct);
 
         var criados = 0;
@@ -549,9 +561,7 @@ public partial class AlbumService : IAlbumService
             var chave = AlbumFigurinhas.ChaveDiaDeJogo(dia);
             foreach (var pessoa in pessoas.Where(p => p.CriadoEm.Date <= dia))
             {
-                var temClube = passagens[pessoa.TreinadorId]
-                    .Any(p => p.Desde.Date < dia && (p.Ate == null || p.Ate.Value.Date >= dia));
-                if (temClube || !jaTem.Add((pessoa.TreinadorId, chave))) continue;
+                if (!jaTem.Add((pessoa.TreinadorId, chave))) continue;
                 _db.PacotesGanhos.Add(NovoPacote(pessoa.TreinadorId, albumId, PacoteGanho.OrigemDiaDeJogo, chave,
                     AlbumFigurinhas.MotivoDiaDeJogo(dia)));
                 criados++;

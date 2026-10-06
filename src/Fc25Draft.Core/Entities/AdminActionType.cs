@@ -14,5 +14,6 @@ public enum AdminActionType
     DarPacotes = 9,
     AjustarLendarias = 10,
     AjustarPontosBolao = 11,
-    ApagarPerfilTreinador = 12
+    ApagarPerfilTreinador = 12,
+    ContarJogosAntesDoLancamento = 13
 }
