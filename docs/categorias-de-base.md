@@ -5,20 +5,23 @@ Plano das categorias de base da liga. Cada fase é feita numa sessão nova, na b
 
 ## A ideia em uma frase
 
-Toda temporada o admin monta o **pote da base** com jovens promessas (Pogba, Griezmann, Götze…), os clubes
-escolhem num **draft da base** e as promessas **evoluem** temporada a temporada — mais rápido se jogarem e
-jogarem bem — rumo ao jogador que elas viraram de verdade.
+O admin cadastra jovens promessas quando quiser (Pogba, Griezmann, Götze…), cada uma com a idade que ele
+escolher; na temporada em que a promessa faz **17 anos** ela entra no **draft da base**, os clubes escolhem, e
+as promessas **evoluem** temporada a temporada — mais rápido se jogarem e jogarem bem — rumo ao jogador que
+elas viraram de verdade.
 
 ## Decisões já tomadas
 
 | Tema | Decisão |
 |---|---|
-| A base é de quem | **Da liga.** O admin cadastra as promessas da temporada num pote; ninguém é dono delas até o draft. |
+| A base é de quem | **Da liga.** O admin cadastra as promessas quando quiser; ninguém é dono delas até o draft. |
+| Idade | **O admin define no cadastro** (pode ser diferente da idade real: Griezmann pode entrar com 16). O site guarda o ano de nascimento na liga (temporada − idade) e calcula a idade em cada temporada. O cadastro só aceita até **17 anos**. |
+| Quando entra no draft | No **draft da base da temporada em que faz 17**. Mais novo fica na fila de "futuras promessas" (visível em `/base`) e entra sozinho quando chegar a hora. |
 | Como chegam aos clubes | **Draft da base**, na ordem inversa da classificação (o pior escolhe primeiro). |
 | Depois do draft | O garoto vira **jogador normal do elenco** do clube que escolheu (conta no elenco, pode ser negociado), com a marca de promessa e a evolução especial. |
 | Evolução | **Mista:** cresce um pouco toda temporada pela idade e cresce mais se jogar (jogos como titular e nota média do PES). |
 | Potencial | **Faixa aproximada visível** (estrelas e "pode chegar a 85–90"); o número exato fica escondido. |
-| Primeiro pote (temporada que vem) | Paul Pogba, Juanfran, Antoine Griezmann, Christian Eriksen, Andriy Yarmolenko, Erik Lamela, Shinji Kagawa, Mario Götze, Raheem Sterling, Paulo Dybala. |
+| Primeira leva (temporada que vem) | Paul Pogba, Juanfran, Antoine Griezmann, Christian Eriksen, Andriy Yarmolenko, Erik Lamela, Shinji Kagawa, Mario Götze, Raheem Sterling, Paulo Dybala — com a idade que o admin escolher no cadastro. |
 
 ## Como a promessa nasce: o jogador real "rejuvenescido"
 
@@ -26,8 +29,8 @@ Nenhum desses jogadores existe no site ainda. A base do PES embutida no site (`p
 pela busca e pelo `BasePesService`) tem a **versão adulta** de cada um. A promessa nasce dela:
 
 1. O admin escolhe o jogador na base do PES (busca que já existe em `/api/admin/players/pes`).
-2. Define a **idade de entrada** (ex.: Pogba 17) e o **overall de entrada** (ex.: 68). O site sugere os dois
-   (idade real em 2010; overall de entrada por uma tabela de idade × teto, ajustável).
+2. Define a **idade** (até 17; ex.: Pogba 17, Sterling 15) e o **overall de entrada** (ex.: 68). O site
+   sugere o overall por uma tabela de idade × teto, ajustável. A temporada do draft sai da idade.
 3. O site cria o `Player` (nome igual ao do PES, para casar as notas da importação) com os `PlayerAtributos`
    da versão adulta **rebaixados** até o overall de entrada — o inverso do `OverallPes.Evoluir`, puxando mais
    para baixo os atributos de físico/experiência e menos os de talento (a definir na Fase 1).
@@ -42,7 +45,8 @@ atributo por atributo, e se forma parecida com o jogador real.
 
 ## O draft da base
 
-- Novo `DraftTipo.Base`. O pote do draft são as promessas da temporada ainda sem clube (não "todos os livres").
+- Novo `DraftTipo.Base`. O pote do draft são as promessas que fazem 17 na temporada (e as de 17 que ficaram
+  sem clube num draft anterior), não "todos os livres".
 - **As promessas no pote não podem vazar** para os lugares que hoje tratam "sem elenco" como disponível: o
   draft normal (`DraftStateService.Livres`), a lista pré-draft (`DraftWishlistService`), o filtro
   `onlyAvailable` dos jogadores, a geração do mercado (`MarketItemGenerationService`, `MarketCycleGenerator`) e
@@ -59,7 +63,8 @@ atributo por atributo, e se forma parecida com o jogador real.
 Roda **na virada de temporada** (junto do `LigaTemporadaService.GerarProximaTemporadaAsync`, que hoje não mexe
 em idade), com **prévia** para o admin conferir antes de confirmar.
 
-- **Idade +1** para as promessas (e, se decidido, para todos — ver "A decidir").
+- A idade das promessas sobe sozinha (é calculada do ano de nascimento na liga); quem faz 17 entra na fila do
+  próximo draft da base. Para os demais jogadores, ver "A decidir".
 - **Crescimento** (valores iniciais, ajustáveis em constantes):
 
   | Idade na temporada | Crescimento base |
@@ -85,14 +90,14 @@ Dados de jogo: titulares de `LigaEscalacoesPartida`, entradas de `LigaEventos` (
 - **Ficha do jogador**: selo "Promessa da base", faixa de potencial em estrelas, idade, clube que draftou e a
   previsão da próxima evolução ("jogando assim, deve subir +3 a +5").
 - **Página do clube**: seção "Crias da base".
-- **/base** (pública): o pote da temporada antes do draft, as escolhas do draft da base e o ranking de quem
-  mais cresceu.
+- **/base** (pública): quem entra no próximo draft da base, a fila de futuras promessas (com a temporada em
+  que cada uma entra), as escolhas dos drafts e o ranking de quem mais cresceu.
 - **Admin `/admin/base`**: montar o pote (buscar na base do PES, idade, overall de entrada, teto), criar o
   draft da base, rodar a evolução da temporada (prévia + confirmar) e o histórico.
 
 ## Modelo de dados (primeira versão)
 
-- `Promessa(PlayerId, TemporadaDeEntrada, IdadeDeEntrada, OverallDeEntrada, Teto, FaixaMin, FaixaMax,
+- `Promessa(PlayerId, CadastradaNaTemporada, AnoDeNascimento, OverallDeEntrada, Teto, FaixaMin, FaixaMax,
   AtributosAlvo (os 25 da versão adulta, CSV como em EvolucaoPes), PesId, DraftadaPorTimeId?, DraftadaEm?,
   FormadaEm?)` — uma por jogador, enquanto for promessa e depois como histórico.
 - `EvolucaoDaBase(Id, PlayerId, Temporada, IdadeNaTemporada, JogosDoClube, JogosComoTitular, NotaMedia,
@@ -103,12 +108,14 @@ Dados de jogo: titulares de `LigaEscalacoesPartida`, entradas de `LigaEventos` (
 
 ### Fase 1 — Pote da base
 Entidade `Promessa`, migração; filtro único "está no pote da base" aplicado em todos os lugares que hoje
-tratam jogador sem elenco como disponível; admin `/admin/base` para montar o pote a partir da base do PES
-(idade, overall de entrada e teto sugeridos e ajustáveis); rebaixamento dos atributos com `EvolucaoPes` de
-entrada; selo e faixa de potencial na ficha do jogador; página `/base` mostrando o pote.
-**Pronto quando:** no banco local o admin monta o pote com os 10 nomes da lista, cada um com atributos
-rebaixados coerentes com o overall de entrada e uma `EvolucaoPes` pendente; nenhum aparece no draft normal,
-no mercado nem na lista de livres.
+tratam jogador sem elenco como disponível; admin `/admin/base` para cadastrar promessas a partir da base do
+PES (idade até 17 escolhida pelo admin, overall de entrada e teto sugeridos e ajustáveis; a temporada do draft
+sai da idade); rebaixamento dos atributos com `EvolucaoPes` de entrada; selo e faixa de potencial na ficha do
+jogador; página `/base` com quem entra no próximo draft e a fila de futuras promessas.
+**Pronto quando:** no banco local o admin cadastra os 10 nomes da lista com idades variadas (alguns com 17,
+outros mais novos), cada um com atributos rebaixados coerentes com o overall de entrada e uma `EvolucaoPes`
+pendente; `/base` separa quem entra no próximo draft de quem fica na fila; nenhum aparece no draft normal, no
+mercado nem na lista de livres; cadastrar com 18 é recusado.
 
 ### Fase 2 — Draft da base
 `DraftTipo.Base`, pote do draft = promessas sem clube, ordem inversa da classificação, criação pelo admin,
@@ -130,9 +137,9 @@ de promessa no álbum seguinte.
 
 ## A decidir (perguntar antes da fase em que pesa)
 
-- **Idade +1 para todos na virada** ou só para as promessas? (Hoje ninguém envelhece no site.) Fase 3.
+- **Idade dos demais jogadores**: as promessas envelhecem pelo ano de nascimento; os outros jogadores também
+  passam a envelhecer na virada? (Hoje ninguém envelhece no site.) Fase 3.
 - **Idade no save do PES**: o `EvolucaoPes` só leva atributos; a idade o admin acerta no editor, ou o editor
   passa a ler a idade do site. Fase 1.
 - **Quantas rodadas no draft da base** e se clube pode passar a vez. Fase 2.
-- **Juanfran** nasceu em 1985 (25 anos em 2010): entra como promessa "tardia" (idade real, teto real) ou com
-  idade ajustada? Fase 1.
+- Promessa de 17 que ninguém escolheu no draft: volta no draft seguinte ou vira jogador livre comum? Fase 2.
