@@ -42,7 +42,7 @@ public interface IAlbumService
     Task SalvarPontosBolaoAsync(Guid albumId, int pontosPorPacote, string? adminToken, CancellationToken ct);
 
     /// <summary>
-    /// Dá os pacotes que faltam pelas vitórias e pelo bolão desde o lançamento do álbum ativo. Rodar de
+    /// Dá os pacotes que faltam pelos jogos e pelo bolão desde o lançamento do álbum ativo. Rodar de
     /// novo não duplica nada (a chave de cada pacote é única por pessoa).
     /// </summary>
     Task<ReconciliacaoPacotesDto> ReconciliarAsync(CancellationToken ct);
@@ -56,7 +56,7 @@ public interface IAlbumService
     Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct);
 
     /// <summary>
-    /// Dá o pacote do dia (data de Brasília). Falso se a pessoa já pegou o de hoje.
+    /// Dá os pacotes do dia (data de Brasília). Falso se a pessoa já pegou os de hoje.
     /// </summary>
     Task<bool> PegarPacoteDoDiaAsync(Guid treinadorId, CancellationToken ct);
 

@@ -87,12 +87,12 @@
                     @if (a.PacoteDoDiaDisponivel)
                     {
                         <button class="btn btn-outline-success d-block w-100 mt-2" disabled="@_pegandoDoDia" @onclick="PegarDoDiaAsync">
-                            🌅 Pegar o pacote do dia
+                            🌅 Pegar os @AlbumFigurinhas.PacotesDoDia pacotes do dia
                         </button>
                     }
                     else if (a.Album.Ativo)
                     {
-                        <div class="small text-muted mt-2">Pacote do dia pego ✓<br />Amanhã tem outro.</div>
+                        <div class="small text-muted mt-2">Pacotes do dia pegos ✓<br />Amanhã tem mais.</div>
                     }
                 </div>
             </div>
@@ -363,7 +363,7 @@
             var ganhou = await AlbumSvc.PegarPacoteDoDiaAsync(_eu.TreinadorId, CancellationToken.None);
             _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
             _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
-            _ok = ganhou ? "Pacote do dia na mão. É só abrir!" : "Você já pegou o pacote de hoje. Amanhã tem outro.";
+            _ok = ganhou ? "Pacotes do dia na mão. É só abrir!" : "Você já pegou os pacotes de hoje. Amanhã tem mais.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally
@@ -376,7 +376,7 @@
     private static string IconeDaOrigem(string origem) => origem switch
     {
         PacoteGanho.OrigemDiario => "🌅",
-        PacoteGanho.OrigemVitoria => "🏆",
+        PacoteGanho.OrigemJogo => "🏆",
         PacoteGanho.OrigemBolao => "🎯",
         PacoteGanho.OrigemAdmin => "🎁",
         _ => "🎴"

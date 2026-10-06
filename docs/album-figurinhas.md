@@ -17,7 +17,7 @@ treinadores e quem completa páginas e o álbum ganha selo e lugar no Hall da Fa
 | Quem entra no álbum | Os **elencos dos clubes da liga** no momento em que o álbum da temporada é lançado. Todo jogador entra, com ou sem foto. |
 | Foto | A figurinha usa a foto do jogador (`/fotos/jogadores/{playerId}`); sem foto aparece a silhueta. Admin tem uma tela para ver quem está sem foto e completar. A meta é todo mundo com foto. |
 | Dono das figurinhas | A **pessoa** (`Treinador`), não o clube — igual ao bolão. Treinador e auxiliar têm álbuns separados; quem troca de clube leva o álbum. |
-| Como ganha pacote | **1 por dia** (resgatado no site) · **bolão: 1 a cada X pontos** · **vitória do seu time: 1 pacote**. O admin também pode dar pacotes (testes, premiação). |
+| Como ganha pacote | **2 por dia** (resgatados no site) · **bolão: 1 a cada X pontos** · **todo jogo do seu time: vitória 3, empate 2, derrota 1** (era 1 por dia e 1 por vitória até 06/10/2026). O admin também pode dar pacotes (testes, premiação). |
 | Prêmio | **Selo** por página completa e **Hall da Fama** (seção Colecionadores) para quem completa o álbum. Não mexe no caixa dos times. |
 | Técnicos no álbum | Treinador e auxiliar de cada clube viram figurinha especial "Técnico" (sorteada como brilhante), com a foto e o perfil que a própria pessoa monta (Fase 5). |
 
@@ -69,11 +69,13 @@ segundo plano que reconcilia:
 
 - `PacoteGanho(Id, TreinadorId, Origem, Chave, CriadoEm, AbertoEm?)` — índice único em
   `(TreinadorId, Chave)`. Reconciliar de novo nunca dá pacote em dobro.
-- **Diário**: chave `diario:2026-10-03` (data de Brasília, `BrazilTime`). Resgatado num botão
-  "Pegar o pacote do dia" no álbum e na Minha Área.
-- **Vitória**: chave `vitoria:{partidaId}`. Para cada partida `Encerrada` (fase de pontos, Copa e
-  mata-mata; WO conta), as pessoas com passagem no clube vencedor na data do jogo (treinador **e**
-  auxiliar) ganham 1. Passagem na data: `Desde <= quando && (Ate == null || Ate >= quando)`.
+- **Diário**: chaves `diario:2026-10-03` e `diario:2026-10-03:2` (data de Brasília, `BrazilTime`).
+  Resgatados de uma vez num botão "Pegar os 2 pacotes do dia" no álbum e na Minha Área.
+- **Jogo**: chaves `jogo:{partidaId}:{n}`. Para cada partida `Encerrada` (fase de pontos, Copa e
+  mata-mata), as pessoas com passagem em cada clube na data do jogo (treinador **e** auxiliar) ganham
+  3 pela vitória, 2 pelo empate e 1 pela derrota; no W.O. quem fez não ganha nada. Passagem na data:
+  `Desde <= quando && (Ate == null || Ate >= quando)`. (Até 06/10/2026 era só 1 pela vitória, chave
+  `vitoria:{partidaId}`.)
 - **Bolão**: chave `bolao:{temporada}:{n}`. Pontos do treinador na temporada (mesma conta do
   `BolaoService` / `BolaoPontuacao`) ÷ X = quantos pacotes já deveria ter; cria os que faltam.
   X inicial = **30 pontos** (≈ 3 placares cravados ou 6 resultados certos).
@@ -181,6 +183,21 @@ reconciliação duas vezes não duplica, e o pacote do dia só sai uma vez por d
   pegou no site), pacote já aberto nem pacote com mais de 1 dia.
 - Telas: botão do pacote do dia e lista "Fechados" (de onde veio cada um) na capa do `/album`;
   cartão `Components/Album/AlbumCartao` na Minha Área.
+
+**Mais pacotes (06/10/2026).** Com 337 figurinhas e uma temporada de 17 jogos (3 por semana, ~40 dias),
+1 pacote por dia + 1 por vitória + bolão davam ~60 pacotes (300 figurinhas): nem trocando tudo dava
+para completar. Agora são ~125 por pessoa (~1,9× o álbum):
+- Números em `AlbumFigurinhas` (`PacotesDoDia` = 2, `PacotesPorVitoria` = 3, `PacotesPorEmpate` = 2,
+  `PacotesPorDerrota` = 1). O 1º pacote do dia mantém a chave antiga, então quem já tinha pegado no dia
+  da mudança não pegou de novo.
+- Origem `vitoria` virou `jogo` (`PacoteGanho.OrigemJogo`); motivos "Vitória sobre o X", "Empate com o
+  X", "Derrota para o X". A migração `PacotesPorJogo` converteu `vitoria:{partida}` em
+  `jogo:{partida}:1`, e a reconciliação deu de forma retroativa a diferença dos jogos encerrados desde o
+  lançamento.
+- Pênaltis decidem vitória e derrota. Placar corrigido tira os pacotes fechados que deixaram de ser
+  devidos (como antes); os abertos ficam.
+- Aviso no celular: os pacotes de um jogo só dizem qual foi ("Você ganhou 3 pacotes pela vitória sobre o
+  Grêmio"); de vários jogos, "pelos jogos".
 
 ### Fase 3 — Experiência
 Animação de abrir pacote, holográfico, compartilhar a carta, feed "últimas raras tiradas",

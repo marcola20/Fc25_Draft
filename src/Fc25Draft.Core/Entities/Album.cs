@@ -115,14 +115,14 @@ public class FigurinhaDoTreinador
 
 /// <summary>
 /// Livro-razão dos pacotes ganhos. A chave é única por pessoa (<c>diario:2026-10-03</c>,
-/// <c>vitoria:{partida}</c>, <c>admin:{guid}</c>…), então reconciliar de novo nunca dá pacote em dobro.
+/// <c>jogo:{partida}:2</c>, <c>admin:{guid}</c>…), então reconciliar de novo nunca dá pacote em dobro.
 /// O sorteio é feito na hora de abrir, não na de ganhar.
 /// </summary>
 public class PacoteGanho
 {
     public const string OrigemAdmin = "admin";
     public const string OrigemDiario = "diario";
-    public const string OrigemVitoria = "vitoria";
+    public const string OrigemJogo = "jogo";
     public const string OrigemBolao = "bolao";
     public const string OrigemReciclagem = "reciclagem";
 
