@@ -97,9 +97,9 @@ public record AlbumResumoDoTreinadorDto(
 }
 
 /// <summary>Pacotes criados por uma rodada da reconciliação.</summary>
-public record ReconciliacaoPacotesDto(int Jogos, int Bolao)
+public record ReconciliacaoPacotesDto(int Jogos, int DiasDeJogo, int Bolao)
 {
-    public int Total => Jogos + Bolao;
+    public int Total => Jogos + DiasDeJogo + Bolao;
 }
 
 /// <summary>Uma figurinha que saiu no pacote: nova (foi colada) ou repetida.</summary>

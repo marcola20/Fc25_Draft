@@ -167,6 +167,11 @@ public static class AlbumFigurinhas
     /// <summary>O n-ésimo pacote (1, 2, 3) de um jogo do time da pessoa.</summary>
     public static string ChaveJogo(Guid partidaId, int n) => $"jogo:{partidaId:N}:{n}";
 
+    /// <summary>Quem está sem clube ganha 1 pacote em cada dia com jogo (data de Brasília).</summary>
+    public static string ChaveDiaDeJogo(DateTime diaEmBrasilia) => $"diadejogo:{diaEmBrasilia:yyyy-MM-dd}";
+
+    public static string MotivoDiaDeJogo(DateTime diaEmBrasilia) => $"Dia de jogo · {diaEmBrasilia:dd/MM}";
+
     /// <summary>O n-ésimo pacote do bolão da temporada (1, 2, 3…).</summary>
     public static string ChaveBolao(int temporada, int n) => $"bolao:{temporada}:{n}";
 
@@ -207,6 +212,7 @@ public static class AlbumFigurinhas
     {
         PacoteGanho.OrigemDiario => "Pacote do dia",
         PacoteGanho.OrigemJogo => motivo ?? "Jogo do seu time",
+        PacoteGanho.OrigemDiaDeJogo => motivo ?? "Dia de jogo",
         PacoteGanho.OrigemBolao => motivo is null ? "Bolão" : $"Bolão · {motivo}",
         PacoteGanho.OrigemAdmin => motivo is null ? "Da organização" : $"Da organização · {motivo}",
         PacoteGanho.OrigemReciclagem => "Reciclagem de repetidas",
@@ -227,6 +233,7 @@ public static class AlbumFigurinhas
             return origem switch
             {
                 PacoteGanho.OrigemJogo when motivo is not null => $"Você ganhou 1 pacote {PeloJogo(motivo)}.",
+                PacoteGanho.OrigemDiaDeJogo => "Você ganhou 1 pacote pelo dia de jogo.",
                 PacoteGanho.OrigemBolao when motivo is not null => $"Você ganhou 1 pacote pelos {motivo}.",
                 PacoteGanho.OrigemAdmin when motivo is not null => $"Você ganhou 1 pacote da organização: {motivo}.",
                 PacoteGanho.OrigemAdmin => "Você ganhou 1 pacote da organização.",
@@ -245,6 +252,7 @@ public static class AlbumFigurinhas
             var de = origens[0] switch
             {
                 PacoteGanho.OrigemJogo => " pelos jogos",
+                PacoteGanho.OrigemDiaDeJogo => " pelos dias de jogo",
                 PacoteGanho.OrigemBolao => " do bolão",
                 PacoteGanho.OrigemAdmin => " da organização",
                 _ => ""
@@ -257,14 +265,17 @@ public static class AlbumFigurinhas
             .OrderBy(g => g.Key switch
             {
                 PacoteGanho.OrigemJogo => 0,
-                PacoteGanho.OrigemBolao => 1,
-                PacoteGanho.OrigemAdmin => 2,
-                _ => 3
+                PacoteGanho.OrigemDiaDeJogo => 1,
+                PacoteGanho.OrigemBolao => 2,
+                PacoteGanho.OrigemAdmin => 3,
+                _ => 4
             })
             .Select(g => (g.Key, g.Count()) switch
             {
                 (PacoteGanho.OrigemJogo, 1) => "1 pelo jogo",
                 (PacoteGanho.OrigemJogo, var n) => $"{n} pelos jogos",
+                (PacoteGanho.OrigemDiaDeJogo, 1) => "1 pelo dia de jogo",
+                (PacoteGanho.OrigemDiaDeJogo, var n) => $"{n} pelos dias de jogo",
                 (PacoteGanho.OrigemBolao, var n) => $"{n} do bolão",
                 (PacoteGanho.OrigemAdmin, var n) => $"{n} da organização",
                 (_, var n) => $"{n} {(n == 1 ? "outro" : "outros")}"

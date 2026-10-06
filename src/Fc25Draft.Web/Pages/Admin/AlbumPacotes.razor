@@ -147,7 +147,7 @@
             await CarregarAsync();
             _ok = r.Total == 0
                 ? "Tudo em dia: nenhum pacote faltando."
-                : $"{r.Total} pacote{(r.Total == 1 ? "" : "s")} novo{(r.Total == 1 ? "" : "s")}: {r.Jogos} pelos jogos e {r.Bolao} do bolão.";
+                : $"{r.Total} pacote{(r.Total == 1 ? "" : "s")} novo{(r.Total == 1 ? "" : "s")}: {r.Jogos} pelos jogos, {r.DiasDeJogo} de dia de jogo (sem clube) e {r.Bolao} do bolão.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

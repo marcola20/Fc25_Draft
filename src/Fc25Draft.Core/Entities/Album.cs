@@ -123,6 +123,7 @@ public class PacoteGanho
     public const string OrigemAdmin = "admin";
     public const string OrigemDiario = "diario";
     public const string OrigemJogo = "jogo";
+    public const string OrigemDiaDeJogo = "diadejogo";
     public const string OrigemBolao = "bolao";
     public const string OrigemReciclagem = "reciclagem";
 

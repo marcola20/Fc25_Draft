@@ -446,7 +446,7 @@ public partial class AlbumService : IAlbumService
             .Where(a => a.Ativo)
             .Select(a => new { a.AlbumId, a.Temporada, a.LancadoEm, a.PontosBolaoPorPacote })
             .FirstOrDefaultAsync(ct);
-        if (album is null) return new ReconciliacaoPacotesDto(0, 0);
+        if (album is null) return new ReconciliacaoPacotesDto(0, 0, 0);
 
         // Só jogos encerrados depois do lançamento: o que veio antes não dá pacote.
         var jogos = await _db.LigaPartidas.AsNoTracking()
@@ -458,9 +458,10 @@ public partial class AlbumService : IAlbumService
             .ToListAsync(ct);
 
         var porJogos = await PacotesDosJogosAsync(album.AlbumId, album.LancadoEm, jogos, ct);
+        var diasDeJogo = await PacotesDeQuemEstaSemClubeAsync(album.AlbumId, jogos, ct);
         var bolao = await PacotesDoBolaoAsync(album.AlbumId, album.Temporada, album.PontosBolaoPorPacote,
             jogos.Where(j => j.Temporada == album.Temporada).ToList(), ct);
-        return new ReconciliacaoPacotesDto(porJogos, bolao);
+        return new ReconciliacaoPacotesDto(porJogos, diasDeJogo, bolao);
     }
 
     private sealed record JogoEncerrado(
@@ -521,6 +522,43 @@ public partial class AlbumService : IAlbumService
         _db.PacotesGanhos.RemoveRange(semDireito);
 
         return await GravarAsync(criados + semDireito.Count, ct) == 0 ? 0 : criados;
+    }
+
+    /// <summary>
+    /// 1 pacote por dia com jogo para cada pessoa ativa sem clube naquele dia (pela mesma regra de passagem dos
+    /// jogos), para quem não tem time não ficar de fora. Nunca é tirado.
+    /// </summary>
+    private async Task<int> PacotesDeQuemEstaSemClubeAsync(Guid albumId, List<JogoEncerrado> jogos, CancellationToken ct)
+    {
+        var dias = jogos.Select(DiaDoJogo).Distinct().ToList();
+        if (dias.Count == 0) return 0;
+
+        var pessoas = await _db.Treinadores.AsNoTracking()
+            .Where(t => t.Ativo)
+            .Select(t => new { t.TreinadorId, t.CriadoEm })
+            .ToListAsync(ct);
+        var passagens = (await _db.TreinadorPassagens.AsNoTracking()
+                .Select(p => new { p.TreinadorId, p.Desde, p.Ate })
+                .ToListAsync(ct))
+            .ToLookup(p => p.TreinadorId);
+        var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemDiaDeJogo, ct);
+
+        var criados = 0;
+        foreach (var dia in dias)
+        {
+            var chave = AlbumFigurinhas.ChaveDiaDeJogo(dia);
+            foreach (var pessoa in pessoas.Where(p => p.CriadoEm.Date <= dia))
+            {
+                var temClube = passagens[pessoa.TreinadorId]
+                    .Any(p => p.Desde.Date < dia && (p.Ate == null || p.Ate.Value.Date >= dia));
+                if (temClube || !jaTem.Add((pessoa.TreinadorId, chave))) continue;
+                _db.PacotesGanhos.Add(NovoPacote(pessoa.TreinadorId, albumId, PacoteGanho.OrigemDiaDeJogo, chave,
+                    AlbumFigurinhas.MotivoDiaDeJogo(dia)));
+                criados++;
+            }
+        }
+
+        return await GravarAsync(criados, ct);
     }
 
     /// <summary>Os dois lados do jogo: quantos pacotes cada time leva e o motivo que aparece na lista.</summary>
