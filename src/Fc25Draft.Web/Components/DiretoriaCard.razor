@@ -1,0 +1,52 @@
+@using Fc25Draft.Core.Utilities
+@inject IDiretoriaService DiretoriaSvc
+
+@* Diretoria do time na temporada atual: confiança, metas e o gráfico jogo a jogo. Some se o time não joga a temporada. *@
+@if (_time is not null)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex flex-wrap align-items-center gap-2">
+            <strong>🏛️ Diretoria</strong>
+            <span class="small text-muted">@Frase(_time.Faixa)</span>
+            <a href="/diretoria" class="ms-auto small">Ver todos os clubes</a>
+        </div>
+        <div class="card-body d-flex flex-column gap-3">
+            <DiretoriaTermometro Time="@_time" />
+            <DiretoriaMetas Metas="@_time.Metas" MostrarExpectativa="true" />
+            @if (_time.Historico.Count > 0)
+            {
+                <div>
+                    <button type="button" class="btn btn-sm btn-link p-0" @onclick="() => _grafico = !_grafico">
+                        @(_grafico ? "Esconder" : "Ver") a confiança jogo a jogo
+                    </button>
+                    @if (_grafico)
+                    {
+                        <div class="mt-2"><DiretoriaGrafico Historico="@_time.Historico" /></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private DiretoriaTimeDto? _time;
+    private bool _grafico;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _time = await DiretoriaSvc.GetTimeAsync(TeamId, CancellationToken.None); }
+        catch { _time = null; }
+    }
+
+    private static string Frase(FaixaConfianca faixa) => faixa switch
+    {
+        FaixaConfianca.Prestigiado => "O técnico é intocável.",
+        FaixaConfianca.Estavel => "Trabalho aprovado, por enquanto.",
+        FaixaConfianca.SobObservacao => "A diretoria está de olho.",
+        FaixaConfianca.Pressionado => "A paciência está acabando.",
+        _ => "A cadeira está balançando."
+    };
+}

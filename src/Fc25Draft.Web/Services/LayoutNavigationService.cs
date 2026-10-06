@@ -23,6 +23,7 @@ public class LayoutNavigationService
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Bolão da rodada", "/bolao", "oi oi-target", MatchPrefix: true),
             new("Power Ranking", "/power-ranking", "oi oi-pulse"),
+            new("Diretoria", "/diretoria", "oi oi-briefcase"),
             new("Reta final", "/liga/reta-final", "oi oi-flag"),
             new("Simulação", "/liga/simulacao", "oi oi-calculator"),
             new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
@@ -77,6 +78,7 @@ public class LayoutNavigationService
             new("Resumo da Rodada", "/admin/resumo-rodada", "oi oi-comment-square"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
             new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
+            new("Metas da Diretoria", "/admin/diretoria", "oi oi-briefcase"),
             new("Gerenciar Regulamento", "/admin/regulamento", "oi oi-document")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
@@ -534,6 +536,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Ranking de Clubes")
+            }
+        },
+        ["/diretoria"] = new PageDefinition
+        {
+            Route = "/diretoria",
+            Title = "Diretoria",
+            Subtitle = "Meta da temporada e confiança no técnico de cada clube",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga"),
+                new("Diretoria")
+            }
+        },
+        ["/admin/diretoria"] = new PageDefinition
+        {
+            Route = "/admin/diretoria",
+            Title = "Metas da Diretoria",
+            Subtitle = "Gerar e ajustar metas e pagar o bônus — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Diretoria")
             }
         },
         ["/power-ranking"] = new PageDefinition

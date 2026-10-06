@@ -1,0 +1,369 @@
+@page "/admin/diretoria"
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IDiretoriaService DiretoriaSvc
+@inject ILigaTemporadaService TemporadaSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Diretoria — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <label class="form-label mb-0">Temporada</label>
+            <select class="form-select w-auto" @onchange="OnTemporadaChanged">
+                @foreach (var t in _temporadas)
+                {
+                    <option value="@t" selected="@(t == _temporada)">@t</option>
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="GerarAsync" disabled="@_salvando">⚙️ @(_painel?.MetasGeradas == true ? "Gerar as metas de novo" : "Gerar as metas")</button>
+            <a href="/diretoria" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
+        </div>
+
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><button class="nav-link @(_aba == "metas" ? "active" : "")" @onclick='() => _aba = "metas"'>Metas</button></li>
+            <li class="nav-item"><button class="nav-link @(_aba == "bonus" ? "active" : "")" @onclick="AbrirBonusAsync">Pagar bônus</button></li>
+        </ul>
+
+        @if (_aba == "metas")
+        {
+            <p class="text-muted small">
+                As metas saem do histórico do clube (@DiretoriaCriterios.PesoHistorico%) e da força do elenco atual (@DiretoriaCriterios.PesoElenco%);
+                na Copa, do pote do sorteio. Gere antes da 1ª rodada (o elenco é o do momento em que gerar). Gerar de novo troca todas, inclusive as ajustadas.
+            </p>
+
+            @if (_painel is null || !_painel.MetasGeradas)
+            {
+                <div class="alert alert-info">Ainda não há metas para @_temporada.</div>
+            }
+            else
+            {
+                @foreach (var competicao in Competicoes)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header d-flex align-items-center gap-2">
+                            <span class="badge bg-dark">@LigaLabels.Competicao(competicao.Tipo, competicao.Divisao)</span>
+                            <span class="fw-bold">@competicao.LigaNome</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Time</th>
+                                        @if (competicao.Tipo == TipoCompetition.Liga)
+                                        {
+                                            <th class="text-center" title="Posição esperada pela nota">Esp.</th>
+                                            <th class="text-center">Nota</th>
+                                            <th class="text-center" title="Posição média nas temporadas anteriores (a B conta depois da A)">Histórico</th>
+                                            <th class="text-center" title="Média dos 11 melhores quando a meta foi gerada">XI</th>
+                                        }
+                                        else
+                                        {
+                                            <th class="text-center">Pote</th>
+                                        }
+                                        <th>Meta</th>
+                                        <th>Agora</th>
+                                        <th style="width: 220px;">Ajustar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var (time, meta) in Linhas(competicao.LigaId))
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@time.TimeNome</td>
+                                            @if (competicao.Tipo == TipoCompetition.Liga)
+                                            {
+                                                <td class="text-center">@(meta.PosicaoEsperada)º</td>
+                                                <td class="text-center">@meta.Nota?.ToString("0.0")</td>
+                                                <td class="text-center">@(meta.MediaHistorico?.ToString("0.0") ?? "—")</td>
+                                                <td class="text-center">@meta.ForcaXI?.ToString("0.0")</td>
+                                            }
+                                            else
+                                            {
+                                                <td class="text-center">@meta.Pote</td>
+                                            }
+                                            <td>
+                                                @meta.Meta
+                                                @if (meta.AjustadaPeloAdmin) { <span class="badge bg-warning text-dark ms-1">ajustada</span> }
+                                            </td>
+                                            <td class="small">
+                                                @meta.Andamento
+                                                @if (meta.Situacao != SituacaoMeta.EmAndamento)
+                                                {
+                                                    <span class="badge @DiretoriaLabels.SituacaoBadge(meta.Situacao) ms-1">@DiretoriaLabels.Situacao(meta.Situacao)</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    @if (competicao.Tipo == TipoCompetition.Liga)
+                                                    {
+                                                        <select class="form-select form-select-sm" value="@meta.MetaPosicao"
+                                                                @onchange="e => AjustarPosicaoAsync(meta, e)" disabled="@_salvando">
+                                                            @for (var p = 1; p <= Linhas(competicao.LigaId).Count; p++)
+                                                            {
+                                                                <option value="@p" selected="@(p == meta.MetaPosicao)">Até o @(p)º</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                    else
+                                                    {
+                                                        <select class="form-select form-select-sm" @onchange="e => AjustarFaseAsync(meta, e)" disabled="@_salvando">
+                                                            <option value="" selected="@(meta.MetaFase is null)">Sem meta</option>
+                                                            @foreach (var fase in FasesDaCopa)
+                                                            {
+                                                                <option value="@fase" selected="@(meta.MetaFase == fase)">@DiretoriaLabels.MetaCopa(fase)</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <p class="text-muted small">
+                Os valores do bônus ficam em <a href="/admin/premiacao">Gerenciar Premiação</a>, em cada temporada.
+                Cada competição encerrada paga uma vez só; os valores entram no caixa dos times na hora.
+            </p>
+
+            @if (_bonus.Count == 0)
+            {
+                <div class="alert alert-info">Nenhuma competição com metas em @_temporada.</div>
+            }
+
+            @foreach (var previa in _bonus)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-dark">@LigaLabels.Competicao(previa.Tipo, previa.Divisao)</span>
+                        <span class="fw-bold">@previa.LigaNome</span>
+                        @if (previa.JaPago)
+                        {
+                            <span class="badge bg-success">Pago em @BrazilTime.ConvertFromUtc(previa.PagoEm!.Value).ToString("dd/MM/yyyy HH:mm")</span>
+                        }
+                        else if (!previa.Encerrada)
+                        {
+                            <span class="badge bg-secondary">Ainda não encerrada</span>
+                        }
+                        <span class="ms-auto fw-bold">@Moeda(previa.Total)</span>
+                    </div>
+
+                    @if (previa.Impedimento is not null)
+                    {
+                        <div class="card-body text-muted small">@previa.Impedimento</div>
+                    }
+                    else if (previa.Linhas.Count == 0)
+                    {
+                        <div class="card-body text-muted small">@(previa.Encerrada ? "Ninguém cumpriu a meta." : "A lista sai quando a competição terminar.")</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Time</th><th>Motivo</th><th class="text-end">Valor</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var linha in previa.Linhas)
+                                    {
+                                        <tr>
+                                            <td>@linha.TimeNome</td>
+                                            <td class="text-muted small">@linha.Motivo</td>
+                                            <td class="text-end">@Moeda(linha.Valor)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer d-flex gap-2">
+                            @if (previa.JaPago)
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => EstornarAsync(previa)" disabled="@_salvando">Estornar pagamento</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-success btn-sm" @onclick="() => PagarAsync(previa)" disabled="@(_salvando || !previa.PodePagar)">
+                                    💰 Pagar @Moeda(previa.Total)
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private static readonly FasePremiacao[] FasesDaCopa =
+        { FasePremiacao.Campeao, FasePremiacao.Vice, FasePremiacao.Semifinal, FasePremiacao.Quartas };
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+    private string _aba = "metas";
+
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private int _temporada;
+    private DiretoriaPainelDto? _painel;
+    private IReadOnlyList<DiretoriaBonusPreviaDto> _bonus = Array.Empty<DiretoriaBonusPreviaDto>();
+
+    private sealed record Competicao(Guid LigaId, string LigaNome, TipoCompetition Tipo, Divisao? Divisao);
+
+    private IEnumerable<Competicao> Competicoes =>
+        (_painel?.Times ?? Array.Empty<DiretoriaTimeDto>())
+            .SelectMany(t => t.Metas)
+            .Select(m => new Competicao(m.LigaId, m.LigaNome, m.Tipo, m.Divisao))
+            .Distinct()
+            .OrderBy(c => c.Tipo).ThenBy(c => c.Divisao);
+
+    /// <summary>Times de uma competição na ordem da meta (liga: posição esperada; Copa: pote).</summary>
+    private List<(DiretoriaTimeDto Time, DiretoriaMetaDto Meta)> Linhas(Guid ligaId) =>
+        (_painel?.Times ?? Array.Empty<DiretoriaTimeDto>())
+            .SelectMany(t => t.Metas.Where(m => m.LigaId == ligaId).Select(m => (t, m)))
+            .OrderBy(x => x.m.PosicaoEsperada ?? x.m.Pote ?? 99)
+            .ThenBy(x => x.t.TimeNome)
+            .ToList();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/diretoria"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _temporadas = (await TemporadaSvc.ListTemporadasAsync(CancellationToken.None)).OrderByDescending(t => t).ToArray();
+            _temporada = await DiretoriaSvc.GetTemporadaAtualAsync(CancellationToken.None) ?? _temporadas.FirstOrDefault();
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _painel = await DiretoriaSvc.GetPainelAsync(_temporada, CancellationToken.None);
+        if (_aba == "bonus")
+            _bonus = await DiretoriaSvc.ListBonusAsync(_temporada, CancellationToken.None);
+    }
+
+    private async Task OnTemporadaChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var t)) return;
+        _temporada = t;
+        try { await CarregarAsync(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task AbrirBonusAsync()
+    {
+        _aba = "bonus";
+        try { _bonus = await DiretoriaSvc.ListBonusAsync(_temporada, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task GerarAsync()
+    {
+        if (_painel?.MetasGeradas == true
+            && !await Confirmar($"Gerar as metas de {_temporada} de novo? As atuais (inclusive as ajustadas) serão trocadas.")) return;
+
+        _salvando = true;
+        try
+        {
+            _painel = await DiretoriaSvc.GerarMetasAsync(_temporada, CancellationToken.None);
+            _aba = "metas";
+            _ok = $"Metas de {_temporada} geradas.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task AjustarPosicaoAsync(DiretoriaMetaDto meta, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var posicao)) return;
+        await AjustarAsync(meta, posicao, null);
+    }
+
+    private async Task AjustarFaseAsync(DiretoriaMetaDto meta, ChangeEventArgs e)
+    {
+        FasePremiacao? fase = Enum.TryParse<FasePremiacao>(e.Value?.ToString(), out var f) ? f : null;
+        await AjustarAsync(meta, null, fase);
+    }
+
+    private async Task AjustarAsync(DiretoriaMetaDto meta, int? posicao, FasePremiacao? fase)
+    {
+        _salvando = true;
+        try
+        {
+            await DiretoriaSvc.AjustarMetaAsync(meta.MetaId, posicao, fase, CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Meta ajustada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task PagarAsync(DiretoriaBonusPreviaDto previa)
+    {
+        if (!await Confirmar($"Creditar {Moeda(previa.Total)} no caixa de {previa.Linhas.Count} time(s) pelo bônus da diretoria em {previa.LigaNome}?")) return;
+
+        _salvando = true;
+        try
+        {
+            await DiretoriaSvc.PagarBonusAsync(previa.LigaId, CancellationToken.None);
+            await AbrirBonusAsync();
+            _ok = $"Bônus de {previa.LigaNome} pago.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task EstornarAsync(DiretoriaBonusPreviaDto previa)
+    {
+        if (!await Confirmar($"Estornar o bônus da diretoria de {previa.LigaNome}? O valor sai do caixa dos times.")) return;
+
+        _salvando = true;
+        try
+        {
+            await DiretoriaSvc.EstornarBonusAsync(previa.LigaId, CancellationToken.None);
+            await AbrirBonusAsync();
+            _ok = $"Bônus de {previa.LigaNome} estornado.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task<bool> Confirmar(string mensagem) =>
+        await JSRuntime.InvokeAsync<bool>("confirm", mensagem);
+
+    private static string Moeda(decimal valor) => $"{valor / 1_000_000m:0.##} Mi";
+}

@@ -16,6 +16,12 @@ public class Premiacao
 
     public string Nome { get; set; } = null!;
 
+    // Bônus da diretoria por meta da temporada (0 = sem bônus).
+    public decimal BonusMetaLigaCumprida { get; set; }
+    public decimal BonusMetaLigaSuperada { get; set; }
+    public decimal BonusMetaCopaCumprida { get; set; }
+    public decimal BonusMetaCopaSuperada { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 

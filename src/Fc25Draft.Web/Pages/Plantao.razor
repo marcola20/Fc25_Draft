@@ -1,6 +1,7 @@
 @page "/plantao"
 @using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
+@inject IDiretoriaService DiretoriaSvc
 
 <PageTitle>Plantão CBFV</PageTitle>
 
@@ -10,10 +11,11 @@
             <button type="button" class="btn @(_filtro is null ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(null)">Tudo</button>
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Jogo ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">⚽ Jogos</button>
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Mercado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">💸 Mercado</button>
+            <button type="button" class="btn @(_filtro == PlantaoCategoria.Diretoria ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Diretoria)">🏛️ Diretoria</button>
         </div>
     </div>
     <p class="text-muted small mb-3">
-        Notícias geradas sozinhas a partir dos jogos, gols, títulos e transferências. Clique para ver o time ou o jogador.
+        Notícias geradas sozinhas a partir dos jogos, gols, títulos, transferências e da confiança das diretorias. Clique para ver o time ou o jogador.
     </p>
 
     @if (_loading)
@@ -57,7 +59,10 @@
     {
         try
         {
-            _noticias = await LigaService.GetPlantaoAsync(CancellationToken.None);
+            var noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).ToList();
+            // A diretoria é complementar: se falhar, o Plantão segue com o resto.
+            try { noticias.AddRange(await DiretoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            _noticias = noticias.OrderByDescending(n => n.Data).ToList();
         }
         catch (Exception ex)
         {

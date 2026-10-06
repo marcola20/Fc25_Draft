@@ -1,0 +1,59 @@
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+
+@* Confiança da diretoria jogo a jogo, sobre as faixas (prestigiado, estável...). Começa no valor inicial. *@
+@if (Historico.Count > 0)
+{
+    var pontos = Historico;
+    const double largura = 640;
+    const double altura = 190;
+    const double esquerda = 34;
+    const double direita = 12;
+    const double topo = 10;
+    const double baixo = 22;
+    double X(int i) => esquerda + i * (largura - esquerda - direita) / pontos.Count;
+    double Y(double v) => topo + (100 - v) * (altura - topo - baixo) / 100;
+
+    <svg viewBox="0 0 @Num(largura) @Num(altura)" class="w-100" style="max-height: 220px;" role="img"
+         aria-label="Confiança da diretoria de @DiretoriaCriterios.ConfiancaInicial.ToString("0") para @pontos[^1].Valor.ToString("0", Brasil)">
+        @foreach (var (de, ate, cor) in Faixas)
+        {
+            <rect x="@Num(esquerda)" y="@Num(Y(ate))" width="@Num(largura - esquerda - direita)" height="@Num(Y(de) - Y(ate))"
+                  fill="@cor" opacity="0.12" />
+            <g><text x="@Num(esquerda - 6)" y="@Num(Y(de) + 4)" text-anchor="end" font-size="10" fill="currentColor" opacity="0.6">@de</text></g>
+        }
+        <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5"
+                  points="@Num(X(0)),@Num(Y(DiretoriaCriterios.ConfiancaInicial)) @string.Join(" ", pontos.Select((p, i) => $"{Num(X(i + 1))},{Num(Y(p.Valor))}"))" />
+        <circle cx="@Num(X(0))" cy="@Num(Y(DiretoriaCriterios.ConfiancaInicial))" r="3.5" fill="var(--cbfv-azul)">
+            <title>Início da temporada · @DiretoriaCriterios.ConfiancaInicial.ToString("0")</title>
+        </circle>
+        @for (var i = 0; i < pontos.Count; i++)
+        {
+            var p = pontos[i];
+            var cor = p.GolsPro > p.GolsContra ? "var(--cbfv-verde)" : p.GolsPro < p.GolsContra ? "#dc3545" : "#6c757d";
+            <circle cx="@Num(X(i + 1))" cy="@Num(Y(p.Valor))" r="5" fill="@cor">
+                <title>@p.Data.AddHours(-3).ToString("dd/MM") · @p.Competicao · @p.GolsPro x @p.GolsContra @p.AdversarioNome · @(p.Variacao >= 0 ? "+" : "")@p.Variacao.ToString("0.0", Brasil) → @p.Valor.ToString("0", Brasil)</title>
+            </circle>
+        }
+    </svg>
+    <div class="small text-muted">
+        Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); passe o mouse para ver o placar e quanto a confiança mudou.
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static readonly (int De, int Ate, string Cor)[] Faixas =
+    {
+        ((int)DiretoriaCriterios.LimitePrestigiado, 100, "#198754"),
+        ((int)DiretoriaCriterios.LimiteEstavel, (int)DiretoriaCriterios.LimitePrestigiado, "#0d6efd"),
+        ((int)DiretoriaCriterios.LimiteSobObservacao, (int)DiretoriaCriterios.LimiteEstavel, "#6c757d"),
+        ((int)DiretoriaCriterios.LimitePressionado, (int)DiretoriaCriterios.LimiteSobObservacao, "#ffc107"),
+        (0, (int)DiretoriaCriterios.LimitePressionado, "#dc3545")
+    };
+
+    [Parameter, EditorRequired] public IReadOnlyList<DiretoriaPontoDto> Historico { get; set; } = Array.Empty<DiretoriaPontoDto>();
+
+    private static string Num(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+}

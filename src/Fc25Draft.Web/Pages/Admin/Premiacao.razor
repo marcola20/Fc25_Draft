@@ -164,6 +164,37 @@
                     </div>
                 }
 
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-bold">🏛️ Bônus da diretoria</span>
+                        <span class="text-muted small">pago a quem cumpre ou supera a meta da temporada (0 = sem bônus)</span>
+                        <a href="/admin/diretoria" class="ms-auto small">Metas e pagamento</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small">Liga · cumpriu (Mi)</label>
+                                <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_bonusLigaCumprida" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small">Liga · superou (Mi)</label>
+                                <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_bonusLigaSuperada" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small">Copa · cumpriu (Mi)</label>
+                                <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_bonusCopaCumprida" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small">Copa · superou (Mi)</label>
+                                <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_bonusCopaSuperada" />
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <button class="btn btn-outline-success btn-sm" @onclick="SalvarBonusAsync" disabled="@_salvando">💾 Salvar bônus</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">💾 Salvar valores</button>
                     <button class="btn btn-outline-secondary" @onclick="RecarregarAtualAsync" disabled="@_salvando">Desfazer alterações</button>
@@ -255,6 +286,12 @@
     private readonly List<Linha> _linhas = new();
     private string _nomeEdicao = "";
 
+    // Bônus da diretoria, em milhões.
+    private decimal _bonusLigaCumprida;
+    private decimal _bonusLigaSuperada;
+    private decimal _bonusCopaCumprida;
+    private decimal _bonusCopaSuperada;
+
     private bool _mostrarNova;
     private int _novaTemporada = DateTime.Today.Year;
     private string _novoNome = "";
@@ -320,6 +357,11 @@
     {
         _linhas.Clear();
         _nomeEdicao = _atual?.Nome ?? "";
+        var bonus = _atual?.BonusDiretoria ?? BonusDiretoriaDto.Nenhum;
+        _bonusLigaCumprida = bonus.LigaCumprida / 1_000_000m;
+        _bonusLigaSuperada = bonus.LigaSuperada / 1_000_000m;
+        _bonusCopaCumprida = bonus.CopaCumprida / 1_000_000m;
+        _bonusCopaSuperada = bonus.CopaSuperada / 1_000_000m;
         if (_atual is null) return;
 
         foreach (var item in _atual.Itens)
@@ -391,6 +433,26 @@
             _atual = await PremiacaoSvc.SalvarItensAsync(_atual.PremiacaoId, itens, CancellationToken.None);
             await CarregarAsync();
             _ok = "Valores salvos.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task SalvarBonusAsync()
+    {
+        if (_atual is null) return;
+        _salvando = true;
+        try
+        {
+            var bonus = new BonusDiretoriaDto(
+                _bonusLigaCumprida * 1_000_000m, _bonusLigaSuperada * 1_000_000m,
+                _bonusCopaCumprida * 1_000_000m, _bonusCopaSuperada * 1_000_000m);
+
+            // Sem recarregar as linhas: valores de prêmio ainda não salvos continuam na tela.
+            var salva = await PremiacaoSvc.SalvarBonusDiretoriaAsync(_atual.PremiacaoId, bonus, CancellationToken.None);
+            _premiacoes = _premiacoes.Select(p => p.PremiacaoId == salva.PremiacaoId ? salva : p).ToArray();
+            _atual = salva;
+            _ok = "Bônus da diretoria salvo.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }
