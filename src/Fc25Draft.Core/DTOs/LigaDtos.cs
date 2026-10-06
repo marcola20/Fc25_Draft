@@ -151,7 +151,10 @@ public record PartidaEscalacaoJogadorDto(
     int Ordem,
     // Nota do PES no jogo (nula sem importação ou sem casar o nome).
     decimal? Nota = null,
-    bool MelhorEmCampo = false);
+    bool MelhorEmCampo = false,
+    // Lugar na escalação (GK, LCB...) e a posição natural, para desenhar o campo.
+    string? SlotCode = null,
+    int PosicaoId = 0);
 
 /// <summary>
 /// Suspensão automática (3 amarelos ou vermelho). <paramref name="JogoCumprido"/> nulo enquanto o próximo

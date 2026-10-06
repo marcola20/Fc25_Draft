@@ -10,6 +10,7 @@ public class LigaEscalacaoPartidaConfiguration : IEntityTypeConfiguration<LigaEs
     {
         b.ToTable("LigaEscalacoesPartida");
         b.HasKey(x => x.Id);
+        b.Property(x => x.SlotCode).HasMaxLength(10);
 
         b.HasIndex(x => new { x.PartidaId, x.TimeId, x.JogadorId }).IsUnique();
         b.HasIndex(x => x.JogadorId);

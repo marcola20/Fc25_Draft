@@ -466,10 +466,16 @@ public class ResultadoPesService : IResultadoPesService
             var doTime = retratoAtual.Where(x => x.TimeId == time.TeamId).ToList();
             if (!faltou && titulares.Count == 11)
             {
+                // As notas não dizem a posição: quem era titular na escalação do time fica no lugar dela (para o
+                // campo desenhado); o resto aparece pela posição natural.
+                var lugares = (await EscalacaoPartidaLoader.EscalacaoAtivaAsync(_db, new[] { time.TeamId }, ct))
+                    .Where(l => l.Titular && l.SlotCode is not null)
+                    .ToDictionary(l => l.JogadorId, l => l.SlotCode);
                 _db.LigaEscalacoes.RemoveRange(doTime);
                 _db.LigaEscalacoes.AddRange(titulares.Select((id, i) => new LigaEscalacaoPartida
                 {
-                    Id = Guid.NewGuid(), PartidaId = partidaId, TimeId = time.TeamId, JogadorId = id, Titular = true, Ordem = i
+                    Id = Guid.NewGuid(), PartidaId = partidaId, TimeId = time.TeamId, JogadorId = id, Titular = true, Ordem = i,
+                    SlotCode = lugares.GetValueOrDefault(id)
                 }));
                 continue;
             }
@@ -484,7 +490,8 @@ public class ResultadoPesService : IResultadoPesService
             var ativa = await EscalacaoPartidaLoader.EscalacaoAtivaAsync(_db, new[] { time.TeamId }, ct);
             _db.LigaEscalacoes.AddRange(ativa.Select(l => new LigaEscalacaoPartida
             {
-                Id = Guid.NewGuid(), PartidaId = partidaId, TimeId = l.TimeId, JogadorId = l.JogadorId, Titular = l.Titular, Ordem = l.Ordem
+                Id = Guid.NewGuid(), PartidaId = partidaId, TimeId = l.TimeId, JogadorId = l.JogadorId, Titular = l.Titular, Ordem = l.Ordem,
+                SlotCode = l.SlotCode
             }));
         }
 

@@ -188,7 +188,7 @@
 
 .abas button.ativa { color: var(--destaque); border-bottom-color: var(--destaque); }
 
-.mensagens, .palpites {
+.mensagens, .palpites, .times {
     flex: 1;
     min-height: 0;
     overflow-y: auto;

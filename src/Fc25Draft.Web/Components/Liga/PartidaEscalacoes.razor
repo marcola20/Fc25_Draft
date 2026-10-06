@@ -2,9 +2,12 @@
 @using Fc25Draft.Core.Enums
 @inject EscudoService Escudos
 
-@* Formação dos dois times no jogo, com os lances de cada jogador. Nada enquanto carrega. *@
+@* Formação dos dois times no jogo: o campo com o rosto dos titulares e, embaixo, a lista com titulares, reservas
+   e os lances de cada um. Nada enquanto carrega. *@
 @if (Dados is not null)
 {
+    <CampoEscalacoes Dados="Dados" />
+
     <div class="row g-3 escalacoes">
         @foreach (var time in new[] { Dados.Casa, Dados.Fora })
         {

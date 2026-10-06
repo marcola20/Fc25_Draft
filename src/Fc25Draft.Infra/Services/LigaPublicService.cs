@@ -788,7 +788,7 @@ public class LigaPublicService : ILigaPublicService
                 .ThenBy(l => l.Ordem)
                 .Select(l => new PartidaEscalacaoJogadorDto(
                     l.JogadorId, l.JogadorNome, ((int)l.PositionId).ToPositionSigla(), l.Titular, l.Ordem,
-                    Nota(l.JogadorId), Melhor(l.JogadorId)))
+                    Nota(l.JogadorId), Melhor(l.JogadorId), l.SlotCode, l.PositionId))
                 .ToList();
 
             // Quem entrou sem estar no banco registrado ainda aparece entre os reservas.

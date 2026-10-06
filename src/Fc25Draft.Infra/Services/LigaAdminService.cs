@@ -947,7 +947,8 @@ public class LigaAdminService : ILigaAdminService
             TimeId = l.TimeId,
             JogadorId = l.JogadorId,
             Titular = l.Titular,
-            Ordem = l.Ordem
+            Ordem = l.Ordem,
+            SlotCode = l.SlotCode
         }));
     }
 

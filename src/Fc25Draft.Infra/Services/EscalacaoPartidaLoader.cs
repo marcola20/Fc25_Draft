@@ -8,7 +8,8 @@ namespace Fc25Draft.Infra.Services;
 /// <summary>Carrega as escalações (titulares e banco) dos times de uma partida.</summary>
 internal static class EscalacaoPartidaLoader
 {
-    internal sealed record Linha(Guid TimeId, int JogadorId, string JogadorNome, short PositionId, bool Titular, int Ordem);
+    internal sealed record Linha(Guid TimeId, int JogadorId, string JogadorNome, short PositionId, bool Titular, int Ordem,
+        string? SlotCode = null);
 
     /// <summary>
     /// Retrato gravado no encerramento; se ainda não existe e a partida não foi
@@ -20,7 +21,7 @@ internal static class EscalacaoPartidaLoader
         var retrato = await db.LigaEscalacoes
             .AsNoTracking()
             .Where(x => x.PartidaId == partida.PartidaId)
-            .Select(x => new Linha(x.TimeId, x.JogadorId, x.Jogador.Name, x.Jogador.PositionId, x.Titular, x.Ordem))
+            .Select(x => new Linha(x.TimeId, x.JogadorId, x.Jogador.Name, x.Jogador.PositionId, x.Titular, x.Ordem, x.SlotCode))
             .ToListAsync(ct);
 
         if (retrato.Count > 0 || partida.Status == PartidaStatus.Encerrada)
@@ -36,7 +37,8 @@ internal static class EscalacaoPartidaLoader
             .Where(s => s.Lineup.IsActive && timeIds.Contains(s.Lineup.TeamId) && s.PlayerId != null
                         // Ignora jogador que ficou na escalação mas já não é do elenco.
                         && db.TeamRosters.Any(r => r.TeamId == s.Lineup.TeamId && r.PlayerId == s.PlayerId))
-            .Select(s => new Linha(s.Lineup.TeamId, s.PlayerId!.Value, s.Player!.Name, s.Player.PositionId, !s.IsBench, s.Order))
+            .Select(s => new Linha(s.Lineup.TeamId, s.PlayerId!.Value, s.Player!.Name, s.Player.PositionId, !s.IsBench, s.Order,
+                s.IsBench ? null : s.SlotCode))
             .ToListAsync(ct);
 
         // Um jogador em dois slots vale uma vez só (titular tem prioridade).

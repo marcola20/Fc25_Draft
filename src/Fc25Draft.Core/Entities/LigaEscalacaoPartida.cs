@@ -15,6 +15,12 @@ public class LigaEscalacaoPartida
     public bool Titular { get; set; }
     public int Ordem { get; set; }
 
+    /// <summary>
+    /// Lugar na escalação (GK, LCB, CDM1...), para desenhar o campo. Nulo nos retratos antigos e no titular que
+    /// veio das notas do PES sem estar entre os titulares da escalação: aí vale a posição natural do jogador.
+    /// </summary>
+    public string? SlotCode { get; set; }
+
     public LigaPartida Partida { get; set; } = null!;
     public Team Time { get; set; } = null!;
     public Player Jogador { get; set; } = null!;

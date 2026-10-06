@@ -112,6 +112,7 @@
                 <nav class="abas">
                     <button type="button" class="@(_aba == Aba.Chat ? "ativa" : "")" @onclick="() => { _aba = Aba.Chat; _rolarChat = true; }">💬 Chat</button>
                     <button type="button" class="@(_aba == Aba.Palpites ? "ativa" : "")" @onclick="AbrirPalpites">🎯 Palpites</button>
+                    <button type="button" class="@(_aba == Aba.Times ? "ativa" : "")" @onclick="AbrirTimes">👕 Times</button>
                 </nav>
 
                 @if (_aba == Aba.Chat)
@@ -174,6 +175,23 @@
                         }
                     }
                 }
+                else if (_aba == Aba.Times)
+                {
+                    <div class="times">
+                        @if (_escalacoes is null)
+                        {
+                            <div class="suave centro">Carregando...</div>
+                        }
+                        else if (_escalacoes.Casa.Vazia && _escalacoes.Fora.Vazia)
+                        {
+                            <div class="suave centro">As escalações deste jogo não foram registradas.</div>
+                        }
+                        else
+                        {
+                            <CampoEscalacoes Dados="_escalacoes" Compacto="true" />
+                        }
+                    </div>
+                }
                 else
                 {
                     <div class="palpites">
@@ -218,7 +236,7 @@
     private const int MensagensNaTela = 200;
     private static readonly TimeSpan IntervaloEntreMensagens = TimeSpan.FromSeconds(2);
 
-    private enum Aba { Chat, Palpites }
+    private enum Aba { Chat, Palpites, Times }
 
     [Parameter] public Guid PartidaId { get; set; }
 
@@ -416,6 +434,18 @@
     // Dois toques rápidos na aba esperam a mesma busca: duas buscas ao mesmo tempo no mesmo DbContext
     // derrubam a tela ("A second operation was started on this context instance...").
     private Task<IReadOnlyList<BolaoPalpiteDeAlguemDto>>? _buscandoPalpites;
+
+    // Escalações do jogo com o rosto dos titulares; a mesma busca serve aos dois toques rápidos, como nos palpites.
+    private PartidaEscalacoesDto? _escalacoes;
+    private Task<PartidaEscalacoesDto?>? _buscandoEscalacoes;
+
+    private async Task AbrirTimes()
+    {
+        _aba = Aba.Times;
+        if (_escalacoes is not null) return;
+        _buscandoEscalacoes ??= LigaService.GetEscalacoesPartidaAsync(PartidaId, CancellationToken.None);
+        _escalacoes = await _buscandoEscalacoes;
+    }
 
     private async Task AbrirPalpites()
     {

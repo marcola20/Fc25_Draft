@@ -1,0 +1,97 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+@inject EscudoService Escudos
+
+@* Os titulares dos dois times no campo, com rosto: mandante embaixo, visitante em cima, como na TV. Embaixo de
+   cada um, o nome curto e o que fez no jogo (gol, cartão, saiu, nota do PES). Compacto: a versão do telão. *@
+@if (Dados is not null && (!Dados.Casa.Vazia || !Dados.Fora.Vazia))
+{
+    <div class="campo @(Compacto ? "compacto" : "")">
+        <svg class="linhas" viewBox="0 0 100 145" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="3" y="3" width="94" height="139" />
+            <line x1="3" y1="72.5" x2="97" y2="72.5" />
+            <ellipse cx="50" cy="72.5" rx="13" ry="9" />
+            <rect x="22" y="3" width="56" height="19" />
+            <rect x="36" y="3" width="28" height="7" />
+            <rect x="22" y="123" width="56" height="19" />
+            <rect x="36" y="135" width="28" height="7" />
+        </svg>
+
+        @foreach (var (time, mandante) in new[] { (Dados.Fora, false), (Dados.Casa, true) })
+        {
+            <div class="time-rotulo @(mandante ? "casa" : "fora")">
+                <img src="@Escudos.GetEscudo(time.TimeNome)" alt="" />
+                <span>@time.TimeNome</span>
+            </div>
+            if (time.Vazia)
+            {
+                <div class="sem-escalacao @(mandante ? "casa" : "fora")">Escalação não registrada</div>
+                continue;
+            }
+
+            var titulares = time.Jogadores.Where(j => j.Titular).ToDictionary(j => j.JogadorId);
+            foreach (var lugar in CampoDaEscalacao.Posicionar(titulares.Values.Select(j => (j.JogadorId, j.SlotCode, j.PosicaoId)), mandante))
+            {
+                var j = titulares[lugar.JogadorId];
+                <div class="jogador @(mandante ? "casa" : "fora")" style="left: @Pct(lugar.X); top: @Pct(lugar.Y);" title="@Dica(j)">
+                    <div class="rosto">
+                        <FotoJogador PlayerId="@j.JogadorId" Tamanho="@(Compacto ? 24 : 42)" Alt="@j.JogadorNome" />
+                        @if (j.MelhorEmCampo)
+                        {
+                            <span class="melhor" title="Melhor em campo">⭐</span>
+                        }
+                        @if (j.Nota is decimal nota)
+                        {
+                            <span class="nota badge @NotaPes.Cor(nota)">@NotaPes.Texto(nota)</span>
+                        }
+                    </div>
+                    <div class="nome">@NomeCurto(j.JogadorNome)</div>
+                    @{ var lances = Lances(j.JogadorId); }
+                    @if (lances.Length > 0)
+                    {
+                        <div class="lances">@lances</div>
+                    }
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public PartidaEscalacoesDto? Dados { get; set; }
+
+    /// <summary>Fotos e letras menores, para a lateral do telão.</summary>
+    [Parameter] public bool Compacto { get; set; }
+
+    private static string Pct(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>Nome que cabe embaixo da foto: o inteiro se for curto; senão o último nome (dois, se o último for "Jr.").</summary>
+    private static string NomeCurto(string nome)
+    {
+        if (nome.Length <= 12) return nome;
+        var partes = nome.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length < 2) return nome;
+        var ultimo = partes[^1];
+        return ultimo.Length <= 3 ? $"{partes[^2]} {ultimo}" : ultimo;
+    }
+
+    /// <summary>O que o jogador fez no jogo, em ícones: ⚽ por gol, 🎯 por assistência, cartões e ▼ se saiu.</summary>
+    private string Lances(int jogadorId)
+    {
+        if (Dados is null) return "";
+        var texto = new System.Text.StringBuilder();
+        foreach (var ev in Dados.Eventos)
+        {
+            if (ev.Tipo == TipoEvento.Gol && ev.JogadorId == jogadorId) texto.Append('⚽');
+            if (ev.Tipo == TipoEvento.Gol && ev.AssistenteId == jogadorId) texto.Append("🎯");
+            if (ev.Tipo == TipoEvento.CartaoAmarelo && ev.JogadorId == jogadorId) texto.Append("🟨");
+            if (ev.Tipo == TipoEvento.CartaoVermelho && ev.JogadorId == jogadorId) texto.Append("🟥");
+            if (ev.Tipo == TipoEvento.Substituicao && ev.JogadorSaiuId == jogadorId) texto.Append($"▼{ev.Minuto}'");
+        }
+        return texto.ToString();
+    }
+
+    private string Dica(PartidaEscalacaoJogadorDto j) =>
+        j.Nota is decimal nota ? $"{j.JogadorNome} · {j.Posicao} · nota {NotaPes.Texto(nota)}" : $"{j.JogadorNome} · {j.Posicao}";
+}
