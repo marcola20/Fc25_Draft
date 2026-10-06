@@ -534,7 +534,7 @@
         <!-- ── Linha do tempo da temporada (Liga) ── -->
         @if (_tab == "linha")
         {
-            <LinhaDoTempoCard Rodadas="_rodadas" Tabela="_classif" Posicoes="_posicoesPorRodada" Regra="_regra" OnAbrir="AbrirDetalhesPartida" />
+            <LinhaDoTempoCard Rodadas="_rodadas" Tabela="_classif" Posicoes="_posicoesPorRodada" Regra="_regra" Selecoes="_selecoes" OnAbrir="AbrirDetalhesPartida" />
         }
 
         <!-- ── Estatísticas ── -->
@@ -880,6 +880,13 @@
                     {
                     <PartidaTelaoLink PartidaId="_partidaDetalhes.PartidaId" YoutubeVideoId="@_partidaDetalhes.YoutubeVideoId" OnAlterado="AtualizarAposVideo" />
                     <ReacoesJogo PartidaId="_partidaDetalhes.PartidaId" Class="mb-3" />
+                    @if (_partidaDetalhes.Status == PartidaStatus.Encerrada)
+                    {
+                        <CraqueDaPartidaCard Escalacoes="_escalacoesPartida" PartidaId="_partidaDetalhes.PartidaId"
+                                             CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome"
+                                             GolsCasa="_partidaDetalhes.GolsCasa" GolsFora="_partidaDetalhes.GolsFora"
+                                             Rotulo="@(_partidaDetalhes.RodadaNumero > 0 ? $"Rodada {_partidaDetalhes.RodadaNumero} · {LigaNome}" : LigaNome)" />
+                    }
                     <PartidaAbas PartidaId="_partidaDetalhes.PartidaId" CasaId="_partidaDetalhes.TimeCasaId" CasaNome="@_partidaDetalhes.TimeCasaNome" ForaNome="@_partidaDetalhes.TimeForaNome" Eventos="_eventoPartida" Escalacoes="_escalacoesPartida" />
                     }
                 </div>

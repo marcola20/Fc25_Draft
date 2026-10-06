@@ -8,8 +8,8 @@ public sealed record FatoDaTemporada(int Rodada, string Icone, string Texto, str
 
 /// <summary>
 /// Conta a história da fase de pontos da Liga a partir dos placares e da posição em cada rodada:
-/// trocas de líder, recordes de goleada, sequências, quem entra nas zonas na reta final e
-/// as maiores arrancadas. Os fatos saem na ordem das rodadas.
+/// trocas de líder, o craque de cada rodada, recordes de goleada, sequências, quem entra nas zonas na reta
+/// final e as maiores arrancadas. Os fatos saem na ordem das rodadas.
 /// </summary>
 public static class LinhaDoTempoTemporada
 {
@@ -19,7 +19,8 @@ public static class LinhaDoTempoTemporada
         IEnumerable<LigaRodadaComPartidasDto> rodadas,
         IReadOnlyList<LigaClassificacaoItemDto> tabela,
         IReadOnlyDictionary<Guid, IReadOnlyList<PosicaoNaRodada>> posicoes,
-        LigaRegraZonas regra)
+        LigaRegraZonas regra,
+        IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>? selecoes = null)
     {
         var regulares = rodadas.Where(r => r.Numero > 0 && !r.Desempate).OrderBy(r => r.Numero).ToList();
         var numeros = posicoes.Values.FirstOrDefault()?.Select(p => p.Rodada).ToList() ?? [];
@@ -30,6 +31,7 @@ public static class LinhaDoTempoTemporada
         var fatos = new List<FatoDaTemporada>();
 
         Liderancas(fatos, tabela, posicoes, numeros, faseEncerrada);
+        CraquesDasRodadas(fatos, regulares, selecoes);
         Recordes(fatos, regulares, numeros[^1]);
         Sequencias(fatos, regulares, nomes, numeros[^1], faseEncerrada);
         Zonas(fatos, tabela, posicoes, numeros, regulares.Count, regra);
@@ -68,6 +70,30 @@ public static class LinhaDoTempoTemporada
         {
             var f = fatos[ultimaTroca];
             fatos[ultimaTroca] = f with { Texto = f.Texto + (faseEncerrada ? " e não sai mais" : " e segue lá até agora") };
+        }
+    }
+
+    /// <summary>
+    /// O craque de cada rodada: entre os melhores em campo dos jogos dela, o de maior nota do PES (sem a marca,
+    /// a maior nota da seleção da rodada). O fato abre o jogo em que ele jogou.
+    /// </summary>
+    private static void CraquesDasRodadas(
+        List<FatoDaTemporada> fatos, List<LigaRodadaComPartidasDto> regulares,
+        IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>? selecoes)
+    {
+        if (selecoes is null) return;
+        var br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+        foreach (var rodada in regulares)
+        {
+            if (!selecoes.TryGetValue(rodada.RodadaId, out var selecao) || selecao.Count == 0) continue;
+            var craque = selecao.Where(j => j.MelhorEmCampo).OrderByDescending(j => j.Nota).FirstOrDefault()
+                         ?? selecao.OrderByDescending(j => j.Nota).First();
+            var jogo = rodada.Partidas.FirstOrDefault(p => p.Status == PartidaStatus.Encerrada
+                                                           && (p.TimeCasaId == craque.TimeId || p.TimeForaId == craque.TimeId));
+            fatos.Add(new FatoDaTemporada(rodada.Numero, "⭐",
+                $"Craque da rodada: {craque.JogadorNome} ({craque.TimeNome}), nota {craque.Nota.ToString("0.0", br)}",
+                craque.TimeNome, jogo));
         }
     }
 

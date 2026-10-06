@@ -59,6 +59,9 @@ else
     [Parameter, EditorRequired] public LigaRegraZonas Regra { get; set; } = LigaRegraZonas.SoCampeao;
     [Parameter] public EventCallback<LigaPartidaDto> OnAbrir { get; set; }
 
+    /// <summary>Seleção de cada rodada (pelo id da rodada), para o craque da rodada.</summary>
+    [Parameter] public IReadOnlyDictionary<Guid, IReadOnlyList<SelecaoRodadaJogadorDto>>? Selecoes { get; set; }
+
     private const int RodadasIniciais = 10;
 
     private IReadOnlyList<FatoDaTemporada> _fatos = [];
@@ -69,7 +72,7 @@ else
     {
         if (ReferenceEquals(_geradoDe, Posicoes)) return;
         _geradoDe = Posicoes;
-        _fatos = LinhaDoTempoTemporada.Gerar(Rodadas, Tabela, Posicoes, Regra);
+        _fatos = LinhaDoTempoTemporada.Gerar(Rodadas, Tabela, Posicoes, Regra, Selecoes);
         _tudo = false;
     }
 

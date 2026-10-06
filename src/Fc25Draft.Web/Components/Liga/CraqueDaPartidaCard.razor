@@ -1,0 +1,65 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@inject EscudoService Escudos
+
+@* O craque do jogo encerrado: foto em pé, nota do PES, gols e assistências e o placar, com o botão de
+   compartilhar a imagem. Não aparece em jogo sem nota (sem importação do PES). *@
+@if (_craque is { } c)
+{
+    <ShareableCard Id="@($"cap-craque-{PartidaId:N}")" Titulo="Craque da partida"
+                   Subtitulo="@($"{CasaNome} {GolsCasa} x {GolsFora} {ForaNome}")" Arquivo="cbfv-craque-da-partida.png">
+        <div class="craque">
+            <div class="foto">
+                <FotoJogador PlayerId="@c.Jogador.JogadorId" Tamanho="150" Lazy="false" Alt="@c.Jogador.JogadorNome" />
+            </div>
+            <div class="info">
+                <div class="rotulo">⭐ Craque da partida</div>
+                <div class="nome">@c.Jogador.JogadorNome</div>
+                <div class="time">
+                    <img src="@Escudos.GetEscudo(c.TimeNome)" alt="" />
+                    <span>@c.TimeNome · @c.Jogador.Posicao</span>
+                </div>
+                <div class="numeros">
+                    @if (c.Jogador.Nota is decimal nota)
+                    {
+                        <span class="nota badge @NotaPes.Cor(nota)" title="Nota do PES">@NotaPes.Texto(nota)</span>
+                    }
+                    @if (c.Gols > 0)
+                    {
+                        <span>⚽ @c.Gols @(c.Gols == 1 ? "gol" : "gols")</span>
+                    }
+                    @if (c.Assistencias > 0)
+                    {
+                        <span>🎯 @c.Assistencias @(c.Assistencias == 1 ? "assistência" : "assistências")</span>
+                    }
+                </div>
+                <div class="placar">
+                    <img src="@Escudos.GetEscudo(CasaNome)" alt="" />
+                    <span class="placar-texto">@CasaNome <strong>@GolsCasa x @GolsFora</strong> @ForaNome</span>
+                    <img src="@Escudos.GetEscudo(ForaNome)" alt="" />
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Rotulo))
+                {
+                    <div class="rodada">@Rotulo</div>
+                }
+            </div>
+        </div>
+    </ShareableCard>
+}
+
+@code {
+    [Parameter, EditorRequired] public PartidaEscalacoesDto? Escalacoes { get; set; }
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+    [Parameter] public int GolsCasa { get; set; }
+    [Parameter] public int GolsFora { get; set; }
+
+    /// <summary>De onde é o jogo ("Rodada 5 · Brasileirão — Série A 2010").</summary>
+    [Parameter] public string? Rotulo { get; set; }
+
+    private CraqueDaPartidaInfo? _craque;
+
+    protected override void OnParametersSet() =>
+        _craque = Escalacoes is null ? null : CraqueDaPartida.Escolher(Escalacoes);
+}
