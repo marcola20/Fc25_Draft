@@ -23,7 +23,12 @@
     flex-shrink: 0;
 }
 
+/* Retrato em pé (4:5), como a foto é feita para a figurinha: na bolinha o rosto ficava pequeno no meio do cinza. */
 .jogador-hero-foto ::deep .jogador-hero-img {
+    width: 120px !important;
+    height: 150px !important;
+    border-radius: 0.9rem;
+    object-position: center top;
     box-shadow: 0 0 0 4px var(--bs-body-bg), 0 0 0 6px var(--cbfv-azul), 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
