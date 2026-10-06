@@ -1,6 +1,7 @@
 # Categorias de base CBFV
 
-Plano das categorias de base da liga. Cada fase é feita numa sessão nova, na branch
+Plano das categorias de base da liga. Faz parte do plano geral `docs/ciclo-de-vida-dos-jogadores.md` (idade,
+evolução, queda e aposentadoria de todos os jogadores): a evolução das promessas segue a virada de temporada de lá. Cada fase é feita numa sessão nova, na branch
 `feat/categorias-de-base`, e vai para a `producao` quando estiver redonda (o Render publica a `producao`).
 
 ## A ideia em uma frase
@@ -137,8 +138,6 @@ de promessa no álbum seguinte.
 
 ## A decidir (perguntar antes da fase em que pesa)
 
-- **Idade dos demais jogadores**: as promessas envelhecem pelo ano de nascimento; os outros jogadores também
-  passam a envelhecer na virada? (Hoje ninguém envelhece no site.) Fase 3.
 - **Idade no save do PES**: o `EvolucaoPes` só leva atributos; a idade o admin acerta no editor, ou o editor
   passa a ler a idade do site. Fase 1.
 - **Quantas rodadas no draft da base** e se clube pode passar a vez. Fase 2.
