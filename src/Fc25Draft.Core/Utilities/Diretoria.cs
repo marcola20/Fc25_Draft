@@ -36,7 +36,7 @@ public static class DiretoriaCriterios
     public const FasePremiacao MetaPote2 = FasePremiacao.Quartas;
 
     // Confiança da diretoria (0 a 100).
-    public const double ConfiancaInicial = 60;
+    public const double ConfiancaInicial = 65;
     public const double K = 12;
 
     public const double LimitePrestigiado = 80;
