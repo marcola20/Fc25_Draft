@@ -4,6 +4,11 @@ Plano das categorias de base da liga. Faz parte do plano geral `docs/ciclo-de-vi
 evolução, queda e aposentadoria de todos os jogadores): a evolução das promessas segue a virada de temporada de lá. Cada fase é feita numa sessão nova, na branch
 `feat/categorias-de-base`, e vai para a `producao` quando estiver redonda (o Render publica a `producao`).
 
+> **Revisto em 07/10/2026:** o draft passou a ser **único e só de jovens** (idade máxima por draft, padrão 23) e a
+> entrada de jovens virou a "nova geração" de `docs/ciclo-de-vida-dos-jogadores.md` (overall de entrada 80+, ajustado pelo
+> admin; dá para criar jogadores que não estão no jogo). O "draft da base aos 17" e a evolução rumo a um teto ficam
+> **substituídos** por lá (teto indefinido, curva G + desempenho). Este documento fica como histórico das ideias.
+
 ## A ideia em uma frase
 
 O admin cadastra jovens promessas quando quiser (Pogba, Griezmann, Götze…), cada uma com a idade que ele
