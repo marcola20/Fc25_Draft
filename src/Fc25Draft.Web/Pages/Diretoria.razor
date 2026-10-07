@@ -1,0 +1,152 @@
+@page "/diretoria"
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+@inject IDiretoriaService DiretoriaSvc
+@inject EscudoService EscudoService
+
+<PageTitle>Diretoria</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1100px;">
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar a Diretoria:</strong> @_erro</div>
+    }
+    else if (_painel is null || _painel.Times.Count == 0)
+    {
+        <div class="alert alert-info">Nenhuma temporada em andamento.</div>
+    }
+    else
+    {
+        <p class="text-muted small mb-3">
+            Temporada @_painel.Temporada. Cada clube tem uma meta para a temporada e uma diretoria que sobe e desce
+            a confiança no técnico a cada jogo. Clique num clube para ver a confiança jogo a jogo.
+        </p>
+
+        @if (!_painel.MetasGeradas)
+        {
+            <div class="alert alert-warning small">A administração ainda não definiu as metas desta temporada; a confiança já está valendo.</div>
+        }
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            @foreach (var faixa in Enum.GetValues<FaixaConfianca>().Reverse())
+            {
+                var n = _painel.Times.Count(t => t.Faixa == faixa);
+                <span class="badge @DiretoriaLabels.Badge(faixa)">@DiretoriaLabels.Emoji(faixa) @DiretoriaLabels.Faixa(faixa): @n</span>
+            }
+        </div>
+
+        <ShareableCard Id="cap-diretoria" Titulo="Diretoria" Subtitulo="@($"Confiança no técnico · temporada {_painel.Temporada}")" Arquivo="cbfv-diretoria.png">
+            <div class="list-group mb-4">
+                @foreach (var t in _painel.Times)
+                {
+                    var aberto = _aberto == t.TimeId;
+                    <div class="list-group-item">
+                        <div class="d-flex flex-column flex-md-row gap-2 align-items-md-center" role="button" @onclick="() => Alternar(t.TimeId)">
+                            <a href="@($"/teams/details/{t.TimeId}")" class="d-flex align-items-center gap-2 text-decoration-none text-reset"
+                               style="min-width: 12rem;" @onclick:stopPropagation="true">
+                                <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="Escudo @t.TimeNome" style="width:26px;height:26px;object-fit:contain;" />
+                                <span class="fw-semibold">@t.TimeNome</span>
+                                @if (t.Divisao is Divisao d)
+                                {
+                                    <span class="badge @(d == Divisao.SerieA ? "bg-primary" : "bg-info text-dark")">@(d == Divisao.SerieA ? "A" : "B")</span>
+                                }
+                            </a>
+                            <div class="flex-grow-1"><DiretoriaTermometro Time="@t" /></div>
+                        </div>
+                        <div class="mt-2 ms-md-5 ps-md-4 small">
+                            <DiretoriaMetas Metas="@t.Metas" MostrarExpectativa="@aberto" />
+                        </div>
+                        @if (aberto)
+                        {
+                            <div class="mt-3">
+                                @if (t.Historico.Count == 0)
+                                {
+                                    <div class="small text-muted">Nenhum jogo ainda nesta temporada.</div>
+                                }
+                                else
+                                {
+                                    <DiretoriaGrafico Historico="@t.Historico" />
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </ShareableCard>
+
+        <div class="card">
+            <div class="card-body small">
+                <h2 class="h6">Como funciona</h2>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <strong>Meta da liga</strong>
+                        <ul class="mb-0 ps-3">
+                            <li>Definida antes da 1ª rodada: @DiretoriaCriterios.PesoHistorico% histórico do clube + @DiretoriaCriterios.PesoElenco% elenco (média dos @DiretoriaCriterios.JogadoresNoXI melhores).</li>
+                            <li>Histórico = posição média nas últimas @DiretoriaCriterios.TemporadasNoHistorico temporadas; a anterior vale o dobro. A Série B conta depois da A.</li>
+                            <li>Série A: os @DiretoriaCriterios.FavoritosAte favoritos precisam terminar no top @DiretoriaCriterios.MetaFavoritos; os seguintes, até o @(DiretoriaCriterios.ParteDeCimaAte)º esperado, no top @DiretoriaCriterios.MetaParteDeCima; o resto precisa escapar do playoff.</li>
+                            <li>Série B: todo mundo precisa subir.</li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <strong>Meta da Copa e avaliação</strong>
+                        <ul class="mb-0 ps-3">
+                            <li>Pote 1: chegar à semifinal. Pote 2: chegar às quartas. Potes 3 e 4: sem meta; passar de fase é lucro.</li>
+                            <li>Série A: terminar @DiretoriaCriterios.PosicoesParaSuperar posições acima da meta, ou ser campeão, é superar.</li>
+                            <li>Série B: subir é superar; ir ao playoff e perder é cumprir.</li>
+                            <li>Na Copa, ir uma fase além da meta é superar.</li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <strong>Confiança (0 a 100)</strong>
+                        <ul class="mb-0 ps-3">
+                            <li>Todo time começa a temporada com @DiretoriaCriterios.ConfiancaInicial.ToString("0").</li>
+                            <li>A cada jogo: @DiretoriaCriterios.K.ToString("0") × (resultado − chance de vencer pelo rating Elo). Ganhar de time forte rende mais; goleada pesa mais.</li>
+                            <li>
+                                Faixas: @DiretoriaCriterios.LimitePrestigiado.ToString("0")+ prestigiado,
+                                @DiretoriaCriterios.LimiteEstavel.ToString("0") estável,
+                                @DiretoriaCriterios.LimiteSobObservacao.ToString("0") sob observação,
+                                @DiretoriaCriterios.LimitePressionado.ToString("0") pressionado,
+                                abaixo de @DiretoriaCriterios.LimitePressionado.ToString("0") cadeira balançando.
+                            </li>
+                            <li>Pênaltis contam como empate; W.O. não entra.</li>
+                            <li>
+                                Caiu para cadeira balançando: <strong>ultimato</strong> de @DiretoriaCriterios.UltimatoPontos pontos nos
+                                @DiretoriaCriterios.UltimatoJogos jogos seguintes. Sem cumprir, a diretoria pede a demissão do técnico
+                                à organização, que decide depois de conversar com ele.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DiretoriaPainelDto? _painel;
+    private Guid? _aberto;
+    private bool _loading = true;
+    private string? _erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _painel = await DiretoriaSvc.GetPainelAsync(null, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Alternar(Guid timeId) => _aberto = _aberto == timeId ? null : timeId;
+}

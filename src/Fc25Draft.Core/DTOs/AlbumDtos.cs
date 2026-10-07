@@ -24,7 +24,8 @@ public record FigurinhaDto(
     public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
 }
 
-public record AlbumDto(Guid AlbumId, string Nome, int Temporada, DateTime LancadoEm, bool Ativo, int TotalFigurinhas);
+public record AlbumDto(Guid AlbumId, string Nome, int Temporada, DateTime LancadoEm, bool Ativo, int TotalFigurinhas,
+    bool ContaJogosAntesDoLancamento = false);
 
 /// <summary>Contagem por raridade (total do álbum ou o que a pessoa já colou).</summary>
 public record AlbumContagemDto(int Comuns, int Brilhantes, int Lendarias)
@@ -97,9 +98,9 @@ public record AlbumResumoDoTreinadorDto(
 }
 
 /// <summary>Pacotes criados por uma rodada da reconciliação.</summary>
-public record ReconciliacaoPacotesDto(int Vitorias, int Bolao)
+public record ReconciliacaoPacotesDto(int Jogos, int DiasDeJogo, int Bolao)
 {
-    public int Total => Vitorias + Bolao;
+    public int Total => Jogos + DiasDeJogo + Bolao;
 }
 
 /// <summary>Uma figurinha que saiu no pacote: nova (foi colada) ou repetida.</summary>

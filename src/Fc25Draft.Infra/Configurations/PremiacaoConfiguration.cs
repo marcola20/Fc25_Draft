@@ -14,6 +14,11 @@ public class PremiacaoConfiguration : IEntityTypeConfiguration<Premiacao>
         b.Property(x => x.Nome).HasMaxLength(120).IsRequired();
         b.HasIndex(x => x.Temporada).IsUnique();
 
+        b.Property(x => x.BonusMetaLigaCumprida).HasColumnType("numeric(18,2)");
+        b.Property(x => x.BonusMetaLigaSuperada).HasColumnType("numeric(18,2)");
+        b.Property(x => x.BonusMetaCopaCumprida).HasColumnType("numeric(18,2)");
+        b.Property(x => x.BonusMetaCopaSuperada).HasColumnType("numeric(18,2)");
+
         b.HasMany(x => x.Itens)
             .WithOne(x => x.Premiacao)
             .HasForeignKey(x => x.PremiacaoId)

@@ -19,6 +19,9 @@ public interface IPremiacaoService
 
     Task<PremiacaoDto> SalvarItensAsync(Guid premiacaoId, IReadOnlyList<PremiacaoItemInput> itens, CancellationToken ct);
 
+    /// <summary>Valores do bônus da diretoria por meta cumprida/superada na temporada.</summary>
+    Task<PremiacaoDto> SalvarBonusDiretoriaAsync(Guid premiacaoId, BonusDiretoriaDto bonus, CancellationToken ct);
+
     Task RenomearAsync(Guid premiacaoId, string nome, CancellationToken ct);
 
     Task ExcluirAsync(Guid premiacaoId, CancellationToken ct);

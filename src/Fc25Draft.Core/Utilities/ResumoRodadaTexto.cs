@@ -70,6 +70,20 @@ public static class ResumoRodadaTexto
             }
         }
 
+        if (resumo.Diretoria is { Vazio: false } diretoria)
+        {
+            texto.AppendLine();
+            texto.AppendLine("🏛️ *DIRETORIA*");
+            foreach (var m in diretoria.Mudancas)
+                texto.Append(DiretoriaLabels.Emoji(m.Depois)).Append(' ').Append(m.TimeNome).Append(": ")
+                     .Append(DiretoriaLabels.Faixa(m.Antes)).Append(" → ").Append(DiretoriaLabels.Faixa(m.Depois))
+                     .Append(" (").Append(m.Confianca.ToString("0", Br)).AppendLine(")");
+
+            if (diretoria.NaCorda.Count > 0)
+                texto.Append("🪑 *Na corda bamba:* ")
+                     .AppendLine(string.Join(", ", diretoria.NaCorda.Select(n => $"{n.TimeNome} ({n.Confianca.ToString("0", Br)})")));
+        }
+
         if (resumo.ProximaRodada is { Length: > 0 } proxima)
         {
             texto.AppendLine();

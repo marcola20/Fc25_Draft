@@ -1,9 +1,10 @@
+@using Fc25Draft.Core.Utilities
 @inject IAlbumService AlbumSvc
 @inject ITreinadorService TreinadorSvc
 @inject AdminAuthService AdminAuth
 @inject EscudoService Escudos
 
-@* Cartão "Álbum" da Minha Área: o progresso da pessoa, os pacotes para abrir e o pacote do dia.
+@* Cartão "Álbum" da Minha Área: o progresso da pessoa, os pacotes para abrir e os pacotes do dia.
    Sem álbum lançado (ou sem pessoa no token) não aparece. *@
 @if (_resumo is { } r)
 {
@@ -58,7 +59,7 @@
             <div class="d-flex flex-wrap gap-2">
                 @if (r.PacoteDoDiaDisponivel)
                 {
-                    <button class="btn btn-sm btn-success" disabled="@_pegando" @onclick="PegarAsync">🌅 Pegar o pacote do dia</button>
+                    <button class="btn btn-sm btn-success" disabled="@_pegando" @onclick="PegarAsync">🌅 Pegar os @AlbumFigurinhas.PacotesDoDia pacotes do dia</button>
                 }
                 <a href="/album" class="btn btn-sm btn-outline-primary">@(r.PacotesParaAbrir > 0 ? "Abrir pacotes" : "Ver o álbum")</a>
                 <a href="/album/trocas" class="btn btn-sm @(r.TrocasEsperando > 0 ? "btn-warning" : "btn-outline-secondary")">
@@ -112,7 +113,7 @@
         try
         {
             var ganhou = await AlbumSvc.PegarPacoteDoDiaAsync(id, CancellationToken.None);
-            _mensagem = ganhou ? "Pacote do dia na mão. É só abrir no álbum!" : "Você já pegou o pacote de hoje.";
+            _mensagem = ganhou ? "Pacotes do dia na mão. É só abrir no álbum!" : "Você já pegou os pacotes de hoje.";
             await CarregarAsync();
         }
         catch (Exception ex) { _mensagem = ex.Message; _falhou = true; }

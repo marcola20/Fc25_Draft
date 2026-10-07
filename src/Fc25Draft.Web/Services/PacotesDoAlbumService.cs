@@ -66,7 +66,7 @@ public class PacotesDoAlbumService : BackgroundService
         {
             var criados = await s.GetRequiredService<IAlbumService>().ReconciliarAsync(ct);
             if (criados.Total > 0)
-                _logger.LogInformation("Pacotes do álbum: {Vitorias} por vitória e {Bolao} do bolão", criados.Vitorias, criados.Bolao);
+                _logger.LogInformation("Pacotes do álbum: {Jogos} pelos jogos, {DiasDeJogo} de dia de jogo e {Bolao} do bolão", criados.Jogos, criados.DiasDeJogo, criados.Bolao);
         });
         await TentarAsync("aviso de pacotes", s => s.GetRequiredService<IPushService>().AvisarPacotesGanhosAsync(ct));
         await TentarAsync("aviso de selos", s => s.GetRequiredService<IPushService>().AvisarConquistasDoAlbumAsync(ct));

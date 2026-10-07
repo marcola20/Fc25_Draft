@@ -1,0 +1,52 @@
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
+
+@* Metas de um time na temporada: competição, meta, onde ele está e a situação. *@
+@if (Metas.Count == 0)
+{
+    <div class="small text-muted">A diretoria ainda não definiu as metas da temporada.</div>
+}
+else
+{
+    <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
+        @foreach (var m in Metas)
+        {
+            <li class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge @(m.Tipo == TipoCompetition.Copa ? "bg-success" : m.Divisao == Divisao.SerieB ? "bg-info text-dark" : "bg-primary")"
+                      style="min-width: 4.5rem;">@LigaLabels.Competicao(m.Tipo, m.Divisao)</span>
+                <span class="fw-semibold">@m.Meta</span>
+                @if (m.AjustadaPeloAdmin)
+                {
+                    <span class="text-muted small" title="Meta ajustada pela administração">✎</span>
+                }
+                @if (!string.IsNullOrEmpty(m.Andamento))
+                {
+                    <span class="small @(m.DentroDaMeta == true ? "text-success" : m.DentroDaMeta == false ? "text-danger" : "text-muted")">
+                        · @m.Andamento@(m.DentroDaMeta == true ? " ✓" : m.DentroDaMeta == false ? " ✗" : "")
+                    </span>
+                }
+                @if (m.Situacao != SituacaoMeta.EmAndamento)
+                {
+                    <span class="badge @DiretoriaLabels.SituacaoBadge(m.Situacao)">@DiretoriaLabels.SituacaoEmoji(m.Situacao) @DiretoriaLabels.Situacao(m.Situacao)</span>
+                }
+                @if (MostrarExpectativa && m.PosicaoEsperada is int esperada)
+                {
+                    <span class="small text-muted" title="Nota da expectativa: @DiretoriaCriterios.PesoHistorico% histórico + @DiretoriaCriterios.PesoElenco% elenco">
+                        (esperado: @(esperada)º@(m.MediaHistorico is double h ? $" · histórico {h:0.0}º" : " · sem histórico")@(m.ForcaXI is double xi ? $" · XI {xi:0.0}" : ""))
+                    </span>
+                }
+                @if (MostrarExpectativa && m.Pote is int pote)
+                {
+                    <span class="small text-muted">(pote @pote)</span>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DiretoriaMetaDto> Metas { get; set; } = Array.Empty<DiretoriaMetaDto>();
+
+    /// <summary>Mostra de onde a meta saiu (posição esperada, histórico, XI, pote).</summary>
+    [Parameter] public bool MostrarExpectativa { get; set; }
+}

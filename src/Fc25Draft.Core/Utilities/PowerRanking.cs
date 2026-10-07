@@ -122,14 +122,29 @@ public static class PowerRanking
     /// Elo de todos os jogos, na ordem em que foram disputados. Pênaltis contam como empate
     /// (vale o placar do tempo normal), igual ao resto do site.
     /// </summary>
-    private static Dictionary<Guid, double> CalcularRatings(IReadOnlyList<PowerRankingPartidaInput> partidas)
+    private static Dictionary<Guid, double> CalcularRatings(IReadOnlyList<PowerRankingPartidaInput> partidas) =>
+        PercorrerElo(partidas, null);
+
+    /// <summary>
+    /// Chance de vitória do mandante em cada jogo, pelo Elo de antes dele (empate vale meio).
+    /// As partidas precisam vir na ordem em que foram disputadas; o resultado segue a mesma ordem.
+    /// </summary>
+    public static IReadOnlyList<double> EsperadoCasa(IReadOnlyList<PowerRankingPartidaInput> partidasEmOrdem)
+    {
+        var esperados = new double[partidasEmOrdem.Count];
+        PercorrerElo(partidasEmOrdem, (i, esperado) => esperados[i] = esperado);
+        return esperados;
+    }
+
+    private static Dictionary<Guid, double> PercorrerElo(IReadOnlyList<PowerRankingPartidaInput> partidas, Action<int, double>? aoCalcular)
     {
         var ratings = new Dictionary<Guid, double>();
         double De(Guid id) => ratings.GetValueOrDefault(id, PowerRankingCriterios.RatingInicial);
         int? temporada = null;
 
-        foreach (var p in partidas)
+        for (int i = 0; i < partidas.Count; i++)
         {
+            var p = partidas[i];
             // Só regride quando começa uma temporada nova: jogo atrasado da anterior
             // (ex.: Supercopa depois da estreia da Série B) não conta como virada.
             if (temporada is int anterior && p.Temporada > anterior)
@@ -143,6 +158,7 @@ public static class PowerRanking
             var casa = De(p.CasaId);
             var fora = De(p.ForaId);
             var esperado = 1 / (1 + Math.Pow(10, (fora - casa) / 400));
+            aoCalcular?.Invoke(i, esperado);
             var resultado = p.GolsCasa > p.GolsFora ? 1.0 : p.GolsCasa < p.GolsFora ? 0.0 : 0.5;
             var delta = PowerRankingCriterios.K
                         * PowerRankingCriterios.MultiplicadorMargem(Math.Abs(p.GolsCasa - p.GolsFora))

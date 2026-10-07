@@ -62,6 +62,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.AjustarLendarias => "Trocou as lendárias do álbum",
         AdminActionType.AjustarPontosBolao => "Mudou os pontos do bolão por pacote",
         AdminActionType.ApagarPerfilTreinador => "Apagou parte do perfil de um treinador",
+        AdminActionType.ContarJogosAntesDoLancamento => "Deu os pacotes dos jogos antes do lançamento do álbum",
         _ => tipo.ToString()
     };
 

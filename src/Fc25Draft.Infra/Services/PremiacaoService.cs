@@ -87,6 +87,11 @@ public class PremiacaoService : IPremiacaoService
                 .FirstOrDefaultAsync(p => p.PremiacaoId == origemId, ct)
                 ?? throw new InvalidOperationException("Premiação de origem não encontrada.");
 
+            premiacao.BonusMetaLigaCumprida = origem.BonusMetaLigaCumprida;
+            premiacao.BonusMetaLigaSuperada = origem.BonusMetaLigaSuperada;
+            premiacao.BonusMetaCopaCumprida = origem.BonusMetaCopaCumprida;
+            premiacao.BonusMetaCopaSuperada = origem.BonusMetaCopaSuperada;
+
             foreach (var item in origem.Itens)
                 premiacao.Itens.Add(new PremiacaoItem
                 {
@@ -149,6 +154,24 @@ public class PremiacaoService : IPremiacaoService
                 Valor = item.Valor
             });
 
+        premiacao.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
+        await _db.SaveChangesAsync(ct);
+
+        return (await GetAsync(premiacaoId, ct))!;
+    }
+
+    public async Task<PremiacaoDto> SalvarBonusDiretoriaAsync(Guid premiacaoId, BonusDiretoriaDto bonus, CancellationToken ct)
+    {
+        if (bonus.LigaCumprida < 0 || bonus.LigaSuperada < 0 || bonus.CopaCumprida < 0 || bonus.CopaSuperada < 0)
+            throw new ArgumentException("O bônus não pode ser negativo.");
+
+        var premiacao = await _db.Premiacoes.FirstOrDefaultAsync(p => p.PremiacaoId == premiacaoId, ct)
+            ?? throw new InvalidOperationException("Premiação não encontrada.");
+
+        premiacao.BonusMetaLigaCumprida = bonus.LigaCumprida;
+        premiacao.BonusMetaLigaSuperada = bonus.LigaSuperada;
+        premiacao.BonusMetaCopaCumprida = bonus.CopaCumprida;
+        premiacao.BonusMetaCopaSuperada = bonus.CopaSuperada;
         premiacao.AtualizadoEm = _time.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
 
@@ -384,50 +407,12 @@ public class PremiacaoService : IPremiacaoService
     {
         var jogos = await _db.LigaKnockoutJogos.AsNoTracking()
             .Where(k => k.LigaId == liga.LigaId)
-            .Select(k => new { k.Fase, k.TimeCasaId, k.TimeForaId, k.VencedorId })
+            .Select(k => new JogoKnockoutInput(k.Fase, k.TimeCasaId, k.TimeForaId, k.VencedorId))
             .ToListAsync(ct);
-
-        var fases = new Dictionary<Guid, FasePremiacao>();
-
-        void Marcar(Guid? timeId, FasePremiacao fase)
-        {
-            if (timeId is not Guid id || id == Guid.Empty) return;
-            // A fase mais longe vale: quem perdeu a final não volta a ser "eliminado nas quartas".
-            if (!fases.TryGetValue(id, out var atual) || fase < atual) fases[id] = fase;
-        }
-
-        foreach (var jogo in jogos)
-        {
-            var ateOndeChegou = jogo.Fase switch
-            {
-                FaseKnockout.Final => FasePremiacao.Vice,
-                FaseKnockout.Semi1 or FaseKnockout.Semi2 => FasePremiacao.Semifinal,
-                FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => FasePremiacao.Quartas,
-                _ => FasePremiacao.FaseDeGrupos
-            };
-
-            Marcar(jogo.TimeCasaId, ateOndeChegou);
-            Marcar(jogo.TimeForaId, ateOndeChegou);
-
-            if (jogo.Fase == FaseKnockout.Final && jogo.VencedorId is Guid campeaoDaFinal)
-                fases[campeaoDaFinal] = FasePremiacao.Campeao;
-        }
-
-        if (liga.CampeaoTimeId is Guid campeao)
-            fases[campeao] = FasePremiacao.Campeao;
 
         var participantes = await ParticipantesAsync(liga.LigaId, ct);
 
-        foreach (var timeId in participantes)
-        {
-            if (fases.ContainsKey(timeId)) continue;
-
-            // Sem bracket (Supercopa e afins) o outro time do jogo único é o vice;
-            // com bracket, quem não apareceu nele parou na fase de grupos.
-            fases[timeId] = jogos.Count == 0 ? FasePremiacao.Vice : FasePremiacao.FaseDeGrupos;
-        }
-
-        return fases;
+        return FasesDoMataMata.Calcular(jogos, liga.CampeaoTimeId, participantes);
     }
 
     private async Task<IReadOnlyList<Guid>> ParticipantesAsync(Guid ligaId, CancellationToken ct)
@@ -462,5 +447,6 @@ public class PremiacaoService : IPremiacaoService
                 .OrderBy(i => i.Tipo).ThenBy(i => i.Divisao ?? 0)
                 .ThenBy(i => i.Fase ?? 0).ThenBy(i => i.PosicaoDe ?? 0)
                 .Select(i => new PremiacaoItemDto(i.PremiacaoItemId, i.Tipo, i.Divisao, i.PosicaoDe, i.PosicaoAte, i.Fase, i.Valor))
-                .ToArray());
+                .ToArray(),
+            new BonusDiretoriaDto(p.BonusMetaLigaCumprida, p.BonusMetaLigaSuperada, p.BonusMetaCopaCumprida, p.BonusMetaCopaSuperada));
 }

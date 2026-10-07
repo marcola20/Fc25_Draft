@@ -43,6 +43,12 @@ public class Album
     /// </summary>
     public int PontosBolaoPorPacote { get; set; } = AlbumFigurinhas.PontosBolaoPorPacotePadrao;
 
+    /// <summary>
+    /// Os jogos da temporada encerrados antes do lançamento também dão pacote (jogo, dia de jogo e bolão).
+    /// Ligado pelo admin, uma vez só; desligar tiraria pacotes fechados, então não tem volta.
+    /// </summary>
+    public bool ContaJogosAntesDoLancamento { get; set; }
+
     public ICollection<Figurinha> Figurinhas { get; set; } = new List<Figurinha>();
 }
 
@@ -115,14 +121,15 @@ public class FigurinhaDoTreinador
 
 /// <summary>
 /// Livro-razão dos pacotes ganhos. A chave é única por pessoa (<c>diario:2026-10-03</c>,
-/// <c>vitoria:{partida}</c>, <c>admin:{guid}</c>…), então reconciliar de novo nunca dá pacote em dobro.
+/// <c>jogo:{partida}:2</c>, <c>admin:{guid}</c>…), então reconciliar de novo nunca dá pacote em dobro.
 /// O sorteio é feito na hora de abrir, não na de ganhar.
 /// </summary>
 public class PacoteGanho
 {
     public const string OrigemAdmin = "admin";
     public const string OrigemDiario = "diario";
-    public const string OrigemVitoria = "vitoria";
+    public const string OrigemJogo = "jogo";
+    public const string OrigemDiaDeJogo = "diadejogo";
     public const string OrigemBolao = "bolao";
     public const string OrigemReciclagem = "reciclagem";
 

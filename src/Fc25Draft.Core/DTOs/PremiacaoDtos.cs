@@ -22,7 +22,8 @@ public record PremiacaoDto(
     int Temporada,
     string Nome,
     DateTime AtualizadoEm,
-    IReadOnlyList<PremiacaoItemDto> Itens)
+    IReadOnlyList<PremiacaoItemDto> Itens,
+    BonusDiretoriaDto BonusDiretoria)
 {
     public decimal Total => Itens.Sum(i => i.Valor);
 
@@ -31,6 +32,18 @@ public record PremiacaoDto(
             .OrderBy(i => i.Fase ?? 0)
             .ThenBy(i => i.PosicaoDe ?? 0)
             .ToArray();
+}
+
+/// <summary>Bônus que a diretoria paga por meta da temporada cumprida ou superada (0 = sem bônus).</summary>
+public record BonusDiretoriaDto(
+    decimal LigaCumprida,
+    decimal LigaSuperada,
+    decimal CopaCumprida,
+    decimal CopaSuperada)
+{
+    public static readonly BonusDiretoriaDto Nenhum = new(0, 0, 0, 0);
+
+    public bool Algum => LigaCumprida > 0 || LigaSuperada > 0 || CopaCumprida > 0 || CopaSuperada > 0;
 }
 
 /// <summary>Cria a premiação de uma temporada, opcionalmente copiando os valores de outra.</summary>

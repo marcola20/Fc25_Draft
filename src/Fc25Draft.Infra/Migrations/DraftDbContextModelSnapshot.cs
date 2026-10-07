@@ -128,6 +128,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ContaJogosAntesDoLancamento")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("LancadoEm")
                         .HasColumnType("timestamp without time zone");
 
@@ -370,6 +373,39 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("PlayerId", "EncerradaEm");
 
                     b.ToTable("ClausulasRevenda", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>
+                {
+                    b.Property<Guid>("PagamentoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LigaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("PagoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("PagamentoId");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("LigaId", "TimeId")
+                        .IsUnique();
+
+                    b.ToTable("DiretoriaPagamentos", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
@@ -782,6 +818,22 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("TomadorTeamId");
 
                     b.ToTable("Emprestimos", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EnvelhecimentoTemporada", b =>
+                {
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AplicadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Jogadores")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Temporada");
+
+                    b.ToTable("EnvelhecimentosTemporada", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.EvolucaoPes", b =>
@@ -1816,6 +1868,60 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("MarketTransactions");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MetaDiretoria", b =>
+                {
+                    b.Property<Guid>("MetaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AjustadaPeloAdmin")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<double?>("ForcaXI")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("LigaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("MediaHistorico")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("MetaFase")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MetaPosicao")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("Nota")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("PosicaoEsperada")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Pote")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("MetaId");
+
+                    b.HasIndex("Temporada");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("LigaId", "TimeId")
+                        .IsUnique();
+
+                    b.ToTable("MetasDiretoria", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.NotificacaoEnviada", b =>
                 {
                     b.Property<string>("Chave")
@@ -1928,6 +2034,51 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("TreinadorId");
 
                     b.ToTable("PartidaReacoes", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PedidoDemissao", b =>
+                {
+                    b.Property<Guid>("PedidoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("DecididoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("PartidaFalhaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PartidaOrigemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Pontos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PedidoId");
+
+                    b.HasIndex("Temporada");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.HasIndex("TimeId", "PartidaFalhaId")
+                        .IsUnique();
+
+                    b.ToTable("PedidosDemissao", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.PerfilTreinador", b =>
@@ -2234,6 +2385,18 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("BonusMetaCopaCumprida")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("BonusMetaCopaSuperada")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("BonusMetaLigaCumprida")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("BonusMetaLigaSuperada")
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp without time zone");
@@ -3143,6 +3306,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Player");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Liga", "Liga")
+                        .WithMany()
+                        .HasForeignKey("LigaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Liga");
+
+                    b.Navigation("Time");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftAutoPick", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Draft", "Draft")
@@ -3833,6 +4015,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("WinnerTeam");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MetaDiretoria", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Liga", "Liga")
+                        .WithMany()
+                        .HasForeignKey("LigaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Liga");
+
+                    b.Navigation("Time");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.PacoteGanho", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Album", "Album")
@@ -3885,6 +4086,24 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Partida");
+
+                    b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PedidoDemissao", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Time");
 
                     b.Navigation("Treinador");
                 });

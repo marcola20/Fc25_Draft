@@ -45,6 +45,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 }
             });
 
+            // Quantos anos somar à idade do jogo (2008) para um jogador novo entrar com a idade da liga.
+            pes.MapGet("/idade-da-liga", async (IIdadesService idades, CancellationToken ct) =>
+                Results.Ok(await idades.GetIdadeDaLigaAsync(ct)));
+
             // Evoluções feitas no site (venda rápida) que o editor ainda tem que gravar no save.
             pes.MapGet("/evolucoes", async (ISincronizacaoPesService sync, CancellationToken ct) =>
                 Results.Ok(await sync.EvolucoesPendentesAsync(ct)));

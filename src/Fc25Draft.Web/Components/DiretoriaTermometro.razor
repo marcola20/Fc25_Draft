@@ -1,0 +1,38 @@
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+
+@* Barra da confiança da diretoria (0 a 100) com a faixa e a variação do último jogo. *@
+<div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="badge @DiretoriaLabels.Badge(Time.Faixa)" style="min-width: 9.5rem;">
+        @DiretoriaLabels.Emoji(Time.Faixa) @DiretoriaLabels.Faixa(Time.Faixa)
+    </span>
+    <div class="progress flex-grow-1" style="height: 0.75rem; min-width: 6rem;" role="progressbar"
+         aria-label="Confiança da diretoria" aria-valuenow="@Time.Confianca.ToString("0", CultureInfo.InvariantCulture)" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar @DiretoriaLabels.Barra(Time.Faixa)" style="width: @Time.Confianca.ToString("0.#", CultureInfo.InvariantCulture)%"></div>
+    </div>
+    <span class="fw-bold" style="min-width: 2rem; text-align: right;">@Time.Confianca.ToString("0", Brasil)</span>
+    @if (Time.UltimaVariacao is double v)
+    {
+        <span class="small @(v > 0 ? "text-success" : v < 0 ? "text-danger" : "text-muted")" style="min-width: 3rem;"
+              title="Último jogo">
+            @(v > 0 ? "▲" : v < 0 ? "▼" : "–")@(v != 0 ? Math.Abs(v).ToString("0.0", Brasil) : "")
+        </span>
+    }
+</div>
+@if (Time.Ultimato is { } u)
+{
+    <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small d-flex flex-wrap gap-2 align-items-center">
+        <strong>🚨 Ultimato da diretoria:</strong>
+        <span>@u.Pontos de @u.PontosExigidos pontos · @(u.JogosRestantes == 1 ? "falta 1 jogo" : $"faltam {u.JogosRestantes} jogos")</span>
+        @if (u.PontosQueFaltam > 0)
+        {
+            <span class="text-muted">(precisa de mais @u.PontosQueFaltam)</span>
+        }
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public DiretoriaTimeDto Time { get; set; } = null!;
+}

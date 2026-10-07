@@ -6,7 +6,8 @@ namespace Fc25Draft.Core.Utilities;
 public enum PlantaoCategoria
 {
     Jogo,
-    Mercado
+    Mercado,
+    Diretoria
 }
 
 /// <summary>Uma notícia do Plantão: manchete, linha fina e para onde o clique leva.</summary>

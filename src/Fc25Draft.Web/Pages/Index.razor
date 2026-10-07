@@ -4,6 +4,7 @@
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
 @inject ILigaPublicService LigaService
+@inject IDiretoriaService DiretoriaSvc
 
 @implements IDisposable
 
@@ -78,7 +79,13 @@ else
     protected override async Task OnInitializedAsync()
     {
         try { _destaques = await LigaService.GetDestaquesAsync(CancellationToken.None); } catch { _destaques = null; }
-        try { _noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).Take(NoticiasNaPaginaInicial).ToList(); } catch { }
+        try
+        {
+            var noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).ToList();
+            try { noticias.AddRange(await DiretoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            _noticias = noticias.OrderByDescending(n => n.Data).Take(NoticiasNaPaginaInicial).ToList();
+        }
+        catch { }
     }
 
     protected override void OnInitialized()

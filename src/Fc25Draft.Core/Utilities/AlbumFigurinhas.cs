@@ -149,10 +149,28 @@ public static class AlbumFigurinhas
     /// <summary>X inicial do bolão: 1 pacote a cada X pontos (≈ 3 placares cravados ou 6 resultados certos).</summary>
     public const int PontosBolaoPorPacotePadrao = 30;
 
-    /// <summary>Pacote do dia: um por pessoa por data de Brasília.</summary>
-    public static string ChaveDiario(DateTime diaEmBrasilia) => $"diario:{diaEmBrasilia:yyyy-MM-dd}";
+    /// <summary>Pacotes que o botão do pacote do dia dá, uma vez por pessoa por data de Brasília.</summary>
+    public const int PacotesDoDia = 2;
 
-    public static string ChaveVitoria(Guid partidaId) => $"vitoria:{partidaId:N}";
+    /// <summary>Pacotes por jogo do seu time: vitória, empate e derrota (quem faz W.O. não ganha nada).</summary>
+    public const int PacotesPorVitoria = 3;
+    public const int PacotesPorEmpate = 2;
+    public const int PacotesPorDerrota = 1;
+
+    /// <summary>
+    /// O n-ésimo pacote do dia (1, 2…). O primeiro mantém a chave de quando era um só, então quem já pegou
+    /// hoje antes da mudança não pega de novo.
+    /// </summary>
+    public static string ChaveDiario(DateTime diaEmBrasilia, int n = 1) =>
+        n == 1 ? $"diario:{diaEmBrasilia:yyyy-MM-dd}" : $"diario:{diaEmBrasilia:yyyy-MM-dd}:{n}";
+
+    /// <summary>O n-ésimo pacote (1, 2, 3) de um jogo do time da pessoa.</summary>
+    public static string ChaveJogo(Guid partidaId, int n) => $"jogo:{partidaId:N}:{n}";
+
+    /// <summary>Todo mundo (com clube ou sem) ganha 1 pacote em cada dia com jogo (data de Brasília).</summary>
+    public static string ChaveDiaDeJogo(DateTime diaEmBrasilia) => $"diadejogo:{diaEmBrasilia:yyyy-MM-dd}";
+
+    public static string MotivoDiaDeJogo(DateTime diaEmBrasilia) => $"Dia de jogo · {diaEmBrasilia:dd/MM}";
 
     /// <summary>O n-ésimo pacote do bolão da temporada (1, 2, 3…).</summary>
     public static string ChaveBolao(int temporada, int n) => $"bolao:{temporada}:{n}";
@@ -162,6 +180,12 @@ public static class AlbumFigurinhas
         pontosPorPacote <= 0 || pontos <= 0 ? 0 : pontos / pontosPorPacote;
 
     public static string MotivoVitoria(string adversario) => $"Vitória sobre o {adversario}";
+    public static string MotivoEmpate(string adversario) => $"Empate com o {adversario}";
+    public static string MotivoDerrota(string adversario) => $"Derrota para o {adversario}";
+
+    /// <summary>"pela vitória sobre o Grêmio", "pelo empate com o Grêmio"…</summary>
+    private static string PeloJogo(string motivo) =>
+        $"{(motivo.StartsWith("Empate", StringComparison.Ordinal) ? "pelo" : "pela")} {Minuscula(motivo)}";
 
     // ---- Trocas e reciclagem ----
 
@@ -187,7 +211,8 @@ public static class AlbumFigurinhas
     public static string DeOndeVeio(string origem, string? motivo) => origem switch
     {
         PacoteGanho.OrigemDiario => "Pacote do dia",
-        PacoteGanho.OrigemVitoria => motivo ?? "Vitória",
+        PacoteGanho.OrigemJogo => motivo ?? "Jogo do seu time",
+        PacoteGanho.OrigemDiaDeJogo => motivo ?? "Dia de jogo",
         PacoteGanho.OrigemBolao => motivo is null ? "Bolão" : $"Bolão · {motivo}",
         PacoteGanho.OrigemAdmin => motivo is null ? "Da organização" : $"Da organização · {motivo}",
         PacoteGanho.OrigemReciclagem => "Reciclagem de repetidas",
@@ -196,7 +221,7 @@ public static class AlbumFigurinhas
 
     /// <summary>
     /// Texto do aviso no celular. Um pacote diz de onde veio ("Você ganhou 1 pacote pela vitória sobre o
-    /// Grêmio"); vários viram um aviso só ("Você ganhou 3 pacotes: 2 por vitórias e 1 do bolão").
+    /// Grêmio"); vários viram um aviso só ("Você ganhou 4 pacotes: 3 pelos jogos e 1 do bolão").
     /// </summary>
     public static string AvisoDePacotes(IReadOnlyList<(string Origem, string? Motivo)> pacotes)
     {
@@ -207,7 +232,8 @@ public static class AlbumFigurinhas
             var (origem, motivo) = pacotes[0];
             return origem switch
             {
-                PacoteGanho.OrigemVitoria when motivo is not null => $"Você ganhou 1 pacote pela {Minuscula(motivo)}.",
+                PacoteGanho.OrigemJogo when motivo is not null => $"Você ganhou 1 pacote {PeloJogo(motivo)}.",
+                PacoteGanho.OrigemDiaDeJogo => "Você ganhou 1 pacote pelo dia de jogo.",
                 PacoteGanho.OrigemBolao when motivo is not null => $"Você ganhou 1 pacote pelos {motivo}.",
                 PacoteGanho.OrigemAdmin when motivo is not null => $"Você ganhou 1 pacote da organização: {motivo}.",
                 PacoteGanho.OrigemAdmin => "Você ganhou 1 pacote da organização.",
@@ -218,9 +244,15 @@ public static class AlbumFigurinhas
         var origens = pacotes.Select(p => p.Origem).Distinct().ToList();
         if (origens.Count == 1)
         {
+            // Os pacotes de um jogo só (3 pela vitória, 2 pelo empate) dizem qual foi o jogo.
+            var motivos = pacotes.Select(p => p.Motivo).Distinct().ToList();
+            if (origens[0] == PacoteGanho.OrigemJogo && motivos is [{ } motivo])
+                return $"Você ganhou {pacotes.Count} pacotes {PeloJogo(motivo)}.";
+
             var de = origens[0] switch
             {
-                PacoteGanho.OrigemVitoria => " por vitórias",
+                PacoteGanho.OrigemJogo => " pelos jogos",
+                PacoteGanho.OrigemDiaDeJogo => " pelos dias de jogo",
                 PacoteGanho.OrigemBolao => " do bolão",
                 PacoteGanho.OrigemAdmin => " da organização",
                 _ => ""
@@ -232,15 +264,18 @@ public static class AlbumFigurinhas
             .GroupBy(p => p.Origem)
             .OrderBy(g => g.Key switch
             {
-                PacoteGanho.OrigemVitoria => 0,
-                PacoteGanho.OrigemBolao => 1,
-                PacoteGanho.OrigemAdmin => 2,
-                _ => 3
+                PacoteGanho.OrigemJogo => 0,
+                PacoteGanho.OrigemDiaDeJogo => 1,
+                PacoteGanho.OrigemBolao => 2,
+                PacoteGanho.OrigemAdmin => 3,
+                _ => 4
             })
             .Select(g => (g.Key, g.Count()) switch
             {
-                (PacoteGanho.OrigemVitoria, 1) => "1 por vitória",
-                (PacoteGanho.OrigemVitoria, var n) => $"{n} por vitórias",
+                (PacoteGanho.OrigemJogo, 1) => "1 pelo jogo",
+                (PacoteGanho.OrigemJogo, var n) => $"{n} pelos jogos",
+                (PacoteGanho.OrigemDiaDeJogo, 1) => "1 pelo dia de jogo",
+                (PacoteGanho.OrigemDiaDeJogo, var n) => $"{n} pelos dias de jogo",
                 (PacoteGanho.OrigemBolao, var n) => $"{n} do bolão",
                 (PacoteGanho.OrigemAdmin, var n) => $"{n} da organização",
                 (_, var n) => $"{n} {(n == 1 ? "outro" : "outros")}"
