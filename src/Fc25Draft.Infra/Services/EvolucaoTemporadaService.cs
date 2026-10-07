@@ -56,6 +56,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
     {
         // A idade que vale é a da temporada: se a próxima já fez aniversário, desconta.
         var aniversariosDepois = await _db.EnvelhecimentosTemporada.AsNoTracking().CountAsync(e => e.Temporada > temporada, ct);
+        var idadeMaximaDraft = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
 
         var jogadores = await _db.Players.AsNoTracking()
             .Where(p => p.Age != null && p.AposentadoNaTemporada == null)
@@ -119,12 +120,12 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var desempenho = new DesempenhoTemporada(
                 j.TimeId is null, jogosDoClube, dele.Count, nota.Jogos > 0 ? nota.Media : null, nota.Jogos);
             var goleiro = j.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
-            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho);
+            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, idadeMaximaDraft);
             var depois = Math.Clamp(j.Overall + conta.Total, AtributosPes.Minimo, AtributosPes.Maximo);
 
             resultado.Add(new Calculo(
                 new EvolucaoLinhaDto(j.PlayerId, j.Name, j.TimeNome, j.Posicao, j.Idade, j.Overall, depois, depois - j.Overall,
-                    conta.Curva, conta.Desempenho, jogosDoClube, dele.Count, desempenho.NotaMedia, string.Join(" · ", conta.Motivos)),
+                    conta.Curva, conta.Total - conta.Curva, jogosDoClube, dele.Count, desempenho.NotaMedia, string.Join(" · ", conta.Motivos)),
                 desempenho));
         }
 

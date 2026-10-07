@@ -29,6 +29,9 @@ public static class EvolucaoCriterios
     public const decimal NotaBoa = 7.0m;       // média ≥: +1
     public const decimal NotaRuim = 6.0m;      // média <: −1 (com jogos suficientes)
     public const int JogosParaNotaRuim = 5;
+
+    /// <summary>Quem tem clube nunca cai mais que isso numa temporada (idade + desempenho). Livre pode cair mais.</summary>
+    public const int QuedaMaximaComClube = 3;
 }
 
 /// <summary>
@@ -41,9 +44,10 @@ public record DesempenhoTemporada(bool SemClube, int JogosDoClube, int Titular, 
 }
 
 /// <summary>A conta da variação de um jogador: curva + desempenho, com o porquê de cada parte.</summary>
-public record VariacaoCalculada(int Curva, int Desempenho, IReadOnlyList<string> Motivos)
+/// <param name="Piso">Queda máxima (negativo) para quem tem clube; nulo = sem limite.</param>
+public record VariacaoCalculada(int Curva, int Desempenho, IReadOnlyList<string> Motivos, int? Piso = null)
 {
-    public int Total => Curva + Desempenho;
+    public int Total => Piso is int piso ? Math.Max(Curva + Desempenho, piso) : Curva + Desempenho;
 }
 
 public static class EvolucaoTemporada
@@ -56,7 +60,8 @@ public static class EvolucaoTemporada
         return EvolucaoCriterios.Curva.First(l => idadeDaTabela <= l.Ate).Variacao;
     }
 
-    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d)
+    /// <param name="idadeMaximaDraft">Livre com até essa idade está reservado para o draft: não perde por estar sem clube.</param>
+    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d, int? idadeMaximaDraft = null)
     {
         var motivos = new List<string>();
         var curva = Curva(idade, goleiro);
@@ -67,8 +72,15 @@ public static class EvolucaoTemporada
 
         if (d.SemClube)
         {
-            desempenho--;
-            motivos.Add("sem clube: −1");
+            if (idadeMaximaDraft is int maxima && idade <= maxima)
+            {
+                motivos.Add("livre, reservado para o draft: 0");
+            }
+            else
+            {
+                desempenho--;
+                motivos.Add("sem clube: −1");
+            }
         }
         else if (pct is double p && p > EvolucaoCriterios.TitularMuito)
         {
@@ -95,7 +107,12 @@ public static class EvolucaoTemporada
             }
         }
 
-        return new VariacaoCalculada(curva, desempenho, motivos);
+        // Com clube, a queda tem limite; livre (veterano encostado) pode cair mais.
+        int? piso = d.SemClube ? null : -EvolucaoCriterios.QuedaMaximaComClube;
+        if (piso is int limite && curva + desempenho < limite)
+            motivos.Add($"limite de queda com clube: {Sinal(limite)}");
+
+        return new VariacaoCalculada(curva, desempenho, motivos, piso);
     }
 
     private static string Pct(double v) => $"{Math.Round(v * 100):0}%";
