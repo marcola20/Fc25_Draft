@@ -40,14 +40,21 @@
                 @if (_situacao.PodeDesfazer)
                 {
                     <button class="btn btn-sm btn-outline-danger" @onclick="DesfazerAsync" disabled="@_salvando">
-                        Desfazer (todos −1 ano)
+                        Desfazer (−1 ano em quem ganhou)
                     </button>
                 }
             }
             else
             {
                 <ul class="small mb-2">
-                    <li>@_situacao.Jogadores jogadores ganham 1 ano (idade média @_situacao.IdadeMedia.ToString("0.0") → @((_situacao.IdadeMedia + 1).ToString("0.0"))).</li>
+                    <li>@(_situacao.Jogadores - _situacao.JaNaIdade.Count) jogadores ganham 1 ano.</li>
+                    @if (_situacao.JaNaIdade.Count > 0)
+                    {
+                        <li>
+                            @_situacao.JaNaIdade.Count já estão com a idade de @temporada (entraram no site depois, já com +1) e
+                            <strong>não ganham</strong>: <span class="text-muted">@string.Join(", ", _situacao.JaNaIdade)</span>.
+                        </li>
+                    }
                     <li>@_situacao.SaemDoSub23 fazem 24 e saem da idade do draft (sub-23).</li>
                     <li>@_situacao.Chegam34 chegam aos 34, a idade em que a aposentadoria começa a rondar.</li>
                     @if (_situacao.SemIdade > 0)
@@ -83,7 +90,9 @@
     {
         if (_situacao?.Temporada is not int temporada) return;
         if (!await JSRuntime.InvokeAsync<bool>("confirm",
-                $"Todos os {_situacao.Jogadores} jogadores ganham 1 ano na temporada {temporada}. Só dá para fazer uma vez por temporada. Confirmar?"))
+                $"{_situacao.Jogadores - _situacao.JaNaIdade.Count} jogadores ganham 1 ano na temporada {temporada}" +
+                (_situacao.JaNaIdade.Count > 0 ? $" ({_situacao.JaNaIdade.Count} já estão na idade e ficam como estão)" : "") +
+                ". Só dá para fazer uma vez por temporada. Confirmar?"))
             return;
 
         _salvando = true;
@@ -100,14 +109,14 @@
     {
         if (_situacao?.Temporada is not int temporada) return;
         if (!await JSRuntime.InvokeAsync<bool>("confirm",
-                $"Desfazer o aniversário da temporada {temporada}? Todos os jogadores perdem 1 ano (se o Editor PES já gravou as idades, abra-o de novo para corrigir o save)."))
+                $"Desfazer o aniversário da temporada {temporada}? Quem ganhou o ano perde 1 (se o Editor PES já gravou as idades, abra-o de novo para corrigir o save)."))
             return;
 
         _salvando = true;
         try
         {
             _situacao = await IdadesSvc.DesfazerAsync(temporada, CancellationToken.None);
-            _ok = "Desfeito: todos voltaram 1 ano.";
+            _ok = "Desfeito: quem tinha ganhado o ano voltou 1.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

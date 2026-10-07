@@ -93,6 +93,9 @@ public class BasePesService : IBasePesService
     private static readonly Lazy<Dictionary<int, Registro>> PorId =
         new(() => Base.Value.GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.First()));
 
+    /// <summary>Idade do jogador na base do PES embutida; nulo se o ID não está nela.</summary>
+    public static int? IdadeNaBase(int pesId) => PorId.Value.TryGetValue(pesId, out var r) ? r.Idade : null;
+
     private static JogadorPesDto ParaDto(Registro r) => new(r.Id, r.Nome, r.Times, Posicao(r), r.Idade, Atributos(r));
 
     public IReadOnlyList<JogadorPesDto> Buscar(string texto, int maximo = 20)
