@@ -1,0 +1,115 @@
+@inject IIdadesService IdadesSvc
+@inject IJSRuntime JSRuntime
+
+@* Aniversário dos jogadores (todos +1), uma vez por temporada. O Editor PES copia a idade do site para o save. *@
+<div class="card mb-3">
+    <div class="card-header fw-bold">🎂 Idade dos jogadores</div>
+    <div class="card-body">
+        @if (_erro is not null)
+        {
+            <div class="alert alert-danger alert-dismissible py-2">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+        }
+        @if (_ok is not null)
+        {
+            <div class="alert alert-success alert-dismissible py-2">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+        }
+
+        @if (_situacao is null)
+        {
+            <div class="text-muted small">Carregando…</div>
+        }
+        else if (_situacao.Temporada is not int temporada)
+        {
+            <div class="text-muted small">Nenhuma temporada cadastrada.</div>
+        }
+        else
+        {
+            <p class="text-muted small mb-2">
+                Uma vez por temporada todos os jogadores fazem aniversário (+1 ano). O site guarda a idade e o
+                <strong>Editor PES copia a idade do site para o save</strong> quando abre — depois é só gravar lá.
+                O valor de mercado já leva a idade em conta.
+            </p>
+
+            @if (_situacao.JaEnvelhecida)
+            {
+                <div class="alert alert-success py-2 mb-2">
+                    ✅ Os jogadores já fizeram aniversário na temporada @temporada
+                    (@_situacao.JogadoresNoEnvelhecimento jogadores, em @BrazilTime.ConvertFromUtc(_situacao.AplicadoEm!.Value).ToString("dd/MM/yyyy HH:mm")).
+                    Idade média hoje: @_situacao.IdadeMedia.ToString("0.0").
+                </div>
+                @if (_situacao.PodeDesfazer)
+                {
+                    <button class="btn btn-sm btn-outline-danger" @onclick="DesfazerAsync" disabled="@_salvando">
+                        Desfazer (todos −1 ano)
+                    </button>
+                }
+            }
+            else
+            {
+                <ul class="small mb-2">
+                    <li>@_situacao.Jogadores jogadores ganham 1 ano (idade média @_situacao.IdadeMedia.ToString("0.0") → @((_situacao.IdadeMedia + 1).ToString("0.0"))).</li>
+                    <li>@_situacao.SaemDoSub23 fazem 24 e saem da idade do draft (sub-23).</li>
+                    <li>@_situacao.Chegam34 chegam aos 34, a idade em que a aposentadoria começa a rondar.</li>
+                    @if (_situacao.SemIdade > 0)
+                    {
+                        <li class="text-danger">@_situacao.SemIdade jogador(es) sem idade ficam de fora — complete em Jogadores.</li>
+                    }
+                    @if (_situacao.UltimaTemporadaEnvelhecida is int ultima)
+                    {
+                        <li>Último aniversário: temporada @ultima.</li>
+                    }
+                </ul>
+                <button class="btn btn-primary" @onclick="EnvelhecerAsync" disabled="@_salvando">
+                    🎂 Envelhecer todos (+1) na temporada @temporada
+                </button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private EnvelhecimentoSituacaoDto? _situacao;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _situacao = await IdadesSvc.GetSituacaoAsync(CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task EnvelhecerAsync()
+    {
+        if (_situacao?.Temporada is not int temporada) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Todos os {_situacao.Jogadores} jogadores ganham 1 ano na temporada {temporada}. Só dá para fazer uma vez por temporada. Confirmar?"))
+            return;
+
+        _salvando = true;
+        try
+        {
+            _situacao = await IdadesSvc.EnvelhecerAsync(temporada, CancellationToken.None);
+            _ok = $"Pronto: {_situacao.JogadoresNoEnvelhecimento} jogadores fizeram aniversário. Agora abra o Editor PES para levar as idades ao save.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task DesfazerAsync()
+    {
+        if (_situacao?.Temporada is not int temporada) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Desfazer o aniversário da temporada {temporada}? Todos os jogadores perdem 1 ano (se o Editor PES já gravou as idades, abra-o de novo para corrigir o save)."))
+            return;
+
+        _salvando = true;
+        try
+        {
+            _situacao = await IdadesSvc.DesfazerAsync(temporada, CancellationToken.None);
+            _ok = "Desfeito: todos voltaram 1 ano.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

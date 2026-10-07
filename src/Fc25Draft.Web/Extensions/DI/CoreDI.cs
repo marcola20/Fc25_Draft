@@ -77,6 +77,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ILigaTemporadaService, LigaTemporadaService>();
             services.AddComConexaoPropria<IPremiacaoService, PremiacaoService>();
             services.AddComConexaoPropria<IDiretoriaService, DiretoriaService>();
+            services.AddComConexaoPropria<IIdadesService, IdadesService>();
             services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();
             services.AddComConexaoPropria<IHallOfFameService, HallOfFameService>();
             services.AddComConexaoPropria<ITreinadorService, TreinadorService>();
