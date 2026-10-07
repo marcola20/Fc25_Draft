@@ -30,6 +30,14 @@
         @for (var i = 0; i < pontos.Count; i++)
         {
             var p = pontos[i];
+            if (p.Evento is EventoDiretoria evento)
+            {
+                var (cx, cy) = (X(i + 1), Y(p.Valor));
+                <polygon points="@Num(cx),@Num(cy - 7) @Num(cx + 7),@Num(cy) @Num(cx),@Num(cy + 7) @Num(cx - 7),@Num(cy)" fill="var(--cbfv-roxo)">
+                    <title>@p.Data.AddHours(-3).ToString("dd/MM") · @Diretoria.NomeDoEvento(evento) → @p.Valor.ToString("0", Brasil)</title>
+                </polygon>
+                continue;
+            }
             var cor = p.GolsPro > p.GolsContra ? "var(--cbfv-verde)" : p.GolsPro < p.GolsContra ? "#dc3545" : "#6c757d";
             <circle cx="@Num(X(i + 1))" cy="@Num(Y(p.Valor))" r="5" fill="@cor">
                 <title>@p.Data.AddHours(-3).ToString("dd/MM") · @p.Competicao · @p.GolsPro x @p.GolsContra @p.AdversarioNome · @(p.Variacao >= 0 ? "+" : "")@p.Variacao.ToString("0.0", Brasil) → @p.Valor.ToString("0", Brasil)</title>
@@ -37,7 +45,8 @@
         }
     </svg>
     <div class="small text-muted">
-        Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); passe o mouse para ver o placar e quanto a confiança mudou.
+        Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); o losango roxo é uma decisão da diretoria
+        (voto de confiança ou técnico novo). Passe o mouse para ver o placar e quanto a confiança mudou.
     </div>
 }
 

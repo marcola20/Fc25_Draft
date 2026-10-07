@@ -42,7 +42,24 @@
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item"><button class="nav-link @(_aba == "metas" ? "active" : "")" @onclick='() => _aba = "metas"'>Metas</button></li>
             <li class="nav-item"><button class="nav-link @(_aba == "bonus" ? "active" : "")" @onclick="AbrirBonusAsync">Pagar bônus</button></li>
+            <li class="nav-item">
+                <button class="nav-link @(_aba == "demissoes" ? "active" : "")" @onclick='() => _aba = "demissoes"'>
+                    Demissões
+                    @if (Pendentes > 0)
+                    {
+                        <span class="badge bg-danger ms-1">@Pendentes</span>
+                    }
+                </button>
+            </li>
         </ul>
+
+        @if (Pendentes > 0 && _aba != "demissoes")
+        {
+            <div class="alert alert-danger d-flex align-items-center gap-2">
+                <span>🚪 @(Pendentes == 1 ? "1 pedido de demissão esperando" : $"{Pendentes} pedidos de demissão esperando") a sua decisão.</span>
+                <button class="btn btn-sm btn-outline-danger ms-auto" @onclick='() => _aba = "demissoes"'>Ver</button>
+            </div>
+        }
 
         @if (_aba == "metas")
         {
@@ -145,6 +162,71 @@
                 }
             }
         }
+        else if (_aba == "demissoes")
+        {
+            <p class="text-muted small">
+                Quando um time cai para cadeira balançando, a diretoria dá um ultimato de @DiretoriaCriterios.UltimatoPontos pontos
+                em @DiretoriaCriterios.UltimatoJogos jogos. Sem cumprir, ela pede a demissão do técnico. O pedido é sigiloso: só você
+                e o treinador sabem até a decisão. <strong>Aceitar</strong> tira o treinador do clube hoje (a carreira registra a saída;
+                nomeie o substituto em <a href="/admin/treinadores">Gerenciar Treinadores</a>) e o técnico novo começa com
+                @DiretoriaCriterios.ConfiancaInicial.ToString("0") de confiança. <strong>Recusar</strong> é um voto de confiança:
+                a confiança vai a @DiretoriaCriterios.ConfiancaVotoDeConfianca.ToString("0") e fica @DiretoriaCriterios.JogosDeCarencia
+                jogos sem ultimato novo. As duas decisões viram notícia no Plantão.
+            </p>
+
+            @if (_pedidos.Count == 0)
+            {
+                <div class="alert alert-info">Nenhum pedido de demissão em @_temporada.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Técnico</th>
+                                <th class="text-center">Ultimato</th>
+                                <th class="text-center">Confiança hoje</th>
+                                <th>Pedido em</th>
+                                <th class="text-end">Decisão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pedido in _pedidos)
+                            {
+                                <tr class="@(pedido.Status == StatusPedidoDemissao.Pendente ? "table-danger" : "")">
+                                    <td class="fw-semibold">@pedido.TimeNome</td>
+                                    <td>@(pedido.TreinadorNome ?? "—")</td>
+                                    <td class="text-center">@pedido.Pontos de @DiretoriaCriterios.UltimatoPontos pts</td>
+                                    <td class="text-center">@pedido.ConfiancaAtual.ToString("0")</td>
+                                    <td class="small">@BrazilTime.ConvertFromUtc(pedido.CriadoEm).ToString("dd/MM HH:mm")</td>
+                                    <td class="text-end">
+                                        @if (pedido.Status == StatusPedidoDemissao.Pendente)
+                                        {
+                                            <div class="d-flex gap-1 justify-content-end">
+                                                <button class="btn btn-sm btn-danger" @onclick="() => DecidirAsync(pedido, true)" disabled="@_salvando">🚪 Demitir</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => DecidirAsync(pedido, false)" disabled="@_salvando">🤝 Manter</button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(pedido.Status == StatusPedidoDemissao.Aceito ? "bg-danger" : "bg-success")">
+                                                @(pedido.Status == StatusPedidoDemissao.Aceito ? "Demitido" : "Mantido")
+                                            </span>
+                                            @if (pedido.DecididoEm is DateTime decidido)
+                                            {
+                                                <span class="small text-muted ms-1">@BrazilTime.ConvertFromUtc(decidido).ToString("dd/MM")</span>
+                                            }
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
         else
         {
             <p class="text-muted small">
@@ -234,6 +316,9 @@
     private int _temporada;
     private DiretoriaPainelDto? _painel;
     private IReadOnlyList<DiretoriaBonusPreviaDto> _bonus = Array.Empty<DiretoriaBonusPreviaDto>();
+    private IReadOnlyList<PedidoDemissaoDto> _pedidos = Array.Empty<PedidoDemissaoDto>();
+
+    private int Pendentes => _pedidos.Count(p => p.Status == StatusPedidoDemissao.Pendente);
 
     private sealed record Competicao(Guid LigaId, string LigaNome, TipoCompetition Tipo, Divisao? Divisao);
 
@@ -272,6 +357,7 @@
     private async Task CarregarAsync()
     {
         _painel = await DiretoriaSvc.GetPainelAsync(_temporada, CancellationToken.None);
+        _pedidos = await DiretoriaSvc.ListPedidosAsync(_temporada, CancellationToken.None);
         if (_aba == "bonus")
             _bonus = await DiretoriaSvc.ListBonusAsync(_temporada, CancellationToken.None);
     }
@@ -327,6 +413,27 @@
             await DiretoriaSvc.AjustarMetaAsync(meta.MetaId, posicao, fase, CancellationToken.None);
             await CarregarAsync();
             _ok = "Meta ajustada.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task DecidirAsync(PedidoDemissaoDto pedido, bool demitir)
+    {
+        var tecnico = pedido.TreinadorNome ?? "o técnico";
+        var pergunta = demitir
+            ? $"Demitir {tecnico} do {pedido.TimeNome}? Ele sai do clube hoje e vira notícia no Plantão."
+            : $"Manter {tecnico} no {pedido.TimeNome} com um voto de confiança? Vira notícia no Plantão.";
+        if (!await Confirmar(pergunta)) return;
+
+        _salvando = true;
+        try
+        {
+            await DiretoriaSvc.DecidirDemissaoAsync(pedido.PedidoId, demitir, CancellationToken.None);
+            await CarregarAsync();
+            _ok = demitir
+                ? $"{tecnico} foi demitido do {pedido.TimeNome}. Nomeie o substituto em Gerenciar Treinadores."
+                : $"{tecnico} segue no {pedido.TimeNome} com um voto de confiança.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

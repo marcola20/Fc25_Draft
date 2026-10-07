@@ -68,7 +68,7 @@ public class NotificacoesService : BackgroundService
         await TentarAsync("vez no draft", s => AvisarVezNoDraftAsync(s, ct));
         // Antes dos avisos: o que a diretoria gravar sai como notificação nesta mesma checagem.
         if (diretoria)
-            await TentarAsync("diretoria", s => s.GetRequiredService<IDiretoriaService>().AvisarMudancasDeFaixaAsync(ct));
+            await TentarAsync("diretoria", s => s.GetRequiredService<IDiretoriaService>().ProcessarJogosRecentesAsync(ct));
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));
         await TentarAsync("avisos", s => s.GetRequiredService<IPushService>().EnviarAvisosPendentesAsync(ct));
         if (lembrarBolao)

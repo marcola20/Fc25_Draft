@@ -37,3 +37,19 @@ public class DiretoriaPagamentoConfiguration : IEntityTypeConfiguration<Diretori
         b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TimeId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public class PedidoDemissaoConfiguration : IEntityTypeConfiguration<PedidoDemissao>
+{
+    public void Configure(EntityTypeBuilder<PedidoDemissao> b)
+    {
+        b.ToTable("PedidosDemissao");
+        b.HasKey(x => x.PedidoId);
+
+        // Um pedido por ultimato fracassado.
+        b.HasIndex(x => new { x.TimeId, x.PartidaFalhaId }).IsUnique();
+        b.HasIndex(x => x.Temporada);
+
+        b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TimeId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

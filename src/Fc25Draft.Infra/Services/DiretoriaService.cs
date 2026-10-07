@@ -20,11 +20,13 @@ public class DiretoriaService : IDiretoriaService
     private const int NumeroPlayoffAcesso = -2;
 
     private readonly DraftDbContext _db;
+    private readonly ITreinadorService? _treinadores;
     private readonly TimeProvider _time;
 
-    public DiretoriaService(DraftDbContext db, TimeProvider? time = null)
+    public DiretoriaService(DraftDbContext db, ITreinadorService? treinadores = null, TimeProvider? time = null)
     {
         _db = db;
+        _treinadores = treinadores;
         _time = time ?? TimeProvider.System;
     }
 
@@ -57,6 +59,7 @@ public class DiretoriaService : IDiretoriaService
             var m = await MontarAsync(t, ct);
             noticias.AddRange(Diretoria.NoticiasDeConfianca(m.Pontos, m.Nomes));
             noticias.AddRange(NoticiasDeMetas(m));
+            noticias.AddRange(NoticiasDeUltimatos(m));
         }
 
         return noticias.OrderByDescending(n => n.Data).ToArray();
@@ -64,7 +67,7 @@ public class DiretoriaService : IDiretoriaService
 
     // ── Avisos ─────────────────────────────────────────────────────────────
 
-    public async Task<int> AvisarMudancasDeFaixaAsync(CancellationToken ct)
+    public async Task<int> ProcessarJogosRecentesAsync(CancellationToken ct)
     {
         if (await GetTemporadaAtualAsync(ct) is not int temporada) return 0;
 
@@ -78,8 +81,8 @@ public class DiretoriaService : IDiretoriaService
             for (int i = 0; i < pontos.Count; i++)
             {
                 var ponto = pontos[i];
-                // Jogo antigo (ex.: na primeira vez que a checagem roda) não vira aviso.
-                if (ponto.Data < desde) continue;
+                // Jogo antigo (ex.: na primeira vez que a checagem roda) não vira aviso; ajuste da diretoria também não.
+                if (ponto.Data < desde || ponto.Evento is not null) continue;
 
                 var antes = Diretoria.Faixa(i > 0 ? pontos[i - 1].Valor : DiretoriaCriterios.ConfiancaInicial);
                 var depois = Diretoria.Faixa(ponto.Valor);
@@ -99,8 +102,130 @@ public class DiretoriaService : IDiretoriaService
             }
         }
 
+        avisados += await AvisarUltimatosAsync(m, desde, agora, ct);
+
         if (avisados > 0) await _db.SaveChangesAsync(ct);
         return avisados;
+    }
+
+    /// <summary>
+    /// Ultimato novo: avisa o time. Ultimato fracassado: grava o pedido de demissão (para a organização decidir)
+    /// e avisa o time em particular. Nada disso é salvo aqui: entra no SaveChanges de quem chamou.
+    /// </summary>
+    private async Task<int> AvisarUltimatosAsync(Montagem m, DateTime desde, DateTime agora, CancellationToken ct)
+    {
+        var avisados = 0;
+        var pedidosGravados = m.Pedidos.Select(p => (p.TimeId, p.PartidaFalhaId)).ToHashSet();
+
+        foreach (var (timeId, ultimatos) in m.Ultimatos)
+        {
+            foreach (var u in ultimatos)
+            {
+                if (u.Inicio >= desde)
+                {
+                    var chave = $"ultimato:{timeId}:{u.PartidaOrigemId}";
+                    if (!await _db.NotificacoesEnviadas.AnyAsync(n => n.Chave == chave, ct))
+                    {
+                        _db.NotificacoesEnviadas.Add(new NotificacaoEnviada { Chave = chave, EnviadaEm = agora });
+                        AvisosDoTime.Criar(_db, timeId, AvisosDoTime.Diretoria,
+                            $"🚨 Ultimato da diretoria: faça {DiretoriaCriterios.UltimatoPontos} pontos nos próximos " +
+                            $"{DiretoriaCriterios.UltimatoJogos} jogos ou ela vai pedir a sua demissão.",
+                            $"/teams/details/{timeId}", agora);
+                        avisados++;
+                    }
+                }
+
+                // Pedido de demissão vale mesmo para ultimato antigo: é uma decisão que a organização precisa tomar.
+                if (u.Situacao != SituacaoUltimato.Fracassado || u.PartidaFinalId is not Guid falha
+                    || pedidosGravados.Contains((timeId, falha)))
+                    continue;
+
+                var treinador = await _db.TreinadorPassagens.AsNoTracking()
+                    .Where(p => p.TimeId == timeId && p.Ate == null && p.Papel == PapelTreinador.Treinador)
+                    .OrderByDescending(p => p.Desde)
+                    .Select(p => (Guid?)p.TreinadorId)
+                    .FirstOrDefaultAsync(ct);
+
+                _db.PedidosDemissao.Add(new PedidoDemissao
+                {
+                    PedidoId = Guid.NewGuid(),
+                    Temporada = m.Painel.Temporada,
+                    TimeId = timeId,
+                    TreinadorId = treinador,
+                    PartidaOrigemId = u.PartidaOrigemId,
+                    PartidaFalhaId = falha,
+                    Pontos = u.Pontos,
+                    Status = StatusPedidoDemissao.Pendente,
+                    CriadoEm = agora
+                });
+                pedidosGravados.Add((timeId, falha));
+
+                AvisosDoTime.Criar(_db, timeId, AvisosDoTime.Diretoria,
+                    $"📉 Você não cumpriu o ultimato ({u.Pontos} de {DiretoriaCriterios.UltimatoPontos} pontos). " +
+                    "A diretoria pediu a sua demissão; a organização vai conversar com você antes de decidir.",
+                    "/minha-area", agora);
+                avisados++;
+            }
+        }
+
+        return avisados;
+    }
+
+    // ── Demissões ──────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PedidoDemissaoDto>> ListPedidosAsync(int temporada, CancellationToken ct)
+    {
+        var m = await MontarAsync(temporada, ct);
+        var confianca = m.Painel.Times.ToDictionary(t => t.TimeId, t => t.Confianca);
+
+        var pedidos = await _db.PedidosDemissao.AsNoTracking()
+            .Where(p => p.Temporada == temporada)
+            .Select(p => new { p.PedidoId, p.Temporada, p.TimeId, Time = p.Time.TeamName, Treinador = p.Treinador != null ? p.Treinador.Nome : null,
+                               p.Pontos, p.CriadoEm, p.Status, p.DecididoEm })
+            .ToListAsync(ct);
+
+        return pedidos
+            .OrderBy(p => p.Status != StatusPedidoDemissao.Pendente)
+            .ThenByDescending(p => p.CriadoEm)
+            .Select(p => new PedidoDemissaoDto(p.PedidoId, p.Temporada, p.TimeId, p.Time, p.Treinador, p.Pontos,
+                p.CriadoEm, p.Status, p.DecididoEm, confianca.GetValueOrDefault(p.TimeId, DiretoriaCriterios.ConfiancaInicial)))
+            .ToArray();
+    }
+
+    public async Task DecidirDemissaoAsync(Guid pedidoId, bool aceitar, CancellationToken ct)
+    {
+        var pedido = await _db.PedidosDemissao.Include(p => p.Treinador).FirstOrDefaultAsync(p => p.PedidoId == pedidoId, ct)
+            ?? throw new InvalidOperationException("Pedido de demissão não encontrado.");
+        if (pedido.Status != StatusPedidoDemissao.Pendente)
+            throw new InvalidOperationException("Esse pedido já foi decidido.");
+
+        var agora = _time.GetUtcNow().UtcDateTime;
+
+        if (aceitar)
+        {
+            // O treinador sai do clube pelo mesmo caminho de Gerenciar Treinadores (a carreira registra a saída).
+            if (_treinadores is null)
+                throw new InvalidOperationException("Serviço de treinadores indisponível.");
+
+            var passagens = await _db.TreinadorPassagens.AsNoTracking()
+                .Where(p => p.TimeId == pedido.TimeId && p.Ate == null && p.Papel == PapelTreinador.Treinador)
+                .Select(p => p.PassagemId)
+                .ToListAsync(ct);
+            var hoje = HorarioDeBrasilia.Agora(_time);
+            foreach (var passagemId in passagens)
+                await _treinadores.EncerrarPassagemAsync(passagemId, hoje, ct);
+        }
+        else
+        {
+            AvisosDoTime.Criar(_db, pedido.TimeId, AvisosDoTime.Diretoria,
+                $"🤝 A organização recusou o pedido de demissão: a diretoria te deu um voto de confiança " +
+                $"(confiança {DiretoriaCriterios.ConfiancaVotoDeConfianca:0}). Aproveite!",
+                $"/teams/details/{pedido.TimeId}", agora);
+        }
+
+        pedido.Status = aceitar ? StatusPedidoDemissao.Aceito : StatusPedidoDemissao.Recusado;
+        pedido.DecididoEm = agora;
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Até quanto tempo depois do jogo a queda de faixa ainda vira aviso.</summary>
@@ -278,7 +403,9 @@ public class DiretoriaService : IDiretoriaService
         DiretoriaPainelDto Painel,
         Dictionary<Guid, List<PontoConfianca>> Pontos,
         IReadOnlyDictionary<Guid, string> Nomes,
-        IReadOnlyDictionary<Guid, DateTime> UltimoJogoPorLiga);
+        IReadOnlyDictionary<Guid, DateTime> UltimoJogoPorLiga,
+        IReadOnlyDictionary<Guid, IReadOnlyList<UltimatoCalculado>> Ultimatos,
+        IReadOnlyList<PedidoDemissao> Pedidos);
 
     private async Task<Montagem> MontarAsync(int temporada, CancellationToken ct)
     {
@@ -294,7 +421,19 @@ public class DiretoriaService : IDiretoriaService
             .Where(m => m.Temporada == temporada)
             .ToListAsync(ct);
 
-        var (pontos, ultimoJogo) = await ConfiancaAsync(temporada, ct);
+        // Decisões sobre pedidos de demissão mexem na confiança: voto de confiança ou técnico novo.
+        var pedidos = await _db.PedidosDemissao.AsNoTracking()
+            .Include(p => p.Treinador)
+            .Where(p => p.Temporada == temporada)
+            .ToListAsync(ct);
+        var ajustes = pedidos
+            .Where(p => p.Status != StatusPedidoDemissao.Pendente && p.DecididoEm is not null)
+            .Select(p => new DiretoriaAjusteInput(p.TimeId, p.DecididoEm!.Value,
+                p.Status == StatusPedidoDemissao.Aceito ? EventoDiretoria.NovoTecnico : EventoDiretoria.VotoDeConfianca))
+            .ToList();
+
+        var (pontos, ultimoJogo) = await ConfiancaAsync(temporada, ajustes, ct);
+        var ultimatos = pontos.ToDictionary(p => p.Key, p => Diretoria.Ultimatos(p.Key, p.Value));
 
         // Quem joga a temporada: inscritos nas ligas, nos grupos da Copa e quem já tem meta.
         var divisaoPorTime = (await _db.LigaTimes.AsNoTracking()
@@ -334,13 +473,16 @@ public class DiretoriaService : IDiretoriaService
                     metasDoTime,
                     historico.Select(p => new DiretoriaPontoDto(
                         p.PartidaId, p.Data, p.Competicao, p.AdversarioId, nomes.GetValueOrDefault(p.AdversarioId, "?"),
-                        p.GolsPro, p.GolsContra, p.Variacao, p.Valor)).ToArray());
+                        p.GolsPro, p.GolsContra, p.Variacao, p.Valor, p.Evento)).ToArray(),
+                    ultimatos.GetValueOrDefault(id)?.LastOrDefault(u => u.Situacao == SituacaoUltimato.EmAndamento) is { } u
+                        ? new DiretoriaUltimatoDto(u.Inicio, u.Pontos, u.Jogos)
+                        : null);
             })
             .OrderByDescending(t => t.Confianca)
             .ThenBy(t => t.TimeNome, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
 
-        return new Montagem(new DiretoriaPainelDto(temporada, metas.Count > 0, times), pontos, nomes, ultimoJogo);
+        return new Montagem(new DiretoriaPainelDto(temporada, metas.Count > 0, times), pontos, nomes, ultimoJogo, ultimatos, pedidos);
     }
 
     /// <summary>
@@ -348,7 +490,7 @@ public class DiretoriaService : IDiretoriaService
     /// até ali (as temporadas anteriores também contam), com o mesmo cálculo do Power Ranking.
     /// </summary>
     private async Task<(Dictionary<Guid, List<PontoConfianca>> Pontos, Dictionary<Guid, DateTime> UltimoJogoPorLiga)> ConfiancaAsync(
-        int temporada, CancellationToken ct)
+        int temporada, IReadOnlyList<DiretoriaAjusteInput> ajustes, CancellationToken ct)
     {
         // W.O. não diz nada sobre a força do time e fica de fora, como no Power Ranking.
         var partidas = await _db.LigaPartidas.AsNoTracking()
@@ -387,7 +529,7 @@ public class DiretoriaService : IDiretoriaService
             .GroupBy(x => x.P.LigaId)
             .ToDictionary(g => g.Key, g => g.Max(x => x.Quando));
 
-        return (Diretoria.Confianca(jogos), ultimoJogo);
+        return (Diretoria.Confianca(jogos, ajustes), ultimoJogo);
     }
 
     /// <summary>Situação de cada meta: onde o time está e se cumpriu, superou ou não cumpriu.</summary>
@@ -553,6 +695,46 @@ public class DiretoriaService : IDiretoriaService
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// Ultimato dado e cumprido viram notícia; o fracasso não (o pedido de demissão é sigiloso até a
+    /// organização decidir). A decisão vira notícia quando é tomada.
+    /// </summary>
+    private static IEnumerable<PlantaoNoticiaDto> NoticiasDeUltimatos(Montagem m)
+    {
+        foreach (var (timeId, ultimatos) in m.Ultimatos)
+        {
+            var time = m.Nomes.GetValueOrDefault(timeId, "?");
+            var link = $"/teams/details/{timeId}";
+
+            foreach (var u in ultimatos)
+            {
+                yield return new PlantaoNoticiaDto(
+                    u.Inicio.AddSeconds(5), PlantaoCategoria.Diretoria, "🚨", $"Ultimato no {time}!",
+                    $"A diretoria exige {DiretoriaCriterios.UltimatoPontos} pontos nos próximos {DiretoriaCriterios.UltimatoJogos} jogos",
+                    link, time);
+
+                if (u.Situacao == SituacaoUltimato.Cumprido && u.Fim is DateTime fim)
+                    yield return new PlantaoNoticiaDto(
+                        fim.AddSeconds(5), PlantaoCategoria.Diretoria, "😮‍💨", $"{time} cumpre o ultimato e o técnico respira",
+                        $"{u.Pontos} pontos em {u.Jogos} {(u.Jogos == 1 ? "jogo" : "jogos")}", link, time);
+            }
+        }
+
+        foreach (var p in m.Pedidos.Where(p => p.DecididoEm is not null))
+        {
+            var time = m.Nomes.GetValueOrDefault(p.TimeId, "?");
+            var tecnico = p.Treinador?.Nome;
+            yield return p.Status == StatusPedidoDemissao.Aceito
+                ? new PlantaoNoticiaDto(p.DecididoEm!.Value, PlantaoCategoria.Diretoria, "🚪",
+                    tecnico is null ? $"{time} demite o técnico" : $"{time} demite {tecnico}",
+                    "Ultimato não cumprido: a diretoria levou a melhor", $"/teams/details/{p.TimeId}", time)
+                : new PlantaoNoticiaDto(p.DecididoEm!.Value, PlantaoCategoria.Diretoria, "🤝",
+                    tecnico is null ? $"Diretoria do {time} mantém o técnico" : $"Diretoria do {time} mantém {tecnico}",
+                    $"Voto de confiança depois do ultimato: confiança volta a {DiretoriaCriterios.ConfiancaVotoDeConfianca:0}",
+                    $"/teams/details/{p.TimeId}", time);
+        }
     }
 
     /// <summary>Fim da liga: quem superou ou não cumpriu a meta vira notícia (cumprir é o esperado).</summary>

@@ -70,6 +70,7 @@ public class DraftDbContext : DbContext
     public DbSet<PremiacaoPagamento> PremiacaoPagamentos => Set<PremiacaoPagamento>();
     public DbSet<MetaDiretoria> MetasDiretoria => Set<MetaDiretoria>();
     public DbSet<DiretoriaPagamento> DiretoriaPagamentos => Set<DiretoriaPagamento>();
+    public DbSet<PedidoDemissao> PedidosDemissao => Set<PedidoDemissao>();
     public DbSet<TeamRoster> TeamRosters => Set<TeamRoster>();
     public DbSet<TeamLineup> TeamLineups => Set<TeamLineup>();
     public DbSet<TeamLineupSlot> TeamLineupSlots => Set<TeamLineupSlot>();

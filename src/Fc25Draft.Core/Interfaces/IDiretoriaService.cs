@@ -23,10 +23,20 @@ public interface IDiretoriaService
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 
     /// <summary>
-    /// Avisa (uma vez por jogo) o time que caiu para "pressionado" ou "cadeira balançando" num jogo recente;
-    /// o aviso aparece no sino e vira notificação no celular. Retorna quantos.
+    /// Confere os jogos recentes: avisa (uma vez por jogo) quem caiu para "pressionado" ou "cadeira balançando"
+    /// e quem recebeu ultimato, e grava o pedido de demissão de quem não cumpriu o ultimato. Os avisos aparecem
+    /// no sino e viram notificação no celular. Retorna quantos avisos.
     /// </summary>
-    Task<int> AvisarMudancasDeFaixaAsync(CancellationToken ct);
+    Task<int> ProcessarJogosRecentesAsync(CancellationToken ct);
+
+    /// <summary>Pedidos de demissão da temporada, os pendentes primeiro. Só para a organização.</summary>
+    Task<IReadOnlyList<PedidoDemissaoDto>> ListPedidosAsync(int temporada, CancellationToken ct);
+
+    /// <summary>
+    /// Aceito: o treinador sai do clube (a passagem dele termina hoje) e o técnico novo começa com a confiança
+    /// inicial. Recusado: voto de confiança.
+    /// </summary>
+    Task DecidirDemissaoAsync(Guid pedidoId, bool aceitar, CancellationToken ct);
 
     /// <summary>Calcula e grava as metas da temporada, trocando as que já existiam.</summary>
     Task<DiretoriaPainelDto> GerarMetasAsync(int temporada, CancellationToken ct);

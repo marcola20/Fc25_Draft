@@ -44,6 +44,16 @@ public static class DiretoriaCriterios
     public const double LimiteEstavel = 50;
     public const double LimiteSobObservacao = 35;
     public const double LimitePressionado = 20;
+
+    // Ultimato: ao cair para "cadeira balançando", a diretoria exige pontos num prazo de jogos.
+    public const int UltimatoPontos = 4;
+    public const int UltimatoJogos = 3;
+
+    /// <summary>Recusado o pedido de demissão, a confiança vai para este valor (voto de confiança).</summary>
+    public const double ConfiancaVotoDeConfianca = 35;
+
+    /// <summary>Depois do voto de confiança, quantos jogos sem ultimato novo.</summary>
+    public const int JogosDeCarencia = 3;
 }
 
 public enum FaixaConfianca
@@ -82,10 +92,38 @@ public record DiretoriaJogoInput(
     Guid PartidaId, string Competicao, DateTime Data,
     Guid CasaId, Guid ForaId, int GolsCasa, int GolsFora, double EsperadoCasa);
 
-/// <summary>Como a confiança de um time ficou depois de um jogo.</summary>
+/// <summary>Como a confiança de um time ficou depois de um jogo (ou de um <see cref="Evento"/> da diretoria).</summary>
+/// <param name="Evento">Nulo num jogo; num ajuste da diretoria, o que aconteceu (sem partida nem adversário).</param>
 public record PontoConfianca(
     Guid PartidaId, string Competicao, DateTime Data, Guid AdversarioId,
-    int GolsPro, int GolsContra, double Variacao, double Valor);
+    int GolsPro, int GolsContra, double Variacao, double Valor, EventoDiretoria? Evento = null);
+
+public enum EventoDiretoria
+{
+    /// <summary>Pedido de demissão recusado: a confiança vai para o voto de confiança.</summary>
+    VotoDeConfianca = 1,
+    /// <summary>Pedido aceito: o técnico novo começa com a confiança inicial.</summary>
+    NovoTecnico = 2
+}
+
+/// <summary>Ajuste da confiança de um time num momento (decisão sobre um pedido de demissão).</summary>
+public record DiretoriaAjusteInput(Guid TimeId, DateTime Data, EventoDiretoria Evento);
+
+public enum SituacaoUltimato
+{
+    EmAndamento = 0,
+    Cumprido,
+    Fracassado
+}
+
+/// <summary>Ultimato da diretoria: começa no jogo que levou à cadeira balançando e vale para os jogos seguintes.</summary>
+/// <param name="PartidaFinalId">Jogo que cumpriu ou fez fracassar o ultimato; nulo em andamento.</param>
+public record UltimatoCalculado(
+    Guid TimeId, Guid PartidaOrigemId, DateTime Inicio, int Pontos, int Jogos,
+    SituacaoUltimato Situacao, Guid? PartidaFinalId, DateTime? Fim)
+{
+    public int JogosRestantes => DiretoriaCriterios.UltimatoJogos - Jogos;
+}
 
 public static class Diretoria
 {
@@ -252,7 +290,8 @@ public static class Diretoria
     /// e anda K × (resultado − chance esperada) × peso da goleada, entre 0 e 100.
     /// Os jogos precisam vir na ordem em que foram disputados.
     /// </summary>
-    public static Dictionary<Guid, List<PontoConfianca>> Confianca(IEnumerable<DiretoriaJogoInput> jogosEmOrdem)
+    public static Dictionary<Guid, List<PontoConfianca>> Confianca(
+        IEnumerable<DiretoriaJogoInput> jogosEmOrdem, IEnumerable<DiretoriaAjusteInput>? ajustes = null)
     {
         var pontos = new Dictionary<Guid, List<PontoConfianca>>();
         double Atual(Guid id) =>
@@ -267,8 +306,27 @@ public static class Diretoria
                 Math.Round(depois - antes, 1), Math.Round(depois, 1)));
         }
 
+        // Ajustes entram na linha do tempo depois dos jogos que já tinham acontecido na hora da decisão.
+        var pendentes = new Queue<DiretoriaAjusteInput>((ajustes ?? Array.Empty<DiretoriaAjusteInput>()).OrderBy(a => a.Data));
+
+        void AplicarAjustesAte(DateTime? data)
+        {
+            while (pendentes.Count > 0 && (data is null || pendentes.Peek().Data <= data))
+            {
+                var a = pendentes.Dequeue();
+                var antes = Atual(a.TimeId);
+                var depois = a.Evento == EventoDiretoria.VotoDeConfianca
+                    ? DiretoriaCriterios.ConfiancaVotoDeConfianca
+                    : DiretoriaCriterios.ConfiancaInicial;
+                if (!pontos.TryGetValue(a.TimeId, out var lista)) pontos[a.TimeId] = lista = new List<PontoConfianca>();
+                lista.Add(new PontoConfianca(Guid.Empty, NomeDoEvento(a.Evento), a.Data, Guid.Empty, 0, 0,
+                    Math.Round(depois - antes, 1), depois, a.Evento));
+            }
+        }
+
         foreach (var j in jogosEmOrdem)
         {
+            AplicarAjustesAte(j.Data);
             var resultado = j.GolsCasa > j.GolsFora ? 1.0 : j.GolsCasa < j.GolsFora ? 0.0 : 0.5;
             var variacao = DiretoriaCriterios.K
                            * PowerRankingCriterios.MultiplicadorMargem(Math.Abs(j.GolsCasa - j.GolsFora))
@@ -278,7 +336,72 @@ public static class Diretoria
             Registrar(j, j.ForaId, j.CasaId, j.GolsFora, j.GolsCasa, -variacao);
         }
 
+        AplicarAjustesAte(null);
         return pontos;
+    }
+
+    public static string NomeDoEvento(EventoDiretoria evento) => evento switch
+    {
+        EventoDiretoria.VotoDeConfianca => "Voto de confiança",
+        _ => "Técnico novo"
+    };
+
+    /// <summary>
+    /// Ultimatos de um time ao longo da temporada. Ao cair para "cadeira balançando", a diretoria exige
+    /// <see cref="DiretoriaCriterios.UltimatoPontos"/> pontos nos <see cref="DiretoriaCriterios.UltimatoJogos"/>
+    /// jogos seguintes. Cumpriu: segue a vida. Ficou impossível: fracassou e a diretoria pede a demissão; até
+    /// a organização decidir não há ultimato novo. Voto de confiança dá alguns jogos de carência; técnico novo
+    /// começa do zero.
+    /// </summary>
+    public static IReadOnlyList<UltimatoCalculado> Ultimatos(Guid timeId, IReadOnlyList<PontoConfianca> pontos)
+    {
+        var ultimatos = new List<UltimatoCalculado>();
+        UltimatoCalculado? atual = null;
+        var aguardandoDecisao = false;
+        var carencia = 0;
+
+        foreach (var p in pontos)
+        {
+            if (p.Evento is EventoDiretoria evento)
+            {
+                atual = null;
+                aguardandoDecisao = false;
+                carencia = evento == EventoDiretoria.VotoDeConfianca ? DiretoriaCriterios.JogosDeCarencia : 0;
+                continue;
+            }
+
+            if (atual is not null)
+            {
+                var pontosDoJogo = p.GolsPro > p.GolsContra ? 3 : p.GolsPro == p.GolsContra ? 1 : 0;
+                atual = atual with { Pontos = atual.Pontos + pontosDoJogo, Jogos = atual.Jogos + 1 };
+
+                if (atual.Pontos >= DiretoriaCriterios.UltimatoPontos)
+                {
+                    ultimatos.Add(atual with { Situacao = SituacaoUltimato.Cumprido, PartidaFinalId = p.PartidaId, Fim = p.Data });
+                    atual = null;
+                }
+                else if (atual.Pontos + 3 * atual.JogosRestantes < DiretoriaCriterios.UltimatoPontos)
+                {
+                    ultimatos.Add(atual with { Situacao = SituacaoUltimato.Fracassado, PartidaFinalId = p.PartidaId, Fim = p.Data });
+                    atual = null;
+                    aguardandoDecisao = true;
+                }
+                continue;
+            }
+
+            if (aguardandoDecisao) continue;
+            if (carencia > 0)
+            {
+                carencia--;
+                continue;
+            }
+
+            if (Faixa(p.Valor) == FaixaConfianca.CadeiraBalancando)
+                atual = new UltimatoCalculado(timeId, p.PartidaId, p.Data, 0, 0, SituacaoUltimato.EmAndamento, null, null);
+        }
+
+        if (atual is not null) ultimatos.Add(atual);
+        return ultimatos;
     }
 
     /// <summary>Quantos times aparecem em "na corda bamba" no resumo da rodada.</summary>
@@ -353,6 +476,12 @@ public static class Diretoria
             foreach (var p in lista)
             {
                 var agora = Faixa(p.Valor);
+                // Ajuste da diretoria (voto de confiança, técnico novo) tem notícia própria.
+                if (p.Evento is not null)
+                {
+                    antes = agora;
+                    continue;
+                }
                 if (agora != antes)
                 {
                     var adversario = nomes.GetValueOrDefault(p.AdversarioId, "?");

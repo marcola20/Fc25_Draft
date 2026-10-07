@@ -61,3 +61,41 @@ public class DiretoriaPagamento
     public Liga Liga { get; set; } = null!;
     public Team Time { get; set; } = null!;
 }
+
+public enum StatusPedidoDemissao
+{
+    Pendente = 0,
+    Aceito = 1,
+    Recusado = 2
+}
+
+/// <summary>
+/// Pedido de demissão da diretoria depois de um ultimato não cumprido. Só a organização vê até decidir:
+/// aceito, o treinador sai do clube; recusado, vira voto de confiança.
+/// </summary>
+public class PedidoDemissao
+{
+    public Guid PedidoId { get; set; }
+    public int Temporada { get; set; }
+    public Guid TimeId { get; set; }
+
+    /// <summary>Treinador do time quando o pedido foi feito.</summary>
+    public Guid? TreinadorId { get; set; }
+
+    /// <summary>Jogo que levou à cadeira balançando e abriu o ultimato.</summary>
+    public Guid PartidaOrigemId { get; set; }
+
+    /// <summary>Jogo em que o ultimato ficou impossível de cumprir.</summary>
+    public Guid PartidaFalhaId { get; set; }
+
+    /// <summary>Pontos feitos no ultimato.</summary>
+    public int Pontos { get; set; }
+
+    public StatusPedidoDemissao Status { get; set; }
+
+    public DateTime CriadoEm { get; set; }
+    public DateTime? DecididoEm { get; set; }
+
+    public Team Time { get; set; } = null!;
+    public Treinador? Treinador { get; set; }
+}

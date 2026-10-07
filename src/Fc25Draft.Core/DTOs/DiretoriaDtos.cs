@@ -1,3 +1,4 @@
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Utilities;
 
@@ -34,9 +35,11 @@ public record DiretoriaPontoDto(
     int GolsPro,
     int GolsContra,
     double Variacao,
-    double Valor);
+    double Valor,
+    EventoDiretoria? Evento = null);
 
 /// <param name="UltimaVariacao">Quanto a confiança mudou no último jogo; nulo antes do 1º jogo.</param>
+/// <param name="Ultimato">Ultimato valendo agora; nulo sem ultimato.</param>
 public record DiretoriaTimeDto(
     Guid TimeId,
     string TimeNome,
@@ -45,7 +48,30 @@ public record DiretoriaTimeDto(
     FaixaConfianca Faixa,
     double? UltimaVariacao,
     IReadOnlyList<DiretoriaMetaDto> Metas,
-    IReadOnlyList<DiretoriaPontoDto> Historico);
+    IReadOnlyList<DiretoriaPontoDto> Historico,
+    DiretoriaUltimatoDto? Ultimato = null);
+
+/// <summary>Ultimato valendo: quantos pontos e jogos já foram, de quantos.</summary>
+public record DiretoriaUltimatoDto(DateTime Inicio, int Pontos, int Jogos)
+{
+    public int PontosExigidos => DiretoriaCriterios.UltimatoPontos;
+    public int JogosDoPrazo => DiretoriaCriterios.UltimatoJogos;
+    public int JogosRestantes => JogosDoPrazo - Jogos;
+    public int PontosQueFaltam => Math.Max(0, PontosExigidos - Pontos);
+}
+
+/// <summary>Pedido de demissão para a organização decidir.</summary>
+public record PedidoDemissaoDto(
+    Guid PedidoId,
+    int Temporada,
+    Guid TimeId,
+    string TimeNome,
+    string? TreinadorNome,
+    int Pontos,
+    DateTime CriadoEm,
+    StatusPedidoDemissao Status,
+    DateTime? DecididoEm,
+    double ConfiancaAtual);
 
 /// <summary>Diretoria de todos os times numa temporada.</summary>
 public record DiretoriaPainelDto(

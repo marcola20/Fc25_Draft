@@ -19,6 +19,17 @@
         </span>
     }
 </div>
+@if (Time.Ultimato is { } u)
+{
+    <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small d-flex flex-wrap gap-2 align-items-center">
+        <strong>🚨 Ultimato da diretoria:</strong>
+        <span>@u.Pontos de @u.PontosExigidos pontos · @(u.JogosRestantes == 1 ? "falta 1 jogo" : $"faltam {u.JogosRestantes} jogos")</span>
+        @if (u.PontosQueFaltam > 0)
+        {
+            <span class="text-muted">(precisa de mais @u.PontosQueFaltam)</span>
+        }
+    </div>
+}
 
 @code {
     private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
