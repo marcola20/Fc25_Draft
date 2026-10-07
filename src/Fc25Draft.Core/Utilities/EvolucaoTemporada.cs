@@ -33,6 +33,13 @@ public static class EvolucaoCriterios
 
     /// <summary>Quem tem clube nunca cai mais que isso numa temporada (idade + desempenho). Livre pode cair mais.</summary>
     public const int QuedaMaximaComClube = 3;
+
+    /// <summary>
+    /// Os pontos da evolução vão para os atributos: cada ponto é ±1 em 5 ou 6 atributos (sorteado por jogador e
+    /// temporada) e o overall é o que a fórmula der.
+    /// </summary>
+    public const int AtributosPorPontoMin = 5;
+    public const int AtributosPorPontoMax = 6;
 }
 
 /// <summary>
@@ -121,6 +128,11 @@ public static class EvolucaoTemporada
     }
 
     private static string Pct(double v) => $"{Math.Round(v * 100):0}%";
+
+    /// <summary>Quantos atributos recebem os pontos: 5 ou 6, sempre o mesmo para o jogador na temporada.</summary>
+    public static int AtributosAfetados(int temporada, int playerId) =>
+        new Random(unchecked(temporada * 92_821 + playerId * 6_007))
+            .Next(EvolucaoCriterios.AtributosPorPontoMin, EvolucaoCriterios.AtributosPorPontoMax + 1);
 
     public static string Sinal(int v) => v > 0 ? $"+{v}" : v < 0 ? $"−{-v}" : "0";
 }

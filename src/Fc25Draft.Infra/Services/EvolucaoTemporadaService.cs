@@ -33,10 +33,14 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
 
         var linhas = await _db.VariacoesDaTemporada.AsNoTracking()
             .Where(v => v.Temporada == temporada)
-            .Select(v => new EvolucaoLinhaDto(
-                v.PlayerId, v.Player.Name, v.Player.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
-                v.Player.Position.Name, v.Idade, v.OverallAntes, v.OverallDepois, v.Variacao, v.Curva, v.Desempenho,
-                v.JogosDoClube, v.Titular, v.NotaMedia, v.Explicacao))
+            .Select(v => new
+            {
+                Linha = new EvolucaoLinhaDto(
+                    v.PlayerId, v.Player.Name, v.Player.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
+                    v.Player.Position.Name, v.Idade, v.OverallAntes, v.OverallDepois, v.Pontos, v.Variacao, v.Curva, v.Desempenho,
+                    v.JogosDoClube, v.Titular, v.NotaMedia, v.Explicacao, ""),
+                Mudancas = _db.EvolucoesPes.Where(e => e.EvolucaoPesId == v.EvolucaoPesId).Select(e => e.Mudancas).FirstOrDefault()
+            })
             .ToListAsync(ct);
 
         var evolucaoIds = await _db.VariacoesDaTemporada.AsNoTracking()
@@ -46,10 +50,14 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
         var jaNoJogo = await _db.EvolucoesPes.AsNoTracking()
             .AnyAsync(e => evolucaoIds.Contains(e.EvolucaoPesId) && e.AplicadaNoJogoEmUtc != null, ct);
 
-        return new EvolucaoPreviaDto(temporada, registro.AplicadaEm, !jaNoJogo, Ordenar(linhas));
+        return new EvolucaoPreviaDto(temporada, registro.AplicadaEm, !jaNoJogo, Ordenar(linhas.Select(l =>
+            l.Mudancas is null
+                ? l.Linha
+                : l.Linha with { Atributos = OverallPes.DescreverMudancas(new int[OverallPes.NumAtributos], l.Mudancas.Split(',').Select(int.Parse).ToArray()) })));
     }
 
-    private sealed record Calculo(EvolucaoLinhaDto Linha, DesempenhoTemporada Desempenho);
+    /// <param name="Novos">Atributos depois da evolução; nulo para quem não tem atributos do jogo.</param>
+    private sealed record Calculo(EvolucaoLinhaDto Linha, DesempenhoTemporada Desempenho, int[]? Antes, int[]? Novos, int Afetados);
 
     /// <summary>A conta de todos os jogadores com idade, pelos jogos da temporada.</summary>
     private async Task<IReadOnlyList<Calculo>> CalcularAsync(int temporada, CancellationToken ct)
@@ -63,7 +71,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             .Select(p => new
             {
                 p.PlayerId, p.Name, Idade = p.Age!.Value - aniversariosDepois, p.Overall, p.PositionId, Posicao = p.Position.Name,
-                PosicaoPes = p.Atributos != null ? p.Atributos.PosicaoPes : null,
+                p.Atributos,
                 TimeId = p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault(),
                 TimeNome = p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()
             })
@@ -119,21 +127,44 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var nota = notas.TryGetValue(j.PlayerId, out var n) ? n : default;
             var desempenho = new DesempenhoTemporada(
                 j.TimeId is null, jogosDoClube, dele.Count, nota.Jogos > 0 ? nota.Media : null, nota.Jogos);
-            var goleiro = j.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
+            var dto = j.Atributos is null ? null : AtributosPes.ParaDto(j.Atributos);
+            var goleiro = dto?.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
             var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, idadeMaximaDraft);
-            var depois = Math.Clamp(j.Overall + conta.Total, AtributosPes.Minimo, AtributosPes.Maximo);
+            var pontos = conta.Total;
+            var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId);
+
+            // Os pontos vão para os atributos; o overall é o que a fórmula der.
+            int[]? antes = null, novos = null;
+            var depois = j.Overall;
+            var atributos = "";
+            if (dto?.PosicaoPes is int pos)
+            {
+                antes = OverallPes.Valores(dto);
+                novos = OverallPes.AplicarPontos(antes, pos, dto.EstiloDeJogo, dto.PeFracoUso, dto.PeFracoPrecisao, pontos, afetados);
+                depois = Math.Clamp(OverallPes.Arredondar(OverallPes.Calcular(novos, pos, dto.PeFracoUso, dto.PeFracoPrecisao)), 1, 99);
+                atributos = OverallPes.DescreverMudancas(antes, novos);
+            }
+            else
+            {
+                // Sem atributos do jogo: só o overall do site muda, pela metade dos pontos (como os atributos fariam).
+                depois = Math.Clamp(j.Overall + pontos / 2, AtributosPes.Minimo, AtributosPes.Maximo);
+            }
+
+            var motivos = conta.Motivos.ToList();
+            if (pontos != 0) motivos.Add($"{EvolucaoTemporada.Sinal(pontos)} em {afetados} atributos");
 
             resultado.Add(new Calculo(
-                new EvolucaoLinhaDto(j.PlayerId, j.Name, j.TimeNome, j.Posicao, j.Idade, j.Overall, depois, depois - j.Overall,
-                    conta.Curva, conta.Total - conta.Curva, jogosDoClube, dele.Count, desempenho.NotaMedia, string.Join(" · ", conta.Motivos)),
-                desempenho));
+                new EvolucaoLinhaDto(j.PlayerId, j.Name, j.TimeNome, j.Posicao, j.Idade, j.Overall, depois, pontos, depois - j.Overall,
+                    conta.Curva, pontos - conta.Curva, jogosDoClube, dele.Count, desempenho.NotaMedia, string.Join(" · ", motivos), atributos),
+                desempenho, antes, novos, afetados));
         }
 
-        return resultado.OrderByDescending(r => r.Linha.Variacao).ThenByDescending(r => r.Linha.OverallAntes).ToArray();
+        return resultado.OrderByDescending(r => r.Linha.Pontos).ThenByDescending(r => r.Linha.Variacao)
+            .ThenByDescending(r => r.Linha.OverallAntes).ToArray();
     }
 
     private static IReadOnlyList<EvolucaoLinhaDto> Ordenar(IEnumerable<EvolucaoLinhaDto> linhas) =>
-        linhas.OrderByDescending(l => l.Variacao).ThenByDescending(l => l.OverallAntes).ToArray();
+        linhas.OrderByDescending(l => l.Pontos).ThenByDescending(l => l.Variacao).ThenByDescending(l => l.OverallAntes).ToArray();
 
     // ── Aplicar e desfazer ─────────────────────────────────────────────────
 
@@ -150,40 +181,35 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var calculos = await CalcularAsync(temporada, ct);
             var agora = _time.GetUtcNow().UtcDateTime;
 
-            var mudam = calculos.Where(c => c.Linha.Variacao != 0).Select(c => c.Linha.PlayerId).ToList();
+            var mudam = calculos.Where(c => c.Linha.Pontos != 0).Select(c => c.Linha.PlayerId).ToList();
             var jogadores = await _db.Players.Include(p => p.Atributos)
                 .Where(p => mudam.Contains(p.PlayerId))
                 .ToDictionaryAsync(p => p.PlayerId, ct);
 
             var evolucoes = new Dictionary<int, EvolucaoPes>();
-            foreach (var c in calculos.Where(c => c.Linha.Variacao != 0))
+            foreach (var c in calculos.Where(c => c.Linha.Pontos != 0))
             {
                 var jogador = jogadores[c.Linha.PlayerId];
                 var antesOverall = jogador.Overall;
 
-                if (jogador.Atributos?.PosicaoPes is int pos)
+                if (jogador.Atributos?.PosicaoPes is not null && c.Antes is { } antes && c.Novos is { } novos)
                 {
-                    var dto = AtributosPes.ParaDto(jogador.Atributos);
-                    var antes = OverallPes.Valores(dto);
-                    var alvo = c.Linha.OverallDepois;
-                    var evolucao = c.Linha.Variacao > 0
-                        ? OverallPes.Evoluir(antes, pos, dto.EstiloDeJogo, dto.PeFracoUso, dto.PeFracoPrecisao, alvo)
-                        : OverallPes.Regredir(antes, pos, dto.PeFracoUso, dto.PeFracoPrecisao, alvo);
-                    if (evolucao.Novos.SequenceEqual(antes)) continue;
+                    if (novos.SequenceEqual(antes)) continue;
 
-                    for (var i = 0; i < antes.Length; i++)
-                        AtributosPes.Todos[i].Set(dto, evolucao.Novos[i]);
+                    var dto = AtributosPes.ParaDto(jogador.Atributos);
+                    for (var i = 0; i < novos.Length; i++)
+                        AtributosPes.Todos[i].Set(dto, novos[i]);
                     AtributosPes.Aplicar(dto, jogador.Atributos);
                     OverallPes.Recalcular(jogador);
 
                     var e = new EvolucaoPes
                     {
                         PlayerId = jogador.PlayerId,
-                        Motivo = $"Temporada {temporada}: {EvolucaoTemporada.Sinal(c.Linha.Variacao)}",
+                        Motivo = $"Temporada {temporada}: {EvolucaoTemporada.Sinal(c.Linha.Pontos)} em {c.Afetados} atributos",
                         CriadaEmUtc = agora,
                         OverallAntes = antesOverall,
                         OverallDepois = jogador.Overall,
-                        Mudancas = EvolucaoPes.EscreverMudancas(antes, evolucao.Novos),
+                        Mudancas = EvolucaoPes.EscreverMudancas(antes, novos),
                     };
                     _db.EvolucoesPes.Add(e);
                     evolucoes[jogador.PlayerId] = e;
@@ -212,6 +238,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
                     NotaMedia = c.Desempenho.NotaMedia,
                     Curva = c.Linha.Curva,
                     Desempenho = c.Linha.Desempenho,
+                    Pontos = c.Linha.Pontos,
                     Variacao = depois - c.Linha.OverallAntes,
                     OverallAntes = c.Linha.OverallAntes,
                     OverallDepois = depois,
@@ -224,7 +251,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             {
                 Temporada = temporada,
                 AplicadaEm = agora,
-                Jogadores = calculos.Count(c => c.Linha.Variacao != 0)
+                Jogadores = calculos.Count(c => c.Linha.Pontos != 0)
             });
 
             await _db.SaveChangesAsync(ct);
@@ -252,12 +279,12 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
                 throw new InvalidOperationException(
                     "O Editor PES já gravou parte dessa evolução no jogo: desfazer agora deixaria o site e o jogo diferentes.");
 
-            var mudaram = variacoes.Where(v => v.Variacao != 0).Select(v => v.PlayerId).ToList();
+            var mudaram = variacoes.Where(v => v.Pontos != 0).Select(v => v.PlayerId).ToList();
             var jogadores = await _db.Players.Include(p => p.Atributos)
                 .Where(p => mudaram.Contains(p.PlayerId))
                 .ToDictionaryAsync(p => p.PlayerId, ct);
 
-            foreach (var v in variacoes.Where(v => v.Variacao != 0))
+            foreach (var v in variacoes.Where(v => v.Pontos != 0))
             {
                 if (!jogadores.TryGetValue(v.PlayerId, out var jogador)) continue;
 

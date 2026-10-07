@@ -24,6 +24,8 @@
             menos o jovem livre reservado para o draft;
             nota média ≥ @EvolucaoCriterios.NotaBoa.ToString("0.0"): +1; abaixo de @EvolucaoCriterios.NotaRuim.ToString("0.0") com @EvolucaoCriterios.JogosParaNotaRuim+ jogos: −1).
             Quem tem clube cai no máximo @EvolucaoCriterios.QuedaMaximaComClube por temporada; o livre veterano pode cair mais.
+            Cada ponto é ±1 em @EvolucaoCriterios.AtributosPorPontoMin ou @EvolucaoCriterios.AtributosPorPontoMax atributos (subindo: os do estilo
+            de jogo e os que mais pesam na posição; caindo: os físicos primeiro) e o overall é o que a fórmula der.
             A mudança vai para os atributos e o <strong>Editor PES leva ao save</strong> quando abrir. Faça antes do aniversário da temporada seguinte.
         </p>
 
@@ -59,6 +61,7 @@
                             <th>Jogador</th>
                             <th>Clube</th>
                             <th class="text-center">Idade</th>
+                            <th class="text-center" title="Pontos da evolução: ± em cada atributo afetado">Pontos</th>
                             <th class="text-center">Overall</th>
                             <th class="text-center" title="Titular / jogos do clube com escalação gravada">Titular</th>
                             <th class="text-center">Nota</th>
@@ -72,6 +75,7 @@
                                 <td><a href="@($"/players/details/{l.PlayerId}")" class="text-reset">@l.Nome</a> <span class="text-muted small">@l.Posicao</span></td>
                                 <td class="small">@(l.TimeNome ?? "—")</td>
                                 <td class="text-center">@l.Idade</td>
+                                <td class="text-center fw-semibold @(l.Pontos > 0 ? "text-success" : l.Pontos < 0 ? "text-danger" : "text-muted")">@EvolucaoTemporada.Sinal(l.Pontos)</td>
                                 <td class="text-center text-nowrap">
                                     @l.OverallAntes →
                                     <strong class="@(l.Variacao > 0 ? "text-success" : l.Variacao < 0 ? "text-danger" : "")">@l.OverallDepois</strong>
@@ -79,7 +83,13 @@
                                 </td>
                                 <td class="text-center small">@l.Titular/@l.JogosDoClube</td>
                                 <td class="text-center small">@(l.NotaMedia?.ToString("0.0") ?? "—")</td>
-                                <td class="small text-muted">@l.Explicacao</td>
+                                <td class="small text-muted">
+                                    @l.Explicacao
+                                    @if (!string.IsNullOrEmpty(l.Atributos))
+                                    {
+                                        <div class="text-body-secondary" style="font-size: 0.75rem;">@l.Atributos</div>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>

@@ -32,6 +32,11 @@ public class VariacaoDaTemporada
 
     public int Curva { get; set; }
     public int Desempenho { get; set; }
+
+    /// <summary>Pontos da evolução: ± em cada atributo afetado.</summary>
+    public int Pontos { get; set; }
+
+    /// <summary>Quanto o overall mudou pela fórmula.</summary>
     public int Variacao { get; set; }
 
     public int OverallAntes { get; set; }

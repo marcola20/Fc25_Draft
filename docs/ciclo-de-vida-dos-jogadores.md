@@ -88,7 +88,13 @@ Somado à curva. Um veterano de 32 (−3) titular absoluto com nota 7,2 fica em 
   **queda de rendimento** (−2 a −4; mais comum a partir de 29). Algo como 5% cada. Destacadas na prévia; o admin desfaz.
 - **Ajuste manual**: o admin sobe ou desce qualquer jogador a qualquer momento com um motivo. Fica registrado na ficha.
 
-### 5. De overall para atributos
+### 5. De pontos para atributos (decisão de 07/10/2026)
+A variação (curva + desempenho, com o limite de queda) são **pontos de atributo**, não de overall: cada ponto é ±1
+em 5 ou 6 atributos (sorteado por jogador e temporada) e o overall é o que a fórmula der (`OverallPes.AplicarPontos`).
+Subindo: estilo de jogo e maiores pesos da posição; caindo: físicos primeiro. Na prévia de 2010, +3 vira ~+2 de overall
+e −3 vira ~−1. O texto abaixo é o plano anterior (alvo de overall), mantido como histórico.
+
+### 5b. De overall para atributos (plano anterior)
 - **Subida**: `OverallPes.Evoluir` (já existe, usado na venda rápida).
 - **Queda**: função nova no Core, o inverso — com a idade caem primeiro os **físicos** (velocidade, aceleração,
   resistência, impulsão); técnicos e mentais caem pouco; goleiro perde reflexo e agilidade por último.

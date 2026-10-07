@@ -1,6 +1,9 @@
 namespace Fc25Draft.Core.DTOs;
 
 /// <summary>Um jogador na prévia (ou no resultado) da evolução de fim de temporada.</summary>
+/// <param name="Pontos">Pontos da evolução (idade + desempenho, com o limite de queda): ± em cada atributo afetado.</param>
+/// <param name="Variacao">Quanto o overall mudou pela fórmula, com os atributos novos.</param>
+/// <param name="Atributos">"Finalização +2, Drible +2…"; vazio se nada mudou.</param>
 public record EvolucaoLinhaDto(
     int PlayerId,
     string Nome,
@@ -9,13 +12,15 @@ public record EvolucaoLinhaDto(
     int Idade,
     int OverallAntes,
     int OverallDepois,
+    int Pontos,
     int Variacao,
     int Curva,
     int Desempenho,
     int JogosDoClube,
     int Titular,
     decimal? NotaMedia,
-    string Explicacao);
+    string Explicacao,
+    string Atributos = "");
 
 /// <summary>Prévia da evolução de uma temporada, ou o que foi aplicado.</summary>
 /// <param name="PodeDesfazer">Aplicada e nenhuma mudança foi gravada no jogo ainda pelo Editor PES.</param>
@@ -26,7 +31,8 @@ public record EvolucaoPreviaDto(
     IReadOnlyList<EvolucaoLinhaDto> Linhas)
 {
     public bool JaAplicada => AplicadaEm is not null;
-    public int Sobem => Linhas.Count(l => l.Variacao > 0);
-    public int Caem => Linhas.Count(l => l.Variacao < 0);
-    public int Mantem => Linhas.Count(l => l.Variacao == 0);
+    // Pelos pontos da evolução (o overall pode nem mexer com poucos pontos).
+    public int Sobem => Linhas.Count(l => l.Pontos > 0);
+    public int Caem => Linhas.Count(l => l.Pontos < 0);
+    public int Mantem => Linhas.Count(l => l.Pontos == 0);
 }
