@@ -31,6 +31,12 @@ public class TransferConfig
     /// </summary>
     public bool MercadoFechado { get; set; }
 
+    /// <summary>
+    /// O draft é de jovens: idade máxima de quem entra no próximo draft (padrão de cada draft gerado). Jogador livre
+    /// com até essa idade fica reservado para o draft e não vai para o leilão. Nulo = draft de qualquer idade.
+    /// </summary>
+    public int? IdadeMaximaDraft { get; set; } = 23;
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>
@@ -51,6 +57,7 @@ public class TransferConfig
         MaxLoans = 3,
         MinRosterSize = 14,
         MaxRosterSize = 23,
-        QuickSellBloqueado = true
+        QuickSellBloqueado = true,
+        IdadeMaximaDraft = 23
     };
 }

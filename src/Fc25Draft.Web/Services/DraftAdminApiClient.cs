@@ -60,6 +60,20 @@ public class DraftAdminApiClient
         return round;
     }
 
+    /// <summary>Muda a idade máxima do draft (nulo = qualquer idade).</summary>
+    public async Task UpdateIdadeMaximaAsync(Guid draftId, int? idadeMaxima, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
+        var response = await client.PutAsJsonAsync($"api/admin/draft/{draftId}/idade-maxima", new DraftIdadeMaximaDto(idadeMaxima), ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new KeyNotFoundException("Draft não encontrado.");
+        }
+
+        await EnsureSuccessAsync(response);
+    }
+
     /// <summary>Muda a faixa de overall de uma rodada que já existe.</summary>
     public async Task UpdateRoundAsync(Guid draftId, int roundNumber, DraftRoundCreateDto? request, CancellationToken ct = default)
     {

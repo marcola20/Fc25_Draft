@@ -73,6 +73,11 @@
     </p>
 }
 
+@if (state is { IdadeMaxima: int idadeMaximaDoDraft, DraftCompleted: false, IsExpansao: false })
+{
+    <p class="small mb-3">🌱 Draft de jovens: só entram jogadores com até <strong>@idadeMaximaDoDraft anos</strong>.</p>
+}
+
 @if (state is { IsExpansao: true, DraftCompleted: false })
 {
     @if (state.AguardandoProtecao)

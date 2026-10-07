@@ -80,6 +80,22 @@ else
                     <dd class="col-sm-9">@selectedDraft.TotalTeams</dd>
                     <dt class="col-sm-3">Total de rodadas</dt>
                     <dd class="col-sm-9">@selectedDraft.TotalRounds</dd>
+                    <dt class="col-sm-3">Idade máxima</dt>
+                    <dd class="col-sm-9">
+                        @if (AdminAuth.IsAdmin)
+                        {
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <input type="number" min="15" max="45" class="form-control form-control-sm" style="width: 90px;"
+                                       placeholder="livre" @bind="editIdadeMaxima" />
+                                <button class="btn btn-sm btn-outline-primary" @onclick="UpdateIdadeMaximaAsync" disabled="@isProcessing">Salvar</button>
+                                <span class="small text-muted">Só entra no draft quem tem até essa idade. Vazio = qualquer idade.</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @(selectedDraft.IdadeMaxima is int idade ? $"até {idade} anos" : "qualquer idade")
+                        }
+                    </dd>
                 </dl>
             </div>
         </div>
@@ -494,6 +510,7 @@ else
             }
 
             selectedDraft = draft;
+            editIdadeMaxima = draft.IdadeMaxima;
             selectedDraftId = draft.DraftId;
 
             if (draft.Rounds.Count == 0)
@@ -587,6 +604,36 @@ else
     }
 
     /// <summary>Troca a faixa de overall de uma rodada que já existe (as escolhas feitas continuam valendo).</summary>
+    private int? editIdadeMaxima;
+
+    private async Task UpdateIdadeMaximaAsync()
+    {
+        if (!selectedDraftId.HasValue || isProcessing || !AdminAuth.IsAdmin) return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            await DraftAdminApiClient.UpdateIdadeMaximaAsync(selectedDraftId.Value, editIdadeMaxima);
+            await LoadDraftDetailsAsync(selectedDraftId.Value);
+
+            successMessage = editIdadeMaxima is int idade
+                ? $"Agora só entra no draft quem tem até {idade} anos."
+                : "O draft agora aceita jogadores de qualquer idade.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Logger.LogError(ex, "Erro ao alterar a idade máxima do draft {DraftId}", selectedDraftId);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
     private async Task UpdateRoundLimitsAsync(int roundNumber)
     {
         if (!selectedDraftId.HasValue || isProcessing) return;

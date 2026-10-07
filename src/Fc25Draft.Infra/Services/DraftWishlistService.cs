@@ -63,7 +63,7 @@ public class DraftWishlistService : IDraftWishlistService
         var players = await _db.Players
             .AsNoTracking()
             .Where(p => ids.Contains(p.PlayerId))
-            .Select(p => new { p.PlayerId, p.Name, p.Overall, Escolhido = p.TeamRosters.Any() })
+            .Select(p => new { p.PlayerId, p.Name, p.Overall, p.Age, Escolhido = p.TeamRosters.Any() })
             .ToListAsync(ct);
 
         if (players.Count != ids.Count)
@@ -80,6 +80,15 @@ public class DraftWishlistService : IDraftWishlistService
         if (foraDaFaixa.Count > 0)
             throw new InvalidOperationException(
                 $"Jogadores fora da faixa de overall do draft ({DraftWishlistRules.OverallMinimo} a {DraftWishlistRules.OverallMaximo}): {string.Join(", ", foraDaFaixa)}.");
+
+        // O draft é de jovens: quem passou da idade não entra na lista.
+        var idadeMaxima = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
+        if (idadeMaxima is int maxima)
+        {
+            var velhos = players.Where(p => p.Age is null || p.Age > maxima).Select(p => $"{p.Name} ({p.Age?.ToString() ?? "sem idade"})").ToList();
+            if (velhos.Count > 0)
+                throw new InvalidOperationException($"O draft é só de jogadores até {maxima} anos: {string.Join(", ", velhos)}.");
+        }
 
         var now = _time.GetUtcNow().UtcDateTime;
 

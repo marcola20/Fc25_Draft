@@ -136,7 +136,8 @@ public class DraftStateService
             draft.TempoPorEscolhaMinutos,
             prazo,
             draft.PausadoEm is not null,
-            restanteNaPausa);
+            restanteNaPausa,
+            draft.IdadeMaxima);
     }
 
     public async Task<IReadOnlyList<AvailablePlayerDto>> GetAvailablePlayersAsync(
@@ -193,7 +194,7 @@ public class DraftStateService
         int? overallMinFilter,
         int? overallMaxFilter,
         CancellationToken ct = default)
-        => await FiltrarEListarAsync(Livres(), positionIds, searchTerm, overallMinFilter, overallMaxFilter, ct);
+        => await FiltrarEListarAsync(await LivresDoProximoDraftAsync(ct), positionIds, searchTerm, overallMinFilter, overallMaxFilter, ct);
 
     /// <summary>Dos jogadores informados, os que continuam sem time.</summary>
     public async Task<HashSet<int>> FiltrarLivresAsync(IReadOnlyCollection<int> playerIds, CancellationToken ct = default)
@@ -203,7 +204,7 @@ public class DraftStateService
             return new HashSet<int>();
         }
 
-        var ids = await Livres()
+        var ids = await (await LivresDoProximoDraftAsync(ct))
             .Where(p => playerIds.Contains(p.PlayerId))
             .Select(p => p.PlayerId)
             .ToListAsync(ct);
@@ -212,6 +213,16 @@ public class DraftStateService
     }
 
     private IQueryable<Player> Livres() => _db.Players.AsNoTracking().Where(p => !p.TeamRosters.Any());
+
+    /// <summary>Livres com até a idade do próximo draft (o draft é de jovens; a idade vem das configurações).</summary>
+    private async Task<IQueryable<Player>> LivresDoProximoDraftAsync(CancellationToken ct)
+    {
+        var idadeMaxima = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
+        return ComIdadeAte(Livres(), idadeMaxima);
+    }
+
+    private static IQueryable<Player> ComIdadeAte(IQueryable<Player> query, int? idadeMaxima) =>
+        idadeMaxima is int maxima ? query.Where(p => p.Age != null && p.Age <= maxima) : query;
 
     private static async Task<IReadOnlyList<AvailablePlayerDto>> FiltrarEListarAsync(
         IQueryable<Player> query,
@@ -271,9 +282,11 @@ public class DraftStateService
     /// <summary>Jogadores escolhíveis no draft; com <paramref name="roundNumber"/>, só os do overall permitido na rodada.</summary>
     private async Task<IQueryable<Player>> ConsultaDisponiveisAsync(Draft draft, int? roundNumber, CancellationToken ct)
     {
-        var query = draft.Tipo == DraftTipo.Expansao
-            ? await _expansao.FiltrarDisponiveisAsync(_db.Players.AsNoTracking(), draft, ct)
-            : Livres();
+        var query = ComIdadeAte(
+            draft.Tipo == DraftTipo.Expansao
+                ? await _expansao.FiltrarDisponiveisAsync(_db.Players.AsNoTracking(), draft, ct)
+                : Livres(),
+            draft.IdadeMaxima);
 
         if (roundNumber is null)
         {
@@ -426,6 +439,11 @@ public class DraftStateService
             if (roundLimits.OverallMax is int overallMax && player.Overall > overallMax)
             {
                 throw new InvalidOperationException($"❌ Este jogador excede o overall máximo ({overallMax}) permitido nesta rodada.");
+            }
+
+            if (draft.IdadeMaxima is int idadeMaxima && (player.Age is null || player.Age > idadeMaxima))
+            {
+                throw new InvalidOperationException($"❌ Este draft é só de jogadores até {idadeMaxima} anos ({player.Name} tem {player.Age?.ToString() ?? "idade desconhecida"}).");
             }
 
             var fromTeam = await AplicarEscolhaAsync(draft, currentPick, player, ct);

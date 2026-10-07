@@ -172,6 +172,11 @@
                                     <input type="number" min="1" class="form-control" @bind="_maxRoster" />
                                     <div class="form-text">Vale em propostas, lista de transferências, leilão e nas ações do admin.</div>
                                 </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">Idade máxima do draft</label>
+                                    <input type="number" min="15" max="45" class="form-control" placeholder="qualquer idade" @bind="_idadeMaximaDraft" />
+                                    <div class="form-text">O draft é de jovens: vale para o próximo draft gerado e para as listas. Jogador livre com até essa idade não vai para o leilão. Vazio = qualquer idade.</div>
+                                </div>
                             </div>
 
                             <hr />
@@ -427,6 +432,7 @@
 
     // Transferências
     private int _maxQuickSell, _maxTransfers, _minRoster, _maxLoans, _maxRoster = 23;
+    private int? _idadeMaximaDraft = 23;
     private int _maxQuickSellSalvo, _maxTransfersSalvo, _minRosterSalvo;
     private bool _quickSellBloqueado, _quickSellBloqueadoSalvo;
     private bool _mercadoFechado, _mercadoFechadoSalvo;
@@ -476,6 +482,7 @@
         _minRosterSalvo = t.MinRosterSize;
         _maxLoans = t.MaxLoans;
         _maxRoster = t.MaxRosterSize;
+        _idadeMaximaDraft = t.IdadeMaximaDraft;
         _quickSellBloqueado = t.QuickSellBloqueado;
         _quickSellBloqueadoSalvo = t.QuickSellBloqueado;
         _mercadoFechado = t.MercadoFechado;
@@ -640,7 +647,7 @@
         _erro = null; _ok = null; _saving = true;
         try
         {
-            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans, _mercadoFechado, _maxRoster), CancellationToken.None);
+            var salvo = await TransferCfg.UpdateAsync(new TransferConfigDto(_maxQuickSell, _maxTransfers, _minRoster, _quickSellBloqueado, _maxLoans, _mercadoFechado, _maxRoster, _idadeMaximaDraft), CancellationToken.None);
             AplicarTransf(salvo);
             // Mudou o limite da janela: o "restantes" de cada time muda junto.
             _restantesEditados.Clear();

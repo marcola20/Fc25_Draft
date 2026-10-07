@@ -214,8 +214,28 @@ public class DraftService
             ? $"DRAFT - {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
             : name.Trim();
 
+        // O draft é de jovens: a idade máxima vem das configurações (o admin pode mudar depois no draft).
+        var idadeMaxima = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
+
         return await CreateDraftAsync(draftName, teamOrder, totalRounds, snake, roundRules, ct,
-            configure: d => d.TempoPorEscolhaMinutos = tempoPorEscolhaMinutos);
+            configure: d =>
+            {
+                d.TempoPorEscolhaMinutos = tempoPorEscolhaMinutos;
+                d.IdadeMaxima = idadeMaxima;
+            });
+    }
+
+    /// <summary>Muda a idade máxima de um draft (nulo = qualquer idade).</summary>
+    public async Task UpdateIdadeMaximaAsync(Guid draftId, int? idadeMaxima, CancellationToken ct = default)
+    {
+        if (idadeMaxima is < 15 or > 45)
+            throw new ArgumentOutOfRangeException(nameof(idadeMaxima), idadeMaxima, "A idade máxima precisa ficar entre 15 e 45 (ou vazia para qualquer idade).");
+
+        var draft = await _db.Drafts.FirstOrDefaultAsync(d => d.DraftId == draftId, ct)
+            ?? throw new KeyNotFoundException("Draft não encontrado.");
+
+        draft.IdadeMaxima = idadeMaxima;
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Só existe um draft ativo (o mais recente); um novo não pode começar antes de ele terminar.</summary>

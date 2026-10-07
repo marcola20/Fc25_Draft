@@ -27,7 +27,9 @@ public record DraftStateDto(
     DateTime? PrazoUtc = null,
     bool Pausado = false,
     // Pausado: o tempo que falta, congelado (a tela não desconta nada enquanto isso).
-    TimeSpan? RestanteNaPausa = null)
+    TimeSpan? RestanteNaPausa = null,
+    // Só entra no draft quem tem até esta idade; nulo = qualquer idade.
+    int? IdadeMaxima = null)
 {
     public static DraftStateDto Empty { get; } = new(
         null,
@@ -162,7 +164,11 @@ public record DraftDetailsDto(
     int TotalRounds,
     int TotalTeams,
     DateTime CreatedAtUtc,
-    IReadOnlyList<DraftRoundDetailsDto> Rounds);
+    IReadOnlyList<DraftRoundDetailsDto> Rounds,
+    int? IdadeMaxima = null);
+
+/// <summary>Muda a idade máxima de um draft (nulo = qualquer idade).</summary>
+public record DraftIdadeMaximaDto(int? IdadeMaxima);
 
 public record DraftRoundCreateDto(int? OverallMin, int? OverallMax);
 

@@ -199,10 +199,17 @@ public class MarketCycleGenerator : IMarketCycleGenerator
             return;
         }
 
+        // Jovem livre fica reservado para o draft (que é só de jovens) e não vai para o leilão.
+        var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
+            .Select(c => c.IdadeMaximaDraft)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
         var candidates = await _dbContext.Players
             .AsNoTracking()
             .Include(p => p.Position)
             .Where(p => p.CurrentTeamId == null)
+            .Where(p => reservadoAte == null || p.Age == null || p.Age > reservadoAte)
             .Where(p => p.Overall >= minOvr && p.Overall <= maxOvr)
             .Where(p => !excluded.Contains(p.PlayerId))
             .ToListAsync(ct)

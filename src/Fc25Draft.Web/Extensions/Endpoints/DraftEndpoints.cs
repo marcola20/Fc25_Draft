@@ -158,7 +158,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                         p.FromTeam != null ? p.FromTeam.TeamName : null,
                                         p.Compensacao))
                                     .ToList()))
-                            .ToList()))
+                            .ToList(),
+                        d.IdadeMaxima))
                     .FirstOrDefaultAsync(ct);
 
                 return draft is null ? Results.NotFound() : Results.Ok(draft);
@@ -219,6 +220,29 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     return Results.BadRequest(new { message = ex.Message });
                 }
                 catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            });
+
+            adminDraftProtectedApi.MapPut("/{id:guid}/idade-maxima", async (
+                DraftService draftService,
+                IHubContext<DraftHub> hubContext,
+                Guid id,
+                DraftIdadeMaximaDto request,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    await draftService.UpdateIdadeMaximaAsync(id, request.IdadeMaxima, ct);
+                    await hubContext.Clients.All.SendAsync("DraftAtualizado", cancellationToken: ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (ArgumentOutOfRangeException ex)
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }

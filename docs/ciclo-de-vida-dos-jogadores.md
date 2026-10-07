@@ -133,7 +133,13 @@ aposentados para o editor, e os avisos aos treinadores.
    save e o banco do patch — não precisou de endpoint novo. Na época, 23 jogadores já estavam 1 ano mais velhos no
    site do que no jogo (entraram depois, já com a idade certa; o jogo é que estava atrasado): todos ganham +1 e o
    editor alinha o jogo ao site. Depois: o "Adicionar ao site" do editor soma os anos da liga sozinho.
-2. **Draft sub-23** — idade máxima no draft; jovens livres fora do leilão; tela da nova geração.
+2. **Draft sub-23** — FEITO em 07/10/2026 (branch `feat/categorias-de-base`): "Idade máxima do draft" em
+   `/admin/configuracoes` (`TransferConfig.IdadeMaximaDraft`, 23); cada draft gerado copia a idade (`Draft.IdadeMaxima`,
+   editável em Informações do Draft); o pote, a escolha manual e a automática respeitam a idade; as listas do próximo
+   draft (pré-draft e escolha automática) só aceitam jovens; os dois geradores do leilão deixam de fora os livres com até
+   essa idade. A "tela da nova geração" é o próprio Editor PES ("Fora do site" com filtro de idade + "Adicionar ao site",
+   que já soma os anos da liga). Atenção: a idade conta na hora do draft — envelhecer a temporada antes do draft tira
+   quem fez 24 (ex.: Messi, 23 hoje).
 3. **Evolução da virada** — curva G, desempenho, atributos (subida e queda), prévia e confirmação, `EvolucaoPes`.
 4. **Aposentadoria** — anúncio, última temporada, saída na virada, editor tirando dos elencos, Lendas aposentadas.
 5. **Fora da curva e experiência** — surpresas, ajuste manual, página /virada, avisos no celular.

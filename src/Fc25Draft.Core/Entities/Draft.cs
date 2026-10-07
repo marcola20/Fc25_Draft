@@ -12,6 +12,12 @@ namespace Fc25Draft.Core.Entities
 
         public DraftTipo Tipo { get; set; } = DraftTipo.Normal;
 
+        /// <summary>
+        /// Só entra no draft quem tem até esta idade (draft de jovens). Nulo = qualquer idade (ex.: expansão).
+        /// Vem de <see cref="TransferConfig.IdadeMaximaDraft"/> quando o draft é gerado; o admin pode mudar.
+        /// </summary>
+        public int? IdadeMaxima { get; set; }
+
         // ── Só no draft de expansão ──
         /// <summary>Quantos jogadores cada time existente pode proteger.</summary>
         public int? ProtegidosPorTime { get; set; }

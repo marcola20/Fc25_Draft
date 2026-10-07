@@ -321,9 +321,15 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         HashSet<int> excluded,
         CancellationToken ct)
     {
+        // Jovem livre fica reservado para o draft (que é só de jovens) e não vai para o leilão.
+        var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
+            .Select(c => c.IdadeMaximaDraft)
+            .FirstOrDefaultAsync(ct);
+
         var query = _dbContext.Players
             .AsNoTracking()
             .Where(player => !player.TeamRosters.Any())
+            .Where(player => reservadoAte == null || player.Age == null || player.Age > reservadoAte)
             .Select(player => new
             {
                 Player = player,

@@ -45,6 +45,7 @@ public class TransferConfigService : ITransferConfigService
         cfg.MaxLoans = dto.MaxLoans;
         cfg.MinRosterSize = dto.MinRosterSize;
         cfg.MaxRosterSize = dto.MaxRosterSize;
+        cfg.IdadeMaximaDraft = dto.IdadeMaximaDraft;
         cfg.QuickSellBloqueado = dto.QuickSellBloqueado;
         cfg.MercadoFechado = dto.MercadoFechado;
         cfg.AtualizadoEm = DateTime.UtcNow;
@@ -169,8 +170,10 @@ public class TransferConfigService : ITransferConfigService
         if (d.MaxLoans < 0) throw new InvalidOperationException("O limite de empréstimos não pode ser negativo.");
         if (d.MinRosterSize < 0) throw new InvalidOperationException("O mínimo de jogadores não pode ser negativo.");
         if (d.MaxRosterSize < d.MinRosterSize) throw new InvalidOperationException("O máximo de jogadores não pode ser menor que o mínimo.");
+        if (d.IdadeMaximaDraft is < 15 or > 45) throw new InvalidOperationException("A idade máxima do draft precisa ficar entre 15 e 45 (ou vazia para qualquer idade).");
     }
 
     private static TransferConfigDto ToDto(TransferConfig c) =>
-        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans, c.MercadoFechado, c.MaxRosterSize);
+        new(c.MaxQuickSellPerWindow, c.MaxTransfers, c.MinRosterSize, c.QuickSellBloqueado, c.MaxLoans, c.MercadoFechado, c.MaxRosterSize,
+            c.IdadeMaximaDraft);
 }
