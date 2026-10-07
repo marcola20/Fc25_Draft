@@ -238,6 +238,65 @@ public static class OverallPes
         return new Evolucao(novo, Estimado(novo), alcancou);
     }
 
+    // Com a idade caem primeiro os físicos; goleiro perde reflexo e alcance por último.
+    private static readonly string[] FisicosQueCaemPrimeiro = ["SPD", "ACC", "STA", "JMP"];
+    private static readonly string[] GoleiroQueCaiPrimeiro = ["GKCL", "GKC", "GKA", "GKRE", "GKR"];
+
+    /// <summary>
+    /// Desce atributos até a fórmula dar <paramref name="alvo"/> (o inverso do <see cref="Evoluir"/>, para o
+    /// envelhecimento): 1 ponto por vez em rodízio, com os físicos (velocidade, aceleração, resistência, impulsão)
+    /// sempre na frente e depois os de maior peso na posição; goleiro, só atributos de goleiro, com reflexo e
+    /// alcance por último. Nunca abaixo do mínimo do jogo.
+    /// </summary>
+    public static Evolucao Regredir(IReadOnlyList<int> atual, int pos, int? peUso, int? pePrecisao, int alvo)
+    {
+        var novo = atual.ToArray();
+        double Estimado(int[] v) => Calcular(v, pos, peUso, pePrecisao);
+
+        if (Estimado(novo) <= alvo + Tolerancia)
+            return new Evolucao(novo, Estimado(novo), true);
+
+        var w = Pesos(pos, atual, peUso, pePrecisao);
+        var permitidos = Permitidos(pos);
+        var primeiro = (pos == 0 ? GoleiroQueCaiPrimeiro : FisicosQueCaemPrimeiro).Select(s => Array.IndexOf(Siglas, s));
+        var porPeso = Enumerable.Range(0, NumAtributos).OrderBy(i => -w[i]).Where(i => w[i] > PesoRelevante);
+        var prio = primeiro.Concat(porPeso).Distinct().Where(i => permitidos(i) && w[i] > 0).ToList();
+
+        var alcancou = true;
+        while (Estimado(novo) > alvo + Tolerancia)
+        {
+            var mexeu = false;
+            foreach (var i in prio)
+            {
+                if (Estimado(novo) <= alvo + Tolerancia) break;
+                if (novo[i] <= AtributosPes.Minimo) continue;
+                novo[i]--;
+                mexeu = true;
+            }
+            if (!mexeu) { alcancou = false; break; }
+        }
+
+        // Passou do ponto no último rodízio: devolve +1 em quem desceu enquanto isso aproximar do alvo.
+        while (Estimado(novo) < alvo - Tolerancia)
+        {
+            var volta = prio.Where(i => novo[i] < atual[i])
+                .Select(i => (i, erro: Math.Abs(Estimado(Com(novo, i, +1)) - alvo)))
+                .OrderBy(x => x.erro)
+                .FirstOrDefault();
+            if (volta == default || volta.erro >= Math.Abs(Estimado(novo) - alvo)) break;
+            novo[volta.i]++;
+        }
+
+        return new Evolucao(novo, Estimado(novo), alcancou);
+    }
+
+    private static int[] Com(int[] v, int i, int d)
+    {
+        var copia = v.ToArray();
+        copia[i] += d;
+        return copia;
+    }
+
     private static Func<int, bool> Permitidos(int pos) => pos == 0 ? i => i >= 20 : i => i < 20;
 
     /// <summary>Estilo de jogo primeiro, depois os maiores pesos da posição.</summary>

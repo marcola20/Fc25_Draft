@@ -1,0 +1,181 @@
+@using Fc25Draft.Core.Utilities
+@inject IEvolucaoTemporadaService EvolucaoSvc
+@inject IJSRuntime JSRuntime
+
+@* Evolução de fim de temporada: curva de idade + desempenho, com prévia, confirmação única e desfazer. *@
+<div class="card mb-3">
+    <div class="card-header fw-bold">📈 Evolução da temporada @Temporada</div>
+    <div class="card-body">
+        @if (_erro is not null)
+        {
+            <div class="alert alert-danger alert-dismissible py-2">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+        }
+        @if (_ok is not null)
+        {
+            <div class="alert alert-success alert-dismissible py-2">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+        }
+
+        <p class="text-muted small mb-2">
+            No fim da temporada cada jogador sobe ou cai pela <strong>idade</strong>
+            (@string.Join(", ", EvolucaoCriterios.Curva.Select((l, i) => $"{Faixa(i)}: {EvolucaoTemporada.Sinal(l.Variacao)}"));
+            goleiro como se tivesse @EvolucaoCriterios.AnosAMenosDoGoleiro anos a menos) e pelo <strong>desempenho</strong>
+            (titular em mais de @Pct(EvolucaoCriterios.TitularMuito) dos jogos: +1; em menos de @Pct(EvolucaoCriterios.TitularPouco) ou sem clube: −1;
+            nota média ≥ @EvolucaoCriterios.NotaBoa.ToString("0.0"): +1; abaixo de @EvolucaoCriterios.NotaRuim.ToString("0.0") com @EvolucaoCriterios.JogosParaNotaRuim+ jogos: −1).
+            A mudança vai para os atributos e o <strong>Editor PES leva ao save</strong> quando abrir. Faça antes do aniversário da temporada seguinte.
+        </p>
+
+        @if (_previa is null)
+        {
+            <button class="btn btn-outline-primary" @onclick="CarregarAsync" disabled="@_carregando">
+                @(_carregando ? "Calculando…" : "Ver a prévia")
+            </button>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                @if (_previa.JaAplicada)
+                {
+                    <span class="badge bg-success">✅ Aplicada em @BrazilTime.ConvertFromUtc(_previa.AplicadaEm!.Value).ToString("dd/MM/yyyy HH:mm")</span>
+                }
+                else
+                {
+                    <span class="badge bg-warning text-dark">Prévia — nada foi mudado ainda</span>
+                }
+                <span class="badge bg-success">▲ @_previa.Sobem sobem</span>
+                <span class="badge bg-danger">▼ @_previa.Caem caem</span>
+                <span class="badge bg-secondary">= @_previa.Mantem mantêm</span>
+
+                <input class="form-control form-control-sm ms-auto" style="max-width: 220px;" placeholder="Buscar jogador ou clube"
+                       @bind="_busca" @bind:event="oninput" />
+            </div>
+
+            <div class="table-responsive" style="max-height: 480px;">
+                <table class="table table-sm table-hover align-middle mb-2">
+                    <thead class="table-light" style="position: sticky; top: 0;">
+                        <tr>
+                            <th>Jogador</th>
+                            <th>Clube</th>
+                            <th class="text-center">Idade</th>
+                            <th class="text-center">Overall</th>
+                            <th class="text-center" title="Titular / jogos do clube com escalação gravada">Titular</th>
+                            <th class="text-center">Nota</th>
+                            <th>Conta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in Linhas)
+                        {
+                            <tr>
+                                <td><a href="@($"/players/details/{l.PlayerId}")" class="text-reset">@l.Nome</a> <span class="text-muted small">@l.Posicao</span></td>
+                                <td class="small">@(l.TimeNome ?? "—")</td>
+                                <td class="text-center">@l.Idade</td>
+                                <td class="text-center text-nowrap">
+                                    @l.OverallAntes →
+                                    <strong class="@(l.Variacao > 0 ? "text-success" : l.Variacao < 0 ? "text-danger" : "")">@l.OverallDepois</strong>
+                                    <span class="small @(l.Variacao > 0 ? "text-success" : l.Variacao < 0 ? "text-danger" : "text-muted")">(@EvolucaoTemporada.Sinal(l.Variacao))</span>
+                                </td>
+                                <td class="text-center small">@l.Titular/@l.JogosDoClube</td>
+                                <td class="text-center small">@(l.NotaMedia?.ToString("0.0") ?? "—")</td>
+                                <td class="small text-muted">@l.Explicacao</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+                @if (!_previa.JaAplicada)
+                {
+                    <button class="btn btn-primary" @onclick="AplicarAsync" disabled="@_carregando">✅ Aplicar a evolução de @Temporada</button>
+                    <button class="btn btn-outline-secondary" @onclick="CarregarAsync" disabled="@_carregando">Recalcular</button>
+                }
+                else if (_previa.PodeDesfazer)
+                {
+                    <button class="btn btn-outline-danger" @onclick="DesfazerAsync" disabled="@_carregando">Desfazer a evolução</button>
+                    <span class="small text-muted align-self-center">Dá para desfazer até o Editor PES gravar no jogo.</span>
+                }
+                else
+                {
+                    <span class="small text-muted">O Editor PES já gravou essa evolução no jogo: não dá mais para desfazer.</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Temporada { get; set; }
+
+    private EvolucaoPreviaDto? _previa;
+    private bool _carregando;
+    private string _busca = "";
+    private string? _erro;
+    private string? _ok;
+    private int _temporadaCarregada;
+
+    private IEnumerable<EvolucaoLinhaDto> Linhas =>
+        (_previa?.Linhas ?? Array.Empty<EvolucaoLinhaDto>())
+            .Where(l => string.IsNullOrWhiteSpace(_busca)
+                        || l.Nome.Contains(_busca, StringComparison.CurrentCultureIgnoreCase)
+                        || (l.TimeNome?.Contains(_busca, StringComparison.CurrentCultureIgnoreCase) ?? false));
+
+    protected override void OnParametersSet()
+    {
+        // Trocou a temporada na página: a prévia antiga não vale mais.
+        if (_temporadaCarregada != Temporada)
+        {
+            _previa = null;
+            _temporadaCarregada = Temporada;
+        }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try { _previa = await EvolucaoSvc.GetPreviaAsync(Temporada, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task AplicarAsync()
+    {
+        if (_previa is null) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Aplicar a evolução da temporada {Temporada}? {_previa.Sobem} sobem e {_previa.Caem} caem. Só dá para fazer uma vez por temporada."))
+            return;
+
+        _carregando = true;
+        try
+        {
+            _previa = await EvolucaoSvc.AplicarAsync(Temporada, CancellationToken.None);
+            _ok = "Evolução aplicada. Agora abra o Editor PES para levar os atributos ao save.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task DesfazerAsync()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Desfazer a evolução da temporada {Temporada}? Todos voltam ao overall de antes."))
+            return;
+
+        _carregando = true;
+        try
+        {
+            _previa = await EvolucaoSvc.DesfazerAsync(Temporada, CancellationToken.None);
+            _ok = "Evolução desfeita.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private static string Pct(double v) => $"{v * 100:0}%";
+
+    private static string Faixa(int i)
+    {
+        var curva = EvolucaoCriterios.Curva;
+        var de = i == 0 ? (int?)null : curva[i - 1].Ate + 1;
+        var ate = curva[i].Ate;
+        return de is null ? $"até {ate}" : ate == int.MaxValue ? $"{de}+" : de == ate ? $"{de}" : $"{de}–{ate}";
+    }
+}

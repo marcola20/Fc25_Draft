@@ -140,7 +140,11 @@ aposentados para o editor, e os avisos aos treinadores.
    essa idade. A "tela da nova geração" é o próprio Editor PES ("Fora do site" com filtro de idade + "Adicionar ao site",
    que já soma os anos da liga). Atenção: a idade conta na hora do draft — envelhecer a temporada antes do draft tira
    quem fez 24 (ex.: Messi, 23 hoje).
-3. **Evolução da virada** — curva G, desempenho, atributos (subida e queda), prévia e confirmação, `EvolucaoPes`.
+3. **Evolução da virada** — FEITO em 07/10/2026 (branch `feat/categorias-de-base`): card "📈 Evolução da temporada"
+   em `/admin/temporada` (prévia com a conta de cada jogador, aplicar uma vez por temporada, desfazer enquanto o Editor
+   PES não gravou). Regras em `EvolucaoCriterios`/`EvolucaoTemporada` (Core); queda de atributos em `OverallPes.Regredir`
+   (físicos primeiro); conta guardada em `VariacoesDaTemporada`. Titular % = titulares ÷ jogos do clube com escalação
+   gravada desde a chegada (escalação só guarda os 11 titulares). Idade da temporada = idade − aniversários posteriores.
 4. **Aposentadoria** — anúncio, última temporada, saída na virada, editor tirando dos elencos, Lendas aposentadas.
 5. **Fora da curva e experiência** — surpresas, ajuste manual, página /virada, avisos no celular.
 
