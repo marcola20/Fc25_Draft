@@ -33,8 +33,8 @@ Tudo passa por uma **prévia que o admin aprova**, e o site e o Editor PES ficam
 - **Jovens**: 59 livres com até 23 anos no site. A base do PES embutida (`pes-jogadores.json.gz`, 23.744 jogadores) é uma
   foto de 2009/2010, o ano da liga: tem os craques que surgiram depois ainda garotos (Coutinho 17 anos/86, Sterling 15/81,
   Götze 16/76, Pogba 15/62) e centenas de jovens com 80+ em cada idade. As idades do site batem com essa foto
-  (Neymar 17). As idades do site não tinham sido atualizadas desde 2009: o primeiro "envelhecer" (temporada 2010)
-  as põe em dia. Logo, **idade na liga = idade na base do PES + (temporada − 2009)**.
+  (Neymar 17). As idades do **jogo** (save, banco do patch e base do PES) são as de **2008**, quando a liga começou; o
+  site recebeu +1 à mão em 2009 e o botão dá +1 a partir de 2010. Logo, **idade na liga = idade no jogo + (temporada − 2008)**.
 - O Editor PES já grava idade no save (6 bits) e no banco do patch (5 bits, +15) — ver `D:\PES\EditorPES\editor\formato.py`.
 
 ## Simulação (5 temporadas, jogadores reais; desempenho sorteado em ±1, aposentadoria pela tabela abaixo)
@@ -57,7 +57,9 @@ fica entre os dois últimos cenários. Os números finais se calibram na prévia
 - **Editor PES**: botão "Sincronizar idades com o site" — baixa a idade de cada jogador ligado (endpoint novo, ex.
   `GET /api/admin/pes/idades`) e grava no save e no banco do patch **a idade do site**. É espelho: pode rodar quantas vezes
   quiser sem somar duas vezes. Entra também na sincronização normal de quando o editor abre.
-- **Jogador novo vindo da base do PES**: idade na liga = idade na base + (temporada − 2009).
+- **Jogador novo vindo do jogo**: idade na liga = idade no jogo + (temporada das idades do site − 2008).
+  `GET /api/admin/pes/idade-da-liga` devolve quantos anos somar; o "Adicionar ao site" do Editor PES já vem com ela e
+  grava a mesma idade no jogo.
 
 ### 2. A curva de idade ("curva G", variação base por temporada)
 
@@ -129,7 +131,8 @@ aposentados para o editor, e os avisos aos treinadores.
 1. **Idade que anda** — FEITO em 07/10/2026 (producao `b98c892`): card "Idade dos jogadores" em `/admin/temporada`
    (+1 com trava por temporada e desfazer); o Editor PES, ao abrir, copia a idade do site (lista que já baixa) para o
    save e o banco do patch — não precisou de endpoint novo. Na época, 23 jogadores já estavam 1 ano mais velhos no
-   site do que no jogo; o editor alinha ao site.
+   site do que no jogo (entraram depois, já com a idade certa; o jogo é que estava atrasado): todos ganham +1 e o
+   editor alinha o jogo ao site. Depois: o "Adicionar ao site" do editor soma os anos da liga sozinho.
 2. **Draft sub-23** — idade máxima no draft; jovens livres fora do leilão; tela da nova geração.
 3. **Evolução da virada** — curva G, desempenho, atributos (subida e queda), prévia e confirmação, `EvolucaoPes`.
 4. **Aposentadoria** — anúncio, última temporada, saída na virada, editor tirando dos elencos, Lendas aposentadas.
