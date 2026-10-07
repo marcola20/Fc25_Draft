@@ -40,6 +40,10 @@ public static class EvolucaoCriterios
     /// </summary>
     public const int AtributosPorPontoMin = 5;
     public const int AtributosPorPontoMax = 6;
+
+    /// <summary>Na queda mexe em mais atributos: os físicos e mais alguns dos que pesam na posição.</summary>
+    public const int AtributosNaQuedaMin = 7;
+    public const int AtributosNaQuedaMax = 8;
 }
 
 /// <summary>
@@ -129,10 +133,16 @@ public static class EvolucaoTemporada
 
     private static string Pct(double v) => $"{Math.Round(v * 100):0}%";
 
-    /// <summary>Quantos atributos recebem os pontos: 5 ou 6, sempre o mesmo para o jogador na temporada.</summary>
-    public static int AtributosAfetados(int temporada, int playerId) =>
-        new Random(unchecked(temporada * 92_821 + playerId * 6_007))
-            .Next(EvolucaoCriterios.AtributosPorPontoMin, EvolucaoCriterios.AtributosPorPontoMax + 1);
+    /// <summary>
+    /// Quantos atributos recebem os pontos: subindo 5 ou 6, caindo 7 ou 8 — sempre o mesmo para o jogador na temporada.
+    /// </summary>
+    public static int AtributosAfetados(int temporada, int playerId, int pontos)
+    {
+        var sorteio = new Random(unchecked(temporada * 92_821 + playerId * 6_007));
+        return pontos < 0
+            ? sorteio.Next(EvolucaoCriterios.AtributosNaQuedaMin, EvolucaoCriterios.AtributosNaQuedaMax + 1)
+            : sorteio.Next(EvolucaoCriterios.AtributosPorPontoMin, EvolucaoCriterios.AtributosPorPontoMax + 1);
+    }
 
     public static string Sinal(int v) => v > 0 ? $"+{v}" : v < 0 ? $"−{-v}" : "0";
 }

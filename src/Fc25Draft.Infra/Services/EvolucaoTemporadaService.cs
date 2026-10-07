@@ -131,7 +131,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var goleiro = dto?.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
             var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, idadeMaximaDraft);
             var pontos = conta.Total;
-            var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId);
+            var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId, pontos);
 
             // Os pontos vão para os atributos; o overall é o que a fórmula der.
             int[]? antes = null, novos = null;
