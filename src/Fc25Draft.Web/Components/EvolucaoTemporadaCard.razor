@@ -19,7 +19,8 @@
             No fim da temporada cada jogador sobe ou cai pela <strong>idade</strong>
             (@string.Join(", ", EvolucaoCriterios.Curva.Select((l, i) => $"{Faixa(i)}: {EvolucaoTemporada.Sinal(l.Variacao)}"));
             goleiro como se tivesse @EvolucaoCriterios.AnosAMenosDoGoleiro anos a menos) e pelo <strong>desempenho</strong>
-            (titular em mais de @Pct(EvolucaoCriterios.TitularMuito) dos jogos: +1; em menos de @Pct(EvolucaoCriterios.TitularPouco) ou sem clube: −1,
+            (titular em mais de @Pct(EvolucaoCriterios.TitularMuito) dos jogos: +1; em menos de @Pct(EvolucaoCriterios.TitularPouco): −1 — só com
+            @EvolucaoCriterios.JogosParaTitular+ jogos do clube; sem clube: −1,
             menos o jovem livre reservado para o draft;
             nota média ≥ @EvolucaoCriterios.NotaBoa.ToString("0.0"): +1; abaixo de @EvolucaoCriterios.NotaRuim.ToString("0.0") com @EvolucaoCriterios.JogosParaNotaRuim+ jogos: −1).
             Quem tem clube cai no máximo @EvolucaoCriterios.QuedaMaximaComClube por temporada; o livre veterano pode cair mais.

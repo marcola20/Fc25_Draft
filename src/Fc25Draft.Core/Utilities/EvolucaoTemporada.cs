@@ -26,6 +26,7 @@ public static class EvolucaoCriterios
     // Desempenho na temporada (somado à curva).
     public const double TitularMuito = 0.60;   // mais que isso: +1
     public const double TitularPouco = 0.20;   // menos que isso (ou sem clube): −1
+    public const int JogosParaTitular = 5;     // a regra do titular só vale com pelo menos esses jogos do clube
     public const decimal NotaBoa = 7.0m;       // média ≥: +1
     public const decimal NotaRuim = 6.0m;      // média <: −1 (com jogos suficientes)
     public const int JogosParaNotaRuim = 5;
@@ -81,6 +82,10 @@ public static class EvolucaoTemporada
                 desempenho--;
                 motivos.Add("sem clube: −1");
             }
+        }
+        else if (d.JogosDoClube < EvolucaoCriterios.JogosParaTitular)
+        {
+            // Poucos jogos não dizem nada (ex.: chegou no fim da temporada).
         }
         else if (pct is double p && p > EvolucaoCriterios.TitularMuito)
         {
