@@ -15,11 +15,13 @@ public class ResumoRodadaService : IResumoRodadaService
 {
     private readonly DraftDbContext _db;
     private readonly IBolaoService _bolao;
+    private readonly IDiretoriaService _diretoria;
 
-    public ResumoRodadaService(DraftDbContext db, IBolaoService bolao)
+    public ResumoRodadaService(DraftDbContext db, IBolaoService bolao, IDiretoriaService diretoria)
     {
         _db = db;
         _bolao = bolao;
+        _diretoria = diretoria;
     }
 
     public async Task<IReadOnlyList<ResumoRodadaOpcaoDto>> RodadasAsync(int quantas, CancellationToken ct)
@@ -137,7 +139,23 @@ public class ResumoRodadaService : IResumoRodadaService
             artilheiros,
             tabela,
             bolao,
-            await ProximaAsync(rodada.LigaId, quando, ct));
+            await ProximaAsync(rodada.LigaId, quando, ct),
+            await DiretoriaAsync(rodada.Temporada, ids, ct));
+    }
+
+    /// <summary>Quem mudou de faixa na rodada e quem está na corda bamba. Complementar: se falhar, o resumo sai sem.</summary>
+    private async Task<DiretoriaResumoRodadaDto?> DiretoriaAsync(int? temporada, IReadOnlyCollection<Guid> partidas, CancellationToken ct)
+    {
+        if (temporada is null) return null;
+        try
+        {
+            var painel = await _diretoria.GetPainelAsync(temporada, ct);
+            return painel is null ? null : Diretoria.ResumoDaRodada(painel.Times, partidas);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     private record Gol(Guid PartidaId, Guid TimeId, TipoEvento Tipo, string Jogador, string Time);

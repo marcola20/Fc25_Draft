@@ -62,6 +62,50 @@ public class DiretoriaService : IDiretoriaService
         return noticias.OrderByDescending(n => n.Data).ToArray();
     }
 
+    // ── Avisos ─────────────────────────────────────────────────────────────
+
+    public async Task<int> AvisarMudancasDeFaixaAsync(CancellationToken ct)
+    {
+        if (await GetTemporadaAtualAsync(ct) is not int temporada) return 0;
+
+        var m = await MontarAsync(temporada, ct);
+        var agora = _time.GetUtcNow().UtcDateTime;
+        var desde = agora - AvisoDeFaixaVale;
+        var avisados = 0;
+
+        foreach (var (timeId, pontos) in m.Pontos)
+        {
+            for (int i = 0; i < pontos.Count; i++)
+            {
+                var ponto = pontos[i];
+                // Jogo antigo (ex.: na primeira vez que a checagem roda) não vira aviso.
+                if (ponto.Data < desde) continue;
+
+                var antes = Diretoria.Faixa(i > 0 ? pontos[i - 1].Valor : DiretoriaCriterios.ConfiancaInicial);
+                var depois = Diretoria.Faixa(ponto.Valor);
+                if (depois >= antes || depois > FaixaConfianca.Pressionado) continue;
+
+                var chave = $"diretoria:{timeId}:{ponto.PartidaId}";
+                if (await _db.NotificacoesEnviadas.AnyAsync(n => n.Chave == chave, ct)) continue;
+                _db.NotificacoesEnviadas.Add(new NotificacaoEnviada { Chave = chave, EnviadaEm = agora });
+
+                var jogo = $"o {ponto.GolsPro} x {ponto.GolsContra} contra o {m.Nomes.GetValueOrDefault(ponto.AdversarioId, "adversário")}";
+                var texto = depois == FaixaConfianca.Pressionado
+                    ? $"⚠️ A diretoria perdeu a paciência depois d{jogo}. Confiança: {ponto.Valor:0} de 100. Hora de reagir!"
+                    : $"🔥 Sua cadeira está balançando: a diretoria entrou em crise depois d{jogo}. Confiança: {ponto.Valor:0} de 100.";
+
+                AvisosDoTime.Criar(_db, timeId, AvisosDoTime.Diretoria, texto, $"/teams/details/{timeId}", agora);
+                avisados++;
+            }
+        }
+
+        if (avisados > 0) await _db.SaveChangesAsync(ct);
+        return avisados;
+    }
+
+    /// <summary>Até quanto tempo depois do jogo a queda de faixa ainda vira aviso.</summary>
+    private static readonly TimeSpan AvisoDeFaixaVale = TimeSpan.FromDays(2);
+
     // ── Metas ──────────────────────────────────────────────────────────────
 
     public async Task<DiretoriaPainelDto> GerarMetasAsync(int temporada, CancellationToken ct)
@@ -289,7 +333,7 @@ public class DiretoriaService : IDiretoriaService
                     historico.Count > 0 ? historico[^1].Variacao : null,
                     metasDoTime,
                     historico.Select(p => new DiretoriaPontoDto(
-                        p.Data, p.Competicao, p.AdversarioId, nomes.GetValueOrDefault(p.AdversarioId, "?"),
+                        p.PartidaId, p.Data, p.Competicao, p.AdversarioId, nomes.GetValueOrDefault(p.AdversarioId, "?"),
                         p.GolsPro, p.GolsContra, p.Variacao, p.Valor)).ToArray());
             })
             .OrderByDescending(t => t.Confianca)

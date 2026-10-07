@@ -22,6 +22,12 @@ public interface IDiretoriaService
     /// <summary>Notícias do Plantão: mudanças de faixa da confiança.</summary>
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Avisa (uma vez por jogo) o time que caiu para "pressionado" ou "cadeira balançando" num jogo recente;
+    /// o aviso aparece no sino e vira notificação no celular. Retorna quantos.
+    /// </summary>
+    Task<int> AvisarMudancasDeFaixaAsync(CancellationToken ct);
+
     /// <summary>Calcula e grava as metas da temporada, trocando as que já existiam.</summary>
     Task<DiretoriaPainelDto> GerarMetasAsync(int temporada, CancellationToken ct);
 

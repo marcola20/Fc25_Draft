@@ -28,7 +28,8 @@ public record ResumoDaRodadaDto(
     IReadOnlyList<ResumoArtilheiroDto> Artilheiros,
     IReadOnlyList<ResumoTabelaLinhaDto> Tabela,
     IReadOnlyList<BolaoRankingLinhaDto> Bolao,
-    string? ProximaRodada);
+    string? ProximaRodada,
+    DiretoriaResumoRodadaDto? Diretoria = null);
 
 /// <summary>Uma rodada na lista de escolha do resumo.</summary>
 public record ResumoRodadaOpcaoDto(Guid RodadaId, string Titulo, DateTime? Quando, int Jogos, bool Completa);

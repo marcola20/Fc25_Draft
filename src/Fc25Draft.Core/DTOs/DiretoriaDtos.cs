@@ -26,6 +26,7 @@ public record DiretoriaMetaDto(
     bool AjustadaPeloAdmin);
 
 public record DiretoriaPontoDto(
+    Guid PartidaId,
     DateTime Data,
     string Competicao,
     Guid AdversarioId,
@@ -51,6 +52,20 @@ public record DiretoriaPainelDto(
     int Temporada,
     bool MetasGeradas,
     IReadOnlyList<DiretoriaTimeDto> Times);
+
+/// <summary>Time que mudou de faixa num jogo da rodada.</summary>
+public record DiretoriaMudancaDto(string TimeNome, FaixaConfianca Antes, FaixaConfianca Depois, double Confianca);
+
+/// <summary>Time abaixo de "estável" depois da rodada.</summary>
+public record DiretoriaNaCordaDto(string TimeNome, FaixaConfianca Faixa, double Confianca);
+
+/// <summary>A diretoria no resumo da rodada: quem mudou de faixa e quem está mais perto da demissão.</summary>
+public record DiretoriaResumoRodadaDto(
+    IReadOnlyList<DiretoriaMudancaDto> Mudancas,
+    IReadOnlyList<DiretoriaNaCordaDto> NaCorda)
+{
+    public bool Vazio => Mudancas.Count == 0 && NaCorda.Count == 0;
+}
 
 /// <summary>Quem recebe bônus da diretoria numa competição, antes de creditar no caixa.</summary>
 public record DiretoriaBonusPreviaDto(

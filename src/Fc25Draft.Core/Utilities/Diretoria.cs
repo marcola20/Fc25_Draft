@@ -1,3 +1,4 @@
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Enums;
 
 namespace Fc25Draft.Core.Utilities;
@@ -278,6 +279,52 @@ public static class Diretoria
         }
 
         return pontos;
+    }
+
+    /// <summary>Quantos times aparecem em "na corda bamba" no resumo da rodada.</summary>
+    public const int NaCordaNoResumo = 3;
+
+    /// <summary>
+    /// A diretoria numa rodada: quem mudou de faixa nos jogos dela e os times mais perto da demissão
+    /// (abaixo de "estável") logo depois dela.
+    /// </summary>
+    public static DiretoriaResumoRodadaDto ResumoDaRodada(IEnumerable<DiretoriaTimeDto> times, IReadOnlyCollection<Guid> partidasDaRodada)
+    {
+        var lista = times.ToList();
+        var mudancas = new List<DiretoriaMudancaDto>();
+        DateTime? fimDaRodada = null;
+
+        foreach (var time in lista)
+        {
+            for (int i = 0; i < time.Historico.Count; i++)
+            {
+                var ponto = time.Historico[i];
+                if (!partidasDaRodada.Contains(ponto.PartidaId)) continue;
+
+                if (fimDaRodada is null || ponto.Data > fimDaRodada) fimDaRodada = ponto.Data;
+
+                var antes = Faixa(i > 0 ? time.Historico[i - 1].Valor : DiretoriaCriterios.ConfiancaInicial);
+                var depois = Faixa(ponto.Valor);
+                if (antes != depois)
+                    mudancas.Add(new DiretoriaMudancaDto(time.TimeNome, antes, depois, ponto.Valor));
+            }
+        }
+
+        // Ninguém jogou: nada a dizer sobre a diretoria nesta rodada.
+        if (fimDaRodada is not DateTime fim)
+            return new DiretoriaResumoRodadaDto(Array.Empty<DiretoriaMudancaDto>(), Array.Empty<DiretoriaNaCordaDto>());
+
+        var naCorda = lista
+            .Select(t => (t.TimeNome, Valor: t.Historico.LastOrDefault(p => p.Data <= fim)?.Valor ?? DiretoriaCriterios.ConfiancaInicial))
+            .Where(x => x.Valor < DiretoriaCriterios.LimiteEstavel)
+            .OrderBy(x => x.Valor)
+            .Take(NaCordaNoResumo)
+            .Select(x => new DiretoriaNaCordaDto(x.TimeNome, Faixa(x.Valor), x.Valor))
+            .ToArray();
+
+        return new DiretoriaResumoRodadaDto(
+            mudancas.OrderBy(m => m.Depois > m.Antes).ThenBy(m => m.Confianca).ToArray(),
+            naCorda);
     }
 
     public static FaixaConfianca Faixa(double confianca) => confianca switch
