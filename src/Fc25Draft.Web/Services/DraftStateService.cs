@@ -212,7 +212,8 @@ public class DraftStateService
         return ids.ToHashSet();
     }
 
-    private IQueryable<Player> Livres() => _db.Players.AsNoTracking().Where(p => !p.TeamRosters.Any());
+    private IQueryable<Player> Livres() =>
+        _db.Players.AsNoTracking().Where(p => !p.TeamRosters.Any() && p.AposentadoNaTemporada == null);
 
     /// <summary>Livres com até a idade do próximo draft (o draft é de jovens; a idade vem das configurações).</summary>
     private async Task<IQueryable<Player>> LivresDoProximoDraftAsync(CancellationToken ct)

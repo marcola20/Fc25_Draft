@@ -10,5 +10,7 @@ public enum TransferType
     ExpansionDraft = 5,
     Loan = 6,
     LoanReturn = 7,
-    LoanPurchase = 8
+    LoanPurchase = 8,
+    /// <summary>Saiu do clube porque se aposentou (sem destino).</summary>
+    Aposentadoria = 9
 }

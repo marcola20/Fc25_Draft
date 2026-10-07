@@ -145,7 +145,12 @@ aposentados para o editor, e os avisos aos treinadores.
    PES não gravou). Regras em `EvolucaoCriterios`/`EvolucaoTemporada` (Core); queda de atributos em `OverallPes.Regredir`
    (físicos primeiro); conta guardada em `VariacoesDaTemporada`. Titular % = titulares ÷ jogos do clube com escalação
    gravada desde a chegada (escalação só guarda os 11 titulares). Idade da temporada = idade − aniversários posteriores.
-4. **Aposentadoria** — anúncio, última temporada, saída na virada, editor tirando dos elencos, Lendas aposentadas.
+4. **Aposentadoria** — FEITO em 07/10/2026 (branch `feat/categorias-de-base`): card "👋 Aposentadorias" em
+   `/admin/temporada` (sorteio estável por temporada e jogador, admin marca/desmarca/acrescenta, anuncia; na virada
+   seguinte "Aposentar" tira do elenco, grava `AposentadoNaTemporada`, histórico `TransferType.Aposentadoria`; desfazer
+   devolve ao clube). Aposentado não é "livre" (draft, listas, leilão, evolução). Selo na ficha; Plantão (👋 Carreira).
+   Editor PES: `GET /api/admin/pes/aposentados`; ao abrir, deixa a saída dos clubes pronta (fica nas seleções).
+   Falta: "Lendas aposentadas" no Hall da Fama e figurinha (passo 5).
 5. **Fora da curva e experiência** — surpresas, ajuste manual, página /virada, avisos no celular.
 
 Cada passo numa sessão, anotando "Feito" aqui no fim.

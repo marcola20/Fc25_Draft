@@ -27,7 +27,11 @@ public record PlayerDetailsDto(
     string Status,
     string? TeamName,
     Guid? TeamId,
-    PlayerAtributosDto? Atributos);
+    PlayerAtributosDto? Atributos,
+    // Anunciou que esta temporada é a última dele.
+    int? UltimaTemporada = null,
+    // Aposentado: a última temporada que jogou.
+    int? AposentadoNaTemporada = null);
 
 /// <summary>Atributos do PES (40–99). Mutável porque também serve de modelo do formulário.</summary>
 public class PlayerAtributosDto

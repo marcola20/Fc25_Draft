@@ -49,6 +49,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             pes.MapGet("/idade-da-liga", async (IIdadesService idades, CancellationToken ct) =>
                 Results.Ok(await idades.GetIdadeDaLigaAsync(ct)));
 
+            // Aposentados: o editor tira dos clubes no save.
+            pes.MapGet("/aposentados", async (IAposentadoriaService aposentadoria, CancellationToken ct) =>
+                Results.Ok(await aposentadoria.ListAposentadosParaPesAsync(ct)));
+
             // Evoluções feitas no site (venda rápida) que o editor ainda tem que gravar no save.
             pes.MapGet("/evolucoes", async (ISincronizacaoPesService sync, CancellationToken ct) =>
                 Results.Ok(await sync.EvolucoesPendentesAsync(ct)));

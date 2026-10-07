@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
 @inject IDiretoriaService DiretoriaSvc
+@inject IAposentadoriaService AposentadoriaSvc
 
 <PageTitle>Plantão CBFV</PageTitle>
 
@@ -12,6 +13,7 @@
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Jogo ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">⚽ Jogos</button>
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Mercado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">💸 Mercado</button>
             <button type="button" class="btn @(_filtro == PlantaoCategoria.Diretoria ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Diretoria)">🏛️ Diretoria</button>
+            <button type="button" class="btn @(_filtro == PlantaoCategoria.Carreira ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Carreira)">👋 Carreira</button>
         </div>
     </div>
     <p class="text-muted small mb-3">
@@ -62,6 +64,7 @@
             var noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).ToList();
             // A diretoria é complementar: se falhar, o Plantão segue com o resto.
             try { noticias.AddRange(await DiretoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await AposentadoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).ToList();
         }
         catch (Exception ex)

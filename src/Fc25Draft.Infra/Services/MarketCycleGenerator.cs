@@ -208,7 +208,7 @@ public class MarketCycleGenerator : IMarketCycleGenerator
         var candidates = await _dbContext.Players
             .AsNoTracking()
             .Include(p => p.Position)
-            .Where(p => p.CurrentTeamId == null)
+            .Where(p => p.CurrentTeamId == null && p.AposentadoNaTemporada == null)
             .Where(p => reservadoAte == null || p.Age == null || p.Age > reservadoAte)
             .Where(p => p.Overall >= minOvr && p.Overall <= maxOvr)
             .Where(p => !excluded.Contains(p.PlayerId))

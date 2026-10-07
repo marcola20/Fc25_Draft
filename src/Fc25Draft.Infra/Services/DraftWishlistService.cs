@@ -63,7 +63,7 @@ public class DraftWishlistService : IDraftWishlistService
         var players = await _db.Players
             .AsNoTracking()
             .Where(p => ids.Contains(p.PlayerId))
-            .Select(p => new { p.PlayerId, p.Name, p.Overall, p.Age, Escolhido = p.TeamRosters.Any() })
+            .Select(p => new { p.PlayerId, p.Name, p.Overall, p.Age, Escolhido = p.TeamRosters.Any() || p.AposentadoNaTemporada != null })
             .ToListAsync(ct);
 
         if (players.Count != ids.Count)

@@ -1,0 +1,216 @@
+@using Fc25Draft.Core.Utilities
+@inject IAposentadoriaService AposentadoriaSvc
+@inject IJSRuntime JSRuntime
+
+@* Aposentadoria com aviso: quem anunciou antes se aposenta nesta virada; o sorteio sugere os anúncios desta temporada. *@
+<div class="card mb-3">
+    <div class="card-header fw-bold">👋 Aposentadorias — temporada @Temporada</div>
+    <div class="card-body">
+        @if (_erro is not null)
+        {
+            <div class="alert alert-danger alert-dismissible py-2">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+        }
+        @if (_ok is not null)
+        {
+            <div class="alert alert-success alert-dismissible py-2">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+        }
+
+        <p class="text-muted small mb-2">
+            O jogador <strong>anuncia</strong> que a temporada é a última dele e se <strong>aposenta na virada seguinte</strong>:
+            sai do elenco, fica no histórico e não volta ao leilão nem ao draft. O Editor PES tira os aposentados dos clubes
+            no save quando abrir. Sorteio da sugestão pela idade na temporada
+            (@string.Join(", ", AposentadoriaCriterios.Chances.Select(c => $"{c.Idade}{(c.Chance >= 1 ? "+" : "")}: {c.Chance:P0}".Replace(" %", "%"))));
+            chance pela metade com overall @AposentadoriaCriterios.OverallAlto+ e ×0,75 com @AposentadoriaCriterios.OverallBom+;
+            goleiro conta @AposentadoriaCriterios.AnosAMenosDoGoleiro anos a menos.
+        </p>
+
+        @if (_painel is null)
+        {
+            <button class="btn btn-outline-primary" @onclick="CarregarAsync" disabled="@_carregando">@(_carregando ? "Carregando…" : "Abrir as aposentadorias")</button>
+        }
+        else
+        {
+            @* 1. Quem anunciou antes se aposenta agora *@
+            <h3 class="h6 mt-2">Se aposentam nesta virada <span class="text-muted small">(anunciaram a despedida antes de @Temporada)</span></h3>
+            @if (_painel.ParaAposentar.Count == 0)
+            {
+                <p class="small text-muted">Ninguém.</p>
+            }
+            else
+            {
+                <p class="small mb-1">@string.Join(", ", _painel.ParaAposentar.Select(j => $"{j.Nome} ({j.Idade}, {j.TimeNome ?? "sem clube"})"))</p>
+                <button class="btn btn-danger btn-sm mb-3" @onclick="AposentarAsync" disabled="@_carregando">
+                    🎖️ Aposentar @_painel.ParaAposentar.Count jogador(es)
+                </button>
+            }
+
+            @* 2. Anúncios desta temporada *@
+            <h3 class="h6 mt-2">Anunciaram que @Temporada é a última temporada</h3>
+            @if (_painel.Anunciados.Count == 0)
+            {
+                <p class="small text-muted">Ninguém ainda.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled small mb-3">
+                    @foreach (var j in _painel.Anunciados)
+                    {
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span>👋 <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
+                            <button class="btn btn-link btn-sm p-0" @onclick="() => CancelarAsync(j)" disabled="@_carregando">desistiu</button>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @* 3. Sugestões do sorteio + escolha manual *@
+            <h3 class="h6 mt-2">Quem anuncia a despedida em @Temporada? <span class="text-muted small">(marcados = sorteio; mude à vontade)</span></h3>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <input class="form-control form-control-sm" style="max-width: 220px;" placeholder="Buscar jogador" @bind="_busca" @bind:event="oninput" />
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="soChance" @bind="_soComChance" />
+                    <label class="form-check-label small" for="soChance">Só quem tem chance</label>
+                </div>
+                <span class="small text-muted ms-auto">@_marcados.Count marcado(s)</span>
+            </div>
+            <div class="table-responsive" style="max-height: 360px;">
+                <table class="table table-sm table-hover align-middle mb-2">
+                    <thead class="table-light" style="position: sticky; top: 0;">
+                        <tr><th></th><th>Jogador</th><th>Clube</th><th class="text-center">Idade</th><th class="text-center">Overall</th><th class="text-center">Chance</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var j in Candidatos)
+                        {
+                            <tr>
+                                <td><input type="checkbox" class="form-check-input" checked="@_marcados.Contains(j.PlayerId)" @onchange="e => Marcar(j.PlayerId, (bool)(e.Value ?? false))" /></td>
+                                <td>@j.Nome @if (j.Sorteado) { <span class="badge bg-warning text-dark ms-1">sorteado</span> }</td>
+                                <td class="small">@(j.TimeNome ?? "—")</td>
+                                <td class="text-center">@j.Idade</td>
+                                <td class="text-center">@j.Overall</td>
+                                <td class="text-center small">@(j.Chance > 0 ? $"{j.Chance:P0}".Replace(" %", "%") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-primary btn-sm" @onclick="AnunciarAsync" disabled="@(_carregando || _marcados.Count == 0)">
+                👋 Anunciar a despedida de @_marcados.Count jogador(es)
+            </button>
+
+            @* 4. Aposentados *@
+            @if (_painel.Aposentados.Count > 0)
+            {
+                <h3 class="h6 mt-4">Aposentados</h3>
+                <ul class="list-unstyled small mb-0">
+                    @foreach (var j in _painel.Aposentados)
+                    {
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span>🎖️ @j.Nome — última temporada @j.AposentadoNaTemporada</span>
+                            <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DesaposentarAsync(j)" disabled="@_carregando">desfazer</button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Temporada { get; set; }
+
+    private AposentadoriaPainelDto? _painel;
+    private readonly HashSet<int> _marcados = new();
+    private string _busca = "";
+    private bool _soComChance = true;
+    private bool _carregando;
+    private string? _erro;
+    private string? _ok;
+    private int _temporadaCarregada;
+
+    // Com busca, qualquer ativo; sem busca, só quem tem chance (e quem já foi marcado).
+    private IEnumerable<AposentadoriaJogadorDto> Candidatos =>
+        _painel!.Candidatos
+            .Where(j => string.IsNullOrWhiteSpace(_busca)
+                ? !_soComChance || j.Chance > 0 || _marcados.Contains(j.PlayerId)
+                : j.Nome.Contains(_busca, StringComparison.CurrentCultureIgnoreCase))
+            .Take(200);
+
+    protected override void OnParametersSet()
+    {
+        if (_temporadaCarregada != Temporada)
+        {
+            _painel = null;
+            _temporadaCarregada = Temporada;
+        }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _painel = await AposentadoriaSvc.GetPainelAsync(Temporada, CancellationToken.None);
+            _marcados.Clear();
+            foreach (var j in _painel.Candidatos.Where(j => j.Sorteado)) _marcados.Add(j.PlayerId);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private void Marcar(int playerId, bool marcado)
+    {
+        if (marcado) _marcados.Add(playerId); else _marcados.Remove(playerId);
+    }
+
+    private async Task AnunciarAsync()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"{_marcados.Count} jogador(es) anunciam que {Temporada} é a última temporada. Vira notícia no Plantão. Confirmar?"))
+            return;
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.AnunciarAsync(Temporada, _marcados.ToArray(), CancellationToken.None);
+            _ok = $"{_marcados.Count} despedida(s) anunciada(s). Eles se aposentam na virada para {Temporada + 1}.";
+        });
+    }
+
+    private async Task CancelarAsync(AposentadoriaJogadorDto j) =>
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.CancelarAnuncioAsync(j.PlayerId, CancellationToken.None);
+            _ok = $"{j.Nome} desistiu da despedida.";
+        });
+
+    private async Task AposentarAsync()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Aposentar {_painel!.ParaAposentar.Count} jogador(es)? Eles saem dos elencos agora."))
+            return;
+        await Executar(async () =>
+        {
+            var n = await AposentadoriaSvc.AposentarAsync(Temporada, CancellationToken.None);
+            _ok = $"{n} jogador(es) aposentado(s). Abra o Editor PES para tirá-los dos clubes no save.";
+        });
+    }
+
+    private async Task DesaposentarAsync(AposentadoriaJogadorDto j)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Desfazer a aposentadoria de {j.Nome}? Ele volta ao clube em que estava (se der)."))
+            return;
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.DesaposentarAsync(j.PlayerId, CancellationToken.None);
+            _ok = $"{j.Nome} voltou à ativa.";
+        });
+    }
+
+    private async Task Executar(Func<Task> acao)
+    {
+        _carregando = true;
+        try
+        {
+            await acao();
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+}

@@ -328,7 +328,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
 
         var query = _dbContext.Players
             .AsNoTracking()
-            .Where(player => !player.TeamRosters.Any())
+            .Where(player => !player.TeamRosters.Any() && player.AposentadoNaTemporada == null)
             .Where(player => reservadoAte == null || player.Age == null || player.Age > reservadoAte)
             .Select(player => new
             {

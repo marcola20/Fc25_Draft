@@ -7,7 +7,8 @@ public enum PlantaoCategoria
 {
     Jogo,
     Mercado,
-    Diretoria
+    Diretoria,
+    Carreira
 }
 
 /// <summary>Uma notícia do Plantão: manchete, linha fina e para onde o clique leva.</summary>

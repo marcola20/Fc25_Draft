@@ -58,7 +58,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
         var aniversariosDepois = await _db.EnvelhecimentosTemporada.AsNoTracking().CountAsync(e => e.Temporada > temporada, ct);
 
         var jogadores = await _db.Players.AsNoTracking()
-            .Where(p => p.Age != null)
+            .Where(p => p.Age != null && p.AposentadoNaTemporada == null)
             .Select(p => new
             {
                 p.PlayerId, p.Name, Idade = p.Age!.Value - aniversariosDepois, p.Overall, p.PositionId, Posicao = p.Position.Name,

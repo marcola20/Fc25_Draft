@@ -58,7 +58,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Position.Name,
                         p.Overall,
                         p.Age,
-                        p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+                        p.TeamRosters.Any() ? "Escolhido" : p.AposentadoNaTemporada != null ? "Aposentado" : "Disponível",
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
                     .ToListAsync(ct);
 
@@ -77,10 +77,12 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Position.Name,
                         p.Overall,
                         p.Age,
-                        p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+                        p.TeamRosters.Any() ? "Escolhido" : p.AposentadoNaTemporada != null ? "Aposentado" : "Disponível",
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
                         p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault(),
-                        p.Atributos == null ? null : AtributosPes.ParaDto(p.Atributos)))
+                        p.Atributos == null ? null : AtributosPes.ParaDto(p.Atributos),
+                        p.UltimaTemporada,
+                        p.AposentadoNaTemporada))
                     .FirstOrDefaultAsync(ct);
 
                 return player is null ? Results.NotFound() : Results.Ok(player);
@@ -289,7 +291,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }
 
             if (onlyAvailable is true)
-                query = query.Where(p => !p.TeamRosters.Any());
+                query = query.Where(p => !p.TeamRosters.Any() && p.AposentadoNaTemporada == null);
 
             if (overallMin.HasValue)
                 query = query.Where(p => p.Overall >= overallMin.Value);
@@ -339,7 +341,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     p.Position.Name,
                     p.Overall,
                     p.Age,
-                    p.TeamRosters.Any() ? "Escolhido" : "Disponível",
+                    p.TeamRosters.Any() ? "Escolhido" : p.AposentadoNaTemporada != null ? "Aposentado" : "Disponível",
                     p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()
                 ))
                 .ToListAsync(ct);

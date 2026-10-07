@@ -14,6 +14,7 @@ public static class TransferTypeExtensions
         TransferType.Loan => "Empréstimo",
         TransferType.LoanReturn => "Fim de empréstimo",
         TransferType.LoanPurchase => "Compra após empréstimo",
+        TransferType.Aposentadoria => "Aposentadoria",
         _ => type.ToString()
     };
 }
