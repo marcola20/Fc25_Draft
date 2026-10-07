@@ -831,9 +831,6 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Jogadores")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Pulados")
-                        .HasColumnType("text");
-
                     b.HasKey("Temporada");
 
                     b.ToTable("EnvelhecimentosTemporada", (string)null);

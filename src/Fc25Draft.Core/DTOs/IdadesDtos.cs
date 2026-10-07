@@ -6,7 +6,6 @@ namespace Fc25Draft.Core.DTOs;
 /// <param name="SaemDoSub23">Quem tem 23 hoje e passa a 24 (sai do draft sub-23).</param>
 /// <param name="Chegam34">Quem tem 33 hoje e passa a 34 (a idade em que a aposentadoria começa a rondar).</param>
 /// <param name="PodeDesfazer">Só o envelhecimento da temporada atual, e se for o último, pode ser desfeito.</param>
-/// <param name="JaNaIdade">Quem já está com a idade da temporada pela base do PES (entrou depois com +1): não ganha o ano.</param>
 public record EnvelhecimentoSituacaoDto(
     int? Temporada,
     DateTime? AplicadoEm,
@@ -17,8 +16,7 @@ public record EnvelhecimentoSituacaoDto(
     int SaemDoSub23,
     int Chegam34,
     int? UltimaTemporadaEnvelhecida,
-    bool PodeDesfazer,
-    IReadOnlyList<string> JaNaIdade)
+    bool PodeDesfazer)
 {
     public bool JaEnvelhecida => AplicadoEm is not null;
 }

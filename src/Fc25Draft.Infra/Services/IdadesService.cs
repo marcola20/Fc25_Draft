@@ -17,12 +17,6 @@ public class IdadesService : IIdadesService
     private const int IdadeMaximaDoDraft = 23;
     private const int IdadeDeFimDeCarreira = 34;
 
-    /// <summary>
-    /// As idades da base do PES embutida são as da temporada 2009 da liga: na temporada T, a idade certa é a da
-    /// base + (T − 2009). Quem já está nela (ex.: entrou no site depois, já com +1) não ganha o ano.
-    /// </summary>
-    private const int TemporadaDaBaseDoPes = 2009;
-
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
 
@@ -44,12 +38,8 @@ public class IdadesService : IIdadesService
         var desta = registros.FirstOrDefault(e => e.Temporada == temporada);
         var ultimo = registros.FirstOrDefault();
 
-        var jogadores = await JogadoresAsync(ct);
-        var idades = jogadores.Select(j => j.Age).ToList();
+        var idades = await _db.Players.AsNoTracking().Select(p => p.Age).ToListAsync(ct);
         var comIdade = idades.Where(a => a is not null).Select(a => a!.Value).ToList();
-        var jaNaIdade = desta is null && temporada is int t
-            ? jogadores.Where(j => JaNaIdade(j, t)).Select(j => j.Nome).OrderBy(n => n).ToArray()
-            : Array.Empty<string>();
 
         return new EnvelhecimentoSituacaoDto(
             temporada,
@@ -61,23 +51,8 @@ public class IdadesService : IIdadesService
             comIdade.Count(a => a == IdadeMaximaDoDraft),
             comIdade.Count(a => a == IdadeDeFimDeCarreira - 1),
             ultimo?.Temporada,
-            desta is not null && ultimo?.Temporada == temporada,
-            jaNaIdade);
+            desta is not null && ultimo?.Temporada == temporada);
     }
-
-    private sealed record JogadorIdade(int PlayerId, string Nome, int? Age, int? PesId);
-
-    private async Task<List<JogadorIdade>> JogadoresAsync(CancellationToken ct) =>
-        await _db.Players.AsNoTracking()
-            .Select(p => new JogadorIdade(p.PlayerId, p.Name, p.Age, p.Atributos != null ? p.Atributos.PesId : null))
-            .ToListAsync(ct);
-
-    /// <summary>Já tem a idade da temporada pela base do PES. Sem ligação com a base, ganha o ano normalmente.</summary>
-    private static bool JaNaIdade(JogadorIdade j, int temporada) =>
-        j.Age is int idade
-        && j.PesId is int pesId
-        && BasePesService.IdadeNaBase(pesId) is int naBase
-        && idade >= naBase + (temporada - TemporadaDaBaseDoPes);
 
     public async Task<EnvelhecimentoSituacaoDto> EnvelhecerAsync(int temporada, CancellationToken ct)
     {
@@ -91,20 +66,15 @@ public class IdadesService : IIdadesService
             if (await _db.EnvelhecimentosTemporada.AnyAsync(e => e.Temporada > temporada, ct))
                 throw new InvalidOperationException($"Já há uma temporada depois de {temporada} envelhecida.");
 
-            var todos = await JogadoresAsync(ct);
-            var pulados = todos.Where(j => JaNaIdade(j, temporada)).Select(j => j.PlayerId).ToList();
-            var ganham = todos.Where(j => j.Age is not null && !pulados.Contains(j.PlayerId)).Select(j => j.PlayerId).ToList();
-
             var jogadores = await _db.Players
-                .Where(p => ganham.Contains(p.PlayerId))
+                .Where(p => p.Age != null)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Age, p => p.Age + 1), ct);
 
             _db.EnvelhecimentosTemporada.Add(new EnvelhecimentoTemporada
             {
                 Temporada = temporada,
                 AplicadoEm = _time.GetUtcNow().UtcDateTime,
-                Jogadores = jogadores,
-                Pulados = pulados.Count == 0 ? null : string.Join(",", pulados)
+                Jogadores = jogadores
             });
             await _db.SaveChangesAsync(ct);
             await transacao.CommitAsync(ct);
@@ -124,9 +94,8 @@ public class IdadesService : IIdadesService
             if (await _db.EnvelhecimentosTemporada.AnyAsync(e => e.Temporada > temporada, ct))
                 throw new InvalidOperationException("Só dá para desfazer o último envelhecimento.");
 
-            var pulados = (registro.Pulados ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
             await _db.Players
-                .Where(p => p.Age != null && !pulados.Contains(p.PlayerId))
+                .Where(p => p.Age != null)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Age, p => p.Age - 1), ct);
 
             _db.EnvelhecimentosTemporada.Remove(registro);

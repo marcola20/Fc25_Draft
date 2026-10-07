@@ -13,10 +13,4 @@ public class EnvelhecimentoTemporada
 
     /// <summary>Quantos jogadores ganharam 1 ano.</summary>
     public int Jogadores { get; set; }
-
-    /// <summary>
-    /// Jogadores que não ganharam o ano por já estarem com a idade da temporada (PlayerIds separados por vírgula).
-    /// O desfazer não mexe neles.
-    /// </summary>
-    public string? Pulados { get; set; }
 }
