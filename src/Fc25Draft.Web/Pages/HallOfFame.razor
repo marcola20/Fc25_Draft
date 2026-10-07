@@ -7,6 +7,7 @@
 @inject IHallOfFameService HallOfFameService
 @inject EscudoService EscudoService
 @inject IAlbumService AlbumSvc
+@inject IAposentadoriaService AposentadoriaSvc
 
 <PageTitle>Hall da Fama - Campeões</PageTitle>
 
@@ -80,6 +81,37 @@
             }
         }
 
+        @* Quem pendurou as chuteiras: vem da aposentadoria (virada de temporada). *@
+        @if (_lendas.Count > 0)
+        {
+            <div class="mb-4" id="lendas">
+                <h2 class="h5 border-bottom pb-2 mb-3">🎖️ Lendas aposentadas <span class="text-muted">(@_lendas.Count)</span></h2>
+                <div class="row g-3">
+                    @foreach (var l in _lendas)
+                    {
+                        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                            <div class="card h-100 shadow-sm text-center">
+                                <div class="card-body">
+                                    <FotoJogador PlayerId="@l.PlayerId" Tamanho="72" Alt="@l.Nome" />
+                                    <h3 class="h6 mb-1 mt-2">
+                                        <a href="@($"/players/details/{l.PlayerId}")" class="text-decoration-none">@l.Nome</a>
+                                    </h3>
+                                    <p class="text-muted small mb-2">
+                                        @l.Posicao · última temporada @l.UltimaTemporada@(l.UltimoClube is null ? "" : $" pelo {l.UltimoClube}")
+                                    </p>
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <span class="badge bg-dark">@l.Overall de overall</span>
+                                        @if (l.Jogos > 0) { <span class="badge bg-secondary">@l.Jogos jogos</span> }
+                                        @if (l.Gols > 0) { <span class="badge bg-success">@l.Gols gols</span> }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         @* Quem completou o álbum de figurinhas: vem dos selos do álbum, não das competições. *@
         @if (_colecionadores.Count > 0)
         {
@@ -118,6 +150,7 @@
     private string? _erro;
     private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
     private IReadOnlyList<AlbumCompletoDto> _colecionadores = Array.Empty<AlbumCompletoDto>();
+    private IReadOnlyList<LendaAposentadaDto> _lendas = Array.Empty<LendaAposentadaDto>();
 
     private static readonly TipoCompetition[] _ordemTipos =
         { TipoCompetition.Liga, TipoCompetition.Copa, TipoCompetition.Supercopa };
@@ -128,6 +161,7 @@
         {
             _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
             _colecionadores = await AlbumSvc.AlbunsCompletosAsync(CancellationToken.None);
+            try { _lendas = await AposentadoriaSvc.ListLendasAsync(CancellationToken.None); } catch { _lendas = Array.Empty<LendaAposentadaDto>(); }
         }
         catch (Exception ex)
         {

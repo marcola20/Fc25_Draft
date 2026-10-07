@@ -26,5 +26,16 @@ public record AposentadoriaPainelDto(
     IReadOnlyList<AposentadoriaJogadorDto> Candidatos,
     IReadOnlyList<AposentadoriaJogadorDto> Aposentados);
 
+/// <summary>Lenda aposentada para o Hall da Fama: onde terminou a carreira e o que fez na liga.</summary>
+public record LendaAposentadaDto(
+    int PlayerId,
+    string Nome,
+    string Posicao,
+    int UltimaTemporada,
+    string? UltimoClube,
+    int Overall,
+    int Jogos,
+    int Gols);
+
 /// <summary>Aposentado para o Editor PES tirar dos clubes no save.</summary>
 public record AposentadoPesDto(int PlayerId, string Nome, int? PesId, int Temporada);

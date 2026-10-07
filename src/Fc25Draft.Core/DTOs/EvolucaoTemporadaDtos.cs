@@ -20,7 +20,18 @@ public record EvolucaoLinhaDto(
     int Titular,
     decimal? NotaMedia,
     string Explicacao,
-    string Atributos = "");
+    string Atributos = "",
+    // Explosão (+) ou queda de rendimento (−) sorteada; 0 = nenhuma.
+    int Surpresa = 0);
+
+/// <summary>A última evolução de fim de temporada de um jogador, com a conta explicada (para a ficha).</summary>
+public record VariacaoJogadorDto(
+    int Temporada,
+    int Pontos,
+    int Surpresa,
+    int OverallAntes,
+    int OverallDepois,
+    string Explicacao);
 
 /// <summary>Prévia da evolução de uma temporada, ou o que foi aplicado.</summary>
 /// <param name="PodeDesfazer">Aplicada e nenhuma mudança foi gravada no jogo ainda pelo Editor PES.</param>

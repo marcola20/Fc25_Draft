@@ -176,6 +176,7 @@ else
     }
     else
     {
+        <JogadorVirada @key="@($"virada-{player.PlayerId}")" PlayerId="@player.PlayerId" Admin="@AdminAuth.IsAdmin" />
         <EvolucaoOverall @key="@($"overall-{player.PlayerId}")" PlayerId="@player.PlayerId" />
         <JogadorCarreira @key="player.PlayerId" PlayerId="@player.PlayerId" />
     }

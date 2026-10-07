@@ -26,7 +26,7 @@
             Quem tem clube cai no máximo @EvolucaoCriterios.QuedaMaximaComClube por temporada; o livre veterano pode cair mais.
             Cada ponto é ±1 em vários atributos — subindo, @EvolucaoCriterios.AtributosPorPontoMin ou @EvolucaoCriterios.AtributosPorPontoMax (os do
             estilo de jogo e os que mais pesam na posição); caindo, @EvolucaoCriterios.AtributosNaQuedaMin ou @EvolucaoCriterios.AtributosNaQuedaMax
-            (os físicos primeiro) — e o overall é o que a fórmula der.
+            (os físicos primeiro); goleiro, @EvolucaoCriterios.AtributosDoGoleiro dos de goleiro — e o overall é o que a fórmula der.
             A mudança vai para os atributos e o <strong>Editor PES leva ao save</strong> quando abrir. Faça antes do aniversário da temporada seguinte.
         </p>
 
@@ -50,6 +50,10 @@
                 <span class="badge bg-success">▲ @_previa.Sobem sobem</span>
                 <span class="badge bg-danger">▼ @_previa.Caem caem</span>
                 <span class="badge bg-secondary">= @_previa.Mantem mantêm</span>
+                @if (_previa.Linhas.Any(l => l.Surpresa != 0) || _canceladas.Count > 0)
+                {
+                    <span class="badge bg-info text-dark">💥 @_previa.Linhas.Count(l => l.Surpresa > 0) explosões · 📉 @_previa.Linhas.Count(l => l.Surpresa < 0) quedas de rendimento@(_canceladas.Count > 0 ? $" · {_canceladas.Count} cancelada(s)" : "")</span>
+                }
 
                 <input class="form-control form-control-sm ms-auto" style="max-width: 220px;" placeholder="Buscar jogador ou clube"
                        @bind="_busca" @bind:event="oninput" />
@@ -73,7 +77,19 @@
                         @foreach (var l in Linhas)
                         {
                             <tr>
-                                <td><a href="@($"/players/details/{l.PlayerId}")" class="text-reset">@l.Nome</a> <span class="text-muted small">@l.Posicao</span></td>
+                                <td>
+                                    <a href="@($"/players/details/{l.PlayerId}")" class="text-reset">@l.Nome</a> <span class="text-muted small">@l.Posicao</span>
+                                    @if (l.Surpresa != 0 && !_previa.JaAplicada)
+                                    {
+                                        <button class="btn btn-sm btn-link p-0 ms-1" title="Cancelar a surpresa deste jogador" @onclick="() => CancelarSurpresaAsync(l.PlayerId)">
+                                            @(l.Surpresa > 0 ? "💥" : "📉") cancelar
+                                        </button>
+                                    }
+                                    else if (l.Surpresa != 0)
+                                    {
+                                        <span>@(l.Surpresa > 0 ? "💥" : "📉")</span>
+                                    }
+                                </td>
                                 <td class="small">@(l.TimeNome ?? "—")</td>
                                 <td class="text-center">@l.Idade</td>
                                 <td class="text-center fw-semibold @(l.Pontos > 0 ? "text-success" : l.Pontos < 0 ? "text-danger" : "text-muted")">@EvolucaoTemporada.Sinal(l.Pontos)</td>
@@ -123,6 +139,8 @@
     private EvolucaoPreviaDto? _previa;
     private bool _carregando;
     private string _busca = "";
+    // Surpresas sorteadas que o admin tirou (valem só nesta tela, até aplicar).
+    private readonly HashSet<int> _canceladas = new();
     private string? _erro;
     private string? _ok;
     private int _temporadaCarregada;
@@ -139,6 +157,7 @@
         if (_temporadaCarregada != Temporada)
         {
             _previa = null;
+            _canceladas.Clear();
             _temporadaCarregada = Temporada;
         }
     }
@@ -146,7 +165,7 @@
     private async Task CarregarAsync()
     {
         _carregando = true;
-        try { _previa = await EvolucaoSvc.GetPreviaAsync(Temporada, CancellationToken.None); }
+        try { _previa = await EvolucaoSvc.GetPreviaAsync(Temporada, CancellationToken.None, _canceladas); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
@@ -161,11 +180,17 @@
         _carregando = true;
         try
         {
-            _previa = await EvolucaoSvc.AplicarAsync(Temporada, CancellationToken.None);
+            _previa = await EvolucaoSvc.AplicarAsync(Temporada, CancellationToken.None, _canceladas);
             _ok = "Evolução aplicada. Agora abra o Editor PES para levar os atributos ao save.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
+    }
+
+    private async Task CancelarSurpresaAsync(int playerId)
+    {
+        _canceladas.Add(playerId);
+        await CarregarAsync();
     }
 
     private async Task DesfazerAsync()

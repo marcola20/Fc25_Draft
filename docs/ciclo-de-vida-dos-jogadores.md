@@ -157,7 +157,12 @@ aposentados para o editor, e os avisos aos treinadores.
    devolve ao clube). Aposentado não é "livre" (draft, listas, leilão, evolução). Selo na ficha; Plantão (👋 Carreira).
    Editor PES: `GET /api/admin/pes/aposentados`; ao abrir, deixa a saída dos clubes pronta (fica nas seleções).
    Falta: "Lendas aposentadas" no Hall da Fama e figurinha (passo 5).
-5. **Fora da curva e experiência** — surpresas, ajuste manual, página /virada, avisos no celular.
+5. **Fora da curva e experiência** — FEITO em 07/10/2026 (branch `feat/categorias-de-base`): surpresas (explosão +2 a +4
+   pontos, mais comum até 25; queda de rendimento −2 a −4, mais comum a partir de 29; 6%/2%; sorteio estável; o admin
+   cancela na prévia); ajuste manual na ficha (admin: ± pontos com motivo → EvolucaoPes); bloco "Virada de temporada" na
+   ficha (aba Carreira); página pública `/virada`; avisos no sino/celular (virada por time, despedida e aposentadoria);
+   "Lendas aposentadas" no Hall da Fama. Goleiro usa 4 atributos por ponto (mesmo efeito de um jogador de linha). Quem
+   anunciou a despedida na temporada não evolui. Falta decidir: figurinha de Lenda no álbum, limite técnico de overall.
 
 Cada passo numa sessão, anotando "Feito" aqui no fim.
 

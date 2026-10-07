@@ -1,0 +1,106 @@
+@using Fc25Draft.Core.Utilities
+@inject IEvolucaoTemporadaService EvolucaoSvc
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+@* Última evolução de fim de temporada com a conta explicada; para o admin, o ajuste manual. Some sem nada a mostrar. *@
+@if (_ultima is not null || Admin)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center gap-2">
+            <strong>🔄 Virada de temporada</strong>
+            @if (Admin)
+            {
+                <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _ajustando = !_ajustando">✎ Ajuste manual</button>
+            }
+        </div>
+        <div class="card-body small">
+            @if (_ultima is { } u)
+            {
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span>Temporada @u.Temporada:</span>
+                    <span class="badge @(u.Pontos > 0 ? "bg-success" : u.Pontos < 0 ? "bg-danger" : "bg-secondary")">@EvolucaoTemporada.Sinal(u.Pontos) pontos</span>
+                    <span>overall @u.OverallAntes → <strong>@u.OverallDepois</strong></span>
+                    @if (u.Surpresa > 0) { <span class="badge bg-warning text-dark">💥 explosão</span> }
+                    @if (u.Surpresa < 0) { <span class="badge bg-dark">📉 queda de rendimento</span> }
+                </div>
+                <div class="text-muted mt-1">@u.Explicacao</div>
+            }
+            else
+            {
+                <div class="text-muted">Ainda não passou por uma virada de temporada.</div>
+            }
+
+            @if (Admin && _ajustando)
+            {
+                <hr />
+                <div class="d-flex flex-wrap align-items-end gap-2">
+                    <div>
+                        <label class="form-label mb-0">Pontos</label>
+                        <select class="form-select form-select-sm" @bind="_pontos">
+                            @for (var p = 5; p >= -5; p--)
+                            {
+                                if (p == 0) continue;
+                                <option value="@p">@EvolucaoTemporada.Sinal(p)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="flex-grow-1">
+                        <label class="form-label mb-0">Motivo</label>
+                        <input class="form-control form-control-sm" maxlength="50" placeholder="lesão grave, fase iluminada…" @bind="_motivo" />
+                    </div>
+                    <button class="btn btn-sm btn-primary" @onclick="AjustarAsync" disabled="@_salvando">Aplicar</button>
+                </div>
+                <div class="form-text">
+                    Como a evolução: cada ponto é ±1 em alguns atributos (subindo, os do estilo e os que mais pesam; caindo, os físicos
+                    primeiro) e o overall é o que a fórmula der. Vai para o save pelo Editor PES e aparece no gráfico abaixo.
+                </div>
+                @if (_mensagem is not null)
+                {
+                    <div class="alert @(_erro ? "alert-danger" : "alert-success") py-1 px-2 mt-2 mb-0">@_mensagem</div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+    [Parameter] public bool Admin { get; set; }
+
+    private VariacaoJogadorDto? _ultima;
+    private bool _ajustando;
+    private int _pontos = 1;
+    private string _motivo = "";
+    private bool _salvando;
+    private string? _mensagem;
+    private bool _erro;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _ultima = await EvolucaoSvc.GetUltimaDoJogadorAsync(PlayerId, CancellationToken.None); }
+        catch { _ultima = null; }
+    }
+
+    private async Task AjustarAsync()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Aplicar {EvolucaoTemporada.Sinal(_pontos)} pontos? Motivo: {_motivo}"))
+            return;
+
+        _salvando = true;
+        try
+        {
+            var resultado = await EvolucaoSvc.AjustarAsync(PlayerId, _pontos, _motivo, CancellationToken.None);
+            _erro = false;
+            _mensagem = $"Feito: {resultado}. Abra o Editor PES para levar ao save.";
+            // Recarrega a ficha (overall, atributos e gráfico).
+            Navigation.Refresh(forceReload: true);
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _mensagem = ex.Message;
+        }
+        finally { _salvando = false; }
+    }
+}

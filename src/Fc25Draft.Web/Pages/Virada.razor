@@ -1,0 +1,175 @@
+@page "/virada"
+@using Fc25Draft.Core.Utilities
+@inject IEvolucaoTemporadaService EvolucaoSvc
+@inject IAposentadoriaService AposentadoriaSvc
+@inject IDiretoriaService DiretoriaSvc
+@inject EscudoService EscudoService
+
+<PageTitle>Virada de Temporada</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1100px;">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar a virada:</strong> @_erro</div>
+    }
+    else
+    {
+        @if (_temporadas.Count > 1)
+        {
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <label class="form-label mb-0">Temporada</label>
+                <select class="form-select form-select-sm w-auto" @onchange="TrocarAsync">
+                    @foreach (var t in _temporadas)
+                    {
+                        <option value="@t" selected="@(t == _temporada)">@t</option>
+                    }
+                </select>
+            </div>
+        }
+
+        <p class="text-muted small">
+            No fim de cada temporada os jogadores envelhecem e evoluem: os jovens sobem, os veteranos caem, e o desempenho
+            (ser titular, a nota do PES) pesa na conta. De vez em quando alguém explode ou entra em queda de rendimento.
+            Os mais velhos anunciam a despedida e se aposentam na virada seguinte.
+        </p>
+
+        @if (_previa is null)
+        {
+            <div class="alert alert-info">A primeira virada ainda não aconteceu. Ela sai no fim da temporada.</div>
+        }
+        else
+        {
+            <ShareableCard Id="cap-virada" Titulo="@($"Virada {_temporada} → {_temporada + 1}")" Subtitulo="Quem subiu e quem caiu" Arquivo="@($"cbfv-virada-{_temporada}.png")">
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <h2 class="h6">📈 Quem mais subiu</h2>
+                        @Lista(MaisSubiram)
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <h2 class="h6">📉 Quem mais caiu</h2>
+                        @Lista(MaisCairam)
+                    </div>
+                </div>
+            </ShareableCard>
+
+            @if (Surpresas.Any())
+            {
+                <h2 class="h6 mt-3">💥 Fora da curva</h2>
+                @Lista(Surpresas)
+            }
+        }
+
+        @if (_aposentadoria is not null)
+        {
+            var aposentados = _previa is null
+                ? new List<AposentadoriaJogadorDto>()
+                : _aposentadoria.Aposentados.Where(a => a.AposentadoNaTemporada == _temporada).ToList();
+            @if (aposentados.Count > 0)
+            {
+                <h2 class="h6 mt-4">🎖️ Penduraram as chuteiras depois de @_temporada</h2>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var a in aposentados)
+                    {
+                        <a href="@($"/players/details/{a.PlayerId}")" class="badge bg-secondary text-decoration-none">@a.Nome (@a.Idade)</a>
+                    }
+                </div>
+            }
+
+            @if (_aposentadoria.Anunciados.Count > 0)
+            {
+                <h2 class="h6 mt-4">👋 Anunciaram que @_aposentadoria.Temporada é a última temporada</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var a in _aposentadoria.Anunciados)
+                    {
+                        <a href="@($"/players/details/{a.PlayerId}")" class="badge bg-warning text-dark text-decoration-none">
+                            @a.Nome (@a.Idade@(a.TimeNome is null ? "" : $", {a.TimeNome}"))
+                        </a>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private const int QuantosNaLista = 10;
+
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private int _temporada;
+    private EvolucaoPreviaDto? _previa;
+    private AposentadoriaPainelDto? _aposentadoria;
+    private bool _carregando = true;
+    private string? _erro;
+
+    private IEnumerable<EvolucaoLinhaDto> MaisSubiram =>
+        _previa!.Linhas.Where(l => l.Variacao > 0).OrderByDescending(l => l.Variacao).ThenByDescending(l => l.OverallDepois).Take(QuantosNaLista);
+
+    private IEnumerable<EvolucaoLinhaDto> MaisCairam =>
+        _previa!.Linhas.Where(l => l.Variacao < 0 && l.TimeNome != null).OrderBy(l => l.Variacao).ThenByDescending(l => l.OverallAntes).Take(QuantosNaLista);
+
+    private IEnumerable<EvolucaoLinhaDto> Surpresas =>
+        _previa!.Linhas.Where(l => l.Surpresa != 0).OrderByDescending(l => l.Surpresa);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _temporadas = await EvolucaoSvc.ListTemporadasAplicadasAsync(CancellationToken.None);
+            await CarregarAsync(_temporadas.Count > 0 ? _temporadas[0] : (int?)null);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarAsync(int? temporada)
+    {
+        if (temporada is int t)
+        {
+            _temporada = t;
+            // Só a evolução já aplicada é pública; a prévia fica no admin.
+            _previa = await EvolucaoSvc.GetPreviaAsync(t, CancellationToken.None);
+            // Despedidas anunciadas na temporada seguinte (a que começou nessa virada).
+            _aposentadoria = await AposentadoriaSvc.GetPainelAsync(t + 1, CancellationToken.None);
+        }
+        else
+        {
+            // Sem virada ainda: mostra as despedidas já anunciadas na temporada em andamento.
+            _previa = null;
+            _aposentadoria = await DiretoriaSvc.GetTemporadaAtualAsync(CancellationToken.None) is int atual
+                ? await AposentadoriaSvc.GetPainelAsync(atual, CancellationToken.None)
+                : null;
+        }
+    }
+
+    private async Task TrocarAsync(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var t)) await CarregarAsync(t);
+    }
+
+    private RenderFragment Lista(IEnumerable<EvolucaoLinhaDto> linhas) => __builder =>
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var l in linhas)
+            {
+                <li class="list-group-item d-flex align-items-center gap-2 px-1 py-1">
+                    @if (l.TimeNome is not null)
+                    {
+                        <img src="@EscudoService.GetEscudo(l.TimeNome)" alt="" style="width:20px;height:20px;object-fit:contain;" />
+                    }
+                    <a href="@($"/players/details/{l.PlayerId}")" class="text-reset fw-semibold text-truncate">@l.Nome</a>
+                    <span class="small text-muted">@l.Idade anos</span>
+                    @if (l.Surpresa > 0) { <span title="Explosão">💥</span> }
+                    @if (l.Surpresa < 0) { <span title="Queda de rendimento">📉</span> }
+                    <span class="ms-auto text-nowrap">
+                        @l.OverallAntes → <strong>@l.OverallDepois</strong>
+                        <span class="small @(l.Variacao > 0 ? "text-success" : "text-danger")">(@EvolucaoTemporada.Sinal(l.Variacao))</span>
+                    </span>
+                </li>
+            }
+        </ul>
+    };
+}

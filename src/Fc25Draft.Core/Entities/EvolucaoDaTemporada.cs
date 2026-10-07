@@ -33,6 +33,9 @@ public class VariacaoDaTemporada
     public int Curva { get; set; }
     public int Desempenho { get; set; }
 
+    /// <summary>Explosão (+) ou queda de rendimento (−) que entrou na conta; 0 = nenhuma.</summary>
+    public int Surpresa { get; set; }
+
     /// <summary>Pontos da evolução: ± em cada atributo afetado.</summary>
     public int Pontos { get; set; }
 

@@ -23,6 +23,9 @@ public interface IAposentadoriaService
     /// <summary>Desfaz a aposentadoria: volta ao clube em que estava (ou fica livre se não der).</summary>
     Task DesaposentarAsync(int playerId, CancellationToken ct);
 
+    /// <summary>Lendas aposentadas para o Hall da Fama, da aposentadoria mais recente para a mais antiga.</summary>
+    Task<IReadOnlyList<LendaAposentadaDto>> ListLendasAsync(CancellationToken ct);
+
     /// <summary>Aposentados, para o Editor PES tirar dos clubes no save.</summary>
     Task<IReadOnlyList<AposentadoPesDto>> ListAposentadosParaPesAsync(CancellationToken ct);
 

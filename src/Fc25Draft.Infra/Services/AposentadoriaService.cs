@@ -71,10 +71,22 @@ public class AposentadoriaService : IAposentadoriaService
             throw new InvalidOperationException($"Já aposentados: {string.Join(", ", aposentados)}.");
 
         var agora = _time.GetUtcNow().UtcDateTime;
-        foreach (var p in jogadores.Where(p => p.UltimaTemporada != temporada))
+        var novos = jogadores.Where(p => p.UltimaTemporada != temporada).ToList();
+        foreach (var p in novos)
         {
             p.UltimaTemporada = temporada;
             p.DespedidaAnunciadaEm = agora;
+        }
+
+        // O time fica sabendo (sino e celular).
+        var novosIds = novos.Select(p => p.PlayerId).ToList();
+        var times = await _db.TeamRosters.AsNoTracking().Where(r => novosIds.Contains(r.PlayerId)).ToListAsync(ct);
+        foreach (var r in times)
+        {
+            var nome = novos.First(p => p.PlayerId == r.PlayerId).Name;
+            AvisosDoTime.Criar(_db, r.TeamId, AvisosDoTime.Carreira,
+                $"👋 {nome} anunciou que {temporada} é a última temporada dele: se aposenta na virada.",
+                $"/players/details/{r.PlayerId}", agora);
         }
         await _db.SaveChangesAsync(ct);
     }
@@ -117,6 +129,10 @@ public class AposentadoriaService : IAposentadoriaService
                 // Sai do elenco: a escalação se limpa sozinha no SaveChanges (EscalacoesDeQuemSaiu).
                 foreach (var r in vinculos.Where(r => r.PlayerId == p.PlayerId))
                     _db.TeamRosters.Remove(r);
+
+                if (p.TimeAoSeAposentar is Guid time)
+                    AvisosDoTime.Criar(_db, time, AvisosDoTime.Carreira,
+                        $"🎖️ {p.Name} pendurou as chuteiras e saiu do elenco.", $"/players/details/{p.PlayerId}", agora);
 
                 _db.TransferHistories.Add(new TransferHistory
                 {
@@ -175,6 +191,46 @@ public class AposentadoriaService : IAposentadoriaService
             await _db.SaveChangesAsync(ct);
             await transacao.CommitAsync(ct);
         });
+    }
+
+    public async Task<IReadOnlyList<LendaAposentadaDto>> ListLendasAsync(CancellationToken ct)
+    {
+        var aposentados = await _db.Players.AsNoTracking()
+            .Where(p => p.AposentadoNaTemporada != null)
+            .Select(p => new
+            {
+                p.PlayerId, p.Name, Posicao = p.Position.Name, Ultima = p.AposentadoNaTemporada!.Value, p.Overall,
+                Clube = _db.Teams.Where(t => t.TeamId == p.TimeAoSeAposentar).Select(t => t.TeamName).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+        if (aposentados.Count == 0) return Array.Empty<LendaAposentadaDto>();
+
+        var ids = aposentados.Select(a => a.PlayerId).ToList();
+        var gols = (await _db.LigaEventos.AsNoTracking()
+                .Where(e => ids.Contains(e.JogadorId) && e.Tipo == TipoEvento.Gol)
+                .GroupBy(e => e.JogadorId)
+                .Select(g => new { g.Key, Gols = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(g => g.Key, g => g.Gols);
+
+        // Jogos: começou como titular ou ganhou nota do PES (quem entrou do banco também tem nota).
+        var titular = await _db.LigaEscalacoes.AsNoTracking()
+            .Where(e => ids.Contains(e.JogadorId) && e.Titular)
+            .Select(e => new { e.JogadorId, e.PartidaId })
+            .ToListAsync(ct);
+        var comNota = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => ids.Contains(n.JogadorId))
+            .Select(n => new { n.JogadorId, n.PartidaId })
+            .ToListAsync(ct);
+        var jogos = titular.Concat(comNota).Distinct()
+            .GroupBy(x => x.JogadorId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return aposentados
+            .OrderByDescending(a => a.Ultima).ThenByDescending(a => a.Overall)
+            .Select(a => new LendaAposentadaDto(a.PlayerId, a.Name, a.Posicao, a.Ultima, a.Clube, a.Overall,
+                jogos.GetValueOrDefault(a.PlayerId), gols.GetValueOrDefault(a.PlayerId)))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<AposentadoPesDto>> ListAposentadosParaPesAsync(CancellationToken ct) =>

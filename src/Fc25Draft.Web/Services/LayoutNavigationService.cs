@@ -39,6 +39,7 @@ public class LayoutNavigationService
             new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
             new("Treinadores", "/treinadores", "oi oi-briefcase"),
             new("Valor de Elenco", "/times/caixa", "oi oi-dollar"),
+            new("Virada de Temporada", "/virada", "oi oi-loop-circular"),
             new("Como o overall é calculado", "/overall", "oi oi-calculator")
         }),
         new("Mercado", new List<MenuItem>
@@ -536,6 +537,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Ranking de Clubes")
+            }
+        },
+        ["/virada"] = new PageDefinition
+        {
+            Route = "/virada",
+            Title = "Virada de Temporada",
+            Subtitle = "Quem subiu, quem caiu e quem pendurou as chuteiras",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Clubes e Jogadores"),
+                new("Virada de Temporada")
             }
         },
         ["/diretoria"] = new PageDefinition
