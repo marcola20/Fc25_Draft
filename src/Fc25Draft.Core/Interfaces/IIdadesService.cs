@@ -10,6 +10,12 @@ public interface IIdadesService
 {
     Task<EnvelhecimentoSituacaoDto> GetSituacaoAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Em que temporada estão as idades do site e quantos anos somar à idade do jogo (2008) para chegar nela.
+    /// Usado pelo Editor PES ao colocar um jogador novo no site.
+    /// </summary>
+    Task<IdadeDaLigaDto> GetIdadeDaLigaAsync(CancellationToken ct);
+
     /// <summary>Todos os jogadores com idade ganham 1 ano. Recusa se a temporada já foi envelhecida.</summary>
     Task<EnvelhecimentoSituacaoDto> EnvelhecerAsync(int temporada, CancellationToken ct);
 

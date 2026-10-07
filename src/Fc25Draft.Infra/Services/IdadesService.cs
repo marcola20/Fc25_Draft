@@ -17,6 +17,15 @@ public class IdadesService : IIdadesService
     private const int IdadeMaximaDoDraft = 23;
     private const int IdadeDeFimDeCarreira = 34;
 
+    /// <summary>O save e o banco do PES têm as idades de 2008, quando a liga começou.</summary>
+    private const int TemporadaDasIdadesDoJogo = 2008;
+
+    /// <summary>
+    /// Antes do botão existir, o admin deu +1 à mão nas idades do site (temporada 2009). Sem nenhum envelhecimento
+    /// registrado, é nela que as idades estão.
+    /// </summary>
+    private const int TemporadaDasIdadesAntesDoBotao = 2009;
+
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
 
@@ -52,6 +61,13 @@ public class IdadesService : IIdadesService
             comIdade.Count(a => a == IdadeDeFimDeCarreira - 1),
             ultimo?.Temporada,
             desta is not null && ultimo?.Temporada == temporada);
+    }
+
+    public async Task<IdadeDaLigaDto> GetIdadeDaLigaAsync(CancellationToken ct)
+    {
+        var ultima = await _db.EnvelhecimentosTemporada.AsNoTracking()
+            .MaxAsync(e => (int?)e.Temporada, ct) ?? TemporadaDasIdadesAntesDoBotao;
+        return new IdadeDaLigaDto(ultima, ultima - TemporadaDasIdadesDoJogo);
     }
 
     public async Task<EnvelhecimentoSituacaoDto> EnvelhecerAsync(int temporada, CancellationToken ct)

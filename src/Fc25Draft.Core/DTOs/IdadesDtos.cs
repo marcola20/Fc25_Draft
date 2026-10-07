@@ -1,5 +1,9 @@
 namespace Fc25Draft.Core.DTOs;
 
+/// <summary>Quantos anos somar à idade do jogo (o save e o banco do PES estão em 2008) para chegar à idade do site.</summary>
+/// <param name="TemporadaDasIdades">Temporada em que as idades do site estão.</param>
+public record IdadeDaLigaDto(int TemporadaDasIdades, int AnosASomar);
+
 /// <summary>Como estão as idades na temporada atual e o que o "envelhecer" vai fazer.</summary>
 /// <param name="Temporada">Temporada mais recente com liga; nulo sem temporada.</param>
 /// <param name="AplicadoEm">Quando os jogadores fizeram aniversário nesta temporada; nulo se ainda não.</param>
