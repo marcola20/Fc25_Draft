@@ -68,6 +68,10 @@ else
                         }
                     </div>
                     <div class="jogador-hero-sub">
+                        @if (!string.IsNullOrWhiteSpace(player.Pais))
+                        {
+                            <span class="text-nowrap"><Bandeira Pais="@player.Pais" Largura="22" Classe="me-1" />@player.Pais ·</span>
+                        }
                         <span>@player.PositionName</span>
                         @if (player.Age is int idade)
                         {

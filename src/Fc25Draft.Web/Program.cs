@@ -43,6 +43,16 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
 
+    // País dos jogadores que ainda não têm (vem da nacionalidade na base do PES).
+    try
+    {
+        await scope.ServiceProvider.GetRequiredService<IBasePesService>().PreencherPaisesAsync(CancellationToken.None);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao preencher o país dos jogadores");
+    }
+
     // Notas do PES das importações que ainda não têm notas gravadas (as feitas antes de existir a tabela).
     try
     {

@@ -75,6 +75,7 @@ public class PlayerService : IPlayerService
             Age = dto.Age,
             Overall = dto.Overall,
             PositionId = dto.PositionId,
+            Pais = PaisValido(dto.Pais),
             PlayerGuid = Guid.NewGuid(),
         };
 
@@ -97,6 +98,7 @@ public class PlayerService : IPlayerService
         entity.Age = dto.Age;
         entity.Overall = dto.Overall;
         entity.PositionId = dto.PositionId;
+        if (dto.Pais is not null) entity.Pais = PaisValido(dto.Pais);
         OverallPes.Recalcular(entity); // com atributos, o overall é o da fórmula do PES
 
         await _db.SaveChangesAsync();
@@ -326,6 +328,13 @@ public class PlayerService : IPlayerService
         await _db.SaveChangesAsync(ct);
 
         return new PlayerImportResultDto(playersToInsert.Count, errors);
+    }
+
+    private static string? PaisValido(string? pais)
+    {
+        var texto = pais?.Trim();
+        if (string.IsNullOrEmpty(texto)) return null;
+        return texto.Length > Paises.TamanhoNome ? texto[..Paises.TamanhoNome] : texto;
     }
 
     private static void Validate(PlayerCreateDto dto)

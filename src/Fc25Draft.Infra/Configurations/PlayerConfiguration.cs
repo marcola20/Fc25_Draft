@@ -12,6 +12,7 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
         e.Property(x => x.Name).IsRequired().HasMaxLength(80);
         e.Property(x => x.Overall).IsRequired();
         e.Property(x => x.Age);
+        e.Property(x => x.Pais).HasMaxLength(40);
         e.Property(x => x.PlayerGuid).IsRequired();
 
         e.HasOne(x => x.Position)

@@ -1,0 +1,16 @@
+@using Fc25Draft.Core.Utilities
+
+@* Bandeira do país do jogador (imagem do flagcdn.com). País desconhecido ou vazio: não mostra nada. *@
+@if (Paises.Bandeira(Pais) is { } url)
+{
+    <img src="@url" alt="@Pais" title="@Pais" class="@Classe" loading="lazy"
+         style="width: @(Largura)px; height: auto; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); vertical-align: middle;" />
+}
+
+@code {
+    [Parameter] public string? Pais { get; set; }
+
+    [Parameter] public int Largura { get; set; } = 20;
+
+    [Parameter] public string? Classe { get; set; }
+}

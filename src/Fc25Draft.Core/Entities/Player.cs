@@ -8,6 +8,9 @@ public class Player
     public Guid PlayerGuid { get; set; }
     public string Name { get; set; } = null!;
     public int? Age { get; set; }
+
+    /// <summary>País (nome em português, ver <c>Paises</c>). Vem da nacionalidade do PES; o admin pode trocar.</summary>
+    public string? Pais { get; set; }
     public int Overall { get; set; }
     public short PositionId { get; set; }
     public Guid? CurrentTeamId { get; set; }

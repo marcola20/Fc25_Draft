@@ -3,9 +3,10 @@ using System.Collections.Generic;
 
 namespace Fc25Draft.Core.DTOs;
 
-public record PlayerCreateDto(string Name, int? Age, int Overall, short PositionId);
+public record PlayerCreateDto(string Name, int? Age, int Overall, short PositionId, string? Pais = null);
 
-public record PlayerUpdateDto(string Name, int? Age, int Overall, short PositionId);
+/// <param name="Pais">Nulo mantém o país; vazio apaga.</param>
+public record PlayerUpdateDto(string Name, int? Age, int Overall, short PositionId, string? Pais = null);
 
 public record PlayerListItemDto(
     int PlayerId,
@@ -15,7 +16,8 @@ public record PlayerListItemDto(
     int Overall,
     int? Age,
     string Status,
-    string? TeamName);
+    string? TeamName,
+    string? Pais = null);
 
 public record PlayerDetailsDto(
     int PlayerId,
@@ -31,7 +33,8 @@ public record PlayerDetailsDto(
     // Anunciou que esta temporada é a última dele.
     int? UltimaTemporada = null,
     // Aposentado: a última temporada que jogou.
-    int? AposentadoNaTemporada = null);
+    int? AposentadoNaTemporada = null,
+    string? Pais = null);
 
 /// <summary>Atributos do PES (40–99). Mutável porque também serve de modelo do formulário.</summary>
 public class PlayerAtributosDto

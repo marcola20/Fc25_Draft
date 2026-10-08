@@ -109,6 +109,26 @@
                      @bind-Value="overallMax"
                      min="70" max="99" />
     </div>
+    <div class="col-4 col-sm-auto flex-sm-grow-0 flex-grow-1">
+        <label class="form-label mb-1" for="idadeMin">Idade mínima</label>
+        <InputNumber id="idadeMin"
+                     class="form-control"
+                     style="height: 38px; font-size: 0.95rem; max-width: 8rem;"
+                     @bind-Value="idadeMin"
+                     min="14" max="50" />
+    </div>
+    <div class="col-5 col-sm-auto flex-sm-grow-0 flex-grow-1">
+        <label class="form-label mb-1" for="idadeMax">Idade máxima</label>
+        <div class="d-flex gap-1">
+            <InputNumber id="idadeMax"
+                         class="form-control"
+                         style="height: 38px; font-size: 0.95rem; max-width: 8rem;"
+                         @bind-Value="idadeMax"
+                         min="14" max="50" />
+            <button type="button" class="btn btn-outline-success text-nowrap" style="height: 38px;"
+                    title="Só quem pode entrar no draft (até @IdadeDoDraft anos)" @onclick="SoSub23Async">Sub-@IdadeDoDraft</button>
+        </div>
+    </div>
     <div class="col-3 col-sm-auto pt-md-4">
         <button type="button"
                 class="btn btn-outline-primary w-100 w-sm-auto"
@@ -188,6 +208,7 @@ else
             <thead>
                 <tr>
                     <th>Nome</th>
+                    <th class="text-center" title="País">País</th>
                     <th>Posição</th>
                     <th>
                         <button type="button"
@@ -221,6 +242,7 @@ else
                 {
                     <tr>
                         <td class="text-nowrap"><FotoJogador PlayerId="@player.PlayerId" Tamanho="32" Classe="me-2" /><a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a></td>
+                        <td class="text-center"><Bandeira Pais="@player.Pais" Largura="22" /></td>
                         <td>@player.PositionName</td>
                         <td>@player.Overall</td>
                         <td>@(player.Age?.ToString() ?? "-")</td>
@@ -307,6 +329,13 @@ else
     private string? appliedSearch;
     private int? appliedOverallMin;
     private int? appliedOverallMax;
+    private int? idadeMin;
+    private int? idadeMax;
+    private int? appliedIdadeMin;
+    private int? appliedIdadeMax;
+
+    /// <summary>Idade máxima do draft (o draft é só para jovens).</summary>
+    private const int IdadeDoDraft = 23;
     private string sortBy = "overall";
     private bool sortDescending = true;
 
@@ -444,12 +473,16 @@ else
                 sortBy,
                 sortDescending ? "desc" : "asc",
                 currentPage,
-                PageSize);
+                PageSize,
+                idadeMin,
+                idadeMax);
             players.AddRange(result.Items);
             totalPlayers = result.Total;
             appliedSearch = search;
             appliedOverallMin = overallMin;
             appliedOverallMax = overallMax;
+            appliedIdadeMin = idadeMin;
+            appliedIdadeMax = idadeMax;
             totalPages = Math.Max(1, (int)Math.Ceiling(totalPlayers / (double)PageSize));
             if (currentPage > totalPages)
             {
@@ -497,6 +530,13 @@ else
             sortDescending = true;
         }
 
+        await ApplyFiltersAsync();
+    }
+
+    private async Task SoSub23Async()
+    {
+        idadeMin = null;
+        idadeMax = IdadeDoDraft;
         await ApplyFiltersAsync();
     }
 
@@ -591,6 +631,16 @@ else
             query.Add(new("overallMax", appliedOverallMax.Value.ToString()));
         }
 
+        if (appliedIdadeMin.HasValue)
+        {
+            query.Add(new("ageMin", appliedIdadeMin.Value.ToString()));
+        }
+
+        if (appliedIdadeMax.HasValue)
+        {
+            query.Add(new("ageMax", appliedIdadeMax.Value.ToString()));
+        }
+
         query.Add(new("sortBy", sortBy));
         query.Add(new("sortOrder", sortDescending ? "desc" : "asc"));
 
@@ -623,6 +673,17 @@ else
                 ({ } min, { } max) => $"overall {min}-{max}",
                 ({ } min, null) => $"overall ≥ {min}",
                 (null, { } max) => $"overall ≤ {max}",
+                _ => string.Empty
+            });
+        }
+
+        if (appliedIdadeMin.HasValue || appliedIdadeMax.HasValue)
+        {
+            parts.Add((appliedIdadeMin, appliedIdadeMax) switch
+            {
+                ({ } min, { } max) => $"{min} a {max} anos",
+                ({ } min, null) => $"{min}+ anos",
+                (null, { } max) => $"até {max} anos",
                 _ => string.Empty
             });
         }

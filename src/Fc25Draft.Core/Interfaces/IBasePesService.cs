@@ -18,6 +18,12 @@ public interface IBasePesService
     Task<int> PreencherFaltantesAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Grava o país (nacionalidade do PES) de quem está ligado a um jogador da base e ainda não tem país.
+    /// Devolve quantos foram preenchidos.
+    /// </summary>
+    Task<int> PreencherPaisesAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Grava as ligações jogador do site ↔ ID do PES conferidas no Editor PES. Ligação nova ou trocada recebe os
     /// atributos da base do PES; PesId nulo só desliga (os atributos ficam). Tudo ou nada: ID do PES repetido,
     /// inexistente ou já ligado a outro jogador gera ArgumentException e nada é gravado.

@@ -46,6 +46,21 @@ else
         </div>
 
         <div class="mb-3">
+            <label class="form-label" for="playerPais">País</label>
+            <div class="d-flex align-items-center gap-2">
+                <Bandeira Pais="@model.Pais" Largura="28" />
+                <InputText id="playerPais" class="form-control" list="listaPaises" @bind-Value="model.Pais" placeholder="Ex.: Brasil" />
+            </div>
+            <datalist id="listaPaises">
+                @foreach (var nome in Paises.Nomes)
+                {
+                    <option value="@nome"></option>
+                }
+            </datalist>
+            <div class="form-text">Vem da nacionalidade do PES quando o jogador é ligado à base; dá para trocar aqui.</div>
+        </div>
+
+        <div class="mb-3">
             <label class="form-label" for="playerOverall">Overall</label>
             @if (OverallDaFormula is double formula)
             {
@@ -263,6 +278,7 @@ else
 
             model.Name = details.Name;
             model.Age = details.Age;
+            model.Pais = details.Pais;
             model.Overall = details.Overall;
             model.PositionId = details.PositionId;
             atributos = details.Atributos;
@@ -299,7 +315,7 @@ else
                     return;
                 }
 
-                await PlayersApiClient.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+                await PlayersApiClient.UpdateAsync(Id.Value, new PlayerUpdateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value, model.Pais ?? string.Empty));
 
                 if (atributos is not null)
                 {
@@ -308,7 +324,7 @@ else
             }
             else
             {
-                await PlayersApiClient.CreateAsync(new PlayerCreateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value));
+                await PlayersApiClient.CreateAsync(new PlayerCreateDto(model.Name!, model.Age, model.Overall!.Value, model.PositionId!.Value, model.Pais));
             }
 
             Navigation.NavigateTo("/players");
@@ -390,6 +406,9 @@ else
 
         [Range(14, 55, ErrorMessage = "A idade deve estar entre 14 e 55 anos.")]
         public int? Age { get; set; }
+
+        [StringLength(40)]
+        public string? Pais { get; set; }
 
         [Required(ErrorMessage = "O overall é obrigatório.")]
         [Range(0, 99)]

@@ -57,6 +57,10 @@ POSICOES_BANCO = [None, 468, None, 474, None, 456, 466, 460, 464, 472, 476, 478,
 CAMPOS_BANCO = {"e": (155, 5), "fo": (438, 3), "wa": (462, 2), "wu": (454, 2)}
 CAMPOS_SAVE = {"e": (274, 5), "fo": (252, 3), "wa": (318, 2), "wu": (126, 2)}
 
+# Nacionalidade: código do país (9 bits; ver Paises.cs no C#). Achada com os elencos das 62 seleções do jogo,
+# cada uma com um código só. O save corrige o banco (no banco vários craques estão com 260).
+NACIONALIDADE_BANCO, NACIONALIDADE_SAVE = 233, 64
+
 
 def bits(v, ini, n):
     return (v >> ini) & ((1 << n) - 1)
@@ -134,6 +138,7 @@ def main():
             "h": bits(v, 216, 7) + 100,
             "w": bits(v, 256, 7) + 30,
             "i": bits(v, 408, 5) + 15,  # idade
+            "na": bits(v, NACIONALIDADE_BANCO, 9),
             "a": [bits(v, b, 6) + 40 for b, _ in ATRIBUTOS],
             **extras(v, CAMPOS_BANCO, HABILIDADES_BANCO, ESTILOS_IA_BANCO, POSICOES_BANCO, bits(v, 434, 4)),
         }
@@ -153,7 +158,8 @@ def main():
             break
         v = int.from_bytes(edit[o:o + REG], "little")
         j = jogadores.setdefault(pid, {"id": pid, "a": None})
-        j.update(n=nome, p=bits(v, 269, 4), f=bits(v, 381, 1), h=bits(v, 80, 8), w=bits(v, 88, 7), i=bits(v, 263, 6))
+        j.update(n=nome, p=bits(v, 269, 4), f=bits(v, 381, 1), h=bits(v, 80, 8), w=bits(v, 88, 7), i=bits(v, 263, 6),
+                 na=bits(v, NACIONALIDADE_SAVE, 9))
         j.update(extras(v, CAMPOS_SAVE, [HABILIDADES_SAVE + i for i in range(41)],
                         [ESTILOS_IA_SAVE + i for i in range(7)], POSICOES_SAVE, j["p"]))
         valores = [bits(v, s, 7) for _, s in ATRIBUTOS]

@@ -61,7 +61,7 @@
         {
             await Task.Delay(250, cts.Token);
             var pagina = await PlayersApi.GetAsync(_termo.Trim(), null, onlyAvailable: false, null, null,
-                "overall", "desc", 1, MaxResultados, cts.Token);
+                "overall", "desc", 1, MaxResultados, ct: cts.Token);
             if (cts.IsCancellationRequested) return;
 
             _resultados = pagina.Items.ToList();

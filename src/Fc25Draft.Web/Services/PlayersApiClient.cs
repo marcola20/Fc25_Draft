@@ -29,6 +29,8 @@ public class PlayersApiClient
                                                                string? sortOrder,
                                                                int page,
                                                                int pageSize,
+                                                               int? ageMin = null,
+                                                               int? ageMax = null,
                                                                CancellationToken ct = default)
     { 
         var client = await _clientFactory.CreateAsync();
@@ -65,6 +67,16 @@ public class PlayersApiClient
         if (overallMax.HasValue)
         {
             query.Add(new KeyValuePair<string, string?>("overallMax", overallMax.Value.ToString()));
+        }
+
+        if (ageMin.HasValue)
+        {
+            query.Add(new KeyValuePair<string, string?>("ageMin", ageMin.Value.ToString()));
+        }
+
+        if (ageMax.HasValue)
+        {
+            query.Add(new KeyValuePair<string, string?>("ageMax", ageMax.Value.ToString()));
         }
 
         if (!string.IsNullOrWhiteSpace(sortBy))

@@ -40,7 +40,8 @@ public class BasePesService : IBasePesService
         [property: JsonPropertyName("pp")] string Posicoes,
         [property: JsonPropertyName("fo")] int Condicao,
         [property: JsonPropertyName("wa")] int PeFracoPrecisao,
-        [property: JsonPropertyName("wu")] int PeFracoUso)
+        [property: JsonPropertyName("wu")] int PeFracoUso,
+        [property: JsonPropertyName("na")] int? Nacionalidade = null)
     {
         public string Chave { get; } = NomesPes.Normalizar(Nome);
     }
@@ -178,6 +179,7 @@ public class BasePesService : IBasePesService
 
         await RecalcularOverallsAsync(novos, ct);
         await _db.SaveChangesAsync(ct);
+        await PreencherPaisesAsync(ct);
         var preenchidos = novos.Count;
         _logger.LogInformation("Atributos do PES: {Preenchidos} de {Faltantes} jogadores sem atributos foram preenchidos.",
             preenchidos, faltantes.Count);
@@ -251,10 +253,35 @@ public class BasePesService : IBasePesService
 
         await RecalcularOverallsAsync(atuais, ct);
         await _db.SaveChangesAsync(ct);
+        await PreencherPaisesAsync(ct);
         _logger.LogInformation(
             "Ligações do PES pelo editor: {Ligados} ligados, {Desligados} desligados, {Iguais} iguais, {Atualizados} com atributos atualizados.",
             ligados, desligados, iguais, atualizados);
         return new ResultadoLigacoesPesDto(ligados, desligados, iguais, atualizados);
+    }
+
+    public async Task<int> PreencherPaisesAsync(CancellationToken ct = default)
+    {
+        var semPais = await _db.Players
+            .Where(p => p.Pais == null && p.Atributos != null && p.Atributos.PesId != null)
+            .Select(p => new { Jogador = p, PesId = p.Atributos!.PesId!.Value })
+            .ToListAsync(ct);
+
+        var porId = PorId.Value;
+        var preenchidos = 0;
+        foreach (var s in semPais)
+        {
+            if (!porId.TryGetValue(s.PesId, out var r) || Paises.DoCodigoPes(r.Nacionalidade) is not { } pais) continue;
+            s.Jogador.Pais = pais;
+            preenchidos++;
+        }
+
+        if (preenchidos > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("País do PES: {Preenchidos} de {SemPais} jogadores sem país foram preenchidos.", preenchidos, semPais.Count);
+        }
+        return preenchidos;
     }
 
     /// <summary>Overall pela fórmula do PES de quem teve os atributos mexidos.</summary>

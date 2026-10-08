@@ -374,7 +374,7 @@ else
                 r.Player.PlayerId, r.Player.Name,
                 r.Player.PositionId, r.Player.Position.Name,
                 r.Player.Overall, r.Player.Age,
-                "Normal", null))
+                "Normal", null, r.Player.Pais))
             .ToListAsync();
         _jogadoresPorTime[teamId] = jogadores;
         return jogadores;

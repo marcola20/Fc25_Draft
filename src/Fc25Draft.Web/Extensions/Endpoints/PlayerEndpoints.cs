@@ -33,6 +33,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 int? overallMax,
                 string? sortBy,
                 string? sortOrder,
+                int? ageMin,
+                int? ageMax,
                 int page = 1,
                 int pageSize = 10,
                 CancellationToken ct = default) =>
@@ -42,8 +44,10 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
                 if (overallMin.HasValue && overallMax.HasValue && overallMin > overallMax)
                     return Results.BadRequest(new { message = "Overall mínimo não pode ser maior que o máximo." });
+                if (ageMin.HasValue && ageMax.HasValue && ageMin > ageMax)
+                    return Results.BadRequest(new { message = "Idade mínima não pode ser maior que a máxima." });
 
-                var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax);
+                var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax, ageMin, ageMax);
                 var orderedQuery = ApplySort(query, sortBy, sortOrder);
 
                 var total = await query.CountAsync(ct);
@@ -59,7 +63,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Overall,
                         p.Age,
                         p.TeamRosters.Any() ? "Escolhido" : p.AposentadoNaTemporada != null ? "Aposentado" : "Disponível",
-                        p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()))
+                        p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
+                        p.Pais))
                     .ToListAsync(ct);
 
                 return Results.Ok(new PagedResult<PlayerListItemDto>(items, total, currentPage, currentPageSize));
@@ -82,7 +87,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault(),
                         p.Atributos == null ? null : AtributosPes.ParaDto(p.Atributos),
                         p.DespedidaAnunciadaEm != null || p.AposentadoNaTemporada != null ? p.UltimaTemporada : null,
-                        p.AposentadoNaTemporada))
+                        p.AposentadoNaTemporada,
+                        p.Pais))
                     .FirstOrDefaultAsync(ct);
 
                 return player is null ? Results.NotFound() : Results.Ok(player);
@@ -97,9 +103,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 int? overallMax,
                 string? sortBy,
                 string? sortOrder,
+                int? ageMin,
+                int? ageMax,
                 CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, ageMin, ageMax, sortBy, sortOrder, ct);
                 var csv = BuildPlayerCsv(players);
                 return Results.File(Encoding.UTF8.GetBytes(csv), "text/csv", "jogadores.csv");
             });
@@ -113,9 +121,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 int? overallMax,
                 string? sortBy,
                 string? sortOrder,
+                int? ageMin,
+                int? ageMax,
                 CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, ageMin, ageMax, sortBy, sortOrder, ct);
                 var json = JsonSerializer.Serialize(players, new JsonSerializerOptions { WriteIndented = true });
                 return Results.File(Encoding.UTF8.GetBytes(json), "application/json", "jogadores.json");
             });
@@ -129,9 +139,11 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 int? overallMax,
                 string? sortBy,
                 string? sortOrder,
+                int? ageMin,
+                int? ageMax,
                 CancellationToken ct) =>
             {
-                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, sortBy, sortOrder, ct);
+                var players = await LoadPlayerExportAsync(db, q, pos, onlyAvailable, overallMin, overallMax, ageMin, ageMax, sortBy, sortOrder, ct);
 
                 using var workbook = new XLWorkbook();
                 var worksheet = workbook.Worksheets.Add("Jogadores");
@@ -141,6 +153,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 worksheet.Cell(1, 4).Value = "Idade";
                 worksheet.Cell(1, 5).Value = "Status";
                 worksheet.Cell(1, 6).Value = "Time";
+                worksheet.Cell(1, 7).Value = "País";
 
                 for (var i = 0; i < players.Count; i++)
                 {
@@ -153,6 +166,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         worksheet.Cell(row, 4).Value = p.Idade.Value;
                     worksheet.Cell(row, 5).Value = p.Status;
                     worksheet.Cell(row, 6).Value = p.Time ?? string.Empty;
+                    worksheet.Cell(row, 7).Value = p.Pais ?? string.Empty;
                 }
 
                 worksheet.Columns().AdjustToContents();
@@ -272,7 +286,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             short[]? pos,
             bool? onlyAvailable,
             int? overallMin,
-            int? overallMax)
+            int? overallMax,
+            int? ageMin = null,
+            int? ageMax = null)
         {
             var query = db.Players.AsNoTracking().AsQueryable();
 
@@ -298,6 +314,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
 
             if (overallMax.HasValue)
                 query = query.Where(p => p.Overall <= overallMax.Value);
+
+            // Sem idade cadastrada fica de fora quando há filtro de idade.
+            if (ageMin.HasValue)
+                query = query.Where(p => p.Age != null && p.Age >= ageMin.Value);
+
+            if (ageMax.HasValue)
+                query = query.Where(p => p.Age != null && p.Age <= ageMax.Value);
 
             return query;
         }
@@ -328,11 +351,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             bool? onlyAvailable,
             int? overallMin,
             int? overallMax,
+            int? ageMin,
+            int? ageMax,
             string? sortBy,
             string? sortOrder,
             CancellationToken ct)
         {
-            var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax);
+            var query = BuildFilteredQuery(db, q, pos, onlyAvailable, overallMin, overallMax, ageMin, ageMax);
             var orderedQuery = ApplySort(query, sortBy, sortOrder);
 
             return await orderedQuery
@@ -342,7 +367,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     p.Overall,
                     p.Age,
                     p.TeamRosters.Any() ? "Escolhido" : p.AposentadoNaTemporada != null ? "Aposentado" : "Disponível",
-                    p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()
+                    p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
+                    p.Pais
                 ))
                 .ToListAsync(ct);
         }
@@ -350,7 +376,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
         private static string BuildPlayerCsv(List<PlayerExportDto> players)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Nome;Posição;Overall;Idade;Status;Time");
+            sb.AppendLine("Nome;Posição;Overall;Idade;Status;Time;País");
 
             foreach (var p in players)
             {
@@ -360,7 +386,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     p.Overall.ToString(CultureInfo.InvariantCulture),
                     p.Idade?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     Csv(p.Status),
-                    Csv(p.Time ?? string.Empty)));
+                    Csv(p.Time ?? string.Empty),
+                    Csv(p.Pais ?? string.Empty)));
             }
 
             return sb.ToString();
@@ -373,7 +400,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             }
         }
 
-        private sealed record PlayerExportDto(string Nome, string Posicao, int Overall, int? Idade, string Status, string? Time);
+        private sealed record PlayerExportDto(string Nome, string Posicao, int Overall, int? Idade, string Status, string? Time, string? Pais);
         #endregion
     }
 }
