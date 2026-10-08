@@ -30,6 +30,18 @@ public interface IAlbumService
     /// <summary>Troca as lendárias. Só enquanto nenhum pacote do álbum foi aberto.</summary>
     Task SalvarLendariasAsync(Guid albumId, IReadOnlyList<LendariaEscolhaDto> lendarias, string? adminToken, CancellationToken ct);
 
+    /// <summary>Figurinhas de Lenda do álbum e os aposentados que ainda podem entrar.</summary>
+    Task<LendasDoAlbumDto> GetLendasAsync(Guid albumId, CancellationToken ct);
+
+    /// <summary>
+    /// Coloca um aposentado como figurinha de Lenda (lendária) na página do último clube, com o próximo número
+    /// do álbum. No máximo <c>AlbumFigurinhas.MaximoLendasPorAlbum</c> por álbum; cada jogador vira lenda uma vez.
+    /// </summary>
+    Task ColocarLendaAsync(Guid albumId, int playerId, string? destaque, string? adminToken, CancellationToken ct);
+
+    /// <summary>Tira a figurinha de Lenda, só enquanto ninguém a tirou em pacote.</summary>
+    Task TirarLendaAsync(Guid albumId, Guid figurinhaId, string? adminToken, CancellationToken ct);
+
     /// <summary>Jogadores do álbum que estão sem foto hoje.</summary>
     Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct);
 

@@ -150,7 +150,8 @@ public partial class AlbumService : IAlbumService
         if (album is null) return null;
 
         var figurinhas = await FigurinhasAsync(albumId, ct);
-        var jogadores = figurinhas.Where(f => f.PlayerId is not null).ToList();
+        // As figurinhas de Lenda (aposentados) têm tela própria: ficam fora das lendárias "Melhores de".
+        var jogadores = figurinhas.Where(f => f.PlayerId is not null && !f.Lenda).ToList();
         var comFoto = await ComFotoAsync(jogadores.Select(f => f.PlayerId!.Value), ct);
 
         var pacotes = await _db.PacotesGanhos.AsNoTracking()
@@ -187,7 +188,7 @@ public partial class AlbumService : IAlbumService
             pacotes?.Dados ?? 0,
             pacotes?.Abertos ?? 0,
             colecionadores,
-            figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria).ToList(),
+            figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria && !f.Lenda).ToList(),
             candidatos,
             pontosPorPacote,
             porOrigem,
@@ -201,7 +202,7 @@ public partial class AlbumService : IAlbumService
             ?? throw new InvalidOperationException("Álbum não encontrado.");
 
         var figurinhas = await _db.Figurinhas
-            .Where(f => f.AlbumId == albumId && f.Tipo == TipoFigurinha.Jogador)
+            .Where(f => f.AlbumId == albumId && f.Tipo == TipoFigurinha.Jogador && !f.Lenda)
             .ToListAsync(ct);
         var escolhidas = ValidarLendarias(lendarias, figurinhas.Select(f => f.PlayerId!.Value).ToHashSet());
 
@@ -239,6 +240,124 @@ public partial class AlbumService : IAlbumService
             lendarias = string.Join(", ", figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria).Select(f => f.NomeImpresso))
         }, ct);
         await _db.SaveChangesAsync(ct);
+    }
+
+    // ---------------------------------------------------------------- Lendas (aposentados)
+
+    public async Task<LendasDoAlbumDto> GetLendasAsync(Guid albumId, CancellationToken ct)
+    {
+        var figurinhas = await FigurinhasAsync(albumId, ct);
+        var donos = await _db.FigurinhasDosTreinadores.AsNoTracking()
+            .Where(f => f.Figurinha.AlbumId == albumId && f.Figurinha.Lenda)
+            .GroupBy(f => f.FigurinhaId)
+            .Select(g => new { g.Key, Donos = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Donos, ct);
+        var noAlbum = figurinhas.Where(f => f.Lenda)
+            .Select(f => new LendaNoAlbumDto(f, donos.GetValueOrDefault(f.FigurinhaId)))
+            .ToList();
+
+        // Quem já tem figurinha neste álbum ou já foi lenda em outro não entra de novo.
+        var clubes = figurinhas.Select(f => f.TeamId).ToHashSet();
+        var jaNoAlbum = figurinhas.Where(f => f.PlayerId is not null).Select(f => f.PlayerId!.Value).ToHashSet();
+        var jaForamLenda = (await _db.Figurinhas.AsNoTracking()
+                .Where(f => f.Lenda && f.PlayerId != null)
+                .Select(f => f.PlayerId!.Value)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var aposentados = await _db.Players.AsNoTracking()
+            .Where(p => p.AposentadoNaTemporada != null)
+            .Select(p => new
+            {
+                p.PlayerId, p.Name, p.PositionId, p.Overall, Temporada = p.AposentadoNaTemporada!.Value, p.TimeAoSeAposentar,
+                Clube = _db.Teams.Where(t => t.TeamId == p.TimeAoSeAposentar).Select(t => t.TeamName).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+
+        var candidatas = aposentados
+            .Where(a => !jaNoAlbum.Contains(a.PlayerId) && !jaForamLenda.Contains(a.PlayerId))
+            .OrderByDescending(a => a.Temporada).ThenByDescending(a => a.Overall).ThenBy(a => a.Name, StringComparer.CurrentCulture)
+            .Select(a => new LendaCandidataDto(a.PlayerId, a.Name, ((int)a.PositionId).ToPositionSigla(), a.Overall, a.Temporada, a.Clube,
+                a.TimeAoSeAposentar is Guid t && clubes.Contains(t)))
+            .ToList();
+
+        return new LendasDoAlbumDto(noAlbum, candidatas);
+    }
+
+    public async Task ColocarLendaAsync(Guid albumId, int playerId, string? destaque, string? adminToken, CancellationToken ct)
+    {
+        var album = await _db.Albuns.FirstOrDefaultAsync(a => a.AlbumId == albumId, ct)
+            ?? throw new InvalidOperationException("Álbum não encontrado.");
+        if (await _db.Figurinhas.CountAsync(f => f.AlbumId == albumId && f.Lenda, ct) >= AlbumFigurinhas.MaximoLendasPorAlbum)
+            throw new InvalidOperationException($"O álbum já tem {AlbumFigurinhas.MaximoLendasPorAlbum} lendas.");
+
+        var p = await _db.Players.AsNoTracking().FirstOrDefaultAsync(x => x.PlayerId == playerId, ct)
+            ?? throw new InvalidOperationException("Jogador não encontrado.");
+        if (p.AposentadoNaTemporada is not int temporada)
+            throw new InvalidOperationException($"{p.Name} não está aposentado: só aposentado vira lenda.");
+        if (await _db.Figurinhas.AnyAsync(f => f.AlbumId == albumId && f.PlayerId == playerId, ct))
+            throw new InvalidOperationException($"{p.Name} já tem figurinha neste álbum.");
+        if (await _db.Figurinhas.AnyAsync(f => f.Lenda && f.PlayerId == playerId, ct))
+            throw new InvalidOperationException($"{p.Name} já foi lenda em outro álbum.");
+        if (p.TimeAoSeAposentar is not Guid time || !await _db.Figurinhas.AnyAsync(f => f.AlbumId == albumId && f.TeamId == time, ct))
+            throw new InvalidOperationException($"O último clube de {p.Name} não tem página neste álbum.");
+
+        // Entra no fim da página do clube, com o próximo número do álbum (figurinha extra, como as especiais).
+        var numero = await _db.Figurinhas.Where(f => f.AlbumId == albumId).MaxAsync(f => f.Numero, ct) + 1;
+        var ordem = await _db.Figurinhas.Where(f => f.AlbumId == albumId && f.TeamId == time).MaxAsync(f => f.Ordem, ct) + 1;
+
+        _db.Figurinhas.Add(new Figurinha
+        {
+            FigurinhaId = Guid.NewGuid(),
+            AlbumId = albumId,
+            Numero = numero,
+            Tipo = TipoFigurinha.Jogador,
+            Raridade = RaridadeFigurinha.Lendaria,
+            TeamId = time,
+            PlayerId = p.PlayerId,
+            NomeImpresso = p.Name,
+            PosicaoSigla = ((int)p.PositionId).ToPositionSigla(),
+            Overall = p.Overall,
+            Destaque = AlbumFigurinhas.Limpar(destaque) ?? AlbumFigurinhas.DestaqueDaLenda(temporada),
+            Ordem = ordem,
+            Lenda = true
+        });
+
+        await RegistrarAsync(AdminActionType.ColocarLenda, adminToken, new { album = album.Nome, lenda = p.Name, numero }, ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task TirarLendaAsync(Guid albumId, Guid figurinhaId, string? adminToken, CancellationToken ct)
+    {
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            _db.ChangeTracker.Clear();
+            await using var transacao = await _db.Database.BeginTransactionAsync(ct);
+
+            var lenda = await _db.Figurinhas.Include(f => f.Album)
+                .FirstOrDefaultAsync(f => f.FigurinhaId == figurinhaId && f.AlbumId == albumId && f.Lenda, ct)
+                ?? throw new InvalidOperationException("Essa lenda não está no álbum.");
+            if (await _db.FigurinhasDosTreinadores.AnyAsync(f => f.FigurinhaId == figurinhaId, ct))
+                throw new InvalidOperationException($"{lenda.NomeImpresso} já saiu em pacote e fica no álbum.");
+
+            // As que vêm depois (outras lendas) descem um número, uma de cada vez por causa do número único.
+            var depois = await _db.Figurinhas
+                .Where(f => f.AlbumId == albumId && f.Numero > lenda.Numero)
+                .OrderBy(f => f.Numero)
+                .ToListAsync(ct);
+
+            _db.Figurinhas.Remove(lenda);
+            await RegistrarAsync(AdminActionType.TirarLenda, adminToken, new { album = lenda.Album.Nome, lenda = lenda.NomeImpresso }, ct);
+            await _db.SaveChangesAsync(ct);
+            foreach (var f in depois)
+            {
+                f.Numero--;
+                await _db.SaveChangesAsync(ct);
+            }
+
+            await transacao.CommitAsync(ct);
+        });
     }
 
     public async Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct)
@@ -1133,7 +1252,7 @@ public partial class AlbumService : IAlbumService
             .Select(f => new
             {
                 f.FigurinhaId, f.Numero, f.Tipo, f.Raridade, f.TeamId, TimeNome = f.Time.TeamName, f.PlayerId, f.NomeImpresso,
-                f.PosicaoSigla, f.Overall, f.Destaque, f.Ordem, f.TreinadorId, f.Papel,
+                f.PosicaoSigla, f.Overall, f.Destaque, f.Ordem, f.TreinadorId, f.Papel, f.Lenda,
                 Pessoa = f.Treinador == null ? null : f.Treinador.Nome,
                 Perfil = _db.PerfisTreinadores
                     .Where(p => p.TreinadorId == f.TreinadorId)
@@ -1147,7 +1266,8 @@ public partial class AlbumService : IAlbumService
                 f.TreinadorId is not { } pessoa ? null
                     : f.Perfil is null ? PerfilTreinadorDto.SoNome(pessoa, f.Pessoa ?? f.NomeImpresso)
                     : new PerfilTreinadorDto(pessoa, f.Pessoa ?? f.NomeImpresso, f.Perfil.Apelido, f.Perfil.Frase, f.Perfil.Esquema,
-                        f.Perfil.TemFoto, PerfilTreinadorService.Versao(f.Perfil.TemFoto, f.Perfil.FotoAtualizadaEm))))
+                        f.Perfil.TemFoto, PerfilTreinadorService.Versao(f.Perfil.TemFoto, f.Perfil.FotoAtualizadaEm)),
+                f.Lenda))
             .ToList();
     }
 

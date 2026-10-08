@@ -92,6 +92,12 @@ public class Figurinha
     /// <summary>Texto curto da lendária, escrito pelo admin ("Artilheiro de 2009").</summary>
     public string? Destaque { get; set; }
 
+    /// <summary>
+    /// Figurinha de Lenda: jogador aposentado que o admin colocou depois do lançamento (lendária, na página
+    /// do último clube, com número no fim do álbum).
+    /// </summary>
+    public bool Lenda { get; set; }
+
     /// <summary>Lugar na página do clube (0 = escudo).</summary>
     public int Ordem { get; set; }
 

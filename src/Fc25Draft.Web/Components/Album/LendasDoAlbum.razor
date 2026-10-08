@@ -1,0 +1,161 @@
+@using Fc25Draft.Core.Utilities
+@inject IAlbumService AlbumSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JSRuntime
+
+@* Figurinhas de Lenda: até 3 aposentados por álbum, colocados pelo admin a qualquer hora. Entram como lendárias
+   na página do último clube, com número no fim do álbum. *@
+<div class="card mb-3">
+    <div class="card-header fw-bold d-flex align-items-center gap-2">
+        🎖️ Lendas aposentadas
+        @if (_dados is not null)
+        {
+            <span class="badge text-bg-secondary">@_dados.NoAlbum.Count/@AlbumFigurinhas.MaximoLendasPorAlbum</span>
+        }
+    </div>
+    <div class="card-body">
+        @if (_erro is not null)
+        {
+            <div class="alert alert-danger py-2">@_erro</div>
+        }
+        <p class="small text-muted">
+            Até @AlbumFigurinhas.MaximoLendasPorAlbum aposentados por álbum viram figurinha de <strong>Lenda</strong>: lendária,
+            no fim da página do último clube dele, com o próximo número do álbum. Quem já completou a página ou o álbum
+            não perde o selo. Dá para tirar enquanto ninguém tiver tirado em pacote.
+        </p>
+
+        @if (_dados is null)
+        {
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+        }
+        else
+        {
+            @if (_dados.NoAlbum.Count > 0)
+            {
+                <div class="grade-cartas mb-3">
+                    @foreach (var l in _dados.NoAlbum)
+                    {
+                        <div class="d-flex flex-column align-items-center gap-1">
+                            <CartaFigurinha Figurinha="@l.Figurinha" Largura="120" />
+                            @if (l.Donos > 0)
+                            {
+                                <span class="small text-muted">🔒 saiu para @l.Donos</span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" disabled="@_salvando" @onclick="() => TirarAsync(l)">Tirar</button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_dados.NoAlbum.Count < AlbumFigurinhas.MaximoLendasPorAlbum)
+            {
+                var disponiveis = _dados.Candidatas.Where(c => c.ClubeNoAlbum).ToList();
+                @if (_dados.Candidatas.Count == 0)
+                {
+                    <div class="small text-muted">
+                        Nenhum aposentado disponível ainda. As aposentadorias acontecem na virada da temporada
+                        (<a href="/admin/temporada">Admin → Temporada</a>).
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                        <div>
+                            <label class="form-label">Aposentado</label>
+                            <select class="form-select" style="min-width: 18rem;" @bind="_playerId">
+                                <option value="0">Escolha…</option>
+                                @foreach (var c in _dados.Candidatas)
+                                {
+                                    <option value="@c.PlayerId" disabled="@(!c.ClubeNoAlbum)">
+                                        @c.Nome (@c.Posicao, @c.Overall) · @(c.UltimoClube ?? "sem clube") · aposentou em @c.AposentadoNaTemporada@(c.ClubeNoAlbum ? "" : " — clube fora do álbum")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="flex-grow-1" style="max-width: 24rem;">
+                            <label class="form-label">Texto da figurinha <span class="text-muted small">(opcional)</span></label>
+                            <input class="form-control" maxlength="@AlbumFigurinhas.TamanhoDestaque" @bind="_destaque"
+                                   placeholder="@AlbumFigurinhas.DestaqueDaLenda(Escolhida?.AposentadoNaTemporada ?? Temporada - 1)" />
+                        </div>
+                        <button class="btn btn-success" disabled="@(_salvando || _playerId == 0)" @onclick="ColocarAsync">🎖️ Colocar no álbum</button>
+                    </div>
+                    @if (disponiveis.Count == 0)
+                    {
+                        <div class="small text-warning mt-2">Os aposentados que sobraram têm o último clube fora deste álbum.</div>
+                    }
+                }
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid AlbumId { get; set; }
+
+    /// <summary>Temporada do álbum (para o texto sugerido).</summary>
+    [Parameter] public int Temporada { get; set; }
+
+    /// <summary>Avisa a página para recontar o álbum depois de colocar ou tirar.</summary>
+    [Parameter] public EventCallback<string> OnMudou { get; set; }
+
+    private LendasDoAlbumDto? _dados;
+    private int _playerId;
+    private string? _destaque;
+    private bool _salvando;
+    private string? _erro;
+    private Guid _carregado;
+
+    private LendaCandidataDto? Escolhida => _dados?.Candidatas.FirstOrDefault(c => c.PlayerId == _playerId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregado == AlbumId) return;
+        _carregado = AlbumId;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        try { _dados = await AlbumSvc.GetLendasAsync(AlbumId, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task ColocarAsync()
+    {
+        if (Escolhida is not { } c) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Colocar {c.Nome} como Lenda na página do {c.UltimoClube}? Ela entra nos pacotes na hora.")) return;
+
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await AlbumSvc.ColocarLendaAsync(AlbumId, c.PlayerId, _destaque, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            _playerId = 0;
+            _destaque = null;
+            await CarregarAsync();
+            await OnMudou.InvokeAsync($"{c.Nome} entrou no álbum como Lenda.");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task TirarAsync(LendaNoAlbumDto l)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Tirar a Lenda {l.Figurinha.NomeImpresso} do álbum?")) return;
+
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await AlbumSvc.TirarLendaAsync(AlbumId, l.Figurinha.FigurinhaId, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            await CarregarAsync();
+            await OnMudou.InvokeAsync($"{l.Figurinha.NomeImpresso} saiu do álbum.");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

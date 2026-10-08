@@ -18,14 +18,18 @@
 }
 else
 {
-    <div class="carta @ClasseDaRaridade @ClasseDoTipo"
+    <div class="carta @ClasseDaRaridade @ClasseDoTipo @(Figurinha.Lenda ? "lenda" : "")"
          style="--w: @(Largura)px" title="@Titulo">
         <div class="moldura">
             @if (Figurinha.Tipo == TipoFigurinha.Treinador)
             {
                 <span class="prendedor" aria-hidden="true"></span>
             }
-            @if (Figurinha.Raridade == RaridadeFigurinha.Lendaria && SeloLendaria is not null)
+            @if (Figurinha.Lenda)
+            {
+                <div class="selo">🎖️ Lenda</div>
+            }
+            else if (Figurinha.Raridade == RaridadeFigurinha.Lendaria && SeloLendaria is not null)
             {
                 <div class="selo">★ @SeloLendaria</div>
             }
@@ -168,5 +172,5 @@ else
         ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · Escudo do {Figurinha.TimeNome}"
         : Figurinha.Tipo == TipoFigurinha.Treinador
         ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.PapelTexto} {Figurinha.NomeImpresso} · {Figurinha.TimeNome}"
-        : $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.NomeImpresso} ({Figurinha.PosicaoSigla}, {Figurinha.Overall}) · {Figurinha.TimeNome}";
+        : $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {(Figurinha.Lenda ? "Lenda " : "")}{Figurinha.NomeImpresso} ({Figurinha.PosicaoSigla}, {Figurinha.Overall}) · {Figurinha.TimeNome}";
 }

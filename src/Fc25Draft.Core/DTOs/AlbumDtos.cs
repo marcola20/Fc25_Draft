@@ -18,7 +18,8 @@ public record FigurinhaDto(
     int Ordem,
     Guid? TreinadorId = null,
     PapelTreinador? Papel = null,
-    PerfilTreinadorDto? Perfil = null)
+    PerfilTreinadorDto? Perfil = null,
+    bool Lenda = false)
 {
     /// <summary>"Técnico" ou "Auxiliar", na figurinha de técnico.</summary>
     public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
@@ -206,6 +207,25 @@ public record AlbumCompletoDto(int Ordem, Guid TreinadorId, string Nome, string 
 
 /// <summary>Uma lendária escolhida pelo admin, com o texto curto opcional.</summary>
 public record LendariaEscolhaDto(int PlayerId, string? Destaque);
+
+/// <summary>Figurinha de Lenda já no álbum e quantas pessoas já tiraram.</summary>
+public record LendaNoAlbumDto(FigurinhaDto Figurinha, int Donos);
+
+/// <summary>
+/// Aposentado que pode virar figurinha de Lenda. <paramref name="ClubeNoAlbum"/>: o último clube dele tem
+/// página no álbum (sem isso não tem onde colar).
+/// </summary>
+public record LendaCandidataDto(
+    int PlayerId,
+    string Nome,
+    string Posicao,
+    int Overall,
+    int AposentadoNaTemporada,
+    string? UltimoClube,
+    bool ClubeNoAlbum);
+
+/// <summary>As lendas de um álbum e os aposentados que ainda podem entrar.</summary>
+public record LendasDoAlbumDto(IReadOnlyList<LendaNoAlbumDto> NoAlbum, IReadOnlyList<LendaCandidataDto> Candidatas);
 
 /// <summary>
 /// Jogador que pode virar lendária (está no álbum), com a média de nota da temporada passada e a raridade

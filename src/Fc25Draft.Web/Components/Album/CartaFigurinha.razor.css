@@ -277,6 +277,23 @@
 
 .r-lendaria .topo { padding-top: 1em; }
 
+/* ---- Lenda (aposentado): lendária em preto e ouro velho, foto puxada para o sépia ---- */
+.r-lendaria.lenda {
+    --fundo: linear-gradient(165deg, #3d2c10 0%, #1d1408 55%, #0b0703 100%);
+    --borda: #c9a227;
+    --texto-suave: #f0d58a;
+    --faixa: linear-gradient(90deg, #1d1408, #8a6a1f, #1d1408);
+    --foto-fundo: radial-gradient(circle at 50% 35%, rgba(240, 213, 138, .4), rgba(240, 213, 138, 0) 70%);
+}
+
+.r-lendaria.lenda .moldura {
+    box-shadow: 0 0 0 .14em #1d1408 inset, 0 0 0 .22em #c9a227 inset, 0 .25em .9em rgba(201, 162, 39, .5);
+}
+
+.lenda .foto { filter: sepia(.45) contrast(1.05); }
+
+.lenda .selo { background: linear-gradient(90deg, #5c4410, #e8c766, #5c4410); color: #1d1408; }
+
 @keyframes holo {
     from { background-position: 0% 0%; }
     to { background-position: 100% 100%; }

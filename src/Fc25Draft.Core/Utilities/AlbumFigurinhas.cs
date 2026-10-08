@@ -24,6 +24,12 @@ public static class AlbumFigurinhas
 
     public const int MaximoLendarias = 10;
 
+    /// <summary>Figurinhas de Lenda (aposentados) que o admin pode colocar em cada álbum.</summary>
+    public const int MaximoLendasPorAlbum = 3;
+
+    /// <summary>Texto da figurinha de Lenda quando o admin não escreve outro.</summary>
+    public static string DestaqueDaLenda(int temporada) => $"Pendurou as chuteiras em {temporada}";
+
     /// <summary>Jogos com nota na temporada passada para entrar nas sugestões de lendária.</summary>
     public const int MinimoJogosParaSugestao = 3;
 
@@ -308,6 +314,7 @@ public static class AlbumFigurinhas
     {
         (TipoFigurinha.Escudo, _) => $"Colei o escudo brilhante do {f.TimeNome} no {albumNome}!",
         (TipoFigurinha.Treinador, _) => $"Tirei o {(f.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "técnico")} {f.Perfil?.NomeCurto ?? f.NomeImpresso} do {f.TimeNome} no {albumNome}!",
+        _ when f.Lenda => $"Tirei a lenda {f.NomeImpresso} no {albumNome}!",
         (_, RaridadeFigurinha.Lendaria) => $"Tirei o {f.NomeImpresso} lendário no {albumNome}!",
         (_, RaridadeFigurinha.Brilhante) => $"Tirei o {f.NomeImpresso} brilhante no {albumNome}!",
         _ => $"Colei o {f.NomeImpresso} no {albumNome}!"

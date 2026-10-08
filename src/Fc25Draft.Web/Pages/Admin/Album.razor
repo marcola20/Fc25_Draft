@@ -124,6 +124,8 @@
                     }
                 </div>
             </div>
+
+            <LendasDoAlbum AlbumId="@ad.Album.AlbumId" Temporada="@ad.Album.Temporada" OnMudou="LendasMudaramAsync" />
         }
         else if (_previa is { } pv)
         {
@@ -336,6 +338,18 @@
         PacoteGanho.OrigemAdmin => "da organização",
         _ => origem
     };
+
+    /// <summary>Lenda colocada ou tirada: reconta o álbum sem mexer nas lendárias que estão sendo escolhidas.</summary>
+    private async Task LendasMudaramAsync(string mensagem)
+    {
+        if (_admin is null) return;
+        try
+        {
+            _admin = await AlbumSvc.GetAdminAsync(_admin.Album.AlbumId, CancellationToken.None);
+            _ok = mensagem;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
 
     private async Task SalvarLendariasAsync()
     {
