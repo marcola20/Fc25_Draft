@@ -155,11 +155,43 @@
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => AbrirPassagem(t)" disabled="@_salvando">Passagem</button>
                                     @if (t.Hoje is { } atual)
                                     {
-                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => Encerrar(t, atual)" disabled="@_salvando">Encerrar</button>
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => AbrirEncerrar(atual)" disabled="@_salvando">Encerrar</button>
                                     }
                                     <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(t)" disabled="@_salvando">Excluir</button>
                                 </td>
                             </tr>
+
+                            @if (t.Hoje is { } aberta && _encerrando == aberta.PassagemId)
+                            {
+                                <tr class="table-warning">
+                                    <td colspan="5">
+                                        <div class="d-flex align-items-end gap-2 flex-wrap">
+                                            <div class="fw-semibold pb-1">@t.Nome sai do @aberta.TimeNome:</div>
+                                            <div>
+                                                <label class="form-label mb-0 small">Motivo</label>
+                                                <select class="form-select form-select-sm w-auto" @bind="_motivo">
+                                                    <option value="@MotivoSaidaTreinador.PediuDemissao">Pediu demissão</option>
+                                                    <option value="@MotivoSaidaTreinador.Demitido">Demitido</option>
+                                                    <option value="@MotivoSaidaTreinador.Outro">Outro (saiu da liga, trocou de função…)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label mb-0 small">Saiu em</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="_saiuEm" />
+                                            </div>
+                                            <button class="btn btn-sm btn-warning" @onclick="() => Encerrar(t, aberta)" disabled="@_salvando">Encerrar passagem</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _encerrando = null" disabled="@_salvando">Cancelar</button>
+                                        </div>
+                                        @if (aberta.Papel == PapelTreinador.Treinador)
+                                        {
+                                            <div class="small text-muted mt-1">
+                                                O clube recebe aviso; pedido de demissão pendente da diretoria é encerrado; quem chegar começa do
+                                                zero com a diretoria. Pediu demissão e demitido viram notícia no Plantão.
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
 
                             @if (_passagemDe == t.TreinadorId)
                             {
@@ -201,7 +233,18 @@
                                                 @foreach (var p in t.Passagens)
                                                 {
                                                     <div class="d-flex align-items-center gap-2">
-                                                        <span>@p.TimeNome · @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador") · @p.Desde.ToString("dd/MM/yyyy", Br) – @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("dd/MM/yyyy", Br))</span>
+                                                        <span>@p.TimeNome · @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador") · @p.Desde.ToString("dd/MM/yyyy", Br) – @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("dd/MM/yyyy", Br))@(p.MotivoTexto is { } motivo ? $" ({motivo})" : "")</span>
+                                                        @if (p.Ate is not null && p.Papel == PapelTreinador.Treinador)
+                                                        {
+                                                            <select class="form-select form-select-sm w-auto py-0" value="@(p.MotivoSaida?.ToString() ?? "")"
+                                                                    title="Motivo da saída" disabled="@_salvando"
+                                                                    @onchange="e => DefinirMotivo(p, e.Value?.ToString())">
+                                                                <option value="">motivo?</option>
+                                                                <option value="@MotivoSaidaTreinador.PediuDemissao">pediu demissão</option>
+                                                                <option value="@MotivoSaidaTreinador.Demitido">demitido</option>
+                                                                <option value="@MotivoSaidaTreinador.Outro">outro</option>
+                                                            </select>
+                                                        }
                                                         <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoverPassagem(p)" disabled="@_salvando">remover</button>
                                                     </div>
                                                 }
@@ -256,6 +299,10 @@
     private PapelTreinador _papelSel = PapelTreinador.Treinador;
     private DateTime? _desde = DateTime.Today;
     private DateTime? _ate;
+
+    private Guid? _encerrando;
+    private MotivoSaidaTreinador _motivo = MotivoSaidaTreinador.PediuDemissao;
+    private DateTime? _saiuEm = DateTime.Today;
 
     protected override void OnInitialized()
     {
@@ -341,16 +388,42 @@
         finally { _salvando = false; }
     }
 
+    private void AbrirEncerrar(TreinadorPassagemDto passagem)
+    {
+        _passagemDe = null;
+        _encerrando = passagem.PassagemId;
+        _motivo = MotivoSaidaTreinador.PediuDemissao;
+        _saiuEm = DateTime.Today;
+    }
+
     private async Task Encerrar(TreinadorDto t, TreinadorPassagemDto passagem)
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Encerrar hoje a passagem de {t.Nome} pelo {passagem.TimeNome}?")) return;
-
         _erro = null; _ok = null; _salvando = true;
         try
         {
-            await TreinadorSvc.EncerrarPassagemAsync(passagem.PassagemId, DateTime.Today, CancellationToken.None);
+            await TreinadorSvc.EncerrarPassagemAsync(passagem.PassagemId, _saiuEm ?? DateTime.Today, CancellationToken.None, _motivo);
+            _encerrando = null;
             await Carregar();
-            _ok = $"{t.Nome} saiu do {passagem.TimeNome}.";
+            _ok = _motivo switch
+            {
+                MotivoSaidaTreinador.PediuDemissao => $"{t.Nome} pediu demissão do {passagem.TimeNome}.",
+                MotivoSaidaTreinador.Demitido => $"{t.Nome} foi demitido do {passagem.TimeNome}.",
+                _ => $"{t.Nome} saiu do {passagem.TimeNome}."
+            };
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task DefinirMotivo(TreinadorPassagemDto passagem, string? valor)
+    {
+        if (!Enum.TryParse<MotivoSaidaTreinador>(valor, out var motivo)) return;
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await TreinadorSvc.DefinirMotivoSaidaAsync(passagem.PassagemId, motivo, CancellationToken.None);
+            await Carregar();
+            _ok = $"Saída do {passagem.TimeNome} marcada.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

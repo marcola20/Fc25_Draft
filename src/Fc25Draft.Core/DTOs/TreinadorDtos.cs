@@ -28,9 +28,18 @@ public record TreinadorPassagemDto(
     PapelTreinador Papel,
     DateTime Desde,
     DateTime? Ate,
-    TreinadorRetrospectoDto? Retrospecto = null)
+    TreinadorRetrospectoDto? Retrospecto = null,
+    MotivoSaidaTreinador? MotivoSaida = null)
 {
     public bool Atual => Ate is null;
+
+    /// <summary>"pediu demissão", "demitido" ou nulo.</summary>
+    public string? MotivoTexto => MotivoSaida switch
+    {
+        MotivoSaidaTreinador.PediuDemissao => "pediu demissão",
+        MotivoSaidaTreinador.Demitido => "demitido",
+        _ => null
+    };
 }
 
 /// <summary>O treinador com as passagens dele, da mais recente para a mais antiga.</summary>

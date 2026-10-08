@@ -200,6 +200,10 @@
                                 @campanha.Jogos jogos · @campanha.Vitorias<span class="text-muted">-</span>@campanha.Empates<span class="text-muted">-</span>@campanha.Derrotas · @campanha.Aproveitamento.ToString("0.#", Br)%
                             </span>
                         }
+                        @if (p.MotivoTexto is { } motivo)
+                        {
+                            <span class="badge @(p.MotivoSaida == MotivoSaidaTreinador.Demitido ? "bg-danger" : "bg-warning text-dark")">@motivo</span>
+                        }
                         <span class="text-muted small ms-auto">
                             @p.Desde.ToString("MMM/yyyy", Br) — @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MMM/yyyy", Br))
                         </span>

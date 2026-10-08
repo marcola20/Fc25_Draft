@@ -211,8 +211,8 @@
                                         }
                                         else
                                         {
-                                            <span class="badge @(pedido.Status == StatusPedidoDemissao.Aceito ? "bg-danger" : "bg-success")">
-                                                @(pedido.Status == StatusPedidoDemissao.Aceito ? "Demitido" : "Mantido")
+                                            <span class="badge @(pedido.Status switch { StatusPedidoDemissao.Aceito => "bg-danger", StatusPedidoDemissao.Encerrado => "bg-secondary", _ => "bg-success" })">
+                                                @(pedido.Status switch { StatusPedidoDemissao.Aceito => "Demitido", StatusPedidoDemissao.Encerrado => "Treinador saiu", _ => "Mantido" })
                                             </span>
                                             @if (pedido.DecididoEm is DateTime decidido)
                                             {

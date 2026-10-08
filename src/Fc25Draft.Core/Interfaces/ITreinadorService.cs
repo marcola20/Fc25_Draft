@@ -1,4 +1,6 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Core.Interfaces;
 
@@ -24,7 +26,18 @@ public interface ITreinadorService
     Task<TreinadorDto> RegistrarPassagemAsync(TreinadorPassagemRequest request, CancellationToken ct);
 
     /// <summary>Encerra a passagem atual (saída do clube).</summary>
-    Task<TreinadorDto> EncerrarPassagemAsync(Guid passagemId, DateTime ate, CancellationToken ct);
+    /// <summary>
+    /// Encerra a passagem. Treinador saindo: o clube recebe aviso, um pedido de demissão pendente da diretoria é
+    /// encerrado e, na diretoria, quem chegar depois começa do zero.
+    /// </summary>
+    Task<TreinadorDto> EncerrarPassagemAsync(Guid passagemId, DateTime ate, CancellationToken ct,
+        MotivoSaidaTreinador? motivo = null);
+
+    /// <summary>Marca o motivo de uma passagem já encerrada (as saídas de antes de existir o motivo).</summary>
+    Task DefinirMotivoSaidaAsync(Guid passagemId, MotivoSaidaTreinador motivo, CancellationToken ct);
+
+    /// <summary>Notícias do Plantão: pedidos de demissão, demissões e técnicos novos.</summary>
+    Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 
     Task RemoverPassagemAsync(Guid passagemId, CancellationToken ct);
 

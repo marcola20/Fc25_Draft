@@ -3,6 +3,7 @@
 @inject ILigaPublicService LigaService
 @inject IDiretoriaService DiretoriaSvc
 @inject IAposentadoriaService AposentadoriaSvc
+@inject ITreinadorService TreinadorNoticiasSvc
 
 <PageTitle>Plantão CBFV</PageTitle>
 
@@ -65,6 +66,7 @@
             // A diretoria é complementar: se falhar, o Plantão segue com o resto.
             try { noticias.AddRange(await DiretoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await AposentadoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await TreinadorNoticiasSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).ToList();
         }
         catch (Exception ex)

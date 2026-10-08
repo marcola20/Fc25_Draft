@@ -170,21 +170,55 @@ public class TreinadorService : ITreinadorService
             Ate = request.Ate?.Date
         });
 
+        // Técnico novo num clube que já teve outro: o clube fica sabendo (a diretoria recomeça do zero).
+        var teveOutro = await _db.TreinadorPassagens.AnyAsync(p =>
+            p.TimeId == request.TimeId && p.Papel == PapelTreinador.Treinador && p.TreinadorId != request.TreinadorId, ct);
+        if (request.Papel == PapelTreinador.Treinador && request.Ate is null && teveOutro)
+            AvisosDoTime.Criar(_db, request.TimeId, AvisosDoTime.Diretoria,
+                $"🤝 {treinador.Nome} é o novo técnico do {time.TeamName}. A diretoria recomeça do zero: confiança " +
+                $"{DiretoriaCriterios.ConfiancaInicial:0}.", $"/teams/details/{request.TimeId}", _time.GetUtcNow().UtcDateTime);
+
         await _db.SaveChangesAsync(ct);
         await AtualizarNomesDosTimesAsync(new[] { request.TimeId }, ct);
 
         return (await GetAsync(request.TreinadorId, ct))!;
     }
 
-    public async Task<TreinadorDto> EncerrarPassagemAsync(Guid passagemId, DateTime ate, CancellationToken ct)
+    public async Task<TreinadorDto> EncerrarPassagemAsync(Guid passagemId, DateTime ate, CancellationToken ct,
+        MotivoSaidaTreinador? motivo = null)
     {
-        var passagem = await _db.TreinadorPassagens.FirstOrDefaultAsync(p => p.PassagemId == passagemId, ct)
+        var passagem = await _db.TreinadorPassagens.Include(p => p.Treinador)
+            .FirstOrDefaultAsync(p => p.PassagemId == passagemId, ct)
             ?? throw new InvalidOperationException("Passagem não encontrada.");
 
         if (ate.Date < passagem.Desde.Date)
             throw new InvalidOperationException("A saída não pode ser antes da entrada.");
 
+        var agora = _time.GetUtcNow().UtcDateTime;
         passagem.Ate = ate.Date;
+        passagem.MotivoSaida = motivo ?? MotivoSaidaTreinador.Outro;
+        passagem.SaiuEm = agora;
+
+        if (passagem.Papel == PapelTreinador.Treinador)
+        {
+            // Pedido de demissão da diretoria ainda sem decisão: não há mais o que decidir.
+            foreach (var pedido in await _db.PedidosDemissao
+                         .Where(p => p.TimeId == passagem.TimeId && p.Status == StatusPedidoDemissao.Pendente)
+                         .ToListAsync(ct))
+            {
+                pedido.Status = StatusPedidoDemissao.Encerrado;
+                pedido.DecididoEm = agora;
+            }
+
+            var nome = passagem.Treinador.Nome;
+            AvisosDoTime.Criar(_db, passagem.TimeId, AvisosDoTime.Diretoria, passagem.MotivoSaida switch
+            {
+                MotivoSaidaTreinador.PediuDemissao => $"🚪 {nome} pediu demissão e deixou o comando do time.",
+                MotivoSaidaTreinador.Demitido => $"🔴 A diretoria demitiu {nome}.",
+                _ => $"👋 {nome} deixou o comando do time."
+            } + " Quem chegar começa do zero com a diretoria.", $"/teams/details/{passagem.TimeId}", agora);
+        }
+
         await _db.SaveChangesAsync(ct);
         await AtualizarNomesDosTimesAsync(new[] { passagem.TimeId }, ct);
 
@@ -477,11 +511,63 @@ public class TreinadorService : ITreinadorService
         return $"{(limpo.Length > 0 ? limpo : "CBFV")}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
     }
 
+    public async Task DefinirMotivoSaidaAsync(Guid passagemId, MotivoSaidaTreinador motivo, CancellationToken ct)
+    {
+        var passagem = await _db.TreinadorPassagens.FirstOrDefaultAsync(p => p.PassagemId == passagemId, ct)
+            ?? throw new InvalidOperationException("Passagem não encontrada.");
+        if (passagem.Ate is null)
+            throw new InvalidOperationException("A passagem ainda está valendo: use Encerrar.");
+        passagem.MotivoSaida = motivo;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Quando a saída aconteceu: o momento registrado ou, nas antigas, a tarde do dia da saída.</summary>
+    private static DateTime MomentoDaSaida(DateTime? saiuEm, DateTime ate) => saiuEm ?? ate.Date.AddHours(18);
+
+    public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct)
+    {
+        var passagens = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => p.Papel == PapelTreinador.Treinador)
+            .Select(p => new { p.PassagemId, p.TreinadorId, Nome = p.Treinador.Nome, p.TimeId, Time = p.Time.TeamName, p.Desde, p.Ate, p.MotivoSaida, p.SaiuEm })
+            .ToListAsync(ct);
+
+        var noticias = new List<PlantaoNoticiaDto>();
+        foreach (var p in passagens)
+        {
+            var link = $"/treinadores/{p.TreinadorId}";
+            // Saída: só as registradas com motivo (as antigas não dizem se foi demissão).
+            if (p.Ate is DateTime ate && p.MotivoSaida is MotivoSaidaTreinador.PediuDemissao or MotivoSaidaTreinador.Demitido)
+            {
+                var saiu = MomentoDaSaida(p.SaiuEm, ate);
+                noticias.Add(p.MotivoSaida == MotivoSaidaTreinador.PediuDemissao
+                    ? new PlantaoNoticiaDto(saiu, PlantaoCategoria.Diretoria, "🚪", $"{p.Nome} pede demissão do {p.Time}",
+                        "O clube procura um novo técnico", link, p.Time)
+                    : new PlantaoNoticiaDto(saiu, PlantaoCategoria.Diretoria, "🔴", $"{p.Time} demite {p.Nome}",
+                        "A diretoria perdeu a paciência", link, p.Time));
+            }
+
+            // Chegada: técnico novo num clube que já teve outro antes dele.
+            var anterior = passagens
+                .Where(o => o.TimeId == p.TimeId && o.PassagemId != p.PassagemId && o.Ate is not null && o.Ate <= p.Desde)
+                .OrderByDescending(o => o.Ate)
+                .FirstOrDefault();
+            if (anterior is null || anterior.TreinadorId == p.TreinadorId) continue;
+            // Logo depois da saída do anterior, para a notícia da chegada vir depois da notícia da saída.
+            var saidaAnterior = MomentoDaSaida(anterior.SaiuEm, anterior.Ate!.Value);
+            var quando = saidaAnterior.Date >= p.Desde.Date ? saidaAnterior.AddMinutes(1) : p.Desde.Date.AddHours(18);
+            noticias.Add(new PlantaoNoticiaDto(quando, PlantaoCategoria.Diretoria, "🤝", $"{p.Nome} é o novo técnico do {p.Time}",
+                $"Chega no lugar de {anterior.Nome}", link, p.Time));
+        }
+
+        return noticias.OrderByDescending(n => n.Data).ToArray();
+    }
+
     private static TreinadorDto ToDto(Treinador t) =>
         new(t.TreinadorId, t.Nome, t.Token, t.Ativo,
             t.Passagens
                 .OrderByDescending(p => p.Ate is null)
                 .ThenByDescending(p => p.Desde)
-                .Select(p => new TreinadorPassagemDto(p.PassagemId, p.TimeId, p.Time?.TeamName ?? "?", p.Papel, p.Desde, p.Ate))
+                .Select(p => new TreinadorPassagemDto(p.PassagemId, p.TimeId, p.Time?.TeamName ?? "?", p.Papel, p.Desde, p.Ate,
+                    MotivoSaida: p.MotivoSaida))
                 .ToArray());
 }

@@ -1,5 +1,13 @@
 namespace Fc25Draft.Core.Entities;
 
+/// <summary>Por que a passagem acabou.</summary>
+public enum MotivoSaidaTreinador
+{
+    PediuDemissao = 1,
+    Demitido = 2,
+    Outro = 3
+}
+
 /// <summary>Papel da pessoa no time.</summary>
 public enum PapelTreinador
 {
@@ -44,6 +52,15 @@ public class TreinadorPassagem
 
     /// <summary>Nulo enquanto a passagem está valendo.</summary>
     public DateTime? Ate { get; set; }
+
+    /// <summary>Pediu demissão, foi demitido ou outro (nulo nas passagens antigas e nas abertas).</summary>
+    public MotivoSaidaTreinador? MotivoSaida { get; set; }
+
+    /// <summary>
+    /// Momento (UTC) em que a saída foi registrada. Na diretoria, é daqui que o técnico novo começa do zero
+    /// (os jogos até ali ainda são do anterior).
+    /// </summary>
+    public DateTime? SaiuEm { get; set; }
 
     public Treinador Treinador { get; set; } = null!;
     public Team Time { get; set; } = null!;

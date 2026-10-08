@@ -6,6 +6,7 @@
 @inject ILigaPublicService LigaService
 @inject IDiretoriaService DiretoriaSvc
 @inject IAposentadoriaService AposentadoriaSvc
+@inject ITreinadorService TreinadorNoticiasSvc
 
 @implements IDisposable
 
@@ -85,6 +86,7 @@ else
             var noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).ToList();
             try { noticias.AddRange(await DiretoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await AposentadoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await TreinadorNoticiasSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).Take(NoticiasNaPaginaInicial).ToList();
         }
         catch { }

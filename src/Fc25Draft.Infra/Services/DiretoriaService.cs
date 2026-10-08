@@ -213,7 +213,7 @@ public class DiretoriaService : IDiretoriaService
                 .ToListAsync(ct);
             var hoje = HorarioDeBrasilia.Agora(_time);
             foreach (var passagemId in passagens)
-                await _treinadores.EncerrarPassagemAsync(passagemId, hoje, ct);
+                await _treinadores.EncerrarPassagemAsync(passagemId, hoje, ct, MotivoSaidaTreinador.Demitido);
         }
         else
         {
@@ -427,10 +427,11 @@ public class DiretoriaService : IDiretoriaService
             .Where(p => p.Temporada == temporada)
             .ToListAsync(ct);
         var ajustes = pedidos
-            .Where(p => p.Status != StatusPedidoDemissao.Pendente && p.DecididoEm is not null)
+            .Where(p => p.Status is StatusPedidoDemissao.Aceito or StatusPedidoDemissao.Recusado && p.DecididoEm is not null)
             .Select(p => new DiretoriaAjusteInput(p.TimeId, p.DecididoEm!.Value,
                 p.Status == StatusPedidoDemissao.Aceito ? EventoDiretoria.NovoTecnico : EventoDiretoria.VotoDeConfianca))
             .ToList();
+        ajustes.AddRange(await SaidasDeTreinadorAsync(temporada, ligas, ajustes, ct));
 
         var (pontos, ultimoJogo) = await ConfiancaAsync(temporada, ajustes, ct);
         var ultimatos = pontos.ToDictionary(p => p.Key, p => Diretoria.Ultimatos(p.Key, p.Value));
@@ -483,6 +484,38 @@ public class DiretoriaService : IDiretoriaService
             .ToArray();
 
         return new Montagem(new DiretoriaPainelDto(temporada, metas.Count > 0, times), pontos, nomes, ultimoJogo, ultimatos, pedidos);
+    }
+
+    /// <summary>
+    /// Treinador que saiu do clube durante a temporada (pediu demissão, foi demitido ou outro): quem chega começa
+    /// do zero, como num pedido de demissão aceito. Saída depois de a temporada acabar não mexe nela.
+    /// </summary>
+    private async Task<List<DiretoriaAjusteInput>> SaidasDeTreinadorAsync(
+        int temporada, IReadOnlyList<LigaInfo> ligas, IReadOnlyList<DiretoriaAjusteInput> jaTem, CancellationToken ct)
+    {
+        if (ligas.Count == 0) return new List<DiretoriaAjusteInput>();
+        var ligaIds = ligas.Select(l => l.LigaId).ToList();
+        var inicio = await _db.Ligas.Where(l => ligaIds.Contains(l.LigaId)).MinAsync(l => l.CriadoEm, ct);
+        DateTime? fim = null;
+        if (ligas.All(l => l.Status == LigaStatus.Encerrada))
+            fim = await _db.LigaPartidas
+                .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada)
+                .MaxAsync(p => (DateTime?)(p.EncerradaEm ?? p.Rodada.DataHora), ct);
+
+        var saidas = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => p.Papel == PapelTreinador.Treinador && p.Ate != null)
+            .Select(p => new { p.TimeId, p.Ate, p.SaiuEm })
+            .ToListAsync(ct);
+
+        return saidas
+            // Sem o momento exato (passagens antigas): fim do dia da saída no horário de Brasília.
+            .Select(s => new { s.TimeId, Quando = s.SaiuEm ?? s.Ate!.Value.Date.AddDays(1).AddHours(3) })
+            .Where(s => s.Quando >= inicio && (fim is null || s.Quando <= fim))
+            // Pedido aceito já trouxe o técnico novo nesse momento.
+            .Where(s => !jaTem.Any(a => a.TimeId == s.TimeId && a.Evento == EventoDiretoria.NovoTecnico
+                                        && Math.Abs((a.Data - s.Quando).TotalHours) < 1))
+            .Select(s => new DiretoriaAjusteInput(s.TimeId, s.Quando, EventoDiretoria.NovoTecnico))
+            .ToList();
     }
 
     /// <summary>

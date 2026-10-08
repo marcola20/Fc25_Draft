@@ -66,7 +66,9 @@ public enum StatusPedidoDemissao
 {
     Pendente = 0,
     Aceito = 1,
-    Recusado = 2
+    Recusado = 2,
+    /// <summary>O treinador saiu (pediu demissão, por exemplo) antes da organização decidir.</summary>
+    Encerrado = 3
 }
 
 /// <summary>
