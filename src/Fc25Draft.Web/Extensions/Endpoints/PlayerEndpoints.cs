@@ -81,7 +81,7 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
                         p.TeamRosters.Select(r => (Guid?)r.TeamId).FirstOrDefault(),
                         p.Atributos == null ? null : AtributosPes.ParaDto(p.Atributos),
-                        p.UltimaTemporada,
+                        p.DespedidaAnunciadaEm != null || p.AposentadoNaTemporada != null ? p.UltimaTemporada : null,
                         p.AposentadoNaTemporada))
                     .FirstOrDefaultAsync(ct);
 

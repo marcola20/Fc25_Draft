@@ -35,7 +35,7 @@ public class AposentadoriaService : IAposentadoriaService
                     p.PlayerId, p.Name, p.Age, p.Overall, p.PositionId, Posicao = p.Position.Name,
                     PosicaoPes = p.Atributos != null ? p.Atributos.PosicaoPes : null,
                     TimeNome = p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
-                    p.UltimaTemporada, p.AposentadoNaTemporada
+                    p.UltimaTemporada, p.AposentadoNaTemporada, Revelado = p.DespedidaAnunciadaEm != null
                 })
                 .ToListAsync(ct))
             .Select(p =>
@@ -44,7 +44,7 @@ public class AposentadoriaService : IAposentadoriaService
                 var goleiro = p.PosicaoPes is int pp ? pp == 0 : p.PositionId == (short)PositionType.Goleiro;
                 var chance = p.AposentadoNaTemporada is null ? Aposentadoria.Chance(idade, goleiro, p.Overall) : 0;
                 return new AposentadoriaJogadorDto(p.PlayerId, p.Name, p.TimeNome, p.Posicao, idade, p.Overall, Math.Round(chance, 3),
-                    Aposentadoria.Sorteado(temporada, p.PlayerId, chance), p.UltimaTemporada, p.AposentadoNaTemporada);
+                    Aposentadoria.Sorteado(temporada, p.PlayerId, chance), p.UltimaTemporada, p.AposentadoNaTemporada, p.Revelado);
             })
             .ToList();
 
@@ -53,7 +53,8 @@ public class AposentadoriaService : IAposentadoriaService
         return new AposentadoriaPainelDto(
             temporada,
             ativos.Where(j => j.UltimaTemporada < temporada).OrderByDescending(j => j.Idade).ToArray(),
-            ativos.Where(j => j.UltimaTemporada == temporada).OrderByDescending(j => j.Idade).ToArray(),
+            ativos.Where(j => j.UltimaTemporada == temporada && j.Revelado).OrderByDescending(j => j.Idade).ToArray(),
+            ativos.Where(j => j.UltimaTemporada == temporada && !j.Revelado).OrderByDescending(j => j.Idade).ToArray(),
             // Todos os ativos que ainda não anunciaram: o sorteio sugere, mas o admin pode escolher qualquer um.
             ativos.Where(j => j.UltimaTemporada is null)
                 .OrderByDescending(j => j.Sorteado).ThenByDescending(j => j.Chance).ThenByDescending(j => j.Idade).ToArray(),
@@ -61,7 +62,7 @@ public class AposentadoriaService : IAposentadoriaService
                 .OrderByDescending(j => j.AposentadoNaTemporada).ThenBy(j => j.Nome).ToArray());
     }
 
-    public async Task AnunciarAsync(int temporada, IReadOnlyCollection<int> playerIds, CancellationToken ct)
+    public async Task AnunciarAsync(int temporada, IReadOnlyCollection<int> playerIds, CancellationToken ct, bool emSegredo = false)
     {
         var ids = playerIds.Distinct().ToList();
         var jogadores = await _db.Players.Where(p => ids.Contains(p.PlayerId)).ToListAsync(ct);
@@ -70,25 +71,47 @@ public class AposentadoriaService : IAposentadoriaService
         if (aposentados.Count > 0)
             throw new InvalidOperationException($"Já aposentados: {string.Join(", ", aposentados)}.");
 
-        var agora = _time.GetUtcNow().UtcDateTime;
         var novos = jogadores.Where(p => p.UltimaTemporada != temporada).ToList();
         foreach (var p in novos)
         {
             p.UltimaTemporada = temporada;
-            p.DespedidaAnunciadaEm = agora;
+            p.DespedidaAnunciadaEm = null;
         }
 
-        // O time fica sabendo (sino e celular).
-        var novosIds = novos.Select(p => p.PlayerId).ToList();
-        var times = await _db.TeamRosters.AsNoTracking().Where(r => novosIds.Contains(r.PlayerId)).ToListAsync(ct);
+        if (!emSegredo)
+            await AnunciarAoPublicoAsync(novos, ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task RevelarAsync(IReadOnlyCollection<int> playerIds, CancellationToken ct)
+    {
+        var ids = playerIds.Distinct().ToList();
+        var guardados = await _db.Players
+            .Where(p => ids.Contains(p.PlayerId) && p.UltimaTemporada != null && p.DespedidaAnunciadaEm == null && p.AposentadoNaTemporada == null)
+            .ToListAsync(ct);
+        if (guardados.Count == 0)
+            throw new InvalidOperationException("Nenhuma despedida guardada para soltar.");
+
+        await AnunciarAoPublicoAsync(guardados, ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>A despedida vira pública: data do anúncio (notícia do Plantão) e aviso para o clube (sino e celular).</summary>
+    private async Task AnunciarAoPublicoAsync(IReadOnlyList<Player> jogadores, CancellationToken ct)
+    {
+        var agora = _time.GetUtcNow().UtcDateTime;
+        foreach (var p in jogadores)
+            p.DespedidaAnunciadaEm = agora;
+
+        var ids = jogadores.Select(p => p.PlayerId).ToList();
+        var times = await _db.TeamRosters.AsNoTracking().Where(r => ids.Contains(r.PlayerId)).ToListAsync(ct);
         foreach (var r in times)
         {
-            var nome = novos.First(p => p.PlayerId == r.PlayerId).Name;
+            var p = jogadores.First(x => x.PlayerId == r.PlayerId);
             AvisosDoTime.Criar(_db, r.TeamId, AvisosDoTime.Carreira,
-                $"👋 {nome} anunciou que {temporada} é a última temporada dele: se aposenta na virada.",
+                $"👋 {p.Name} anunciou que {p.UltimaTemporada} é a última temporada dele: se aposenta na virada.",
                 $"/players/details/{r.PlayerId}", agora);
         }
-        await _db.SaveChangesAsync(ct);
     }
 
     public async Task CancelarAnuncioAsync(int playerId, CancellationToken ct)

@@ -11,8 +11,14 @@ public interface IAposentadoriaService
 {
     Task<AposentadoriaPainelDto> GetPainelAsync(int temporada, CancellationToken ct);
 
-    /// <summary>Esses jogadores anunciam que <paramref name="temporada"/> é a última deles.</summary>
-    Task AnunciarAsync(int temporada, IReadOnlyCollection<int> playerIds, CancellationToken ct);
+    /// <summary>
+    /// Esses jogadores decidem que <paramref name="temporada"/> é a última deles. Com <paramref name="emSegredo"/>, a
+    /// decisão fica guardada (só o admin vê) até <see cref="RevelarAsync"/>; sem, o anúncio sai na hora.
+    /// </summary>
+    Task AnunciarAsync(int temporada, IReadOnlyCollection<int> playerIds, CancellationToken ct, bool emSegredo = false);
+
+    /// <summary>Solta o anúncio de quem estava guardado em segredo: vira notícia e aviso para o clube.</summary>
+    Task RevelarAsync(IReadOnlyCollection<int> playerIds, CancellationToken ct);
 
     /// <summary>O jogador desiste da despedida.</summary>
     Task CancelarAnuncioAsync(int playerId, CancellationToken ct);

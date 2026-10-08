@@ -44,7 +44,29 @@
                 </button>
             }
 
-            @* 2. Anúncios desta temporada *@
+            @* 2. Decididos em segredo: o admin solta aos poucos *@
+            <h3 class="h6 mt-2">🤫 Guardados em segredo <span class="text-muted small">(já decidiram parar em @Temporada; ninguém sabe ainda)</span></h3>
+            @if (_painel.Guardados.Count == 0)
+            {
+                <p class="small text-muted">Ninguém.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled small mb-2">
+                    @foreach (var j in _painel.Guardados)
+                    {
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span>🤫 <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
+                            <button class="btn btn-link btn-sm p-0" @onclick="() => SoltarAsync(j)" disabled="@_carregando">📣 soltar agora</button>
+                            <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => CancelarAsync(j)" disabled="@_carregando">desistiu</button>
+                        </li>
+                    }
+                </ul>
+                <button class="btn btn-outline-primary btn-sm mb-3" @onclick="SoltarAleatorioAsync" disabled="@_carregando">🎲 Soltar um aleatório</button>
+                <p class="small text-muted mb-3">Quem não for solto até a virada se aposenta do mesmo jeito, sem o anúncio antes.</p>
+            }
+
+            @* 3. Anúncios desta temporada *@
             <h3 class="h6 mt-2">Anunciaram que @Temporada é a última temporada</h3>
             @if (_painel.Anunciados.Count == 0)
             {
@@ -63,7 +85,7 @@
                 </ul>
             }
 
-            @* 3. Sugestões do sorteio + escolha manual *@
+            @* 4. Sugestões do sorteio + escolha manual *@
             <h3 class="h6 mt-2">Quem anuncia a despedida em @Temporada? <span class="text-muted small">(marcados = sorteio; mude à vontade)</span></h3>
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                 <input class="form-control form-control-sm" style="max-width: 220px;" placeholder="Buscar jogador" @bind="_busca" @bind:event="oninput" />
@@ -93,11 +115,19 @@
                     </tbody>
                 </table>
             </div>
-            <button class="btn btn-primary btn-sm" @onclick="AnunciarAsync" disabled="@(_carregando || _marcados.Count == 0)">
-                👋 Anunciar a despedida de @_marcados.Count jogador(es)
-            </button>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary btn-sm" @onclick="GuardarAsync" disabled="@(_carregando || _marcados.Count == 0)">
+                    🤫 Decidir em segredo (@_marcados.Count)
+                </button>
+                <button class="btn btn-outline-primary btn-sm" @onclick="AnunciarAsync" disabled="@(_carregando || _marcados.Count == 0)">
+                    👋 Anunciar já (@_marcados.Count)
+                </button>
+            </div>
+            <p class="small text-muted mt-1 mb-0">
+                Em segredo: fica guardado aqui e você solta um por um durante a temporada (vira notícia e aviso na hora em que soltar).
+            </p>
 
-            @* 4. Aposentados *@
+            @* 5. Aposentados *@
             @if (_painel.Aposentados.Count > 0)
             {
                 <h3 class="h6 mt-4">Aposentados</h3>
@@ -170,6 +200,42 @@
         {
             await AposentadoriaSvc.AnunciarAsync(Temporada, _marcados.ToArray(), CancellationToken.None);
             _ok = $"{_marcados.Count} despedida(s) anunciada(s). Eles se aposentam na virada para {Temporada + 1}.";
+        });
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"{_marcados.Count} jogador(es) decidem que {Temporada} é a última temporada, em segredo. Você solta os anúncios depois. Confirmar?"))
+            return;
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.AnunciarAsync(Temporada, _marcados.ToArray(), CancellationToken.None, emSegredo: true);
+            _ok = $"{_marcados.Count} despedida(s) guardada(s) em segredo. Solte quando quiser.";
+        });
+    }
+
+    private async Task SoltarAsync(AposentadoriaJogadorDto j)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Soltar o anúncio de {j.Nome}? Vira notícia no Plantão e aviso para o clube."))
+            return;
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.RevelarAsync(new[] { j.PlayerId }, CancellationToken.None);
+            _ok = $"👋 {j.Nome} anunciou a despedida.";
+        });
+    }
+
+    private async Task SoltarAleatorioAsync()
+    {
+        var guardados = _painel?.Guardados ?? Array.Empty<AposentadoriaJogadorDto>();
+        if (guardados.Count == 0) return;
+        var j = guardados[Random.Shared.Next(guardados.Count)];
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"O sorteio escolheu {j.Nome}. Soltar o anúncio agora?"))
+            return;
+        await Executar(async () =>
+        {
+            await AposentadoriaSvc.RevelarAsync(new[] { j.PlayerId }, CancellationToken.None);
+            _ok = $"👋 {j.Nome} anunciou a despedida.";
         });
     }
 
