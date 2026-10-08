@@ -13,11 +13,10 @@ public static class EvolucaoCriterios
     [
         (20, +2),
         (23, +1),
-        (27, 0),
-        (29, -1),
-        (31, -2),
-        (33, -3),
-        (int.MaxValue, -4),
+        (30, 0),
+        (33, -1),
+        (36, -2),
+        (int.MaxValue, -3),
     ];
 
     /// <summary>Goleiro envelhece mais devagar: usa a linha de quem tem 3 anos a menos.</summary>

@@ -63,9 +63,9 @@ fica entre os dois últimos cenários. Os números finais se calibram na prévia
 
 ### 2. A curva de idade ("curva G", variação base por temporada)
 
-| Idade na temporada | até 20 | 21–23 | 24–27 | 28–29 | 30–31 | 32–33 | 34+ |
-|---|---|---|---|---|---|---|---|
-| Variação | +2 | +1 | 0 | −1 | −2 | −3 | −4 |
+| Idade na temporada | até 20 | 21–23 | 24–30 | 31–33 | 34–36 | 37+ |
+|---|---|---|---|---|---|---|
+| Variação | +2 | +1 | 0 | −1 | −2 | −3 |
 
 Goleiro envelhece mais devagar: a tabela dele anda 3 anos (um goleiro de 33 usa a linha de 30).
 
