@@ -284,12 +284,12 @@ public class AposentadoriaService : IAposentadoriaService
                 var time = p.TimeAoSeAposentar ?? p.TimeAtual;
                 noticias.Add(new PlantaoNoticiaDto(anunciado, PlantaoCategoria.Carreira, "👋",
                     $"{p.Name} anuncia que {ultima} é sua última temporada",
-                    time is null ? "A despedida dos gramados está marcada" : $"A despedida será pelo {time}", link, time));
+                    time is null ? "A despedida dos gramados está marcada" : $"A despedida será pelo {time}", link, time, p.PlayerId));
             }
             if (p.AposentadoEm is DateTime aposentado)
                 noticias.Add(new PlantaoNoticiaDto(aposentado, PlantaoCategoria.Carreira, "🎖️",
                     $"{p.Name} pendura as chuteiras",
-                    p.TimeAoSeAposentar is null ? "Fim de carreira" : $"Encerra a carreira no {p.TimeAoSeAposentar}", link, p.TimeAoSeAposentar));
+                    p.TimeAoSeAposentar is null ? "Fim de carreira" : $"Encerra a carreira no {p.TimeAoSeAposentar}", link, p.TimeAoSeAposentar, p.PlayerId));
         }
 
         return noticias.OrderByDescending(n => n.Data).ToArray();

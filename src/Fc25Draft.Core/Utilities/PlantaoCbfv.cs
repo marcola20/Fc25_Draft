@@ -20,7 +20,9 @@ public record PlantaoNoticiaDto(
     string? Detalhe,
     string Link,
     // Time para o escudo ao lado da notícia.
-    string? TimeNome);
+    string? TimeNome,
+    // Notícia de um jogador (hat-trick, aposentadoria): a foto dele no lugar do escudo.
+    int? JogadorId = null);
 
 public record PlantaoPartidaInput(
     Guid PartidaId, Guid LigaId, string Competicao, string Etapa, bool Final,
@@ -136,7 +138,7 @@ public static class PlantaoCbfv
                 var resultado = vencedorId == autor.TimeId ? "na vitória do" : vencedorId is null ? "no empate do" : "mesmo na derrota do";
                 noticias.Add(new PlantaoNoticiaDto(p.EncerradaEm.AddSeconds(1), PlantaoCategoria.Jogo, "🎩",
                     $"{autor.JogadorNome} marca {h.Count()} vezes {resultado} {doTime} contra o {rival}",
-                    competicao, $"/players/details/{autor.JogadorId}", doTime));
+                    competicao, $"/players/details/{autor.JogadorId}", doTime, autor.JogadorId));
             }
         }
 
