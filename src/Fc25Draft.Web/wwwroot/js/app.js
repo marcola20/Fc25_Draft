@@ -144,15 +144,29 @@ window.fc25Unsaved = (function () {
 
 // Geração e compartilhamento de imagem (tabela / rodada) para WhatsApp e afins.
 window.fc25ShareImage = (function () {
+    // Promessa que desiste depois de `ms`: sem `erro` segue em frente, com `erro` falha com ele.
+    function comPrazo(promise, ms, erro) {
+        return new Promise((resolve, reject) => {
+            const t = setTimeout(() => erro ? reject(new Error(erro)) : resolve(), ms);
+            promise.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+        });
+    }
+
     function waitForImages(el) {
         const imgs = Array.from(el.querySelectorAll('img'));
-        return Promise.all(imgs.map(img => {
-            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        const todas = Promise.all(imgs.map(img => {
+            // Imagem "lazy" que ainda não apareceu na tela nunca carregaria; e o clone do html2canvas
+            // herda o atributo, então ela precisa sair daqui como eager.
+            if (img.loading === 'lazy') img.loading = 'eager';
+            // complete também vale para imagem que já falhou (aí os eventos não disparam mais).
+            if (img.complete) return Promise.resolve();
             return new Promise(resolve => {
                 img.addEventListener('load', resolve, { once: true });
                 img.addEventListener('error', resolve, { once: true });
             });
         }));
+        // Foto lenta não pode segurar o botão para sempre: depois do prazo vai assim mesmo.
+        return comPrazo(todas, 6000);
     }
 
     // Largura fixa (px) do cartão gerado — mantém a imagem no formato "print"
@@ -179,13 +193,20 @@ window.fc25ShareImage = (function () {
         el.style.maxWidth = RENDER_WIDTH + 'px';
 
         try {
-            const canvas = await html2canvas(el, {
+            const canvas = await comPrazo(html2canvas(el, {
                 backgroundColor: '#ffffff',
                 // Alta resolução (nitidez) mesmo em telas sem retina.
                 scale: Math.max(2, window.devicePixelRatio || 1),
                 useCORS: true,
                 logging: false,
                 windowWidth: 1200,
+                // No WebKit (todo navegador do iPhone) o html2canvas espera TODAS as imagens da cópia
+                // da página carregarem, sem prazo. A cópia fica num iframe escondido onde as fotos
+                // "lazy" do resto da página (o álbum atrás do modal) nunca carregam: carregamento eterno.
+                // Fora do bloco capturado as imagens não aparecem mesmo, então nem entram na cópia.
+                ignoreElements: function (node) {
+                    return node.tagName === 'IMG' && !el.contains(node);
+                },
                 onclone: function (clonedDoc) {
                     const clonedEl = clonedDoc.getElementById(elementId);
                     if (!clonedEl) return;
@@ -200,7 +221,7 @@ window.fc25ShareImage = (function () {
                     });
                     clonedEl.classList.add('share-rendering');
                 }
-            });
+            }), 25000, 'A geração da imagem demorou demais.');
 
             return await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
         } finally {
