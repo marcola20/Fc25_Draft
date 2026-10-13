@@ -58,6 +58,7 @@ else
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <h2 class="jogador-hero-nome">@player.Name</h2>
                         <span class="badge jogador-hero-overall @CorDoOverall(player.Overall)" title="Overall">@player.Overall</span>
+                        <PremiosConquistados PlayerId="@player.PlayerId" />
                         @if (player.AposentadoNaTemporada is int aposentou)
                         {
                             <span class="badge bg-secondary" title="Pendurou as chuteiras">🎖️ Aposentado (última temporada: @aposentou)</span>

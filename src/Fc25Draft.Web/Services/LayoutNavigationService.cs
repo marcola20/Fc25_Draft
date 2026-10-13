@@ -22,6 +22,7 @@ public class LayoutNavigationService
         {
             new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
             new("Bolão da rodada", "/bolao", "oi oi-target", MatchPrefix: true),
+            new("Prêmios da Temporada", "/premios", "oi oi-star"),
             new("Power Ranking", "/power-ranking", "oi oi-pulse"),
             new("Diretoria", "/diretoria", "oi oi-briefcase"),
             new("Reta final", "/liga/reta-final", "oi oi-flag"),
@@ -80,6 +81,7 @@ public class LayoutNavigationService
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
             new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
             new("Metas da Diretoria", "/admin/diretoria", "oi oi-briefcase"),
+            new("Prêmios da Temporada", "/admin/premios", "oi oi-star"),
             new("Gerenciar Regulamento", "/admin/regulamento", "oi oi-document")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
@@ -418,6 +420,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Bolão")
+            }
+        },
+        ["/premios"] = new PageDefinition
+        {
+            Route = "/premios",
+            Title = "Prêmios da Temporada",
+            Subtitle = "MVP, ROY, MIP, DPOY, GKOY e COTY — eleitos pela liga",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Competições"),
+                new("Prêmios da Temporada")
+            }
+        },
+        ["/admin/premios"] = new PageDefinition
+        {
+            Route = "/admin/premios",
+            Title = "Prêmios da Temporada",
+            Subtitle = "Finalistas, votação, vencedores e o +1 over — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Prêmios da Temporada")
             }
         },
         ["/bolao/ranking"] = new PageDefinition

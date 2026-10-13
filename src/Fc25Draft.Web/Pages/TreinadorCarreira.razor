@@ -30,6 +30,7 @@
             <FotoTreinador TreinadorId="@_carreira.TreinadorId" Tamanho="72" Versao="@_perfil?.VersaoFoto" Alt="@_carreira.Nome" />
             <div class="flex-grow-1" style="min-width: 0;">
                 <h1 class="h3 mb-0"><NomeTreinador Nome="@_carreira.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
+                <div class="d-flex gap-1 flex-wrap"><PremiosConquistados TreinadorId="@_carreira.TreinadorId" /></div>
                 <div class="text-muted small d-flex align-items-center gap-1 flex-wrap">
                     @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
                     {

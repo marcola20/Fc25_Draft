@@ -1,0 +1,441 @@
+@page "/admin/premios"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IPremiosService PremiosSvc
+@inject ILigaTemporadaService TemporadaSvc
+@inject EscudoService EscudoService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Prêmios da temporada — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <label class="form-label mb-0">Temporada</label>
+            <select class="form-select w-auto" @onchange="TrocarTemporada">
+                @foreach (var t in _temporadas)
+                {
+                    <option value="@t" selected="@(t == _temporada)">@t</option>
+                }
+            </select>
+            <a href="/premios?temporada=@_temporada" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
+        </div>
+
+        @if (_votacao is null)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <p class="mb-2">
+                        Ainda não há votação de <strong>@_temporada</strong>. O site monta os finalistas pelos números da temporada
+                        (notas do PES, gols e assistências, jogos sem sofrer gol, overall que subiu, campanha do clube) e você ajusta
+                        antes de abrir.
+                    </p>
+                    <button class="btn btn-primary" @onclick="Criar" disabled="@_salvando">
+                        ⚙️ Criar a votação de @_temporada
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            var v = _votacao;
+
+            <div class="card mb-3">
+                <div class="card-body d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-semibold">@Etapa(v.Situacao)</span>
+                    <span class="text-muted small">@v.Votaram de @v.Eleitores votaram</span>
+                    <div class="ms-auto d-flex gap-2 flex-wrap">
+                        @switch (v.Situacao)
+                        {
+                            case SituacaoVotacao.Preparando:
+                                <button class="btn btn-success" @onclick="Abrir" disabled="@_salvando">🗳️ Abrir a votação</button>
+                                break;
+                            case SituacaoVotacao.Aberta:
+                                <button class="btn btn-outline-secondary" @onclick="VoltarParaMontagem" disabled="@_salvando">↩ Voltar a mexer nos finalistas</button>
+                                <button class="btn btn-warning" @onclick="Encerrar" disabled="@_salvando">🔒 Encerrar a votação</button>
+                                break;
+                            case SituacaoVotacao.Encerrada:
+                                <button class="btn btn-outline-secondary" @onclick="Reabrir" disabled="@_salvando">↩ Reabrir</button>
+                                <button class="btn btn-primary" @onclick="Publicar" disabled="@_salvando">🏆 Publicar o resultado</button>
+                                break;
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (v.Situacao != SituacaoVotacao.Preparando)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span class="fw-semibold">Quem votou</span>
+                        <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _verCedulas = !_verCedulas">
+                            👁 @(_verCedulas ? "Esconder" : "Ver") os votos de cada um <span class="text-muted small">(secreto)</span>
+                        </button>
+                    </div>
+                    <div class="card-body small">
+                        @{ var faltam = _eleitores.Where(e => !e.Votou).ToList(); }
+                        @if (faltam.Count > 0)
+                        {
+                            <div><span class="fw-semibold">Faltam (@faltam.Count):</span> <span class="text-muted">@string.Join(", ", faltam.Select(e => e.Nome))</span></div>
+                        }
+                        <div><span class="fw-semibold">Votaram (@_eleitores.Count(e => e.Votou)):</span> <span class="text-muted">@string.Join(", ", _eleitores.Where(e => e.Votou).Select(e => e.Nome))</span></div>
+
+                        @if (_verCedulas)
+                        {
+                            var nomes = v.Categorias.SelectMany(c => c.Candidatos).ToDictionary(c => c.CandidatoId, c => (c.Categoria, c.Nome));
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Quem</th>
+                                            @foreach (var regra in PremiosTemporada.Todas)
+                                            {
+                                                <th>@regra.Sigla</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var cedula in _cedulas)
+                                        {
+                                            <tr>
+                                                <td class="text-nowrap">@cedula.Nome</td>
+                                                @foreach (var regra in PremiosTemporada.Todas)
+                                                {
+                                                    <td>@string.Join(", ", cedula.Candidatos.Where(nomes.ContainsKey).Select(id => nomes[id]).Where(x => x.Categoria == regra.Categoria).Select(x => x.Nome))</td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @foreach (var categoria in v.Categorias)
+            {
+                var regra = categoria.Regra;
+
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fs-5">@regra.Emoji</span>
+                        <span class="fw-bold">@regra.Sigla</span>
+                        <span class="text-muted small">@regra.Nome · @regra.Votos @(regra.Votos == 1 ? "voto" : "votos") por pessoa · @(regra.Vencedores > 1 ? $"top {regra.Vencedores}" : "1 vencedor") · @(regra.DaOver ? "+1 over" : "honra")</span>
+                        @if (v.Situacao == SituacaoVotacao.Preparando)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => SugerirDeNovo(regra)" disabled="@_salvando">↻ Sugerir de novo</button>
+                        }
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @if (categoria.Candidatos.Count == 0)
+                        {
+                            <li class="list-group-item text-muted small">Nenhum finalista. Adicione abaixo.</li>
+                        }
+                        @foreach (var c in categoria.Candidatos)
+                        {
+                            <li class="list-group-item" @key="c.CandidatoId">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    @if (v.Situacao == SituacaoVotacao.Encerrada)
+                                    {
+                                        <input type="checkbox" class="form-check-input mt-0" title="Vencedor" checked="@c.Vencedor"
+                                               @onchange="e => Fazer(() => PremiosSvc.MarcarVencedorAsync(c.CandidatoId, e.Value is true, default))" />
+                                    }
+                                    else if (c.Vencedor && v.Situacao == SituacaoVotacao.Publicada)
+                                    {
+                                        <span>🏆</span>
+                                    }
+                                    @if (c.TimeNome is { Length: > 0 } time)
+                                    {
+                                        <img src="@EscudoService.GetEscudo(time)" alt="" title="@time" style="width:22px;height:22px;object-fit:contain;" />
+                                    }
+                                    <span>
+                                        <span class="fw-semibold">@c.Nome</span>
+                                        @if (c.Posicao is not null)
+                                        {
+                                            <span class="text-muted small">@c.Posicao · @c.Overall</span>
+                                        }
+                                        <span class="d-block text-muted small">@(c.TimeNome ?? "sem clube")@(c.Resumo is null ? "" : $" · {c.Resumo}")</span>
+                                    </span>
+                                    @if (v.Situacao != SituacaoVotacao.Preparando)
+                                    {
+                                        <span class="badge bg-dark ms-auto">@(c.Votos ?? 0) @(c.Votos == 1 ? "voto" : "votos")</span>
+                                        @if (v.Situacao == SituacaoVotacao.Encerrada && Empatado(categoria, c))
+                                        {
+                                            <span class="badge bg-warning text-dark" title="Empate na linha de corte: marque quem leva">empate</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger ms-auto" title="Tirar dos finalistas"
+                                                @onclick="() => Fazer(() => PremiosSvc.RemoverCandidatoAsync(c.CandidatoId, default))" disabled="@_salvando">✕</button>
+                                    }
+                                </div>
+
+                                @if (v.Situacao == SituacaoVotacao.Publicada && c.Vencedor && regra.DaOver)
+                                {
+                                    @Over(categoria, c)
+                                }
+                            </li>
+                        }
+                    </ul>
+
+                    @if (v.Situacao == SituacaoVotacao.Preparando)
+                    {
+                        <div class="card-footer">
+                            @if (regra.DeTreinador)
+                            {
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <select class="form-select form-select-sm w-auto" @bind="_treinadorEscolhido">
+                                        <option value="">Escolha um treinador…</option>
+                                        @foreach (var t in _treinadores.Where(t => categoria.Candidatos.All(c => c.TreinadorId != t.TreinadorId)))
+                                        {
+                                            <option value="@t.TreinadorId">@t.Nome@(t.TimeNome is null ? "" : $" ({t.TimeNome})")</option>
+                                        }
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-primary" disabled="@(_salvando || !Guid.TryParse(_treinadorEscolhido, out _))"
+                                            @onclick="() => Fazer(() => PremiosSvc.AdicionarTreinadorAsync(_temporada, Guid.Parse(_treinadorEscolhido!), default))">+ Adicionar</button>
+                                </div>
+                            }
+                            else
+                            {
+                                var termo = _busca.GetValueOrDefault(regra.Categoria) ?? "";
+                                <input class="form-control form-control-sm" style="max-width:20rem;" placeholder="Buscar jogador para adicionar…"
+                                       value="@termo" @oninput="e => Buscar(regra.Categoria, e.Value?.ToString())" />
+                                @if (_achados.GetValueOrDefault(regra.Categoria) is { Count: > 0 } achados)
+                                {
+                                    <div class="list-group mt-1" style="max-width:28rem;">
+                                        @foreach (var j in achados.Where(j => categoria.Candidatos.All(c => c.PlayerId != j.PlayerId)))
+                                        {
+                                            <button type="button" class="list-group-item list-group-item-action py-1 small" disabled="@_salvando"
+                                                    @onclick="() => Adicionar(regra.Categoria, j.PlayerId)">
+                                                + @j.Nome <span class="text-muted">@j.Posicao · @j.Overall · @(j.TimeNome ?? "sem clube")</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private int _temporada;
+    private VotacaoPremiosDto? _votacao;
+    private IReadOnlyList<PremioEleitorDto> _eleitores = Array.Empty<PremioEleitorDto>();
+    private IReadOnlyList<PremioVotosDoEleitorDto> _cedulas = Array.Empty<PremioVotosDoEleitorDto>();
+    private IReadOnlyList<PremioTreinadorOpcaoDto> _treinadores = Array.Empty<PremioTreinadorOpcaoDto>();
+    private bool _verCedulas;
+
+    private string? _treinadorEscolhido;
+    private readonly Dictionary<CategoriaPremio, string> _busca = new();
+    private readonly Dictionary<CategoriaPremio, IReadOnlyList<PremioJogadorOpcaoDto>> _achados = new();
+
+    // +1 over: quem recebe (o próprio vencedor ou um companheiro) e os companheiros de cada vencedor.
+    private readonly Dictionary<Guid, int?> _overPara = new();
+    private readonly Dictionary<Guid, IReadOnlyList<PremioJogadorOpcaoDto>> _companheiros = new();
+
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var daLiga = await TemporadaSvc.ListTemporadasAsync(CancellationToken.None);
+            var comVotacao = await PremiosSvc.TemporadasAsync(CancellationToken.None);
+            _temporadas = daLiga.Concat(comVotacao).Distinct().OrderByDescending(t => t).ToList();
+
+            var query = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query);
+            _temporada = int.TryParse(query["temporada"], out var t) && _temporadas.Contains(t) ? t : _temporadas.FirstOrDefault();
+            await Carregar();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task TrocarTemporada(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var t)) return;
+        _temporada = t;
+        _busca.Clear(); _achados.Clear(); _companheiros.Clear(); _overPara.Clear();
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        await _umaPorVez.WaitAsync();
+        try
+        {
+            _votacao = await PremiosSvc.GetAsync(_temporada, comVotos: true, CancellationToken.None);
+            _eleitores = _votacao is null ? Array.Empty<PremioEleitorDto>() : await PremiosSvc.EleitoresAsync(_temporada, CancellationToken.None);
+            _cedulas = _votacao is null ? Array.Empty<PremioVotosDoEleitorDto>() : await PremiosSvc.CedulasAsync(_temporada, CancellationToken.None);
+            if (_votacao?.Situacao == SituacaoVotacao.Preparando && _treinadores.Count == 0)
+                _treinadores = await PremiosSvc.TreinadoresAsync(CancellationToken.None);
+
+            if (_votacao?.Situacao == SituacaoVotacao.Publicada)
+                foreach (var c in _votacao.Categorias.Where(c => c.Regra.DaOver).SelectMany(c => c.Vencedores))
+                    if (!_companheiros.ContainsKey(c.CandidatoId))
+                        _companheiros[c.CandidatoId] = await PremiosSvc.CompanheirosAsync(c.CandidatoId, CancellationToken.None);
+        }
+        finally { _umaPorVez.Release(); }
+    }
+
+    private Task Criar() => Fazer(() => PremiosSvc.CriarAsync(_temporada, default), "Votação criada com os finalistas sugeridos.");
+
+    private Task Abrir() => Confirmar("Abrir a votação? Depois disso os finalistas não mudam.",
+        () => Fazer(() => PremiosSvc.AbrirAsync(_temporada, default), "Votação aberta! Avise o grupo."));
+
+    private Task VoltarParaMontagem() => Fazer(() => PremiosSvc.VoltarParaMontagemAsync(_temporada, default), "De volta para a montagem.");
+
+    private Task Encerrar() => Confirmar("Encerrar a votação? Ninguém mais vota (dá para reabrir).",
+        () => Fazer(() => PremiosSvc.EncerrarAsync(_temporada, default), "Votação encerrada. Confira os vencedores e publique."));
+
+    private Task Reabrir() => Fazer(() => PremiosSvc.ReabrirAsync(_temporada, default), "Votação reaberta.");
+
+    private Task Publicar() => Confirmar("Publicar o resultado? Ele vai para a página, para o Plantão e para a ficha dos jogadores.",
+        () => Fazer(() => PremiosSvc.PublicarAsync(_temporada, default), "Resultado publicado! Agora dê o +1 over dos vencedores."));
+
+    private Task SugerirDeNovo(PremiosTemporada.Regra regra) => Confirmar($"Trocar os finalistas de {regra.Sigla} pelas sugestões do site?",
+        () => Fazer(() => PremiosSvc.SugerirDeNovoAsync(_temporada, regra.Categoria, default), "Sugestões refeitas."));
+
+    private Task DesfazerOver(PremioCandidatoDto c) => Confirmar($"Desfazer o +1 over de {c.OverParaNome}?",
+        () => Mostrar(() => PremiosSvc.DesfazerOverAsync(c.CandidatoId, default)));
+
+    private async Task Fazer(Func<Task> acao, string? ok = null)
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await _umaPorVez.WaitAsync();
+            try { await acao(); }
+            finally { _umaPorVez.Release(); }
+            await Carregar();
+            _ok = ok;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task Confirmar(string pergunta, Func<Task> passo)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", pergunta))
+            await passo();
+    }
+
+    private async Task Buscar(CategoriaPremio categoria, string? termo)
+    {
+        _busca[categoria] = termo ?? "";
+        if ((termo?.Trim().Length ?? 0) < 2) { _achados.Remove(categoria); return; }
+
+        await _umaPorVez.WaitAsync();
+        try
+        {
+            var achados = await PremiosSvc.BuscarJogadoresAsync(termo!, CancellationToken.None);
+            // Só vale a resposta da última busca digitada.
+            if (_busca.GetValueOrDefault(categoria) == termo) _achados[categoria] = achados;
+        }
+        finally { _umaPorVez.Release(); }
+    }
+
+    private async Task Adicionar(CategoriaPremio categoria, int playerId)
+    {
+        await Fazer(() => PremiosSvc.AdicionarJogadorAsync(_temporada, categoria, playerId, default));
+        if (_erro is null) { _busca.Remove(categoria); _achados.Remove(categoria); }
+    }
+
+    private static string Etapa(SituacaoVotacao s) => s switch
+    {
+        SituacaoVotacao.Preparando => "1. Montando os finalistas (ninguém vê ainda)",
+        SituacaoVotacao.Aberta => "2. 🗳️ Votação aberta",
+        SituacaoVotacao.Encerrada => "3. Apuração: confira os vencedores (empate você decide) e publique",
+        _ => "4. 🏆 Resultado publicado: dê o +1 over"
+    };
+
+    /// <summary>Na linha de corte com outro de mesmos votos, quando não cabem todos.</summary>
+    private static bool Empatado(PremioCategoriaDto categoria, PremioCandidatoDto c)
+    {
+        var comVoto = categoria.Candidatos.Where(x => (x.Votos ?? 0) > 0).OrderByDescending(x => x.Votos).ToList();
+        if (comVoto.Count <= categoria.Regra.Vencedores || (c.Votos ?? 0) == 0) return false;
+
+        var corte = comVoto[categoria.Regra.Vencedores - 1].Votos;
+        return c.Votos == corte && comVoto.Count(x => x.Votos >= corte) > categoria.Regra.Vencedores;
+    }
+
+    /// <summary>O mesmo jogador já levou over por outro prêmio desta temporada.</summary>
+    private string? JaGanhouOver(PremioCandidatoDto c) =>
+        _votacao?.Categorias
+            .Where(x => x.Regra.Categoria != c.Categoria)
+            .SelectMany(x => x.Candidatos)
+            .Where(x => x.OverParaPlayerId == c.PlayerId && x.OverAplicadoEm is not null)
+            .Select(x => PremiosTemporada.De(x.Categoria).Sigla)
+            .FirstOrDefault();
+
+    private RenderFragment Over(PremioCategoriaDto categoria, PremioCandidatoDto c) => __builder =>
+    {
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-2 ms-4 small">
+            @if (c.OverAplicadoEm is DateTime quando)
+            {
+                <span class="text-success">✅ +1 over em <strong>@c.OverParaNome</strong> (@quando.ToString("dd/MM HH:mm", Br)) — vai para o save pelo Editor PES</span>
+                <button class="btn btn-sm btn-outline-secondary" disabled="@_salvando"
+                        @onclick="() => DesfazerOver(c)">Desfazer</button>
+            }
+            else
+            {
+                @if (JaGanhouOver(c) is { } outro)
+                {
+                    <span class="badge bg-warning text-dark">já levou +1 over pelo @outro: repasse a um companheiro</span>
+                }
+                <span>+1 over para</span>
+                <select class="form-select form-select-sm w-auto"
+                        @onchange="e => _overPara[c.CandidatoId] = int.TryParse(e.Value?.ToString(), out var id) ? id : null">
+                    <option value="">@c.Nome (o vencedor)</option>
+                    @foreach (var j in _companheiros.GetValueOrDefault(c.CandidatoId) ?? Array.Empty<PremioJogadorOpcaoDto>())
+                    {
+                        <option value="@j.PlayerId" selected="@(_overPara.GetValueOrDefault(c.CandidatoId) == j.PlayerId)">↪ @j.Nome (@j.Posicao · @j.Overall)</option>
+                    }
+                </select>
+                <button class="btn btn-sm btn-primary" disabled="@_salvando"
+                        @onclick="() => Mostrar(() => PremiosSvc.AplicarOverAsync(c.CandidatoId, _overPara.GetValueOrDefault(c.CandidatoId), default))">Dar +1 over</button>
+            }
+        </div>
+    };
+
+    /// <summary>Roda a ação e mostra a mensagem que ela devolve ("overall 86 → 87 · Finalização +1...").</summary>
+    private async Task Mostrar(Func<Task<string>> acao)
+    {
+        string? mensagem = null;
+        await Fazer(async () => mensagem = await acao());
+        if (_erro is null) _ok = mensagem;
+    }
+}

@@ -1,0 +1,35 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IPremiosService PremiosSvc
+
+@* Selos dos prêmios de destaque ganhos (MVP 2010, ROY 2010...), na ficha do jogador ou do treinador. *@
+@foreach (var p in _premios)
+{
+    <a href="/premios?temporada=@p.Temporada" class="badge bg-warning text-dark text-decoration-none"
+       title="@Dica(p)">@p.Regra.Emoji @p.Titulo</a>
+}
+
+@code {
+    [Parameter] public int? PlayerId { get; set; }
+    [Parameter] public Guid? TreinadorId { get; set; }
+
+    private static string Dica(PremioConquistadoDto p) =>
+        p.TimeNome is null ? $"{p.Regra.Nome} de {p.Temporada}" : $"{p.Regra.Nome} de {p.Temporada} pelo {p.TimeNome}";
+
+    private IReadOnlyList<PremioConquistadoDto> _premios = Array.Empty<PremioConquistadoDto>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _premios = PlayerId is int id ? await PremiosSvc.DoJogadorAsync(id, CancellationToken.None)
+                : TreinadorId is Guid tid ? await PremiosSvc.DoTreinadorAsync(tid, CancellationToken.None)
+                : Array.Empty<PremioConquistadoDto>();
+        }
+        catch
+        {
+            // Selo é enfeite: sem ele a ficha abre do mesmo jeito.
+            _premios = Array.Empty<PremioConquistadoDto>();
+        }
+    }
+}

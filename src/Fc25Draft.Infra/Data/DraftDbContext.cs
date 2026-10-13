@@ -64,6 +64,9 @@ public class DraftDbContext : DbContext
     public DbSet<PerfilTreinador> PerfisTreinadores => Set<PerfilTreinador>();
     public DbSet<TreinadorPassagem> TreinadorPassagens => Set<TreinadorPassagem>();
     public DbSet<BolaoPalpite> BolaoPalpites => Set<BolaoPalpite>();
+    public DbSet<VotacaoPremios> VotacoesPremios => Set<VotacaoPremios>();
+    public DbSet<PremioCandidato> PremiosCandidatos => Set<PremioCandidato>();
+    public DbSet<PremioVoto> PremiosVotos => Set<PremioVoto>();
     public DbSet<Regulamento> Regulamentos => Set<Regulamento>();
     public DbSet<AberturaTemporada> AberturasTemporada => Set<AberturaTemporada>();
     public DbSet<PremiacaoItem> PremiacaoItens => Set<PremiacaoItem>();
