@@ -24,5 +24,16 @@ public class BolaoPalpiteConfiguration : IEntityTypeConfiguration<BolaoPalpite>
             .WithMany()
             .HasForeignKey(x => x.PartidaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Aposta G/A: o palpite fica mesmo se o jogador sumir, só perde a escolha.
+        b.HasOne(x => x.JogadorCasa)
+            .WithMany()
+            .HasForeignKey(x => x.JogadorCasaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.HasOne(x => x.JogadorFora)
+            .WithMany()
+            .HasForeignKey(x => x.JogadorForaId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

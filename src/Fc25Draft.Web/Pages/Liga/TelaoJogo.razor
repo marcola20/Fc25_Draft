@@ -215,11 +215,11 @@
                                     {
                                         <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
                                     }
-                                    <span class="autor">@p.Nome</span>
+                                    <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · ⚽ {ga}" : "")</span></span>
                                     <span class="chute">@p.GolsCasa – @p.GolsFora</span>
                                     @if (p.Pontos is int pts)
                                     {
-                                        <span class="pontos">+@pts</span>
+                                        <span class="pontos">@(pts > 0 ? $"+{pts}" : pts.ToString())</span>
                                     }
                                 </div>
                             }
@@ -237,6 +237,9 @@
     private static readonly TimeSpan IntervaloEntreMensagens = TimeSpan.FromSeconds(2);
 
     private enum Aba { Chat, Palpites, Times }
+
+    private static string ApostasG_A(BolaoPalpiteDeAlguemDto p) =>
+        string.Join(", ", new[] { p.JogadorCasa, p.JogadorFora }.Where(n => !string.IsNullOrEmpty(n)));
 
     [Parameter] public Guid PartidaId { get; set; }
 

@@ -250,6 +250,12 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("GolsFora")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("JogadorCasaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("JogadorForaId")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("PartidaId")
                         .HasColumnType("uuid");
 
@@ -257,6 +263,10 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("PalpiteId");
+
+                    b.HasIndex("JogadorCasaId");
+
+                    b.HasIndex("JogadorForaId");
 
                     b.HasIndex("PartidaId");
 
@@ -3367,6 +3377,16 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.BolaoPalpite", b =>
                 {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "JogadorCasa")
+                        .WithMany()
+                        .HasForeignKey("JogadorCasaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "JogadorFora")
+                        .WithMany()
+                        .HasForeignKey("JogadorForaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
                         .WithMany()
                         .HasForeignKey("PartidaId")
@@ -3378,6 +3398,10 @@ namespace Fc25Draft.Infra.Migrations
                         .HasForeignKey("TreinadorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("JogadorCasa");
+
+                    b.Navigation("JogadorFora");
 
                     b.Navigation("Partida");
 

@@ -19,6 +19,18 @@ public interface IBolaoService
     /// <summary>O que cada um chutou num jogo. Só depois que a rodada fecha.</summary>
     Task<IReadOnlyList<BolaoPalpiteDeAlguemDto>> PalpitesDoJogoAsync(Guid partidaId, CancellationToken ct);
 
+    /// <summary>
+    /// Tudo o que foi chutado na rodada, mesmo aberta, e quem ainda não palpitou. Só para o adm:
+    /// quem chama confere a permissão.
+    /// </summary>
+    Task<BolaoPalpitesDaRodadaDto> PalpitesDaRodadaAsync(Guid rodadaId, CancellationToken ct);
+
+    /// <summary>Os jogadores de cada time que dá para escolher na aposta G/A, atacantes primeiro.</summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<BolaoJogadorOpcaoDto>>> ElencosAsync(IEnumerable<Guid> timeIds, CancellationToken ct);
+
+    /// <summary>Pontos de cada pessoa nesses jogos (os encerrados), com as apostas extras. Usado pelo álbum.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> PontosPorPessoaAsync(IReadOnlyCollection<Guid> partidaIds, CancellationToken ct);
+
     /// <summary>Ranking geral ou de uma temporada.</summary>
     Task<IReadOnlyList<BolaoRankingLinhaDto>> RankingAsync(int? temporada, CancellationToken ct);
 

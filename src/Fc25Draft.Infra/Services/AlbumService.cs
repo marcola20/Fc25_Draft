@@ -721,17 +721,9 @@ public partial class AlbumService : IAlbumService
     {
         if (jogos.Count == 0) return 0;
 
-        var placares = jogos.ToDictionary(j => j.PartidaId);
-        var ids = placares.Keys.ToList();
-        var palpites = await _db.BolaoPalpites.AsNoTracking()
-            .Where(p => ids.Contains(p.PartidaId))
-            .Select(p => new { p.TreinadorId, p.PartidaId, p.GolsCasa, p.GolsFora })
-            .ToListAsync(ct);
-
-        var pontos = palpites
-            .GroupBy(p => p.TreinadorId)
-            .Select(g => (Pessoa: g.Key, Pontos: g.Sum(p => BolaoPontuacao.Calcular(
-                p.GolsCasa, p.GolsFora, placares[p.PartidaId].GolsCasa, placares[p.PartidaId].GolsFora))))
+        // A mesma conta do bolão, com as apostas extras.
+        var pontos = (await new BolaoService(_db, _time).PontosPorPessoaAsync(jogos.Select(j => j.PartidaId).ToList(), ct))
+            .Select(p => (Pessoa: p.Key, Pontos: p.Value))
             .ToList();
         var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemBolao, ct);
 

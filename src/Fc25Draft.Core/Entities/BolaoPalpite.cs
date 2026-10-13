@@ -13,9 +13,20 @@ public class BolaoPalpite
     public int GolsCasa { get; set; }
     public int GolsFora { get; set; }
 
+    /// <summary>
+    /// Aposta G/A: um jogador do mandante que faz gol ou dá assistência. Opcional, e só vale com o
+    /// mandante marcando no palpite — quem chutou 0 para ele aposta no clean sheet do visitante.
+    /// </summary>
+    public int? JogadorCasaId { get; set; }
+
+    /// <summary>A mesma aposta G/A, do lado do visitante.</summary>
+    public int? JogadorForaId { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 
     public Treinador Treinador { get; set; } = null!;
     public LigaPartida Partida { get; set; } = null!;
+    public Player? JogadorCasa { get; set; }
+    public Player? JogadorFora { get; set; }
 }

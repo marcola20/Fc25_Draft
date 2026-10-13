@@ -1,4 +1,4 @@
-﻿@page "/bolao"
+@page "/bolao"
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
@@ -26,10 +26,16 @@
     <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
         <a href="/bolao/ranking" class="btn btn-sm btn-outline-secondary">🏅 Ranking</a>
     </div>
-    <p class="text-muted small mb-4">
+    <p class="text-muted small mb-1">
         Cravou o placar, @BolaoPontuacao.PlacarExato pontos. Acertou o vencedor e o placar de um dos times,
         @BolaoPontuacao.VencedorEUmPlacar. Acertou só o resultado, @BolaoPontuacao.SoOVencedor.
+        Placar invertido (chutou 2x1, deu 1x2), @Sinal(BolaoPontuacao.PlacarInvertido).
         Os palpites fecham quando a bola rola.
+    </p>
+    <p class="text-muted small mb-4">
+        <strong>Apostas extras</strong>, uma de cada lado do jogo: escolha um jogador do time — fez gol ou deu
+        assistência, @Sinal(BolaoPontuacao.ExtraAcerto); passou em branco, @Sinal(BolaoPontuacao.ExtraErro); se nem entrou
+        em campo, não conta. Chutou 0 para um time? Aquele lado vira o 🧤 clean sheet do adversário, com os mesmos pontos.
     </p>
 
     @if (_carregando)
@@ -42,6 +48,17 @@
             Entre com o seu token (botão <strong>Login</strong> no topo) para palpitar. O bolão é por pessoa —
             treinador e auxiliar jogam separado, e quem está sem clube joga também.
         </div>
+
+        @if (AdminAuth.IsAdmin)
+        {
+            @foreach (var rodada in _abertas)
+            {
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">@rodada.Titulo</div>
+                    <div class="card-body">@PainelDoAdm(rodada)</div>
+                </div>
+            }
+        }
     }
     else
     {
@@ -92,19 +109,27 @@
                 <div class="card-body">
                     @foreach (var jogo in rodada.Jogos)
                     {
+                        var palpite = Palpite(rodada.RodadaId, jogo.PartidaId);
                         <div class="d-flex align-items-center justify-content-center gap-2 mb-2 flex-wrap">
                             <span class="text-end" style="min-width:9rem;">@jogo.TimeCasa</span>
                             <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" style="width:26px;height:26px;object-fit:contain;" />
                             <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
-                                   value="@Palpite(rodada.RodadaId, jogo.PartidaId).Casa"
-                                   @onchange="e => AnotarCasa(rodada.RodadaId, jogo.PartidaId, e.Value?.ToString())" />
+                                   value="@palpite.Casa"
+                                   @onchange="e => palpite.Casa = Numero(e.Value?.ToString())" />
                             <span class="text-muted">x</span>
                             <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
-                                   value="@Palpite(rodada.RodadaId, jogo.PartidaId).Fora"
-                                   @onchange="e => AnotarFora(rodada.RodadaId, jogo.PartidaId, e.Value?.ToString())" />
+                                   value="@palpite.Fora"
+                                   @onchange="e => palpite.Fora = Numero(e.Value?.ToString())" />
                             <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
                             <span style="min-width:9rem;">@jogo.TimeFora</span>
                         </div>
+                        @if (jogo.ComExtras)
+                        {
+                            <div class="d-flex justify-content-center gap-2 mb-2 flex-wrap">
+                                @Aposta(jogo, palpite, casa: true)
+                                @Aposta(jogo, palpite, casa: false)
+                            </div>
+                        }
                         @if (NaTabela(rodada.LigaId, jogo.TimeCasaId) is { } mandante && NaTabela(rodada.LigaId, jogo.TimeForaId) is { } visitante)
                         {
                             <div class="mb-3">
@@ -118,6 +143,11 @@
                             @(rodada.Palpitados > 0 ? "Atualizar palpites" : "Enviar palpites")
                         </button>
                     </div>
+
+                    @if (AdminAuth.IsAdmin)
+                    {
+                        <div class="border-top mt-3 pt-3">@PainelDoAdm(rodada)</div>
+                    }
                 </div>
             </div>
         }
@@ -160,10 +190,15 @@
                                             }
                                         </td>
                                         <td>@jogo.TimeFora</td>
-                                        <td class="text-center text-nowrap" style="width:7rem;">
+                                        <td class="text-center" style="min-width:8rem;">
                                             @if (jogo.PalpiteCasa is { } casa)
                                             {
-                                                <span class="text-muted small">você: @casa x @jogo.PalpiteFora</span>
+                                                <div class="text-muted small text-nowrap">você: @casa x @jogo.PalpiteFora</div>
+                                                @if (jogo.ComExtras)
+                                                {
+                                                    @ExtraFeito(jogo, casa: true)
+                                                    @ExtraFeito(jogo, casa: false)
+                                                }
                                             }
                                             else
                                             {
@@ -173,8 +208,8 @@
                                         <td class="text-center" style="width:6rem;">
                                             @if (jogo.Pontos is { } pontos)
                                             {
-                                                <span class="badge @(pontos == BolaoPontuacao.PlacarExato ? "bg-success" : pontos > 0 ? "bg-primary" : "bg-light text-muted border")"
-                                                      title="@BolaoPontuacao.Explicacao(pontos)">
+                                                <span class="badge @CorDosPontos(jogo, pontos)"
+                                                      title="@BolaoPontuacao.Explicacao(jogo.PontosPlacar ?? pontos)">
                                                     @pontos
                                                 </span>
                                             }
@@ -186,6 +221,10 @@
                     </div>
                     <div class="card-footer bg-white">
                         <a href="/bolao/ranking?rodada=@rodada.RodadaId" class="small">Ver o que o pessoal chutou nessa rodada →</a>
+                        @if (AdminAuth.IsAdmin)
+                        {
+                            <div class="mt-2">@PainelDoAdm(rodada)</div>
+                        }
                     </div>
                 </div>
             }
@@ -207,9 +246,19 @@
     private IReadOnlyList<BolaoRodadaDto> _abertas = Array.Empty<BolaoRodadaDto>();
     private int _aindaVem;
     private IReadOnlyList<BolaoRodadaDto> _fechadas = Array.Empty<BolaoRodadaDto>();
+    private IReadOnlyDictionary<Guid, IReadOnlyList<BolaoJogadorOpcaoDto>> _elencos = new Dictionary<Guid, IReadOnlyList<BolaoJogadorOpcaoDto>>();
 
     // O que está digitado na tela, por rodada e jogo, antes de salvar.
-    private readonly Dictionary<(Guid Rodada, Guid Partida), (int? Casa, int? Fora)> _rascunho = new();
+    private sealed class Rascunho
+    {
+        public int? Casa, Fora, JogadorCasa, JogadorFora;
+    }
+
+    private readonly Dictionary<(Guid Rodada, Guid Partida), Rascunho> _rascunho = new();
+
+    // Painel do adm: o que cada um chutou, aberto por rodada.
+    private readonly Dictionary<Guid, BolaoPalpitesDaRodadaDto> _doPessoal = new();
+    private readonly HashSet<Guid> _painelAberto = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -247,6 +296,11 @@
             _fechadas = await BolaoSvc.RodadasFechadasAsync(_eu?.TreinadorId, 3, CancellationToken.None);
             _resumo = _eu is null ? null : await BolaoSvc.ResumoAsync(_eu.TreinadorId, CancellationToken.None);
 
+            // Elencos dos times das rodadas abertas, para a aposta G/A.
+            _elencos = await BolaoSvc.ElencosAsync(
+                _abertas.SelectMany(r => r.Jogos.Where(j => j.ComExtras).SelectMany(j => new[] { j.TimeCasaId, j.TimeForaId })),
+                CancellationToken.None);
+
             // Classificação de cada competição aberta, para a chance de cada jogo.
             _tabelas.Clear();
             foreach (var ligaId in _abertas.Select(r => r.LigaId).Distinct())
@@ -255,7 +309,19 @@
             _rascunho.Clear();
             foreach (var rodada in _abertas)
                 foreach (var jogo in rodada.Jogos)
-                    _rascunho[(rodada.RodadaId, jogo.PartidaId)] = (jogo.PalpiteCasa, jogo.PalpiteFora);
+                    _rascunho[(rodada.RodadaId, jogo.PartidaId)] = new Rascunho
+                    {
+                        Casa = jogo.PalpiteCasa,
+                        Fora = jogo.PalpiteFora,
+                        JogadorCasa = jogo.JogadorCasaId,
+                        JogadorFora = jogo.JogadorForaId
+                    };
+
+            // Painéis do adm que estavam abertos voltam com o que mudou.
+            _doPessoal.Clear();
+            if (AdminAuth.IsAdmin)
+                foreach (var rodadaId in _painelAberto)
+                    _doPessoal[rodadaId] = await BolaoSvc.PalpitesDaRodadaAsync(rodadaId, CancellationToken.None);
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally
@@ -270,17 +336,191 @@
     private LigaClassificacaoItemDto? NaTabela(Guid ligaId, Guid timeId) =>
         _tabelas.TryGetValue(ligaId, out var tabela) && tabela.TryGetValue(timeId, out var item) ? item : null;
 
-    private (int? Casa, int? Fora) Palpite(Guid rodadaId, Guid partidaId) =>
-        _rascunho.TryGetValue((rodadaId, partidaId), out var p) ? p : (null, null);
-
-    private void AnotarCasa(Guid rodadaId, Guid partidaId, string? valor) =>
-        _rascunho[(rodadaId, partidaId)] = (Numero(valor), Palpite(rodadaId, partidaId).Fora);
-
-    private void AnotarFora(Guid rodadaId, Guid partidaId, string? valor) =>
-        _rascunho[(rodadaId, partidaId)] = (Palpite(rodadaId, partidaId).Casa, Numero(valor));
+    private Rascunho Palpite(Guid rodadaId, Guid partidaId)
+    {
+        if (!_rascunho.TryGetValue((rodadaId, partidaId), out var palpite))
+            _rascunho[(rodadaId, partidaId)] = palpite = new Rascunho();
+        return palpite;
+    }
 
     private static int? Numero(string? valor) =>
         int.TryParse(valor, out var n) && n >= 0 && n <= 99 ? n : null;
+
+    private static string Sinal(int pontos) => pontos > 0 ? $"+{pontos}" : pontos.ToString(Br).Replace("-", "−");
+
+    /// <summary>A aposta extra de um lado, enquanto a rodada está aberta.</summary>
+    private RenderFragment Aposta(BolaoJogoDto jogo, Rascunho palpite, bool casa) => __builder =>
+    {
+        var gols = casa ? palpite.Casa : palpite.Fora;
+        var time = casa ? jogo.TimeCasa : jogo.TimeFora;
+        var adversario = casa ? jogo.TimeFora : jogo.TimeCasa;
+        var escolhido = casa ? palpite.JogadorCasa : palpite.JogadorFora;
+
+        <div style="width:15rem;">
+            @if (gols is null)
+            {
+                <div class="form-control form-control-sm text-muted small text-truncate" title="Chute o placar primeiro">⚽ G/A do @time</div>
+            }
+            else if (gols == 0)
+            {
+                <div class="form-control form-control-sm small text-truncate" title="Você chutou que o @time não marca">🧤 clean sheet do @adversario</div>
+            }
+            else
+            {
+                var elenco = _elencos.GetValueOrDefault(casa ? jogo.TimeCasaId : jogo.TimeForaId) ?? Array.Empty<BolaoJogadorOpcaoDto>();
+                var salvo = casa ? (jogo.JogadorCasaId, jogo.JogadorCasa) : (jogo.JogadorForaId, jogo.JogadorFora);
+
+                <select class="form-select form-select-sm" title="Jogador do @time que faz gol ou dá assistência"
+                        value="@(escolhido?.ToString(CultureInfo.InvariantCulture) ?? "")"
+                        @onchange="e => Escolher(palpite, casa, e.Value?.ToString())">
+                    <option value="">⚽ G/A do @time: ninguém</option>
+                    @if (salvo.Item1 is int saiu && elenco.All(j => j.JogadorId != saiu))
+                    {
+                        <option value="@saiu">@salvo.Item2</option>
+                    }
+                    @foreach (var jogador in elenco)
+                    {
+                        <option value="@jogador.JogadorId">@jogador.Nome (@jogador.Posicao)</option>
+                    }
+                </select>
+            }
+        </div>
+    };
+
+    private static void Escolher(Rascunho palpite, bool casa, string? valor)
+    {
+        int? id = int.TryParse(valor, out var n) ? n : null;
+        if (casa) palpite.JogadorCasa = id;
+        else palpite.JogadorFora = id;
+    }
+
+    /// <summary>A aposta extra de um lado, depois do jogo: quem ou o quê, e quanto deu.</summary>
+    private RenderFragment ExtraFeito(BolaoJogoDto jogo, bool casa) => __builder =>
+    {
+        var chute = casa ? jogo.PalpiteCasa : jogo.PalpiteFora;
+        var jogador = casa ? jogo.JogadorCasa : jogo.JogadorFora;
+        var pontos = casa ? jogo.ExtraCasa : jogo.ExtraFora;
+
+        var texto = chute == 0 ? $"🧤 {(casa ? jogo.TimeFora : jogo.TimeCasa)}" : jogador is null ? null : $"⚽ {jogador}";
+        if (texto is null) return;
+
+        <div class="small text-nowrap">
+            <span class="text-muted">@texto</span>
+            @if (jogo.Encerrado && pontos is int p)
+            {
+                <span class="fw-semibold ms-1 @(p > 0 ? "text-success" : "text-danger")">@Sinal(p)</span>
+            }
+            else if (jogo.Encerrado)
+            {
+                <span class="text-muted ms-1 fst-italic" title="Não entrou em campo: a aposta não conta">(não jogou)</span>
+            }
+        </div>
+    };
+
+    private static string CorDosPontos(BolaoJogoDto jogo, int pontos) =>
+        jogo.PontosPlacar == BolaoPontuacao.PlacarExato ? "bg-success"
+        : pontos > 0 ? "bg-primary"
+        : pontos < 0 ? "bg-danger"
+        : "bg-light text-muted border";
+
+    // ── Painel do adm ──────────────────────────────────────────────────────────
+
+    private async Task AlternarPainel(Guid rodadaId)
+    {
+        if (!_painelAberto.Add(rodadaId))
+        {
+            _painelAberto.Remove(rodadaId);
+            return;
+        }
+
+        await _umaPorVez.WaitAsync();
+        try { _doPessoal[rodadaId] = await BolaoSvc.PalpitesDaRodadaAsync(rodadaId, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; _painelAberto.Remove(rodadaId); }
+        finally { _umaPorVez.Release(); }
+    }
+
+    private RenderFragment PainelDoAdm(BolaoRodadaDto rodada) => __builder =>
+    {
+        var aberto = _painelAberto.Contains(rodada.RodadaId);
+
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => AlternarPainel(rodada.RodadaId)">
+            👁 @(aberto ? "Esconder" : "Ver") os palpites do pessoal <span class="text-muted small">(só o adm vê)</span>
+        </button>
+
+        @if (aberto && _doPessoal.GetValueOrDefault(rodada.RodadaId) is { } pessoal)
+        {
+            @if (pessoal.Faltam.Count > 0)
+            {
+                <div class="small mt-2">
+                    <span class="fw-semibold">Ainda não palpitaram (@pessoal.Faltam.Count):</span>
+                    <span class="text-muted">@string.Join(", ", pessoal.Faltam)</span>
+                </div>
+            }
+
+            @if (pessoal.Pessoas.Count == 0)
+            {
+                <div class="text-muted small mt-2">Ninguém palpitou ainda.</div>
+            }
+            else
+            {
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-bordered align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Quem (@pessoal.Pessoas.Count)</th>
+                                @foreach (var jogo in rodada.Jogos)
+                                {
+                                    <th class="text-center text-nowrap" title="@jogo.TimeCasa x @jogo.TimeFora">
+                                        <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="@jogo.TimeCasa" style="width:20px;height:20px;object-fit:contain;" />
+                                        <span class="text-muted">x</span>
+                                        <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="@jogo.TimeFora" style="width:20px;height:20px;object-fit:contain;" />
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pessoa in pessoal.Pessoas)
+                            {
+                                var porJogo = pessoa.Palpites.ToDictionary(p => p.PartidaId);
+                                <tr>
+                                    <td class="text-nowrap">
+                                        @if (pessoa.TimeNome is { Length: > 0 } clube)
+                                        {
+                                            <img src="@EscudoService.GetEscudo(clube)" alt="" title="@clube" style="width:18px;height:18px;object-fit:contain;" class="me-1" />
+                                        }
+                                        @pessoa.Nome
+                                    </td>
+                                    @foreach (var jogo in rodada.Jogos)
+                                    {
+                                        <td class="text-center">
+                                            @if (porJogo.GetValueOrDefault(jogo.PartidaId) is { } p)
+                                            {
+                                                <div class="fw-bold text-nowrap">
+                                                    @p.GolsCasa x @p.GolsFora
+                                                    @if (p.Pontos is int pts)
+                                                    {
+                                                        <span class="badge @(pts > 0 ? "bg-primary" : pts < 0 ? "bg-danger" : "bg-light text-muted border") ms-1">@pts</span>
+                                                    }
+                                                </div>
+                                                @foreach (var nome in new[] { p.JogadorCasa, p.JogadorFora }.Where(n => n is not null))
+                                                {
+                                                    <div class="text-muted text-nowrap">⚽ @nome</div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    };
 
     private async Task Salvar(BolaoRodadaDto rodada)
     {
@@ -288,9 +528,12 @@
         try
         {
             var palpites = rodada.Jogos
-                .Select(j => (j.PartidaId, Palpite(rodada.RodadaId, j.PartidaId)))
-                .Where(x => x.Item2.Casa is not null && x.Item2.Fora is not null)
-                .Select(x => new BolaoPalpiteRequest(x.PartidaId, x.Item2.Casa!.Value, x.Item2.Fora!.Value))
+                .Select(j => (j.PartidaId, Palpite: Palpite(rodada.RodadaId, j.PartidaId)))
+                .Where(x => x.Palpite.Casa is not null && x.Palpite.Fora is not null)
+                .Select(x => new BolaoPalpiteRequest(
+                    x.PartidaId, x.Palpite.Casa!.Value, x.Palpite.Fora!.Value,
+                    x.Palpite.Casa > 0 ? x.Palpite.JogadorCasa : null,
+                    x.Palpite.Fora > 0 ? x.Palpite.JogadorFora : null))
                 .ToList();
 
             if (palpites.Count == 0) throw new InvalidOperationException("Preencha pelo menos um placar.");

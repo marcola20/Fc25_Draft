@@ -14,7 +14,15 @@ public record BolaoJogoDto(
     int? GolsFora,
     int? PalpiteCasa,
     int? PalpiteFora,
-    int? Pontos);
+    int? Pontos,
+    bool ComExtras = false,
+    int? JogadorCasaId = null,
+    string? JogadorCasa = null,
+    int? JogadorForaId = null,
+    string? JogadorFora = null,
+    int? PontosPlacar = null,
+    int? ExtraCasa = null,
+    int? ExtraFora = null);
 
 /// <summary>Uma rodada aberta ou fechada para palpite.</summary>
 public record BolaoRodadaDto(
@@ -40,7 +48,32 @@ public record BolaoPalpiteDeAlguemDto(
     string? TimeNome,
     int GolsCasa,
     int GolsFora,
+    int? Pontos,
+    string? JogadorCasa = null,
+    string? JogadorFora = null);
+
+/// <summary>Um jogador que dá para escolher na aposta G/A.</summary>
+public record BolaoJogadorOpcaoDto(int JogadorId, string Nome, string Posicao);
+
+/// <summary>O palpite de alguém num jogo da rodada, para o adm conferir antes da bola rolar.</summary>
+public record BolaoPalpiteNoJogoDto(
+    Guid PartidaId,
+    int GolsCasa,
+    int GolsFora,
+    string? JogadorCasa,
+    string? JogadorFora,
     int? Pontos);
+
+public record BolaoPalpitesDeAlguemDto(
+    Guid TreinadorId,
+    string Nome,
+    string? TimeNome,
+    IReadOnlyList<BolaoPalpiteNoJogoDto> Palpites);
+
+/// <summary>Tudo o que foi chutado numa rodada, e quem ainda não chutou nada.</summary>
+public record BolaoPalpitesDaRodadaDto(
+    IReadOnlyList<BolaoPalpitesDeAlguemDto> Pessoas,
+    IReadOnlyList<string> Faltam);
 
 /// <summary>Uma linha do ranking do bolão.</summary>
 public record BolaoRankingLinhaDto(
@@ -57,7 +90,7 @@ public record BolaoRankingLinhaDto(
     public decimal Media => Palpites == 0 ? 0m : Math.Round((decimal)Pontos / Palpites, 1);
 }
 
-public record BolaoPalpiteRequest(Guid PartidaId, int GolsCasa, int GolsFora);
+public record BolaoPalpiteRequest(Guid PartidaId, int GolsCasa, int GolsFora, int? JogadorCasaId = null, int? JogadorForaId = null);
 
 /// <summary>O que a pessoa fez no bolão, para a página de carreira.</summary>
 public record BolaoResumoDoTreinadorDto(
