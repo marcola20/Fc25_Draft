@@ -24,7 +24,7 @@ public static class BolaoPontuacao
     /// Os pontos são recalculados a cada vez; as regras novas valem só para os jogos marcados a partir
     /// deste dia (horário de Brasília), para não mexer no que já foi apurado.
     /// </summary>
-    public static readonly DateTime RegrasNovasDesde = new(2026, 10, 14);
+    public static readonly DateTime RegrasNovasDesde = new(2026, 10, 13);
 
     public static int Calcular(int palpiteCasa, int palpiteFora, int golsCasa, int golsFora, bool regrasNovas = false)
     {
