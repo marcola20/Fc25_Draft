@@ -88,7 +88,10 @@ public static class NomesPes
         var (curto, longo) = ta.Length <= tb.Length ? (ta, tb) : (tb, ta);
 
         // Contido: toda palavra do nome curto está no longo, e ao menos uma não é só inicial.
-        if (curto.All(p => longo.Any(q => MesmaPalavra(p, q))) && curto.Any(p => p.Length >= 3))
+        // Palavra inteira do curto não vale pela inicial do longo: senão "Ricardinho" cabe
+        // em "R. Cabella" e empata com "Rémy Cabella".
+        if (curto.All(p => longo.Any(q => (p.Length == 1 || q.Length > 1) && MesmaPalavra(p, q)))
+            && curto.Any(p => p.Length >= 3))
             return 80;
 
         // Sobrenome: só a última palavra — "Thiago Silva" não pode virar "Thiago Alcântara".
