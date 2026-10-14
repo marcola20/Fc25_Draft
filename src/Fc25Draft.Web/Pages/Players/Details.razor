@@ -8,6 +8,7 @@
 @inject AdminAuthService AdminAuth
 @inject IMinhaAreaService MinhaArea
 @inject IPricingService Pricing
+@inject IParticipacaoService ParticipacaoSvc
 @inject IFotosJogadoresService Fotos
 @inject IJSRuntime JS
 @inject EscudoService Escudos
@@ -67,6 +68,10 @@ else
                         {
                             <span class="badge bg-warning text-dark" title="Anunciou a despedida">👋 Última temporada: @ultima</span>
                         }
+                        @if (_participacao is { Insatisfeito: true } insatisfeito)
+                        {
+                            <span class="badge bg-danger" title="Tem nível para jogar e quase não joga: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular">😤 Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
+                        }
                     </div>
                     <div class="jogador-hero-sub">
                         @if (!string.IsNullOrWhiteSpace(player.Pais))
@@ -95,7 +100,34 @@ else
                         <div>
                             <div class="jogador-hero-rotulo">Valor de mercado</div>
                             <div class="jogador-hero-valor">@(_valorDeMercado is decimal valor ? Dinheiro.Curto(valor) : "—")</div>
+                            @if (_participacao is { Variacao: not 0m } comVariacao)
+                            {
+                                <div class="jogador-hero-variacao @(comVariacao.Variacao > 0 ? "text-success" : "text-danger")">
+                                    @(comVariacao.Variacao > 0 ? "▲" : "▼") @Participacao.Rotulo(comVariacao.Variacao) pela participação
+                                </div>
+                            }
                         </div>
+                        @if (_participacao is { } part)
+                        {
+                            <div title="Últimos @ParticipacaoCriterios.JanelaDeJogos jogos do clube desde que chegou (sem os de suspensão): titular vale 1 jogo, entrar do banco vale meio. Mexe no valor de mercado.">
+                                <div class="jogador-hero-rotulo">Participação</div>
+                                <div class="jogador-hero-valor">@(part.Percentual is decimal pct ? $"{pct * 100:0}%" : "—")</div>
+                                <div class="jogador-hero-variacao text-body-secondary">
+                                    @if (part.Jogos == 0)
+                                    {
+                                        <span>sem jogos pelo clube ainda</span>
+                                    }
+                                    else
+                                    {
+                                        <span>titular em @part.Titular@(part.EntrouDoBanco > 0 ? $", entrou em {part.EntrouDoBanco}" : "") de @part.Jogos @(part.Jogos == 1 ? "jogo" : "jogos")</span>
+                                    }
+                                    @if (part.EmCarencia)
+                                    {
+                                        <span> · chegou agora, o valor ainda não muda</span>
+                                    }
+                                </div>
+                            </div>
+                        }
                         <div>
                             <div class="jogador-hero-rotulo">Situação</div>
                             <div class="jogador-hero-valor">@player.Status</div>
@@ -301,14 +333,17 @@ else
         StateHasChanged();
     }
 
-    // Mesmo cálculo do leilão, da venda rápida e da compensação do draft de expansão (posição, overall e idade).
+    // Mesmo cálculo do leilão, da venda rápida e da compensação do draft de expansão (posição, overall e idade),
+    // com a variação pela participação no clube.
     private decimal? _valorDeMercado;
+    private ParticipacaoJogador? _participacao;
 
     private async Task LoadPlayerAsync()
     {
         isLoading = true;
         errorMessage = null;
         _valorDeMercado = null;
+        _participacao = null;
 
         try
         {
@@ -320,6 +355,7 @@ else
             else
             {
                 _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
+                _participacao = player.TeamId is null ? null : await ParticipacaoSvc.GetAsync(player.PlayerId, CancellationToken.None);
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
                 _versaoFoto = _foto.Versao;
             }

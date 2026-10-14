@@ -25,6 +25,7 @@ internal static class AvisosDoTime
     public const string Diretoria = "DIRETORIA";
     public const string Virada = "VIRADA";
     public const string Carreira = "CARREIRA";
+    public const string Insatisfeito = "INSATISFEITO";
 
     public static void Criar(DraftDbContext db, Guid teamId, string tipo, string texto, string? link, DateTime quando)
     {

@@ -7,7 +7,7 @@ namespace Fc25Draft.Web.Services;
 /// <summary>
 /// Notificações no celular em segundo plano: a cada 15 s (ou na hora, quando um aviso é gravado) envia os
 /// avisos novos dos times, confere de quem é a vez no draft e os leilões fechando; a cada minuto confere quem caiu
-/// de faixa na diretoria; a cada 10 min lembra o bolão.
+/// de faixa na diretoria e quem ficou insatisfeito no banco; a cada 10 min lembra o bolão.
 /// </summary>
 public class NotificacoesService : BackgroundService
 {
@@ -68,7 +68,10 @@ public class NotificacoesService : BackgroundService
         await TentarAsync("vez no draft", s => AvisarVezNoDraftAsync(s, ct));
         // Antes dos avisos: o que a diretoria gravar sai como notificação nesta mesma checagem.
         if (diretoria)
+        {
             await TentarAsync("diretoria", s => s.GetRequiredService<IDiretoriaService>().ProcessarJogosRecentesAsync(ct));
+            await TentarAsync("insatisfeitos", s => s.GetRequiredService<IParticipacaoService>().AvisarInsatisfeitosAsync(ct));
+        }
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));
         await TentarAsync("avisos", s => s.GetRequiredService<IPushService>().EnviarAvisosPendentesAsync(ct));
         if (lembrarBolao)

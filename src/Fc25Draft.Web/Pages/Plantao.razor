@@ -5,6 +5,7 @@
 @inject IAposentadoriaService AposentadoriaSvc
 @inject IPremiosService PremiosSvc
 @inject ITreinadorService TreinadorNoticiasSvc
+@inject IParticipacaoService ParticipacaoSvc
 
 <PageTitle>Plantão CBFV</PageTitle>
 
@@ -19,7 +20,7 @@
         </div>
     </div>
     <p class="text-muted small mb-3">
-        Notícias geradas sozinhas a partir dos jogos, gols, títulos, transferências e da confiança das diretorias. Clique para ver o time ou o jogador.
+        Notícias geradas sozinhas a partir dos jogos, gols, títulos, transferências, da confiança das diretorias e dos jogadores insatisfeitos com o banco. Clique para ver o time ou o jogador.
     </p>
 
     @if (_loading)
@@ -69,6 +70,7 @@
             try { noticias.AddRange(await AposentadoriaSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await PremiosSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await TreinadorNoticiasSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await ParticipacaoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).ToList();
         }
         catch (Exception ex)

@@ -99,6 +99,11 @@
     margin-top: 1rem;
 }
 
+.jogador-hero-variacao {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
 .jogador-hero-rotulo {
     font-size: 0.72rem;
     text-transform: uppercase;

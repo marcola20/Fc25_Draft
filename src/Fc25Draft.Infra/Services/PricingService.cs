@@ -10,11 +10,13 @@ namespace Fc25Draft.Infra.Services;
 public class PricingService : IPricingService
 {
     private readonly DraftDbContext _dbContext;
+    private readonly IParticipacaoService? _participacao;
     private PricingConfig? _config;
 
-    public PricingService(DraftDbContext dbContext)
+    public PricingService(DraftDbContext dbContext, IParticipacaoService? participacao = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _participacao = participacao;
     }
 
     // Config de precificação (editável em /admin/configuracoes). Carregada uma vez por instância;
@@ -83,7 +85,36 @@ public class PricingService : IPricingService
         }
 
         var weight = MarketWeightResolver.GetByPositionId(player.PositionId);
-        return Calculate(weight, player.Overall, player.Age.Value);
+        var preco = Calculate(weight, player.Overall, player.Age.Value);
+
+        // Com clube, quanto ele joga mexe no valor (regra de participação).
+        var variacao = await VariacaoPorParticipacaoAsync(player.PlayerId, ct).ConfigureAwait(false);
+        return variacao == 0m ? preco : ComVariacao(preco, variacao);
+    }
+
+    /// <summary>Variação da participação no clube atual; 0 para quem não tem clube.</summary>
+    private async Task<decimal> VariacaoPorParticipacaoAsync(int playerId, CancellationToken ct)
+    {
+        if (_participacao is null) return 0m;
+
+        var participacao = await _participacao.GetAsync(playerId, ct).ConfigureAwait(false);
+        if (participacao is null || participacao.Variacao == 0m) return 0m;
+
+        // A conta fica guardada por um minuto: confere se ele ainda está no mesmo clube.
+        var noClube = await _dbContext.TeamRosters.AsNoTracking()
+            .AnyAsync(r => r.PlayerId == playerId && r.TeamId == participacao.TimeId, ct)
+            .ConfigureAwait(false);
+        return noClube ? participacao.Variacao : 0m;
+    }
+
+    private PricingResult ComVariacao(PricingResult preco, decimal variacao)
+    {
+        var cfg = Config;
+        var basePrice = Round(preco.BasePrice * (1 + variacao), cfg.MinIncrementStep);
+        return new PricingResult(
+            basePrice,
+            RoundUp(basePrice * cfg.MinIncrementRate, cfg.MinIncrementStep),
+            Round(basePrice * cfg.BuyNowFactor, cfg.MinIncrementStep));
     }
 
     public decimal RoundUp(decimal value, decimal step)

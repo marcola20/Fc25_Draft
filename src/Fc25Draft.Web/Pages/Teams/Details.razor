@@ -12,6 +12,7 @@
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IPricingService PricingService
+@inject IParticipacaoService ParticipacaoSvc
 @inject ITransferConfigService TransferConfigSvc
 @inject TeamAccessService TeamAccess
 @inject TransferOffersApiClient OffersApi
@@ -319,11 +320,24 @@ else
                                             Emprestado pelo @dono
                                         </span>
                                     }
+                                    @if (player.Participacao is { Insatisfeito: true })
+                                    {
+                                        <span class="badge bg-danger ms-1" title="Insatisfeito com o banco: pediu para sair. Passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular.">😤</span>
+                                    }
                                 </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
                                 <td>@player.Overall</td>
                                 <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
-                                <td class="text-nowrap">@FormatCurrency(player.BasePrice)</td>
+                                <td class="text-nowrap">
+                                    @FormatCurrency(player.BasePrice)
+                                    @if (player.Participacao is { Variacao: not 0m } part)
+                                    {
+                                        <span class="small fw-semibold @(part.Variacao > 0 ? "text-success" : "text-danger")"
+                                              title="Participação de @(part.Percentual is decimal pct ? $"{pct * 100:0}%" : "—") nos últimos @part.Jogos jogos do clube">
+                                            @(part.Variacao > 0 ? "▲" : "▼")@Participacao.Rotulo(part.Variacao)
+                                        </span>
+                                    }
+                                </td>
                                 @if (_canQuickSell && player.EmprestadoPor is not null)
                                 {
                                     <td class="text-center text-nowrap pe-0 text-muted small" title="Emprestado não pode ser vendido">—</td>
@@ -416,7 +430,7 @@ else
                     </p>
                     <ul class="list-unstyled small mb-0">
                         <li><strong>Overall:</strong> @_quickSellTarget.Overall</li>
-                        <li><strong>Preço base:</strong> @FormatCurrency(_quickSellTarget.BasePrice)</li>
+                        <li><strong>Preço base:</strong> @FormatCurrency(_quickSellTarget.BasePrice)@(_quickSellTarget.Participacao is { Variacao: not 0m } qsPart ? $" ({Participacao.Rotulo(qsPart.Variacao)} pela participação)" : "")</li>
                         <li><strong>Pagamento (80%):</strong> @FormatCurrency(_quickSellPayout)</li>
                         <li><strong>Quick-sells restantes:</strong> @(Math.Max(0, _maxQuickSell - (team?.QuickSellCount ?? 0))) / @_maxQuickSell</li>
                     </ul>
@@ -695,6 +709,16 @@ else
     {
         _rosterPlayers.Clear();
 
+        IReadOnlyDictionary<int, ParticipacaoJogador> participacoes;
+        try
+        {
+            participacoes = await ParticipacaoSvc.GetTodosAsync(default);
+        }
+        catch
+        {
+            participacoes = new Dictionary<int, ParticipacaoJogador>();
+        }
+
         foreach (var player in players)
         {
             decimal basePrice = 0m;
@@ -720,7 +744,8 @@ else
                 player.Idade,
                 basePrice,
                 player.PrecoPedido,
-                player.EmprestadoPor));
+                player.EmprestadoPor,
+                participacoes.GetValueOrDefault(player.PlayerId) is { } part && part.TimeId == Id ? part : null));
         }
 
         teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
@@ -1076,5 +1101,6 @@ else
         int? Age,
         decimal BasePrice,
         decimal? AskingPrice,
-        string? EmprestadoPor = null);
+        string? EmprestadoPor = null,
+        ParticipacaoJogador? Participacao = null);
 }
