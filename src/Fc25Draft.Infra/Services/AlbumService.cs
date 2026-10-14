@@ -590,7 +590,7 @@ public partial class AlbumService : IAlbumService
             .Select(p => new JogoEncerrado(
                 p.PartidaId, p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
                 p.GolsCasa, p.GolsFora, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId,
-                p.Rodada.DataHora, p.EncerradaEm!.Value, p.Rodada.Liga.Temporada))
+                p.Rodada.DataHora, p.IniciadaEm, p.EncerradaEm!.Value, p.Rodada.Liga.Temporada))
             .ToListAsync(ct);
 
         var porJogos = await PacotesDosJogosAsync(album.AlbumId, album.LancadoEm, jogos, ct);
@@ -603,16 +603,16 @@ public partial class AlbumService : IAlbumService
     private sealed record JogoEncerrado(
         Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora,
         int GolsCasa, int GolsFora, bool IsWO, bool TemPenaltis, Guid? PenaltisVencedorId,
-        DateTime? Marcado, DateTime EncerradaEm, int? Temporada);
+        DateTime? Marcado, DateTime? IniciadaEm, DateTime EncerradaEm, int? Temporada);
 
     /// <summary>
-    /// Pacotes por jogo para cada pessoa (treinador e auxiliar) com passagem no clube no dia do jogo: vitória 3,
+    /// Pacotes por jogo para cada pessoa (treinador e auxiliar) no comando do clube quando o jogo começou: vitória 3,
     /// empate 2, derrota 1. Pênaltis decidem quem venceu; no W.O. quem não fez ganha a vitória e quem fez, nada.
     /// </summary>
     private async Task<int> PacotesDosJogosAsync(Guid albumId, DateTime lancadoEm, List<JogoEncerrado> jogos, CancellationToken ct)
     {
         var resultados = jogos
-            .SelectMany(j => Resultados(j).Select(r => (Jogo: j, r.Time, r.Pacotes, r.Motivo, Dia: DiaDoJogo(j))))
+            .SelectMany(j => Resultados(j).Select(r => (Jogo: j, r.Time, r.Pacotes, r.Motivo)))
             .Where(r => r.Pacotes > 0)
             .ToList();
         var devidos = new HashSet<(Guid, string)>();
@@ -620,17 +620,22 @@ public partial class AlbumService : IAlbumService
         var times = resultados.Select(r => r.Time).Distinct().ToList();
         var passagens = await _db.TreinadorPassagens.AsNoTracking()
             .Where(p => times.Contains(p.TimeId))
-            .Select(p => new { p.TreinadorId, p.TimeId, p.Desde, p.Ate })
+            .Select(p => new { p.TreinadorId, Periodo = new ComandoDoJogo.Periodo(p.PassagemId, p.TimeId, p.Papel, p.Desde, p.Ate, p.SaiuEm) })
             .ToListAsync(ct);
+        var periodos = passagens.Select(p => p.Periodo).ToList();
+        var comando = passagens
+            .Select(p => (p.TreinadorId, p.Periodo.TimeId, Janela: ComandoDoJogo.Janela(p.Periodo, periodos)))
+            .ToList();
         var jaTem = await ChavesExistentesAsync(PacoteGanho.OrigemJogo, ct);
 
         var criados = 0;
         foreach (var r in resultados)
         {
-            // Mesma regra da carreira (TreinadorService): quem chega assume depois do jogo do dia e quem sai
-            // leva o jogo do dia da saída, então o jogo tem um dono só.
-            var pessoas = passagens
-                .Where(p => p.TimeId == r.Time && p.Desde.Date < r.Dia && (p.Ate == null || p.Ate.Value.Date >= r.Dia))
+            // Mesma regra da carreira (TreinadorService): o jogo é de quem estava no comando quando ele começou,
+            // então tem um dono só.
+            var comeco = r.Jogo.IniciadaEm ?? r.Jogo.EncerradaEm;
+            var pessoas = comando
+                .Where(p => p.TimeId == r.Time && ComandoDoJogo.Comandou(p.Janela, comeco))
                 .Select(p => p.TreinadorId)
                 .Distinct();
             foreach (var pessoa in pessoas)

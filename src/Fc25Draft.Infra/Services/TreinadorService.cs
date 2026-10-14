@@ -277,21 +277,28 @@ public class TreinadorService : ITreinadorService
         // Os jogos que ele comandou: só partida encerrada, e só dentro do período dele.
         var timeIds = treinador.Passagens.Select(p => p.TimeId).Distinct().ToList();
 
+        // O jogo é de quem estava no comando quando ele começou.
         var jogos = await _db.LigaPartidas.AsNoTracking()
             .Where(p => (p.EncerradaEm != null || p.IniciadaEm != null)
                         && (timeIds.Contains(p.TimeCasaId) || timeIds.Contains(p.TimeForaId)))
             .Select(p => new Jogo(p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora,
-                (p.EncerradaEm ?? p.IniciadaEm)!.Value))
+                (p.IniciadaEm ?? p.EncerradaEm)!.Value))
             .ToListAsync(ct);
 
-        // Quem chega assume depois do jogo do dia; quem sai leva o jogo do dia da saída.
-        // Assim cada partida tem um dono só, e a soma dos treinadores fecha com o clube.
+        // As passagens de todo mundo nesses clubes: a chegada dele é a hora em que o anterior saiu.
+        var doClube = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => timeIds.Contains(p.TimeId))
+            .Select(p => new ComandoDoJogo.Periodo(p.PassagemId, p.TimeId, p.Papel, p.Desde, p.Ate, p.SaiuEm))
+            .ToListAsync(ct);
+        var janelas = doClube
+            .Where(p => treinador.Passagens.Any(t => t.PassagemId == p.PassagemId))
+            .ToDictionary(p => p.PassagemId, p => ComandoDoJogo.Janela(p, doClube));
+
         List<Jogo> JogosDa(TreinadorPassagemDto passagem, Guid? ligaId = null) =>
             jogos.Where(j =>
                 (j.CasaId == passagem.TimeId || j.ForaId == passagem.TimeId)
                 && (ligaId is null || j.LigaId == ligaId)
-                && j.Quando.Date > passagem.Desde.Date
-                && (passagem.Ate is null || j.Quando.Date <= passagem.Ate.Value.Date)).ToList();
+                && ComandoDoJogo.Comandou(janelas[passagem.PassagemId], j.Quando)).ToList();
 
         var passagensComRetrospecto = treinador.Passagens
             .Select(p => p with { Retrospecto = Retrospecto(JogosDa(p), p.TimeId) })
