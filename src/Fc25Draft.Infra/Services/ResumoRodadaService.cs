@@ -189,8 +189,11 @@ public class ResumoRodadaService : IResumoRodadaService
         var quando = proxima.DataHora!.Value;
         var titulo = Titulo(LigaLabels.Competicao(proxima.Tipo, proxima.Divisao), proxima.Numero, proxima.Desempate);
 
-        return $"{titulo}, {quando:ddd dd/MM} às {quando:HH'h'}";
+        return $"{titulo}, {DiasDaSemana[(int)quando.DayOfWeek]} {quando:dd/MM} às {quando:HH'h'}";
     }
+
+    // Fixo em português: o "ddd" segue a cultura do servidor e saía "Thu".
+    private static readonly string[] DiasDaSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
     private static string Titulo(string competicao, int numero, bool desempate) => numero switch
     {

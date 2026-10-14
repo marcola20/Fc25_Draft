@@ -6,7 +6,7 @@ namespace Fc25Draft.Core.Utilities;
 
 /// <summary>
 /// O resumo da rodada do jeito que vai para o grupo: negrito do WhatsApp com asterisco,
-/// uma linha por jogo e só as seções que têm o que dizer.
+/// cada jogo separado por uma linha em branco e só as seções que têm o que dizer.
 /// </summary>
 public static class ResumoRodadaTexto
 {
@@ -25,9 +25,9 @@ public static class ResumoRodadaTexto
 
         if (resumo.Jogos.Count > 0)
         {
-            texto.AppendLine();
             foreach (var jogo in resumo.Jogos)
             {
+                texto.AppendLine();
                 texto.Append("*").Append(jogo.Placar).AppendLine("*");
 
                 var gols = Marcadores(jogo);
