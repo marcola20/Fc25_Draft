@@ -85,6 +85,29 @@ public record TreinadorCarreiraDto(
     public IReadOnlyList<string> Clubes => Passagens.Select(p => p.TimeNome).Distinct().ToArray();
 }
 
+/// <summary>Um jogo entre dois técnicos, visto do lado de quem é o dono do retrospecto.</summary>
+public record TreinadorConfrontoJogoDto(
+    Guid PartidaId,
+    DateTime Data,
+    string Competicao,
+    string TimeNome,
+    string AdversarioTimeNome,
+    bool EmCasa,
+    int GolsPro,
+    int GolsContra,
+    bool IsWO)
+{
+    /// <summary>"V", "E" ou "D" pelo placar do tempo normal (pênaltis contam como empate).</summary>
+    public string Resultado => GolsPro > GolsContra ? "V" : GolsPro < GolsContra ? "D" : "E";
+}
+
+/// <summary>Retrospecto contra outro técnico, com os jogos do mais recente para o mais antigo.</summary>
+public record TreinadorConfrontoDto(
+    Guid AdversarioId,
+    string AdversarioNome,
+    TreinadorRetrospectoDto Retrospecto,
+    IReadOnlyList<TreinadorConfrontoJogoDto> Jogos);
+
 public record TreinadorSalvarRequest(Guid? TreinadorId, string Nome, string? Token, bool Ativo = true);
 
 public record TreinadorPassagemRequest(Guid TreinadorId, Guid TimeId, PapelTreinador Papel, DateTime Desde, DateTime? Ate);

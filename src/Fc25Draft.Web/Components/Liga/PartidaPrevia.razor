@@ -86,6 +86,74 @@
             }
         </ul>
     }
+
+    @if (pv.Treinadores is { } tr)
+    {
+        <h6 class="mt-4 mb-2">👔 Duelo dos técnicos</h6>
+        <div class="previa-confronto mb-2">
+            <div>
+                <a href="/treinadores/@tr.Casa.TreinadorId" class="text-reset text-decoration-none">
+                    <FotoTreinador TreinadorId="@tr.Casa.TreinadorId" Tamanho="40" Versao="@tr.Casa.VersaoFoto" Alt="@tr.Casa.Nome" />
+                    @if (tr.Retrospecto.Jogos > 0)
+                    {
+                        <div class="valor previa-casa">@tr.Retrospecto.Vitorias</div>
+                    }
+                    <div class="small text-muted"><NomeTreinador Perfil="tr.Casa" /></div>
+                </a>
+            </div>
+            <div class="align-self-center">
+                @if (tr.Retrospecto.Jogos > 0)
+                {
+                    <div class="valor">@tr.Retrospecto.Empates</div>
+                    <div class="small text-muted">empate@(tr.Retrospecto.Empates == 1 ? "" : "s")</div>
+                }
+                else
+                {
+                    <div class="small text-muted">x</div>
+                }
+            </div>
+            <div>
+                <a href="/treinadores/@tr.Fora.TreinadorId" class="text-reset text-decoration-none">
+                    <FotoTreinador TreinadorId="@tr.Fora.TreinadorId" Tamanho="40" Versao="@tr.Fora.VersaoFoto" Alt="@tr.Fora.Nome" />
+                    @if (tr.Retrospecto.Jogos > 0)
+                    {
+                        <div class="valor previa-fora">@tr.Retrospecto.Derrotas</div>
+                    }
+                    <div class="small text-muted"><NomeTreinador Perfil="tr.Fora" /></div>
+                </a>
+            </div>
+        </div>
+        @if (tr.Retrospecto.Jogos == 0)
+        {
+            <div class="text-muted small text-center">Primeiro duelo entre os dois técnicos.</div>
+        }
+        else
+        {
+            <div class="small text-muted text-center mb-2">
+                @tr.Retrospecto.Jogos jogo@(tr.Retrospecto.Jogos == 1 ? "" : "s") · gols @tr.Retrospecto.GolsPro x @tr.Retrospecto.GolsContra
+                · com qualquer clube que dirigiam
+            </div>
+            <ul class="list-unstyled small mb-0">
+                @foreach (var j in tr.Ultimos)
+                {
+                    <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+                        <span class="text-muted text-nowrap">@j.Data.ToString("dd/MM/yy", Brasil)</span>
+                        <span class="text-center flex-grow-1">
+                            @if (j.EmCasa)
+                            {
+                                <span>@j.TimeNome <strong>@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
+                            }
+                            else
+                            {
+                                <span>@j.AdversarioTimeNome <strong>@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
+                            }
+                        </span>
+                        <span class="text-muted text-truncate" style="max-width: 40%;">@j.Competicao</span>
+                    </li>
+                }
+            </ul>
+        }
+    }
 }
 
 @code {

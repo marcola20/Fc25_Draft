@@ -1,3 +1,4 @@
+using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Core.Interfaces;
@@ -34,7 +35,24 @@ public record PreviaConfrontoDto(
     int GolsFora,
     IReadOnlyList<PreviaJogoAnteriorDto> Ultimos);
 
-public record PreviaDto(Guid PartidaId, string Competicao, PreviaTimeDto Casa, PreviaTimeDto Fora, PreviaConfrontoDto Confronto)
+/// <summary>
+/// Duelo entre os técnicos de hoje dos dois clubes, com qualquer clube que dirigiam, contado do lado do técnico
+/// do mandante. Os últimos jogos vêm do mais recente para o mais antigo.
+/// </summary>
+public record PreviaTreinadoresDto(
+    PerfilTreinadorDto Casa,
+    PerfilTreinadorDto Fora,
+    TreinadorRetrospectoDto Retrospecto,
+    IReadOnlyList<TreinadorConfrontoJogoDto> Ultimos);
+
+public record PreviaDto(
+    Guid PartidaId,
+    string Competicao,
+    PreviaTimeDto Casa,
+    PreviaTimeDto Fora,
+    PreviaConfrontoDto Confronto,
+    // Nulo quando algum dos dois clubes está sem técnico.
+    PreviaTreinadoresDto? Treinadores = null)
 {
     public bool TemTabela => Casa.Jogos is not null && Fora.Jogos is not null;
 }

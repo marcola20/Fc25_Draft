@@ -84,6 +84,94 @@
             </div>
         }
 
+        @if (_confrontos.Count > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-header fw-bold">🆚 Confrontos com outros técnicos</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Técnico</th>
+                                <th class="text-center">J</th>
+                                <th class="text-center">V-E-D</th>
+                                <th class="text-center">Gols</th>
+                                <th class="text-center">Aprov.</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in _confrontos)
+                            {
+                                var aberto = _confrontoAberto == c.AdversarioId;
+                                var r = c.Retrospecto;
+                                var perfil = _perfisAdversarios.GetValueOrDefault(c.AdversarioId);
+                                <tr role="button" @onclick="() => _confrontoAberto = aberto ? null : c.AdversarioId">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="28" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
+                                            <a href="/treinadores/@c.AdversarioId" class="text-reset" @onclick:stopPropagation="true">
+                                                <NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" />
+                                            </a>
+                                            @if (c.AdversarioId == _fregues)
+                                            {
+                                                <span class="badge bg-success" title="O técnico que ele mais venceu">freguês</span>
+                                            }
+                                            @if (c.AdversarioId == _carrasco)
+                                            {
+                                                <span class="badge bg-danger" title="O técnico que mais o venceu">carrasco</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td class="text-center">@r.Jogos</td>
+                                    <td class="text-center text-nowrap">
+                                        <span class="text-success">@r.Vitorias</span><span class="text-muted">-</span>@r.Empates<span class="text-muted">-</span><span class="text-danger">@r.Derrotas</span>
+                                    </td>
+                                    <td class="text-center text-nowrap">@r.GolsPro<span class="text-muted">:</span>@r.GolsContra</td>
+                                    <td class="text-center">@r.Aproveitamento.ToString("0.#", Br)%</td>
+                                    <td class="text-end text-muted small">@(aberto ? "▲" : "▼")</td>
+                                </tr>
+                                @if (aberto)
+                                {
+                                    <tr>
+                                        <td colspan="6" class="bg-body-tertiary">
+                                            <ul class="list-unstyled small mb-0">
+                                                @foreach (var j in c.Jogos)
+                                                {
+                                                    <li class="d-flex align-items-center gap-2 py-1">
+                                                        <span class="badge @CorDoResultado(j.Resultado)" style="width: 1.6rem;">@j.Resultado</span>
+                                                        <span class="text-muted text-nowrap">@j.Data.ToString("dd/MM/yy", Br)</span>
+                                                        <span class="flex-grow-1">
+                                                            @if (j.EmCasa)
+                                                            {
+                                                                <span>@j.TimeNome <strong>@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span>@j.AdversarioTimeNome <strong>@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
+                                                            }
+                                                            @if (j.IsWO)
+                                                            {
+                                                                <span class="badge bg-secondary ms-1">W.O.</span>
+                                                            }
+                                                        </span>
+                                                        <span class="text-muted text-truncate" style="max-width: 40%;">@j.Competicao</span>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer text-muted small">
+                    Contam os jogos encerrados em que os dois estavam no comando, com qualquer clube. Pênaltis contam como empate.
+                </div>
+            </div>
+        }
+
         @if (_carreira.Titulos.Count > 0)
         {
             <div class="card mb-4">
@@ -225,6 +313,11 @@
     private bool _carregando = true;
     private string? _erro;
     private TreinadorCarreiraDto? _carreira;
+    private IReadOnlyList<TreinadorConfrontoDto> _confrontos = Array.Empty<TreinadorConfrontoDto>();
+    private IReadOnlyDictionary<Guid, PerfilTreinadorDto> _perfisAdversarios = new Dictionary<Guid, PerfilTreinadorDto>();
+    private Guid? _confrontoAberto;
+    private Guid? _fregues;
+    private Guid? _carrasco;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -234,11 +327,38 @@
         {
             _carreira = await TreinadorSvc.GetCarreiraAsync(TreinadorId, CancellationToken.None);
             _perfil = _carreira is null ? null : await PerfilSvc.GetAsync(TreinadorId, CancellationToken.None);
+            await CarregarConfrontosAsync();
             AtualizarCabecalho();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
+
+    private async Task CarregarConfrontosAsync()
+    {
+        _confrontoAberto = null;
+        _confrontos = _carreira is null
+            ? Array.Empty<TreinadorConfrontoDto>()
+            : await TreinadorSvc.GetConfrontosAsync(TreinadorId, CancellationToken.None);
+        _perfisAdversarios = await PerfilSvc.VariosAsync(_confrontos.Select(c => c.AdversarioId), CancellationToken.None);
+
+        // Freguês: quem ele mais venceu; carrasco: quem mais o venceu. Só com pelo menos 2 e vantagem no duelo.
+        _fregues = _confrontos
+            .Where(c => c.Retrospecto.Vitorias >= 2 && c.Retrospecto.Vitorias > c.Retrospecto.Derrotas)
+            .OrderByDescending(c => c.Retrospecto.Vitorias).ThenBy(c => c.Retrospecto.Derrotas)
+            .Select(c => (Guid?)c.AdversarioId).FirstOrDefault();
+        _carrasco = _confrontos
+            .Where(c => c.Retrospecto.Derrotas >= 2 && c.Retrospecto.Derrotas > c.Retrospecto.Vitorias)
+            .OrderByDescending(c => c.Retrospecto.Derrotas).ThenBy(c => c.Retrospecto.Vitorias)
+            .Select(c => (Guid?)c.AdversarioId).FirstOrDefault();
+    }
+
+    private static string CorDoResultado(string resultado) => resultado switch
+    {
+        "V" => "bg-success",
+        "D" => "bg-danger",
+        _ => "bg-secondary"
+    };
 
     /// <summary>O cabeçalho da página vira o nome do treinador, com a migalha voltando para a lista.</summary>
     private void AtualizarCabecalho()

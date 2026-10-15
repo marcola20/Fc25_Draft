@@ -43,4 +43,7 @@ public interface ITreinadorService
 
     /// <summary>Carreira completa: clubes, temporadas e títulos.</summary>
     Task<TreinadorCarreiraDto?> GetCarreiraAsync(Guid treinadorId, CancellationToken ct);
+
+    /// <summary>Retrospecto contra cada técnico que ele já enfrentou, com qualquer clube.</summary>
+    Task<IReadOnlyList<TreinadorConfrontoDto>> GetConfrontosAsync(Guid treinadorId, CancellationToken ct);
 }

@@ -439,6 +439,31 @@ public class TreinadorService : ITreinadorService
             Somar(passagensComRetrospecto.Select(p => p.Retrospecto!)));
     }
 
+    public async Task<IReadOnlyList<TreinadorConfrontoDto>> GetConfrontosAsync(Guid treinadorId, CancellationToken ct)
+    {
+        // Todas as passagens de técnico: as dele dizem os clubes, as dos outros dizem quem estava do outro lado.
+        var passagens = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => p.Papel == PapelTreinador.Treinador)
+            .Select(p => new ConfrontoTreinadores.Passagem(p.TreinadorId,
+                new ComandoDoJogo.Periodo(p.PassagemId, p.TimeId, p.Papel, p.Desde, p.Ate, p.SaiuEm)))
+            .ToListAsync(ct);
+
+        var timeIds = passagens.Where(p => p.TreinadorId == treinadorId).Select(p => p.Periodo.TimeId).Distinct().ToList();
+        if (timeIds.Count == 0) return Array.Empty<TreinadorConfrontoDto>();
+
+        var jogos = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && (p.IniciadaEm != null || p.EncerradaEm != null)
+                        && (timeIds.Contains(p.TimeCasaId) || timeIds.Contains(p.TimeForaId)))
+            .Select(p => new ConfrontoTreinadores.Jogo(p.PartidaId, p.Rodada.Liga.Nome,
+                p.TimeCasaId, p.TimeCasa.TeamName, p.TimeForaId, p.TimeFora.TeamName,
+                p.GolsCasa, p.GolsFora, p.IsWO, (p.IniciadaEm ?? p.EncerradaEm)!.Value))
+            .ToListAsync(ct);
+
+        var nomes = await _db.Treinadores.AsNoTracking().ToDictionaryAsync(t => t.TreinadorId, t => t.Nome, ct);
+
+        return ConfrontoTreinadores.Calcular(treinadorId, jogos, passagens, nomes);
+    }
+
     /// <summary>Os nomes que aparecem no cadastro do time saem das passagens que estão valendo.</summary>
     private async Task AtualizarNomesDosTimesAsync(IEnumerable<Guid> timeIds, CancellationToken ct)
     {

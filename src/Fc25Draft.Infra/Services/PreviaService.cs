@@ -1,4 +1,5 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Utilities;
@@ -9,20 +10,25 @@ namespace Fc25Draft.Infra.Services;
 
 /// <summary>
 /// Prévia de um jogo que ainda não terminou: situação de cada time na competição (tabela, artilheiro, médias do
-/// PES, suspensos e pendurados), a forma em todas as competições e o confronto direto. Junta o que já existe no
-/// perfil do time e nas telas da liga.
+/// PES, suspensos e pendurados), a forma em todas as competições, o confronto direto dos clubes e o dos técnicos.
+/// Junta o que já existe no perfil do time, na carreira do treinador e nas telas da liga.
 /// </summary>
 public class PreviaService : IPreviaService
 {
     private readonly DraftDbContext _db;
     private readonly ILigaPublicService _ligas;
     private readonly IEstatisticasPesService _estatisticas;
+    private readonly ITreinadorService _treinadores;
+    private readonly IPerfilTreinadorService _perfis;
 
-    public PreviaService(DraftDbContext db, ILigaPublicService ligas, IEstatisticasPesService estatisticas)
+    public PreviaService(DraftDbContext db, ILigaPublicService ligas, IEstatisticasPesService estatisticas,
+        ITreinadorService treinadores, IPerfilTreinadorService perfis)
     {
         _db = db;
         _ligas = ligas;
         _estatisticas = estatisticas;
+        _treinadores = treinadores;
+        _perfis = perfis;
     }
 
     public async Task<PreviaDto?> MontarAsync(Guid partidaId, CancellationToken ct)
@@ -86,6 +92,24 @@ public class PreviaService : IPreviaService
             Lado(p.TimeForaId, p.Fora, perfilFora),
             new PreviaConfrontoDto(
                 confronto?.Jogos ?? 0, confronto?.Vitorias ?? 0, confronto?.Empates ?? 0, confronto?.Derrotas ?? 0,
-                confronto?.GolsPro ?? 0, confronto?.GolsContra ?? 0, anteriores));
+                confronto?.GolsPro ?? 0, confronto?.GolsContra ?? 0, anteriores),
+            await DueloDosTreinadoresAsync(p.TimeCasaId, p.TimeForaId, ct));
+    }
+
+    /// <summary>Quem está no comando de cada clube hoje e como foram os jogos entre os dois, com qualquer clube.</summary>
+    private async Task<PreviaTreinadoresDto?> DueloDosTreinadoresAsync(Guid casaId, Guid foraId, CancellationToken ct)
+    {
+        var casa = (await _perfis.ComissaoTecnicaAsync(casaId, ct)).FirstOrDefault(c => c.Papel == PapelTreinador.Treinador);
+        var fora = (await _perfis.ComissaoTecnicaAsync(foraId, ct)).FirstOrDefault(c => c.Papel == PapelTreinador.Treinador);
+        if (casa is null || fora is null || casa.Perfil.TreinadorId == fora.Perfil.TreinadorId) return null;
+
+        var duelo = (await _treinadores.GetConfrontosAsync(casa.Perfil.TreinadorId, ct))
+            .FirstOrDefault(c => c.AdversarioId == fora.Perfil.TreinadorId);
+
+        return new PreviaTreinadoresDto(
+            casa.Perfil,
+            fora.Perfil,
+            duelo?.Retrospecto ?? TreinadorRetrospectoDto.Vazio,
+            duelo?.Jogos.Take(5).ToList() ?? new List<TreinadorConfrontoJogoDto>());
     }
 }
