@@ -30,7 +30,8 @@ public static class ParticipacaoCriterios
 
     // Insatisfeito: tem nível para jogar e quase não joga.
     public const int JanelaDoInsatisfeito = 6;
-    public const decimal InsatisfeitoAbaixoDe = 0.25m;
+    /// <summary>Jogou isso ou menos da janela: reclama (com a janela de 6, 25% = 1 titular e 1 entrada do banco).</summary>
+    public const decimal InsatisfeitoAte = 0.25m;
     public const decimal DescontoDoInsatisfeito = -0.10m;
     /// <summary>Titular em tantos jogos seguidos: a insatisfação passa.</summary>
     public const int TitularSeguidoParaResolver = 2;
@@ -115,7 +116,7 @@ public static class Participacao
             }
             else if (temNivel
                      && i + 1 >= ParticipacaoCriterios.JanelaDoInsatisfeito
-                     && percentual < ParticipacaoCriterios.InsatisfeitoAbaixoDe)
+                     && percentual <= ParticipacaoCriterios.InsatisfeitoAte)
             {
                 insatisfeito = true;
                 humor.Add(new MudancaDeHumor(jogo.PartidaId, jogo.Data, true, percentual));
