@@ -9,6 +9,8 @@ public interface IPricingService
     PricingResult Calculate(decimal positionWeight, int overall, int age);
     Task<PricingResult> CalculateForPositionAsync(string? positionCode, short? positionId, int age, int overall, CancellationToken ct);
     Task<PricingResult> CalculateForPlayerAsync(int playerId, CancellationToken ct);
+    /// <summary>O preço com a variação da participação (+0,15 = 15% a mais), arredondado como os outros.</summary>
+    PricingResult ComVariacao(PricingResult preco, decimal variacao);
     decimal RoundUp(decimal value, decimal step);
     decimal Round(decimal value, decimal step);
 }

@@ -48,6 +48,7 @@ public class LayoutNavigationService
             new("Leilão", "/mercado", "oi oi-cart"),
             new("Lista de Transferências", "/mercado/lista", "oi oi-tag"),
             new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
+            new("Sobe e Desce", "/mercado/sobe-e-desce", "oi oi-elevator"),
             new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
             new("Histórico de Lances", "/mercado/historico", "oi oi-clock")
         }),
@@ -145,6 +146,7 @@ public class LayoutNavigationService
         ["/mercado"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
         ["/mercado/lista"] = CreateDefinition("Lista de Transferências", "Mercado", "/mercado/lista"),
         ["/mercado/termometro"] = CreateDefinition("Termômetro do Mercado", "Mercado", "/mercado/termometro"),
+        ["/mercado/sobe-e-desce"] = CreateDefinition("Sobe e Desce", "Mercado", "/mercado/sobe-e-desce"),
         ["/market"] = CreateDefinition("Mercado de Transferências", "Mercado", "/mercado"),
         ["/players"] = CreateDefinition("Jogadores", "Mercado", "/players"),
         ["/jogadores/comparar"] = CreateDefinition("Comparar Jogadores", "Mercado", "/jogadores/comparar"),

@@ -40,6 +40,9 @@ public class ParticipacaoService : IParticipacaoService
     public async Task<ParticipacaoJogador?> GetAsync(int playerId, CancellationToken ct) =>
         (await MontarAsync(ct)).Jogadores.GetValueOrDefault(playerId);
 
+    public async Task<IReadOnlyDictionary<int, ParticipacaoJogador>> GetTodosEmAsync(DateTime ateUtc, CancellationToken ct) =>
+        (await CalcularAsync(_time.GetUtcNow().UtcDateTime, ateUtc, ct)).Jogadores;
+
     private async Task<Montagem> MontarAsync(CancellationToken ct)
     {
         var agora = _time.GetUtcNow().UtcDateTime;
@@ -48,12 +51,13 @@ public class ParticipacaoService : IParticipacaoService
             if (_guardada is { } g && agora - g.CalculadaEm < Validade) return g;
         }
 
-        var montagem = await CalcularAsync(agora, ct);
+        var montagem = await CalcularAsync(agora, null, ct);
         lock (Trava) _guardada = montagem;
         return montagem;
     }
 
-    private async Task<Montagem> CalcularAsync(DateTime agora, CancellationToken ct)
+    /// <param name="ate">Só os jogos até essa data (como estava naquele dia, com o elenco de hoje); nulo = todos.</param>
+    private async Task<Montagem> CalcularAsync(DateTime agora, DateTime? ate, CancellationToken ct)
     {
         var elenco = await _db.TeamRosters.AsNoTracking()
             .Select(r => new { r.TeamId, r.PlayerId, r.Player.Name, r.Player.Overall, r.Player.PositionId })
@@ -102,7 +106,8 @@ public class ParticipacaoService : IParticipacaoService
         {
             var desde = chegadas.TryGetValue((j.PlayerId, j.TeamId), out var c) ? c : (DateTime?)null;
             var jogos = (jogosDoTime.GetValueOrDefault(j.TeamId) ?? [])
-                .Where(x => (desde is null || x.Data >= desde) && !suspensoEm.Contains((x.PartidaId, j.PlayerId)))
+                .Where(x => (desde is null || x.Data >= desde) && (ate is null || x.Data <= ate)
+                            && !suspensoEm.Contains((x.PartidaId, j.PlayerId)))
                 .Select(x => new JogoDoJogador(x.PartidaId, x.Data,
                     titularEm.Contains((x.PartidaId, j.PlayerId)), entrouEm.Contains((x.PartidaId, j.PlayerId))))
                 .ToList();

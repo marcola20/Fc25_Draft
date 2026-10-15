@@ -107,7 +107,7 @@ public class PricingService : IPricingService
         return noClube ? participacao.Variacao : 0m;
     }
 
-    private PricingResult ComVariacao(PricingResult preco, decimal variacao)
+    public PricingResult ComVariacao(PricingResult preco, decimal variacao)
     {
         var cfg = Config;
         var basePrice = Round(preco.BasePrice * (1 + variacao), cfg.MinIncrementStep);

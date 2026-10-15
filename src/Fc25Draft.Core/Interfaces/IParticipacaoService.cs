@@ -14,6 +14,12 @@ public interface IParticipacaoService
     /// <summary>A conta de um jogador; nulo se ele não tem clube.</summary>
     Task<ParticipacaoJogador?> GetAsync(int playerId, CancellationToken ct);
 
+    /// <summary>
+    /// Como estava em <paramref name="ateUtc"/>: a conta dos jogadores com clube hoje, só com os jogos até essa data
+    /// (sem guardar).
+    /// </summary>
+    Task<IReadOnlyDictionary<int, ParticipacaoJogador>> GetTodosEmAsync(DateTime ateUtc, CancellationToken ct);
+
     /// <summary>Notícias do Plantão: quem pediu para sair e quem fez as pazes.</summary>
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 

@@ -1,0 +1,176 @@
+@page "/mercado/sobe-e-desce"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@inject ISobeEDesceService SobeEDesceSvc
+@inject EscudoService Escudos
+
+<PageTitle>Sobe e Desce</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1100px;">
+    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Período">
+            @foreach (var (dias, nome) in Periodos)
+            {
+                <button type="button" class="btn @(_dias == dias ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => TrocarAsync(dias)" disabled="@_loading">@nome</button>
+            }
+        </div>
+        <a href="/mercado/termometro" class="btn btn-sm btn-outline-secondary">🌡️ Termômetro do Mercado</a>
+    </div>
+    <p class="text-muted small mb-3">
+        Quanto o valor de mercado de cada jogador mudou desde @(_d is null ? "o começo do período" : BrazilTime.ConvertFromUtc(_d.Desde).ToString("dd/MM")),
+        pela participação nos jogos do clube: quem joga valoriza, quem fica no banco perde valor, e o insatisfeito perde mais.
+        <a href="/manual">Como funciona</a>.
+    </p>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar o Sobe e Desce:</strong> @_erro</div>
+    }
+    else if (_d is not null)
+    {
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
+                <h5>📈 Mais valorizados</h5>
+                @Lista(_d.Valorizados, "Ninguém valorizou no período.")
+            </div>
+            <div class="col-12 col-lg-6">
+                <h5>📉 Mais desvalorizados</h5>
+                @Lista(_d.Desvalorizados, "Ninguém desvalorizou no período.")
+            </div>
+        </div>
+
+        <h5>😤 Insatisfeitos agora</h5>
+        @if (_d.Insatisfeitos.Count == 0)
+        {
+            <p class="text-muted">Ninguém está insatisfeito com o banco.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-4">
+                @foreach (var j in _d.Insatisfeitos)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="" />
+                        <div class="me-auto">
+                            <a href="/players/details/@j.PlayerId" class="fw-semibold text-primary">@j.Nome</a>
+                            <span class="small text-muted">· @j.Posicao · @j.Overall</span>
+                            <div class="small text-muted">
+                                <img src="@Escudos.GetEscudo(j.TimeNome)" alt="" width="16" height="16" class="me-1" style="object-fit: contain;" />@j.TimeNome
+                                · participação @Pct(j.ParticipacaoAgora)
+                            </div>
+                        </div>
+                        <span class="fw-semibold text-nowrap">@Moeda(j.ValorAgora)</span>
+                    </li>
+                }
+            </ul>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly (int Dias, string Nome)[] Periodos = [(7, "Últimos 7 dias"), (30, "Últimos 30 dias")];
+    private const int Quantos = 10;
+
+    private int _dias = 7;
+    private SobeEDesceDto? _d;
+    private bool _loading = true;
+    private string? _erro;
+
+    protected override Task OnInitializedAsync() => CarregarAsync();
+
+    private async Task TrocarAsync(int dias)
+    {
+        _dias = dias;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _loading = true;
+        _erro = null;
+        try
+        {
+            _d = await SobeEDesceSvc.GetAsync(_dias, Quantos, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // O que mudou: a participação e, quando for o caso, o humor.
+    private static string Motivo(SobeEDesceJogadorDto j)
+    {
+        var partes = new List<string>
+        {
+            j.CarenciaAntes
+                ? $"completou {ParticipacaoCriterios.JogosParaValer} jogos no clube · participação {Pct(j.ParticipacaoAgora)}"
+                : $"participação {Pct(j.ParticipacaoAntes)} → {Pct(j.ParticipacaoAgora)}"
+        };
+        if (j.InsatisfeitoAgora && !j.InsatisfeitoAntes) partes.Add("😤 ficou insatisfeito");
+        else if (!j.InsatisfeitoAgora && j.InsatisfeitoAntes) partes.Add("🤝 fez as pazes");
+        return string.Join(" · ", partes);
+    }
+
+    private static string Pct(decimal? p) => p is decimal v ? $"{v * 100:0}%" : "—";
+
+    // "R$ 51,3 mi", como no Termômetro.
+    private static string Moeda(decimal valor)
+    {
+        var sinal = valor < 0 ? "-" : "";
+        var abs = Math.Abs(valor);
+        return abs switch
+        {
+            >= 1_000_000_000 => $"{sinal}R$ {(abs / 1_000_000_000).ToString("0.0", Brasil)} bi",
+            >= 1_000_000 => $"{sinal}R$ {(abs / 1_000_000).ToString("0.0", Brasil)} mi",
+            _ => sinal + abs.ToString("C0", Brasil)
+        };
+    }
+
+    private RenderFragment Lista(IReadOnlyList<SobeEDesceJogadorDto> jogadores, string vazio) => __builder =>
+    {
+        @if (jogadores.Count == 0)
+        {
+            <p class="text-muted">@vazio</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var (j, i) in jogadores.Select((j, i) => (j, i + 1)))
+                {
+                    var sobe = j.Diferenca > 0;
+                    <li class="list-group-item d-flex align-items-start gap-2">
+                        <span class="text-muted small fw-semibold pt-2" style="min-width: 1.25rem;">@i</span>
+                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="flex-shrink-0" />
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <div class="d-flex justify-content-between align-items-baseline gap-2">
+                                <a href="/players/details/@j.PlayerId" class="fw-semibold text-primary">@j.Nome</a>
+                                <span class="fw-bold text-nowrap @(sobe ? "text-success" : "text-danger")">
+                                    @(sobe ? "▲ +" : "▼ −")@Moeda(Math.Abs(j.Diferenca))
+                                </span>
+                            </div>
+                            <div class="small text-muted">
+                                @j.Posicao · @j.Overall ·
+                                <img src="@Escudos.GetEscudo(j.TimeNome)" alt="" width="16" height="16" class="me-1" style="object-fit: contain;" />@j.TimeNome
+                                · @Moeda(j.ValorAntes) → <strong class="text-body">@Moeda(j.ValorAgora)</strong>
+                                @(j.ValorAntes == 0 ? "" : $"({(j.ValorAgora / j.ValorAntes - 1) * 100:+0;−0;0}%)")
+                            </div>
+                            <div class="small text-muted">@Motivo(j)</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    };
+}
