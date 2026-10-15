@@ -130,8 +130,9 @@
         else
         {
             <div class="small text-muted text-center mb-2">
-                @tr.Retrospecto.Jogos jogo@(tr.Retrospecto.Jogos == 1 ? "" : "s") · gols @tr.Retrospecto.GolsPro x @tr.Retrospecto.GolsContra
+                @tr.Retrospecto.Jogos jogo@(tr.Retrospecto.Jogos == 1 ? "" : "s")@if (tr.ComAuxiliar) {<span class="text-warning" title="Com um dos dois de auxiliar">*</span>} · gols @tr.Retrospecto.GolsPro x @tr.Retrospecto.GolsContra
                 · com qualquer clube que dirigiam
+                · <a href="/treinadores/@tr.Casa.TreinadorId/confrontos?contra=@tr.Fora.TreinadorId">ver o duelo</a>
             </div>
             <ul class="list-unstyled small mb-0">
                 @foreach (var j in tr.Ultimos)
@@ -147,11 +148,25 @@
                             {
                                 <span>@j.AdversarioTimeNome <strong>@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
                             }
+                            @if (j.ComAuxiliar)
+                            {
+                                <span class="text-warning" title="Com um dos dois de auxiliar">*</span>
+                            }
                         </span>
                         <span class="text-muted text-truncate" style="max-width: 40%;">@j.Competicao</span>
                     </li>
                 }
             </ul>
+            @if (tr.ComAuxiliar)
+            {
+                <div class="small text-muted mt-1">
+                    <span class="text-warning">*</span> jogo em que um dos dois estava no banco como auxiliar
+                    @foreach (var nome in Auxiliares(tr))
+                    {
+                        <span>· @nome</span>
+                    }
+                </div>
+            }
         }
     }
 }
@@ -165,6 +180,13 @@
 
     private static string Artilheiro(PreviaTimeDto t) =>
         t.Artilheiro is null ? "—" : $"{t.Artilheiro} ({t.ArtilheiroGols})";
+
+    /// <summary>Quem esteve de auxiliar nos jogos com asterisco ("Fulano era auxiliar").</summary>
+    private static IEnumerable<string> Auxiliares(PreviaTreinadoresDto tr) =>
+        tr.Ultimos.Where(j => j.EleAuxiliar).Select(_ => tr.Casa.NomeCurto)
+            .Concat(tr.Ultimos.Where(j => j.AdversarioAuxiliar).Select(_ => tr.Fora.NomeCurto))
+            .Distinct()
+            .Select(n => $"{n} era auxiliar");
 
     private static string Nomes(IReadOnlyList<string> nomes) => nomes.Count == 0 ? "—" : string.Join(", ", nomes);
 

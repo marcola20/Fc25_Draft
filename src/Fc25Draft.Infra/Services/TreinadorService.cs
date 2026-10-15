@@ -441,9 +441,9 @@ public class TreinadorService : ITreinadorService
 
     public async Task<IReadOnlyList<TreinadorConfrontoDto>> GetConfrontosAsync(Guid treinadorId, CancellationToken ct)
     {
-        // Todas as passagens de técnico: as dele dizem os clubes, as dos outros dizem quem estava do outro lado.
+        // Todas as passagens, de técnico e de auxiliar: as dele dizem os clubes, as dos outros dizem quem estava
+        // do outro lado.
         var passagens = await _db.TreinadorPassagens.AsNoTracking()
-            .Where(p => p.Papel == PapelTreinador.Treinador)
             .Select(p => new ConfrontoTreinadores.Passagem(p.TreinadorId,
                 new ComandoDoJogo.Periodo(p.PassagemId, p.TimeId, p.Papel, p.Desde, p.Ate, p.SaiuEm)))
             .ToListAsync(ct);

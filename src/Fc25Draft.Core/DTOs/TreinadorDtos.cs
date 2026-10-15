@@ -85,7 +85,10 @@ public record TreinadorCarreiraDto(
     public IReadOnlyList<string> Clubes => Passagens.Select(p => p.TimeNome).Distinct().ToArray();
 }
 
-/// <summary>Um jogo entre dois técnicos, visto do lado de quem é o dono do retrospecto.</summary>
+/// <summary>
+/// Um jogo entre dois técnicos, visto do lado de quem é o dono do retrospecto. <see cref="EleAuxiliar"/> e
+/// <see cref="AdversarioAuxiliar"/> dizem quem estava no banco como auxiliar (o jogo leva asterisco).
+/// </summary>
 public record TreinadorConfrontoJogoDto(
     Guid PartidaId,
     DateTime Data,
@@ -95,8 +98,12 @@ public record TreinadorConfrontoJogoDto(
     bool EmCasa,
     int GolsPro,
     int GolsContra,
-    bool IsWO)
+    bool IsWO,
+    bool EleAuxiliar = false,
+    bool AdversarioAuxiliar = false)
 {
+    public bool ComAuxiliar => EleAuxiliar || AdversarioAuxiliar;
+
     /// <summary>"V", "E" ou "D" pelo placar do tempo normal (pênaltis contam como empate).</summary>
     public string Resultado => GolsPro > GolsContra ? "V" : GolsPro < GolsContra ? "D" : "E";
 }
@@ -106,7 +113,11 @@ public record TreinadorConfrontoDto(
     Guid AdversarioId,
     string AdversarioNome,
     TreinadorRetrospectoDto Retrospecto,
-    IReadOnlyList<TreinadorConfrontoJogoDto> Jogos);
+    IReadOnlyList<TreinadorConfrontoJogoDto> Jogos)
+{
+    /// <summary>Algum dos jogos foi com um dos dois de auxiliar (o retrospecto leva asterisco).</summary>
+    public bool ComAuxiliar => Jogos.Any(j => j.ComAuxiliar);
+}
 
 public record TreinadorSalvarRequest(Guid? TreinadorId, string Nome, string? Token, bool Ativo = true);
 

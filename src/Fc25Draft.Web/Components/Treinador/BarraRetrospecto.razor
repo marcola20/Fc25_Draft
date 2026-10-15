@@ -1,0 +1,21 @@
+@* Vitórias, empates e derrotas numa barra só, na proporção dos jogos. *@
+@if (Retrospecto.Jogos > 0)
+{
+    <div class="progress @Classe" style="height: @(Fina ? "4px" : "10px");"
+         title="@Retrospecto.Vitorias V · @Retrospecto.Empates E · @Retrospecto.Derrotas D">
+        <div class="progress-bar bg-success" style="width: @Parte(Retrospecto.Vitorias)"></div>
+        <div class="progress-bar bg-secondary" style="width: @Parte(Retrospecto.Empates)"></div>
+        <div class="progress-bar bg-danger" style="width: @Parte(Retrospecto.Derrotas)"></div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public TreinadorRetrospectoDto Retrospecto { get; set; } = TreinadorRetrospectoDto.Vazio;
+    [Parameter] public string? Classe { get; set; }
+
+    /// <summary>Barra baixinha, para listas.</summary>
+    [Parameter] public bool Fina { get; set; }
+
+    private string Parte(int n) =>
+        (n * 100m / Retrospecto.Jogos).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+}

@@ -110,6 +110,7 @@ public class PreviaService : IPreviaService
             casa.Perfil,
             fora.Perfil,
             duelo?.Retrospecto ?? TreinadorRetrospectoDto.Vazio,
-            duelo?.Jogos.Take(5).ToList() ?? new List<TreinadorConfrontoJogoDto>());
+            duelo?.Jogos.Take(5).ToList() ?? new List<TreinadorConfrontoJogoDto>(),
+            duelo?.ComAuxiliar ?? false);
     }
 }

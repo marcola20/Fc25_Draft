@@ -37,13 +37,15 @@ public record PreviaConfrontoDto(
 
 /// <summary>
 /// Duelo entre os técnicos de hoje dos dois clubes, com qualquer clube que dirigiam, contado do lado do técnico
-/// do mandante. Os últimos jogos vêm do mais recente para o mais antigo.
+/// do mandante. Os últimos jogos vêm do mais recente para o mais antigo. <see cref="ComAuxiliar"/>: algum jogo foi
+/// com um dos dois de auxiliar (leva asterisco).
 /// </summary>
 public record PreviaTreinadoresDto(
     PerfilTreinadorDto Casa,
     PerfilTreinadorDto Fora,
     TreinadorRetrospectoDto Retrospecto,
-    IReadOnlyList<TreinadorConfrontoJogoDto> Ultimos);
+    IReadOnlyList<TreinadorConfrontoJogoDto> Ultimos,
+    bool ComAuxiliar = false);
 
 public record PreviaDto(
     Guid PartidaId,

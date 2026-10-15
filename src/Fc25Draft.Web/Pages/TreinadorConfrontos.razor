@@ -1,0 +1,262 @@
+@page "/treinadores/{TreinadorId:guid}/confrontos"
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+@inject ITreinadorService TreinadorSvc
+@inject IPerfilTreinadorService PerfilSvc
+@inject NavigationManager Nav
+@inject LayoutState LayoutState
+
+<PageTitle>Confrontos · @(_treinador?.Nome ?? "Treinador")</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar os confrontos:</strong> @_erro</div>
+    }
+    else if (_treinador is null)
+    {
+        <div class="alert alert-info">Treinador não encontrado. <a href="/treinadores">Ver todos</a></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" />
+            <div class="flex-grow-1" style="min-width: 0;">
+                <h1 class="h4 mb-0"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
+                <div class="text-muted small">
+                    @if (_confrontos.Count == 0)
+                    {
+                        <span>Ainda não enfrentou nenhum técnico.</span>
+                    }
+                    else
+                    {
+                        <span>Enfrentou @_confrontos.Count técnico@(_confrontos.Count == 1 ? "" : "s") em @_confrontos.SelectMany(c => c.Jogos).Select(j => j.PartidaId).Distinct().Count() jogos</span>
+                    }
+                </div>
+            </div>
+            <a href="/treinadores/@TreinadorId" class="btn btn-sm btn-outline-secondary">← Carreira</a>
+        </div>
+
+        @if (_confrontos.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="row g-0 confrontos-destaques">
+                @Destaque("🎯 Freguês", "quem ele mais venceu", ConfrontoTreinadores.Fregues(_confrontos))
+                @Destaque("💀 Carrasco", "quem mais o venceu", ConfrontoTreinadores.Carrasco(_confrontos))
+                @Destaque("🔁 Rival", "quem ele mais enfrentou", _confrontos[0])
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-7 order-lg-2">
+                    <div class="card confrontos-painel" tabindex="-1" @ref="_painel">
+                        @if (_selecionado is { } s)
+                        {
+                            var r = s.Retrospecto;
+                            var adv = Perfil(s.AdversarioId);
+                            <div class="card-body">
+                                <div class="confrontos-duelo text-center">
+                                    <div>
+                                        <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" />
+                                        <div class="fw-semibold mt-1 text-truncate"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" /></div>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <div class="confrontos-placar">
+                                            <div><div class="valor text-success">@r.Vitorias</div><div class="small text-muted"><span class="d-none d-sm-inline">vitórias</span><span class="d-sm-none">V</span></div></div>
+                                            <div><div class="valor text-secondary">@r.Empates</div><div class="small text-muted"><span class="d-none d-sm-inline">empates</span><span class="d-sm-none">E</span></div></div>
+                                            <div><div class="valor text-danger">@r.Derrotas</div><div class="small text-muted"><span class="d-none d-sm-inline">derrotas</span><span class="d-sm-none">D</span></div></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <a href="/treinadores/@s.AdversarioId" class="text-reset text-decoration-none">
+                                            <FotoTreinador TreinadorId="@s.AdversarioId" Tamanho="56" Versao="@adv?.VersaoFoto" Alt="@s.AdversarioNome" />
+                                            <div class="fw-semibold mt-1 text-truncate"><NomeTreinador Nome="@s.AdversarioNome" Apelido="@adv?.Apelido" /></div>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <BarraRetrospecto Retrospecto="r" Classe="my-3" />
+
+                                <div class="d-flex justify-content-center flex-wrap gap-4 small text-muted mb-3">
+                                    <span><strong class="text-body">@r.Jogos</strong> jogo@(r.Jogos == 1 ? "" : "s")@if (s.ComAuxiliar) {<span class="text-warning" title="Com um dos dois de auxiliar">*</span>}</span>
+                                    <span>gols <strong class="text-body">@r.GolsPro x @r.GolsContra</strong></span>
+                                    <span>aproveitamento <strong class="text-body">@r.Aproveitamento.ToString("0.#", Br)%</strong></span>
+                                </div>
+
+                                <ul class="list-unstyled small mb-0">
+                                    @foreach (var j in s.Jogos)
+                                    {
+                                        <li class="d-flex align-items-center gap-2 py-2 border-top">
+                                            <span class="badge @CorDoResultado(j.Resultado)" style="width: 1.6rem;">@j.Resultado</span>
+                                            <div class="flex-grow-1" style="min-width: 0;">
+                                            <div>
+                                                @if (j.EmCasa)
+                                                {
+                                                    <span>@j.TimeNome <strong>@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@j.AdversarioTimeNome <strong>@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
+                                                }
+                                                @if (j.IsWO)
+                                                {
+                                                    <span class="badge bg-secondary ms-1">W.O.</span>
+                                                }
+                                                @if (j.ComAuxiliar)
+                                                {
+                                                    <span class="badge text-bg-warning ms-1">* @QuemEraAuxiliar(j, s)</span>
+                                                }
+                                            </div>
+                                            <div class="text-muted text-truncate">@j.Data.ToString("dd/MM/yy", Br) · @j.Competicao</div>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-lg-5 order-lg-1">
+                    <div class="list-group">
+                        @foreach (var c in _confrontos)
+                        {
+                            var perfil = Perfil(c.AdversarioId);
+                            var ativo = _selecionado?.AdversarioId == c.AdversarioId;
+                            <button type="button" class="list-group-item list-group-item-action @(ativo ? "active" : "")"
+                                    @onclick="() => SelecionarAsync(c.AdversarioId)">
+                                <div class="d-flex align-items-center gap-2">
+                                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="32" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
+                                    <div class="flex-grow-1" style="min-width: 0;">
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="fw-semibold text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
+                                            <span class="small text-nowrap">
+                                                @c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas
+                                                <span class="@(ativo ? "" : "text-muted")">· @c.Retrospecto.Jogos J@(c.ComAuxiliar ? "*" : "")</span>
+                                            </span>
+                                        </div>
+                                        <BarraRetrospecto Retrospecto="c.Retrospecto" Classe="mt-1" Fina="true" />
+                                    </div>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        Contam os jogos encerrados em que os dois estavam no comando, com qualquer clube. Pênaltis contam como empate.
+                        <span class="text-warning">*</span> Jogo em que um dos dois estava no banco como auxiliar.
+                    </p>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter] public Guid TreinadorId { get; set; }
+
+    /// <summary>O adversário aberto no painel; sem ele, o mais enfrentado.</summary>
+    [SupplyParameterFromQuery(Name = "contra")] public Guid? Contra { get; set; }
+
+    private bool _carregando = true;
+    private string? _erro;
+    private TreinadorDto? _treinador;
+    private PerfilTreinadorDto? _perfil;
+    private IReadOnlyList<TreinadorConfrontoDto> _confrontos = Array.Empty<TreinadorConfrontoDto>();
+    private IReadOnlyDictionary<Guid, PerfilTreinadorDto> _perfis = new Dictionary<Guid, PerfilTreinadorDto>();
+    private TreinadorConfrontoDto? _selecionado;
+    private ElementReference _painel;
+    private Guid? _carregadoPara;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregadoPara != TreinadorId)
+        {
+            _carregando = true;
+            _erro = null;
+            try
+            {
+                _treinador = await TreinadorSvc.GetAsync(TreinadorId, CancellationToken.None);
+                if (_treinador is not null)
+                {
+                    _perfil = await PerfilSvc.GetAsync(TreinadorId, CancellationToken.None);
+                    _confrontos = await TreinadorSvc.GetConfrontosAsync(TreinadorId, CancellationToken.None);
+                    _perfis = await PerfilSvc.VariosAsync(_confrontos.Select(c => c.AdversarioId), CancellationToken.None);
+                    AtualizarCabecalho();
+                }
+                _carregadoPara = TreinadorId;
+            }
+            catch (Exception ex) { _erro = ex.Message; }
+            finally { _carregando = false; }
+        }
+
+        _selecionado = _confrontos.FirstOrDefault(c => c.AdversarioId == Contra) ?? _confrontos.FirstOrDefault();
+    }
+
+    /// <summary>Abre o duelo, deixa o link apontando para ele e, no celular, sobe até o painel.</summary>
+    private async Task SelecionarAsync(Guid adversarioId)
+    {
+        _selecionado = _confrontos.First(c => c.AdversarioId == adversarioId);
+        Nav.NavigateTo(Nav.GetUriWithQueryParameter("contra", adversarioId), replace: true);
+        await Task.Yield();
+        try { await _painel.FocusAsync(preventScroll: false); } catch (JSException) { }
+    }
+
+    private PerfilTreinadorDto? Perfil(Guid id) => _perfis.GetValueOrDefault(id);
+
+    /// <summary>"Fulano era auxiliar" (ou os dois).</summary>
+    private string QuemEraAuxiliar(TreinadorConfrontoJogoDto j, TreinadorConfrontoDto c)
+    {
+        var nomes = new List<string>();
+        if (j.EleAuxiliar) nomes.Add(_perfil?.NomeCurto ?? _treinador!.Nome);
+        if (j.AdversarioAuxiliar) nomes.Add(Perfil(c.AdversarioId)?.NomeCurto ?? c.AdversarioNome);
+        return nomes.Count == 2 ? "os dois eram auxiliares" : $"{nomes[0]} era auxiliar";
+    }
+
+    private void AtualizarCabecalho()
+    {
+        LayoutState.SetPage(
+            new PageDefinition { Route = "/treinadores", Title = $"Confrontos de {_treinador!.Nome}" },
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Treinadores", "/treinadores"),
+                new(_treinador.Nome, $"/treinadores/{TreinadorId}"),
+                new("Confrontos")
+            },
+            subtitle: "Retrospecto contra cada técnico, com qualquer clube");
+    }
+
+    private static string CorDoResultado(string resultado) => resultado switch
+    {
+        "V" => "bg-success",
+        "D" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    /// <summary>No celular vira uma linha só (rótulo e técnico lado a lado); do tablet para cima, uma coluna.</summary>
+    private RenderFragment Destaque(string titulo, string dica, TreinadorConfrontoDto? c) => @<div class="col-md-4 confrontos-destaque">
+        <div class="d-flex d-md-block align-items-center gap-2 px-3 py-2">
+            <div class="small text-muted text-nowrap confrontos-destaque-titulo">@titulo <span class="opacity-75 d-none d-xl-inline">· @dica</span></div>
+            @if (c is null)
+            {
+                <div class="text-muted small">Ninguém ainda</div>
+            }
+            else
+            {
+                var perfil = Perfil(c.AdversarioId);
+                <button type="button" class="btn btn-link p-0 text-reset text-decoration-none d-flex align-items-center gap-2 mt-md-1 text-start"
+                        style="min-width: 0;" @onclick="() => SelecionarAsync(c.AdversarioId)">
+                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="24" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
+                    <span class="fw-semibold text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
+                    <span class="small text-muted text-nowrap">@c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas@(c.ComAuxiliar ? "*" : "")</span>
+                </button>
+            }
+        </div>
+    </div>;
+}
