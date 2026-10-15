@@ -244,9 +244,18 @@ public class ResultadoPesService : IResultadoPesService
         }
 
         // Reenvio (JSON corrigido ou reextraído): fica na partida que recebeu o envio anterior,
-        // mesmo já encerrada e mesmo havendo outra do mesmo par mais perto de agora.
+        // mesmo já encerrada e mesmo havendo outra do mesmo par mais perto de agora. Só se for o
+        // mesmo vídeo: o script anota pelo nome do arquivo, e o PES repete o nome ("Vasco vs
+        // Cruzeiro") quando o par se enfrenta de novo em outra competição.
         if (candidatos.Count > 1 && candidatos.FirstOrDefault(c => partidaAnterior is not null && c.PartidaId == partidaAnterior) is { } anterior)
-            candidatos = [anterior];
+        {
+            var doAnterior = await _db.LigaPartidaImportacoes.AsNoTracking()
+                .Where(i => i.PartidaId == partidaAnterior)
+                .Select(i => new { i.Video, i.Json })
+                .FirstOrDefaultAsync(ct);
+            if (doAnterior is not null && MesmoVideo(doAnterior.Video, GravadoEm(doAnterior.Json), r))
+                candidatos = [anterior];
+        }
 
         // Reenvio sem o id (o primeiro envio gravou, mas a resposta não chegou ao script): a
         // partida que já tem este vídeo. Sem isto ela, já encerrada, perderia para a do mesmo par
@@ -311,11 +320,12 @@ public class ResultadoPesService : IResultadoPesService
     }
 
     /// <summary>
-    /// O JSON importado antes veio do mesmo vídeo? Pela data de gravação quando os dois a têm
-    /// (o nome pode se repetir se o vídeo antigo saiu da pasta); senão, pelo nome do vídeo.
+    /// O JSON importado antes veio do mesmo vídeo? Pela data de gravação quando algum dos dois a tem:
+    /// o nome se repete quando o par volta a se enfrentar ("Vasco vs Cruzeiro.mp4" na Copa e na Série A),
+    /// então um JSON com data e outro sem são vídeos diferentes. Só quando nenhum tem data vale o nome.
     /// </summary>
     private static bool MesmoVideo(string? videoImportado, string? gravadoEmImportado, ResultadoPesRequest r) =>
-        gravadoEmImportado is not null && r.GravadoEm is not null
+        gravadoEmImportado is not null || r.GravadoEm is not null
             ? gravadoEmImportado == r.GravadoEm
             : !string.IsNullOrWhiteSpace(r.Video) && string.Equals(videoImportado, r.Video, StringComparison.OrdinalIgnoreCase);
 
