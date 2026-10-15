@@ -13,6 +13,12 @@ public static class AlbumFigurinhas
     /// <summary>Figurinhas por pacote.</summary>
     public const int TamanhoPacote = 5;
 
+    /// <summary>
+    /// Figurinhas novas (que a pessoa ainda não tem) garantidas em cada pacote, enquanto faltar alguma da
+    /// raridade da vaga ou abaixo.
+    /// </summary>
+    public const int NovasGarantidasPorPacote = 2;
+
     /// <summary>Chance de uma das vagas comuns (1 a 4) vir brilhante.</summary>
     public const double ChanceBrilhanteNaComum = 0.05;
 
@@ -121,11 +127,15 @@ public static class AlbumFigurinhas
     /// a última: brilhante, com <see cref="ChanceLendariaNaEspecial"/> de virar lendária. Sem figurinha da
     /// raridade sorteada no álbum, desce para a de baixo. Não repete figurinha dentro do mesmo pacote
     /// enquanto houver outra da raridade.
+    /// Depois garante <see cref="NovasGarantidasPorPacote"/> novas: se veio menos, troca vagas repetidas
+    /// (as comuns primeiro, a especial por último) por uma que falta da mesma raridade ou de baixo — a
+    /// garantia nunca sobe a raridade da vaga.
     /// </summary>
     public static IReadOnlyList<Guid> SortearPacote(
-        IReadOnlyDictionary<RaridadeFigurinha, IReadOnlyList<Guid>> porRaridade, Random rng)
+        IReadOnlyDictionary<RaridadeFigurinha, IReadOnlyList<Guid>> porRaridade, IReadOnlySet<Guid> jaTem, Random rng)
     {
         var sorteadas = new List<Guid>(TamanhoPacote);
+        var raridades = new List<RaridadeFigurinha>(TamanhoPacote);
         for (var vaga = 1; vaga <= TamanhoPacote; vaga++)
         {
             var especial = vaga == TamanhoPacote;
@@ -140,11 +150,47 @@ public static class AlbumFigurinhas
                 var livres = opcoes.Where(id => !sorteadas.Contains(id)).ToList();
                 var lista = livres.Count > 0 ? livres : opcoes;
                 sorteadas.Add(lista[rng.Next(lista.Count)]);
+                raridades.Add(r);
                 break;
             }
         }
 
+        GarantirNovas(sorteadas, raridades, porRaridade, jaTem, rng);
         return sorteadas;
+    }
+
+    private static void GarantirNovas(List<Guid> sorteadas, List<RaridadeFigurinha> raridades,
+        IReadOnlyDictionary<RaridadeFigurinha, IReadOnlyList<Guid>> porRaridade, IReadOnlySet<Guid> jaTem, Random rng)
+    {
+        // Repetida: a pessoa já tem, ou a mesma figurinha já saiu numa vaga anterior deste pacote.
+        bool Repetida(int i) => jaTem.Contains(sorteadas[i]) || sorteadas.IndexOf(sorteadas[i]) < i;
+
+        var faltam = NovasGarantidasPorPacote - Enumerable.Range(0, sorteadas.Count).Count(i => !Repetida(i));
+        if (faltam <= 0) return;
+
+        var vagas = Enumerable.Range(0, sorteadas.Count)
+            .Where(Repetida)
+            .OrderBy(i => raridades[i])
+            .ThenBy(i => i)
+            .ToList();
+
+        foreach (var i in vagas)
+        {
+            if (faltam <= 0) break;
+
+            for (var r = raridades[i]; r >= RaridadeFigurinha.Comum; r--)
+            {
+                if (!porRaridade.TryGetValue(r, out var opcoes)) continue;
+
+                var novas = opcoes.Where(id => !jaTem.Contains(id) && !sorteadas.Contains(id)).ToList();
+                if (novas.Count == 0) continue;
+
+                sorteadas[i] = novas[rng.Next(novas.Count)];
+                raridades[i] = r;
+                faltam--;
+                break;
+            }
+        }
     }
 
     /// <summary>"#007": o número como vem impresso.</summary>

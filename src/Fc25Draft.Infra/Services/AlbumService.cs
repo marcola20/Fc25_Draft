@@ -819,7 +819,12 @@ public partial class AlbumService : IAlbumService
             var porRaridade = figurinhas
                 .GroupBy(f => f.Raridade)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<Guid>)g.Select(f => f.FigurinhaId).ToList());
-            var sorteadas = AlbumFigurinhas.SortearPacote(porRaridade, Random.Shared);
+            var idsDoAlbum = figurinhas.Select(f => f.FigurinhaId).ToList();
+            var jaTem = (await _db.FigurinhasDosTreinadores
+                .Where(f => f.TreinadorId == treinadorId && idsDoAlbum.Contains(f.FigurinhaId))
+                .Select(f => f.FigurinhaId)
+                .ToListAsync(ct)).ToHashSet();
+            var sorteadas = AlbumFigurinhas.SortearPacote(porRaridade, jaTem, Random.Shared);
 
             var agora = Agora;
             var ids = sorteadas.Distinct().ToList();
