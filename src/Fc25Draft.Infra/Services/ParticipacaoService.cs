@@ -31,14 +31,23 @@ public class ParticipacaoService : IParticipacaoService
     private sealed record Montagem(
         DateTime CalculadaEm,
         IReadOnlyDictionary<int, ParticipacaoJogador> Jogadores,
+        IReadOnlyDictionary<int, Entrada> Entradas,
         IReadOnlyDictionary<int, string> Nomes,
         IReadOnlyDictionary<Guid, string> Times);
+
+    /// <summary>O que entrou na conta de cada jogador (para refazer jogo a jogo).</summary>
+    private sealed record Entrada(Guid TimeId, IReadOnlyList<JogoDoJogador> Jogos, bool Goleiro, bool TemNivel);
 
     public async Task<IReadOnlyDictionary<int, ParticipacaoJogador>> GetTodosAsync(CancellationToken ct) =>
         (await MontarAsync(ct)).Jogadores;
 
     public async Task<ParticipacaoJogador?> GetAsync(int playerId, CancellationToken ct) =>
         (await MontarAsync(ct)).Jogadores.GetValueOrDefault(playerId);
+
+    public async Task<IReadOnlyList<PontoDeParticipacao>> GetHistoricoAsync(int playerId, CancellationToken ct) =>
+        (await MontarAsync(ct)).Entradas.GetValueOrDefault(playerId) is { } e
+            ? Participacao.Historico(e.TimeId, e.Jogos, e.Goleiro, e.TemNivel)
+            : [];
 
     public async Task<IReadOnlyDictionary<int, ParticipacaoJogador>> GetTodosEmAsync(DateTime ateUtc, CancellationToken ct) =>
         (await CalcularAsync(_time.GetUtcNow().UtcDateTime, ateUtc, ct)).Jogadores;
@@ -102,6 +111,7 @@ public class ParticipacaoService : IParticipacaoService
             .ToDictionary(g => g.Key, g => g.Select(e => e.Overall).OrderByDescending(o => o).Take(11).DefaultIfEmpty(0).Average());
 
         var jogadores = new Dictionary<int, ParticipacaoJogador>(elenco.Count);
+        var entradas = new Dictionary<int, Entrada>(elenco.Count);
         foreach (var j in elenco)
         {
             var desde = chegadas.TryGetValue((j.PlayerId, j.TeamId), out var c) ? c : (DateTime?)null;
@@ -115,9 +125,10 @@ public class ParticipacaoService : IParticipacaoService
             var goleiro = j.PositionId == (short)PositionType.Goleiro;
             var temNivel = j.Overall >= mediaDoXi[j.TeamId] - ParticipacaoCriterios.MargemDoNivel;
             jogadores[j.PlayerId] = Participacao.Calcular(j.TeamId, jogos, goleiro, temNivel);
+            entradas[j.PlayerId] = new Entrada(j.TeamId, jogos, goleiro, temNivel);
         }
 
-        return new Montagem(agora, jogadores, elenco.ToDictionary(e => e.PlayerId, e => e.Name), times);
+        return new Montagem(agora, jogadores, entradas, elenco.ToDictionary(e => e.PlayerId, e => e.Name), times);
     }
 
     /// <summary>(partida, jogador) em que o jogador cumpria suspensão: esse jogo não conta para ele.</summary>

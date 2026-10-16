@@ -1,0 +1,17 @@
+/* Tamanhos em unidades do viewBox (640 de largura): no celular o SVG encolhe, então os textos crescem. */
+.valor-grafico .vg-valor { font-size: 11px; font-weight: 600; }
+.valor-grafico .vg-data { font-size: 10px; }
+.valor-grafico .vg-ref { font-size: 10px; }
+.valor-grafico .vg-humor { font-size: 15px; }
+.valor-grafico .vg-ponto { r: 6px; }
+
+@media (max-width: 576px) {
+    .valor-grafico .vg-valor { font-size: 24px; }
+    .valor-grafico .vg-data { font-size: 22px; }
+    .valor-grafico .vg-ref { font-size: 20px; }
+    .valor-grafico .vg-humor { font-size: 30px; }
+    .valor-grafico .vg-ponto { r: 12px; }
+    /* Textos maiores: afasta do ponto para não encostar. */
+    .valor-grafico .vg-valor { transform: translateY(-9px); }
+    .valor-grafico .vg-humor { transform: translateY(-26px); }
+}

@@ -14,6 +14,9 @@ public interface IParticipacaoService
     /// <summary>A conta de um jogador; nulo se ele não tem clube.</summary>
     Task<ParticipacaoJogador?> GetAsync(int playerId, CancellationToken ct);
 
+    /// <summary>A conta depois de cada jogo do clube atual, desde a chegada; vazio se ele não tem clube.</summary>
+    Task<IReadOnlyList<PontoDeParticipacao>> GetHistoricoAsync(int playerId, CancellationToken ct);
+
     /// <summary>
     /// Como estava em <paramref name="ateUtc"/>: a conta dos jogadores com clube hoje, só com os jogos até essa data
     /// (sem guardar).

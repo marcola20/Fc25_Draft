@@ -1,0 +1,141 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IValorDoJogadorService ValorDoJogador
+
+@* Valor de mercado jogo a jogo no clube atual. Some sem clube ou sem jogo pelo clube. *@
+@if (_d is { Pontos.Count: > 0 } d)
+{
+    var pontos = d.Pontos;
+    var valores = pontos.Select(p => (double)p.Valor).Append((double)d.ValorSemVariacao).ToList();
+    var max = valores.Max();
+    var min = valores.Min();
+    var folga = Math.Max((max - min) * 0.2, max * 0.03);
+    var topo = max + folga;
+    var base0 = Math.Max(0, min - folga);
+    const double largura = 640;
+    const double altura = 210;
+    const double margemX = 44;
+    double X(int i) => pontos.Count == 1 ? largura / 2 : margemX + i * (largura - 2 * margemX) / (pontos.Count - 1);
+    double Y(decimal v) => 50 + (topo - (double)v) * (altura - 90) / Math.Max(1, topo - base0);
+    // Datas embaixo: a primeira, a última e mais umas no meio, sem encavalar.
+    var passoDatas = Math.Max(1, (int)Math.Ceiling(pontos.Count / 6.0));
+    var ultimo = pontos[^1];
+
+    <div class="card mb-3">
+        <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
+            <strong>💹 Valor no @d.TimeNome jogo a jogo</strong>
+            <span class="small text-muted">
+                @Dinheiro.Curto(pontos[0].Valor) → <strong class="text-body">@Dinheiro.Curto(ultimo.Valor)</strong>
+            </span>
+            @if (ultimo.Variacao != 0m)
+            {
+                <span class="small fw-semibold @(ultimo.Variacao > 0 ? "text-success" : "text-danger")">
+                    @Participacao.Rotulo(ultimo.Variacao) pela participação
+                </span>
+            }
+        </div>
+        <div class="card-body">
+            <svg viewBox="0 0 @Num(largura) @Num(altura)" class="w-100 valor-grafico" style="max-height: 250px;" role="img"
+                 aria-label="Valor de @Dinheiro.Curto(pontos[0].Valor) para @Dinheiro.Curto(ultimo.Valor) em @pontos.Count jogos">
+                @* Referência: o valor sem a participação (de quem acabou de chegar). *@
+                <line x1="@Num(margemX - 20)" x2="@Num(largura - margemX + 20)" y1="@Num(Y(d.ValorSemVariacao))" y2="@Num(Y(d.ValorSemVariacao))"
+                      stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 4" />
+                <text x="@Num(largura - margemX + 20)" y="@Num(Y(d.ValorSemVariacao) + 13)" text-anchor="end" class="vg-ref"
+                      fill="currentColor" opacity="0.55">sem participação · @Dinheiro.Curto(d.ValorSemVariacao).Replace("R$ ", "")</text>
+
+                @if (pontos.Count > 1)
+                {
+                    <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5" stroke-linejoin="round"
+                              points="@string.Join(" ", pontos.Select((p, i) => $"{Num(X(i))},{Num(Y(p.Valor))}"))" />
+                }
+
+                @for (var i = 0; i < pontos.Count; i++)
+                {
+                    var p = pontos[i];
+                    var mudou = i == 0 || i == pontos.Count - 1 || p.Valor != pontos[i - 1].Valor;
+                    <circle cx="@Num(X(i))" cy="@Num(Y(p.Valor))" class="vg-ponto" fill="@Cor(p.Participou)" stroke="var(--bs-body-bg)" stroke-width="1.5">
+                        <title>@Dica(p)</title>
+                    </circle>
+                    @if (p.Humor is string humor)
+                    {
+                        <g><text x="@Num(X(i))" y="@Num(Y(p.Valor) - 24)" text-anchor="middle" class="vg-humor">@humor</text></g>
+                    }
+                    @if (mudou)
+                    {
+                        <g><text x="@Num(X(i))" y="@Num(Y(p.Valor) - 10)" text-anchor="middle" class="vg-valor"
+                              fill="currentColor">@Dinheiro.Curto(p.Valor).Replace("R$ ", "")</text></g>
+                    }
+                    @if (i % passoDatas == 0 || i == pontos.Count - 1)
+                    {
+                        <g><text x="@Num(X(i))" y="@Num(altura - 8)" text-anchor="middle" class="vg-data"
+                              fill="currentColor" opacity="0.6">@Dia(p.Data)</text></g>
+                    }
+                }
+            </svg>
+            <div class="small text-muted mt-1 d-flex flex-wrap gap-3">
+                <span><span style="color: @Cor(ParticipouComo.Titular)">●</span> titular</span>
+                <span><span style="color: @Cor(ParticipouComo.EntrouDoBanco)">●</span> entrou do banco</span>
+                <span><span style="color: @Cor(ParticipouComo.NaoJogou)">●</span> não jogou</span>
+                <span>😤 ficou insatisfeito · 🤝 fez as pazes</span>
+            </div>
+            <div class="small text-muted mt-1">
+                Valor de mercado de hoje com a participação de cada momento (últimos @ParticipacaoCriterios.JanelaDeJogos jogos do clube).
+                Passe o dedo ou o mouse nos pontos para ver o jogo.
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    private ValorDoJogadorDto? _d;
+    private int _carregado;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregado == PlayerId && _d is not null) return;
+        _carregado = PlayerId;
+        try
+        {
+            _d = await ValorDoJogador.HistoricoAsync(PlayerId, CancellationToken.None);
+        }
+        catch
+        {
+            // O gráfico é complementar: se falhar, a ficha segue sem ele.
+            _d = null;
+        }
+    }
+
+    private static string Cor(ParticipouComo p) => p switch
+    {
+        ParticipouComo.Titular => "var(--bs-success)",
+        ParticipouComo.EntrouDoBanco => "var(--bs-warning)",
+        _ => "var(--bs-secondary)"
+    };
+
+    private static string Dia(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), HorarioDeBrasilia.Fuso).ToString("dd/MM", Brasil);
+
+    private static string Dica(ValorDoJogadorPontoDto p)
+    {
+        var como = p.Participou switch
+        {
+            ParticipouComo.Titular => "titular",
+            ParticipouComo.EntrouDoBanco => "entrou do banco",
+            _ => "não jogou"
+        };
+        var participacao = p.EmCarencia
+            ? $" · nos primeiros {ParticipacaoCriterios.JogosParaValer} jogos o valor não muda"
+            : p.Percentual is decimal pct ? $" · participação {pct * 100:0}%" : "";
+        var humor = p.Humor switch { "😤" => " · ficou insatisfeito", "🤝" => " · fez as pazes", _ => "" };
+        return $"{Dia(p.Data)} · x {p.Adversario} ({p.GolsPro} x {p.GolsContra}) · {como}{humor} · "
+               + $"{Dinheiro.Curto(p.Valor)} ({Participacao.Rotulo(p.Variacao)}){participacao}";
+    }
+
+    private static string Num(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+}

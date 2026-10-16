@@ -168,6 +168,11 @@ else
         </div>
     </div>
 
+    @if (player.TeamId is not null)
+    {
+        <JogadorValorGrafico @key="@($"valor-{player.PlayerId}")" PlayerId="@player.PlayerId" />
+    }
+
     <ul class="nav nav-tabs mb-3" role="tablist">
         @if (player.Atributos is not null)
         {

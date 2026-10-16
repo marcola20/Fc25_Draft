@@ -47,6 +47,9 @@ public sealed record JogoDoJogador(Guid PartidaId, DateTime Data, bool Titular, 
         : 0m;
 }
 
+/// <summary>A conta do jogador logo depois de um jogo do clube (para o gráfico jogo a jogo).</summary>
+public sealed record PontoDeParticipacao(JogoDoJogador Jogo, ParticipacaoJogador Depois);
+
 /// <summary>Momento em que o jogador ficou insatisfeito (ou deixou de ficar), no jogo que decidiu.</summary>
 public sealed record MudancaDeHumor(Guid PartidaId, DateTime Data, bool Insatisfeito, decimal PercentualNaJanela);
 
@@ -144,6 +147,12 @@ public static class Participacao
             insatisfeito,
             humor);
     }
+
+    /// <summary>A conta depois de cada jogo: o jogo i usa só os jogos até ele.</summary>
+    public static IReadOnlyList<PontoDeParticipacao> Historico(
+        Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel) =>
+        jogos.Select((jogo, i) => new PontoDeParticipacao(jogo, Calcular(timeId, jogos.Take(i + 1).ToList(), goleiro, temNivel)))
+            .ToList();
 
     /// <summary>"+15%", "−30%" (sinal de menos de verdade) ou "0%".</summary>
     public static string Rotulo(decimal variacao) =>
