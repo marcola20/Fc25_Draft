@@ -4,8 +4,16 @@
 @using Fc25Draft.Core.Utilities
 @inject IValorDoJogadorService ValorDoJogador
 
-@* Valor de mercado jogo a jogo no clube atual. Some sem clube ou sem jogo pelo clube. *@
-@if (_d is { Pontos.Count: > 0 } d)
+@* Valor de mercado jogo a jogo no clube atual (aba Valor da ficha). *@
+@if (!_carregou)
+{
+    <div class="text-center py-4"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+}
+else if (_d is not { Pontos.Count: > 0 })
+{
+    <p class="text-muted">O gráfico aparece depois do primeiro jogo dele pelo clube.</p>
+}
+else if (_d is { } d)
 {
     var pontos = d.Pontos;
     var valores = pontos.Select(p => (double)p.Valor).Append((double)d.ValorSemVariacao).ToList();
@@ -95,6 +103,7 @@
 
     private ValorDoJogadorDto? _d;
     private int _carregado;
+    private bool _carregou;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -109,6 +118,7 @@
             // O gráfico é complementar: se falhar, a ficha segue sem ele.
             _d = null;
         }
+        _carregou = true;
     }
 
     private static string Cor(ParticipouComo p) => p switch

@@ -168,11 +168,6 @@ else
         </div>
     </div>
 
-    @if (player.TeamId is not null)
-    {
-        <JogadorValorGrafico @key="@($"valor-{player.PlayerId}")" PlayerId="@player.PlayerId" />
-    }
-
     <ul class="nav nav-tabs mb-3" role="tablist">
         @if (player.Atributos is not null)
         {
@@ -195,6 +190,15 @@ else
                 Jogos
             </button>
         </li>
+        @if (player.TeamId is not null)
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(_aba == Aba.Valor ? "active" : "")"
+                        type="button" @onclick="() => _aba = Aba.Valor">
+                    Valor
+                </button>
+            </li>
+        }
         <li class="nav-item" role="presentation">
             <button class="nav-link @(_aba == Aba.Carreira ? "active" : "")"
                     type="button" @onclick="() => _aba = Aba.Carreira">
@@ -215,6 +219,10 @@ else
     else if (_aba == Aba.Jogos)
     {
         <JogadorJogos @key="@($"jogos-{player.PlayerId}")" PlayerId="@player.PlayerId" />
+    }
+    else if (_aba == Aba.Valor && player.TeamId is not null)
+    {
+        <JogadorValorGrafico @key="@($"valor-{player.PlayerId}")" PlayerId="@player.PlayerId" />
     }
     else
     {
@@ -238,7 +246,7 @@ else
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
 
-    private enum Aba { Atributos, Habilidades, Jogos, Carreira }
+    private enum Aba { Atributos, Habilidades, Jogos, Valor, Carreira }
 
     // Mesma escala de cores dos atributos.
     private static string CorDoOverall(int overall) => overall switch
