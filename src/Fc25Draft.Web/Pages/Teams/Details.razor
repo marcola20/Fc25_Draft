@@ -120,7 +120,9 @@ else
 
     <TimeResumoFaixa Perfil="@_perfil" />
 
-    <DiretoriaCard @key="Id" TeamId="@Id" />
+    @* As chaves levam um prefixo: a diretoria e a aba aberta ficam lado a lado na página, e duas
+       chaves iguais (só o Id do time) derrubavam a conexão inteira ao renderizar. *@
+    <DiretoriaCard @key="@($"diretoria-{Id}")" TeamId="@Id" />
 
     <ComissaoTecnica TeamId="@Id" />
 
@@ -187,12 +189,12 @@ else
 
     @if (_activeMainTab == MainTab.Negotiations)
     {
-        <Negotiations @key="Id" TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)"
+        <Negotiations @key="@($"negociacoes-{Id}")" TeamId="@Id" TeamToken="@_currentTeamToken" TransferCount="@(team?.TransferCount ?? 0)"
                       PropostaPorJogador="@_propostaPorJogador" />
     }
     else if (_activeMainTab == MainTab.Temporada)
     {
-        <TimeTemporadaTab @key="Id" TeamId="@Id" />
+        <TimeTemporadaTab @key="@($"temporada-{Id}")" TeamId="@Id" />
     }
     else if (_activeMainTab == MainTab.Jogos)
     {
@@ -200,19 +202,19 @@ else
     }
     else if (_activeMainTab == MainTab.Historico)
     {
-        <TimeHistoricoTab @key="Id" TeamId="@Id" />
+        <TimeHistoricoTab @key="@($"historico-{Id}")" TeamId="@Id" />
     }
     else if (_activeMainTab == MainTab.Retrospectiva)
     {
-        <TimeRetrospectivaTab @key="Id" TeamId="@Id" />
+        <TimeRetrospectivaTab @key="@($"retrospectiva-{Id}")" TeamId="@Id" />
     }
     else if (_activeMainTab == MainTab.Transferencias)
     {
-        <TimeTransferenciasTab @key="Id" TeamId="@Id" />
+        <TimeTransferenciasTab @key="@($"transferencias-{Id}")" TeamId="@Id" />
     }
     else if (_activeMainTab == MainTab.Extrato)
     {
-        <TimeExtratoTab @key="Id" TeamId="@Id" />
+        <TimeExtratoTab @key="@($"extrato-{Id}")" TeamId="@Id" />
     }
     else
     {
