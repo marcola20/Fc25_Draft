@@ -360,7 +360,12 @@
         }
     }
 
-    private async void HandleChange() => await InvokeAsync(StateHasChanged);
+    // async void: uma exceção aqui (conexão já encerrada) derrubaria o processo, então fica contida.
+    private async void HandleChange()
+    {
+        try { await InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { }
+    }
     public void Dispose() => LotteryService.OnChange -= HandleChange;
 
     private IEnumerable<LigaDto> Ligas(TipoCompetition tipo, Divisao? divisao) =>

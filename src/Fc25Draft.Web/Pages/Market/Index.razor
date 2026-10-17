@@ -370,7 +370,15 @@ else
     {
         if (ActiveCycleId != Guid.Empty && cycleId != ActiveCycleId)
             return;
-        await InvokeAsync(() => HandleRealtimeUpdateAsync(vm));
+        // async void: uma exceção que escape daqui derruba a conexão (ou o processo, vinda de outra thread).
+        try
+        {
+            await InvokeAsync(() => HandleRealtimeUpdateAsync(vm));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Falha ao aplicar atualização em tempo real do item {ItemId}", vm.ItemId);
+        }
     }
 
     protected override async Task OnInitializedAsync()

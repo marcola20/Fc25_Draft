@@ -47,7 +47,17 @@
             }
             else
             {
-                @Body
+                @* Um erro numa página fica só nela: sem isto a exceção derruba a conexão inteira e o
+                   site todo para, com a faixa amarela de "Recarregar". *@
+                <ErrorBoundary @ref="erroNaPagina">
+                    <ChildContent>@Body</ChildContent>
+                    <ErrorContent>
+                        <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+                            <span><strong>Algo deu errado nesta tela.</strong> O resto do site continua funcionando.</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="TentarDeNovo">Tentar de novo</button>
+                        </div>
+                    </ErrorContent>
+                </ErrorBoundary>
             }
         </section>
     </div>
@@ -108,6 +118,10 @@
     private bool isLoadingInitial = true;
     private CancellationTokenSource? initializationCts;
     private string? homeRoute;
+    private ErrorBoundary? erroNaPagina;
+
+    // Volta a mostrar a página (ela é criada de novo e recarrega os dados).
+    private void TentarDeNovo() => erroNaPagina?.Recover();
 
     protected override void OnInitialized()
     {
@@ -382,6 +396,8 @@
     {
         _ = InvokeAsync(async () =>
         {
+            // Ao trocar de página, o erro da página anterior não fica na tela.
+            erroNaPagina?.Recover();
             await UpdatePageDefinitionAsync(e.Location);
             await LogRouteVisitedAsync(e.Location);
             StateHasChanged();

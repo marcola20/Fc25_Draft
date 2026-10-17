@@ -10,7 +10,20 @@
    pré-renderizado uma prévia posta pela página não substituiria esta. *@
 <PreviaDoLink Titulo="@_previa?.Titulo" Descricao="@_previa?.Descricao" Imagem="@_previa?.Imagem" />
 
-<AppLayout Body="@Body" />
+@* Rede de segurança para o cabeçalho, o sino, a busca e o menu (a página tem a sua no AppLayout):
+   um erro neles não derruba a conexão; aí só recarregando. *@
+<ErrorBoundary>
+    <ChildContent>
+        <AppLayout Body="@Body" />
+    </ChildContent>
+    <ErrorContent>
+        <div class="container py-5">
+            <div class="alert alert-warning" role="alert">
+                <strong>Algo deu errado.</strong> <a href="@Nav.Uri">Recarregar a página</a>
+            </div>
+        </div>
+    </ErrorContent>
+</ErrorBoundary>
 
 <ToastContainer />
 
