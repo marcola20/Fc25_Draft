@@ -243,6 +243,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var seed = options.Seed ?? Random.Shared.Next();
         var excluded = await LoadExcludedPlayersAsync(cycleId, options, ct).ConfigureAwait(false);
         var eligiblePlayers = await QueryEligiblePlayersAsync(options, excluded, ct).ConfigureAwait(false);
+        eligiblePlayers = await IncluirManuaisForaDosFiltrosAsync(eligiblePlayers, options, excluded, ct).ConfigureAwait(false);
 
         if (eligiblePlayers.Count == 0)
             throw new MarketValidationException("Nenhum jogador elegível para os filtros informados.");
@@ -316,10 +317,68 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         return excluded;
     }
 
-    private async Task<List<MarketItemGenerationCandidate>> QueryEligiblePlayersAsync(
+    /// <summary>
+    /// O jogador escolhido à mão não precisa bater com os filtros do sorteio (posição, overall, idade):
+    /// só com as regras fixas (livre, não aposentado, fora de outro anúncio, não reservado ao draft).
+    /// </summary>
+    private async Task<List<MarketItemGenerationCandidate>> IncluirManuaisForaDosFiltrosAsync(
+        List<MarketItemGenerationCandidate> eligible,
         MarketItemGenerationOptions options,
         HashSet<int> excluded,
         CancellationToken ct)
+    {
+        if (options.ManualPlayerIds is not { Count: > 0 })
+            return eligible;
+
+        var noSorteio = eligible.Select(c => c.PlayerId).ToHashSet();
+        var faltando = options.ManualPlayerIds.Distinct().Where(id => !noSorteio.Contains(id)).ToList();
+        if (faltando.Count == 0)
+            return eligible;
+
+        var manuais = await QueryEligiblePlayersAsync(options, excluded, ct, somenteIds: faltando).ConfigureAwait(false);
+        foreach (var playerId in faltando)
+        {
+            if (manuais.All(c => c.PlayerId != playerId))
+                throw new MarketValidationException(await MotivoManualIndisponivelAsync(playerId, excluded, ct).ConfigureAwait(false));
+        }
+
+        return eligible.Concat(manuais).ToList();
+    }
+
+    private async Task<string> MotivoManualIndisponivelAsync(int playerId, HashSet<int> excluded, CancellationToken ct)
+    {
+        var jogador = await _dbContext.Players
+            .AsNoTracking()
+            .Where(p => p.PlayerId == playerId)
+            .Select(p => new { p.Name, p.Age, Aposentado = p.AposentadoNaTemporada != null, NoElenco = p.TeamRosters.Any() })
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        if (jogador is null)
+            return "Jogador selecionado manualmente não encontrado.";
+        if (jogador.Aposentado)
+            return $"{jogador.Name} está aposentado.";
+        if (jogador.NoElenco)
+            return $"{jogador.Name} está no elenco de um time.";
+        if (excluded.Contains(playerId))
+            return $"{jogador.Name} já está anunciado neste ciclo ou em outro ciclo aberto.";
+
+        var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
+            .Select(c => c.IdadeMaximaDraft)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (reservadoAte is not null && jogador.Age is not null && jogador.Age <= reservadoAte)
+            return $"{jogador.Name} tem {jogador.Age} anos: jogador livre com até {reservadoAte} anos fica reservado para o draft.";
+
+        return $"{jogador.Name} não pode ser anunciado.";
+    }
+
+    /// <param name="somenteIds">Só estes jogadores, sem os filtros de posição, overall e idade (seleção manual).</param>
+    private async Task<List<MarketItemGenerationCandidate>> QueryEligiblePlayersAsync(
+        MarketItemGenerationOptions options,
+        HashSet<int> excluded,
+        CancellationToken ct,
+        IReadOnlyCollection<int>? somenteIds = null)
     {
         // Jovem livre fica reservado para o draft (que é só de jovens) e não vai para o leilão.
         var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
@@ -341,22 +400,25 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         if (excluded.Count > 0)
             query = query.Where(p => !excluded.Contains(p.Player.PlayerId));
 
-        if (options.PositionIds is { Count: > 0 })
+        if (somenteIds is not null)
+            query = query.Where(p => somenteIds.Contains(p.Player.PlayerId));
+
+        if (somenteIds is null && options.PositionIds is { Count: > 0 })
         {
             var positions = options.PositionIds.Distinct().ToArray();
             query = query.Where(p => positions.Contains(p.Player.PositionId));
         }
 
-        if (options.MinOverall.HasValue)
+        if (somenteIds is null && options.MinOverall.HasValue)
             query = query.Where(p => p.Player.Overall >= options.MinOverall.Value);
 
-        if (options.MaxOverall.HasValue)
+        if (somenteIds is null && options.MaxOverall.HasValue)
             query = query.Where(p => p.Player.Overall <= options.MaxOverall.Value);
         
-        if (options.MinAge.HasValue)
+        if (somenteIds is null && options.MinAge.HasValue)
             query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value >= options.MinAge.Value);
 
-        if (options.MaxAge.HasValue)
+        if (somenteIds is null && options.MaxAge.HasValue)
             query = query.Where(p => p.Player.Age.HasValue && p.Player.Age.Value <= options.MaxAge.Value);
 
         return await query

@@ -854,7 +854,11 @@ else
             _excludedPlayerIds = previousExcluded.ToHashSet();
             _preview = previousPreview;
             await InvokeAsync(StateHasChanged);
-            Toasts.ShowError($"Não foi possível adicionar {player.Name} à pré-visualização.");
+            // 400 = regra do mercado (ex.: reservado para o draft): mostra o motivo que o servidor deu.
+            var motivo = ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.BadRequest }
+                ? " " + ex.Message.Replace("(HTTP 400) ", string.Empty)
+                : string.Empty;
+            Toasts.ShowError($"Não foi possível adicionar {player.Name} à pré-visualização.{motivo}");
             Logger.LogError(ex, "LayoutNav:Error ao adicionar jogador manual à pré-visualização {PlayerId}", player.PlayerId);
         }
     }
