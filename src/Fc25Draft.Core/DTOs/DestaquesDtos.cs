@@ -18,6 +18,7 @@ public record DestaqueTransferenciaDto(int JogadorId, string JogadorNome, string
 public record DestaquesDto(
     IReadOnlyList<DestaqueLiderDto> Lideres,
     DestaqueFaseDto? MelhorFase,
+    DestaqueFaseDto? PiorFase,
     IReadOnlyList<DestaqueJogadorDto> Artilheiros,
     IReadOnlyList<DestaqueJogadorDto> Garcons,
     DestaqueNotaDto? MelhorNota,

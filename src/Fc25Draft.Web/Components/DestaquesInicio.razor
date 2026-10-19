@@ -43,6 +43,22 @@
                     </a>
                 </div>
             }
+
+            @if (_dados.PiorFase is { } crise)
+            {
+                <div class="col-12 col-md">
+                    <a href="/teams/details/@crise.TimeId" class="card h-100 text-decoration-none text-body border-danger">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <img src="@Escudos.GetEscudo(crise.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
+                            <div class="min-w-0">
+                                <div class="small text-muted">🥶 Em pior fase</div>
+                                <div class="fs-5 fw-bold text-truncate">@crise.TimeNome</div>
+                                <div class="small text-danger fw-semibold">@crise.Sequencia</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
         </div>
     }
 
@@ -109,7 +125,7 @@
 
     private DestaquesDto? _dados => Dados;
 
-    private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null);
+    private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.PiorFase is not null);
 
     private bool TemJogador => _dados is not null
         && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.MaiorTransferencia is not null);

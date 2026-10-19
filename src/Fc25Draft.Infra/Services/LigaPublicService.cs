@@ -1329,7 +1329,9 @@ public class LigaPublicService : ILigaPublicService
             {
                 Perfil = p,
                 Vitorias = p.UltimosJogos.TakeWhile(j => j.Resultado == "V").Count(),
-                Invicto = p.UltimosJogos.TakeWhile(j => j.Resultado != "D").Count()
+                Invicto = p.UltimosJogos.TakeWhile(j => j.Resultado != "D").Count(),
+                Derrotas = p.UltimosJogos.TakeWhile(j => j.Resultado == "D").Count(),
+                SemVencer = p.UltimosJogos.TakeWhile(j => j.Resultado != "V").Count()
             })
             .ToList();
         var melhor = fases
@@ -1341,6 +1343,18 @@ public class LigaPublicService : ILigaPublicService
             ? null
             : new DestaqueFaseDto(melhor.Perfil.TimeId, nomes.GetValueOrDefault(melhor.Perfil.TimeId, "?"),
                 melhor.Perfil.SequenciaAtual!, melhor.Perfil.SequenciaTipo!);
+
+        // Pior fase: mais jogos sem vencer agora (derrotas seguidas desempatam); nunca o mesmo da melhor fase.
+        var pior = fases
+            .Where(f => f.SemVencer >= 2 && f.Perfil.TimeId != melhor?.Perfil.TimeId)
+            .OrderByDescending(f => f.SemVencer)
+            .ThenByDescending(f => f.Derrotas)
+            .FirstOrDefault();
+        var piorFase = pior is null
+            ? null
+            : new DestaqueFaseDto(pior.Perfil.TimeId, nomes.GetValueOrDefault(pior.Perfil.TimeId, "?"),
+                pior.Derrotas == pior.SemVencer ? $"{pior.Derrotas} derrotas seguidas" : $"Sem vencer há {pior.SemVencer} jogos",
+                "D");
 
         // Artilheiro e garçom da temporada = gols e assistências nas competições em andamento.
         var golsTemporada = await _db.LigaEventos.AsNoTracking()
@@ -1390,7 +1404,7 @@ public class LigaPublicService : ILigaPublicService
                 maior.ToTeamId is Guid para ? nomes.GetValueOrDefault(para) : null,
                 maior.Amount!.Value, maior.PerformedAtUtc);
 
-        return new DestaquesDto(lideres, melhorFase, artilheiros, garcons, melhorNota, maiorTransferencia);
+        return new DestaquesDto(lideres, melhorFase, piorFase, artilheiros, garcons, melhorNota, maiorTransferencia);
     }
 
     /// <summary>Quem tem a maior contagem (todos os empatados), cada um com o time pelo qual mais contou.</summary>
