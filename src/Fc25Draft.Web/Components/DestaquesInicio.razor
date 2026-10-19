@@ -40,7 +40,7 @@
             </div>
         }
 
-        @if (_dados.Artilheiros.Count > 0)
+        @if (_dados.Artilheiros.Count == 1)
         {
             var a = _dados.Artilheiros[0];
             <div class="col-12 col-md-6 col-xl-3">
@@ -49,17 +49,34 @@
                         <FotoJogador PlayerId="@a.JogadorId" Tamanho="56" Classe="" />
                         <div class="min-w-0">
                         <div class="small text-muted">⚽ Artilheiro da temporada</div>
-                        <div class="fs-5 fw-bold mt-1">
-                            @a.Nome
-                            @if (_dados.Artilheiros.Count > 1)
-                            {
-                                <span class="fs-6 fw-normal text-muted">e mais @(_dados.Artilheiros.Count - 1)</span>
-                            }
-                        </div>
+                        <div class="fs-5 fw-bold mt-1">@a.Nome</div>
                         <div class="small text-muted mt-1">@a.Gols gols · @a.TimeNome</div>
                         </div>
                     </div>
                 </a>
+            </div>
+        }
+        else if (_dados.Artilheiros.Count > 1)
+        {
+            @* Empate no topo: todos aparecem, cada um com o link da própria ficha. *@
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="card h-100 border-primary">
+                    <div class="card-body">
+                        <div class="small text-muted">⚽ Artilheiros da temporada · @_dados.Artilheiros[0].Gols gols</div>
+                        <div class="d-flex flex-column gap-2 mt-2">
+                            @foreach (var a in _dados.Artilheiros)
+                            {
+                                <a href="/players/details/@a.JogadorId" class="d-flex align-items-center gap-2 text-decoration-none text-body">
+                                    <FotoJogador PlayerId="@a.JogadorId" Tamanho="32" Classe="" />
+                                    <div class="min-w-0">
+                                        <div class="fw-bold text-truncate">@a.Nome</div>
+                                        <div class="small text-muted">@a.TimeNome</div>
+                                    </div>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
             </div>
         }
 
