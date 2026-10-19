@@ -7,7 +7,10 @@ public record DestaqueLiderDto(Guid LigaId, string LigaNome, Guid TimeId, string
 
 public record DestaqueFaseDto(Guid TimeId, string TimeNome, string Sequencia, string Tipo);
 
-public record DestaqueArtilheiroDto(int JogadorId, string Nome, string TimeNome, int Gols);
+/// <summary>Quem lidera uma contagem da temporada (gols, assistências): Total é o número dele.</summary>
+public record DestaqueJogadorDto(int JogadorId, string Nome, string TimeNome, int Total);
+
+public record DestaqueNotaDto(int JogadorId, string Nome, string TimeNome, decimal Media, int Jogos);
 
 public record DestaqueTransferenciaDto(int JogadorId, string JogadorNome, string? DeTime, string? ParaTime, decimal Valor, DateTime Data);
 
@@ -15,5 +18,7 @@ public record DestaqueTransferenciaDto(int JogadorId, string JogadorNome, string
 public record DestaquesDto(
     IReadOnlyList<DestaqueLiderDto> Lideres,
     DestaqueFaseDto? MelhorFase,
-    IReadOnlyList<DestaqueArtilheiroDto> Artilheiros,
+    IReadOnlyList<DestaqueJogadorDto> Artilheiros,
+    IReadOnlyList<DestaqueJogadorDto> Garcons,
+    DestaqueNotaDto? MelhorNota,
     DestaqueTransferenciaDto? MaiorTransferencia);

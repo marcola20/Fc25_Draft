@@ -1342,22 +1342,39 @@ public class LigaPublicService : ILigaPublicService
             : new DestaqueFaseDto(melhor.Perfil.TimeId, nomes.GetValueOrDefault(melhor.Perfil.TimeId, "?"),
                 melhor.Perfil.SequenciaAtual!, melhor.Perfil.SequenciaTipo!);
 
-        // Artilheiro da temporada = gols nas competições em andamento.
+        // Artilheiro e garçom da temporada = gols e assistências nas competições em andamento.
         var golsTemporada = await _db.LigaEventos.AsNoTracking()
             .Where(e => e.Tipo == TipoEvento.Gol && ativaIds.Contains(e.Partida.Rodada.LigaId))
-            .Select(e => new { e.JogadorId, e.Jogador.Name, e.TimeId })
+            .Select(e => new
+            {
+                e.JogadorId, e.Jogador.Name, e.TimeId,
+                e.AssistenteId, AssistenteNome = e.Assistente != null ? e.Assistente.Name : null
+            })
             .ToListAsync(ct);
-        var porJogador = golsTemporada
-            .GroupBy(g => g.JogadorId)
-            .Select(g => new DestaqueArtilheiroDto(g.Key, g.First().Name,
-                nomes.GetValueOrDefault(g.GroupBy(x => x.TimeId).OrderByDescending(x => x.Count()).First().Key, "?"),
-                g.Count()))
+        var artilheiros = LideresDaContagem(golsTemporada.Select(g => (g.JogadorId, g.Name, g.TimeId)), nomes);
+        var garcons = LideresDaContagem(golsTemporada
+            .Where(g => g.AssistenteId is not null)
+            .Select(g => (g.AssistenteId!.Value, g.AssistenteNome ?? "?", g.TimeId)), nomes);
+
+        // Melhor nota: média de quem jogou ao menos metade dos jogos de quem mais jogou (evita a nota de um
+        // jogo só); com menos de 3 jogos com nota ainda não há destaque.
+        var notasTemporada = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => ativaIds.Contains(n.Partida.Rodada.LigaId))
+            .Select(n => new { n.JogadorId, n.Jogador.Name, n.TimeId, n.Nota, Quando = n.Partida.EncerradaEm ?? n.Partida.IniciadaEm })
+            .ToListAsync(ct);
+        var medias = notasTemporada
+            .GroupBy(n => n.JogadorId)
+            .Select(g => new DestaqueNotaDto(g.Key, g.First().Name,
+                nomes.GetValueOrDefault(g.OrderByDescending(n => n.Quando).First().TimeId, "?"),
+                Math.Round(g.Average(n => n.Nota), 2), g.Count()))
             .ToList();
-        var maxGols = porJogador.Count == 0 ? 0 : porJogador.Max(a => a.Gols);
-        var artilheiros = porJogador
-            .Where(a => a.Gols == maxGols && maxGols > 0)
-            .OrderBy(a => a.Nome, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var maisJogos = medias.Count == 0 ? 0 : medias.Max(m => m.Jogos);
+        var minimoJogos = Math.Max(1, (int)Math.Ceiling(maisJogos / 2.0));
+        var melhorNota = medias
+            .Where(m => maisJogos >= 3 && m.Jogos >= minimoJogos)
+            .OrderByDescending(m => m.Media)
+            .ThenByDescending(m => m.Jogos)
+            .FirstOrDefault();
 
         var desde = DateTime.UtcNow.AddDays(-DiasMaiorTransferencia);
         var maior = await _db.TransferHistories.AsNoTracking()
@@ -1373,7 +1390,24 @@ public class LigaPublicService : ILigaPublicService
                 maior.ToTeamId is Guid para ? nomes.GetValueOrDefault(para) : null,
                 maior.Amount!.Value, maior.PerformedAtUtc);
 
-        return new DestaquesDto(lideres, melhorFase, artilheiros, maiorTransferencia);
+        return new DestaquesDto(lideres, melhorFase, artilheiros, garcons, melhorNota, maiorTransferencia);
+    }
+
+    /// <summary>Quem tem a maior contagem (todos os empatados), cada um com o time pelo qual mais contou.</summary>
+    private static List<DestaqueJogadorDto> LideresDaContagem(
+        IEnumerable<(int JogadorId, string Nome, Guid TimeId)> lances, IReadOnlyDictionary<Guid, string> nomes)
+    {
+        var porJogador = lances
+            .GroupBy(l => l.JogadorId)
+            .Select(g => new DestaqueJogadorDto(g.Key, g.First().Nome,
+                nomes.GetValueOrDefault(g.GroupBy(x => x.TimeId).OrderByDescending(x => x.Count()).First().Key, "?"),
+                g.Count()))
+            .ToList();
+        var maximo = porJogador.Count == 0 ? 0 : porJogador.Max(j => j.Total);
+        return porJogador
+            .Where(j => j.Total == maximo && maximo > 0)
+            .OrderBy(j => j.Nome, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetPlantaoAsync(CancellationToken ct)

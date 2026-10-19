@@ -2,116 +2,169 @@
 @using Fc25Draft.Core.DTOs
 @inject EscudoService Escudos
 
-@* O que está acontecendo agora na liga: aparece no topo da Central CBFV. *@
+@* O que está acontecendo agora na liga: aparece no topo da Central CBFV.
+   Primeira linha só com times, segunda só com jogadores; cada linha divide a largura entre os seus cards. *@
 
 @if (_dados is not null && TemAlgo)
 {
     <h5 class="text-uppercase text-muted small fw-bold mb-2">Destaques</h5>
-    <div class="row g-3 mb-4">
-        @foreach (var lider in _dados.Lideres)
-        {
-            <div class="col-12 col-md-6 col-xl-3">
-                <a href="/liga?liga=@lider.LigaId" class="card h-100 text-decoration-none text-body border-warning">
-                    <div class="card-body">
-                        <div class="small text-muted">🏆 Líder · @lider.LigaNome</div>
-                        <div class="d-flex align-items-center gap-2 mt-1">
-                            <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" width="32" height="32" style="object-fit: contain;" />
-                            <span class="fs-5 fw-bold">@lider.TimeNome</span>
-                        </div>
-                        <div class="small text-muted mt-1">@lider.Pontos pontos em @lider.Jogos jogos</div>
-                    </div>
-                </a>
-            </div>
-        }
 
-        @if (_dados.MelhorFase is { } fase)
-        {
-            <div class="col-12 col-md-6 col-xl-3">
-                <a href="/teams/details/@fase.TimeId" class="card h-100 text-decoration-none text-body border-success">
-                    <div class="card-body">
-                        <div class="small text-muted">🔥 Em melhor fase</div>
-                        <div class="d-flex align-items-center gap-2 mt-1">
-                            <img src="@Escudos.GetEscudo(fase.TimeNome)" alt="" width="32" height="32" style="object-fit: contain;" />
-                            <span class="fs-5 fw-bold">@fase.TimeNome</span>
+    @if (TemTime)
+    {
+        <div class="row g-3 mb-3">
+            @foreach (var lider in _dados.Lideres)
+            {
+                <div class="col-12 col-md">
+                    <a href="/liga?liga=@lider.LigaId" class="card h-100 text-decoration-none text-body border-warning">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
+                            <div class="min-w-0">
+                                <div class="small text-muted text-truncate">🏆 Líder · @lider.LigaNome</div>
+                                <div class="fs-5 fw-bold text-truncate">@lider.TimeNome</div>
+                                <div class="small text-muted">@lider.Pontos pontos em @lider.Jogos jogos</div>
+                            </div>
                         </div>
-                        <div class="small text-success fw-semibold mt-1">@fase.Sequencia</div>
-                    </div>
-                </a>
-            </div>
-        }
-
-        @if (_dados.Artilheiros.Count == 1)
-        {
-            var a = _dados.Artilheiros[0];
-            <div class="col-12 col-md-6 col-xl-3">
-                <a href="/players/details/@a.JogadorId" class="card h-100 text-decoration-none text-body border-primary">
-                    <div class="card-body d-flex align-items-center gap-3">
-                        <FotoJogador PlayerId="@a.JogadorId" Tamanho="56" Classe="" />
-                        <div class="min-w-0">
-                        <div class="small text-muted">⚽ Artilheiro da temporada</div>
-                        <div class="fs-5 fw-bold mt-1">@a.Nome</div>
-                        <div class="small text-muted mt-1">@a.Gols gols · @a.TimeNome</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-        }
-        else if (_dados.Artilheiros.Count > 1)
-        {
-            @* Empate no topo: todos aparecem, cada um com o link da própria ficha. *@
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="card h-100 border-primary">
-                    <div class="card-body">
-                        <div class="small text-muted">⚽ Artilheiros da temporada · @_dados.Artilheiros[0].Gols gols</div>
-                        <div class="d-flex flex-column gap-2 mt-2">
-                            @foreach (var a in _dados.Artilheiros)
-                            {
-                                <a href="/players/details/@a.JogadorId" class="d-flex align-items-center gap-2 text-decoration-none text-body">
-                                    <FotoJogador PlayerId="@a.JogadorId" Tamanho="32" Classe="" />
-                                    <div class="min-w-0">
-                                        <div class="fw-bold text-truncate">@a.Nome</div>
-                                        <div class="small text-muted">@a.TimeNome</div>
-                                    </div>
-                                </a>
-                            }
-                        </div>
-                    </div>
+                    </a>
                 </div>
-            </div>
-        }
+            }
 
-        @if (_dados.MaiorTransferencia is { } t)
-        {
-            <div class="col-12 col-md-6 col-xl-3">
-                <a href="/players/details/@t.JogadorId" class="card h-100 text-decoration-none text-body border-dark">
-                    <div class="card-body d-flex align-items-center gap-3">
-                        <FotoJogador PlayerId="@t.JogadorId" Tamanho="56" Classe="" />
-                        <div class="min-w-0">
-                        <div class="small text-muted">💸 Maior transferência da semana</div>
-                        <div class="fs-5 fw-bold mt-1">@t.JogadorNome</div>
-                        <div class="small text-muted mt-1">
-                            @t.Valor.ToString("C0", Brasil)
-                            @if (t.ParaTime is not null)
-                            {
-                                <span class="ms-1">· @(t.DeTime is null ? "" : $"{t.DeTime} → ")@t.ParaTime</span>
-                            }
+            @if (_dados.MelhorFase is { } fase)
+            {
+                <div class="col-12 col-md">
+                    <a href="/teams/details/@fase.TimeId" class="card h-100 text-decoration-none text-body border-success">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <img src="@Escudos.GetEscudo(fase.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
+                            <div class="min-w-0">
+                                <div class="small text-muted">🔥 Em melhor fase</div>
+                                <div class="fs-5 fw-bold text-truncate">@fase.TimeNome</div>
+                                <div class="small text-success fw-semibold">@fase.Sequencia</div>
+                            </div>
                         </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+
+    @if (TemJogador)
+    {
+        <div class="row g-3 mb-4">
+            @if (_dados.Artilheiros.Count > 0)
+            {
+                @Contagem(_dados.Artilheiros, "⚽", "Artilheiro", "Artilheiros", "gol", "gols", "border-primary")
+            }
+
+            @if (_dados.Garcons.Count > 0)
+            {
+                @Contagem(_dados.Garcons, "🎯", "Garçom", "Garçons", "assistência", "assistências", "border-info")
+            }
+
+            @if (_dados.MelhorNota is { } nota)
+            {
+                <div class="col-12 col-sm-6 col-xl">
+                    <a href="/players/details/@nota.JogadorId" class="card h-100 text-decoration-none text-body border-success">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <FotoJogador PlayerId="@nota.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
+                            <div class="min-w-0">
+                                <div class="small text-muted">⭐ Melhor nota</div>
+                                <div class="fs-5 fw-bold text-truncate">@nota.Nome</div>
+                                <div class="small text-muted text-truncate">
+                                    @nota.Media.ToString("0.00", Brasil) em @nota.Jogos @(nota.Jogos == 1 ? "jogo" : "jogos") · @nota.TimeNome
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </a>
-            </div>
-        }
-    </div>
+                    </a>
+                </div>
+            }
+
+            @if (_dados.MaiorTransferencia is { } t)
+            {
+                <div class="col-12 col-sm-6 col-xl">
+                    <a href="/players/details/@t.JogadorId" class="card h-100 text-decoration-none text-body border-secondary">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <FotoJogador PlayerId="@t.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
+                            <div class="min-w-0">
+                                <div class="small text-muted text-truncate">💸 Maior transferência da semana</div>
+                                <div class="fs-5 fw-bold text-truncate">@t.JogadorNome</div>
+                                <div class="small text-muted text-truncate">
+                                    @t.Valor.ToString("C0", Brasil)@(t.ParaTime is null ? "" : $" · {(t.DeTime is null ? "" : $"{t.DeTime} → ")}{t.ParaTime}")
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
 }
 
 @code {
     private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
+
+    // Fotos sobrepostas no card de empate; os nomes aparecem todos.
+    private const int FotosNoEmpate = 3;
 
     // Carregado pela página inicial (em sequência com o Plantão: as duas consultas usam a mesma conexão).
     [Parameter] public DestaquesDto? Dados { get; set; }
 
     private DestaquesDto? _dados => Dados;
 
-    private bool TemAlgo => _dados is not null
-        && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.Artilheiros.Count > 0 || _dados.MaiorTransferencia is not null);
+    private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null);
+
+    private bool TemJogador => _dados is not null
+        && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.MaiorTransferencia is not null);
+
+    private bool TemAlgo => TemTime || TemJogador;
+
+    /// <summary>Card de quem lidera uma contagem; no empate, todos os empatados com o link de cada um.</summary>
+    private RenderFragment Contagem(IReadOnlyList<DestaqueJogadorDto> jogadores, string icone, string titulo,
+        string tituloPlural, string unidade, string unidadePlural, string borda) => __builder =>
+    {
+        var total = jogadores[0].Total;
+        var numero = $"{total} {(total == 1 ? unidade : unidadePlural)}";
+        if (jogadores.Count == 1)
+        {
+            var j = jogadores[0];
+            <div class="col-12 col-sm-6 col-xl">
+                <a href="/players/details/@j.JogadorId" class="card h-100 text-decoration-none text-body @borda">
+                    <div class="card-body py-2 d-flex align-items-center gap-3">
+                        <FotoJogador PlayerId="@j.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
+                        <div class="min-w-0">
+                            <div class="small text-muted">@icone @titulo da temporada</div>
+                            <div class="fs-5 fw-bold text-truncate">@j.Nome</div>
+                            <div class="small text-muted text-truncate">@numero · @j.TimeNome</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="col-12 col-sm-6 col-xl">
+                <div class="card h-100 @borda">
+                    <div class="card-body py-2 d-flex align-items-center gap-3">
+                        <div class="d-flex flex-shrink-0">
+                            @foreach (var (j, i) in jogadores.Take(FotosNoEmpate).Select((j, i) => (j, i)))
+                            {
+                                <span style="@(i == 0 ? "" : "margin-left: -18px;")">
+                                    <FotoJogador PlayerId="@j.JogadorId" Tamanho="40" Classe="border border-2 border-dark rounded-circle" />
+                                </span>
+                            }
+                        </div>
+                        <div class="min-w-0">
+                            <div class="small text-muted">@icone @tituloPlural da temporada</div>
+                            <div class="fw-bold lh-sm">
+                                @for (var i = 0; i < jogadores.Count; i++)
+                                {
+                                    var j = jogadores[i];
+                                    <a href="/players/details/@j.JogadorId" class="text-body text-decoration-none" title="@j.TimeNome">@j.Nome</a>@(i < jogadores.Count - 1 ? ", " : "")
+                                }
+                            </div>
+                            <div class="small text-muted">@numero cada</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    };
 }
