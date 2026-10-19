@@ -318,8 +318,8 @@ public class MarketItemGenerationService : IMarketItemGenerationService
     }
 
     /// <summary>
-    /// O jogador escolhido à mão não precisa bater com os filtros do sorteio (posição, overall, idade):
-    /// só com as regras fixas (livre, não aposentado, fora de outro anúncio, não reservado ao draft).
+    /// O jogador escolhido à mão não precisa bater com os filtros do sorteio (posição, overall, idade) nem
+    /// com a reserva de jovens para o draft: só com as regras fixas (livre, não aposentado, fora de outro anúncio).
     /// </summary>
     private async Task<List<MarketItemGenerationCandidate>> IncluirManuaisForaDosFiltrosAsync(
         List<MarketItemGenerationCandidate> eligible,
@@ -350,7 +350,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var jogador = await _dbContext.Players
             .AsNoTracking()
             .Where(p => p.PlayerId == playerId)
-            .Select(p => new { p.Name, p.Age, Aposentado = p.AposentadoNaTemporada != null, NoElenco = p.TeamRosters.Any() })
+            .Select(p => new { p.Name, Aposentado = p.AposentadoNaTemporada != null, NoElenco = p.TeamRosters.Any() })
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
@@ -363,27 +363,25 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         if (excluded.Contains(playerId))
             return $"{jogador.Name} já está anunciado neste ciclo ou em outro ciclo aberto.";
 
-        var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
-            .Select(c => c.IdadeMaximaDraft)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (reservadoAte is not null && jogador.Age is not null && jogador.Age <= reservadoAte)
-            return $"{jogador.Name} tem {jogador.Age} anos: jogador livre com até {reservadoAte} anos fica reservado para o draft.";
-
         return $"{jogador.Name} não pode ser anunciado.";
     }
 
-    /// <param name="somenteIds">Só estes jogadores, sem os filtros de posição, overall e idade (seleção manual).</param>
+    /// <param name="somenteIds">
+    /// Só estes jogadores, sem os filtros de posição, overall e idade nem a reserva do draft (seleção manual).
+    /// </param>
     private async Task<List<MarketItemGenerationCandidate>> QueryEligiblePlayersAsync(
         MarketItemGenerationOptions options,
         HashSet<int> excluded,
         CancellationToken ct,
         IReadOnlyCollection<int>? somenteIds = null)
     {
-        // Jovem livre fica reservado para o draft (que é só de jovens) e não vai para o leilão.
-        var reservadoAte = await _dbContext.TransferConfigs.AsNoTracking()
-            .Select(c => c.IdadeMaximaDraft)
-            .FirstOrDefaultAsync(ct);
+        // Jovem livre fica reservado para o draft (que é só de jovens) e não vai para o leilão sorteado;
+        // escolhido à mão pelo admin, vai.
+        var reservadoAte = somenteIds is not null
+            ? null
+            : await _dbContext.TransferConfigs.AsNoTracking()
+                .Select(c => c.IdadeMaximaDraft)
+                .FirstOrDefaultAsync(ct);
 
         var query = _dbContext.Players
             .AsNoTracking()
