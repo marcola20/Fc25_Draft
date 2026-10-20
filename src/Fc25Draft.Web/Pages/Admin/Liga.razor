@@ -781,11 +781,63 @@
             </div>
         }
 
-        @foreach (var p in _partidas)
+        @if (_partidas.Count > 1)
         {
+            <div class="card mb-3">
+                <div class="card-body py-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-semibold">⏱ Horários</span>
+                        <span class="text-muted small">
+                            Os jogos aparecem na liga (e fecham no bolão) na ordem dos horários.
+                            Ponha na ordem das estreias com ▲▼ e escalone: o 1º sai no horário da rodada
+                            (@(_rodadaSelecionada.DataHora?.ToString("ddd dd/MM · HH:mm", Br) ?? "sem data")).
+                        </span>
+                        <div class="input-group input-group-sm ms-auto" style="width:auto;">
+                            <span class="input-group-text">a cada</span>
+                            <input type="number" min="0" max="240" class="form-control" style="width:4.5rem;" @bind="_intervaloMinutos" />
+                            <span class="input-group-text">min</span>
+                            <button class="btn btn-primary" @onclick="EscalonarHorarios" disabled="@(_saving || _rodadaSelecionada.DataHora is null)">Escalonar</button>
+                        </div>
+                    </div>
+                    @if (_ordemMudou)
+                    {
+                        <div class="small text-warning-emphasis mt-1">A ordem mudou aqui — clique em <strong>Escalonar</strong> para gravar os horários.</div>
+                    }
+                </div>
+            </div>
+        }
+
+        @for (var i = 0; i < _partidas.Count; i++)
+        {
+            var p = _partidas[i];
+            var posicao = i;
             <div class="card mb-2">
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap align-items-center gap-2">
+                        @if (_partidas.Count > 1)
+                        {
+                            <div class="btn-group-vertical btn-group-sm" role="group" aria-label="Ordem do jogo">
+                                <button class="btn btn-outline-secondary py-0" title="Sobe" @onclick="() => MoverPartida(posicao, -1)" disabled="@(posicao == 0)">▲</button>
+                                <button class="btn btn-outline-secondary py-0" title="Desce" @onclick="() => MoverPartida(posicao, 1)" disabled="@(posicao == _partidas.Count - 1)">▼</button>
+                            </div>
+                        }
+                        @if (_editandoHorario == p.PartidaId)
+                        {
+                            <div class="input-group input-group-sm" style="width:auto;">
+                                <input type="datetime-local" class="form-control" @bind="_novoHorario" />
+                                <button class="btn btn-primary" @onclick="() => SalvarHorario(p, _novoHorario)" disabled="@_saving">Salvar</button>
+                                <button class="btn btn-outline-secondary" title="Volta a seguir o horário da rodada" @onclick="() => SalvarHorario(p, null)" disabled="@_saving">Da rodada</button>
+                                <button class="btn btn-outline-secondary" @onclick="() => _editandoHorario = null">Cancelar</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-light border text-nowrap"
+                                    title="@(p.HorarioProprio ? "Horário próprio deste jogo" : "Segue o horário da rodada") — clique para mudar"
+                                    @onclick="() => EditarHorario(p)">
+                                🕒 @(p.DataHora?.ToString("HH:mm", Br) ?? "sem hora")@(p.HorarioProprio ? "" : "*") ✏️
+                            </button>
+                        }
                         <span class="fw-semibold">@p.TimeCasaNome</span>
                         <span class="fw-bold fs-5">@p.GolsCasa – @p.GolsFora</span>
                         <span class="fw-semibold">@p.TimeForaNome</span>
@@ -1108,6 +1160,12 @@
 
     // Partidas
     private IReadOnlyList<LigaPartidaDto> _partidas = Array.Empty<LigaPartidaDto>();
+
+    // Horário de cada jogo (as estreias saem uma depois da outra)
+    private Guid? _editandoHorario;
+    private DateTime? _novoHorario;
+    private int _intervaloMinutos = 20;
+    private bool _ordemMudou;
     private bool _showCriarPartida;
     private string? _novaCasa, _novaFora;
     private LigaPartidaDto? _woPartida;
@@ -1536,6 +1594,59 @@
             _editandoDataRodada = null;
             await CarregarDados();
             _ok = $"{RodadaLabel(r.Numero)}: {salva.DataHora?.ToString("ddd dd/MM · HH:mm", Br) ?? "sem data"}.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void EditarHorario(LigaPartidaDto p)
+    {
+        _editandoHorario = p.PartidaId;
+        _novoHorario = p.DataHora ?? _rodadaSelecionada?.DataHora ?? DateTime.Today.Add(CalendarioTemporada.Horario);
+    }
+
+    /// <summary>Grava o horário de um jogo; nulo volta a seguir a rodada.</summary>
+    private async Task SalvarHorario(LigaPartidaDto p, DateTime? horario)
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var salva = await AdminSvc.DefinirHorarioPartidaAsync(p.PartidaId, horario, CancellationToken.None);
+            _editandoHorario = null;
+            _ordemMudou = false;
+            await CarregarDados();
+            _ok = $"{p.TimeCasaNome} x {p.TimeForaNome}: {salva.DataHora?.ToString("ddd dd/MM · HH:mm", Br) ?? "sem data"}"
+                  + (salva.HorarioProprio ? "." : " (o da rodada).");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    /// <summary>Troca o jogo de lugar só na tela; os horários mudam ao escalonar.</summary>
+    private void MoverPartida(int posicao, int direcao)
+    {
+        var destino = posicao + direcao;
+        if (destino < 0 || destino >= _partidas.Count) return;
+
+        var lista = _partidas.ToList();
+        (lista[posicao], lista[destino]) = (lista[destino], lista[posicao]);
+        _partidas = lista;
+        _ordemMudou = true;
+    }
+
+    /// <summary>Marca os jogos um depois do outro, na ordem da tela, a partir do horário da rodada.</summary>
+    private async Task EscalonarHorarios()
+    {
+        if (_rodadaSelecionada is null) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            await AdminSvc.EscalonarHorariosAsync(
+                _rodadaSelecionada.RodadaId, _partidas.Select(p => p.PartidaId).ToList(), _intervaloMinutos, CancellationToken.None);
+            _ordemMudou = false;
+            await CarregarDados();
+            _ok = "Horários marcados: " + string.Join(" · ", _partidas.Select(p => $"{p.DataHora:HH:mm} {p.TimeCasaNome} x {p.TimeForaNome}"));
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }

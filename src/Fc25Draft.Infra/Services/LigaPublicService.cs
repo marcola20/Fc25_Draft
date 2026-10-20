@@ -668,12 +668,16 @@ public class LigaPublicService : ILigaPublicService
 
     private static LigaRodadaComPartidasDto RodadaComPartidas(LigaRodada r, string? titulo = null) => new(
         r.RodadaId, r.LigaId, r.Numero,
-        r.Partidas.Select(p => new LigaPartidaDto(
-            p.PartidaId, p.RodadaId, r.Numero,
-            p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
-            p.TimeForaId, p.TimeFora?.TeamName ?? "?",
-            p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
-            p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId)).ToArray(),
+        // Na ordem em que os jogos saem (as estreias são uma depois da outra).
+        r.Partidas
+            .OrderBy(p => p.DataHora ?? r.DataHora ?? DateTime.MaxValue)
+            .Select(p => new LigaPartidaDto(
+                p.PartidaId, p.RodadaId, r.Numero,
+                p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
+                p.TimeForaId, p.TimeFora?.TeamName ?? "?",
+                p.GolsCasa, p.GolsFora, p.Status, p.IsWO,
+                p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId,
+                p.DataHora ?? r.DataHora, p.DataHora is not null)).ToArray(),
         r.Desempate, r.DataHora, titulo);
 
     public async Task<IReadOnlyList<LigaEventoDto>> GetGolsRodadaAsync(Guid rodadaId, CancellationToken ct)
@@ -760,7 +764,7 @@ public class LigaPublicService : ILigaPublicService
             p.TimeCasaId, p.TimeCasa?.TeamName ?? "?",
             p.TimeForaId, p.TimeFora?.TeamName ?? "?",
             p.Status, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedor?.TeamName,
-            p.Rodada.DataHora, p.YoutubeVideoId);
+            p.DataHora ?? p.Rodada.DataHora, p.YoutubeVideoId);
     }
 
     public async Task<PartidaEscalacoesDto?> GetEscalacoesPartidaAsync(Guid partidaId, CancellationToken ct)

@@ -22,9 +22,11 @@ public record BolaoJogoDto(
     string? JogadorFora = null,
     int? PontosPlacar = null,
     int? ExtraCasa = null,
-    int? ExtraFora = null);
+    int? ExtraFora = null,
+    bool Aberto = false,
+    DateTime? Quando = null);
 
-/// <summary>Uma rodada aberta ou fechada para palpite.</summary>
+/// <summary>Uma rodada aberta (com algum jogo ainda por vir) ou fechada para palpite.</summary>
 public record BolaoRodadaDto(
     Guid RodadaId,
     Guid LigaId,
@@ -38,6 +40,9 @@ public record BolaoRodadaDto(
 {
     public int Palpitados => Jogos.Count(j => j.PalpiteCasa is not null);
     public bool Completa => Jogos.Count > 0 && Palpitados == Jogos.Count;
+
+    /// <summary>Jogos que ainda aceitam palpite e estão sem o de quem está olhando.</summary>
+    public int Faltam => Jogos.Count(j => j.Aberto && j.PalpiteCasa is null);
     public int Pontos => Jogos.Sum(j => j.Pontos ?? 0);
 }
 

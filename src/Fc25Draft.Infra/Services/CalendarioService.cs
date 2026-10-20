@@ -38,12 +38,12 @@ public class CalendarioService : ICalendarioService
 
         var jogos = await _db.LigaPartidas.AsNoTracking()
             .Where(p => (p.TimeCasaId == timeId || p.TimeForaId == timeId)
-                        && p.Rodada.DataHora != null && p.Rodada.DataHora >= desde)
-            .OrderBy(p => p.Rodada.DataHora)
+                        && (p.DataHora ?? p.Rodada.DataHora) != null && (p.DataHora ?? p.Rodada.DataHora) >= desde)
+            .OrderBy(p => p.DataHora ?? p.Rodada.DataHora)
             .Select(p => new
             {
                 p.PartidaId, p.Rodada.LigaId, Liga = p.Rodada.Liga.Nome, p.Rodada.Numero, p.Rodada.Desempate,
-                DataHora = p.Rodada.DataHora!.Value,
+                DataHora = (p.DataHora ?? p.Rodada.DataHora)!.Value,
                 Casa = p.TimeCasa.TeamName, Fora = p.TimeFora.TeamName, p.GolsCasa, p.GolsFora, p.Status
             })
             .ToListAsync(ct);

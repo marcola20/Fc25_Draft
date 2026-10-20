@@ -41,6 +41,15 @@ public interface ILigaAdminService
     /// <summary>Grava (ou tira, com link vazio) o vídeo do jogo no YouTube. Devolve o ID do vídeo.</summary>
     Task<string?> DefinirVideoPartidaAsync(Guid partidaId, string? link, CancellationToken ct);
 
+    /// <summary>Muda o horário de um jogo (Brasília). Nulo, ou o mesmo da rodada, volta a seguir a rodada.</summary>
+    Task<LigaPartidaDto> DefinirHorarioPartidaAsync(Guid partidaId, DateTime? dataHora, CancellationToken ct);
+
+    /// <summary>
+    /// Marca os jogos da rodada um depois do outro, na ordem dada: o primeiro no horário da rodada e
+    /// cada seguinte <paramref name="intervaloMinutos"/> depois.
+    /// </summary>
+    Task<IReadOnlyList<LigaPartidaDto>> EscalonarHorariosAsync(Guid rodadaId, IReadOnlyList<Guid> ordem, int intervaloMinutos, CancellationToken ct);
+
     // Eventos
     Task<LigaEventoDto> AddGolAsync(Guid partidaId, LigaGolRequest request, CancellationToken ct);
     Task<LigaEventoDto> AddCartaoAsync(Guid partidaId, LigaCartaoRequest request, CancellationToken ct);

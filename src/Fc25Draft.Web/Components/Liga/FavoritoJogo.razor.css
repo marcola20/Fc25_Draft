@@ -19,9 +19,14 @@
 .favorito-empate { background-color: var(--bs-secondary-bg); }
 .favorito-fora { background-color: var(--cbfv-laranja); }
 
+/* Três colunas: o empate fica no meio exato, embaixo do "vs", seja qual for a largura das pontas. */
 .favorito-textos {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.5rem;
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
 }
+
+    .favorito-textos > :first-child { justify-self: start; }
+    .favorito-textos > :last-child { justify-self: end; }

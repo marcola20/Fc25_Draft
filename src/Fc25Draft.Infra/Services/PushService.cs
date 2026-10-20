@@ -206,7 +206,7 @@ public class PushService : IPushService
         foreach (var pessoa in pessoas)
         {
             var rodadas = (await bolao.RodadasAbertasAsync(pessoa, ct))
-                .Where(r => r.Aberta && !r.Completa && r.Quando is DateTime quando
+                .Where(r => r.Aberta && r.Faltam > 0 && r.Quando is DateTime quando
                             && quando > agora && quando - agora <= AntecedenciaDoBolao)
                 .ToList();
 
@@ -214,7 +214,7 @@ public class PushService : IPushService
             {
                 if (!await MarcarAsync($"bolao:{rodada.RodadaId}:{pessoa}", ct)) continue;
 
-                var faltam = rodada.Jogos.Count - rodada.Palpitados;
+                var faltam = rodada.Faltam;
                 var inscricoes = await _db.InscricoesPush.Where(i => i.TreinadorId == pessoa).ToListAsync(ct);
                 await EnviarAsync(inscricoes, new Notificacao(
                     "🎯 Bolão da rodada",

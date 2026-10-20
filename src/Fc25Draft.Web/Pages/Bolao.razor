@@ -30,7 +30,7 @@
         Cravou o placar, @BolaoPontuacao.PlacarExato pontos. Acertou o vencedor e o placar de um dos times,
         @BolaoPontuacao.VencedorEUmPlacar. Acertou só o resultado, @BolaoPontuacao.SoOVencedor.
         Placar invertido (chutou 2x1, deu 1x2), @Sinal(BolaoPontuacao.PlacarInvertido).
-        Os palpites fecham quando a bola rola.
+        Cada jogo fecha quando a bola rola nele — chegou com a rodada em andamento, ainda dá para palpitar nos que faltam.
     </p>
     <p class="text-muted small mb-4">
         <strong>Apostas extras</strong>, uma de cada lado do jogo: escolha um jogador do time — fez gol ou deu
@@ -95,9 +95,9 @@
                     <span class="fw-bold">@rodada.Titulo</span>
                     @if (rodada.Quando is { } quando)
                     {
-                        <span class="text-muted small">@quando.ToString("ddd dd/MM · HH'h'", Br)</span>
+                        <span class="text-muted small">@quando.ToString("ddd dd/MM", Br) · @HoraCurta(quando)</span>
                     }
-                    @if (rodada.Completa)
+                    @if (rodada.Faltam == 0 && rodada.Palpitados > 0)
                     {
                         <span class="badge bg-success">palpites enviados</span>
                     }
@@ -105,11 +105,26 @@
                     {
                         <span class="badge bg-warning text-dark">@rodada.Palpitados de @rodada.Jogos.Count</span>
                     }
+                    @if (rodada.Jogos.Any(j => !j.Aberto))
+                    {
+                        <span class="badge bg-info text-dark" title="Os jogos que já começaram fecharam; os outros ainda aceitam palpite">rodada em andamento</span>
+                    }
                 </div>
                 <div class="card-body">
+                    @{ var horariosDiferentes = rodada.Jogos.Select(j => j.Quando).Distinct().Count() > 1; }
                     @foreach (var jogo in rodada.Jogos)
                     {
+                        @if (!jogo.Aberto)
+                        {
+                            @JogoFechado(jogo)
+                            continue;
+                        }
+
                         var palpite = Palpite(rodada.RodadaId, jogo.PartidaId);
+                        @if (horariosDiferentes && jogo.Quando is DateTime hora)
+                        {
+                            <div class="text-center text-muted small mb-1">🕒 @HoraCurta(hora)</div>
+                        }
                         <div class="d-flex align-items-center justify-content-center gap-2 mb-2 flex-wrap">
                             <span class="text-end" style="min-width:9rem;">@jogo.TimeCasa</span>
                             <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" style="width:26px;height:26px;object-fit:contain;" />
@@ -140,7 +155,7 @@
 
                     <div class="d-flex justify-content-end gap-2 mt-3">
                         <button class="btn btn-success" @onclick="() => Salvar(rodada)" disabled="@_salvando">
-                            @(rodada.Palpitados > 0 ? "Atualizar palpites" : "Enviar palpites")
+                            @(rodada.Jogos.Any(j => j.Aberto && j.PalpiteCasa is not null) ? "Atualizar palpites" : "Enviar palpites")
                         </button>
                     </div>
 
@@ -417,6 +432,44 @@
         </div>
     };
 
+    /// <summary>"18h" na hora cheia, "18h20" nas outras.</summary>
+    private static string HoraCurta(DateTime hora) => hora.Minute == 0 ? $"{hora:HH}h" : $"{hora:HH}h{hora:mm}";
+
+    /// <summary>Jogo de uma rodada ainda aberta que já começou: o palpite ficou travado.</summary>
+    private RenderFragment JogoFechado(BolaoJogoDto jogo) => __builder =>
+    {
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-3 flex-wrap opacity-75">
+            <span class="text-end" style="min-width:9rem;">@jogo.TimeCasa</span>
+            <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" style="width:26px;height:26px;object-fit:contain;" />
+            <span class="fw-bold text-center" style="width:8.6rem;">
+                @if (jogo.Encerrado)
+                {
+                    @jogo.GolsCasa <span class="text-muted fw-normal">x</span> @jogo.GolsFora
+                }
+                else
+                {
+                    <span class="badge bg-secondary" title="O horário do jogo passou: o palpite dele fechou">🔒 fechado</span>
+                }
+            </span>
+            <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
+            <span style="min-width:9rem;">@jogo.TimeFora</span>
+            <div class="w-100 text-center small">
+                @if (jogo.PalpiteCasa is { } casa)
+                {
+                    <span class="text-muted">você: @casa x @jogo.PalpiteFora</span>
+                    @if (jogo.Pontos is { } pontos)
+                    {
+                        <span class="badge @CorDosPontos(jogo, pontos) ms-1" title="@BolaoPontuacao.Explicacao(jogo.PontosPlacar ?? pontos)">@pontos</span>
+                    }
+                }
+                else
+                {
+                    <span class="text-muted">sem palpite — esse já fechou</span>
+                }
+            </div>
+        </div>
+    };
+
     private static string CorDosPontos(BolaoJogoDto jogo, int pontos) =>
         jogo.PontosPlacar == BolaoPontuacao.PlacarExato ? "bg-success"
         : pontos > 0 ? "bg-primary"
@@ -527,7 +580,9 @@
         _erro = null; _ok = null; _salvando = true;
         try
         {
-            var palpites = rodada.Jogos
+            // Só os jogos que ainda estavam abertos na tela; os que já começaram ficaram travados.
+            var abertos = rodada.Jogos.Where(j => j.Aberto).ToList();
+            var palpites = abertos
                 .Select(j => (j.PartidaId, Palpite: Palpite(rodada.RodadaId, j.PartidaId)))
                 .Where(x => x.Palpite.Casa is not null && x.Palpite.Fora is not null)
                 .Select(x => new BolaoPalpiteRequest(
@@ -538,14 +593,27 @@
 
             if (palpites.Count == 0) throw new InvalidOperationException("Preencha pelo menos um placar.");
 
+            BolaoRodadaDto salva;
             await _umaPorVez.WaitAsync();
-            try { await BolaoSvc.SalvarAsync(_eu!.TreinadorId, rodada.RodadaId, palpites, CancellationToken.None); }
+            try { salva = await BolaoSvc.SalvarAsync(_eu!.TreinadorId, rodada.RodadaId, palpites, CancellationToken.None); }
             finally { _umaPorVez.Release(); }
             await Carregar();
 
-            _ok = palpites.Count == rodada.Jogos.Count
-                ? $"Palpites da {rodada.Titulo.ToLower(Br)} registrados. Boa sorte."
-                : $"{palpites.Count} de {rodada.Jogos.Count} jogos palpitados — dá para completar até a bola rolar.";
+            // A tela pode estar velha: jogo que começou enquanto a pessoa digitava fica de fora.
+            var fechouNoMeio = palpites.Count(p => salva.Jogos.FirstOrDefault(j => j.PartidaId == p.PartidaId) is { Aberto: false } j
+                                                   && (j.PalpiteCasa != p.GolsCasa || j.PalpiteFora != p.GolsFora));
+            var gravados = palpites.Count - fechouNoMeio;
+
+            var faltam = abertos.Count - gravados;
+            _ok = (faltam == 0
+                    ? $"Palpites da {rodada.Titulo.ToLower(Br)} registrados. Boa sorte."
+                    : $"Palpites registrados. Falta{(faltam == 1 ? "" : "m")} {faltam} jogo{(faltam == 1 ? "" : "s")} — dá para completar até a bola rolar em cada um.")
+                  + fechouNoMeio switch
+                  {
+                      0 => "",
+                      1 => " 1 jogo começou enquanto você palpitava e ficou de fora.",
+                      _ => $" {fechouNoMeio} jogos começaram enquanto você palpitava e ficaram de fora."
+                  };
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

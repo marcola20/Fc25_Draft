@@ -1538,6 +1538,9 @@ namespace Fc25Draft.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DataHora")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime?>("EncerradaEm")
                         .HasColumnType("timestamp without time zone");
 

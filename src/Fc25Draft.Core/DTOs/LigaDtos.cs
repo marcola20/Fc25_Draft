@@ -108,7 +108,9 @@ public record LigaPartidaDto(
     Guid? PenaltisVencedorId,
     DateTime? IniciadaEm,
     DateTime? EncerradaEm,
-    string? YoutubeVideoId = null);
+    string? YoutubeVideoId = null,
+    DateTime? DataHora = null,
+    bool HorarioProprio = false);
 
 public record LigaPartidaCreateRequest(
     [Required] Guid TimeCasaId,

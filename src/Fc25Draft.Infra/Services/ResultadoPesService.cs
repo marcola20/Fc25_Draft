@@ -183,7 +183,7 @@ public class ResultadoPesService : IResultadoPesService
             var partidas = await _db.LigaPartidas.AsNoTracking()
                 .Where(p => p.TimeCasaId == mandante && p.TimeForaId == visitante
                             && p.Rodada.Liga.Status != LigaStatus.Encerrada)
-                .Select(p => new { p.PartidaId, p.Status, p.Rodada.Numero, p.Rodada.Desempate, p.Rodada.DataHora, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
+                .Select(p => new { p.PartidaId, p.Status, p.Rodada.Numero, p.Rodada.Desempate, DataHora = p.DataHora ?? p.Rodada.DataHora, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
                 .ToListAsync(ct);
 
             var ids = partidas.Select(p => p.PartidaId).ToList();

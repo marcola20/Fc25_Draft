@@ -483,6 +483,7 @@ public class LigaAdminService : ILigaAdminService
             ?? throw new InvalidOperationException("Liga não encontrada.");
 
         var rodadas = await _db.LigaRodadas
+            .Include(r => r.Partidas)
             .Where(r => r.LigaId == ligaId && r.Numero > 0 && !r.Desempate)
             .OrderBy(r => r.Numero)
             .Select(r => new { Rodada = r, Jogada = r.Partidas.Any(p => p.Status != PartidaStatus.Agendada) })
@@ -503,7 +504,7 @@ public class LigaAdminService : ILigaAdminService
         for (int i = 0; i < rodadas.Count && i < datas.Count; i++)
         {
             if (rodadas[i].Jogada) continue;
-            rodadas[i].Rodada.DataHora = datas[i];
+            MudarDataDaRodada(rodadas[i].Rodada, datas[i]);
             marcadas++;
         }
 
@@ -518,7 +519,7 @@ public class LigaAdminService : ILigaAdminService
             .FirstOrDefaultAsync(r => r.RodadaId == rodadaId, ct)
             ?? throw new InvalidOperationException("Rodada não encontrada.");
 
-        rodada.DataHora = dataHora;
+        MudarDataDaRodada(rodada, dataHora);
         await _db.SaveChangesAsync(ct);
 
         return new LigaRodadaDto(rodada.RodadaId, rodada.LigaId, rodada.Numero, rodada.Partidas.Count, rodada.Desempate, rodada.DataHora);
@@ -660,6 +661,59 @@ public class LigaAdminService : ILigaAdminService
         return videoId;
     }
 
+    public async Task<LigaPartidaDto> DefinirHorarioPartidaAsync(Guid partidaId, DateTime? dataHora, CancellationToken ct)
+    {
+        var partida = await _db.LigaPartidas.Include(x => x.Rodada).FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)
+            ?? throw new InvalidOperationException("Partida não encontrada.");
+
+        partida.DataHora = HorarioDoJogo(dataHora, partida.Rodada.DataHora);
+        await _db.SaveChangesAsync(ct);
+
+        return await GetPartidaDtoAsync(partidaId, ct);
+    }
+
+    public async Task<IReadOnlyList<LigaPartidaDto>> EscalonarHorariosAsync(
+        Guid rodadaId, IReadOnlyList<Guid> ordem, int intervaloMinutos, CancellationToken ct)
+    {
+        if (intervaloMinutos is < 0 or > 24 * 60)
+            throw new InvalidOperationException("Intervalo inválido.");
+
+        var rodada = await _db.LigaRodadas.Include(r => r.Partidas).FirstOrDefaultAsync(r => r.RodadaId == rodadaId, ct)
+            ?? throw new InvalidOperationException("Rodada não encontrada.");
+
+        if (rodada.DataHora is not DateTime inicio)
+            throw new InvalidOperationException("Marque a data da rodada primeiro: o primeiro jogo sai no horário dela.");
+
+        // Jogo que não veio na lista vai para o fim, na ordem em que já estava.
+        var naOrdem = ordem.Select(id => rodada.Partidas.FirstOrDefault(p => p.PartidaId == id)).OfType<LigaPartida>()
+            .Concat(rodada.Partidas.Where(p => !ordem.Contains(p.PartidaId)).OrderBy(p => p.DataHora ?? inicio))
+            .Distinct()
+            .ToList();
+
+        for (var i = 0; i < naOrdem.Count; i++)
+            naOrdem[i].DataHora = HorarioDoJogo(inicio.AddMinutes(i * intervaloMinutos), inicio);
+
+        await _db.SaveChangesAsync(ct);
+        return await ListPartidasAsync(rodadaId, ct);
+    }
+
+    /// <summary>O horário que fica gravado no jogo: o mesmo da rodada não precisa ser guardado.</summary>
+    private static DateTime? HorarioDoJogo(DateTime? dataHora, DateTime? daRodada) =>
+        dataHora is DateTime d && d != daRodada ? d : null;
+
+    /// <summary>
+    /// Troca a data da rodada levando junto os jogos com horário próprio: a estreia que era 20 minutos
+    /// depois continua 20 minutos depois. As partidas da rodada precisam estar carregadas.
+    /// </summary>
+    private static void MudarDataDaRodada(LigaRodada rodada, DateTime? dataHora)
+    {
+        if (rodada.DataHora is DateTime antiga && dataHora is DateTime nova)
+            foreach (var p in rodada.Partidas.Where(p => p.DataHora is not null))
+                p.DataHora = HorarioDoJogo(p.DataHora!.Value + (nova - antiga), nova);
+
+        rodada.DataHora = dataHora;
+    }
+
     public async Task<IReadOnlyList<LigaPartidaDto>> ListPartidasAsync(Guid rodadaId, CancellationToken ct)
     {
         var partidas = await _db.LigaPartidas
@@ -670,7 +724,10 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.TimeFora)
             .ToListAsync(ct);
 
-        return partidas.Select(ToPartidaDto).ToArray();
+        return partidas
+            .OrderBy(p => p.DataHora ?? p.Rodada.DataHora ?? DateTime.MaxValue)
+            .Select(ToPartidaDto)
+            .ToArray();
     }
 
     public async Task<LigaPartidaDto> IniciarPartidaAsync(Guid partidaId, CancellationToken ct)
@@ -2596,7 +2653,8 @@ public class LigaAdminService : ILigaAdminService
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",
-            p.GolsCasa, p.GolsFora, p.Status, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId);
+            p.GolsCasa, p.GolsFora, p.Status, p.IsWO, p.TemPenaltis, p.PenaltisVencedorId, p.IniciadaEm, p.EncerradaEm, p.YoutubeVideoId,
+            p.DataHora ?? p.Rodada?.DataHora, p.DataHora is not null);
 
     private static LigaEventoDto ToEventoDto(LigaEventoPartida ev) =>
         new(ev.EventoId, ev.PartidaId, ev.Tipo, ev.TimeId, ev.Time?.TeamName ?? "?", ev.JogadorId, ev.Jogador?.Name ?? "?",

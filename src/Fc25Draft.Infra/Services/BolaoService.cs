@@ -74,6 +74,11 @@ public class BolaoService : IBolaoService
         if (palpites.Any(p => !jogos.ContainsKey(p.PartidaId)))
             throw new InvalidOperationException("Tem palpite de jogo que não é dessa rodada.");
 
+        // Cada jogo fecha no seu horário: o que já começou fica de fora, e o resto da rodada vale.
+        palpites = palpites.Where(p => JogoAberto(jogos[p.PartidaId])).ToList();
+        if (palpites.Count == 0)
+            throw new InvalidOperationException("Esses jogos já começaram. Os palpites deles estão fechados.");
+
         if (palpites.Any(p => p.GolsCasa < 0 || p.GolsFora < 0 || p.GolsCasa > 99 || p.GolsFora > 99))
             throw new InvalidOperationException("Placar inválido.");
 
@@ -147,10 +152,9 @@ public class BolaoService : IBolaoService
 
     public async Task<IReadOnlyList<BolaoPalpiteDeAlguemDto>> PalpitesDoJogoAsync(Guid partidaId, CancellationToken ct)
     {
-        var rodada = (await CarregarAsync(ct)).FirstOrDefault(r => r.Jogos.Any(j => j.PartidaId == partidaId));
-        if (rodada is null || EstaAberta(rodada)) return Array.Empty<BolaoPalpiteDeAlguemDto>();
+        var jogo = (await CarregarAsync(ct)).SelectMany(r => r.Jogos).FirstOrDefault(j => j.PartidaId == partidaId);
+        if (jogo is null || JogoAberto(jogo)) return Array.Empty<BolaoPalpiteDeAlguemDto>();
 
-        var jogo = rodada.Jogos.First(j => j.PartidaId == partidaId);
         var palpites = await PalpitesAsync(new[] { partidaId }, null, ct);
         var lances = await LancesAsync(new[] { jogo }, ct);
         var clubes = await ClubesAtuaisAsync(ct);
@@ -289,9 +293,10 @@ public class BolaoService : IBolaoService
 
     // ── Bastidores ─────────────────────────────────────────────────────────────
 
+    /// <param name="Quando">Horário do jogo: o próprio ou, sem ele, o da rodada.</param>
     private record Jogo(
         Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora, bool Comecou, bool Encerrado,
-        int GolsCasa, int GolsFora, bool IsWO, bool RegrasNovas);
+        int GolsCasa, int GolsFora, bool IsWO, bool RegrasNovas, DateTime? Quando);
 
     private record Rodada(
         Guid RodadaId, Guid LigaId, string Competicao, TipoCompetition Tipo, int Numero, bool Desempate,
@@ -343,7 +348,8 @@ public class BolaoService : IBolaoService
                     p.IsWO,
                     p.IniciadaEm,
                     p.EncerradaEm,
-                    p.Status
+                    p.Status,
+                    p.DataHora
                 }).ToList()
             })
             .ToListAsync(ct);
@@ -358,7 +364,10 @@ public class BolaoService : IBolaoService
                     j.IniciadaEm is not null || j.EncerradaEm is not null || j.Status != PartidaStatus.Agendada,
                     j.EncerradaEm is not null || j.Status == PartidaStatus.Encerrada,
                     j.GolsCasa, j.GolsFora, j.IsWO,
-                    RegrasNovas(r.DataHora ?? j.EncerradaEm))).ToList()))
+                    RegrasNovas(r.DataHora ?? j.EncerradaEm),
+                    j.DataHora ?? r.DataHora))
+                    .OrderBy(j => j.Quando ?? DateTime.MaxValue)
+                    .ToList()))
             .ToList();
 
         return _cache;
@@ -369,14 +378,17 @@ public class BolaoService : IBolaoService
         quando is not DateTime dia || dia >= BolaoPontuacao.RegrasNovasDesde;
 
     /// <summary>
-    /// A rodada aceita palpite enquanto a bola não rolar: antes do horário marcado e sem
-    /// nenhum jogo começado. Rodada sem data fica aberta até o primeiro apito.
+    /// O jogo aceita palpite enquanto a bola não rolar: antes do horário dele e sem ter começado.
+    /// Jogo sem data fica aberto até o apito.
     /// </summary>
-    private bool EstaAberta(Rodada rodada)
-    {
-        if (rodada.Jogos.Any(j => j.Comecou)) return false;
-        return rodada.Quando is not DateTime quando || Agora < quando;
-    }
+    private bool JogoAberto(Jogo jogo) =>
+        !jogo.Comecou && (jogo.Quando is not DateTime quando || Agora < quando);
+
+    /// <summary>
+    /// A rodada aceita palpite enquanto tiver jogo por vir: as estreias saem uma depois da outra,
+    /// e quem chega no meio da rodada ainda palpita nos jogos que faltam.
+    /// </summary>
+    private bool EstaAberta(Rodada rodada) => rodada.Jogos.Any(JogoAberto);
 
     private async Task<List<Palpite>> PalpitesAsync(IEnumerable<Guid> partidaIds, Guid? treinadorId, CancellationToken ct)
     {
@@ -502,7 +514,8 @@ public class BolaoService : IBolaoService
                     j.RegrasNovas,
                     meu?.JogadorCasaId, meu?.JogadorCasa,
                     meu?.JogadorForaId, meu?.JogadorFora,
-                    apurado?.Placar, apurado?.ExtraCasa, apurado?.ExtraFora);
+                    apurado?.Placar, apurado?.ExtraCasa, apurado?.ExtraFora,
+                    JogoAberto(j), j.Quando);
             }).ToList()))
             .ToArray();
     }

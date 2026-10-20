@@ -17,6 +17,12 @@ public class LigaPartida
     public DateTime? IniciadaEm { get; set; }
     public DateTime? EncerradaEm { get; set; }
 
+    /// <summary>
+    /// Horário do jogo (Brasília), quando é diferente do da rodada: as estreias no YouTube saem uma
+    /// depois da outra. Nulo segue o horário da rodada.
+    /// </summary>
+    public DateTime? DataHora { get; set; }
+
     /// <summary>ID do vídeo do jogo no YouTube (a estreia), para passar no telão.</summary>
     public string? YoutubeVideoId { get; set; }
 
