@@ -337,6 +337,16 @@
 .vaga-num { font-size: 1.6em; font-weight: 800; opacity: .75; }
 .vaga-nome { font-size: .85em; font-weight: 700; text-transform: uppercase; opacity: .8; overflow-wrap: anywhere; }
 .vaga-pos { font-size: .75em; opacity: .7; }
+.vaga-atualizacao {
+    font-size: .65em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .1em .5em;
+    border-radius: 1em;
+    background: rgba(13, 110, 253, .15);
+    color: var(--bs-primary-text-emphasis);
+}
 .vaga.t-escudo { border-style: double; border-width: .3em; }
 
 /* Na imagem de compartilhar o reflexo não funciona (a captura não mistura cores): sai a carta limpa. */

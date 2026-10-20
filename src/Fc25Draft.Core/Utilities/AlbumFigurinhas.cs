@@ -108,6 +108,115 @@ public static class AlbumFigurinhas
         return resultado;
     }
 
+    // ---- Atualização do álbum ----
+
+    /// <summary>Uma figurinha que já está no álbum (dentro ou fora), do jeito que a atualização precisa ver.</summary>
+    public sealed record FigurinhaExistente(
+        Guid FigurinhaId, TipoFigurinha Tipo, Guid TeamId, int? PlayerId, Guid? TreinadorId,
+        string Nome, int? Overall, bool Lenda, bool Fora);
+
+    /// <summary>Jogador que chega ao álbum: o elenco de hoje e a raridade que a figurinha nova ganha.</summary>
+    public sealed record JogadorQueEntra(JogadorDoAlbum Jogador, RaridadeFigurinha Raridade);
+
+    /// <summary>
+    /// O que muda no álbum para ele ficar igual aos elencos e às comissões técnicas de hoje:
+    /// <list type="bullet">
+    /// <item><b>Mudam</b>: estão no álbum, mas em outro clube agora — a figurinha vai para a página nova (quem tem, continua tendo).</item>
+    /// <item><b>Voltam</b>: tinham saído e estão de novo num clube do álbum — a mesma figurinha volta, na página do clube de hoje.</item>
+    /// <item><b>Saem</b>: deixaram os clubes do álbum — a figurinha sai das páginas.</item>
+    /// <item><b>Entram</b>: chegaram e nunca tiveram figurinha neste álbum — nasce uma nova, com número no fim.</item>
+    /// </list>
+    /// Escudos e Lendas não mudam nunca.
+    /// </summary>
+    public sealed record AtualizacaoDoAlbum(
+        IReadOnlyList<(FigurinhaExistente Figurinha, Guid Para, PapelTreinador? Papel)> Mudam,
+        IReadOnlyList<(FigurinhaExistente Figurinha, Guid Para, PapelTreinador? Papel)> Voltam,
+        IReadOnlyList<FigurinhaExistente> Saem,
+        IReadOnlyList<JogadorQueEntra> JogadoresEntram,
+        IReadOnlyList<(Guid TeamId, TecnicoDoAlbum Tecnico)> TecnicosEntram)
+    {
+        public int Total => Mudam.Count + Voltam.Count + Saem.Count + JogadoresEntram.Count + TecnicosEntram.Count;
+    }
+
+    /// <summary>
+    /// Compara o álbum com os elencos (<paramref name="jogadores"/>) e os técnicos de hoje dos clubes do álbum.
+    /// Quem chega vira brilhante se ficar entre os <see cref="BrilhantesPorClube"/> maiores overalls do clube
+    /// (contando o overall impresso de quem já está lá); as figurinhas que já existem não mudam de raridade.
+    /// </summary>
+    public static AtualizacaoDoAlbum PlanejarAtualizacao(
+        IReadOnlyList<FigurinhaExistente> figurinhas,
+        IReadOnlySet<Guid> clubesDoAlbum,
+        IReadOnlyList<JogadorDoAlbum> jogadores,
+        IReadOnlyDictionary<Guid, List<TecnicoDoAlbum>> tecnicos)
+    {
+        var mudam = new List<(FigurinhaExistente, Guid, PapelTreinador?)>();
+        var voltam = new List<(FigurinhaExistente, Guid, PapelTreinador?)>();
+        var saem = new List<FigurinhaExistente>();
+
+        // Jogadores: o clube de hoje de quem está num elenco do álbum.
+        var clubeDoJogador = jogadores.Where(j => clubesDoAlbum.Contains(j.TeamId))
+            .GroupBy(j => j.PlayerId).ToDictionary(g => g.Key, g => g.First());
+        var dosJogadores = figurinhas
+            .Where(f => f.Tipo == TipoFigurinha.Jogador && !f.Lenda && f.PlayerId is not null)
+            .GroupBy(f => f.PlayerId!.Value)
+            // A mesma pessoa tem uma figurinha só; se houver duas, vale a que está no álbum.
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Fora).First());
+
+        foreach (var (playerId, f) in dosJogadores)
+            Comparar(f, clubeDoJogador.TryGetValue(playerId, out var hoje) ? hoje.TeamId : null, null);
+
+        // Técnicos: a passagem aberta de hoje num clube do álbum.
+        var clubeDoTecnico = tecnicos.Where(t => clubesDoAlbum.Contains(t.Key))
+            .SelectMany(t => t.Value.Select(tec => (TeamId: t.Key, Tecnico: tec)))
+            .GroupBy(t => t.Tecnico.TreinadorId)
+            .ToDictionary(g => g.Key, g => g.First());
+        var dosTecnicos = figurinhas
+            .Where(f => f.Tipo == TipoFigurinha.Treinador && f.TreinadorId is not null)
+            .GroupBy(f => f.TreinadorId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Fora).First());
+
+        foreach (var (treinadorId, f) in dosTecnicos)
+        {
+            var hoje = clubeDoTecnico.TryGetValue(treinadorId, out var t) ? t : default;
+            Comparar(f, hoje.Tecnico is null ? null : hoje.TeamId, hoje.Tecnico?.Papel);
+        }
+
+        void Comparar(FigurinhaExistente f, Guid? clubeHoje, PapelTreinador? papel)
+        {
+            if (clubeHoje is not Guid para)
+            {
+                if (!f.Fora) saem.Add(f);
+            }
+            else if (f.Fora) voltam.Add((f, para, papel));
+            else if (para != f.TeamId) mudam.Add((f, para, papel));
+        }
+
+        // Quem chega: está num elenco ou comissão do álbum e nunca teve figurinha aqui.
+        var chegam = clubeDoJogador.Values.Where(j => !dosJogadores.ContainsKey(j.PlayerId)).ToList();
+        var tecnicosEntram = clubeDoTecnico.Values
+            .Where(t => !dosTecnicos.ContainsKey(t.Tecnico.TreinadorId))
+            .Select(t => (t.TeamId, t.Tecnico))
+            .ToList();
+
+        // Brilhante para quem chega entre os maiores overalls do clube, contando quem fica, quem muda e quem volta.
+        var saemIds = saem.Select(s => s.FigurinhaId).ToHashSet();
+        var paraOnde = mudam.Concat(voltam).ToDictionary(m => m.Item1.FigurinhaId, m => m.Item2);
+        var ficam = dosJogadores.Values
+            .Where(f => !saemIds.Contains(f.FigurinhaId) && (!f.Fora || paraOnde.ContainsKey(f.FigurinhaId)))
+            .Select(f => (TeamId: paraOnde.GetValueOrDefault(f.FigurinhaId, f.TeamId), PlayerId: f.PlayerId!.Value, Overall: f.Overall ?? 0, f.Nome));
+        var brilhantes = ficam
+            .Concat(chegam.Select(j => (j.TeamId, j.PlayerId, j.Overall, j.Nome)))
+            .GroupBy(j => j.TeamId)
+            .SelectMany(g => MaioresOveralls(g.Select(j => (j.PlayerId, j.Overall, j.Nome))))
+            .ToHashSet();
+
+        var jogadoresEntram = chegam
+            .Select(j => new JogadorQueEntra(j, brilhantes.Contains(j.PlayerId) ? RaridadeFigurinha.Brilhante : RaridadeFigurinha.Comum))
+            .ToList();
+
+        return new AtualizacaoDoAlbum(mudam, voltam, saem, jogadoresEntram, tecnicosEntram);
+    }
+
     /// <summary>Os <see cref="BrilhantesPorClube"/> maiores overalls do elenco (empate pelo nome).</summary>
     public static HashSet<int> MaioresOveralls(IEnumerable<(int PlayerId, int Overall, string Nome)> elenco) =>
         elenco.OrderByDescending(j => j.Overall).ThenBy(j => j.Nome, StringComparer.CurrentCulture)

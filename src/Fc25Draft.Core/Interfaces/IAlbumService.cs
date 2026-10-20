@@ -42,6 +42,19 @@ public interface IAlbumService
     /// <summary>Tira a figurinha de Lenda, só enquanto ninguém a tirou em pacote.</summary>
     Task TirarLendaAsync(Guid albumId, Guid figurinhaId, string? adminToken, CancellationToken ct);
 
+    /// <summary>
+    /// Prévia da atualização: compara o álbum com os elencos e técnicos de hoje (quem entra, quem muda de clube,
+    /// quem volta e quem sai). Não grava nada.
+    /// </summary>
+    Task<AtualizacaoDoAlbumDto> PreviaDaAtualizacaoAsync(Guid albumId, CancellationToken ct);
+
+    /// <summary>
+    /// Aplica a atualização: quem mudou de clube vai para a página nova, quem saiu deixa o álbum (fica com quem
+    /// tem, para reciclar), quem chegou ganha figurinha nova no fim. Trocas pendentes com figurinha que saiu caem,
+    /// e quem ficou com página completa ganha o selo.
+    /// </summary>
+    Task<AtualizacaoAplicadaDto> AtualizarAsync(Guid albumId, string? adminToken, CancellationToken ct);
+
     /// <summary>Jogadores do álbum que estão sem foto hoje.</summary>
     Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct);
 

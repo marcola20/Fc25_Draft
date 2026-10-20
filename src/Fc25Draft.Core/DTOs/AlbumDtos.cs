@@ -19,8 +19,13 @@ public record FigurinhaDto(
     Guid? TreinadorId = null,
     PapelTreinador? Papel = null,
     PerfilTreinadorDto? Perfil = null,
-    bool Lenda = false)
+    bool Lenda = false,
+    DateTime? EntrouEm = null,
+    bool Fora = false)
 {
+    /// <summary>Chegou numa atualização do álbum (depois do lançamento).</summary>
+    public bool DaAtualizacao => EntrouEm is not null;
+
     /// <summary>"Técnico" ou "Auxiliar", na figurinha de técnico.</summary>
     public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
 }
@@ -66,7 +71,8 @@ public record MeuAlbumDto(
     int Repetidas,
     bool PacoteDoDiaDisponivel,
     IReadOnlyList<ConquistaAlbumDto> Conquistas,
-    int TrocasEsperando)
+    int TrocasEsperando,
+    IReadOnlyList<VagaDoAlbumDto>? ForaDoAlbum = null)
 {
     public int PacotesParaAbrir => Fechados.Count;
 
@@ -156,10 +162,13 @@ public record TrocaDto(
     public bool Pendente => Status == StatusTroca.Pendente;
 }
 
-/// <summary>Uma repetida: a figurinha e quantas cópias a pessoa tem (a colada conta, então troca até Quantidade - 1).</summary>
-public record RepetidaDto(FigurinhaDto Figurinha, int Quantidade)
+/// <summary>
+/// Uma repetida: a figurinha e quantas cópias a pessoa tem (a colada conta, então troca até Quantidade - 1).
+/// A que saiu do álbum não tem vaga para colar: todas as cópias sobram, mas só servem para reciclar.
+/// </summary>
+public record RepetidaDto(FigurinhaDto Figurinha, int Quantidade, bool ForaDoAlbum = false)
 {
-    public int Sobrando => Quantidade - 1;
+    public int Sobrando => ForaDoAlbum ? Quantidade : Quantidade - 1;
 }
 
 /// <summary>Uma figurinha que falta e quem a tem repetida.</summary>
@@ -293,3 +302,25 @@ public record FigurinhaSemFotoDto(int? PlayerId, int Numero, string Nome, Guid T
 
 /// <summary>Pacotes de uma pessoa, para a tela de dar pacotes.</summary>
 public record PacotesDoTreinadorDto(Guid TreinadorId, string Nome, string? TimeAtual, bool Ativo, int ParaAbrir, int Abertos, int Coladas);
+
+/// <summary>Uma linha da prévia (ou do resultado) da atualização do álbum.</summary>
+/// <param name="Donos">Quantas pessoas têm essa figurinha (0 na que ainda vai nascer).</param>
+public record MudancaDoAlbumDto(
+    string Nome, TipoFigurinha Tipo, string? PosicaoSigla, int? Overall, RaridadeFigurinha Raridade, int? Numero,
+    string? De, string? Para, int Donos);
+
+/// <summary>O que a atualização faz para o álbum ficar com os elencos e técnicos de hoje.</summary>
+public record AtualizacaoDoAlbumDto(
+    IReadOnlyList<MudancaDoAlbumDto> Entram,
+    IReadOnlyList<MudancaDoAlbumDto> Mudam,
+    IReadOnlyList<MudancaDoAlbumDto> Voltam,
+    IReadOnlyList<MudancaDoAlbumDto> Saem,
+    int TotalHoje,
+    int TotalDepois,
+    int TrocasQueCaem = 0)
+{
+    public int Total => Entram.Count + Mudam.Count + Voltam.Count + Saem.Count;
+}
+
+/// <summary>A atualização aplicada: o que mudou e os selos de página que ela fechou.</summary>
+public record AtualizacaoAplicadaDto(AtualizacaoDoAlbumDto Mudancas, int Selos);

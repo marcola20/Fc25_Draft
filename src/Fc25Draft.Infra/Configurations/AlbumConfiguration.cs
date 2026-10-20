@@ -38,6 +38,7 @@ public class FigurinhaConfiguration : IEntityTypeConfiguration<Figurinha>
 
         b.HasIndex(x => new { x.AlbumId, x.Numero }).IsUnique();
         b.HasIndex(x => new { x.AlbumId, x.Raridade });
+        b.HasIndex(x => new { x.AlbumId, x.SaiuEm });
 
         b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Jogador).WithMany().HasForeignKey(x => x.PlayerId).OnDelete(DeleteBehavior.Restrict);

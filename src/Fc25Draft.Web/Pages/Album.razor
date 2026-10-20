@@ -266,6 +266,30 @@
                     </a>
                 }
             </div>
+
+            @if (a.ForaDoAlbum is { Count: > 0 } fora)
+            {
+                @* ---- Figurinhas de quem saiu dos clubes da liga ---- *@
+                <div class="card mt-4">
+                    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-bold">📦 Saíram do álbum</span>
+                        <span class="small text-muted">@fora.Sum(v => v.Quantidade) cópia@(fora.Sum(v => v.Quantidade) == 1 ? "" : "s")</span>
+                        <a href="/album/trocas?aba=repetidas" class="btn btn-sm btn-outline-success ms-auto">♻️ Reciclar</a>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            Jogadores e técnicos que deixaram os clubes da liga numa atualização do álbum. A figurinha continua sua,
+                            mas não tem mais vaga nas páginas: todas as cópias, até a que estava colada, podem ir para a reciclagem.
+                        </p>
+                        <div class="grade-cartas">
+                            @foreach (var v in fora)
+                            {
+                                <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Largura="110" Quantidade="@v.Quantidade" SeloLendaria="@Selo" />
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
         }
     }
 </div>

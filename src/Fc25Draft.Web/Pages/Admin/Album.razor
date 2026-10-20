@@ -85,6 +85,56 @@
                 </div>
             </div>
 
+            @if (ad.Album.Ativo)
+            {
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">🔄 Atualizar com os elencos de hoje</div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            Depois do mercado e das trocas de técnico, deixa o álbum igual aos elencos de hoje sem ninguém perder
+                            figurinha: quem <strong>mudou de clube</strong> vai para a página nova com a mesma figurinha; quem
+                            <strong>chegou</strong> ganha figurinha nova, com número no fim; a de quem <strong>saiu</strong> deixa as
+                            páginas (não conta mais para completar nem sai em pacote) e fica com quem tem, para reciclar inteira.
+                            Escudos e Lendas não mudam.
+                        </p>
+                        <button class="btn btn-outline-primary" disabled="@_salvando" @onclick="PreviaDaAtualizacaoAsync">
+                            @(_atualizacao is null ? "Ver o que mudou" : "Conferir de novo")
+                        </button>
+
+                        @if (_atualizacao is { } at)
+                        {
+                            @if (at.Total == 0)
+                            {
+                                <div class="alert alert-success mt-3 mb-0">O álbum já está igual aos elencos de hoje.</div>
+                            }
+                            else
+                            {
+                                <div class="row g-3 text-center my-2">
+                                    <div class="col-6 col-md-3"><div class="h4 mb-0 text-success">+@at.Entram.Count</div><div class="small text-muted">entram</div></div>
+                                    <div class="col-6 col-md-3"><div class="h4 mb-0 text-primary">@at.Mudam.Count</div><div class="small text-muted">mudam de clube</div></div>
+                                    <div class="col-6 col-md-3"><div class="h4 mb-0 text-info">@at.Voltam.Count</div><div class="small text-muted">voltam</div></div>
+                                    <div class="col-6 col-md-3"><div class="h4 mb-0 text-danger">−@at.Saem.Count</div><div class="small text-muted">saem</div></div>
+                                </div>
+                                <div class="small mb-2">
+                                    O álbum vai de <strong>@at.TotalHoje</strong> para <strong>@at.TotalDepois</strong> figurinhas.
+                                    @if (at.TrocasQueCaem > 0)
+                                    {
+                                        <span class="text-warning">@at.TrocasQueCaem proposta@(at.TrocasQueCaem == 1 ? "" : "s") de troca pendente@(at.TrocasQueCaem == 1 ? "" : "s") com figurinha que sai @(at.TrocasQueCaem == 1 ? "cai" : "caem").</span>
+                                    }
+                                </div>
+
+                                @ListaDeMudancas("➕ Entram", at.Entram, mostrarDe: false)
+                                @ListaDeMudancas("➡️ Mudam de clube", at.Mudam, mostrarDe: true)
+                                @ListaDeMudancas("↩️ Voltam ao álbum", at.Voltam, mostrarDe: false)
+                                @ListaDeMudancas("➖ Saem do álbum", at.Saem, mostrarDe: true)
+
+                                <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="AtualizarAlbumAsync">✅ Aplicar a atualização</button>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
             <div class="card mb-3">
                 <div class="card-header fw-bold">🎯 Pacotes do bolão</div>
                 <div class="card-body">
@@ -251,6 +301,7 @@
     {
         _admin = null;
         _previa = null;
+        _atualizacao = null;
         _escolhidas = new();
         try
         {
@@ -350,6 +401,79 @@
         }
         catch (Exception ex) { _erro = ex.Message; }
     }
+
+    // ---- Atualização do álbum
+
+    private AtualizacaoDoAlbumDto? _atualizacao;
+
+    private async Task PreviaDaAtualizacaoAsync()
+    {
+        if (_admin is null) return;
+        _salvando = true;
+        _erro = null;
+        try { _atualizacao = await AlbumSvc.PreviaDaAtualizacaoAsync(_admin.Album.AlbumId, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task AtualizarAlbumAsync()
+    {
+        if (_admin is null || _atualizacao is not { } at) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm",
+                $"Aplicar a atualização? {at.Entram.Count} entram, {at.Mudam.Count} mudam de clube, {at.Voltam.Count} voltam e {at.Saem.Count} saem. " +
+                "Quem tem figurinha que sai continua com ela, fora das páginas.")) return;
+
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            var feita = await AlbumSvc.AtualizarAsync(_admin.Album.AlbumId, await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            _albuns = await AlbumSvc.ListarAsync(CancellationToken.None);
+            await CarregarTemporadaAsync();
+            _atualizacao = null;
+            var m = feita.Mudancas;
+            _ok = $"Álbum atualizado: {m.Entram.Count} entraram, {m.Mudam.Count} mudaram de clube, {m.Voltam.Count} voltaram e {m.Saem.Count} saíram. " +
+                  $"Agora são {m.TotalDepois} figurinhas." +
+                  (feita.Selos > 0 ? $" {feita.Selos} selo{(feita.Selos == 1 ? "" : "s")} de página completa saíram com a atualização." : "");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private RenderFragment ListaDeMudancas(string titulo, IReadOnlyList<MudancaDoAlbumDto> linhas, bool mostrarDe) => __builder =>
+    {
+        if (linhas.Count == 0) return;
+        <details class="mb-2" open="@(linhas.Count <= 15)">
+            <summary class="fw-semibold small">@titulo (@linhas.Count)</summary>
+            <div class="table-responsive mt-1">
+                <table class="table table-sm align-middle mb-0 small">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Nome</th><th>Pos.</th><th class="text-center">Ovr</th><th>Raridade</th>
+                            @if (mostrarDe) { <th>De</th> }
+                            @if (linhas.Any(l => l.Para is not null)) { <th>Para</th> }
+                            <th class="text-center" title="Quantas pessoas têm essa figurinha">Donos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in linhas)
+                        {
+                            <tr>
+                                <td class="text-muted">@(l.Numero is int n ? AlbumFigurinhas.NumeroImpresso(n) : "")</td>
+                                <td>@l.Nome</td>
+                                <td>@l.PosicaoSigla</td>
+                                <td class="text-center">@l.Overall</td>
+                                <td>@(l.Raridade switch { RaridadeFigurinha.Lendaria => "★ lendária", RaridadeFigurinha.Brilhante => "✨ brilhante", _ => "comum" })</td>
+                                @if (mostrarDe) { <td>@l.De</td> }
+                                @if (linhas.Any(x => x.Para is not null)) { <td>@l.Para</td> }
+                                <td class="text-center">@(l.Donos > 0 ? l.Donos : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    };
 
     private async Task SalvarLendariasAsync()
     {

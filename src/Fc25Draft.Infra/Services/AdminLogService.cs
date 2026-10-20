@@ -65,6 +65,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.ContarJogosAntesDoLancamento => "Deu os pacotes dos jogos antes do lançamento do álbum",
         AdminActionType.ColocarLenda => "Colocou uma lenda no álbum",
         AdminActionType.TirarLenda => "Tirou uma lenda do álbum",
+        AdminActionType.AtualizarAlbum => "Atualizou o álbum com os elencos de hoje",
         _ => tipo.ToString()
     };
 

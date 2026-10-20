@@ -101,6 +101,18 @@ public class Figurinha
     /// <summary>Lugar na página do clube (0 = escudo).</summary>
     public int Ordem { get; set; }
 
+    /// <summary>
+    /// Entrou numa atualização do álbum (chegou ao clube depois do lançamento); nulo = veio no lançamento.
+    /// </summary>
+    public DateTime? EntrouEm { get; set; }
+
+    /// <summary>
+    /// Saiu do álbum numa atualização (o jogador ou técnico deixou os clubes da liga). Não aparece nas páginas,
+    /// não conta para completar e não sai mais em pacote; quem tem fica com ela e pode reciclar todas as cópias.
+    /// Volta (nulo de novo) se a pessoa retornar a um clube do álbum.
+    /// </summary>
+    public DateTime? SaiuEm { get; set; }
+
     public Album Album { get; set; } = null!;
     public Team Time { get; set; } = null!;
     public Player? Jogador { get; set; }

@@ -28,9 +28,10 @@ public partial class AlbumService
             .CountAsync(t => t.ParaTreinadorId == treinadorId && t.Status == StatusTroca.Pendente && t.ExpiraEm > agora, ct);
     }
 
+    /// <summary>Quem tem o quê, só das figurinhas que estão nas páginas: a que saiu do álbum não entra em troca.</summary>
     private async Task<List<Posse>> PossesAsync(Guid albumId, CancellationToken ct) =>
         await _db.FigurinhasDosTreinadores.AsNoTracking()
-            .Where(f => f.Figurinha.AlbumId == albumId)
+            .Where(f => f.Figurinha.AlbumId == albumId && f.Figurinha.SaiuEm == null)
             .Select(f => new Posse(f.TreinadorId, f.FigurinhaId, f.Quantidade))
             .ToListAsync(ct);
 
@@ -41,8 +42,10 @@ public partial class AlbumService
         var album = await AtivoAsync(ct);
         if (album is null) return null;
 
-        var figurinhas = await FigurinhasAsync(album.AlbumId, ct);
-        var porId = figurinhas.ToDictionary(f => f.FigurinhaId);
+        // As que saíram do álbum ficam no dicionário para o histórico de trocas e para a reciclagem.
+        var todas = await FigurinhasAsync(album.AlbumId, ct, incluirForaDoAlbum: true);
+        var porId = todas.ToDictionary(f => f.FigurinhaId);
+        var figurinhas = todas.Where(f => !f.Fora).ToList();
         var posses = await PossesAsync(album.AlbumId, ct);
         var pessoas = await PessoasAtivasAsync(posses.Select(p => p.TreinadorId).Where(id => id != treinadorId), ct);
 
@@ -50,9 +53,16 @@ public partial class AlbumService
         var outros = posses.Where(p => p.TreinadorId != treinadorId && pessoas.ContainsKey(p.TreinadorId)).ToList();
         var repetidasDe = outros.Where(p => p.Quantidade >= 2).ToLookup(p => p.FigurinhaId, p => p.TreinadorId);
 
+        // As que saíram do álbum entram inteiras (até a que estava colada), mas só servem para reciclar.
+        var foraDoAlbum = (await _db.FigurinhasDosTreinadores.AsNoTracking()
+                .Where(f => f.TreinadorId == treinadorId && f.Figurinha.AlbumId == album.AlbumId && f.Figurinha.SaiuEm != null)
+                .Select(f => new { f.FigurinhaId, f.Quantidade })
+                .ToListAsync(ct))
+            .Select(f => new RepetidaDto(porId[f.FigurinhaId], f.Quantidade, ForaDoAlbum: true));
         var minhasRepetidas = minhas.Where(m => m.Value >= 2)
             .Select(m => new RepetidaDto(porId[m.Key], m.Value))
-            .OrderBy(r => r.Figurinha.Numero)
+            .Concat(foraDoAlbum)
+            .OrderBy(r => r.ForaDoAlbum).ThenBy(r => r.Figurinha.Numero)
             .ToList();
         var faltam = figurinhas.Where(f => !minhas.ContainsKey(f.FigurinhaId))
             .Select(f => new FaltaDto(f, repetidasDe[f.FigurinhaId]
@@ -276,6 +286,8 @@ public partial class AlbumService
 
             var figurinhas = await FigurinhasAsync(troca.AlbumId, ct);
             var porId = figurinhas.ToDictionary(f => f.FigurinhaId);
+            if (troca.Itens.Any(i => !porId.ContainsKey(i.FigurinhaId)))
+                return await EncerrarAsync(troca, StatusTroca.NaoValeMais, "Uma das figurinhas saiu do álbum na atualização.", agora, tx, ct);
             var nomes = await PessoasAtivasAsync(new[] { de, para }, ct, incluirInativos: true);
             var ativos = await PessoasAtivasAsync(new[] { de, para }, ct);
             var quantidades = posses.ToDictionary(p => p.Key, p => p.Value.Quantidade);
@@ -405,14 +417,17 @@ public partial class AlbumService
 
             foreach (var (id, quantas) in porFigurinha)
             {
-                // A colada fica: só as cópias que sobram entram na reciclagem.
-                if (!posses.TryGetValue(id, out var posse) || posse.Quantidade - quantas < 1)
+                // A colada fica: só as cópias que sobram entram na reciclagem. Da que saiu do álbum não tem vaga
+                // para colar, então vão todas.
+                var minimo = posses.TryGetValue(id, out var posse) && posse.Figurinha.SaiuEm is not null ? 0 : 1;
+                if (posse is null || posse.Quantidade - quantas < minimo)
                 {
                     var nome = posse?.Figurinha.NomeImpresso ?? "uma das figurinhas";
                     throw new InvalidOperationException($"Você não tem tantas repetidas de {nome}.");
                 }
 
                 posse.Quantidade -= quantas;
+                if (posse.Quantidade == 0) _db.FigurinhasDosTreinadores.Remove(posse);
             }
 
             var pacoteId = Guid.NewGuid();

@@ -920,6 +920,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<DateTime?>("EntrouEm")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<bool>("Lenda")
                         .HasColumnType("boolean");
 
@@ -950,6 +953,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Raridade")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("SaiuEm")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid");
 
@@ -971,6 +977,8 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.HasIndex("AlbumId", "Raridade");
+
+                    b.HasIndex("AlbumId", "SaiuEm");
 
                     b.ToTable("Figurinhas", (string)null);
                 });

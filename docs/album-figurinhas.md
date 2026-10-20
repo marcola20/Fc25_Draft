@@ -326,6 +326,30 @@ abrir pacotes até sair uma figurinha de técnico mostra a foto atual do perfil;
   técnicos com link para o perfil. "Você se tirou!" na abertura (`AberturaDePacote.EuId`), com festa.
 - O álbum 2010 local foi relançado nesta fase (337 figurinhas, 22 técnicos).
 
+### Fase 6 — Atualização do álbum
+Decisões (20/10/2026): depois do mercado e das trocas de técnico o álbum deixa de ser só o retrato do lançamento.
+O admin roda a atualização **à mão, com prévia**, em `/admin/album` (cartão "Atualizar com os elencos de hoje").
+- **Mudou de clube** (jogador ou técnico, dentro dos clubes do álbum): a **mesma figurinha** vai para a página do
+  clube novo, com o mesmo número; quem tem continua tendo. Técnico que mudou de papel passa a TÉC/AUX novo.
+- **Saiu** dos clubes do álbum (dispensado, foi para fora, aposentou, técnico sem clube): `Figurinha.SaiuEm`. Sai das
+  páginas, da contagem, dos pacotes, das trocas e dos selos; quem tem fica com ela na seção "Saíram do álbum" do
+  `/album` e pode reciclar **todas** as cópias (até a colada) — a linha some quando acaba.
+- **Chegou** sem nunca ter tido figurinha no álbum: figurinha nova com número no fim (`Figurinha.EntrouEm`), no fim da
+  página do clube (técnicos logo depois do escudo). Brilhante se ficar entre os 3 maiores overalls do clube (contando o
+  overall impresso de quem já está lá); as que já existem não mudam de raridade.
+- **Voltou** (tinha saído e está de novo num clube do álbum): a mesma figurinha volta, na página do clube de hoje.
+- Escudos e Lendas não mudam. Proposta de troca pendente com figurinha que saiu vira `NaoValeMais`. Quem fica com
+  página (ou álbum) completa depois da atualização ganha o selo na hora; selo antigo não sai.
+
+**Feito (20/10/2026).** Como ficou:
+- Regra pura em `AlbumFigurinhas.PlanejarAtualizacao`; serviço em `AlbumService.Atualizacao.cs`
+  (`PreviaDaAtualizacaoAsync`, `AtualizarAsync`, que trava a linha do álbum). Fonte: `TeamRosters` e as passagens
+  abertas dos clubes que têm escudo no álbum. Log `AtualizarAlbum`. Migração `AtualizacaoDoAlbum`.
+- `FigurinhasAsync` devolve só as que estão nas páginas (`incluirForaDoAlbum` para o feed de raras, o histórico de
+  trocas e a seção "Saíram do álbum"). Totais e coladas contam só as que estão no álbum.
+- Página do clube: escudo, técnicos, elenco pela `Ordem` (não mais pelo número). A vaga de quem chegou mostra
+  "atualização". Na reciclagem, a que saiu aparece com "saiu do álbum" e `RepetidaDto.ForaDoAlbum`.
+
 ## Fotos das figurinhas
 
 Medida e enquadramento das fotos (jogador e técnico), para o álbum ficar padronizado:
