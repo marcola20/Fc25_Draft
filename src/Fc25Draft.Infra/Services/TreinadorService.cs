@@ -240,7 +240,7 @@ public class TreinadorService : ITreinadorService
         var treinador = await GetAsync(treinadorId, ct);
         if (treinador is null) return null;
 
-        // Uma temporada entra na carreira quando a passagem cobre a competição.
+        // Uma temporada entra na carreira quando ele comandou o clube em jogos da competição.
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => l.Temporada != null)
             .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.Temporada, l.DataInicio, l.DataFim, l.CampeaoTimeId, l.VagasDiretas, l.VagasPlayoff })
@@ -294,10 +294,9 @@ public class TreinadorService : ITreinadorService
             .Where(p => treinador.Passagens.Any(t => t.PassagemId == p.PassagemId))
             .ToDictionary(p => p.PassagemId, p => ComandoDoJogo.Janela(p, doClube));
 
-        List<Jogo> JogosDa(TreinadorPassagemDto passagem, Guid? ligaId = null) =>
+        List<Jogo> JogosDa(TreinadorPassagemDto passagem) =>
             jogos.Where(j =>
                 (j.CasaId == passagem.TimeId || j.ForaId == passagem.TimeId)
-                && (ligaId is null || j.LigaId == ligaId)
                 && ComandoDoJogo.Comandou(janelas[passagem.PassagemId], j.Quando)).ToList();
 
         var passagensComRetrospecto = treinador.Passagens
@@ -375,22 +374,15 @@ public class TreinadorService : ITreinadorService
 
         foreach (var passagem in treinador.Passagens)
         {
-            foreach (var liga in ligas.Where(l => l.Temporada is not null))
+            // A competição entra quando ele comandou o clube em algum jogo dela: quem assume
+            // no meio da temporada também a disputou, e o período só encostar nela não basta
+            // (troca de clube no meio da temporada não leva as competições do outro clube).
+            var dele = JogosDa(passagem);
+
+            foreach (var liga in ligas.Where(l => dele.Any(j => j.LigaId == l.LigaId)))
             {
-                // Vale quem estava no comando em algum momento da competição, não só quem
-                // começou com ela: quem assume no meio da temporada também a disputou.
                 var comecou = liga.DataInicio.Date;
                 var acabou = (ultimoJogo.TryGetValue(liga.LigaId, out var fim) ? fim : liga.DataFim).Date;
-
-                var pegou = passagem.Desde.Date < (acabou > comecou ? acabou : DateTime.MaxValue)
-                            && comecou < (passagem.Ate?.Date ?? DateTime.MaxValue);
-                if (!pegou) continue;
-
-                var naLiga = classificacoes.FirstOrDefault(c => c.LigaId == liga.LigaId && c.TimeId == passagem.TimeId);
-                var jogouSupercopa = liga.Tipo == TipoCompetition.Supercopa
-                                     && await _db.LigaTimes.AnyAsync(t => t.LigaId == liga.LigaId && t.TimeId == passagem.TimeId, ct);
-
-                if (naLiga is null && !jogouSupercopa) continue;
 
                 var campeao = liga.CampeaoTimeId == passagem.TimeId;
                 var naTabela = liga.Tipo == TipoCompetition.Liga;
@@ -398,11 +390,7 @@ public class TreinadorService : ITreinadorService
                 // A posição só vale quando a competição acabou (durante a temporada ela ainda muda).
                 var encerrada = liga.Status == LigaStatus.Encerrada;
 
-                var campanha = Retrospecto(JogosDa(passagem, liga.LigaId), passagem.TimeId);
-
-                // Competição que já acabou e ele não comandou nenhum jogo não é carreira dele
-                // (o período só encostou nela).
-                if (encerrada && campanha.Jogos == 0) continue;
+                var campanha = Retrospecto(dele.Where(j => j.LigaId == liga.LigaId), passagem.TimeId);
 
                 var posicaoFinal = naTabela && encerrada && PosicaoFinalDa(liga.LigaId).TryGetValue(passagem.TimeId, out var lugar)
                     ? lugar
