@@ -1,7 +1,10 @@
 @page "/jogadores/comparar"
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@using Fc25Draft.Core.Utilities
 @inject ILigaPublicService LigaService
+@inject PlayersApiClient PlayersApi
 @inject IPricingService Pricing
 @inject IDiretoriaService Diretoria
 @inject EscudoService Escudos
@@ -10,19 +13,9 @@
 <PageTitle>Comparar jogadores</PageTitle>
 
 <div class="comparar py-3 @(SlotsVisiveis > 2 ? "largo" : "")">
-    <div class="d-flex flex-column align-items-center gap-2 mb-3">
-        @if (_temporada is int temporada)
-        {
-            <div class="btn-group btn-group-sm" role="group" aria-label="O que comparar">
-                <button type="button" class="btn @(SoTemporada ? "btn-outline-secondary" : "btn-secondary")" @onclick="() => TrocarModo(false)">Carreira toda</button>
-                <button type="button" class="btn @(SoTemporada ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => TrocarModo(true)">Só a temporada @temporada</button>
-            </div>
-        }
-        <p class="text-muted small text-center mb-0">
-            @(SoTemporada ? $"Só a temporada {_temporada}, em todas as competições." : "Carreira de todas as temporadas e competições.")
-            Dá para comparar até @Maximo jogadores, e o link guarda todos: dá para mandar no grupo.
-        </p>
-    </div>
+    <p class="text-muted small text-center mb-3">
+        Dá para comparar até @Maximo jogadores, e o link guarda todos: dá para mandar no grupo.
+    </p>
 
     <div class="row g-3 mb-4">
         @for (var i = 0; i < SlotsVisiveis; i++)
@@ -85,19 +78,72 @@
 
     @if (_comparados.Count >= 2)
     {
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(VerAtributos ? "" : "active")" @onclick="() => Navegar(atributos: false)">📊 Estatísticas</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(VerAtributos ? "active" : "")" @onclick="() => Navegar(atributos: true)">🧬 Atributos</button>
+                </li>
+            </ul>
+            @if (!VerAtributos && _temporada is int temporada)
+            {
+                <div class="btn-group btn-group-sm" role="group" aria-label="Recorte das estatísticas">
+                    <button type="button" class="btn @(SoTemporada ? "btn-outline-secondary" : "btn-secondary")" @onclick="() => Navegar(soTemporada: false)">Carreira toda</button>
+                    <button type="button" class="btn @(SoTemporada ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => Navegar(soTemporada: true)">Só a temporada @temporada</button>
+                </div>
+            }
+        </div>
+    }
+
+    @if (_comparados.Count >= 2 && VerAtributos)
+    {
+        var comAtributos = _comparados.Count(c => c.Atributos is not null);
+        if (comAtributos == 0)
+        {
+            <div class="alert alert-secondary">Nenhum desses jogadores tem os atributos do PES cadastrados.</div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-body py-2">
+                    @Cabecalho()
+                    @if (_comparados.Any(c => c.Atributos?.Altura is not null))
+                    {
+                        @Linha("Altura (cm)", c => c.Atributos?.Altura, destacar: false)
+                    }
+                    @if (_comparados.Any(c => c.Atributos?.Peso is not null))
+                    {
+                        @Linha("Peso (kg)", c => c.Atributos?.Peso, destacar: false)
+                    }
+                    @foreach (var grupo in GruposAtributos)
+                    {
+                        <div class="grupo-titulo">@grupo.Key</div>
+                        @foreach (var atributo in grupo)
+                        {
+                            var a = atributo;
+                            @Linha(a.Nome, c => c.Atributos is { } x ? a.Get(x) : null, minimo: AtributosPes.Minimo, teto: AtributosPes.Maximo)
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-muted">
+                <span>Atributos do PES, como estão hoje. A barra vai de @AtributosPes.Minimo a @AtributosPes.Maximo.</span>
+                @if (comAtributos < _comparados.Count)
+                {
+                    <span>— = jogador sem atributos cadastrados.</span>
+                }
+            </div>
+        }
+    }
+    else if (_comparados.Count >= 2)
+    {
         var todos = _comparados.Select(c => c.N).ToList();
         <div class="card">
             <div class="card-body py-2">
-                @if (_comparados.Count > 2)
-                {
-                    <div class="multi cabecalho" style="--n: @_comparados.Count;">
-                        <div class="rotulo"></div>
-                        @foreach (var c in _comparados)
-                        {
-                            <div class="nome-coluna borda-@c.Slot text-truncate" title="@c.Jogador.Nome">@c.Jogador.Nome</div>
-                        }
-                    </div>
-                }
+                @Cabecalho()
                 @Linha("Overall", c => c.Jogador.Overall)
                 @Linha("Valor de mercado", c => (double)c.Valor, Milhoes)
                 @if (todos.Any(n => n.TemContador))
@@ -127,6 +173,7 @@
 
         <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-muted">
             <span>
+                @(SoTemporada ? $"Só a temporada {_temporada}, em todas as competições." : "Carreira de todas as temporadas e competições.")
                 Barra colorida: quem leva vantagem. Nos cartões, ganha quem tem menos.
                 @if (SoTemporada)
                 {
@@ -148,19 +195,21 @@
     [Parameter, SupplyParameterFromQuery(Name = "d")] public int? D { get; set; }
     // "temporada" = só a temporada atual; sem nada = carreira toda.
     [Parameter, SupplyParameterFromQuery(Name = "ver")] public string? Ver { get; set; }
+    // "atributos" = aba de atributos do PES; sem nada = estatísticas.
+    [Parameter, SupplyParameterFromQuery(Name = "aba")] public string? Aba { get; set; }
 
     private const int Maximo = 4;
     private static readonly string[] Parametros = { "a", "b", "c", "d" };
     private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
 
-    private sealed record Carregado(JogadorCarreiraDto Jogador, decimal Valor);
+    private sealed record Carregado(JogadorCarreiraDto Jogador, decimal Valor, PlayerAtributosDto? Atributos);
 
     /// <summary>Os números que entram na comparação, já recortados (carreira ou temporada).</summary>
     private sealed record Numeros(int Jogos, bool JogosParcial, bool TemContador, int Gols, int Assistencias, double? GolsPorJogo,
         int? CleanSheets, int Titulos, int Hattricks, int MaisGolsNumJogo, int Amarelos, int Vermelhos, int Competicoes, int Clubes);
 
     /// <summary>Um jogador na comparação; Slot é a posição do card (e a cor dele).</summary>
-    private sealed record Comparado(int Slot, JogadorCarreiraDto Jogador, decimal Valor, Numeros N);
+    private sealed record Comparado(int Slot, JogadorCarreiraDto Jogador, decimal Valor, PlayerAtributosDto? Atributos, Numeros N);
 
     private readonly int?[] _ids = new int?[Maximo];
     // Por id: trocar a ordem ou tirar um jogador não recarrega os outros. Nulo = não deu para carregar.
@@ -171,6 +220,22 @@
     private bool _temporadaBuscada;
 
     private bool SoTemporada => _temporada is not null && string.Equals(Ver, "temporada", StringComparison.OrdinalIgnoreCase);
+
+    private bool VerAtributos => string.Equals(Aba, "atributos", StringComparison.OrdinalIgnoreCase);
+
+    // O grupo de goleiro só entra se tiver goleiro na comparação; se forem todos goleiros, vem primeiro.
+    private IEnumerable<IGrouping<string, AtributosPes.Atributo>> GruposAtributos
+    {
+        get
+        {
+            bool Goleiro(Comparado c) => c.Jogador.PositionId == (short)PositionType.Goleiro;
+            if (!_comparados.Any(Goleiro))
+                return AtributosPes.PorGrupo.Where(g => g.Key != AtributosPes.GrupoGoleiro);
+            return _comparados.All(Goleiro)
+                ? AtributosPes.PorGrupo.OrderBy(g => g.Key != AtributosPes.GrupoGoleiro)
+                : AtributosPes.PorGrupo;
+        }
+    }
 
     // Os cards preenchidos e mais um vazio para adicionar, no mínimo dois.
     private int SlotsVisiveis => Math.Clamp(Array.FindLastIndex(_ids, id => id is not null) + 2, 2, Maximo);
@@ -209,7 +274,9 @@
                 var jogador = await LigaService.GetCarreiraJogadorAsync(id, CancellationToken.None);
                 _cache[id] = jogador is null
                     ? null
-                    : new Carregado(jogador, (await Pricing.CalculateForPlayerAsync(id, CancellationToken.None)).BasePrice);
+                    : new Carregado(jogador,
+                        (await Pricing.CalculateForPlayerAsync(id, CancellationToken.None)).BasePrice,
+                        await AtributosAsync(id));
             }
             catch
             {
@@ -224,8 +291,21 @@
         _comparados = Enumerable.Range(0, Maximo)
             .Select(i => (Slot: i, Carregado: Jogador(i)))
             .Where(x => x.Carregado is not null)
-            .Select(x => new Comparado(x.Slot, x.Carregado!.Jogador, x.Carregado.Valor, Calcular(x.Carregado.Jogador)))
+            .Select(x => new Comparado(x.Slot, x.Carregado!.Jogador, x.Carregado.Valor, x.Carregado.Atributos, Calcular(x.Carregado.Jogador)))
             .ToList();
+    }
+
+    // Sem atributos (ou se a busca falhar) o jogador ainda entra nas estatísticas.
+    private async Task<PlayerAtributosDto?> AtributosAsync(int id)
+    {
+        try
+        {
+            return (await PlayersApi.GetByIdAsync(id))?.Atributos;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private Carregado? Jogador(int slot) => _ids[slot] is int id && _cache.TryGetValue(id, out var c) ? c : null;
@@ -239,26 +319,30 @@
             _ => "Adicionar mais um (opcional)"
         };
 
-    // O link carrega todos os jogadores e o recorte: qualquer troca atualiza a URL.
+    // O link carrega os jogadores, a aba e o recorte: qualquer troca atualiza a URL.
     private void Escolher(int slot, int playerId)
     {
         var ids = _ids.ToArray();
         ids[slot] = playerId;
-        Navegar(ids, SoTemporada);
+        Navegar(ids);
     }
 
     // Tirar um jogador fecha o buraco: os de depois sobem uma posição.
     private void Remover(int slot)
     {
         var restantes = _ids.Where((id, i) => i != slot && id is not null).ToList();
-        Navegar(Enumerable.Range(0, Maximo).Select(i => i < restantes.Count ? restantes[i] : null).ToArray(), SoTemporada);
+        Navegar(Enumerable.Range(0, Maximo).Select(i => i < restantes.Count ? restantes[i] : null).ToArray());
     }
 
-    private void TrocarModo(bool soTemporada) => Navegar(_ids, soTemporada);
-
-    private void Navegar(int?[] ids, bool soTemporada)
+    // O que não vier mantém como está.
+    private void Navegar(int?[]? ids = null, bool? soTemporada = null, bool? atributos = null)
     {
-        var query = new Dictionary<string, object?> { ["ver"] = soTemporada ? "temporada" : null };
+        ids ??= _ids;
+        var query = new Dictionary<string, object?>
+        {
+            ["ver"] = soTemporada ?? SoTemporada ? "temporada" : null,
+            ["aba"] = atributos ?? VerAtributos ? "atributos" : null
+        };
         for (var i = 0; i < Maximo; i++)
             query[Parametros[i]] = ids[i];
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(query));
@@ -302,23 +386,38 @@
     private static string Milhoes(double valor) =>
         valor >= 1_000_000 ? $"R$ {(valor / 1_000_000).ToString("0.0", Brasil)} mi" : valor.ToString("C0", Brasil);
 
-    private static string Largura(double? v, double maximo) =>
-        (maximo <= 0 || v is not double d ? 0 : d / maximo * 100).ToString("0", CultureInfo.InvariantCulture);
+    private static string Largura(double? v, double minimo, double maximo) =>
+        (maximo <= minimo || v is not double d ? 0 : Math.Clamp((d - minimo) / (maximo - minimo), 0, 1) * 100)
+            .ToString("0", CultureInfo.InvariantCulture);
+
+    // Com três ou quatro jogadores, o nome de cada um em cima da sua coluna.
+    private RenderFragment Cabecalho() => __builder =>
+    {
+        if (_comparados.Count <= 2) return;
+        <div class="multi cabecalho" style="--n: @_comparados.Count;">
+            <div class="rotulo"></div>
+            @foreach (var c in _comparados)
+            {
+                <div class="nome-coluna borda-@c.Slot text-truncate" title="@c.Jogador.Nome">@c.Jogador.Nome</div>
+            }
+        </div>
+    };
 
     /// <summary>
     /// Uma linha da comparação. Com dois jogadores é um duelo (valor e barra de cada lado, rótulo no meio);
-    /// com três ou quatro, uma coluna por jogador. A barra é proporcional ao maior valor;
-    /// quem leva vantagem fica com a cor do seu card (ninguém, se todos empatam). Sem valor aparece "—".
+    /// com três ou quatro, uma coluna por jogador. A barra vai de <paramref name="minimo"/> até o
+    /// <paramref name="teto"/> (sem teto, o maior valor da linha); quem leva vantagem fica com a cor do seu card
+    /// (ninguém, se todos empatam). Sem valor aparece "—".
     /// </summary>
     private RenderFragment Linha(string rotulo, Func<Comparado, double?> valor, Func<double, string>? formato = null,
-        bool menorMelhor = false, bool destacar = true, string? rodape = null) => __builder =>
+        bool menorMelhor = false, bool destacar = true, string? rodape = null, double minimo = 0, double? teto = null) => __builder =>
     {
         formato ??= v => v.ToString("0");
         var valores = _comparados.Select(valor).ToList();
         var presentes = valores.OfType<double>().ToList();
         var haDisputa = destacar && presentes.Distinct().Count() > 1;
         var melhor = presentes.Count == 0 ? 0 : menorMelhor ? presentes.Min() : presentes.Max();
-        var maximo = presentes.Count == 0 ? 0 : presentes.Max();
+        var maximo = teto ?? (presentes.Count == 0 ? 0 : presentes.Max());
 
         bool Vence(int i) => haDisputa && valores[i] == melhor;
         string Texto(int i) => valores[i] is double d ? formato(d) + rodape : "—";
@@ -328,9 +427,9 @@
             var (a, b) = (_comparados[0].Slot, _comparados[1].Slot);
             <div class="duelo">
                 <div class="valor text-end @(Vence(0) ? $"vence-{a}" : "")">@Texto(0)</div>
-                <div class="barra barra-esq"><div class="@(Vence(0) ? $"cor-{a}" : "cor-neutra")" style="width: @Largura(valores[0], maximo)%;"></div></div>
+                <div class="barra barra-esq"><div class="@(Vence(0) ? $"cor-{a}" : "cor-neutra")" style="width: @Largura(valores[0], minimo, maximo)%;"></div></div>
                 <div class="rotulo">@rotulo</div>
-                <div class="barra"><div class="@(Vence(1) ? $"cor-{b}" : "cor-neutra")" style="width: @Largura(valores[1], maximo)%;"></div></div>
+                <div class="barra"><div class="@(Vence(1) ? $"cor-{b}" : "cor-neutra")" style="width: @Largura(valores[1], minimo, maximo)%;"></div></div>
                 <div class="valor @(Vence(1) ? $"vence-{b}" : "")">@Texto(1)</div>
             </div>
         }
@@ -343,7 +442,7 @@
                     var slot = _comparados[i].Slot;
                     <div class="celula">
                         <div class="valor @(Vence(i) ? $"vence-{slot}" : "")">@Texto(i)</div>
-                        <div class="barra"><div class="@(Vence(i) ? $"cor-{slot}" : "cor-neutra")" style="width: @Largura(valores[i], maximo)%;"></div></div>
+                        <div class="barra"><div class="@(Vence(i) ? $"cor-{slot}" : "cor-neutra")" style="width: @Largura(valores[i], minimo, maximo)%;"></div></div>
                     </div>
                 }
             </div>
