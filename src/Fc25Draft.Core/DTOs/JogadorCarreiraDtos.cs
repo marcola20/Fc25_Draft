@@ -22,7 +22,10 @@ public record JogadorCarreiraCompeticaoDto(
     int? CleanSheets,
     bool Campeao,
     // Sem registro em campo (gol, cartão, escalação): o jogador estava no elenco do time durante a competição.
-    bool SoElenco = false);
+    bool SoElenco = false,
+    // Para recortar por temporada (a carreira soma tudo direto dos eventos).
+    int Hattricks = 0,
+    int MaisGolsNumJogo = 0);
 
 public record JogadorTituloDto(Guid LigaId, string Competicao, TipoCompetition Tipo, int? Temporada, string TimeNome);
 

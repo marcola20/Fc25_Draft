@@ -1,18 +1,22 @@
-/* Cores dos dois lados do duelo (card do jogador, barra e valor vencedor). */
+/* Uma cor por card (borda do card, barra e valor de quem leva vantagem). */
 .comparar {
-    --cor-a: #0d6efd;
-    --cor-b: #fd7e14;
+    --cor-0: #0d6efd;
+    --cor-1: #fd7e14;
+    --cor-2: #198754;
+    --cor-3: #6f42c1;
     max-width: 960px;
     margin: 0 auto;
 }
 
-.jogador-card.lado-a {
-    border-top: 4px solid var(--cor-a);
-}
+    /* Três ou quatro cards precisam de mais largura. */
+    .comparar.largo {
+        max-width: 1200px;
+    }
 
-.jogador-card.lado-b {
-    border-top: 4px solid var(--cor-b);
-}
+.jogador-card.lado-0 { border-top: 4px solid var(--cor-0); }
+.jogador-card.lado-1 { border-top: 4px solid var(--cor-1); }
+.jogador-card.lado-2 { border-top: 4px solid var(--cor-2); }
+.jogador-card.lado-3 { border-top: 4px solid var(--cor-3); }
 
 .jogador-card .nome {
     font-size: 1.25rem;
@@ -20,11 +24,15 @@
     color: #0D1B2A;
 }
 
+[data-bs-theme="dark"] .jogador-card .nome {
+    color: var(--bs-emphasis-color);
+}
+
 .min-w-0 {
     min-width: 0;
 }
 
-/* Linha: valor A | barra A | rótulo | barra B | valor B */
+/* Dois jogadores: valor A | barra A | rótulo | barra B | valor B */
 .duelo {
     display: grid;
     grid-template-columns: 5.5rem 1fr 11rem 1fr 5.5rem;
@@ -34,23 +42,56 @@
     border-bottom: 1px solid var(--bs-border-color);
 }
 
-    .duelo:last-child {
+/* Três ou quatro: rótulo | uma coluna por jogador (valor com a barra embaixo). */
+.multi {
+    display: grid;
+    grid-template-columns: 11rem repeat(var(--n), minmax(0, 1fr));
+    align-items: center;
+    gap: .75rem;
+    padding: .55rem 0;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+    .multi .celula {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .3rem;
+    }
+
+    .multi .celula .barra {
+        width: 100%;
+    }
+
+    .multi.cabecalho .nome-coluna {
+        text-align: center;
+        font-weight: 700;
+        font-size: .9rem;
+        padding-bottom: .25rem;
+    }
+
+.borda-0 { border-bottom: 3px solid var(--cor-0); }
+.borda-1 { border-bottom: 3px solid var(--cor-1); }
+.borda-2 { border-bottom: 3px solid var(--cor-2); }
+.borda-3 { border-bottom: 3px solid var(--cor-3); }
+
+    .duelo:last-child, .multi:last-child {
         border-bottom: 0;
     }
 
-    .duelo .valor {
+    .duelo .valor, .multi .valor {
         font-size: 1.15rem;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
     }
 
-    .duelo .rotulo {
+    .duelo .rotulo, .multi .rotulo {
         text-align: center;
         font-size: .85rem;
         color: var(--bs-secondary-color);
     }
 
-    .duelo .barra {
+    .duelo .barra, .multi .barra {
         height: 10px;
         background: var(--bs-tertiary-bg);
         border-radius: 5px;
@@ -58,51 +99,71 @@
         display: flex;
     }
 
-    /* A barra de A cresce da direita para a esquerda (encosta no rótulo). */
-    .duelo .barra-a {
+    /* A barra da esquerda no duelo cresce da direita para a esquerda (encosta no rótulo). */
+    .duelo .barra-esq {
         justify-content: flex-end;
     }
 
-    .duelo .barra > div {
+    .duelo .barra > div, .multi .barra > div {
         height: 100%;
         border-radius: 5px;
     }
 
-.cor-a {
-    background: var(--cor-a);
-}
-
-.cor-b {
-    background: var(--cor-b);
-}
+.cor-0 { background: var(--cor-0); }
+.cor-1 { background: var(--cor-1); }
+.cor-2 { background: var(--cor-2); }
+.cor-3 { background: var(--cor-3); }
 
 .cor-neutra {
     background: var(--bs-secondary-bg);
 }
 
-.vence-a {
-    color: var(--cor-a);
+.vence-0, .vence-1, .vence-2, .vence-3 {
     font-weight: 700;
 }
 
-.vence-b {
-    color: var(--cor-b);
-    font-weight: 700;
-}
+.vence-0 { color: var(--cor-0); }
+.vence-1 { color: var(--cor-1); }
+.vence-2 { color: var(--cor-2); }
+.vence-3 { color: var(--cor-3); }
 
-/* No celular as barras somem: fica valor | rótulo | valor. */
+/* No celular as barras somem. Duelo: valor | rótulo | valor. Vários: rótulo numa linha, valores embaixo. */
 @media (max-width: 576px) {
     .duelo {
         grid-template-columns: 1fr auto 1fr;
         gap: .5rem;
     }
 
-        .duelo .barra {
+    .multi {
+        grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+        gap: .25rem .5rem;
+    }
+
+        .multi .rotulo {
+            grid-column: 1 / -1;
+        }
+
+        .multi.cabecalho .rotulo {
             display: none;
         }
 
-        .duelo .valor {
+        .multi.cabecalho .nome-coluna {
+            font-size: .75rem;
+        }
+
+        .duelo .barra, .multi .barra {
+            display: none;
+        }
+
+        .duelo .valor, .multi .valor {
             font-size: 1rem;
+        }
+
+        /* Quatro colunas não cabem "R$ 52,4 mi" numa linha: deixa quebrar. */
+        .multi .valor {
+            white-space: normal;
+            text-align: center;
+            line-height: 1.2;
         }
 
         /* Números nas bordas, alinhados em coluna; o rótulo fica no meio. */

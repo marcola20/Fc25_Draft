@@ -76,6 +76,7 @@ public static class CarreiraJogador
                 var liga = ligas[k.LigaId];
                 var jogou = parts.Where(p => p.LigaId == k.LigaId && p.TimeId == k.TimeId).ToList();
                 bool Da(CarreiraEventoInput e) => e.LigaId == k.LigaId && e.TimeId == k.TimeId;
+                var golsPorJogoAqui = gols.Where(Da).GroupBy(g => g.PartidaId).Select(g => g.Count()).ToList();
 
                 return new JogadorCarreiraCompeticaoDto(
                     liga.LigaId,
@@ -91,7 +92,9 @@ public static class CarreiraJogador
                     vermelhos.Count(Da),
                     defensor && liga.TemContagem ? jogou.Count(p => p.SemSofrerGol) : null,
                     liga.CampeaoTimeId == k.TimeId && (emCampo.Contains(k) || NoElencoNoFim(liga, k.TimeId)),
-                    !emCampo.Contains(k));
+                    !emCampo.Contains(k),
+                    golsPorJogoAqui.Count(n => n >= 3),
+                    golsPorJogoAqui.Count == 0 ? 0 : golsPorJogoAqui.Max());
             })
             .OrderByDescending(c => ligas[c.LigaId].CriadaEm)
             .ThenBy(c => c.TimeNome, StringComparer.OrdinalIgnoreCase)
