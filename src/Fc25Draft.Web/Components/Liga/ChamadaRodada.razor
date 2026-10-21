@@ -1,5 +1,6 @@
 @using System.Globalization
 @using System.Text
+@using System.Text.RegularExpressions
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @inject ILigaAdminService AdminSvc
@@ -48,6 +49,7 @@
     [Parameter, EditorRequired] public Guid LigaId { get; set; }
     [Parameter, EditorRequired] public Guid RodadaId { get; set; }
     [Parameter, EditorRequired] public string Titulo { get; set; } = "";
+    [Parameter, EditorRequired] public string Competicao { get; set; } = "";
 
     private string? _texto;
     private List<string> _semVideo = new();
@@ -88,6 +90,7 @@
 
             var site = Nav.BaseUri.TrimEnd('/');
             var sb = new StringBuilder();
+            sb.Append("🔰 ").Append(NomeDaCompeticao(Competicao)).Append('\n');
             sb.Append("📆 ").Append(Titulo).Append("\n\n");
 
             _semVideo = new();
@@ -118,6 +121,10 @@
         }
         finally { _gerando = false; }
     }
+
+    /// <summary>"Brasileirão — Série A 2010" vira "Brasileirão Série A": no grupo todo mundo sabe a temporada.</summary>
+    private static string NomeDaCompeticao(string nome) =>
+        Regex.Replace(nome.Replace(" — ", " "), @"\s+\d{4}$", "").Trim();
 
     private async Task CopiarAsync()
     {

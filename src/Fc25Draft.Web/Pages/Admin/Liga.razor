@@ -753,7 +753,7 @@
 
         @if (_partidas.Count > 0)
         {
-            <ChamadaRodada LigaId="_ligaAtual!.LigaId" RodadaId="_rodadaSelecionada.RodadaId" Titulo="@RodadaLabel(_rodadaSelecionada.Numero)" />
+            <ChamadaRodada LigaId="_ligaAtual!.LigaId" RodadaId="_rodadaSelecionada.RodadaId" Titulo="@RodadaLabel(_rodadaSelecionada.Numero)" Competicao="@_ligaAtual.Nome" />
         }
 
         @if (_showCriarPartida)
