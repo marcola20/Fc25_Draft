@@ -1,0 +1,136 @@
+@using System.Globalization
+@using System.Text
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject ILigaAdminService AdminSvc
+@inject ILigaPublicService PublicSvc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@* Mensagem que vai pro grupo antes da rodada: confrontos com a posição na tabela, horário e link do telão. *@
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="fw-semibold">📣 Mensagem do grupo</span>
+            <span class="text-muted small">Confrontos, horários, telão e bolão prontos para colar no WhatsApp.</span>
+            <div class="ms-auto d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary" @onclick="GerarAsync" disabled="@_gerando">
+                    @(_texto is null ? "Gerar" : "Gerar de novo")
+                </button>
+                @if (_texto is not null)
+                {
+                    <button class="btn btn-sm btn-success" @onclick="CopiarAsync">📋 Copiar</button>
+                }
+            </div>
+        </div>
+
+        @if (_texto is not null)
+        {
+            @if (_semVideo.Count > 0)
+            {
+                <div class="small text-warning-emphasis mt-2">
+                    Sem link do YouTube (fica sem o telão na mensagem): @string.Join(" · ", _semVideo)
+                </div>
+            }
+            <textarea class="form-control font-monospace mt-2" style="min-height:18rem; font-size:.85rem;"
+                      @bind="_texto" @bind:event="oninput"></textarea>
+        }
+        @if (_aviso is not null)
+        {
+            <div class="small mt-1 @(_avisoErro ? "text-danger" : "text-success")">@_aviso</div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public Guid LigaId { get; set; }
+    [Parameter, EditorRequired] public Guid RodadaId { get; set; }
+    [Parameter, EditorRequired] public string Titulo { get; set; } = "";
+
+    private string? _texto;
+    private List<string> _semVideo = new();
+    private bool _gerando;
+    private string? _aviso;
+    private bool _avisoErro;
+    private Guid _rodadaGerada;
+
+    // Outra rodada aberta: o texto da anterior não vale mais.
+    protected override void OnParametersSet()
+    {
+        if (_rodadaGerada != RodadaId)
+        {
+            _rodadaGerada = RodadaId;
+            _texto = null;
+            _aviso = null;
+            _semVideo.Clear();
+        }
+    }
+
+    // Busca tudo na hora: o vídeo é colado no detalhe do jogo, fora desta tela.
+    private async Task GerarAsync()
+    {
+        _gerando = true;
+        _aviso = null;
+        try
+        {
+            var partidas = await AdminSvc.ListPartidasAsync(RodadaId, CancellationToken.None);
+            var tabela = await PublicSvc.GetClassificacaoAsync(LigaId, CancellationToken.None);
+
+            // Antes da 1ª rodada a tabela é só ordem alfabética: não mostra posição.
+            var posicoes = tabela.Any(t => t.Jogos > 0)
+                ? tabela.GroupBy(t => t.TimeId).ToDictionary(g => g.Key, g => g.First().Posicao)
+                : new Dictionary<Guid, int>();
+
+            string Posicao(Guid timeId) => posicoes.TryGetValue(timeId, out var pos) ? $"({pos}°) " : "";
+            string PosicaoFora(Guid timeId) => posicoes.TryGetValue(timeId, out var pos) ? $" ({pos}°)" : "";
+
+            var site = Nav.BaseUri.TrimEnd('/');
+            var sb = new StringBuilder();
+            sb.Append("📆 ").Append(Titulo).Append("\n\n");
+
+            _semVideo = new();
+            foreach (var p in partidas)
+            {
+                sb.Append(Posicao(p.TimeCasaId)).Append(p.TimeCasaNome)
+                  .Append(" vs ")
+                  .Append(p.TimeForaNome).Append(PosicaoFora(p.TimeForaId));
+                if (p.DataHora is DateTime quando)
+                    sb.Append(" - ").Append(quando.ToString("HH:mm", Br));
+                sb.Append('\n');
+
+                if (string.IsNullOrWhiteSpace(p.YoutubeVideoId))
+                    _semVideo.Add($"{p.TimeCasaNome} x {p.TimeForaNome}");
+                else
+                    sb.Append(site).Append("/telao/jogo/").Append(p.PartidaId).Append('\n');
+
+                sb.Append('\n');
+            }
+
+            sb.Append("Bolão: ").Append(site).Append("/bolao");
+            _texto = sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            _aviso = ex.Message;
+            _avisoErro = true;
+        }
+        finally { _gerando = false; }
+    }
+
+    private async Task CopiarAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _texto);
+            _aviso = "Copiado. É só colar no grupo.";
+            _avisoErro = false;
+        }
+        catch (Exception)
+        {
+            _aviso = "O navegador não deixou copiar sozinho — selecione o texto e copie na mão.";
+            _avisoErro = true;
+        }
+    }
+}

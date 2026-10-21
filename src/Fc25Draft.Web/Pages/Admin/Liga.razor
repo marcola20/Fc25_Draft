@@ -751,6 +751,11 @@
             <button class="btn btn-primary btn-sm" @onclick="() => _showCriarPartida = !_showCriarPartida">+ Nova Partida</button>
         </div>
 
+        @if (_partidas.Count > 0)
+        {
+            <ChamadaRodada LigaId="_ligaAtual!.LigaId" RodadaId="_rodadaSelecionada.RodadaId" Titulo="@RodadaLabel(_rodadaSelecionada.Numero)" />
+        }
+
         @if (_showCriarPartida)
         {
             <div class="card mb-3" style="max-width:420px">
