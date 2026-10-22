@@ -54,8 +54,9 @@ public partial class ResultadoPesService
             previa?.NaoIdentificados ?? [], avisos);
     }
 
+    // Sem a linha (logo depois do deploy) vale ligada: esquecer de ligar não pode vazar resultado.
     public async Task<bool> SegurandoAsync(CancellationToken ct) =>
-        await _db.ResultadosPesConfig.AsNoTracking().Select(c => c.Segurar).FirstOrDefaultAsync(ct);
+        await _db.ResultadosPesConfig.AsNoTracking().Select(c => (bool?)c.Segurar).FirstOrDefaultAsync(ct) ?? true;
 
     public async Task DefinirSegurarAsync(bool segurar, CancellationToken ct)
     {

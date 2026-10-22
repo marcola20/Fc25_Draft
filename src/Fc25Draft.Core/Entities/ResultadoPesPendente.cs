@@ -39,8 +39,11 @@ public class ResultadoPesConfig
 {
     public int Id { get; set; } // singleton, sempre 1
 
-    /// <summary>Ligada: o resultado enviado pelo Auto_PES21 fica guardado até o admin liberar.</summary>
-    public bool Segurar { get; set; }
+    /// <summary>
+    /// Ligada: o resultado enviado pelo Auto_PES21 fica guardado até o admin liberar.
+    /// Sem a linha, vale ligada (padrão seguro).
+    /// </summary>
+    public bool Segurar { get; set; } = true;
 
     public DateTime AtualizadoEm { get; set; }
 }
