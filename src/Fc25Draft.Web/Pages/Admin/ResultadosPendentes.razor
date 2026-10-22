@@ -1,0 +1,229 @@
+@page "/admin/resultados-pendentes"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IResultadoPesService ResultadoSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Resultados pendentes</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok.Count > 0)
+    {
+        <div class="alert alert-success alert-dismissible">
+            @foreach (var linha in _ok)
+            {
+                <div>@linha</div>
+            }
+            <button type="button" class="btn-close" @onclick="() => _ok.Clear()"></button>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="segurar"
+                           checked="@_segurar" disabled="@_ocupado" @onchange="TrocarSegurar" />
+                    <label class="form-check-label" for="segurar">Segurar resultados do PES</label>
+                </div>
+                <span class="badge @(_segurar ? "bg-warning text-dark" : "bg-success")">
+                    @(_segurar ? "Segurando: só sai quando você liberar" : "Desligado: sai na hora do envio")
+                </span>
+            </div>
+            <div class="form-text">
+                Ligado, o que o Auto_PES21 enviar fica aqui, validado mas sem tocar na partida — ninguém vê o placar.
+                Ao liberar, a partida é encerrada e aparece para todos. Reenviar um jogo pendente substitui o que estava aqui;
+                reenviar um jogo já liberado corrige direto, como sem a chave.
+            </div>
+        </div>
+    </div>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_pendentes.Count == 0)
+    {
+        <div class="alert alert-info">Nenhum resultado aguardando liberação.</div>
+    }
+    else
+    {
+        @foreach (var grupo in Grupos())
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold">@grupo.Titulo</span>
+                    <span class="badge bg-secondary">@grupo.Itens.Count</span>
+                    @if (grupo.Itens.Count > 1)
+                    {
+                        <button class="btn btn-sm btn-success ms-auto" disabled="@_ocupado" @onclick="() => LiberarVarios(grupo.Itens, grupo.Titulo)">
+                            Liberar todos (@grupo.Itens.Count)
+                        </button>
+                    }
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var p in grupo.Itens)
+                    {
+                        <li class="list-group-item">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-semibold">@p.Casa</span>
+                                <span class="badge bg-dark fs-6">@p.GolsCasa x @p.GolsFora</span>
+                                <span class="fw-semibold">@p.Fora</span>
+                                @if (p.DataHora is DateTime quando)
+                                {
+                                    <span class="text-muted small">@quando.ToString("dd/MM HH:mm")</span>
+                                }
+                                <span class="text-muted small" title="@p.Video">enviado @Brasilia(p.EnviadoEm).ToString("dd/MM HH:mm")</span>
+                                <div class="ms-auto d-flex gap-2">
+                                    @if (p.Erro is not null)
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" disabled="@_ocupado" @onclick="() => Revalidar(p)">Validar de novo</button>
+                                    }
+                                    <button class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="() => LiberarVarios([p], null)">Liberar</button>
+                                    <button class="btn btn-sm btn-outline-danger" disabled="@_ocupado" @onclick="() => Descartar(p)">Descartar</button>
+                                </div>
+                            </div>
+                            @if (p.Erro is not null)
+                            {
+                                <div class="text-danger small mt-1">⚠ @p.Erro</div>
+                            }
+                            @if (p.Avisos.Count > 0)
+                            {
+                                <details class="small mt-1">
+                                    <summary class="text-muted">@p.Avisos.Count aviso(s) da validação</summary>
+                                    <ul class="mb-0">
+                                        @foreach (var a in p.Avisos)
+                                        {
+                                            <li>@a</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true, _ocupado, _segurar;
+    private string? _erro;
+    private readonly List<string> _ok = new();
+    private IReadOnlyList<ResultadoPesPendenteDto> _pendentes = Array.Empty<ResultadoPesPendenteDto>();
+
+    private sealed record Grupo(string Titulo, List<ResultadoPesPendenteDto> Itens);
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/resultados-pendentes"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _segurar = await ResultadoSvc.SegurandoAsync(CancellationToken.None);
+            await Carregar();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task Carregar() => _pendentes = await ResultadoSvc.PendentesAsync(CancellationToken.None);
+
+    /// <summary>Por competição e rodada, na ordem de liberação (a do primeiro jogo de cada grupo).</summary>
+    private List<Grupo> Grupos() => _pendentes
+        .GroupBy(p => p.Competicao is null ? "Jogo ainda não achado" : $"{p.Competicao} · {p.Onde}")
+        .Select(g => new Grupo(g.Key, g.ToList()))
+        .ToList();
+
+    private static DateTime Brasilia(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), HorarioDeBrasilia.Fuso);
+
+    private async Task TrocarSegurar(ChangeEventArgs e)
+    {
+        var segurar = (bool)(e.Value ?? false);
+        _erro = null; _ok.Clear();
+        try
+        {
+            await ResultadoSvc.DefinirSegurarAsync(segurar, CancellationToken.None);
+            _segurar = segurar;
+            _ok.Add(segurar
+                ? "Segurando: os próximos envios do PES ficam aqui até você liberar."
+                : "Desligado: os próximos envios do PES saem na hora. Os que já estão aqui continuam esperando.");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    /// <summary>Libera na ordem da lista e para no primeiro que falhar.</summary>
+    private async Task LiberarVarios(IReadOnlyList<ResultadoPesPendenteDto> itens, string? titulo)
+    {
+        var texto = itens.Count == 1
+            ? $"Liberar {itens[0].Casa} {itens[0].GolsCasa} x {itens[0].GolsFora} {itens[0].Fora}? A partida é encerrada e aparece para todos."
+            : $"Liberar os {itens.Count} jogos de {titulo}? As partidas são encerradas e aparecem para todos.";
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", texto)) return;
+
+        _erro = null; _ok.Clear(); _ocupado = true;
+        try
+        {
+            foreach (var p in itens)
+            {
+                try
+                {
+                    var r = await ResultadoSvc.LiberarAsync(p.Id, CancellationToken.None);
+                    _ok.Add($"Liberado: {r.Casa} {r.GolsCasa} x {r.GolsFora} {r.Fora} ({r.Competicao}).");
+                    _ok.AddRange(r.Avisos.Select(a => "↳ " + a));
+                }
+                catch (Exception ex)
+                {
+                    _erro = $"{p.Casa} x {p.Fora} não foi liberado: {ex.Message}";
+                    break;
+                }
+            }
+
+            // O que não validou pode ter destravado (ex.: o mata-mata ganhou os times agora).
+            foreach (var p in (await ResultadoSvc.PendentesAsync(CancellationToken.None)).Where(x => x.Erro is not null))
+                await ResultadoSvc.RevalidarAsync(p.Id, CancellationToken.None);
+            await Carregar();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _ocupado = false; }
+    }
+
+    private async Task Revalidar(ResultadoPesPendenteDto p)
+    {
+        _erro = null; _ok.Clear(); _ocupado = true;
+        try
+        {
+            var r = await ResultadoSvc.RevalidarAsync(p.Id, CancellationToken.None);
+            if (r.Erro is null) _ok.Add($"{r.Casa} x {r.Fora}: validado ({r.Competicao} · {r.Onde}).");
+            await Carregar();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _ocupado = false; }
+    }
+
+    private async Task Descartar(ResultadoPesPendenteDto p)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Descartar {p.Casa} {p.GolsCasa} x {p.GolsFora} {p.Fora}? A partida não muda; dá para reenviar do PES depois.")) return;
+        _erro = null; _ok.Clear(); _ocupado = true;
+        try
+        {
+            await ResultadoSvc.DescartarAsync(p.Id, CancellationToken.None);
+            await Carregar();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _ocupado = false; }
+    }
+}

@@ -80,6 +80,10 @@ Os jogos simulados no PES 2021 entram pelo `POST /api/admin/liga/resultados-pes`
 `?simular=true` testa sem gravar). O envio é feito pelo `enviar_resultados.py`, que fica no projeto
 Auto_PES21.
 
+Com a chave "Segurar resultados do PES" ligada em `/admin/resultados-pendentes`, o envio é validado e
+fica guardado sem tocar na partida; ela só é encerrada (e aparece para todos) quando o admin libera
+na mesma tela. Reenviar um jogo já liberado corrige direto.
+
 ## Fotos dos jogadores
 
 As fotos ficam no banco (tabela `FotosJogadores`). As do PES entram pelo script, que lê os rostos do

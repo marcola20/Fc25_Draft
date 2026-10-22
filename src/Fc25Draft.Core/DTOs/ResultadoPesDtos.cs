@@ -73,3 +73,18 @@ public record ResultadoPesRespostaDto(
     bool TitularesDasNotas,
     IReadOnlyList<ResultadoPesNaoIdentificadoDto> NaoIdentificados,
     IReadOnlyList<string> Avisos);
+
+/// <summary>Resultado segurado à espera da liberação (/admin/resultados-pendentes).</summary>
+public record ResultadoPesPendenteDto(
+    Guid Id,
+    string? Video,
+    string? Competicao,
+    string? Onde,
+    string Casa,
+    string Fora,
+    int GolsCasa,
+    int GolsFora,
+    DateTime? DataHora,
+    IReadOnlyList<string> Avisos,
+    string? Erro,
+    DateTime EnviadoEm);

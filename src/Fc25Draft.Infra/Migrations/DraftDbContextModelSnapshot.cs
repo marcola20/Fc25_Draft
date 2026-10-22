@@ -2715,6 +2715,86 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("Regulamentos", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ResultadoPesConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("Segurar")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ResultadosPesConfig", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ResultadoPesPendente", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Avisos")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Casa")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Competicao")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("DataHora")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("EnviadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Erro")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Fora")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("GolsCasa")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GolsFora")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("KnockoutJogoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Onde")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("PartidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Video")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ResultadosPesPendentes", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Team", b =>
                 {
                     b.Property<Guid>("TeamId")

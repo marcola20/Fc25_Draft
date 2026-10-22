@@ -19,7 +19,7 @@ namespace Fc25Draft.Infra.Services;
 /// vencedor e termina empatado fica em andamento para registrar os pênaltis na tela.
 /// Reenviar o mesmo jogo substitui os eventos (idempotente).
 /// </summary>
-public class ResultadoPesService : IResultadoPesService
+public partial class ResultadoPesService : IResultadoPesService
 {
     private const string Casa = "casa";
     private const string Fora = "fora";
@@ -41,10 +41,15 @@ public class ResultadoPesService : IResultadoPesService
     }
 
     public async Task<ResultadoPesRespostaDto> ImportarAsync(
-        ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, bool simular, CancellationToken ct)
+        ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, bool simular, CancellationToken ct) =>
+        (await ImportarAsync(request, jsonBruto, partidaAnterior, null, simular, ct)).Resposta;
+
+    /// <param name="fixo">Jogo achado quando o resultado segurado foi enviado: vale ele, se ainda estiver aberto.</param>
+    private async Task<(ResultadoPesRespostaDto Resposta, Alvo Alvo)> ImportarAsync(
+        ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, JogoFixo? fixo, bool simular, CancellationToken ct)
     {
         Validar(request);
-        var alvo = await AcharPartidaAsync(request, partidaAnterior, ct);
+        var alvo = await AcharPartidaAsync(request, partidaAnterior, fixo, ct);
 
         ResultadoPesRespostaDto resposta = null!;
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -61,7 +66,7 @@ public class ResultadoPesService : IResultadoPesService
 
         // Simulação: o que ficou no change tracker foi desfeito no banco.
         if (simular) _db.ChangeTracker.Clear();
-        return resposta;
+        return (resposta, alvo);
     }
 
     // ── Validação ─────────────────────────────────────────────────────────────
@@ -153,7 +158,9 @@ public class ResultadoPesService : IResultadoPesService
         _ => "play-in"
     };
 
-    private async Task<Alvo> AcharPartidaAsync(ResultadoPesRequest r, Guid? partidaAnterior, CancellationToken ct)
+    private sealed record JogoFixo(Guid? PartidaId, Guid? KnockoutJogoId);
+
+    private async Task<Alvo> AcharPartidaAsync(ResultadoPesRequest r, Guid? partidaAnterior, JogoFixo? fixo, CancellationToken ct)
     {
         var competicao = LerCompeticao(r.Video);
         Divisao? divisao = r.Serie?.Trim().ToUpperInvariant() switch
@@ -242,6 +249,12 @@ public class ResultadoPesService : IResultadoPesService
             throw new ResultadoPesException(ResultadoPesErro.NaoEncontrado,
                 $"Nenhuma partida aberta {jogo}{ondeSerie}.{dica}");
         }
+
+        // Liberação de resultado segurado: fica no jogo achado quando ele foi enviado.
+        if (fixo is not null && candidatos.FirstOrDefault(c =>
+                (fixo.KnockoutJogoId is not null && c.KnockoutJogoId == fixo.KnockoutJogoId)
+                || (fixo.PartidaId is not null && c.PartidaId == fixo.PartidaId)) is { } doEnvio)
+            candidatos = [doEnvio];
 
         // Reenvio (JSON corrigido ou reextraído): fica na partida que recebeu o envio anterior,
         // mesmo já encerrada e mesmo havendo outra do mesmo par mais perto de agora. Só se for o

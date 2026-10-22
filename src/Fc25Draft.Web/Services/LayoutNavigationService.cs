@@ -78,6 +78,7 @@ public class LayoutNavigationService
         {
             new("Gerenciar Liga", "/admin/liga", "oi oi-wrench"),
             new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular"),
+            new("Resultados Pendentes", "/admin/resultados-pendentes", "oi oi-lock-locked"),
             new("Resumo da Rodada", "/admin/resumo-rodada", "oi oi-comment-square"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
             new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
@@ -398,6 +399,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Configurações")
+            }
+        },
+        ["/admin/resultados-pendentes"] = new PageDefinition
+        {
+            Route = "/admin/resultados-pendentes",
+            Title = "Resultados Pendentes",
+            Subtitle = "Resultados do PES esperando você liberar",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Resultados pendentes")
             }
         },
         ["/admin/resumo-rodada"] = new PageDefinition

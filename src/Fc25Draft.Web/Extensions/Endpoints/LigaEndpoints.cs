@@ -164,7 +164,7 @@ public static class LigaEndpoints
             catch (JsonException ex) { return Results.BadRequest(new { message = $"JSON inválido: {ex.Message}" }); }
             if (request is null) return Results.BadRequest(new { message = "JSON vazio." });
 
-            try { return Results.Ok(await svc.ImportarAsync(request, corpo.GetRawText(), partida, simular ?? false, ct)); }
+            try { return Results.Ok(await svc.ReceberAsync(request, corpo.GetRawText(), partida, simular ?? false, ct)); }
             catch (ResultadoPesException ex)
             {
                 var body = new { message = ex.Message, candidatos = ex.Candidatos };
