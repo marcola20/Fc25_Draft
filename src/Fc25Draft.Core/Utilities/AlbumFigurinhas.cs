@@ -15,9 +15,12 @@ public static class AlbumFigurinhas
 
     /// <summary>
     /// Figurinhas novas (que a pessoa ainda não tem) garantidas em cada pacote, enquanto faltar alguma da
-    /// raridade da vaga ou abaixo.
+    /// raridade da vaga ou abaixo: a 1ª sempre, a 2ª com <see cref="ChanceSegundaNova"/> e, depois dela, cada
+    /// uma a mais com <see cref="ChanceDeMaisUmaNova"/> — 3 ou mais de vez em quando, sem virar regra.
     /// </summary>
-    public const int NovasGarantidasPorPacote = 2;
+    public const double ChanceSegundaNova = 0.9;
+
+    public const double ChanceDeMaisUmaNova = 0.35;
 
     /// <summary>Chance de uma das vagas comuns (1 a 4) vir brilhante.</summary>
     public const double ChanceBrilhanteNaComum = 0.05;
@@ -236,7 +239,7 @@ public static class AlbumFigurinhas
     /// a última: brilhante, com <see cref="ChanceLendariaNaEspecial"/> de virar lendária. Sem figurinha da
     /// raridade sorteada no álbum, desce para a de baixo. Não repete figurinha dentro do mesmo pacote
     /// enquanto houver outra da raridade.
-    /// Depois garante <see cref="NovasGarantidasPorPacote"/> novas: se veio menos, troca vagas repetidas
+    /// Depois garante as novas de <see cref="NovasGarantidas"/>: se veio menos, troca vagas repetidas
     /// (as comuns primeiro, a especial por último) por uma que falta da mesma raridade ou de baixo — a
     /// garantia nunca sobe a raridade da vaga.
     /// </summary>
@@ -274,7 +277,7 @@ public static class AlbumFigurinhas
         // Repetida: a pessoa já tem, ou a mesma figurinha já saiu numa vaga anterior deste pacote.
         bool Repetida(int i) => jaTem.Contains(sorteadas[i]) || sorteadas.IndexOf(sorteadas[i]) < i;
 
-        var faltam = NovasGarantidasPorPacote - Enumerable.Range(0, sorteadas.Count).Count(i => !Repetida(i));
+        var faltam = NovasGarantidas(rng) - Enumerable.Range(0, sorteadas.Count).Count(i => !Repetida(i));
         if (faltam <= 0) return;
 
         var vagas = Enumerable.Range(0, sorteadas.Count)
@@ -300,6 +303,16 @@ public static class AlbumFigurinhas
                 break;
             }
         }
+    }
+
+    /// <summary>Sorteia quantas novas este pacote garante (de 1 a <see cref="TamanhoPacote"/>).</summary>
+    public static int NovasGarantidas(Random rng)
+    {
+        if (rng.NextDouble() >= ChanceSegundaNova) return 1;
+
+        var novas = 2;
+        while (novas < TamanhoPacote && rng.NextDouble() < ChanceDeMaisUmaNova) novas++;
+        return novas;
     }
 
     /// <summary>"#007": o número como vem impresso.</summary>
