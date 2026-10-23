@@ -184,6 +184,16 @@ public record SugestaoDeTrocaDto(
     public int Encaixe => Math.Min(EleTemQueVocePrecisa.Count, VoceTemQueElePrecisa.Count);
 }
 
+/// <summary>
+/// "Fulano precisa de 7 das suas repetidas": o lado de quem quer ajudar (até quem já completou o álbum).
+/// <paramref name="RepetidasDele"/> diz se ele tem o que dar em troca.
+/// </summary>
+public record AjudaDto(
+    PessoaDaTrocaDto Pessoa,
+    IReadOnlyList<FigurinhaDto> VoceTemQueElePrecisa,
+    IReadOnlyList<FigurinhaDto> EleTemQueVocePrecisa,
+    int RepetidasDele);
+
 /// <summary>Tudo da página de trocas de uma pessoa.</summary>
 public record TrocasDoTreinadorDto(
     AlbumDto Album,
@@ -193,7 +203,8 @@ public record TrocasDoTreinadorDto(
     IReadOnlyList<TrocaDto> Enviadas,
     IReadOnlyList<TrocaDto> Historico,
     IReadOnlyList<SugestaoDeTrocaDto> Sugestoes,
-    IReadOnlyList<PessoaDaTrocaDto> Colecionadores)
+    IReadOnlyList<PessoaDaTrocaDto> Colecionadores,
+    IReadOnlyList<AjudaDto> PossoAjudar)
 {
     public int RepetidasSobrando => MinhasRepetidas.Sum(r => r.Sobrando);
 }

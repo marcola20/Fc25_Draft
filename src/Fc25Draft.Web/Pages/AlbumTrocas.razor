@@ -69,6 +69,9 @@
                 }
             </button>
             <button type="button" role="tab" class="aba @(_aba == Aba.Sugestoes ? "ativa" : "")" @onclick="() => _aba = Aba.Sugestoes">Sugestões</button>
+            <button type="button" role="tab" class="aba @(_aba == Aba.Ajudar ? "ativa" : "")" @onclick="() => _aba = Aba.Ajudar">
+                Posso ajudar <span class="text-muted small">@d.PossoAjudar.Count</span>
+            </button>
             <button type="button" role="tab" class="aba @(_aba == Aba.Repetidas ? "ativa" : "")" @onclick="() => _aba = Aba.Repetidas">
                 Repetidas <span class="text-muted small">@d.RepetidasSobrando</span>
             </button>
@@ -189,6 +192,58 @@
                                     Ele precisa: @string.Join(", ", s.VoceTemQueElePrecisa.Take(6).Select(Rotulo))@(s.VoceTemQueElePrecisa.Count > 6 ? "…" : "")
                                 </div>
                             }
+                        </div>
+                    </div>
+                }
+                break;
+
+            case Aba.Ajudar:
+                <p class="small text-muted">Quem precisa das suas repetidas: tudo o que aparece aqui falta no álbum da pessoa.</p>
+                @if (d.PossoAjudar.Count == 0)
+                {
+                    <p class="small text-muted">
+                        @(d.MinhasRepetidas.Count == 0 ? "Você ainda não tem repetidas." : "Nenhuma das suas repetidas falta para alguém agora.")
+                    </p>
+                }
+                @foreach (var a in d.PossoAjudar)
+                {
+                    var ajuda = a;
+                    <div class="card mb-2">
+                        <div class="card-body p-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    @Quem(a.Pessoa) precisa de <strong>@a.VoceTemQueElePrecisa.Count</strong> das suas repetidas
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@(a.RepetidasDele == 0)"
+                                        @onclick="() => MontarParaAjudarAsync(ajuda)">Montar proposta</button>
+                            </div>
+                            @{ var todas = _ajudasAbertas.Contains(a.Pessoa.TreinadorId); }
+                            <div class="chips mt-1">
+                                @foreach (var f in todas ? a.VoceTemQueElePrecisa : a.VoceTemQueElePrecisa.Take(ChipsVisiveis))
+                                {
+                                    <span class="chip-figurinha"><span class="numero">@AlbumFigurinhas.NumeroImpresso(f.Numero)</span>@Rotulo(f)@RaridadeChip(f)</span>
+                                }
+                                @if (!todas && a.VoceTemQueElePrecisa.Count > ChipsVisiveis)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => _ajudasAbertas.Add(ajuda.Pessoa.TreinadorId)">
+                                        + ver todas (@(a.VoceTemQueElePrecisa.Count - ChipsVisiveis) a mais)
+                                    </button>
+                                }
+                            </div>
+                            <div class="small text-muted mt-1">
+                                @if (a.RepetidasDele == 0)
+                                {
+                                    <span>Ele não tem repetida para dar em troca agora.</span>
+                                }
+                                else if (a.EleTemQueVocePrecisa.Count > 0)
+                                {
+                                    <span>E ele tem <strong>@a.EleTemQueVocePrecisa.Count</strong> que faltam para você.</span>
+                                }
+                                else
+                                {
+                                    <span>Nada dele te falta: na proposta, peça @(a.RepetidasDele == 1 ? "a única repetida dele" : $"qualquer uma das {a.RepetidasDele} repetidas dele").</span>
+                                }
+                            </div>
                         </div>
                     </div>
                 }
@@ -391,7 +446,7 @@
 </div>
 
 @code {
-    private enum Aba { Propostas, Sugestoes, Repetidas, Faltam, Nova }
+    private enum Aba { Propostas, Sugestoes, Ajudar, Repetidas, Faltam, Nova }
 
     [SupplyParameterFromQuery(Name = "aba")]
     public string? AbaInicial { get; set; }
@@ -406,6 +461,10 @@
     private TreinadorDto? _eu;
     private TrocasDoTreinadorDto? _dados;
     private int _faltamVisiveis = 60;
+
+    // Posso ajudar: quantas figurinhas aparecem por pessoa antes do "ver todas".
+    private const int ChipsVisiveis = 24;
+    private readonly HashSet<Guid> _ajudasAbertas = new();
 
     // Montando proposta
     private MontarTrocaDto? _montar;
@@ -424,6 +483,7 @@
         _aba = AbaInicial switch
         {
             "sugestoes" => Aba.Sugestoes,
+            "ajudar" => Aba.Ajudar,
             "repetidas" => Aba.Repetidas,
             "faltam" => Aba.Faltam,
             "nova" => Aba.Nova,
@@ -592,6 +652,15 @@
         var quantas = Math.Max(1, s.Encaixe);
         foreach (var f in s.EleTemQueVocePrecisa.Take(quantas)) _pedir.Add(f.FigurinhaId);
         foreach (var f in s.VoceTemQueElePrecisa.Take(quantas)) _dar.Add(f.FigurinhaId);
+        _aba = Aba.Nova;
+    }
+
+    /// <summary>Para ajudar: já marca as minhas que faltam para ele (até o limite) e, se houver, as dele que me faltam.</summary>
+    private async Task MontarParaAjudarAsync(AjudaDto a)
+    {
+        await AbrirEditorAsync(a.Pessoa.TreinadorId);
+        foreach (var f in a.VoceTemQueElePrecisa.Take(AlbumFigurinhas.MaximoPorLadoDaTroca)) _dar.Add(f.FigurinhaId);
+        foreach (var f in a.EleTemQueVocePrecisa.Take(AlbumFigurinhas.MaximoPorLadoDaTroca)) _pedir.Add(f.FigurinhaId);
         _aba = Aba.Nova;
     }
 

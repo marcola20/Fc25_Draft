@@ -85,7 +85,36 @@ public partial class AlbumService
             trocas.Where(t => t.Pendente && t.De.TreinadorId == treinadorId).OrderBy(t => t.CriadaEm).ToList(),
             trocas.Where(t => !t.Pendente).OrderByDescending(t => t.RespondidaEm ?? t.CriadaEm).Take(30).ToList(),
             Sugerir(minhas, outros, pessoas, porId),
-            pessoas.Select(p => new PessoaDaTrocaDto(p.Key, p.Value)).OrderBy(p => p.Nome, StringComparer.CurrentCulture).ToList());
+            pessoas.Select(p => new PessoaDaTrocaDto(p.Key, p.Value)).OrderBy(p => p.Nome, StringComparer.CurrentCulture).ToList(),
+            Ajudar(minhas, outros, pessoas, porId));
+    }
+
+    /// <summary>
+    /// As minhas repetidas que faltam no álbum de cada pessoa, quem precisa de mais primeiro. Diferente das
+    /// sugestões, entra quem não tem nada que me falte: é para quem já completou (ou quase) ajudar os outros.
+    /// </summary>
+    private static List<AjudaDto> Ajudar(
+        Dictionary<Guid, int> minhas, List<Posse> outros, Dictionary<Guid, string> pessoas, Dictionary<Guid, FigurinhaDto> porId)
+    {
+        var minhasRepetidas = minhas.Where(m => m.Value >= 2).Select(m => porId[m.Key]).OrderBy(f => f.Numero).ToList();
+        if (minhasRepetidas.Count == 0) return new List<AjudaDto>();
+
+        return outros
+            .GroupBy(p => p.TreinadorId)
+            .Select(g =>
+            {
+                var tem = g.Select(p => p.FigurinhaId).ToHashSet();
+                var repetidasDele = g.Where(p => p.Quantidade >= 2).ToList();
+                return new AjudaDto(
+                    new PessoaDaTrocaDto(g.Key, pessoas[g.Key]),
+                    minhasRepetidas.Where(f => !tem.Contains(f.FigurinhaId)).ToList(),
+                    repetidasDele.Where(p => !minhas.ContainsKey(p.FigurinhaId)).Select(p => porId[p.FigurinhaId]).OrderBy(f => f.Numero).ToList(),
+                    repetidasDele.Count);
+            })
+            .Where(a => a.VoceTemQueElePrecisa.Count > 0)
+            .OrderByDescending(a => a.VoceTemQueElePrecisa.Count)
+            .ThenBy(a => a.Pessoa.Nome, StringComparer.CurrentCulture)
+            .ToList();
     }
 
     /// <summary>

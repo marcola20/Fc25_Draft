@@ -58,3 +58,18 @@
 .escolha label { cursor: pointer; }
 
 .quem { display: inline-flex; align-items: center; gap: .25rem; }
+
+/* Posso ajudar: as minhas repetidas que faltam para a pessoa. */
+.chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+
+.chip-figurinha {
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    border-radius: 2rem;
+    padding: .05rem .5rem;
+    font-size: .8rem;
+    white-space: nowrap;
+}
+
+.chip-figurinha .numero { color: var(--bs-secondary-color); margin-right: .2rem; }
