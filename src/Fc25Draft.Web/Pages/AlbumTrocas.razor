@@ -57,7 +57,7 @@
             <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Meu álbum</a>
         </div>
         <p class="small text-muted">
-            Só repetida entra em troca: a figurinha colada no seu álbum nunca sai. A proposta vale por 48 horas.
+            Só repetida entra em troca: a figurinha colada no seu álbum nunca sai. Dá para mandar de presente, sem pedir nada. A proposta vale por 48 horas.
         </p>
 
         <div class="abas mb-3" role="tablist">
@@ -95,17 +95,23 @@
                     <div class="card mb-2 proposta">
                         <div class="card-body p-2">
                             <div class="small mb-1">
-                                @Quem(t.De) @(t.ContrapropostaDeId is null ? "propõe" : "fez uma contraproposta") · expira @Prazo(t.ExpiraEm)
+                                @Quem(t.De) @(Doacao(t) ? "quer te dar de presente, sem pedir nada" : t.ContrapropostaDeId is null ? "propõe" : "fez uma contraproposta") · expira @Prazo(t.ExpiraEm)
                             </div>
                             <div class="lados">
                                 <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Oferecidas)</div>
-                                <div class="seta" aria-hidden="true">⇄</div>
-                                <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Pedidas)</div>
+                                @if (!Doacao(t))
+                                {
+                                    <div class="seta" aria-hidden="true">⇄</div>
+                                    <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Pedidas)</div>
+                                }
                             </div>
                             <div class="d-flex flex-wrap gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="() => AceitarAsync(troca)">Aceitar</button>
+                                <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="() => AceitarAsync(troca)">@(Doacao(t) ? "Aceitar presente" : "Aceitar")</button>
                                 <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_ocupado" @onclick="() => RecusarAsync(troca)">Recusar</button>
-                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="() => ContrapropostaAsync(troca)">Contraproposta</button>
+                                @if (!Doacao(t))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="() => ContrapropostaAsync(troca)">Contraproposta</button>
+                                }
                             </div>
                         </div>
                     </div>
@@ -121,11 +127,14 @@
                     var troca = t;
                     <div class="card mb-2 proposta">
                         <div class="card-body p-2">
-                            <div class="small mb-1">Para @Quem(t.Para) · expira @Prazo(t.ExpiraEm)</div>
+                            <div class="small mb-1">@(Doacao(t) ? "🎁 Presente para" : "Para") @Quem(t.Para) · expira @Prazo(t.ExpiraEm)</div>
                             <div class="lados">
                                 <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Oferecidas)</div>
-                                <div class="seta" aria-hidden="true">⇄</div>
-                                <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Pedidas)</div>
+                                @if (!Doacao(t))
+                                {
+                                    <div class="seta" aria-hidden="true">⇄</div>
+                                    <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Pedidas)</div>
+                                }
                             </div>
                             <button type="button" class="btn btn-sm btn-outline-secondary mt-2" disabled="@_ocupado" @onclick="() => CancelarAsync(troca)">Cancelar proposta</button>
                         </div>
@@ -148,7 +157,8 @@
                                     <span class="badge @StatusClasse(t.Status)">@StatusTexto(t.Status)</span>
                                     <span>@if (eu) { <span>Você → </span>@Quem(t.Para) } else { @Quem(t.De)<span> → você</span> }</span>
                                     <span class="text-muted">
-                                        @(eu ? $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count}" : $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count} suas")
+                                        @(Doacao(t) ? $"🎁 presente de {t.Oferecidas.Count}"
+                                          : eu ? $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count}" : $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count} suas")
                                     </span>
                                     <span class="text-muted ms-auto">@AvisosSino.Quando(t.RespondidaEm ?? t.CriadaEm)</span>
                                 </div>
@@ -214,8 +224,7 @@
                                 <div class="flex-grow-1">
                                     @Quem(a.Pessoa) precisa de <strong>@a.VoceTemQueElePrecisa.Count</strong> das suas repetidas
                                 </div>
-                                <button type="button" class="btn btn-sm btn-primary" disabled="@(a.RepetidasDele == 0)"
-                                        @onclick="() => MontarParaAjudarAsync(ajuda)">Montar proposta</button>
+                                <button type="button" class="btn btn-sm btn-primary" @onclick="() => MontarParaAjudarAsync(ajuda)">Montar proposta</button>
                             </div>
                             @{ var todas = _ajudasAbertas.Contains(a.Pessoa.TreinadorId); }
                             <div class="chips mt-1">
@@ -231,17 +240,17 @@
                                 }
                             </div>
                             <div class="small text-muted mt-1">
-                                @if (a.RepetidasDele == 0)
-                                {
-                                    <span>Ele não tem repetida para dar em troca agora.</span>
-                                }
-                                else if (a.EleTemQueVocePrecisa.Count > 0)
+                                @if (a.EleTemQueVocePrecisa.Count > 0)
                                 {
                                     <span>E ele tem <strong>@a.EleTemQueVocePrecisa.Count</strong> que faltam para você.</span>
                                 }
+                                else if (a.RepetidasDele == 0)
+                                {
+                                    <span>Ele não tem repetida: mande de presente.</span>
+                                }
                                 else
                                 {
-                                    <span>Nada dele te falta: na proposta, peça @(a.RepetidasDele == 1 ? "a única repetida dele" : $"qualquer uma das {a.RepetidasDele} repetidas dele").</span>
+                                    <span>Nada dele te falta: mande de presente ou peça @(a.RepetidasDele == 1 ? "a única repetida dele" : $"alguma das {a.RepetidasDele} repetidas dele") para reciclar.</span>
                                 }
                             </div>
                         </div>
@@ -379,8 +388,8 @@
                             @if (_montar is not null)
                             {
                                 <div class="small">Você dá <strong>@_dar.Count</strong> · pede <strong>@_pedir.Count</strong></div>
-                                <button type="button" class="btn btn-sm btn-success ms-auto" disabled="@(_ocupado || _dar.Count == 0 || _pedir.Count == 0)" @onclick="EnviarAsync">
-                                    Enviar proposta
+                                <button type="button" class="btn btn-sm btn-success ms-auto" disabled="@(_ocupado || _dar.Count == 0)" @onclick="EnviarAsync">
+                                    @(_pedir.Count == 0 ? "🎁 Enviar de presente" : "Enviar proposta")
                                 </button>
                             }
                         </div>
@@ -413,7 +422,7 @@
                                     </ul>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <div class="fw-semibold small mb-1">Você pede (repetidas de @m.Outro.Nome)</div>
+                                    <div class="fw-semibold small mb-1">Você pede (repetidas de @m.Outro.Nome) <span class="fw-normal text-muted">· opcional: sem pedir nada, vai de presente</span></div>
                                     @if (m.RepetidasDele.Count == 0)
                                     {
                                         <p class="small text-muted">@m.Outro.Nome não tem repetidas.</p>
@@ -680,7 +689,8 @@
     {
         var m = _montar!;
         await AlbumSvc.ProporTrocaAsync(_eu!.TreinadorId, m.Outro.TreinadorId, _dar.ToList(), _pedir.ToList(), _contraDe?.TrocaId, CancellationToken.None);
-        _ok = _contraDe is null ? $"Proposta enviada para {m.Outro.Nome}." : $"Contraproposta enviada para {m.Outro.Nome}.";
+        _ok = _pedir.Count == 0 ? $"🎁 Presente enviado para {m.Outro.Nome}. Ele só precisa aceitar."
+            : _contraDe is null ? $"Proposta enviada para {m.Outro.Nome}." : $"Contraproposta enviada para {m.Outro.Nome}.";
         _montar = null;
         _contraDe = null;
         _dar.Clear();
@@ -743,8 +753,12 @@
         _ => f.NomeImpresso
     };
 
-    private static string Nomes(TrocaDto t) =>
-        $"{string.Join(", ", t.Oferecidas.Select(Rotulo))} ⇄ {string.Join(", ", t.Pedidas.Select(Rotulo))}";
+    private static string Nomes(TrocaDto t) => Doacao(t)
+        ? string.Join(", ", t.Oferecidas.Select(Rotulo))
+        : $"{string.Join(", ", t.Oferecidas.Select(Rotulo))} ⇄ {string.Join(", ", t.Pedidas.Select(Rotulo))}";
+
+    /// <summary>Proposta só com o que se dá, sem pedir nada em troca.</summary>
+    private static bool Doacao(TrocaDto t) => t.Pedidas.Count == 0;
 
     private static string Prazo(DateTime expiraEm)
     {

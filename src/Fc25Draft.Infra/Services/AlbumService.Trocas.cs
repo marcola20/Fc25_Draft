@@ -178,8 +178,9 @@ public partial class AlbumService
         if (deId == paraId) throw new InvalidOperationException("Escolha outra pessoa para trocar.");
         var dar = oferecidas.Distinct().ToList();
         var receber = pedidas.Distinct().ToList();
-        if (dar.Count == 0 || receber.Count == 0)
-            throw new InvalidOperationException("Escolha pelo menos uma repetida sua e uma dele.");
+        // Pedir é opcional: só dar é doação (quem já completou o álbum ajuda os outros).
+        if (dar.Count == 0)
+            throw new InvalidOperationException("Escolha pelo menos uma repetida sua.");
         if (dar.Intersect(receber).Any())
             throw new InvalidOperationException("A mesma figurinha não pode estar dos dois lados da troca.");
         if (dar.Count > AlbumFigurinhas.MaximoPorLadoDaTroca || receber.Count > AlbumFigurinhas.MaximoPorLadoDaTroca)
@@ -369,7 +370,10 @@ public partial class AlbumService
             await tx.CommitAsync(ct);
 
             if (selosPara.Count + selosDe.Count > 0) ConquistasGravadas?.Invoke();
-            return new ResultadoDaTrocaDto(true, $"Troca feita com {nomes[de]}! As figurinhas já estão no seu álbum.",
+            var doacao = troca.Itens.All(i => i.Oferecida);
+            return new ResultadoDaTrocaDto(true,
+                doacao ? $"🎁 Presente de {nomes[de]} recebido! As figurinhas já estão no seu álbum."
+                       : $"Troca feita com {nomes[de]}! As figurinhas já estão no seu álbum.",
                 recebidasPara.OrderBy(f => f.Numero).ToList(), selosPara);
         });
 

@@ -259,6 +259,9 @@ repetidas (ex.: 6 repetidas → 1 pacote).
   Fulano", Nova proposta; `?aba=` abre direto numa aba), link com contador de propostas esperando resposta
   na capa do `/album` e no cartão da Minha Área (`TrocasEsperando` no `MeuAlbumDto` e no resumo), item
   "Trocas" no menu do Álbum.
+- Depois (23/10/2026): aba **Posso ajudar** (as minhas repetidas que faltam para cada pessoa, até para
+  quem já completou ajudar os outros) e **doação**: pedir é opcional, então a proposta só com o que se dá
+  vai de presente (sem contraproposta; avisos com 🎁).
 
 ### Fase 5 — Perfil do treinador e figurinha de técnico
 Decisões (04/10/2026): **treinador e auxiliar** viram figurinha; raridade **especial "Técnico"**

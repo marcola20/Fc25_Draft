@@ -507,6 +507,18 @@ public static class AlbumFigurinhas
         if (eventos.Count > 1) return $"🔁 {eventos.Count} novidades nas suas trocas de figurinhas.";
 
         var (evento, quem, oferecidas, pedidas) = eventos[0];
+        // Doação: só um lado, sem pedir nada em troca.
+        if (pedidas == 0)
+        {
+            return evento switch
+            {
+                EventoTroca.Recebida or EventoTroca.Contraproposta => $"🎁 {quem} quer te dar {Figurinhas(oferecidas)} de presente. Aceite para colar no álbum.",
+                EventoTroca.Aceita => $"🎁 {quem} aceitou o seu presente.",
+                EventoTroca.Recusada => $"❌ {quem} recusou o seu presente.",
+                _ => "🎁 Novidade nas suas trocas de figurinhas."
+            };
+        }
+
         return evento switch
         {
             EventoTroca.Recebida => $"🔁 {quem} te propôs uma troca: {Figurinhas(oferecidas)} dele por {pedidas} sua{(pedidas == 1 ? "" : "s")}.",
