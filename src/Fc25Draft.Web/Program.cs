@@ -9,6 +9,7 @@ using Fc25Draft.Web.Security;
 using Fc25Draft.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Blazored.Toast;
 
@@ -34,6 +35,14 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor(o => o.DetailedErrors = builder.Environment.IsDevelopment())
     .AddHubOptions(o => o.MaximumReceiveMessageSize = 512 * 1024);
 builder.Services.AddBlazoredToast();
+// O Render cobra o tráfego de saída que passa de 5 GB no mês: páginas, CSS, JS e JSON saem comprimidos.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["image/svg+xml", "application/manifest+json"]);
+});
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 
 var app = builder.Build();
@@ -181,7 +190,23 @@ forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+
+// Com ?v= (asp-append-version ou versão posta à mão) o endereço muda junto com o arquivo, então fica no cache
+// para sempre. Sem versão (escudos, logo, html2canvas, blazor.server.js) o navegador guarda por um tempo e
+// depois só confere pelo ETag (304, sem baixar de novo). Service worker e manifest são sempre conferidos.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var nome = ctx.File.Name;
+        ctx.Context.Response.Headers.CacheControl =
+            nome is "sw.js" or "manifest.json" ? "no-cache"
+            : ctx.Context.Request.Query.ContainsKey("v") ? "public, max-age=31536000, immutable"
+            : Path.GetExtension(nome) is ".png" or ".svg" or ".jpg" or ".webp" or ".ico" ? "public, max-age=604800"
+            : "public, max-age=86400";
+    }
+});
 
 app.UseRouting();
 app.UseAuthentication();
