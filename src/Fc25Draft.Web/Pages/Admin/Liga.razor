@@ -1897,9 +1897,10 @@
 
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
-    private static string RodadaLabel(int numero) => numero switch
+    // A rodada 0 guarda tanto os jogos do mata-mata quanto os da mini liga.
+    private string RodadaLabel(int numero) => numero switch
     {
-        0  => "Mini Liga",
+        0  => _ligaAtual?.Tipo == TipoCompetition.Copa || _knockoutJogos.Count > 0 ? "Mata-Mata" : "Mini Liga",
         -1 => "Jogo Decisivo",
         _  => $"Rodada {numero}"
     };

@@ -36,8 +36,8 @@
     else
     {
         <ShareableCard Id="cap-matamata" Titulo="@LigaNome" Subtitulo="Mata-Mata" Arquivo="cbfv-mata-mata.png">
-        <!-- Copa: sem Play-In nem Quartas -->
-        @if (_liga?.Tipo != TipoCompetition.Copa)
+        <!-- Cada fase só aparece se tiver jogos: a Copa com 2 grupos vai direto às semis, com 4 tem quartas -->
+        @if (_jogos.Any(j => j.Fase is FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C))
         {
             <!-- Play-In (Liga apenas) -->
             <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
@@ -53,8 +53,11 @@
                     }
                 }
             </div>
+        }
 
-            <!-- Quartas (Liga apenas) -->
+        @if (_jogos.Any(j => j.Fase is FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4))
+        {
+            <!-- Quartas -->
             <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
             <div class="row g-3 mb-4">
                 @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
