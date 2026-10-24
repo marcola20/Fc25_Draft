@@ -831,6 +831,16 @@ public class LigaAdminService : ILigaAdminService
         var partida = await _db.LigaPartidas.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct)
             ?? throw new InvalidOperationException("Partida não encontrada.");
 
+        // Partida de mata-mata criada sem querer: o jogo volta a "Criar Partida". Com vencedor já
+        // definido, o chaveamento avançou e não dá para apagar daqui.
+        var knockout = await _db.LigaKnockoutJogos.FirstOrDefaultAsync(x => x.PartidaId == partidaId, ct);
+        if (knockout is not null)
+        {
+            if (knockout.VencedorId.HasValue)
+                throw new InvalidOperationException("Este jogo do mata-mata já foi encerrado; reverta a fase antes de apagar a partida.");
+            knockout.PartidaId = null;
+        }
+
         _db.LigaPartidas.Remove(partida);
         await _db.SaveChangesAsync(ct);
         await RecalcularClassificacaoAsync(partida.RodadaId, ct);
