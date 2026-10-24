@@ -22,6 +22,12 @@ public interface IResultadoPesService
     /// </summary>
     Task<ResultadoPesRespostaDto> ReceberAsync(ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, bool simular, CancellationToken ct);
 
+    /// <summary>
+    /// Grava o vídeo do YouTube na partida achada como no envio do resultado (mandante x visitante e
+    /// o título do vídeo). Recusa com <see cref="Exceptions.ResultadoPesException"/> sem gravar nada.
+    /// </summary>
+    Task<VideoPesRespostaDto> DefinirVideoAsync(VideoPesRequest request, Guid? partidaAnterior, CancellationToken ct);
+
     Task<bool> SegurandoAsync(CancellationToken ct);
     Task DefinirSegurarAsync(bool segurar, CancellationToken ct);
 

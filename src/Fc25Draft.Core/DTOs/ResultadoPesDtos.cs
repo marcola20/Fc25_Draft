@@ -88,3 +88,28 @@ public record ResultadoPesPendenteDto(
     IReadOnlyList<string> Avisos,
     string? Erro,
     DateTime EnviadoEm);
+
+// ── Vídeo do jogo no YouTube (botão "Atribuir" do painel do Auto_PES21) ─────
+
+/// <summary>
+/// O jogo é achado como no envio do resultado: mandante x visitante, com o título do vídeo no
+/// YouTube no lugar do nome do arquivo (ele cita a competição e se é jogo extra).
+/// </summary>
+public record VideoPesRequest(
+    [property: JsonPropertyName("video")] string? Video,
+    [property: JsonPropertyName("serie")] string? Serie,
+    [property: JsonPropertyName("rodada")] int? Rodada,
+    [property: JsonPropertyName("casa")] ResultadoPesTime? Casa,
+    [property: JsonPropertyName("fora")] ResultadoPesTime? Fora,
+    [property: JsonPropertyName("link")] string? Link,
+    [property: JsonPropertyName("gravado_em")] string? GravadoEm = null);
+
+public record VideoPesRespostaDto(
+    Guid PartidaId,
+    string Competicao,
+    string Onde,
+    string Casa,
+    string Fora,
+    string VideoId,
+    // O vídeo que a partida tinha antes, quando era outro.
+    string? VideoAnterior);

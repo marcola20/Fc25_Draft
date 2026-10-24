@@ -177,6 +177,23 @@ public static class LigaEndpoints
             }
         });
 
+        // Vídeo do jogo no YouTube (painel do Auto_PES21). ?partida=<id> = partida que recebeu o resultado deste vídeo.
+        admin.MapPost("/video-pes", async (VideoPesRequest request, Guid? partida, IResultadoPesService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.DefinirVideoAsync(request, partida, ct)); }
+            catch (ResultadoPesException ex)
+            {
+                var body = new { message = ex.Message, candidatos = ex.Candidatos };
+                return ex.Erro switch
+                {
+                    ResultadoPesErro.NaoEncontrado => Results.NotFound(body),
+                    ResultadoPesErro.Ambiguo => Results.Conflict(body),
+                    _ => Results.UnprocessableEntity(body)
+                };
+            }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        });
+
         // Punições
         var punicoes = admin.MapGroup("/{ligaId:guid}/punicoes");
         punicoes.MapGet("", async (Guid ligaId, ILigaAdminService svc, CancellationToken ct) =>
