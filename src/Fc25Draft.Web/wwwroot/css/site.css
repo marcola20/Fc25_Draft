@@ -193,6 +193,12 @@ a, .btn-link {
         overflow: visible;
     }
 
+    /* Na imagem (700px) as quartas do mata-mata ficam 2×2 em vez de 4 cartões espremidos. */
+    .share-capture.share-rendering .ko-quartas > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
     /* Mostra os nomes dos times (escondidos no mobile) na imagem da rodada. */
     .share-capture.share-rendering .d-none.d-md-inline {
         display: inline !important;

@@ -503,7 +503,7 @@
                 @if (_knockoutJogos.Any(j => j.Fase is FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4))
                 {
                 <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
-                <div class="row g-3 mb-4">
+                <div class="row g-3 mb-4 ko-quartas">
                     @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
                     {
                         var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);

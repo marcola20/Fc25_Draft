@@ -5,26 +5,33 @@
      style="@(OnClick.HasDelegate ? "cursor:pointer;" : "")"
      @onclick="() => OnClick.InvokeAsync(Jogo)">
     <div class="card-header d-flex justify-content-between align-items-center py-1 px-2 @(Destaque ? "bg-warning text-dark" : "bg-dark text-white")">
-        <small class="fw-bold">@Jogo.FaseLabel</small>
+        @{ var (fase, confronto) = DividirLabel(Jogo.FaseLabel); }
+        <div class="lh-sm" style="min-width:0">
+            <small class="fw-bold d-block">@fase</small>
+            @if (confronto is not null)
+            {
+                <small class="d-block text-truncate" style="opacity:.75;font-size:.72rem">@confronto</small>
+            }
+        </div>
         @if (Jogo.PartidaStatus.HasValue)
         {
-            <span class="badge @StatusBadge(Jogo.PartidaStatus.Value) ms-1">@StatusLabel(Jogo.PartidaStatus.Value)</span>
+            <span class="badge @StatusBadge(Jogo.PartidaStatus.Value) ms-1 flex-shrink-0">@StatusLabel(Jogo.PartidaStatus.Value)</span>
         }
     </div>
     <div class="card-body py-2 px-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold @(IsVencedor(Jogo.TimeCasaId) ? "text-success" : "") d-flex align-items-center gap-1">
-                <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                @(Jogo.TimeCasaNome ?? "A definir")
+            <span class="fw-semibold @(IsVencedor(Jogo.TimeCasaId) ? "text-success" : "") d-flex align-items-center gap-1" style="min-width:0">
+                <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                <span class="text-truncate">@(Jogo.TimeCasaNome ?? "A definir")</span>
             </span>
-            <span class="badge bg-secondary fs-6 mx-2">@(Jogo.GolsCasa?.ToString() ?? "—")</span>
+            <span class="badge bg-secondary fs-6 ms-2 flex-shrink-0">@(Jogo.GolsCasa?.ToString() ?? "—")</span>
         </div>
         <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-semibold @(IsVencedor(Jogo.TimeForaId) ? "text-success" : "") d-flex align-items-center gap-1">
-                <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                @(Jogo.TimeForaNome ?? "A definir")
+            <span class="fw-semibold @(IsVencedor(Jogo.TimeForaId) ? "text-success" : "") d-flex align-items-center gap-1" style="min-width:0">
+                <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                <span class="text-truncate">@(Jogo.TimeForaNome ?? "A definir")</span>
             </span>
-            <span class="badge bg-secondary fs-6 mx-2">@(Jogo.GolsFora?.ToString() ?? "—")</span>
+            <span class="badge bg-secondary fs-6 ms-2 flex-shrink-0">@(Jogo.GolsFora?.ToString() ?? "—")</span>
         </div>
         @if (Jogo.TemPenaltis && Jogo.VencedorNome is not null)
         {
@@ -47,6 +54,14 @@
     [Parameter] public EventCallback<LigaKnockoutJogoDto> OnClick { get; set; }
 
     private bool IsVencedor(Guid? timeId) => timeId.HasValue && timeId == Jogo.VencedorId;
+
+    // "Quartas 1 — 1º Grupo A x 2º Grupo B" vira título curto + confronto em linha menor,
+    // para o cartão não quebrar em três linhas quando fica estreito.
+    private static (string Fase, string? Confronto) DividirLabel(string label)
+    {
+        var i = label.IndexOf(" — ", StringComparison.Ordinal);
+        return i < 0 ? (label, null) : (label[..i], label[(i + 3)..]);
+    }
 
     private static string EscudoUrl(string? teamName)
     {
