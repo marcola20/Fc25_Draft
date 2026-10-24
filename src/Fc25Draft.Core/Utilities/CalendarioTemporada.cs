@@ -123,17 +123,36 @@ public static class CalendarioTemporada
 
     /// <summary>
     /// Troca a data das rodadas que já têm data gravada (mudada à mão ou aplicada antes) e põe o
-    /// calendário na ordem cronológica, renumerando. O resto (mercado, mata-mata da Copa, playoff)
-    /// segue a conta a partir da abertura.
+    /// calendário na ordem cronológica, renumerando. O mata-mata da Copa não tem data própria: segue
+    /// o dia da semana e a hora da última rodada dos grupos, uma fase por semana. O resto (mercado,
+    /// playoff) segue a conta a partir da abertura.
     /// </summary>
     public static IReadOnlyList<DataDaTemporada> ComDatasGravadas(
-        IEnumerable<DataDaTemporada> calendario, Func<DataDaTemporada, DateTime?> dataGravada) =>
-        calendario
+        IEnumerable<DataDaTemporada> calendario, Func<DataDaTemporada, DateTime?> dataGravada)
+    {
+        var datas = calendario
             .Select(d => dataGravada(d) is DateTime gravada ? d with { Quando = gravada } : d)
+            .ToList();
+
+        var ultimaDosGrupos = datas
+            .Where(d => d.Tipo == TipoCompetition.Copa && d.Rodada is not null)
+            .MaxBy(d => d.Rodada);
+        if (ultimaDosGrupos is not null)
+        {
+            var semana = 0;
+            datas = datas
+                .Select(d => d.Tipo == TipoCompetition.Copa && d.Rodada is null
+                    ? d with { Quando = ultimaDosGrupos.Quando.AddDays(7 * ++semana) }
+                    : d)
+                .ToList();
+        }
+
+        return datas
             .OrderBy(d => d.Quando)
             .ThenBy(d => d.Numero)
             .Select((d, i) => d with { Numero = i + 1 })
             .ToList();
+    }
 
     /// <summary>Datas de uma competição da temporada, na ordem das rodadas.</summary>
     public static IReadOnlyList<DateTime> DatasDasRodadas(
