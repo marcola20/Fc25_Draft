@@ -270,6 +270,136 @@
     animation: aparecer .5s ease-out;
 }
 
+/* ---- Pacote de estrelas: dourado por fora, fogos e estrelas ao rasgar ---- */
+.pacote-fechado.estrelas .pacote-corpo,
+.pacote-fechado.estrelas .pacote-tira {
+    background:
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, .12) 0 10px, transparent 10px 20px),
+        linear-gradient(160deg, #f5d36b 0%, #b8860b 55%, #6b4a00 100%);
+    box-shadow: 0 0 2.5rem rgba(245, 211, 107, .55), 0 1rem 2.5rem rgba(0, 0, 0, .5), inset 0 0 0 3px #fff3c4;
+}
+
+.pacote-fechado.estrelas .pacote-marca { color: #fff; text-shadow: 0 .15rem 0 rgba(107, 74, 0, .6); }
+.pacote-fechado.estrelas .pacote-nome,
+.pacote-fechado.estrelas .pacote-qtd { color: #2a1a00; }
+
+.pacote-selo {
+    font-size: 1.1rem;
+    letter-spacing: .3em;
+    color: #fff;
+    text-shadow: 0 0 .6rem #fff3c4;
+    animation: pulso 1.6s ease-in-out infinite;
+}
+
+.fogos {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* Cada explosão: o foguete sobe, estoura num clarão e as faíscas abrem em círculo. */
+.explosao {
+    position: absolute;
+    left: var(--bx);
+    top: var(--by);
+    width: 0;
+    height: 0;
+}
+
+.explosao::before {
+    content: "";
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 4px;
+    height: 26px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, #fff, transparent);
+    opacity: 0;
+    animation: foguete .55s ease-out var(--d) forwards;
+}
+
+.explosao::after {
+    content: "";
+    position: absolute;
+    left: -70px;
+    top: -70px;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, var(--c) 30%, transparent 70%);
+    opacity: 0;
+    animation: clarao-fogo .6s ease-out calc(var(--d) + .55s) forwards;
+}
+
+.explosao span {
+    position: absolute;
+    left: -4px;
+    top: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px 3px var(--c), 0 0 14px 6px var(--c);
+    opacity: 0;
+    animation: faisca 1.8s cubic-bezier(.15, .7, .3, 1) calc(var(--d) + .55s) forwards;
+}
+
+@keyframes foguete {
+    0% { transform: translateY(70vh); opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(0); opacity: 0; }
+}
+
+@keyframes clarao-fogo {
+    0% { transform: scale(.2); opacity: 1; }
+    100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes faisca {
+    0% { transform: rotate(var(--a)) translateY(0) scale(1.2); opacity: 1; }
+    60% { opacity: 1; }
+    100% { transform: rotate(var(--a)) translateY(calc(var(--r) * -1)) scale(.4); opacity: 0; }
+}
+
+/* Estrelas: metade chove do alto girando, metade pisca no lugar. */
+.estrela-cai,
+.estrela-brilha {
+    position: absolute;
+    left: var(--x);
+    font-size: var(--s);
+    line-height: 1;
+    color: #f5d36b;
+    text-shadow: 0 0 .5rem #f5d36b, 0 0 1.2rem rgba(245, 211, 107, .7);
+    opacity: 0;
+}
+
+.estrela-cai {
+    top: -2rem;
+    animation: estrela-cai 3.2s ease-in calc(var(--d) + .4s) forwards;
+}
+
+.estrela-brilha {
+    top: var(--y);
+    color: #fff3c4;
+    animation: estrela-brilha 1.4s ease-in-out calc(var(--d) + .6s) forwards;
+}
+
+@keyframes estrela-cai {
+    0% { transform: translateY(0) rotate(0) scale(.6); opacity: 0; }
+    10% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translateY(105vh) rotate(var(--g)) scale(1); opacity: 0; }
+}
+
+@keyframes estrela-brilha {
+    0% { transform: scale(0) rotate(0); opacity: 0; }
+    40% { transform: scale(1.5) rotate(calc(var(--g) / 2)); opacity: 1; }
+    100% { transform: scale(0) rotate(var(--g)); opacity: 0; }
+}
+
 /* Menos movimento: nada de rasgar, voar, girar nem confete — as cartas aparecem abertas. */
 @media (prefers-reduced-motion: reduce) {
     .abertura-fundo,
@@ -283,7 +413,10 @@
 
     .flip.r-brilhante.virada::after,
     .flip.r-lendaria.virada::after,
-    .confete { display: none; }
+    .confete,
+    .fogos { display: none; }
+
+    .pacote-selo { animation: none; }
 
     .flip.virada .flip-miolo { animation: none; }
 }

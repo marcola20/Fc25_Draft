@@ -59,7 +59,11 @@ public interface IAlbumService
     Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct);
 
     /// <summary>Dá pacotes a uma pessoa (testes, premiação). Fica no log de ações do admin.</summary>
-    Task<int> DarPacotesAsync(Guid treinadorId, int quantidade, string? motivo, string? adminToken, CancellationToken ct);
+    /// <param name="estrelas">Pacote de festa: abre com fogos e estrelas.</param>
+    Task<int> DarPacotesAsync(Guid treinadorId, int quantidade, string? motivo, bool estrelas, string? adminToken, CancellationToken ct);
+
+    /// <summary>Dá pacotes a todo mundo que está na liga. Devolve quantas pessoas ganharam.</summary>
+    Task<int> DarPacotesParaTodosAsync(int quantidade, string? motivo, bool estrelas, string? adminToken, CancellationToken ct);
 
     Task<IReadOnlyList<PacotesDoTreinadorDto>> PacotesPorTreinadorAsync(CancellationToken ct);
 

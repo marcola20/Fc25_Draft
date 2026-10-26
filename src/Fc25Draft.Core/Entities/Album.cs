@@ -163,6 +163,9 @@ public class PacoteGanho
     /// <summary>Por que ganhou, em palavras (o motivo do admin, "Vitória sobre o Grêmio"…).</summary>
     public string? Motivo { get; set; }
 
+    /// <summary>Pacote de festa (só o admin dá): ao abrir, a tela solta fogos e estrelas.</summary>
+    public bool Estrelas { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime? AbertoEm { get; set; }
 

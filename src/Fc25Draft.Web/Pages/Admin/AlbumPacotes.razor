@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject IAlbumService AlbumSvc
 @inject AdminAuthService AdminAuth
+@inject IJSRuntime JS
 
 <PageTitle>Dar pacotes — Admin</PageTitle>
 
@@ -37,6 +38,7 @@
                         <label class="form-label">Para quem</label>
                         <select class="form-select" @bind="_treinadorId">
                             <option value="">Escolha…</option>
+                            <option value="@Todos">👥 Todos da liga (@NaLiga pessoas)</option>
                             @foreach (var t in _lista)
                             {
                                 <option value="@t.TreinadorId">@t.Nome@(t.TimeAtual is null ? "" : $" · {t.TimeAtual}")@(t.Ativo ? "" : " (fora da liga)")</option>
@@ -52,10 +54,21 @@
                         <input class="form-control" maxlength="200" placeholder="Ex.: prêmio da rodada" @bind="_motivo" />
                     </div>
                     <div class="col-12 col-md-2">
-                        <button class="btn btn-success w-100" disabled="@(_salvando || string.IsNullOrEmpty(_treinadorId))" @onclick="DarAsync">Dar</button>
+                        <button class="btn @(_estrelas ? "btn-warning" : "btn-success") w-100" disabled="@(_salvando || string.IsNullOrEmpty(_treinadorId))" @onclick="DarAsync">
+                            @(_estrelas ? "🌟 Dar" : "Dar")
+                        </button>
                     </div>
                 </div>
-                <p class="small text-muted mb-0 mt-2">O sorteio das figurinhas é feito quando a pessoa abre o pacote. Fica registrado no Log de Ações.</p>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="pacote-estrelas" @bind="_estrelas" />
+                    <label class="form-check-label" for="pacote-estrelas">
+                        🌟 <strong>Estrelas</strong> — pacote de festa: quando a pessoa abrir, a tela solta fogos e estrelas
+                    </label>
+                </div>
+                <p class="small text-muted mb-0 mt-2">
+                    O sorteio das figurinhas é feito quando a pessoa abre o pacote. “Todos da liga” dá para cada pessoa que está na
+                    liga hoje (quem está fora fica de fora). Fica registrado no Log de Ações.
+                </p>
             </div>
         </div>
 
@@ -144,6 +157,10 @@
     private string _treinadorId = string.Empty;
     private int _quantidade = 1;
     private string? _motivo;
+    private bool _estrelas;
+
+    private const string Todos = "todos";
+    private int NaLiga => _lista.Count(t => t.Ativo);
 
     protected override async Task OnInitializedAsync()
     {
@@ -195,17 +212,33 @@
 
     private async Task DarAsync()
     {
-        if (!Guid.TryParse(_treinadorId, out var id)) return;
+        var paraTodos = _treinadorId == Todos;
+        Guid id = default;
+        if (!paraTodos && !Guid.TryParse(_treinadorId, out id)) return;
+
+        var pacotes = $"{_quantidade} pacote{(_quantidade == 1 ? "" : "s")}{(_estrelas ? " com estrelas 🌟" : "")}";
+        if (paraTodos && !await JS.InvokeAsync<bool>("confirm", $"Dar {pacotes} para cada uma das {NaLiga} pessoas da liga?"))
+            return;
+
         _salvando = true;
         _erro = null;
         try
         {
-            var dados = await AlbumSvc.DarPacotesAsync(id, _quantidade, _motivo, await AdminAuth.GetTokenAsync(), CancellationToken.None);
-            var nome = _lista.FirstOrDefault(t => t.TreinadorId == id)?.Nome;
+            var token = await AdminAuth.GetTokenAsync();
+            if (paraTodos)
+            {
+                var pessoas = await AlbumSvc.DarPacotesParaTodosAsync(_quantidade, _motivo, _estrelas, token, CancellationToken.None);
+                _ok = $"{pacotes} para cada uma das {pessoas} pessoas da liga.";
+            }
+            else
+            {
+                await AlbumSvc.DarPacotesAsync(id, _quantidade, _motivo, _estrelas, token, CancellationToken.None);
+                _ok = $"{pacotes} para {_lista.FirstOrDefault(t => t.TreinadorId == id)?.Nome}.";
+            }
             await CarregarAsync();
-            _ok = $"{dados} pacote{(dados == 1 ? "" : "s")} para {nome}.";
             _motivo = null;
             _quantidade = 1;
+            _estrelas = false;
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }

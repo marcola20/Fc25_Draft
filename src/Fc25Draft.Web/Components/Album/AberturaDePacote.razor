@@ -3,27 +3,32 @@
 
 @* Abertura do pacote: o pacote rasga, as 5 cartas chegam viradas e a pessoa vira uma a uma (ou todas).
    Brilhante brilha ao virar; lendária vem com festa. O sorteio já foi feito no servidor: as cartas são as
-   gravadas no PacoteGanho, na mesma ordem. Com "menos movimento" no sistema, as cartas já vêm abertas. *@
+   gravadas no PacoteGanho, na mesma ordem. Com "menos movimento" no sistema, as cartas já vêm abertas.
+   Pacote de estrelas (dado pelo admin): é dourado e, ao rasgar, a tela solta fogos e estrelas. *@
 <div class="abertura-fundo @(_festa ? "festa" : "")" role="dialog" aria-modal="true" aria-label="Pacote aberto">
     <div class="abertura">
         <div class="abertura-topo">
-            <span class="small">🎁 @AlbumFigurinhas.DeOndeVeio(Pacote.Origem, Pacote.Motivo)</span>
+            <span class="small">@(Pacote.Estrelas ? "🌟" : "🎁") @AlbumFigurinhas.DeOndeVeio(Pacote.Origem, Pacote.Motivo)</span>
             <button type="button" class="btn-close btn-close-white ms-auto" aria-label="Fechar" @onclick="OnFechar"></button>
         </div>
 
         @if (_fase != Fase.Cartas)
         {
             <div class="pacote-palco">
-                <button type="button" class="pacote-fechado @(_fase == Fase.Rasgando ? "rasgando" : "")" @onclick="RasgarAsync"
+                <button type="button" class="pacote-fechado @(_fase == Fase.Rasgando ? "rasgando" : "") @(Pacote.Estrelas ? "estrelas" : "")" @onclick="RasgarAsync"
                         aria-label="Rasgar o pacote">
                     <span class="pacote-tira" aria-hidden="true"></span>
                     <span class="pacote-corpo">
                         <span class="pacote-marca">CBFV</span>
                         <span class="pacote-nome">@AlbumNome</span>
+                        @if (Pacote.Estrelas)
+                        {
+                            <span class="pacote-selo">★ ★ ★</span>
+                        }
                         <span class="pacote-qtd">@Pacote.Figurinhas.Count figurinhas</span>
                     </span>
                 </button>
-                <div class="dica">Toque no pacote para rasgar</div>
+                <div class="dica">@(Pacote.Estrelas ? "🌟 Pacote de estrelas! Toque para rasgar" : "Toque no pacote para rasgar")</div>
             </div>
         }
         else
@@ -113,6 +118,26 @@
             }
         }
     </div>
+
+    @if (_fogos)
+    {
+        <div class="fogos" aria-hidden="true">
+            @for (var b = 0; b < Explosoes; b++)
+            {
+                <div class="explosao" style="--bx: @(12 + b * 41 % 76)%; --by: @(14 + b * 29 % 38)%; --d: @(b * 330)ms; --c: @Cores[b % Cores.Length]">
+                    @for (var f = 0; f < Faiscas; f++)
+                    {
+                        <span style="--a: @(f * 360 / Faiscas)deg; --r: @(130 + (b * 7 + f * 13) % 60)px"></span>
+                    }
+                </div>
+            }
+            @for (var e = 0; e < EstrelasNaTela; e++)
+            {
+                <span class="@(e % 2 == 0 ? "estrela-cai" : "estrela-brilha")"
+                      style="--x: @(e * 37 % 96 + 2)%; --y: @(e * 53 % 80 + 5)%; --d: @(e * 173 % 3200)ms; --s: @TamanhoDaEstrela(e)rem; --g: @(e * 97 % 360 - 180)deg">★</span>
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -120,6 +145,9 @@
 
     private const int Largura = 150;
     private const int Confetes = 28;
+    private const int Explosoes = 12;
+    private const int Faiscas = 24;
+    private const int EstrelasNaTela = 30;
     private static readonly string[] Cores = { "#f5d36b", "#b197fc", "#f783ac", "#5eead4", "#ffa94d", "#6ea8fe" };
 
     [Parameter, EditorRequired] public PacoteAbertoDto Pacote { get; set; } = null!;
@@ -142,6 +170,7 @@
     private bool _virandoTodas;
     private bool _dandoCartas;
     private bool _festa;
+    private bool _fogos;
     private bool _reduzido;
     private Guid _pacoteAtual;
 
@@ -155,6 +184,7 @@
         _viradas.Clear();
         _virandoTodas = false;
         _festa = false;
+        _fogos = false;
         _fase = _reduzido ? Fase.Cartas : Fase.Fechado;
         if (_reduzido) VirarTudoSemAnimacao();
     }
@@ -182,6 +212,7 @@
     {
         if (_fase != Fase.Fechado) return;
         _fase = Fase.Rasgando;
+        if (Pacote.Estrelas) _ = FogosAsync();
         StateHasChanged();
         await Task.Delay(650);
         _fase = Fase.Cartas;
@@ -232,6 +263,23 @@
         _festa = false;
         await InvokeAsync(StateHasChanged);
     }
+
+    /// <summary>Pacote de estrelas rasgado: fogos estourando e estrelas caindo por uns segundos.</summary>
+    private async Task FogosAsync()
+    {
+        if (_reduzido) return;
+        var pacote = Pacote.PacoteId;
+        _fogos = true;
+        _ = FestaAsync(500);
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(7500);
+        if (Pacote.PacoteId != pacote) return;
+        _fogos = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>De 1 a 2,2rem, com ponto (o CSS não entende vírgula).</summary>
+    private static string TamanhoDaEstrela(int e) => (1 + e * 7 % 13 / 10.0).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private async Task CompartilharAsync()
     {

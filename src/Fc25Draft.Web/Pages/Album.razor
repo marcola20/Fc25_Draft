@@ -100,14 +100,14 @@
             {
                 @* De onde veio cada pacote fechado, na ordem em que vão ser abertos. *@
                 var grupos = a.Fechados
-                    .GroupBy(f => f.DeOndeVeio)
-                    .Select(g => (Texto: g.Key, Origem: g.First().Origem, Quantos: g.Count()))
+                    .GroupBy(f => (f.DeOndeVeio, f.Estrelas))
+                    .Select(g => (Texto: g.Key.DeOndeVeio, Origem: g.First().Origem, Estrelas: g.Key.Estrelas, Quantos: g.Count()))
                     .ToList();
                 <div class="card-footer bg-transparent small">
                     <span class="text-muted me-1">Fechados:</span>
                     @foreach (var g in grupos.Take(MaximoDeOrigens))
                     {
-                        <span class="pacote-origem @g.Origem">@IconeDaOrigem(g.Origem) @g.Texto@(g.Quantos > 1 ? $" ×{g.Quantos}" : "")</span>
+                        <span class="pacote-origem @g.Origem">@(g.Estrelas ? "🌟" : IconeDaOrigem(g.Origem)) @g.Texto@(g.Quantos > 1 ? $" ×{g.Quantos}" : "")</span>
                     }
                     @if (grupos.Count > MaximoDeOrigens)
                     {

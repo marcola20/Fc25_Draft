@@ -1999,6 +1999,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<bool>("Estrelas")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid[]>("Figurinhas")
                         .HasColumnType("uuid[]");
 

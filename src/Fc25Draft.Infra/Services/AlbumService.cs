@@ -381,7 +381,7 @@ public partial class AlbumService : IAlbumService
         return jogadores.Concat(tecnicos).OrderBy(f => f.Numero).ToList();
     }
 
-    public async Task<int> DarPacotesAsync(Guid treinadorId, int quantidade, string? motivo, string? adminToken, CancellationToken ct)
+    public async Task<int> DarPacotesAsync(Guid treinadorId, int quantidade, string? motivo, bool estrelas, string? adminToken, CancellationToken ct)
     {
         if (quantidade < 1 || quantidade > MaximoPacotesPorVez)
             throw new InvalidOperationException($"Dê de 1 a {MaximoPacotesPorVez} pacotes por vez.");
@@ -392,29 +392,60 @@ public partial class AlbumService : IAlbumService
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("Pessoa não encontrada.");
 
+        var texto = await AdicionarPacotesDoAdminAsync(new[] { treinadorId }, quantidade, motivo, estrelas, ct);
+        await RegistrarAsync(AdminActionType.DarPacotes, adminToken, new { treinador, quantidade, motivo = texto, estrelas }, ct);
+        await _db.SaveChangesAsync(ct);
+        return quantidade;
+    }
+
+    public async Task<int> DarPacotesParaTodosAsync(int quantidade, string? motivo, bool estrelas, string? adminToken, CancellationToken ct)
+    {
+        if (quantidade < 1 || quantidade > MaximoPacotesPorVez)
+            throw new InvalidOperationException($"Dê de 1 a {MaximoPacotesPorVez} pacotes por vez.");
+
+        var pessoas = await _db.Treinadores.AsNoTracking()
+            .Where(t => t.Ativo)
+            .Select(t => t.TreinadorId)
+            .ToListAsync(ct);
+        if (pessoas.Count == 0)
+            throw new InvalidOperationException("Ninguém na liga para ganhar pacote.");
+
+        var texto = await AdicionarPacotesDoAdminAsync(pessoas, quantidade, motivo, estrelas, ct);
+        await RegistrarAsync(AdminActionType.DarPacotes, adminToken,
+            new { treinador = "Todos da liga", pessoas = pessoas.Count, quantidade, motivo = texto, estrelas }, ct);
+        await _db.SaveChangesAsync(ct);
+        return pessoas.Count;
+    }
+
+    /// <summary>Põe os pacotes da organização no livro-razão (sem salvar). Devolve o motivo já limpo.</summary>
+    private async Task<string?> AdicionarPacotesDoAdminAsync(
+        IReadOnlyList<Guid> pessoas, int quantidade, string? motivo, bool estrelas, CancellationToken ct)
+    {
         var albumId = await _db.Albuns.Where(a => a.Ativo).Select(a => (Guid?)a.AlbumId).FirstOrDefaultAsync(ct);
         var texto = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
         if (texto?.Length > 200) texto = texto[..200];
 
         var agora = Agora;
-        for (var i = 0; i < quantidade; i++)
+        foreach (var treinadorId in pessoas)
         {
-            var id = Guid.NewGuid();
-            _db.PacotesGanhos.Add(new PacoteGanho
+            for (var i = 0; i < quantidade; i++)
             {
-                PacoteId = id,
-                TreinadorId = treinadorId,
-                AlbumId = albumId,
-                Origem = PacoteGanho.OrigemAdmin,
-                Chave = $"{PacoteGanho.OrigemAdmin}:{id:N}",
-                Motivo = texto,
-                CriadoEm = agora
-            });
+                var id = Guid.NewGuid();
+                _db.PacotesGanhos.Add(new PacoteGanho
+                {
+                    PacoteId = id,
+                    TreinadorId = treinadorId,
+                    AlbumId = albumId,
+                    Origem = PacoteGanho.OrigemAdmin,
+                    Chave = $"{PacoteGanho.OrigemAdmin}:{id:N}",
+                    Motivo = texto,
+                    Estrelas = estrelas,
+                    CriadoEm = agora
+                });
+            }
         }
 
-        await RegistrarAsync(AdminActionType.DarPacotes, adminToken, new { treinador, quantidade, motivo = texto }, ct);
-        await _db.SaveChangesAsync(ct);
-        return quantidade;
+        return texto;
     }
 
     public async Task<IReadOnlyList<PacotesDoTreinadorDto>> PacotesPorTreinadorAsync(CancellationToken ct)
@@ -472,9 +503,9 @@ public partial class AlbumService : IAlbumService
                 .Where(p => p.TreinadorId == treinadorId && p.AbertoEm == null
                             && (p.AlbumId == album.AlbumId || (p.AlbumId == null && album.Ativo)))
                 .OrderBy(p => p.CriadoEm).ThenBy(p => p.PacoteId)
-                .Select(p => new { p.PacoteId, p.Origem, p.Motivo, p.CriadoEm })
+                .Select(p => new { p.PacoteId, p.Origem, p.Motivo, p.CriadoEm, p.Estrelas })
                 .ToListAsync(ct))
-            .Select(p => new PacoteFechadoDto(p.PacoteId, p.Origem, AlbumFigurinhas.DeOndeVeio(p.Origem, p.Motivo), p.CriadoEm))
+            .Select(p => new PacoteFechadoDto(p.PacoteId, p.Origem, AlbumFigurinhas.DeOndeVeio(p.Origem, p.Motivo), p.CriadoEm, p.Estrelas))
             .ToList();
 
         return new MeuAlbumDto(
@@ -897,7 +928,7 @@ public partial class AlbumService : IAlbumService
             await tx.CommitAsync(ct);
 
             if (conquistas.Count > 0) ConquistasGravadas?.Invoke();
-            return new PacoteAbertoDto(pacote.PacoteId, pacote.Origem, pacote.Motivo, tiradas, restantes, conquistas);
+            return new PacoteAbertoDto(pacote.PacoteId, pacote.Origem, pacote.Motivo, tiradas, restantes, conquistas, pacote.Estrelas);
         });
     }
 

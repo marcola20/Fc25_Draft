@@ -88,7 +88,7 @@ public record MeuAlbumDto(
 }
 
 /// <summary>Um pacote ainda fechado e de onde ele veio, na ordem em que vai ser aberto.</summary>
-public record PacoteFechadoDto(Guid PacoteId, string Origem, string DeOndeVeio, DateTime CriadoEm);
+public record PacoteFechadoDto(Guid PacoteId, string Origem, string DeOndeVeio, DateTime CriadoEm, bool Estrelas = false);
 
 /// <summary>O álbum da pessoa em números, para o cartão da Minha Área.</summary>
 public record AlbumResumoDoTreinadorDto(
@@ -115,7 +115,7 @@ public record FigurinhaTiradaDto(FigurinhaDto Figurinha, bool Nova, int Quantida
 
 public record PacoteAbertoDto(
     Guid PacoteId, string Origem, string? Motivo, IReadOnlyList<FigurinhaTiradaDto> Figurinhas, int PacotesRestantes,
-    IReadOnlyList<ConquistaAlbumDto> Conquistas);
+    IReadOnlyList<ConquistaAlbumDto> Conquistas, bool Estrelas = false);
 
 /// <summary>Um selo do álbum: página completa (com o clube) ou álbum completo.</summary>
 public record ConquistaAlbumDto(TipoConquistaAlbum Tipo, Guid? TeamId, string? TimeNome, DateTime Em);
