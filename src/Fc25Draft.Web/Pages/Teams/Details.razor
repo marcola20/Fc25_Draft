@@ -322,9 +322,19 @@ else
                                             Emprestado pelo @dono
                                         </span>
                                     }
-                                    @if (player.Participacao is { Insatisfeito: true })
+                                    @if (player.Participacao?.Saida is { NaLista: true } saida)
                                     {
-                                        <span class="badge bg-danger ms-1" title="Insatisfeito com o banco: pediu para sair. Passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular.">😤</span>
+                                        <span class="badge bg-danger ms-1"
+                                              title="@(saida.PromessaQuebrada ? "Promessa quebrada: voltou à lista pela metade da venda rápida e só sai vendido" : "Pediu para sair: está na lista pelo preço da venda rápida e só sai dela com a promessa de colocar para jogar")">🚪 Pediu para sair</span>
+                                    }
+                                    else if (player.Participacao?.Saida is { PromessaEm: not null } promessa)
+                                    {
+                                        <span class="badge bg-info text-dark ms-1"
+                                              title="Promessa de colocar para jogar: ele precisa ser titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos. Faltam @promessa.FaltamDaPromessa jogo(s); se não acontecer, volta à lista pela metade do preço.">🤝 Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
+                                    }
+                                    @if (player.Participacao is { Insatisfeito: true } insatisfeito)
+                                    {
+                                        <span class="badge bg-danger ms-1" title="@TituloInsatisfeito(insatisfeito)">😤</span>
                                     }
                                 </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
@@ -335,8 +345,8 @@ else
                                     @if (player.Participacao is { Variacao: not 0m } part)
                                     {
                                         <span class="small fw-semibold @(part.Variacao > 0 ? "text-success" : "text-danger")"
-                                              title="Participação de @(part.Percentual is decimal pct ? $"{pct * 100:0}%" : "—") nos últimos @part.Jogos jogos do clube">
-                                            @(part.Variacao > 0 ? "▲" : "▼")@Participacao.Rotulo(part.Variacao)
+                                              title="@TituloVariacao(part)">
+                                            @(part.Travada ? "🔒" : part.Variacao > 0 ? "▲" : "▼")@Participacao.Rotulo(part.Variacao)
                                         </span>
                                     }
                                 </td>
@@ -347,6 +357,19 @@ else
                                 else if (_canQuickSell)
                                 {
                                     <td class="text-center text-nowrap pe-0">
+                                        @if (player.Participacao?.Saida is { NaLista: true })
+                                        {
+                                        <button type="button"
+                                                class="btn btn-sm btn-danger me-1"
+                                                style="padding: 2px 6px; line-height: 1;"
+                                                title="Pediu para sair: ver a promessa de colocar para jogar"
+                                                aria-label="Pediu para sair: @player.Name"
+                                                @onclick="() => AbrirSaida(player)">
+                                            🚪
+                                        </button>
+                                        }
+                                        else
+                                        {
                                         <button type="button"
                                                 class="btn btn-sm me-1 @(player.AskingPrice is null ? "btn-outline-warning" : "btn-warning")"
                                                 style="padding: 2px 6px; line-height: 1;"
@@ -355,6 +378,7 @@ else
                                                 @onclick="() => OpenListingModal(player)">
                                             🏷️
                                         </button>
+                                        }
                                         <button type="button" 
                                                 class="btn btn-outline-danger btn-sm btn-icon"
                                                 style="border-width: 2px;
@@ -465,6 +489,73 @@ else
     <div class="modal-backdrop fade show"></div>
 }
 
+@if (_saidaTarget is { Participacao.Saida: { } saidaAlvo })
+{
+    var promessaEmAndamento = _rosterPlayers.FirstOrDefault(p => p.Participacao?.Saida?.PromessaEm is not null);
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🚪 @_saidaTarget.Name pediu para sair</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="FecharSaida" disabled="@_saidaProcessando"></button>
+                </div>
+                <div class="modal-body">
+                    @if (saidaAlvo.PromessaQuebrada)
+                    {
+                        <p>
+                            A promessa de colocar para jogar não foi cumprida: ele voltou à
+                            <a href="/mercado/lista">lista de transferência</a> por
+                            <strong>@FormatCurrency(_saidaTarget.AskingPrice ?? 0m)</strong>, metade do preço da venda rápida
+                            (e a venda rápida dele também caiu pela metade).
+                        </p>
+                        <div class="alert alert-secondary mb-0">Ele não acredita mais em promessa: só sai do clube vendido.</div>
+                    }
+                    else
+                    {
+                        <p>
+                            Ficou insatisfeito e seguiu no banco, então foi sozinho para a
+                            <a href="/mercado/lista">lista de transferência</a> por
+                            <strong>@FormatCurrency(_saidaTarget.AskingPrice ?? 0m)</strong>, o preço da venda rápida. Qualquer time
+                            pode comprar direto (com a janela aberta). Você não muda o preço nem tira da lista.
+                        </p>
+                        <p class="mb-2">
+                            <strong>🤝 Promessa:</strong> ele sai da lista e você tem @PedidoDeSaidaCriterios.JogosDaPromessa jogos
+                            para escalá-lo como titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos. Se não
+                            cumprir, ele volta para a lista pela <strong>metade</strong> do preço da venda rápida (e a venda rápida
+                            dele também cai pela metade). Uma promessa por vez.
+                        </p>
+                        @if (promessaEmAndamento is not null)
+                        {
+                            <div class="alert alert-warning mb-0">
+                                Você já tem uma promessa em andamento com @promessaEmAndamento.Name. Cumpra ou quebre essa antes.
+                            </div>
+                        }
+                    }
+                    @if (!string.IsNullOrEmpty(_saidaErro))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">@_saidaErro</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="FecharSaida" disabled="@_saidaProcessando">Fechar</button>
+                    @if (!saidaAlvo.PromessaQuebrada)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="PrometerAsync"
+                                disabled="@(_saidaProcessando || promessaEmAndamento is not null)">
+                            @if (_saidaProcessando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            }
+                            🤝 Tirar da lista prometendo jogar
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @if (_listingTarget is not null)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
@@ -532,6 +623,9 @@ else
     private decimal _listingPrice;
     private bool _listingProcessing;
     private string? _listingErrorMessage;
+    private RosterPlayerViewModel? _saidaTarget;
+    private bool _saidaProcessando;
+    private string? _saidaErro;
 
     private TeamDetailsDto? team;
     private int _maxQuickSell = 5;
@@ -962,6 +1056,77 @@ else
         finally
         {
             _quickSellProcessing = false;
+        }
+    }
+
+    private static string TituloInsatisfeito(ParticipacaoJogador p) =>
+        $"Insatisfeito com o banco. Passa com {ParticipacaoCriterios.TitularSeguidoParaResolver} jogos seguidos como titular."
+        + (p.Saida?.FaltamParaPedir switch
+        {
+            0 => " Vai pedir para sair.",
+            int n => $" Se seguir assim por mais {n} jogo(s), pede para sair e vai sozinho para a lista.",
+            _ => ""
+        });
+
+    private static string TituloVariacao(ParticipacaoJogador p) =>
+        p.Travada ? "Preço travado: pediu para sair e está na lista"
+        : p.ChegouEmBaixa ? $"Chegou em baixa: pediu para sair do clube anterior (vale até ele ter {ParticipacaoCriterios.JogosParaValer} jogos aqui)"
+        : $"Participação de {(p.Percentual is decimal pct ? $"{pct * 100:0}%" : "—")} nos últimos {p.Jogos} jogos do clube";
+
+    private void AbrirSaida(RosterPlayerViewModel player)
+    {
+        if (!_canQuickSell)
+            return;
+
+        _saidaTarget = player;
+        _saidaErro = null;
+    }
+
+    private void FecharSaida()
+    {
+        if (_saidaProcessando)
+            return;
+
+        _saidaTarget = null;
+        _saidaErro = null;
+    }
+
+    private async Task PrometerAsync()
+    {
+        if (_saidaTarget is null || string.IsNullOrWhiteSpace(_currentTeamToken))
+            return;
+
+        _saidaProcessando = true;
+        _saidaErro = null;
+        try
+        {
+            await OffersApi.PrometerAsync(_saidaTarget.PlayerGuid, _currentTeamToken);
+
+            // Sai da lista e o preço volta à conta da participação.
+            var participacao = await ParticipacaoSvc.GetAsync(_saidaTarget.PlayerId, default);
+            var preco = await PricingService.CalculateForPlayerAsync(_saidaTarget.PlayerId, default);
+            var index = _rosterPlayers.FindIndex(p => p.PlayerGuid == _saidaTarget.PlayerGuid);
+            if (index >= 0)
+                _rosterPlayers[index] = _rosterPlayers[index] with
+                {
+                    AskingPrice = null,
+                    BasePrice = preco.BasePrice,
+                    Participacao = participacao is { } part && part.TimeId == Id ? part : null
+                };
+            teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
+            ApplyRosterSort();
+
+            _quickSellSuccessMessage = $"🤝 Promessa feita: {_saidaTarget.Name} saiu da lista. Escale ele como titular "
+                + $"{ParticipacaoCriterios.TitularSeguidoParaResolver} jogos seguidos nos próximos {PedidoDeSaidaCriterios.JogosDaPromessa} jogos.";
+            _saidaTarget = null;
+        }
+        catch (Exception ex)
+        {
+            _saidaErro = ex.Message;
+        }
+        finally
+        {
+            _saidaProcessando = false;
         }
     }
 

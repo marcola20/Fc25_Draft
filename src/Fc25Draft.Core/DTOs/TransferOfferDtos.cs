@@ -48,7 +48,10 @@ public record TransferOfferPlayerDto(
     int Overall,
     int? Age);
 
-/// <summary>Jogador colocado como negociável pelo dono, com o preço pedido.</summary>
+/// <summary>
+/// Jogador colocado como negociável pelo dono, com o preço pedido. <see cref="PediuParaSair"/>: foi sozinho para a
+/// lista pelo preço da venda rápida (<see cref="PromessaQuebrada"/>: pela metade dela).
+/// </summary>
 public record ListaTransferenciaItemDto(
     int PlayerId,
     Guid PlayerGuid,
@@ -60,7 +63,9 @@ public record ListaTransferenciaItemDto(
     Guid TeamId,
     string TeamName,
     decimal AskingPrice,
-    DateTime ListedAtUtc);
+    DateTime ListedAtUtc,
+    bool PediuParaSair = false,
+    bool PromessaQuebrada = false);
 
 /// <summary>Preço pedido; nulo tira o jogador da lista de transferência.</summary>
 public record SetAskingPriceDto(decimal? AskingPrice);

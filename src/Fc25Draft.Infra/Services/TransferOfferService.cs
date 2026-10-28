@@ -106,10 +106,14 @@ public class TransferOfferService : ITransferOfferService
         }
 
         await EnsureNotOnLoanAsync(targetPlayers.Concat(offeredPlayers), ct);
+        var pediram = await PediramParaSairAsync(targetPlayers.Concat(offeredPlayers), ct);
+        if (dto.Type == OfferType.Loan) EnsureNaoEmprestaQuemPediuParaSair(pediram);
 
         // Os alvos saem do time de destino e os oferecidos saem do time de origem.
-        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
-        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct,
+            targetPlayers.Count(p => pediram.ContainsKey(p.PlayerId)));
+        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct,
+            offeredPlayers.Count(p => pediram.ContainsKey(p.PlayerId)));
 
         if (dto.ParentOfferId.HasValue)
         {
@@ -243,6 +247,8 @@ public class TransferOfferService : ITransferOfferService
             }
 
             await EnsureNotOnLoanAsync(offer.Players.Select(p => p.Player), ct);
+            if (offer.Type == OfferType.Loan)
+                EnsureNaoEmprestaQuemPediuParaSair(await PediramParaSairAsync(offer.Players.Select(p => p.Player), ct));
 
             // A proposta pode ser antiga: os pedidos ainda precisam ser de quem recebeu e os oferecidos de quem mandou.
             var mudaram = offer.Players
@@ -435,15 +441,19 @@ public class TransferOfferService : ITransferOfferService
                 r.TeamId,
                 r.Team.TeamName,
                 r.AskingPrice!.Value,
-                r.ListedAtUtc ?? DateTime.MinValue))
+                r.ListedAtUtc ?? DateTime.MinValue,
+                r.SaidaPedidaEm != null,
+                r.PromessaQuebrada))
             .ToListAsync(ct);
     }
 
     /// <summary>
     /// Quem cede jogador não pode ficar abaixo do mínimo de elenco (quem já está abaixo só contrata até
-    /// voltar a ele), e quem recebe não pode passar do máximo.
+    /// voltar a ele), e quem recebe não pode passar do máximo. Quem pediu para sair sai mesmo assim
+    /// (<paramref name="pediramParaSair"/> dos que saem não contam para o mínimo).
     /// </summary>
-    private async Task EnsureElencoAsync(TransferConfig cfg, Team team, int saem, int entram, CancellationToken ct)
+    private async Task EnsureElencoAsync(TransferConfig cfg, Team team, int saem, int entram, CancellationToken ct,
+        int pediramParaSair = 0)
     {
         if (saem == entram) return;
 
@@ -455,7 +465,7 @@ public class TransferOfferService : ITransferOfferService
                 $"O {team.TeamName} ficaria com {depois} jogadores; o máximo é {cfg.MaxRosterSize}.");
 
         var minimo = cfg.MinRosterSizeFor(team);
-        if (saem > entram && depois < minimo)
+        if (saem - pediramParaSair > entram && depois + pediramParaSair < minimo)
             throw new InvalidOperationException(elenco < minimo
                 ? $"O {team.TeamName} está abaixo do mínimo de elenco ({elenco} de {minimo} jogadores): só pode contratar até voltar ao mínimo."
                 : $"O {team.TeamName} ficaria com menos de {minimo} jogadores.");
@@ -476,6 +486,10 @@ public class TransferOfferService : ITransferOfferService
         var roster = await _db.TeamRosters
             .FirstOrDefaultAsync(r => r.TeamId == teamId && r.Player.PlayerGuid == playerGuid, ct)
             ?? throw new KeyNotFoundException("Jogador não encontrado no seu elenco.");
+
+        if (roster.SaidaPedidaEm is not null)
+            throw new InvalidOperationException(
+                "Ele pediu para sair: o preço é o da venda rápida e ele só sai da lista com a promessa de colocar para jogar.");
 
         if (askingPrice is not null && await _db.Emprestimos.AnyAsync(e => e.PlayerId == roster.PlayerId && e.Status == EmprestimoStatus.Ativo, ct))
             throw new InvalidOperationException("Jogador emprestado não pode ser colocado à venda.");
@@ -618,11 +632,14 @@ public class TransferOfferService : ITransferOfferService
             ?? throw new InvalidOperationException("Time de destino não encontrado.");
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        var pediram = await PediramParaSairAsync(allPlayers, ct);
 
         // Valida o tamanho do elenco para os times ficarem entre o mínimo e o máximo de jogadores.
         // targetPlayers saem de toTeam e entram em fromTeam; offeredPlayers saem de fromTeam e entram em toTeam.
-        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct);
-        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct);
+        await EnsureElencoAsync(cfg, toTeam, targetPlayers.Count, offeredPlayers.Count, ct,
+            targetPlayers.Count(p => pediram.ContainsKey(p.PlayerId)));
+        await EnsureElencoAsync(cfg, fromTeam, offeredPlayers.Count, targetPlayers.Count, ct,
+            offeredPlayers.Count(p => pediram.ContainsKey(p.PlayerId)));
 
         if (offer.Money > 0 && offer.MoneyPayerTeamId.HasValue)
         {
@@ -732,7 +749,8 @@ public class TransferOfferService : ITransferOfferService
                 PerformedBy = "system",
                 PerformedAtUtc = now,
                 OldOverall = player.Overall,
-                NewOverall = player.Overall
+                NewOverall = player.Overall,
+                VariacaoEmBaixa = isLoan ? null : pediram.GetValueOrDefault(player.PlayerId)?.Variacao
             }, ct);
         }
 
@@ -762,7 +780,8 @@ public class TransferOfferService : ITransferOfferService
                 PerformedBy = "system",
                 PerformedAtUtc = now,
                 OldOverall = player.Overall,
-                NewOverall = player.Overall
+                NewOverall = player.Overall,
+                VariacaoEmBaixa = isLoan ? null : pediram.GetValueOrDefault(player.PlayerId)?.Variacao
             }, ct);
         }
 
@@ -879,6 +898,29 @@ public class TransferOfferService : ITransferOfferService
     {
         if (borrower.LoanCount >= cfg.MaxLoans)
             throw new InvalidOperationException($"O time {borrower.TeamName} já atingiu o limite de empréstimos da janela ({borrower.LoanCount}/{cfg.MaxLoans}).");
+    }
+
+    /// <summary>Quem pediu para sair, com a variação do valor travada (o preço em baixa que vai junto para o clube novo).</summary>
+    private sealed record PedidoNoVinculo(string Nome, decimal? Variacao);
+
+    private async Task<Dictionary<int, PedidoNoVinculo>> PediramParaSairAsync(IEnumerable<Player> players, CancellationToken ct)
+    {
+        var ids = players.Select(p => p.PlayerId).Distinct().ToList();
+        if (ids.Count == 0) return [];
+
+        return (await _db.TeamRosters.AsNoTracking()
+                .Where(r => ids.Contains(r.PlayerId) && r.SaidaPedidaEm != null)
+                .Select(r => new { r.PlayerId, r.Player.Name, r.VariacaoCongelada })
+                .ToListAsync(ct))
+            .ToDictionary(r => r.PlayerId, r => new PedidoNoVinculo(r.Name, r.VariacaoCongelada));
+    }
+
+    /// <summary>Quem pediu para sair só sai vendido ou trocado: emprestar seria escapar da lista e voltar no fim da temporada.</summary>
+    private static void EnsureNaoEmprestaQuemPediuParaSair(Dictionary<int, PedidoNoVinculo> pediram)
+    {
+        if (pediram.Count > 0)
+            throw new InvalidOperationException(
+                $"{string.Join(", ", pediram.Values.Select(p => p.Nome))} pediu para sair: só sai vendido ou trocado, não emprestado.");
     }
 
     /// <summary>Jogador emprestado fica parado até voltar: não entra em venda, troca nem outro empréstimo.</summary>

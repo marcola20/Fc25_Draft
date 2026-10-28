@@ -26,6 +26,8 @@ internal static class AvisosDoTime
     public const string Virada = "VIRADA";
     public const string Carreira = "CARREIRA";
     public const string Insatisfeito = "INSATISFEITO";
+    public const string PediuParaSair = "PEDIU_PARA_SAIR";
+    public const string Promessa = "PROMESSA";
 
     public static void Criar(DraftDbContext db, Guid teamId, string tipo, string texto, string? link, DateTime quando)
     {

@@ -12,6 +12,7 @@ public class TeamRosterConfiguration : IEntityTypeConfiguration<TeamRoster>
         e.HasIndex(x => x.PlayerId).IsUnique();
 
         e.Property(x => x.AskingPrice).HasColumnType("numeric(18,2)");
+        e.Property(x => x.VariacaoCongelada).HasColumnType("numeric(6,4)");
 
         e.HasOne(x => x.Team)
          .WithMany(t => t.Roster)

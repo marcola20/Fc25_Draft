@@ -37,6 +37,12 @@ public class TransferConfig
     /// </summary>
     public int? IdadeMaximaDraft { get; set; } = 23;
 
+    /// <summary>
+    /// Os jogos que levam o insatisfeito a pedir para sair contam a partir daqui (a regra entrou no ar; a virada
+    /// recomeça a contagem). Nulo = ninguém pede para sair.
+    /// </summary>
+    public DateTime? PedidoDeSaidaDesde { get; set; }
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>

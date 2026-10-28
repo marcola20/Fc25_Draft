@@ -26,6 +26,7 @@ public static class TransferOffersEndpoints
             Results.Ok(await service.GetTransferListAsync(ct)));
         listApi.MapPut("/{playerGuid:guid}", HandleSetAskingPriceAsync);
         listApi.MapPost("/{playerGuid:guid}/buy", HandleBuyListedAsync);
+        listApi.MapPost("/{playerGuid:guid}/promessa", HandlePrometerAsync);
 
         return api;
     }
@@ -50,6 +51,33 @@ public static class TransferOffersEndpoints
         catch (ArgumentException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Tira da lista quem pediu para sair, com a promessa de colocar para jogar.</summary>
+    private static async Task<IResult> HandlePrometerAsync(
+        Guid playerGuid,
+        IPedidoDeSaidaService service,
+        DraftDbContext db,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var teamId = await ResolveTeamIdAsync(httpContext, db, ct);
+        if (teamId is null)
+            return Results.Unauthorized();
+
+        try
+        {
+            await service.PrometerAsync(teamId.Value, playerGuid, ct);
+            return Results.NoContent();
         }
         catch (KeyNotFoundException ex)
         {

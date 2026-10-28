@@ -55,8 +55,12 @@ public sealed record MudancaDeHumor(Guid PartidaId, DateTime Data, bool Insatisf
 
 /// <summary>
 /// Como o jogador está jogando no clube atual. <see cref="Percentual"/> é da janela (titular 1, banco ½);
-/// <see cref="Variacao"/> é o quanto o valor de mercado muda (−0,40 a +0,15).
+/// <see cref="Variacao"/> é o quanto o valor de mercado muda (−0,40 a +0,15; mais baixo para quem pediu para sair e
+/// teve a promessa quebrada).
 /// </summary>
+/// <param name="ChegouEmBaixa">Pediu para sair do clube anterior: o preço em baixa vale até a carência acabar.</param>
+/// <param name="Travada">Pediu para sair e está na lista: a variação é a travada naquele momento.</param>
+/// <param name="Saida">Caminho de saída (pediu para sair, promessa); nulo para quem não tem clube.</param>
 public sealed record ParticipacaoJogador(
     Guid TimeId,
     int Jogos,
@@ -65,7 +69,10 @@ public sealed record ParticipacaoJogador(
     decimal? Percentual,
     decimal Variacao,
     bool Insatisfeito,
-    IReadOnlyList<MudancaDeHumor> Humor)
+    IReadOnlyList<MudancaDeHumor> Humor,
+    bool ChegouEmBaixa = false,
+    bool Travada = false,
+    SituacaoDeSaida? Saida = null)
 {
     /// <summary>Ainda sem jogos suficientes no clube para o valor mudar.</summary>
     public bool EmCarencia => Jogos < ParticipacaoCriterios.JogosParaValer;
@@ -97,7 +104,13 @@ public static class Participacao
     /// <param name="jogos">Jogos do clube desde que ele chegou, em ordem, sem os jogos em que estava suspenso.</param>
     /// <param name="goleiro">Goleiro tem piso de <see cref="ParticipacaoCriterios.PisoDoGoleiro"/>.</param>
     /// <param name="temNivel">Overall perto da média do XI do clube: só quem tem nível fica insatisfeito.</param>
-    public static ParticipacaoJogador Calcular(Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel)
+    /// <param name="variacaoHerdada">
+    /// Saiu do clube anterior depois de pedir para sair: o preço em baixa com que chegou vale enquanto ele está em
+    /// carência (a satisfação volta, o preço não).
+    /// </param>
+    /// <param name="variacaoTravada">Pediu para sair e está na lista: o preço fica travado nessa variação.</param>
+    public static ParticipacaoJogador Calcular(Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel,
+        decimal? variacaoHerdada = null, decimal? variacaoTravada = null)
     {
         // Humor jogo a jogo: entra quando a janela do insatisfeito fecha abaixo do limite; sai com titular seguido.
         var humor = new List<MudancaDeHumor>();
@@ -137,6 +150,10 @@ public static class Participacao
             if (goleiro) variacao = Math.Max(variacao, ParticipacaoCriterios.PisoDoGoleiro);
         }
 
+        var chegouEmBaixa = jogos.Count < ParticipacaoCriterios.JogosParaValer && variacaoHerdada is not null;
+        if (chegouEmBaixa) variacao = variacaoHerdada!.Value;
+        if (variacaoTravada is decimal travada) variacao = travada;
+
         return new ParticipacaoJogador(
             timeId,
             janela.Count,
@@ -145,13 +162,16 @@ public static class Participacao
             percentualAtual,
             variacao,
             insatisfeito,
-            humor);
+            humor,
+            chegouEmBaixa && variacaoTravada is null,
+            variacaoTravada is not null);
     }
 
     /// <summary>A conta depois de cada jogo: o jogo i usa só os jogos até ele.</summary>
     public static IReadOnlyList<PontoDeParticipacao> Historico(
-        Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel) =>
-        jogos.Select((jogo, i) => new PontoDeParticipacao(jogo, Calcular(timeId, jogos.Take(i + 1).ToList(), goleiro, temNivel)))
+        Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel, decimal? variacaoHerdada = null) =>
+        jogos.Select((jogo, i) => new PontoDeParticipacao(jogo,
+                Calcular(timeId, jogos.Take(i + 1).ToList(), goleiro, temNivel, variacaoHerdada)))
             .ToList();
 
     /// <summary>"+15%", "−30%" (sinal de menos de verdade) ou "0%".</summary>

@@ -15,6 +15,12 @@ public class TransferHistory
     public int? OldOverall { get; set; }
     public int? NewOverall { get; set; }
 
+    /// <summary>
+    /// Saiu do clube depois de pedir para sair: a variação do valor com que saiu, que segue no clube novo até a
+    /// carência acabar (o preço não volta ao normal só por mudar de time).
+    /// </summary>
+    public decimal? VariacaoEmBaixa { get; set; }
+
     public Player Player { get; set; } = null!;
     public Team? FromTeam { get; set; }
     public Team? ToTeam { get; set; }

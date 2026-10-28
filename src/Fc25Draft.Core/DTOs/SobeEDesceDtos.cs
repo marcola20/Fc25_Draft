@@ -20,7 +20,10 @@ public record SobeEDesceJogadorDto(
     bool InsatisfeitoAntes,
     bool InsatisfeitoAgora,
     // Menos de 3 jogos no clube naquele dia: o valor ainda não mudava.
-    bool CarenciaAntes)
+    bool CarenciaAntes,
+    // Hoje: pediu para sair e está na lista, ou quantos jogos faltam para pedir (nulo se não está contando).
+    bool PediuParaSair = false,
+    int? FaltamParaPedir = null)
 {
     public decimal Diferenca => ValorAgora - ValorAntes;
 }

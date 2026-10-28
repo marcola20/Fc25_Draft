@@ -310,11 +310,24 @@ public class LigaTemporadaService : ILigaTemporadaService
         }
 
         if (request.LimparListaTransferencias)
+        {
+            // Quem pediu para sair também sai da lista e as promessas acabam; a contagem de quem pede para sair
+            // recomeça (os jogos da temporada que acabou não contam mais).
             await _db.TeamRosters
-                .Where(r => r.AskingPrice != null)
+                .Where(r => r.AskingPrice != null || r.SaidaPedidaEm != null || r.PromessaEm != null || r.PromessaQuebrada)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(r => r.AskingPrice, (decimal?)null)
-                    .SetProperty(r => r.ListedAtUtc, (DateTime?)null), ct);
+                    .SetProperty(r => r.ListedAtUtc, (DateTime?)null)
+                    .SetProperty(r => r.SaidaPedidaEm, (DateTime?)null)
+                    .SetProperty(r => r.VariacaoCongelada, (decimal?)null)
+                    .SetProperty(r => r.PromessaEm, (DateTime?)null)
+                    .SetProperty(r => r.PromessaQuebrada, false), ct);
+            var agora = DateTime.UtcNow;
+            await _db.TransferConfigs
+                .Where(c => c.PedidoDeSaidaDesde != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.PedidoDeSaidaDesde, agora), ct);
+            ParticipacaoService.Esquecer();
+        }
 
         if (request.RemoverMinimosTemporarios)
             await _db.Teams

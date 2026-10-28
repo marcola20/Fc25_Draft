@@ -68,6 +68,16 @@ else
                         {
                             <span class="badge bg-warning text-dark" title="Anunciou a despedida">👋 Última temporada: @ultima</span>
                         }
+                        @if (_participacao?.Saida is { NaLista: true } saida)
+                        {
+                            <a href="/mercado/lista" class="badge bg-danger text-decoration-none"
+                               title="@(saida.PromessaQuebrada ? "A promessa de colocar para jogar foi quebrada: está na lista pela metade da venda rápida" : "Seguiu insatisfeito no banco: está na lista pelo preço da venda rápida")">🚪 Pediu para sair</a>
+                        }
+                        else if (_participacao?.Saida is { PromessaEm: not null } promessa)
+                        {
+                            <span class="badge bg-info text-dark"
+                                  title="O clube prometeu colocar para jogar: titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos até o @(PedidoDeSaidaCriterios.JogosDaPromessa)º jogo">🤝 Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
+                        }
                         @if (_participacao is { Insatisfeito: true } insatisfeito)
                         {
                             <span class="badge bg-danger" title="Tem nível para jogar e quase não joga: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular">😤 Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
@@ -103,7 +113,8 @@ else
                             @if (_participacao is { Variacao: not 0m } comVariacao)
                             {
                                 <div class="jogador-hero-variacao @(comVariacao.Variacao > 0 ? "text-success" : "text-danger")">
-                                    @(comVariacao.Variacao > 0 ? "▲" : "▼") @Participacao.Rotulo(comVariacao.Variacao) pela participação
+                                    @(comVariacao.Travada ? "🔒" : comVariacao.Variacao > 0 ? "▲" : "▼") @Participacao.Rotulo(comVariacao.Variacao)
+                                    @(comVariacao.Travada ? "travado: pediu para sair" : comVariacao.ChegouEmBaixa ? "chegou em baixa" : "pela participação")
                                 </div>
                             }
                         </div>

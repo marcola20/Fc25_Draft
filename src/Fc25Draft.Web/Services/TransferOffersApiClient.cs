@@ -118,6 +118,17 @@ public class TransferOffersApiClient
         await EnsureSuccessAsync(response, ct);
     }
 
+    /// <summary>Tira da lista quem pediu para sair, com a promessa de colocar para jogar.</summary>
+    public async Task PrometerAsync(Guid playerGuid, string teamToken, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/transfer-list/{playerGuid}/promessa");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+
+        using var response = await client.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
     public async Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid playerGuid, decimal expectedPrice, string teamToken, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync();

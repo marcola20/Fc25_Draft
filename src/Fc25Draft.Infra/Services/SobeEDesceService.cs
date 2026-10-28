@@ -57,13 +57,16 @@ public class SobeEDesceService : ISobeEDesceService
                 variacaoAntes, hoje.Variacao,
                 entao?.Percentual, hoje.Percentual,
                 entao?.Insatisfeito == true, hoje.Insatisfeito,
-                entao is null || entao.EmCarencia));
+                entao is null || entao.EmCarencia,
+                hoje.Saida?.NaLista == true,
+                hoje.Saida?.FaltamParaPedir));
         }
 
         return new SobeEDesceDto(
             desde,
             linhas.Where(l => l.Diferenca > 0).OrderByDescending(l => l.Diferenca).ThenBy(l => l.Nome).Take(quantos).ToList(),
             linhas.Where(l => l.Diferenca < 0).OrderBy(l => l.Diferenca).ThenBy(l => l.Nome).Take(quantos).ToList(),
-            linhas.Where(l => l.InsatisfeitoAgora).OrderByDescending(l => l.Overall).ThenBy(l => l.Nome).ToList());
+            linhas.Where(l => l.InsatisfeitoAgora || l.PediuParaSair)
+                .OrderByDescending(l => l.PediuParaSair).ThenByDescending(l => l.Overall).ThenBy(l => l.Nome).ToList());
     }
 }

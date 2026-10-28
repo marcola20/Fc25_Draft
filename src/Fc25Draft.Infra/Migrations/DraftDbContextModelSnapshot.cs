@@ -3117,6 +3117,18 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime?>("ListedAtUtc")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<DateTime?>("PromessaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("PromessaQuebrada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("SaidaPedidaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal?>("VariacaoCongelada")
+                        .HasColumnType("numeric(6,4)");
+
                     b.HasKey("TeamId", "PlayerId");
 
                     b.HasIndex("PlayerId")
@@ -3155,6 +3167,9 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("MinRosterSize")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PedidoDeSaidaDesde")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("QuickSellBloqueado")
                         .ValueGeneratedOnAdd()
@@ -3206,6 +3221,9 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("VariacaoEmBaixa")
+                        .HasColumnType("numeric(6,4)");
 
                     b.HasKey("TransferId");
 
