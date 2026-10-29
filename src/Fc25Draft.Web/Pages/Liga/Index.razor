@@ -571,9 +571,181 @@
                     <button class="nav-link @(_statsTab == "notas" ? "active" : "")" @onclick='() => _statsTab = "notas"'>Notas</button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "momentos" ? "active" : "")" @onclick='() => _statsTab = "momentos"'>Momentos</button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link @(_statsTab == "times" ? "active" : "")" @onclick='() => _statsTab = "times"'>Times</button>
                 </li>
             </ul>
+
+            @if (_statsTab == "momentos")
+            {
+                if (_momentos is not { JogosAnalisados: > 0 } m)
+                {
+                    <div class="alert alert-info">Nenhum jogo desta competição tem o minuto de todos os gols registrado.</div>
+                }
+                else
+                {
+                    <p class="small text-muted mb-3">
+                        Calculado pela ordem dos gols em @m.JogosAnalisados de @m.JogosDaCompeticao jogos@(m.JogosAnalisados < m.JogosDaCompeticao ? " (os outros não têm o minuto de todos os gols)" : "").
+                    </p>
+
+                    <h6 class="fw-bold mb-1">⚡ Gols decisivos</h6>
+                    <p class="small text-muted mb-2">
+                        Gol da vitória: o que deixou o time na frente de vez num jogo ganho por um gol. Gol do empate: o que deixou o jogo igual no fim. Gol contra não entra.
+                    </p>
+                    @if (m.Decisivos.Count == 0)
+                    {
+                        <div class="text-muted small mb-4">Nenhum gol decisivo ainda.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive mb-4">
+                            <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width:35px;">#</th>
+                                        <th>Jogador</th>
+                                        <th class="d-none d-md-table-cell">Time</th>
+                                        <th class="text-center" style="width:80px;" title="Gols da vitória">Vitória</th>
+                                        <th class="text-center" style="width:80px;" title="Gols do empate">Empate</th>
+                                        <th class="text-center" style="width:60px;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < m.Decisivos.Count; i++)
+                                    {
+                                        var d = m.Decisivos[i];
+                                        <tr style="height:40px;">
+                                            <td class="fw-bold text-muted">@(i + 1)</td>
+                                            <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                                <FotoJogador PlayerId="@d.JogadorId" Tamanho="28" Classe="me-2" />
+                                                <a href="/players/details/@d.JogadorId" class="text-body">@d.JogadorNome</a>
+                                            </td>
+                                            <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                                <img src="@EscudoUrl(d.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                                @d.TimeNome
+                                            </td>
+                                            <td class="text-center">@(d.DaVitoria > 0 ? d.DaVitoria.ToString() : "—")</td>
+                                            <td class="text-center">@(d.DoEmpate > 0 ? d.DoEmpate.ToString() : "—")</td>
+                                            <td class="text-center fw-bold">@d.Total</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    <h6 class="fw-bold mb-1">🔄 Viradas</h6>
+                    <p class="small text-muted mb-2">
+                        Pontos buscados depois de sair atrás (virada vale 3, empate 1) e pontos que escaparam depois de estar na frente (empate tira 2, derrota 3).
+                    </p>
+                    <div class="table-responsive mb-2">
+                        <table class="table table-sm table-hover align-middle text-center" style="font-size:0.85rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-start">Time</th>
+                                    <th title="Saiu atrás e venceu">Viradas</th>
+                                    <th title="Saiu atrás e empatou">Empates buscados</th>
+                                    <th title="Pontos ganhos depois de sair atrás">Pts buscados</th>
+                                    <th title="Estava na frente e não venceu">Vantagens perdidas</th>
+                                    <th title="Pontos que escaparam depois de estar na frente">Pts perdidos</th>
+                                    <th>Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in m.Times)
+                                {
+                                    <tr>
+                                        <td class="text-start text-nowrap">
+                                            <img src="@EscudoUrl(t.TimeNome)" alt="" width="20" height="20" style="object-fit:contain" class="me-1" />
+                                            <a href="/teams/details/@t.TimeId">@t.TimeNome</a>
+                                        </td>
+                                        <td>@t.Viradas</td>
+                                        <td>@t.EmpatesBuscados</td>
+                                        <td class="text-success fw-semibold">@t.PontosBuscados</td>
+                                        <td>@t.VantagensPerdidas</td>
+                                        <td class="text-danger fw-semibold">@t.PontosPerdidos</td>
+                                        <td class="fw-bold @(t.Saldo > 0 ? "text-success" : t.Saldo < 0 ? "text-danger" : "")">@(t.Saldo > 0 ? "+" : "")@t.Saldo</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (m.Viradas.Count > 0)
+                    {
+                        <ul class="list-group list-group-flush small mb-4">
+                            @foreach (var v in m.Viradas)
+                            {
+                                var vencedor = v.VencedorId == v.CasaId ? v.CasaNome : v.ForaNome;
+                                <li class="list-group-item px-0 d-flex flex-wrap gap-2 align-items-center">
+                                    <span class="text-muted" style="min-width:90px;">@v.Rotulo</span>
+                                    <span class="@(v.VencedorId == v.CasaId ? "fw-bold" : "")">@v.CasaNome</span>
+                                    <span class="fw-bold">@v.GolsCasa x @v.GolsFora</span>
+                                    <span class="@(v.VencedorId == v.ForaId ? "fw-bold" : "")">@v.ForaNome</span>
+                                    <span class="text-success">· @vencedor virou depois de estar perdendo por @v.MaiorDesvantagem @(v.MaiorDesvantagem == 1 ? "gol" : "gols")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <div class="text-muted small mb-4">Nenhuma virada ainda.</div>
+                    }
+
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <h6 class="fw-bold mb-0">⏱️ Gols por período</h6>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn @(_periodoSofridos ? "btn-outline-secondary" : "btn-success")" @onclick="() => _periodoSofridos = false">Feitos</button>
+                            <button class="btn @(_periodoSofridos ? "btn-danger" : "btn-outline-secondary")" @onclick="() => _periodoSofridos = true">Sofridos</button>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-2">Gols @(_periodoSofridos ? "sofridos" : "feitos") em cada faixa de 15 minutos; os acréscimos do segundo tempo contam no último período.</p>
+                    var maximo = Math.Max(1, m.PorPeriodo.SelectMany(t => _periodoSofridos ? t.Sofridos : t.Feitos).DefaultIfEmpty(0).Max());
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle text-center" style="font-size:0.85rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-start">Time</th>
+                                    @foreach (var periodo in m.Periodos)
+                                    {
+                                        <th class="text-nowrap">@periodo</th>
+                                    }
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in m.PorPeriodo.OrderByDescending(t => (_periodoSofridos ? t.Sofridos : t.Feitos).Sum()))
+                                {
+                                    var valores = _periodoSofridos ? t.Sofridos : t.Feitos;
+                                    <tr>
+                                        <td class="text-start text-nowrap">
+                                            <img src="@EscudoUrl(t.TimeNome)" alt="" width="20" height="20" style="object-fit:contain" class="me-1" />
+                                            <a href="/teams/details/@t.TimeId">@t.TimeNome</a>
+                                        </td>
+                                        @foreach (var v in valores)
+                                        {
+                                            <td style="@CorDoPeriodo(v, maximo)">@(v > 0 ? v.ToString() : "")</td>
+                                        }
+                                        <td class="fw-bold">@valores.Sum()</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-semibold">
+                                    <td class="text-start">Competição</td>
+                                    @for (int i = 0; i < m.Periodos.Count; i++)
+                                    {
+                                        var periodo = i;
+                                        <td>@m.PorPeriodo.Sum(t => t.Feitos[periodo])</td>
+                                    }
+                                    <td>@m.PorPeriodo.Sum(t => t.Feitos.Sum())</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                }
+            }
 
             @if (_statsTab == "times")
             {
@@ -1013,6 +1185,15 @@
 
     // ── Números do PES por time (aba Estatísticas › Times) ──
     private IReadOnlyList<NumerosDoTimeDto> _numerosTimes = Array.Empty<NumerosDoTimeDto>();
+
+    // ── Momentos (aba Estatísticas › Momentos): decisivos, viradas e gols por período ──
+    private MomentosDosGolsDto? _momentos;
+    private bool _periodoSofridos;
+
+    /// <summary>Fundo da célula mais forte quanto mais gols no período (verde nos feitos, vermelho nos sofridos).</summary>
+    private string CorDoPeriodo(int valor, int maximo) => valor <= 0
+        ? ""
+        : $"background-color: rgba({(_periodoSofridos ? "220, 53, 69" : "25, 135, 84")}, {(0.12 + 0.55 * valor / maximo).ToString("0.00", CultureInfo.InvariantCulture)});";
     private string _ordemTimes = "posse";
     private bool _ordemTimesDesc = true;
 
@@ -1251,6 +1432,7 @@
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
+        _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);

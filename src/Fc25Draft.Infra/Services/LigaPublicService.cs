@@ -523,6 +523,36 @@ public class LigaPublicService : ILigaPublicService
             .ToArray();
     }
 
+    public async Task<MomentosDosGolsDto> GetMomentosDosGolsAsync(Guid ligaId, CancellationToken ct)
+    {
+        var nomes = await _db.Teams.AsNoTracking()
+            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        var fases = await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.LigaId == ligaId && k.PartidaId != null)
+            .ToDictionaryAsync(k => k.PartidaId!.Value, k => k.Fase, ct);
+
+        var partidas = (await _db.LigaPartidas.AsNoTracking()
+                .Where(p => p.Rodada.LigaId == ligaId && p.Status == PartidaStatus.Encerrada && !p.IsWO)
+                .OrderBy(p => p.EncerradaEm)
+                .Select(p => new { p.PartidaId, p.Rodada.Numero, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
+                .ToListAsync(ct))
+            .Select(p => new MomentoPartidaInput(
+                p.PartidaId,
+                fases.TryGetValue(p.PartidaId, out var fase) ? FaseLabelMap.GetValueOrDefault(fase, fase.ToString())
+                    : p.Numero > 0 ? $"{p.Numero}ª rodada" : "Jogo extra",
+                p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora))
+            .ToList();
+
+        var gols = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Partida.Rodada.LigaId == ligaId && (e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra))
+            .Select(e => new MomentoGolInput(e.PartidaId, e.TimeId, e.JogadorId, e.Jogador.Name, e.Minuto, e.CriadoEm,
+                e.Tipo == TipoEvento.GolContra))
+            .ToListAsync(ct);
+
+        return MomentosDosGols.Calcular(partidas, gols, nomes);
+    }
+
     public async Task<IReadOnlyList<LigaCartaoEstatDto>> GetCartoesEstatAsync(Guid ligaId, CancellationToken ct)
     {
         var eventos = await _db.LigaEventos
