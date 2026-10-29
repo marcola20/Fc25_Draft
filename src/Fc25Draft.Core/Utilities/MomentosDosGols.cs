@@ -33,14 +33,23 @@ public static class MomentosDosGols
         var decisivos = new List<(MomentoGolInput Gol, bool DaVitoria, MomentoPartidaInput Partida, int Casa, int Fora)>();
         var viradas = new List<ViradaJogoDto>();
         var times = new Dictionary<Guid, (int Viradas, int Empates, int Buscados, int Perdidas, int Perdidos)>();
+        var jogosPorTime = new Dictionary<Guid, List<ViradaTimeJogoDto>>();
         var feitos = new Dictionary<Guid, int[]>();
         var sofridos = new Dictionary<Guid, int[]>();
         var analisados = 0;
 
-        void Somar(Guid timeId, int viradas = 0, int empates = 0, int buscados = 0, int perdidas = 0, int perdidos = 0)
+        // Soma o jogo nos números do time e guarda o jogo para a lista dele.
+        void Registrar(Guid timeId, MomentoPartidaInput p, TipoViradaJogo tipo, int gols, int pontos)
         {
-            var t = times.GetValueOrDefault(timeId);
-            times[timeId] = (t.Viradas + viradas, t.Empates + empates, t.Buscados + buscados, t.Perdidas + perdidas, t.Perdidos + perdidos);
+            var t = times[timeId];
+            times[timeId] = (
+                t.Viradas + (tipo == TipoViradaJogo.Virada ? 1 : 0),
+                t.Empates + (tipo == TipoViradaJogo.EmpateBuscado ? 1 : 0),
+                t.Buscados + Math.Max(pontos, 0),
+                t.Perdidas + (tipo == TipoViradaJogo.VantagemPerdida ? 1 : 0),
+                t.Perdidos + Math.Max(-pontos, 0));
+            jogosPorTime[timeId].Add(new ViradaTimeJogoDto(p.PartidaId, p.Rotulo, Nome(p.CasaId), Nome(p.ForaId),
+                p.GolsCasa, p.GolsFora, tipo, gols, pontos));
         }
 
         foreach (var p in partidas)
@@ -56,7 +65,8 @@ public static class MomentosDosGols
             {
                 feitos.TryAdd(t, new int[Periodos.Count]);
                 sofridos.TryAdd(t, new int[Periodos.Count]);
-                Somar(t);
+                times.TryAdd(t, default);
+                jogosPorTime.TryAdd(t, new List<ViradaTimeJogoDto>());
             }
 
             // Placar gol a gol: até quanto cada lado esteve na frente (saldo do mandante).
@@ -82,8 +92,8 @@ public static class MomentosDosGols
                 var desvantagem = casaVenceu ? -menorSaldo : maiorSaldo;
                 if (desvantagem > 0)
                 {
-                    Somar(vencedor, viradas: 1, buscados: 3);
-                    Somar(perdedor, perdidas: 1, perdidos: 3);
+                    Registrar(vencedor, p, TipoViradaJogo.Virada, desvantagem, 3);
+                    Registrar(perdedor, p, TipoViradaJogo.VantagemPerdida, desvantagem, -3);
                     viradas.Add(new ViradaJogoDto(p.PartidaId, p.Rotulo, p.CasaId, Nome(p.CasaId), p.ForaId, Nome(p.ForaId),
                         p.GolsCasa, p.GolsFora, vencedor, desvantagem));
                 }
@@ -101,13 +111,13 @@ public static class MomentosDosGols
                 // Empate com gols: quem esteve atrás buscou 1 ponto; quem esteve na frente deixou 2 escaparem.
                 if (menorSaldo < 0)
                 {
-                    Somar(p.CasaId, empates: 1, buscados: 1);
-                    Somar(p.ForaId, perdidas: 1, perdidos: 2);
+                    Registrar(p.CasaId, p, TipoViradaJogo.EmpateBuscado, -menorSaldo, 1);
+                    Registrar(p.ForaId, p, TipoViradaJogo.VantagemPerdida, -menorSaldo, -2);
                 }
                 if (maiorSaldo > 0)
                 {
-                    Somar(p.ForaId, empates: 1, buscados: 1);
-                    Somar(p.CasaId, perdidas: 1, perdidos: 2);
+                    Registrar(p.ForaId, p, TipoViradaJogo.EmpateBuscado, maiorSaldo, 1);
+                    Registrar(p.CasaId, p, TipoViradaJogo.VantagemPerdida, maiorSaldo, -2);
                 }
 
                 // Gol do empate: o último do jogo, que deixou tudo igual.
@@ -135,7 +145,7 @@ public static class MomentosDosGols
 
         var porTime = times
             .Select(t => new ViradaTimeDto(t.Key, Nome(t.Key), t.Value.Viradas, t.Value.Empates, t.Value.Buscados,
-                t.Value.Perdidas, t.Value.Perdidos))
+                t.Value.Perdidas, t.Value.Perdidos, jogosPorTime[t.Key]))
             .OrderByDescending(t => t.Saldo)
             .ThenByDescending(t => t.PontosBuscados)
             .ThenBy(t => t.TimeNome, StringComparer.OrdinalIgnoreCase)

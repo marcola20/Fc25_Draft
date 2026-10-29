@@ -674,7 +674,9 @@
                             <tbody>
                                 @foreach (var t in m.Times)
                                 {
-                                    <tr>
+                                    var temJogos = t.Jogos.Count > 0;
+                                    <tr style="@(temJogos ? "cursor:pointer;" : "")" title="@(temJogos ? "Ver os jogos" : "")"
+                                        @onclick="() => { if (temJogos) _viradaAberta = _viradaAberta == t.TimeId ? null : t.TimeId; }">
                                         <td class="text-start text-nowrap">
                                             <img src="@EscudoUrl(t.TimeNome)" alt="" width="20" height="20" style="object-fit:contain" class="me-1" />
                                             <a href="/teams/details/@t.TimeId">@t.TimeNome</a>
@@ -684,8 +686,37 @@
                                         <td class="text-success fw-semibold">@t.PontosBuscados</td>
                                         <td>@t.VantagensPerdidas</td>
                                         <td class="text-danger fw-semibold">@t.PontosPerdidos</td>
-                                        <td class="fw-bold @(t.Saldo > 0 ? "text-success" : t.Saldo < 0 ? "text-danger" : "")">@(t.Saldo > 0 ? "+" : "")@t.Saldo</td>
+                                        <td class="fw-bold text-nowrap @(t.Saldo > 0 ? "text-success" : t.Saldo < 0 ? "text-danger" : "")">
+                                            @(t.Saldo > 0 ? "+" : "")@t.Saldo
+                                            @if (temJogos)
+                                            {
+                                                <span class="text-muted small fw-normal">@(_viradaAberta == t.TimeId ? "▴" : "▾")</span>
+                                            }
+                                        </td>
                                     </tr>
+                                    @if (_viradaAberta == t.TimeId)
+                                    {
+                                        <tr>
+                                            <td colspan="7" class="p-0 border-0 text-start">
+                                                <ul class="list-group list-group-flush small border-bottom">
+                                                    @foreach (var j in t.Jogos)
+                                                    {
+                                                        <li class="list-group-item d-flex flex-wrap gap-2 align-items-center ps-4">
+                                                            <span class="text-muted" style="min-width:90px;">@j.Rotulo</span>
+                                                            <span>@j.CasaNome <strong>@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
+                                                            <span class="badge @(j.Pontos > 0 ? "bg-success" : "bg-danger")">
+                                                                @(j.Tipo switch { TipoViradaJogo.Virada => "Virada", TipoViradaJogo.EmpateBuscado => "Empate buscado", _ => "Vantagem perdida" })
+                                                                @(j.Pontos > 0 ? "+" : "−")@Math.Abs(j.Pontos)
+                                                            </span>
+                                                            <span class="text-muted">
+                                                                @(j.Tipo == TipoViradaJogo.VantagemPerdida ? "esteve ganhando" : "esteve perdendo") por @j.Gols @(j.Gols == 1 ? "gol" : "gols")
+                                                            </span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    }
                                 }
                             </tbody>
                         </table>
@@ -1208,6 +1239,7 @@
     private MomentosDosGolsDto? _momentos;
     private bool _periodoSofridos;
     private int? _decisivoAberto;
+    private Guid? _viradaAberta;
 
     /// <summary>Fundo da célula mais forte quanto mais gols no período (verde nos feitos, vermelho nos sofridos).</summary>
     private string CorDoPeriodo(int valor, int maximo) => valor <= 0
@@ -1453,6 +1485,7 @@
         _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
         _decisivoAberto = null;
+        _viradaAberta = null;
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);

@@ -24,10 +24,22 @@ public record GolDecisivoJogoDto(
 public record ViradaTimeDto(
     Guid TimeId, string TimeNome,
     int Viradas, int EmpatesBuscados, int PontosBuscados,
-    int VantagensPerdidas, int PontosPerdidos)
+    int VantagensPerdidas, int PontosPerdidos,
+    IReadOnlyList<ViradaTimeJogoDto> Jogos)
 {
     public int Saldo => PontosBuscados - PontosPerdidos;
 }
+
+public enum TipoViradaJogo { Virada, EmpateBuscado, VantagemPerdida }
+
+/// <summary>
+/// Um jogo do time na tabela de viradas. Gols = por quanto ele chegou a estar atrás (virada, empate buscado) ou na
+/// frente (vantagem perdida); Pontos = +3, +1, −2 ou −3.
+/// </summary>
+public record ViradaTimeJogoDto(
+    Guid PartidaId, string Rotulo,
+    string CasaNome, string ForaNome, int GolsCasa, int GolsFora,
+    TipoViradaJogo Tipo, int Gols, int Pontos);
 
 /// <summary>Jogo virado; MaiorDesvantagem = por quantos gols o vencedor chegou a estar perdendo.</summary>
 public record ViradaJogoDto(
