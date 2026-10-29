@@ -616,7 +616,7 @@
                                     @for (int i = 0; i < m.Decisivos.Count; i++)
                                     {
                                         var d = m.Decisivos[i];
-                                        <tr style="height:40px;">
+                                        <tr style="height:40px;cursor:pointer;" title="Ver os jogos" @onclick="() => _decisivoAberto = _decisivoAberto == d.JogadorId ? null : d.JogadorId">
                                             <td class="fw-bold text-muted">@(i + 1)</td>
                                             <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                                 <FotoJogador PlayerId="@d.JogadorId" Tamanho="28" Classe="me-2" />
@@ -628,8 +628,26 @@
                                             </td>
                                             <td class="text-center">@(d.DaVitoria > 0 ? d.DaVitoria.ToString() : "—")</td>
                                             <td class="text-center">@(d.DoEmpate > 0 ? d.DoEmpate.ToString() : "—")</td>
-                                            <td class="text-center fw-bold">@d.Total</td>
+                                            <td class="text-center fw-bold">@d.Total <span class="text-muted small">@(_decisivoAberto == d.JogadorId ? "▴" : "▾")</span></td>
                                         </tr>
+                                        @if (_decisivoAberto == d.JogadorId)
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="p-0 border-0">
+                                                    <ul class="list-group list-group-flush small border-bottom">
+                                                        @foreach (var j in d.Jogos)
+                                                        {
+                                                            <li class="list-group-item d-flex flex-wrap gap-2 align-items-center ps-5">
+                                                                <span class="text-muted" style="min-width:90px;">@j.Rotulo</span>
+                                                                <span>@j.CasaNome <strong>@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
+                                                                <span class="badge @(j.DaVitoria ? "bg-success" : "bg-secondary")">@(j.DaVitoria ? "Vitória" : "Empate")</span>
+                                                                <span class="text-muted">@(j.DaVitoria ? "fez" : "empatou em") @j.PlacarCasa x @j.PlacarFora aos @(j.Minuto)'</span>
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </td>
+                                            </tr>
+                                        }
                                     }
                                 </tbody>
                             </table>
@@ -1189,6 +1207,7 @@
     // ── Momentos (aba Estatísticas › Momentos): decisivos, viradas e gols por período ──
     private MomentosDosGolsDto? _momentos;
     private bool _periodoSofridos;
+    private int? _decisivoAberto;
 
     /// <summary>Fundo da célula mais forte quanto mais gols no período (verde nos feitos, vermelho nos sofridos).</summary>
     private string CorDoPeriodo(int valor, int maximo) => valor <= 0
@@ -1433,6 +1452,7 @@
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
+        _decisivoAberto = null;
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);

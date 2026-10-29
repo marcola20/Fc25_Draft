@@ -30,7 +30,7 @@ public static class MomentosDosGols
             return new MomentosDosGolsDto(0, partidas.Count, [], [], [], Periodos, []);
         string Nome(Guid timeId) => nomes.GetValueOrDefault(timeId, "?");
 
-        var decisivos = new List<(MomentoGolInput Gol, bool DaVitoria)>();
+        var decisivos = new List<(MomentoGolInput Gol, bool DaVitoria, MomentoPartidaInput Partida, int Casa, int Fora)>();
         var viradas = new List<ViradaJogoDto>();
         var times = new Dictionary<Guid, (int Viradas, int Empates, int Buscados, int Perdidas, int Perdidos)>();
         var feitos = new Dictionary<Guid, int[]>();
@@ -62,9 +62,11 @@ public static class MomentosDosGols
             // Placar gol a gol: até quanto cada lado esteve na frente (saldo do mandante).
             var ordem = lista.OrderBy(g => g.Minuto).ThenBy(g => g.CriadoEm).ToList();
             int casa = 0, fora = 0, menorSaldo = 0, maiorSaldo = 0;
+            var placarApos = new List<(int Casa, int Fora)>();
             foreach (var g in ordem)
             {
                 if (g.TimeId == p.CasaId) casa++; else fora++;
+                placarApos.Add((casa, fora));
                 menorSaldo = Math.Min(menorSaldo, casa - fora);
                 maiorSaldo = Math.Max(maiorSaldo, casa - fora);
 
@@ -89,7 +91,10 @@ public static class MomentosDosGols
                 // Gol da vitória: o que deixou o vencedor na frente de vez, só quando ele ganhou por um gol.
                 var golsPerdedor = Math.Min(p.GolsCasa, p.GolsFora);
                 if (Math.Abs(p.GolsCasa - p.GolsFora) == 1)
-                    decisivos.Add((ordem.Where(g => g.TimeId == vencedor).ElementAt(golsPerdedor), true));
+                {
+                    var indice = Enumerable.Range(0, ordem.Count).Where(i => ordem[i].TimeId == vencedor).ElementAt(golsPerdedor);
+                    decisivos.Add((ordem[indice], true, p, placarApos[indice].Casa, placarApos[indice].Fora));
+                }
             }
             else if (ordem.Count > 0)
             {
@@ -106,7 +111,7 @@ public static class MomentosDosGols
                 }
 
                 // Gol do empate: o último do jogo, que deixou tudo igual.
-                decisivos.Add((ordem[^1], false));
+                decisivos.Add((ordem[^1], false, p, p.GolsCasa, p.GolsFora));
             }
         }
 
@@ -117,7 +122,11 @@ public static class MomentosDosGols
             {
                 var ultimo = g.OrderBy(d => d.Gol.CriadoEm).Last().Gol;
                 return new GolDecisivoJogadorDto(g.Key, ultimo.JogadorNome, ultimo.TimeId, Nome(ultimo.TimeId),
-                    g.Count(d => d.DaVitoria), g.Count(d => !d.DaVitoria));
+                    g.Count(d => d.DaVitoria), g.Count(d => !d.DaVitoria),
+                    g.Select(d => new GolDecisivoJogoDto(d.Partida.PartidaId, d.Partida.Rotulo,
+                            Nome(d.Partida.CasaId), Nome(d.Partida.ForaId), d.Partida.GolsCasa, d.Partida.GolsFora,
+                            d.Gol.Minuto!.Value, d.Casa, d.Fora, d.DaVitoria))
+                        .ToList());
             })
             .OrderByDescending(d => d.Total)
             .ThenByDescending(d => d.DaVitoria)
