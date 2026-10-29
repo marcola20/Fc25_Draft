@@ -109,6 +109,19 @@ public static class TimePerfil
             confrontos);
     }
 
+    /// <summary>Resultados (V, E, D) do time, do jogo mais recente para o mais antigo, sem o limite da lista do perfil.</summary>
+    public static IReadOnlyList<string> ResultadosRecentes(Guid timeId, IEnumerable<TimePerfilPartidaInput> partidas)
+    {
+        var semNomes = new Dictionary<Guid, string>();
+        return Enumerable.Reverse(partidas
+                .Where(p => (p.CasaId == timeId || p.ForaId == timeId) && p.Status == PartidaStatus.Encerrada)
+                .OrderBy(p => p.EncerradaEm ?? DateTime.MinValue)
+                .ThenBy(p => p.OrdemAgenda)
+                .Select(p => Jogo(timeId, p, semNomes).Resultado!)
+                .ToList())
+            .ToList();
+    }
+
     private static TimePerfilJogoDto Jogo(Guid timeId, TimePerfilPartidaInput p, IReadOnlyDictionary<Guid, string> nomes)
     {
         var emCasa = p.CasaId == timeId;

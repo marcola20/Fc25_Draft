@@ -28,36 +28,20 @@
                 </div>
             }
 
-            @if (_dados.MelhorFase is { } fase)
+            @if (_dados.MelhorFase.Count > 0)
             {
-                <div class="col-12 col-md">
-                    <a href="/teams/details/@fase.TimeId" class="card h-100 text-decoration-none text-body border-success">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
-                            <img src="@Escudos.GetEscudo(fase.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
-                            <div class="min-w-0">
-                                <div class="small text-muted">🔥 Em melhor fase</div>
-                                <div class="fs-5 fw-bold text-truncate">@fase.TimeNome</div>
-                                <div class="small text-success fw-semibold">@fase.Sequencia</div>
-                            </div>
-                        </div>
-                    </a>
-                </div>
+                var n = _dados.MelhorFase[0].Jogos;
+                @Fase(_dados.MelhorFase, "🔥 Em melhor fase", "border-success", "text-success",
+                    f => f.Vitorias == f.Jogos ? $"{n} vitórias seguidas" : $"Invicto há {n} jogos · {Retrospecto(f)}",
+                    $"Invictos há {n} jogos")
             }
 
-            @if (_dados.PiorFase is { } crise)
+            @if (_dados.PiorFase.Count > 0)
             {
-                <div class="col-12 col-md">
-                    <a href="/teams/details/@crise.TimeId" class="card h-100 text-decoration-none text-body border-danger">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
-                            <img src="@Escudos.GetEscudo(crise.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
-                            <div class="min-w-0">
-                                <div class="small text-muted">🥶 Em pior fase</div>
-                                <div class="fs-5 fw-bold text-truncate">@crise.TimeNome</div>
-                                <div class="small text-danger fw-semibold">@crise.Sequencia</div>
-                            </div>
-                        </div>
-                    </a>
-                </div>
+                var n = _dados.PiorFase[0].Jogos;
+                @Fase(_dados.PiorFase, "🥶 Em pior fase", "border-danger", "text-danger",
+                    f => f.Derrotas == f.Jogos ? $"{n} derrotas seguidas" : $"Sem vencer há {n} jogos · {Retrospecto(f)}",
+                    $"Sem vencer há {n} jogos")
             }
         </div>
     }
@@ -112,7 +96,60 @@
 
     private DestaquesDto? _dados => Dados;
 
-    private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.PiorFase is not null);
+    private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase.Count > 0 || _dados.PiorFase.Count > 0);
+
+    /// <summary>"3V 2E": o que o time fez na sequência, sem os zeros.</summary>
+    private static string Retrospecto(DestaqueFaseDto f) => string.Join(" ",
+        new[] { (f.Vitorias, "V"), (f.Empates, "E"), (f.Derrotas, "D") }.Where(x => x.Item1 > 0).Select(x => $"{x.Item1}{x.Item2}"));
+
+    /// <summary>Card da melhor/pior fase; no empate, todos os times com o retrospecto de cada um.</summary>
+    private RenderFragment Fase(IReadOnlyList<DestaqueFaseDto> times, string titulo, string borda, string cor,
+        Func<DestaqueFaseDto, string> sequencia, string sequenciaEmpate) => __builder =>
+    {
+        if (times.Count == 1)
+        {
+            var f = times[0];
+            <div class="col-12 col-md">
+                <a href="/teams/details/@f.TimeId" class="card h-100 text-decoration-none text-body @borda">
+                    <div class="card-body py-2 d-flex align-items-center gap-3">
+                        <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
+                        <div class="min-w-0">
+                            <div class="small text-muted">@titulo</div>
+                            <div class="fs-5 fw-bold text-truncate">@f.TimeNome</div>
+                            <div class="small @cor fw-semibold">@sequencia(f)</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="col-12 col-md">
+                <div class="card h-100 @borda">
+                    <div class="card-body py-2 d-flex align-items-center gap-3">
+                        <div class="d-flex flex-shrink-0">
+                            @foreach (var (f, i) in times.Take(FotosNoEmpate).Select((f, i) => (f, i)))
+                            {
+                                <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" width="36" height="36"
+                                     style="object-fit: contain; @(i == 0 ? "" : "margin-left: -12px;")" />
+                            }
+                        </div>
+                        <div class="min-w-0">
+                            <div class="small text-muted">@titulo</div>
+                            @foreach (var f in times)
+                            {
+                                <div class="text-truncate lh-sm">
+                                    <a href="/teams/details/@f.TimeId" class="fw-bold text-body text-decoration-none">@f.TimeNome</a>
+                                    <span class="small text-muted">@Retrospecto(f)</span>
+                                </div>
+                            }
+                            <div class="small @cor fw-semibold">@sequenciaEmpate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    };
 
     private bool TemJogador => _dados is not null
         && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.Paredoes.Count > 0);

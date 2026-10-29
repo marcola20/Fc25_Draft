@@ -1349,46 +1349,45 @@ public class LigaPublicService : ILigaPublicService
                 lideres.Add(new DestaqueLiderDto(liga.LigaId, liga.Nome, lider.TimeId, lider.TimeNome, lider.Pontos, lider.Jogos));
         }
 
-        // Melhor fase: maior invencibilidade atual (vitórias seguidas desempatam).
+        // Melhor fase: maior invencibilidade atual; empatados aparecem todos, mais vitórias primeiro.
         var timesAtivos = await _db.LigaClassificacoes.AsNoTracking()
             .Where(c => ativaIds.Contains(c.LigaId))
             .Select(c => c.TimeId)
             .Distinct()
             .ToListAsync(ct);
         var partidas = await CarregarPartidasPerfilAsync(null, ct);
-        var fases = timesAtivos
-            .Select(t => TimePerfil.Calcular(t, partidas, nomes))
-            .Where(p => p.UltimosJogos.Count > 0)
-            .Select(p => new
-            {
-                Perfil = p,
-                Vitorias = p.UltimosJogos.TakeWhile(j => j.Resultado == "V").Count(),
-                Invicto = p.UltimosJogos.TakeWhile(j => j.Resultado != "D").Count(),
-                Derrotas = p.UltimosJogos.TakeWhile(j => j.Resultado == "D").Count(),
-                SemVencer = p.UltimosJogos.TakeWhile(j => j.Resultado != "V").Count()
-            })
+        DestaqueFaseDto Sequencia(Guid timeId, IReadOnlyList<string> resultados, Func<string, bool> condicao)
+        {
+            var jogos = resultados.TakeWhile(condicao).ToList();
+            return new DestaqueFaseDto(timeId, nomes.GetValueOrDefault(timeId, "?"), jogos.Count,
+                jogos.Count(r => r == "V"), jogos.Count(r => r == "E"), jogos.Count(r => r == "D"));
+        }
+        var resultadosPorTime = timesAtivos
+            .Select(t => (TimeId: t, Resultados: TimePerfil.ResultadosRecentes(t, partidas)))
+            .Where(t => t.Resultados.Count > 0)
             .ToList();
-        var melhor = fases
-            .Where(f => f.Invicto >= 2)
-            .OrderByDescending(f => f.Invicto)
-            .ThenByDescending(f => f.Vitorias)
-            .FirstOrDefault();
-        var melhorFase = melhor is null
-            ? null
-            : new DestaqueFaseDto(melhor.Perfil.TimeId, nomes.GetValueOrDefault(melhor.Perfil.TimeId, "?"),
-                melhor.Perfil.SequenciaAtual!, melhor.Perfil.SequenciaTipo!);
 
-        // Pior fase: mais jogos sem vencer agora (derrotas seguidas desempatam); nunca o mesmo da melhor fase.
-        var pior = fases
-            .Where(f => f.SemVencer >= 2 && f.Perfil.TimeId != melhor?.Perfil.TimeId)
-            .OrderByDescending(f => f.SemVencer)
-            .ThenByDescending(f => f.Derrotas)
-            .FirstOrDefault();
-        var piorFase = pior is null
-            ? null
-            : new DestaqueFaseDto(pior.Perfil.TimeId, nomes.GetValueOrDefault(pior.Perfil.TimeId, "?"),
-                pior.Derrotas == pior.SemVencer ? $"{pior.Derrotas} derrotas seguidas" : $"Sem vencer há {pior.SemVencer} jogos",
-                "D");
+        var invictos = resultadosPorTime.Select(t => Sequencia(t.TimeId, t.Resultados, r => r != "D")).Where(f => f.Jogos >= 2).ToList();
+        var maisInvicto = invictos.Count == 0 ? 0 : invictos.Max(f => f.Jogos);
+        var melhorFase = invictos
+            .Where(f => f.Jogos == maisInvicto)
+            .OrderByDescending(f => f.Vitorias)
+            .ThenBy(f => f.TimeNome, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Pior fase: mais jogos sem vencer agora, todos os empatados (mais derrotas primeiro); nunca quem está na melhor fase.
+        var naMelhor = melhorFase.Select(f => f.TimeId).ToHashSet();
+        var semVencer = resultadosPorTime
+            .Where(t => !naMelhor.Contains(t.TimeId))
+            .Select(t => Sequencia(t.TimeId, t.Resultados, r => r != "V"))
+            .Where(f => f.Jogos >= 2)
+            .ToList();
+        var maisSemVencer = semVencer.Count == 0 ? 0 : semVencer.Max(f => f.Jogos);
+        var piorFase = semVencer
+            .Where(f => f.Jogos == maisSemVencer)
+            .OrderByDescending(f => f.Derrotas)
+            .ThenBy(f => f.TimeNome, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         // Artilheiro e garçom da temporada = gols e assistências nas competições em andamento.
         var golsTemporada = await _db.LigaEventos.AsNoTracking()
