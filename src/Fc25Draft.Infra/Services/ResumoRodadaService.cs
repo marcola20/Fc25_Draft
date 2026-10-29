@@ -91,7 +91,7 @@ public class ResumoRodadaService : IResumoRodadaService
 
         var ids = partidas.Select(p => p.PartidaId).ToList();
 
-        // Gols da rodada, para dizer quem marcou. Gol contra vai para o time adversário.
+        // Gols da rodada, para dizer quem marcou. Gol contra vem com o TimeId de quem ganhou o gol.
         var gols = await _db.LigaEventos.AsNoTracking()
             .Where(e => ids.Contains(e.PartidaId) && (e.Tipo == TipoEvento.Gol || e.Tipo == TipoEvento.GolContra))
             .Select(e => new Gol(e.PartidaId, e.TimeId, e.Tipo, e.Jogador.Name, e.Time.TeamName))
@@ -102,8 +102,8 @@ public class ResumoRodadaService : IResumoRodadaService
             .OrderBy(p => p.Quando)
             .Select(p => new ResumoJogoDto(
                 p.Casa, p.GolsCasa, p.GolsFora, p.Fora,
-                MarcadoresDe(gols, p.PartidaId, p.TimeCasaId, p.TimeForaId),
-                MarcadoresDe(gols, p.PartidaId, p.TimeForaId, p.TimeCasaId)))
+                MarcadoresDe(gols, p.PartidaId, p.TimeCasaId),
+                MarcadoresDe(gols, p.PartidaId, p.TimeForaId)))
             .ToArray();
 
         var artilheiros = gols
@@ -160,13 +160,10 @@ public class ResumoRodadaService : IResumoRodadaService
 
     private record Gol(Guid PartidaId, Guid TimeId, TipoEvento Tipo, string Jogador, string Time);
 
-    /// <summary>Quem marcou pelo time, contando também o gol contra do adversário.</summary>
-    private static IReadOnlyList<string> MarcadoresDe(
-        IEnumerable<Gol> gols, Guid partidaId, Guid timeId, Guid adversarioId) =>
+    /// <summary>Quem marcou pelo time, contando também o gol contra do adversário (que já vem com o TimeId do time).</summary>
+    private static IReadOnlyList<string> MarcadoresDe(IEnumerable<Gol> gols, Guid partidaId, Guid timeId) =>
         gols
-            .Where(g => g.PartidaId == partidaId)
-            .Where(g => (g.Tipo == TipoEvento.Gol && g.TimeId == timeId)
-                        || (g.Tipo == TipoEvento.GolContra && g.TimeId == adversarioId))
+            .Where(g => g.PartidaId == partidaId && g.TimeId == timeId)
             .GroupBy(g => new { g.Jogador, Contra = g.Tipo == TipoEvento.GolContra })
             .Select(g => g.Key.Contra
                 ? $"{g.Key.Jogador} (contra){(g.Count() > 1 ? $" x{g.Count()}" : "")}"
