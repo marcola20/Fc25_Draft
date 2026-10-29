@@ -1384,6 +1384,26 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("LigaEventos");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaGoleiroPartida", b =>
+                {
+                    b.Property<Guid>("PartidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("JogadorId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PartidaId", "TimeId");
+
+                    b.HasIndex("JogadorId");
+
+                    b.HasIndex("TimeId");
+
+                    b.ToTable("LigaGoleirosPartida", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.LigaGrupoTime", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4121,6 +4141,33 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Jogador");
 
                     b.Navigation("JogadorSaiu");
+
+                    b.Navigation("Partida");
+
+                    b.Navigation("Time");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaGoleiroPartida", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Jogador")
+                        .WithMany()
+                        .HasForeignKey("JogadorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
+                        .WithMany()
+                        .HasForeignKey("PartidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Jogador");
 
                     b.Navigation("Partida");
 

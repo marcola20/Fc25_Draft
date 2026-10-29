@@ -384,6 +384,18 @@ public record ArtilheiroCompetitionDetalheDto(
     // Null quando a competição é anterior ao contador de jogos.
     int? Jogos = null);
 
+public record HistoricoGoleiroDto(
+    int JogadorId,
+    string JogadorNome,
+    int CleanSheets,
+    IReadOnlyList<GoleiroCompeticaoDetalheDto> Competicoes);
+
+public record GoleiroCompeticaoDetalheDto(
+    Guid LigaId,
+    string NomeCompeticao,
+    TipoCompetition TipoCompeticao,
+    int CleanSheets);
+
 public record HistoricoAssistenciaDto(
     int JogadorId,
     string JogadorNome,

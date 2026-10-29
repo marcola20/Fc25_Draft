@@ -103,6 +103,7 @@ public class DraftDbContext : DbContext
     public DbSet<LigaEscalacaoPartida> LigaEscalacoes => Set<LigaEscalacaoPartida>();
     public DbSet<LigaPartidaImportacao> LigaPartidaImportacoes => Set<LigaPartidaImportacao>();
     public DbSet<LigaNotaJogador> LigaNotasJogadores => Set<LigaNotaJogador>();
+    public DbSet<LigaGoleiroPartida> LigaGoleirosPartida => Set<LigaGoleiroPartida>();
     public DbSet<ResultadoPesPendente> ResultadosPesPendentes => Set<ResultadoPesPendente>();
     public DbSet<ResultadoPesConfig> ResultadosPesConfig => Set<ResultadoPesConfig>();
     public DbSet<AvisoTime> AvisosTimes => Set<AvisoTime>();

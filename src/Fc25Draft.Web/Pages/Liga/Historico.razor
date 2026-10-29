@@ -24,6 +24,15 @@
             <p class="text-muted">Estatísticas de todas as competições</p>
         </div>
 
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(_aba == "artilheiros" ? "active" : "")" @onclick='() => TrocarAba("artilheiros")'>⚽ Artilheiros</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_aba == "goleiros" ? "active" : "")" @onclick='() => TrocarAba("goleiros")'>🧤 Goleiros</button>
+            </li>
+        </ul>
+
         <div class="row mb-3">
             <div class="col-md-6 col-lg-4">
                 <div class="input-group">
@@ -41,7 +50,73 @@
             </div>
         </div>
 
-        @if (!_artilheiros.Any())
+        @if (_aba == "goleiros")
+        {
+            var goleiros = GoleirosFiltrados.ToList();
+            if (!_goleiros.Any())
+            {
+                <div class="alert alert-info">Nenhum clean sheet registrado no histórico.</div>
+            }
+            else if (!goleiros.Any())
+            {
+                <div class="alert alert-warning">Nenhum goleiro encontrado para "<strong>@_busca</strong>".</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th>Goleiro</th>
+                                <th class="text-center" style="width:130px;">🧤 Clean sheets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var (item, idx) in goleiros.Select((x, i) => (x, i + 1)))
+                            {
+                                <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarGoleiro(item)'>
+                                    <td class="fw-bold text-muted">@idx</td>
+                                    <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
+                                    <td class="text-center fw-bold">@item.CleanSheets</td>
+                                </tr>
+                                @if (_goleiroSelecionado == item)
+                                {
+                                    <tr>
+                                        <td colspan="3" class="p-0 border-0">
+                                            <div class="p-3 bg-light border-top border-bottom">
+                                                <table class="table table-sm table-striped mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Competição</th>
+                                                            <th class="text-center" style="width:70px;">🧤</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var comp in item.Competicoes)
+                                                        {
+                                                            <tr>
+                                                                <td>
+                                                                    <span>@comp.NomeCompeticao</span>
+                                                                    <br />
+                                                                    <small class="text-muted">@(comp.TipoCompeticao == TipoCompetition.Copa ? "Copa" : "Liga")</small>
+                                                                </td>
+                                                                <td class="text-center fw-bold">@comp.CleanSheets</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (!_artilheiros.Any())
         {
             <div class="alert alert-info">Nenhum gol registrado no histórico.</div>
         }
@@ -151,6 +226,9 @@
     private string? _erro;
     private IReadOnlyList<HistoricoArtilheiroDto> _artilheiros = Array.Empty<HistoricoArtilheiroDto>();
     private HistoricoArtilheiroDto? _jogadorSelecionado;
+    private IReadOnlyList<HistoricoGoleiroDto> _goleiros = Array.Empty<HistoricoGoleiroDto>();
+    private HistoricoGoleiroDto? _goleiroSelecionado;
+    private string _aba = "artilheiros";
 
     private string _sortBy = "gols";
     private bool _sortAsc = false;
@@ -179,6 +257,22 @@
             var termo = TextoBusca.Normalizar(_busca);
             return _artilheiros.Where(x => TextoBusca.Normalizar(x.JogadorNome).Contains(termo));
         }
+    }
+
+    private IEnumerable<HistoricoGoleiroDto> GoleirosFiltrados => string.IsNullOrWhiteSpace(_busca)
+        ? _goleiros
+        : _goleiros.Where(x => TextoBusca.Normalizar(x.JogadorNome).Contains(TextoBusca.Normalizar(_busca)));
+
+    private void TrocarAba(string aba)
+    {
+        _aba = aba;
+        _jogadorSelecionado = null;
+        _goleiroSelecionado = null;
+    }
+
+    private void SelecionarGoleiro(HistoricoGoleiroDto goleiro)
+    {
+        _goleiroSelecionado = _goleiroSelecionado == goleiro ? null : goleiro;
     }
 
     private IEnumerable<HistoricoArtilheiroDto> SortedItems => _sortBy switch
@@ -272,6 +366,7 @@
         try
         {
             _artilheiros = await LigaService.GetHistoricoArtilheirosAsync(CancellationToken.None);
+            _goleiros = await LigaService.GetHistoricoGoleirosAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {

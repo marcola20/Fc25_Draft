@@ -40,6 +40,7 @@ public interface ILigaPublicService
     Task<TelaoJogoDto?> GetTelaoJogoAsync(Guid partidaId, CancellationToken ct);
     Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct);
     Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct);
+    Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(CancellationToken ct);
 
     /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
     Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);

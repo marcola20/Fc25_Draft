@@ -969,6 +969,79 @@ public class LigaPublicService : ILigaPublicService
         return resultado;
     }
 
+    private sealed record CleanSheetFlat(int JogadorId, string JogadorNome, Guid TimeId, Guid PartidaId, Guid LigaId);
+
+    /// <summary>
+    /// Um clean sheet por goleiro que esteve em campo (titular, entrou ou tem nota) num jogo encerrado em que o time
+    /// não sofreu gol; W.O. não conta. Nos jogos antigos, sem escalação, vale o goleiro apontado à mão.
+    /// </summary>
+    private async Task<List<CleanSheetFlat>> GetCleanSheetsDeGoleirosAsync(Guid[]? ligaIds, CancellationToken ct)
+    {
+        var partidas = _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && !p.IsWO && (p.GolsCasa == 0 || p.GolsFora == 0));
+        if (ligaIds is not null)
+            partidas = partidas.Where(p => ligaIds.Contains(p.Rodada.LigaId));
+
+        var semSofrer = (await partidas
+                .Select(p => new { p.PartidaId, p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
+                .ToListAsync(ct))
+            .SelectMany(p => new[] { (p.PartidaId, Time: p.TimeCasaId, Sofreu: p.GolsFora, p.LigaId), (p.PartidaId, Time: p.TimeForaId, Sofreu: p.GolsCasa, p.LigaId) })
+            .Where(x => x.Sofreu == 0)
+            .ToDictionary(x => (x.PartidaId, x.Time), x => x.LigaId);
+        if (semSofrer.Count == 0) return new List<CleanSheetFlat>();
+
+        var ids = semSofrer.Keys.Select(k => k.PartidaId).Distinct().ToList();
+        var emCampo = (await GetParticipacoesAsync(ligaIds, null, ct))
+            .Select(p => (p.PartidaId, p.TimeId, p.JogadorId))
+            .Concat((await _db.LigaNotasJogadores.AsNoTracking()
+                    .Where(n => ids.Contains(n.PartidaId))
+                    .Select(n => new { n.PartidaId, n.TimeId, n.JogadorId })
+                    .ToListAsync(ct))
+                .Select(n => (n.PartidaId, n.TimeId, n.JogadorId)))
+            .Concat((await _db.LigaGoleirosPartida.AsNoTracking()
+                    .Where(g => ids.Contains(g.PartidaId))
+                    .Select(g => new { g.PartidaId, g.TimeId, g.JogadorId })
+                    .ToListAsync(ct))
+                .Select(g => (g.PartidaId, g.TimeId, g.JogadorId)))
+            .Where(x => semSofrer.ContainsKey((x.PartidaId, x.TimeId)))
+            .Distinct()
+            .ToList();
+
+        var idsEmCampo = emCampo.Select(x => x.JogadorId).Distinct().ToList();
+        var goleiros = await _db.Players.AsNoTracking()
+            .Where(p => idsEmCampo.Contains(p.PlayerId) && p.PositionId == (short)PositionType.Goleiro)
+            .ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
+
+        return emCampo
+            .Where(x => goleiros.ContainsKey(x.JogadorId))
+            .Select(x => new CleanSheetFlat(x.JogadorId, goleiros[x.JogadorId], x.TimeId, x.PartidaId, semSofrer[(x.PartidaId, x.TimeId)]))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(CancellationToken ct)
+    {
+        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(null, ct);
+        var ligaIds = cleanSheets.Select(c => c.LigaId).Distinct().ToList();
+        var ligas = await _db.Ligas.AsNoTracking()
+            .Where(l => ligaIds.Contains(l.LigaId))
+            .ToDictionaryAsync(l => l.LigaId, l => (l.Nome, l.Tipo), ct);
+
+        return cleanSheets
+            .GroupBy(c => c.JogadorId)
+            .Select(g => new HistoricoGoleiroDto(
+                g.Key,
+                g.First().JogadorNome,
+                g.Count(),
+                g.GroupBy(c => c.LigaId)
+                    .Select(l => new GoleiroCompeticaoDetalheDto(l.Key, ligas[l.Key].Nome, ligas[l.Key].Tipo, l.Count()))
+                    .OrderByDescending(l => l.CleanSheets)
+                    .ThenBy(l => l.NomeCompeticao, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()))
+            .OrderByDescending(g => g.CleanSheets)
+            .ThenBy(g => g.JogadorNome, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public async Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct)
     {
         var historico = await GetHistoricoArtilheirosAsync(ct);
@@ -1423,26 +1496,9 @@ public class LigaPublicService : ILigaPublicService
             .ThenByDescending(m => m.Jogos)
             .FirstOrDefault();
 
-        // Paredão: goleiro que esteve em campo (titular ou entrou) em mais jogos encerrados sem sofrer gol; W.O. não conta.
-        var semSofrer = (await _db.LigaPartidas.AsNoTracking()
-                .Where(p => ativaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada && !p.IsWO
-                            && (p.GolsCasa == 0 || p.GolsFora == 0))
-                .Select(p => new { p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
-                .ToListAsync(ct))
-            .SelectMany(p => new[] { (p.PartidaId, Time: p.TimeCasaId, Sofreu: p.GolsFora), (p.PartidaId, Time: p.TimeForaId, Sofreu: p.GolsCasa) })
-            .Where(x => x.Sofreu == 0)
-            .Select(x => (x.PartidaId, x.Time))
-            .ToHashSet();
-        var emCampo = (await GetParticipacoesAsync(ativaIds.ToArray(), null, ct))
-            .Where(p => semSofrer.Contains((p.PartidaId, p.TimeId)))
-            .ToList();
-        var idsEmCampo = emCampo.Select(p => p.JogadorId).Distinct().ToList();
-        var goleiros = await _db.Players.AsNoTracking()
-            .Where(p => idsEmCampo.Contains(p.PlayerId) && p.PositionId == (short)PositionType.Goleiro)
-            .ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
-        var paredoes = LideresDaContagem(emCampo
-            .Where(p => goleiros.ContainsKey(p.JogadorId))
-            .Select(p => (p.JogadorId, goleiros[p.JogadorId], p.TimeId)), nomes);
+        // Paredão: goleiro com mais clean sheets nas competições em andamento.
+        var paredoes = LideresDaContagem((await GetCleanSheetsDeGoleirosAsync(ativaIds.ToArray(), ct))
+            .Select(c => (c.JogadorId, c.JogadorNome, c.TimeId)), nomes);
 
         return new DestaquesDto(lideres, melhorFase, piorFase, artilheiros, garcons, melhorNota, paredoes);
     }
