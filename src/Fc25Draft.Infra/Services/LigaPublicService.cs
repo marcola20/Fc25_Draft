@@ -1295,8 +1295,6 @@ public class LigaPublicService : ILigaPublicService
         return RecordesLiga.Calcular(partidas, gols, campanhas, nomes);
     }
 
-    private const int DiasMaiorTransferencia = 7;
-
     public async Task<DestaquesDto> GetDestaquesAsync(CancellationToken ct)
     {
         var nomes = await _db.Teams.AsNoTracking()
@@ -1394,21 +1392,28 @@ public class LigaPublicService : ILigaPublicService
             .ThenByDescending(m => m.Jogos)
             .FirstOrDefault();
 
-        var desde = DateTime.UtcNow.AddDays(-DiasMaiorTransferencia);
-        var maior = await _db.TransferHistories.AsNoTracking()
-            .Where(t => t.PerformedAtUtc >= desde && t.Amount != null
-                        && (t.Type == TransferType.MarketAuction || t.Type == TransferType.TeamSale))
-            .OrderByDescending(t => t.Amount)
-            .Select(t => new { t.PlayerId, t.Player.Name, t.FromTeamId, t.ToTeamId, t.Amount, t.PerformedAtUtc })
-            .FirstOrDefaultAsync(ct);
-        var maiorTransferencia = maior is null
-            ? null
-            : new DestaqueTransferenciaDto(maior.PlayerId, maior.Name,
-                maior.FromTeamId is Guid de ? nomes.GetValueOrDefault(de) : null,
-                maior.ToTeamId is Guid para ? nomes.GetValueOrDefault(para) : null,
-                maior.Amount!.Value, maior.PerformedAtUtc);
+        // Paredão: goleiro que esteve em campo (titular ou entrou) em mais jogos encerrados sem sofrer gol; W.O. não conta.
+        var semSofrer = (await _db.LigaPartidas.AsNoTracking()
+                .Where(p => ativaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada && !p.IsWO
+                            && (p.GolsCasa == 0 || p.GolsFora == 0))
+                .Select(p => new { p.PartidaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora })
+                .ToListAsync(ct))
+            .SelectMany(p => new[] { (p.PartidaId, Time: p.TimeCasaId, Sofreu: p.GolsFora), (p.PartidaId, Time: p.TimeForaId, Sofreu: p.GolsCasa) })
+            .Where(x => x.Sofreu == 0)
+            .Select(x => (x.PartidaId, x.Time))
+            .ToHashSet();
+        var emCampo = (await GetParticipacoesAsync(ativaIds.ToArray(), null, ct))
+            .Where(p => semSofrer.Contains((p.PartidaId, p.TimeId)))
+            .ToList();
+        var idsEmCampo = emCampo.Select(p => p.JogadorId).Distinct().ToList();
+        var goleiros = await _db.Players.AsNoTracking()
+            .Where(p => idsEmCampo.Contains(p.PlayerId) && p.PositionId == (short)PositionType.Goleiro)
+            .ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
+        var paredoes = LideresDaContagem(emCampo
+            .Where(p => goleiros.ContainsKey(p.JogadorId))
+            .Select(p => (p.JogadorId, goleiros[p.JogadorId], p.TimeId)), nomes);
 
-        return new DestaquesDto(lideres, melhorFase, piorFase, artilheiros, garcons, melhorNota, maiorTransferencia);
+        return new DestaquesDto(lideres, melhorFase, piorFase, artilheiros, garcons, melhorNota, paredoes);
     }
 
     /// <summary>Quem tem a maior contagem (todos os empatados), cada um com o time pelo qual mais contou.</summary>

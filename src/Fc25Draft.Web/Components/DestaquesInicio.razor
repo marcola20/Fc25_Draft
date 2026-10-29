@@ -93,22 +93,9 @@
                 </div>
             }
 
-            @if (_dados.MaiorTransferencia is { } t)
+            @if (_dados.Paredoes.Count > 0)
             {
-                <div class="col-12 col-sm-6 col-xl">
-                    <a href="/players/details/@t.JogadorId" class="card h-100 text-decoration-none text-body border-secondary">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
-                            <FotoJogador PlayerId="@t.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
-                            <div class="min-w-0">
-                                <div class="small text-muted text-truncate">💸 Maior transferência da semana</div>
-                                <div class="fs-5 fw-bold text-truncate">@t.JogadorNome</div>
-                                <div class="small text-muted text-truncate">
-                                    @t.Valor.ToString("C0", Brasil)@(t.ParaTime is null ? "" : $" · {(t.DeTime is null ? "" : $"{t.DeTime} → ")}{t.ParaTime}")
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                </div>
+                @Contagem(_dados.Paredoes, "🧤", "Paredão", "Paredões", "clean sheet", "clean sheets", "border-secondary")
             }
         </div>
     }
@@ -128,7 +115,7 @@
     private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase is not null || _dados.PiorFase is not null);
 
     private bool TemJogador => _dados is not null
-        && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.MaiorTransferencia is not null);
+        && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.Paredoes.Count > 0);
 
     private bool TemAlgo => TemTime || TemJogador;
 
