@@ -10,6 +10,8 @@
 @inject IEstatisticasPesService EstatisticasPes
 @inject AdminAuthService AdminAuth
 @inject ILigaAdminService AdminSvc
+@inject NavigationManager Nav
+@inject UltimaLigaVista UltimaLiga
 @implements IDisposable
 
 <PageTitle>Liga</PageTitle>
@@ -1175,7 +1177,7 @@
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 
-    /// <summary>Edição a abrir (link da página de Edições); vazio = liga atual.</summary>
+    /// <summary>Edição a abrir (link da página de Edições ou a escolhida no seletor); vazio = a última vista, senão a atual.</summary>
     [Parameter, SupplyParameterFromQuery(Name = "liga")]
     public Guid? LigaDaUrl { get; set; }
 
@@ -1185,7 +1187,7 @@
         {
             _ligas = await LigaService.ListAtivasAsync(CancellationToken.None);
 
-            if (LigaDaUrl is Guid daUrl && daUrl != Guid.Empty)
+            if ((LigaDaUrl ?? UltimaLiga.LigaId) is Guid daUrl && daUrl != Guid.Empty)
             {
                 _liga = _ligas.FirstOrDefault(l => l.LigaId == daUrl)
                         ?? await LigaService.GetByIdAsync(daUrl, CancellationToken.None);
@@ -1202,6 +1204,7 @@
             if (_liga is not null)
             {
                 _ligaId = _liga.LigaId;
+                UltimaLiga.LigaId = _liga.LigaId;
                 await LoadLigaDataAsync(_liga.LigaId);
             }
         }
@@ -1269,6 +1272,9 @@
         {
             _ligaId = ligaId;
             _liga = _ligas?.FirstOrDefault(l => l.LigaId == ligaId);
+            UltimaLiga.LigaId = ligaId;
+            // Fica no endereço (sem criar entrada nova no histórico): voltar de outra página reabre nela.
+            Nav.NavigateTo(Nav.GetUriWithQueryParameter("liga", ligaId), replace: true);
             _tab = "classif";
             _loading = true;
             StateHasChanged();

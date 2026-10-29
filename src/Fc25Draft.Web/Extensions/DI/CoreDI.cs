@@ -128,6 +128,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddSingleton<EscudoService>();
             services.AddScoped<LayoutNavigationService>();
             services.AddScoped<LayoutState>();
+            services.AddScoped<UltimaLigaVista>();
 
             services.AddHttpClient();
             services.AddSignalR();
