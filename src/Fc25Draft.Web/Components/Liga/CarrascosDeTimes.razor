@@ -1,0 +1,83 @@
+@using Fc25Draft.Core.DTOs
+@inject EscudoService Escudos
+
+@* Jogadores que mais marcaram contra um mesmo time, em todas as competições. Clicar abre os jogos. *@
+@if (Carrascos.Count == 0)
+{
+    <div class="text-muted">Nenhum gol registrado.</div>
+    return;
+}
+
+<div class="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted">
+    <span>Gols de um jogador contra o mesmo adversário, somando todas as competições. Clique para ver os jogos.</span>
+    <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="todosCarrascos" @bind="_todos" />
+        <label class="form-check-label" for="todosCarrascos">Mostrar todos (sem o mínimo de @Minimo gols)</label>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle" style="font-size:0.875rem;">
+        <thead class="table-dark">
+            <tr>
+                <th style="width:35px;">#</th>
+                <th>Jogador</th>
+                <th>Contra</th>
+                <th class="text-center" style="width:70px;">Gols</th>
+                <th class="text-center d-none d-sm-table-cell" style="width:90px;" title="Jogos em que marcou contra esse time">Jogos c/ gol</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (c, i) in Visiveis.Select((c, i) => (c, i)))
+            {
+                var chave = (c.JogadorId, c.AdversarioId);
+                <tr style="cursor:pointer;" title="Ver os jogos" @onclick="() => _aberto = _aberto == chave ? null : chave">
+                    <td class="fw-bold text-muted">@(i + 1)</td>
+                    <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <FotoJogador PlayerId="@c.JogadorId" Tamanho="28" Classe="me-2" />
+                        <a href="/players/details/@c.JogadorId" class="text-body">@c.JogadorNome</a>
+                    </td>
+                    <td class="text-nowrap">
+                        <img src="@Escudos.GetEscudo(c.AdversarioNome)" alt="" width="20" height="20" class="me-1" style="object-fit:contain" />
+                        <a href="/teams/details/@c.AdversarioId" class="text-body">@c.AdversarioNome</a>
+                    </td>
+                    <td class="text-center fw-bold text-nowrap">@c.Gols <span class="text-muted small fw-normal">@(_aberto == chave ? "▴" : "▾")</span></td>
+                    <td class="text-center text-muted d-none d-sm-table-cell">@c.Jogos.Count</td>
+                </tr>
+                @if (_aberto == chave)
+                {
+                    <tr>
+                        <td colspan="5" class="p-0 border-0">
+                            <ul class="list-group list-group-flush small border-bottom">
+                                @foreach (var j in c.Jogos)
+                                {
+                                    <li class="list-group-item d-flex flex-wrap gap-2 align-items-center ps-5">
+                                        <span class="text-muted" style="min-width:90px;">@j.Jogo.Competicao · @j.Jogo.Rotulo</span>
+                                        <span>@j.Jogo.CasaNome <strong>@j.Jogo.GolsCasa x @j.Jogo.GolsFora</strong> @j.Jogo.ForaNome</span>
+                                        <span class="text-muted">
+                                            ⚽ @j.Gols @(j.Gols == 1 ? "gol" : "gols")@Minutos(j) pelo @j.TimeNome
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CarrascoDto> Carrascos { get; set; } = Array.Empty<CarrascoDto>();
+
+    private const int Minimo = 3;
+    private bool _todos;
+    private (int, Guid)? _aberto;
+
+    private IEnumerable<CarrascoDto> Visiveis => _todos ? Carrascos : Carrascos.Where(c => c.Gols >= Minimo);
+
+    /// <summary>" (12', 67')"; vazio quando os gols não têm minuto (2008).</summary>
+    private static string Minutos(CarrascoJogoDto j) =>
+        j.Minutos.Count == 0 ? "" : " (" + string.Join(", ", j.Minutos.Select(m => m + "'")) + ")";
+}

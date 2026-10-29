@@ -43,6 +43,12 @@ public interface ILigaPublicService
     Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(CancellationToken ct);
     Task<MomentosDosGolsDto> GetMomentosDosGolsAsync(Guid ligaId, CancellationToken ct);
 
+    /// <summary>Duplas de gol de uma competição, ou de todas (ligaId nulo).</summary>
+    Task<IReadOnlyList<DuplaDto>> GetDuplasAsync(Guid? ligaId, CancellationToken ct);
+
+    /// <summary>Jogadores e os times contra quem marcaram, em todas as competições.</summary>
+    Task<IReadOnlyList<CarrascoDto>> GetCarrascosAsync(CancellationToken ct);
+
     /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
     Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);
 

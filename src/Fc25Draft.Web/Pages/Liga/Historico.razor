@@ -3,6 +3,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Web.Components.Liga
 @implements IDisposable
 @inject ILigaPublicService LigaService
 
@@ -31,7 +32,24 @@
             <li class="nav-item">
                 <button class="nav-link @(_aba == "goleiros" ? "active" : "")" @onclick='() => TrocarAba("goleiros")'>🧤 Goleiros</button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link @(_aba == "duplas" ? "active" : "")" @onclick='() => TrocarAba("duplas")'>🤝 Duplas</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_aba == "carrascos" ? "active" : "")" @onclick='() => TrocarAba("carrascos")'>💀 Carrascos</button>
+            </li>
         </ul>
+
+        @if (_aba == "duplas")
+        {
+            <DuplasDeGol Duplas="_duplas" MostrarCompeticao="true" />
+        }
+        else if (_aba == "carrascos")
+        {
+            <CarrascosDeTimes Carrascos="_carrascos" />
+        }
+        else
+        {
 
         <div class="row mb-3">
             <div class="col-md-6 col-lg-4">
@@ -218,6 +236,7 @@
                 <p class="text-center text-muted small mt-1">@_totalFiltrados jogadores · página @_page de @_totalPages</p>
             }
         }
+        }
     }
 </div>
 
@@ -229,6 +248,8 @@
     private IReadOnlyList<HistoricoGoleiroDto> _goleiros = Array.Empty<HistoricoGoleiroDto>();
     private HistoricoGoleiroDto? _goleiroSelecionado;
     private string _aba = "artilheiros";
+    private IReadOnlyList<DuplaDto> _duplas = Array.Empty<DuplaDto>();
+    private IReadOnlyList<CarrascoDto> _carrascos = Array.Empty<CarrascoDto>();
 
     private string _sortBy = "gols";
     private bool _sortAsc = false;
@@ -367,6 +388,8 @@
         {
             _artilheiros = await LigaService.GetHistoricoArtilheirosAsync(CancellationToken.None);
             _goleiros = await LigaService.GetHistoricoGoleirosAsync(CancellationToken.None);
+            _duplas = await LigaService.GetDuplasAsync(null, CancellationToken.None);
+            _carrascos = await LigaService.GetCarrascosAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {

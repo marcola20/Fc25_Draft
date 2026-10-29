@@ -574,9 +574,17 @@
                     <button class="nav-link @(_statsTab == "momentos" ? "active" : "")" @onclick='() => _statsTab = "momentos"'>Momentos</button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "duplas" ? "active" : "")" @onclick='() => _statsTab = "duplas"'>Duplas</button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link @(_statsTab == "times" ? "active" : "")" @onclick='() => _statsTab = "times"'>Times</button>
                 </li>
             </ul>
+
+            @if (_statsTab == "duplas")
+            {
+                <DuplasDeGol @key="_ligaId" Duplas="_duplas" />
+            }
 
             @if (_statsTab == "momentos")
             {
@@ -1240,6 +1248,7 @@
     private bool _periodoSofridos;
     private int? _decisivoAberto;
     private Guid? _viradaAberta;
+    private IReadOnlyList<DuplaDto> _duplas = Array.Empty<DuplaDto>();
 
     /// <summary>Fundo da célula mais forte quanto mais gols no período (verde nos feitos, vermelho nos sofridos).</summary>
     private string CorDoPeriodo(int valor, int maximo) => valor <= 0
@@ -1486,6 +1495,7 @@
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
         _decisivoAberto = null;
         _viradaAberta = null;
+        _duplas = await LigaService.GetDuplasAsync(ligaId, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);
