@@ -30,33 +30,40 @@ public static class EvolucaoCriterios
     public const decimal NotaRuim = 6.0m;      // média <: −1 (com jogos suficientes)
     public const int JogosParaNotaRuim = 5;
 
-    /// <summary>Quem tem clube nunca cai mais que isso numa temporada (idade + desempenho). Livre pode cair mais.</summary>
-    public const int QuedaMaximaComClube = 3;
+    /// <summary>Ninguém sobe mais que isso numa temporada (idade + desempenho + explosão).</summary>
+    public const int SubidaMaxima = 3;
+
+    /// <summary>Quem tem clube nunca cai mais que isso numa temporada. O livre veterano cai até <see cref="QuedaMaximaSemClube"/>.</summary>
+    public const int QuedaMaximaComClube = 2;
+    public const int QuedaMaximaSemClube = 3;
+
+    /// <summary>Livre com até essa idade fica guardado para o draft: não sobe nem cai.</summary>
+    public const int LivreParadoAte = 24;
 
     /// <summary>
-    /// Os pontos da evolução vão para os atributos: cada ponto é ±1 em 5 ou 6 atributos (sorteado por jogador e
+    /// Os pontos da evolução vão para os atributos: cada ponto é ±1 em 3 ou 4 atributos (sorteado por jogador e
     /// temporada) e o overall é o que a fórmula der.
     /// </summary>
-    public const int AtributosPorPontoMin = 5;
-    public const int AtributosPorPontoMax = 6;
+    public const int AtributosPorPontoMin = 3;
+    public const int AtributosPorPontoMax = 4;
 
-    // Surpresas: fora da curva, sorteadas por jogador e temporada (o admin cancela na prévia).
+    // Surpresas: fora da curva, sorteadas por jogador e temporada (o admin cancela na prévia). Explosão só com clube.
     public const int ExplosaoAte = 25;            // explosão é mais comum até essa idade
     public const int QuedaDeRendimentoDesde = 29; // queda de rendimento é mais comum a partir dessa idade
     public const double ChanceSurpresaComum = 0.06;
     public const double ChanceSurpresaRara = 0.02;
-    public const int SurpresaMin = 2;
-    public const int SurpresaMax = 4;
+    public const int SurpresaMin = 1;
+    public const int SurpresaMax = 2;
 
-    /// <summary>Na queda mexe em mais atributos: os físicos e mais alguns dos que pesam na posição.</summary>
-    public const int AtributosNaQuedaMin = 7;
-    public const int AtributosNaQuedaMax = 8;
+    /// <summary>Na queda mexe em um pouco mais de atributos: os físicos e mais alguns dos que pesam na posição.</summary>
+    public const int AtributosNaQuedaMin = 4;
+    public const int AtributosNaQuedaMax = 5;
 
     /// <summary>
-    /// Goleiro só tem 5 atributos de goleiro: com 4 por ponto o overall anda como o de um jogador de linha
-    /// (medido com o elenco real: +2 pontos ≈ +1,6 nos dois).
+    /// Goleiro só tem 5 atributos de goleiro, que carregam quase todo o overall: com 2 por ponto anda como o de um
+    /// jogador de linha.
     /// </summary>
-    public const int AtributosDoGoleiro = 4;
+    public const int AtributosDoGoleiro = 2;
 }
 
 /// <summary>
@@ -69,11 +76,12 @@ public record DesempenhoTemporada(bool SemClube, int JogosDoClube, int Titular, 
 }
 
 /// <summary>A conta da variação de um jogador: curva + desempenho (+ surpresa), com o porquê de cada parte.</summary>
-/// <param name="Piso">Queda máxima (negativo) para quem tem clube; nulo = sem limite.</param>
+/// <param name="Piso">Queda máxima (negativo); nulo = sem limite.</param>
 /// <param name="Surpresa">Explosão (+) ou queda de rendimento (−) sorteada; 0 = nenhuma.</param>
-public record VariacaoCalculada(int Curva, int Desempenho, IReadOnlyList<string> Motivos, int? Piso = null, int Surpresa = 0)
+/// <param name="Teto">Subida máxima; nulo = sem limite.</param>
+public record VariacaoCalculada(int Curva, int Desempenho, IReadOnlyList<string> Motivos, int? Piso = null, int Surpresa = 0, int? Teto = null)
 {
-    public int Total => Piso is int piso ? Math.Max(Curva + Desempenho + Surpresa, piso) : Curva + Desempenho + Surpresa;
+    public int Total => Math.Clamp(Curva + Desempenho + Surpresa, Piso ?? int.MinValue, Teto ?? int.MaxValue);
 }
 
 public static class EvolucaoTemporada
@@ -86,28 +94,29 @@ public static class EvolucaoTemporada
         return EvolucaoCriterios.Curva.First(l => idadeDaTabela <= l.Ate).Variacao;
     }
 
-    /// <param name="idadeMaximaDraft">Livre com até essa idade está reservado para o draft: não perde por estar sem clube.</param>
     /// <param name="surpresa">Explosão (+) ou queda de rendimento (−) sorteada para o jogador; 0 = nenhuma.</param>
-    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d, int? idadeMaximaDraft = null, int surpresa = 0)
+    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d, int surpresa = 0)
     {
         var motivos = new List<string>();
         var curva = Curva(idade, goleiro);
         motivos.Add($"idade {idade}{(goleiro ? " (goleiro)" : "")}: {Sinal(curva)}");
+
+        // Livre jovem fica guardado para o draft do jeito que está.
+        if (d.SemClube && idade <= EvolucaoCriterios.LivreParadoAte)
+        {
+            motivos.Add($"livre até {EvolucaoCriterios.LivreParadoAte} anos, guardado para o draft: não muda");
+            return new VariacaoCalculada(curva, 0, motivos, Piso: 0, Teto: 0);
+        }
 
         var desempenho = 0;
         var pct = d.PercentualTitular;
 
         if (d.SemClube)
         {
-            if (idadeMaximaDraft is int maxima && idade <= maxima)
-            {
-                motivos.Add("livre, reservado para o draft: 0");
-            }
-            else
-            {
-                desempenho--;
-                motivos.Add("sem clube: −1");
-            }
+            desempenho--;
+            motivos.Add("sem clube: −1");
+            // Sem jogar não tem explosão.
+            if (surpresa > 0) surpresa = 0;
         }
         else if (d.JogosDoClube < EvolucaoCriterios.JogosParaTitular)
         {
@@ -141,17 +150,21 @@ public static class EvolucaoTemporada
         if (surpresa > 0) motivos.Add($"💥 explosão: {Sinal(surpresa)}");
         else if (surpresa < 0) motivos.Add($"📉 queda de rendimento: {Sinal(surpresa)}");
 
-        // Com clube, a queda tem limite; livre (veterano encostado) pode cair mais.
-        int? piso = d.SemClube ? null : -EvolucaoCriterios.QuedaMaximaComClube;
-        if (piso is int limite && curva + desempenho + surpresa < limite)
-            motivos.Add($"limite de queda com clube: {Sinal(limite)}");
+        // Livre nunca sobe; a queda tem limite (maior para o livre veterano encostado); a subida também.
+        var soma = curva + desempenho + surpresa;
+        var piso = -(d.SemClube ? EvolucaoCriterios.QuedaMaximaSemClube : EvolucaoCriterios.QuedaMaximaComClube);
+        var teto = d.SemClube ? 0 : EvolucaoCriterios.SubidaMaxima;
+        if (soma < piso)
+            motivos.Add($"limite de queda{(d.SemClube ? " sem clube" : " com clube")}: {Sinal(piso)}");
+        else if (soma > teto)
+            motivos.Add(d.SemClube ? "livre não sobe: 0" : $"limite de subida: {Sinal(teto)}");
 
-        return new VariacaoCalculada(curva, desempenho, motivos, piso, surpresa);
+        return new VariacaoCalculada(curva, desempenho, motivos, piso, surpresa, teto);
     }
 
     /// <summary>
-    /// Surpresa da temporada (sorteio estável por jogador): explosão de +2 a +4, mais comum até 25 anos; ou queda de
-    /// rendimento de −2 a −4, mais comum a partir de 29. Na maioria dos casos, 0.
+    /// Surpresa da temporada (sorteio estável por jogador): explosão de +1 a +2, mais comum até 25 anos; ou queda de
+    /// rendimento de −1 a −2, mais comum a partir de 29. Na maioria dos casos, 0.
     /// </summary>
     public static int Surpresa(int temporada, int playerId, int idade)
     {

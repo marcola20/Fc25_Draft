@@ -65,7 +65,6 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
     {
         // A idade que vale é a da temporada: se a próxima já fez aniversário, desconta.
         var aniversariosDepois = await _db.EnvelhecimentosTemporada.AsNoTracking().CountAsync(e => e.Temporada > temporada, ct);
-        var idadeMaximaDraft = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
 
         var jogadores = await _db.Players.AsNoTracking()
             // Quem anunciou que esta é a última temporada se aposenta na virada: não evolui mais.
@@ -132,7 +131,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var dto = j.Atributos is null ? null : AtributosPes.ParaDto(j.Atributos);
             var goleiro = dto?.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
             var surpresa = surpresasCanceladas?.Contains(j.PlayerId) == true ? 0 : EvolucaoTemporada.Surpresa(temporada, j.PlayerId, j.Idade);
-            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, idadeMaximaDraft, surpresa);
+            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, surpresa);
             var pontos = conta.Total;
             var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId, pontos, goleiro);
 

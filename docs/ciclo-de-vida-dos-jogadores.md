@@ -83,16 +83,20 @@ Pela temporada que acabou, com os dados que o site já tem (titulares em `LigaEs
 Somado à curva. Um veterano de 32 (−3) titular absoluto com nota 7,2 fica em −1: segura quase todo o nível. Um jovem de
 20 (+2) que não joga fica em +1.
 
+**Limites (revistos em 30/10/2026, a prévia de 2010 subia e caía demais):** ninguém sobe mais que +3 pontos por
+temporada; com clube cai no máximo −2. **Livre até 24 anos fica parado** (guardado para o draft, nem sobe nem cai, sem
+surpresa); o livre mais velho nunca sobe (nem explode) e cai no máximo −3.
+
 ### 4. Fora da curva
-- **Surpresas** (sorteadas na prévia): pequena chance de **explosão** (+2 a +4 a mais; mais comum até 25 anos) ou de
-  **queda de rendimento** (−2 a −4; mais comum a partir de 29). Algo como 5% cada. Destacadas na prévia; o admin desfaz.
+- **Surpresas** (sorteadas na prévia): pequena chance de **explosão** (+1 a +2 a mais; mais comum até 25 anos; só
+  com clube) ou de **queda de rendimento** (−1 a −2; mais comum a partir de 29). Algo como 5% cada. Destacadas na prévia; o admin desfaz.
 - **Ajuste manual**: o admin sobe ou desce qualquer jogador a qualquer momento com um motivo. Fica registrado na ficha.
 
 ### 5. De pontos para atributos (decisão de 07/10/2026)
 A variação (curva + desempenho, com o limite de queda) são **pontos de atributo**, não de overall: cada ponto é ±1
-em 5 ou 6 atributos (sorteado por jogador e temporada) e o overall é o que a fórmula der (`OverallPes.AplicarPontos`).
-Subindo: estilo de jogo e maiores pesos da posição; caindo: físicos primeiro. Na prévia de 2010, +3 vira ~+2 de overall
-e −3 vira ~−1. O texto abaixo é o plano anterior (alvo de overall), mantido como histórico.
+em 3 ou 4 atributos subindo, 4 ou 5 caindo, 2 no goleiro (sorteado por jogador e temporada) e o overall é o que a
+fórmula der (`OverallPes.AplicarPontos`). Subindo: estilo de jogo e maiores pesos da posição; caindo: físicos primeiro.
+Na prévia de 2010 (30/10/2026), +3 vira +1 ou +2 de overall e −2/−3 vira −1 ou −2. O texto abaixo é o plano anterior (alvo de overall), mantido como histórico.
 
 ### 5b. De overall para atributos (plano anterior)
 - **Subida**: `OverallPes.Evoluir` (já existe, usado na venda rápida).

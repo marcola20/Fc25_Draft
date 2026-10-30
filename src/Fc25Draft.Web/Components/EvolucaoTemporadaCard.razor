@@ -20,10 +20,11 @@
             (@string.Join(", ", EvolucaoCriterios.Curva.Select((l, i) => $"{Faixa(i)}: {EvolucaoTemporada.Sinal(l.Variacao)}"));
             goleiro como se tivesse @EvolucaoCriterios.AnosAMenosDoGoleiro anos a menos) e pelo <strong>desempenho</strong>
             (titular em mais de @Pct(EvolucaoCriterios.TitularMuito) dos jogos: +1; em menos de @Pct(EvolucaoCriterios.TitularPouco): −1 — só com
-            @EvolucaoCriterios.JogosParaTitular+ jogos do clube; sem clube: −1,
-            menos o jovem livre reservado para o draft;
+            @EvolucaoCriterios.JogosParaTitular+ jogos do clube; sem clube: −1;
             nota média ≥ @EvolucaoCriterios.NotaBoa.ToString("0.0"): +1; abaixo de @EvolucaoCriterios.NotaRuim.ToString("0.0") com @EvolucaoCriterios.JogosParaNotaRuim+ jogos: −1).
-            Quem tem clube cai no máximo @EvolucaoCriterios.QuedaMaximaComClube por temporada; o livre veterano pode cair mais.
+            Ninguém sobe mais que +@EvolucaoCriterios.SubidaMaxima por temporada; quem tem clube cai no máximo @EvolucaoCriterios.QuedaMaximaComClube.
+            Livre até @EvolucaoCriterios.LivreParadoAte anos fica guardado para o draft e não muda; o livre mais velho não sobe
+            (nem explode) e cai no máximo @EvolucaoCriterios.QuedaMaximaSemClube.
             Cada ponto é ±1 em vários atributos — subindo, @EvolucaoCriterios.AtributosPorPontoMin ou @EvolucaoCriterios.AtributosPorPontoMax (os do
             estilo de jogo e os que mais pesam na posição); caindo, @EvolucaoCriterios.AtributosNaQuedaMin ou @EvolucaoCriterios.AtributosNaQuedaMax
             (os físicos primeiro); goleiro, @EvolucaoCriterios.AtributosDoGoleiro dos de goleiro — e o overall é o que a fórmula der.
