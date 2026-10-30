@@ -1191,6 +1191,7 @@ public class LigaAdminService : ILigaAdminService
 
         _db.LigaKnockoutJogos.AddRange(jogos);
         await _db.SaveChangesAsync(ct);
+        await AgendarJogosDoMataMataAsync(ligaId, ct);
 
         return await GetKnockoutDtosAsync(ligaId, ct);
     }
@@ -1204,17 +1205,11 @@ public class LigaAdminService : ILigaAdminService
         if (!jogo.TimeCasaId.HasValue || !jogo.TimeForaId.HasValue)
             throw new InvalidOperationException("Times ainda não definidos para este jogo.");
 
-        if (jogo.PartidaId.HasValue)
-            throw new InvalidOperationException("Partida já criada para este jogo.");
+        // A partida já nasce agendada quando o confronto fecha (para o bolão): aqui ela só começa.
+        if (jogo.PartidaId is Guid agendadaId)
+            return await IniciarPartidaAsync(agendadaId, ct);
 
-        // Knockout rodada: Numero = 0, shared for all knockout games of this liga
-        var rodada = await _db.LigaRodadas.FirstOrDefaultAsync(x => x.LigaId == jogo.LigaId && x.Numero == 0, ct);
-        if (rodada is null)
-        {
-            rodada = new LigaRodada { RodadaId = Guid.NewGuid(), LigaId = jogo.LigaId, Numero = 0 };
-            _db.LigaRodadas.Add(rodada);
-            await _db.SaveChangesAsync(ct);
-        }
+        var rodada = await RodadaDoMataMataAsync(jogo.LigaId, ct);
 
         var partida = new LigaPartida
         {
@@ -1231,6 +1226,77 @@ public class LigaAdminService : ILigaAdminService
         await _db.SaveChangesAsync(ct);
 
         return await GetPartidaDtoAsync(partida.PartidaId, ct);
+    }
+
+    public async Task<int> AgendarJogosDoMataMataAsync(Guid? ligaId, CancellationToken ct)
+    {
+        // Confronto definido e ainda sem partida: ela fica agendada, e o bolão abre o palpite dele.
+        var jogos = await _db.LigaKnockoutJogos
+            .Include(x => x.Liga)
+            .Where(x => (ligaId == null || x.LigaId == ligaId)
+                        && x.TimeCasaId != null && x.TimeForaId != null
+                        && x.PartidaId == null && x.VencedorId == null
+                        && x.Liga.Status != LigaStatus.Encerrada)
+            .ToListAsync(ct);
+
+        var calendarios = new Dictionary<int, IReadOnlyList<DataDaTemporada>?>();
+        foreach (var jogo in jogos)
+        {
+            var rodada = await RodadaDoMataMataAsync(jogo.LigaId, ct);
+            var partida = new LigaPartida
+            {
+                PartidaId = Guid.NewGuid(),
+                RodadaId = rodada.RodadaId,
+                TimeCasaId = jogo.TimeCasaId!.Value,
+                TimeForaId = jogo.TimeForaId!.Value,
+                Status = PartidaStatus.Agendada,
+                DataHora = await DataDaFaseAsync(jogo.Liga, jogo.Fase, calendarios, ct)
+            };
+            _db.LigaPartidas.Add(partida);
+            jogo.PartidaId = partida.PartidaId;
+        }
+
+        if (jogos.Count > 0) await _db.SaveChangesAsync(ct);
+        return jogos.Count;
+    }
+
+    /// <summary>
+    /// O dia da fase no calendário da temporada (só a Copa tem: uma sexta por fase depois dos grupos).
+    /// Data que já passou fica de fora: o jogo atrasou, e o palpite segue aberto até a bola rolar.
+    /// </summary>
+    private async Task<DateTime?> DataDaFaseAsync(
+        Liga liga, FaseKnockout fase, Dictionary<int, IReadOnlyList<DataDaTemporada>?> calendarios, CancellationToken ct)
+    {
+        if (liga.Tipo != TipoCompetition.Copa || liga.Temporada is not int temporada) return null;
+
+        var detalhe = fase switch
+        {
+            FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => CalendarioTemporada.QuartasDaCopa,
+            FaseKnockout.Semi1 or FaseKnockout.Semi2 => CalendarioTemporada.SemifinaisDaCopa,
+            FaseKnockout.Final => CalendarioTemporada.FinalDaCopa,
+            _ => null
+        };
+        if (detalhe is null) return null;
+
+        if (!calendarios.TryGetValue(temporada, out var calendario))
+            calendarios[temporada] = calendario = await CalendarioDaTemporada.MontarComDatasGravadasAsync(_db, temporada, ct);
+
+        var quando = calendario?.FirstOrDefault(d => d.Tipo == TipoCompetition.Copa && d.Rodada is null && d.Detalhe == detalhe)?.Quando;
+        return quando > HorarioDeBrasilia.Agora(_time) ? quando : null;
+    }
+
+    /// <summary>A rodada 0 da competição, que guarda todos os jogos do mata-mata.</summary>
+    private async Task<LigaRodada> RodadaDoMataMataAsync(Guid ligaId, CancellationToken ct)
+    {
+        var rodada = _db.LigaRodadas.Local.FirstOrDefault(x => x.LigaId == ligaId && x.Numero == 0)
+            ?? await _db.LigaRodadas.FirstOrDefaultAsync(x => x.LigaId == ligaId && x.Numero == 0, ct);
+        if (rodada is null)
+        {
+            rodada = new LigaRodada { RodadaId = Guid.NewGuid(), LigaId = ligaId, Numero = 0 };
+            _db.LigaRodadas.Add(rodada);
+            await _db.SaveChangesAsync(ct);
+        }
+        return rodada;
     }
 
     public async Task<LigaKnockoutJogoDto> EncerrarKnockoutJogoAsync(Guid knockoutJogoId, LigaEncerrarKnockoutRequest request, CancellationToken ct)
@@ -1642,6 +1708,7 @@ public class LigaAdminService : ILigaAdminService
         LigaKnockoutJogo Jogo(FaseKnockout fase, Guid? casa = null, Guid? fora = null) =>
             new() { KnockoutJogoId = Guid.NewGuid(), LigaId = ligaId, Fase = fase, TimeCasaId = casa, TimeForaId = fora };
         await _db.SaveChangesAsync(ct);
+        await AgendarJogosDoMataMataAsync(ligaId, ct);
 
         return await GetKnockoutDtosAsync(ligaId, ct);
     }
@@ -2354,6 +2421,7 @@ public class LigaAdminService : ILigaAdminService
         if (timeForaId.HasValue) jogo.TimeForaId = timeForaId;
 
         await _db.SaveChangesAsync(ct);
+        await AgendarJogosDoMataMataAsync(ligaId, ct);
     }
 
     // ── Classificação (recálculo) ─────────────────────────────────────────────
@@ -2673,7 +2741,10 @@ public class LigaAdminService : ILigaAdminService
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
         new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase], j.TimeCasaId, j.TimeCasa?.TeamName,
             j.TimeForaId, j.TimeFora?.TeamName, j.VencedorId, j.Vencedor?.TeamName,
-            j.PartidaId, j.Partida?.GolsCasa, j.Partida?.GolsFora,
+            j.PartidaId,
+            // Partida agendada ainda não tem placar: o 0 x 0 dela não é resultado.
+            j.Partida is { Status: not PartidaStatus.Agendada } ? j.Partida.GolsCasa : null,
+            j.Partida is { Status: not PartidaStatus.Agendada } ? j.Partida.GolsFora : null,
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
             j.Partida?.TemPenaltis ?? false,
             j.Partida?.YoutubeVideoId);

@@ -24,7 +24,11 @@ public record BolaoJogoDto(
     int? ExtraCasa = null,
     int? ExtraFora = null,
     bool Aberto = false,
-    DateTime? Quando = null);
+    DateTime? Quando = null,
+    bool Eliminatorio = false,
+    Guid? PalpitePenaltis = null,
+    int? PontosPenaltis = null,
+    Guid? PenaltisVencedorId = null);
 
 /// <summary>Uma rodada aberta (com algum jogo ainda por vir) ou fechada para palpite.</summary>
 public record BolaoRodadaDto(
@@ -55,7 +59,8 @@ public record BolaoPalpiteDeAlguemDto(
     int GolsFora,
     int? Pontos,
     string? JogadorCasa = null,
-    string? JogadorFora = null);
+    string? JogadorFora = null,
+    string? Penaltis = null);
 
 /// <summary>Um jogador que dá para escolher na aposta G/A.</summary>
 public record BolaoJogadorOpcaoDto(int JogadorId, string Nome, string Posicao);
@@ -67,7 +72,8 @@ public record BolaoPalpiteNoJogoDto(
     int GolsFora,
     string? JogadorCasa,
     string? JogadorFora,
-    int? Pontos);
+    int? Pontos,
+    string? Penaltis = null);
 
 public record BolaoPalpitesDeAlguemDto(
     Guid TreinadorId,
@@ -95,7 +101,9 @@ public record BolaoRankingLinhaDto(
     public decimal Media => Palpites == 0 ? 0m : Math.Round((decimal)Pontos / Palpites, 1);
 }
 
-public record BolaoPalpiteRequest(Guid PartidaId, int GolsCasa, int GolsFora, int? JogadorCasaId = null, int? JogadorForaId = null);
+/// <param name="PenaltisVencedorId">Quem passa nos pênaltis: só em jogo que precisa de vencedor com empate no palpite.</param>
+public record BolaoPalpiteRequest(
+    Guid PartidaId, int GolsCasa, int GolsFora, int? JogadorCasaId = null, int? JogadorForaId = null, Guid? PenaltisVencedorId = null);
 
 /// <summary>O que a pessoa fez no bolão, para a página de carreira.</summary>
 public record BolaoResumoDoTreinadorDto(

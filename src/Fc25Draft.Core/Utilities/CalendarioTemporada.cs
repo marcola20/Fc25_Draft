@@ -32,6 +32,9 @@ public static class CalendarioTemporada
     /// <summary>Horário em que a janela de transferências abre, depois dos jogos.</summary>
     public static readonly TimeSpan HorarioDaJanela = new(20, 0, 0);
 
+    /// <summary>Detalhe das datas do mata-mata da Copa (que não têm número de rodada).</summary>
+    public const string QuartasDaCopa = "Quartas de final", SemifinaisDaCopa = "Semifinais", FinalDaCopa = "Final";
+
     public static IReadOnlyList<DataDaTemporada> Montar(
         DateTime abertura,
         int rodadasSerieA = 9,
@@ -58,9 +61,9 @@ public static class CalendarioTemporada
         // Datas da Copa na ordem em que acontecem, uma por sexta.
         var daCopa = new Queue<(string Titulo, string Detalhe, int? Rodada)>();
         for (int g = 1; g <= rodadasGrupoCopa; g++) daCopa.Enqueue(("Copa", $"Rodada {g} · grupos", g));
-        daCopa.Enqueue(("Copa", "Quartas de final", null));
-        daCopa.Enqueue(("Copa", "Semifinais", null));
-        daCopa.Enqueue(("Copa", "Final", null));
+        daCopa.Enqueue(("Copa", QuartasDaCopa, null));
+        daCopa.Enqueue(("Copa", SemifinaisDaCopa, null));
+        daCopa.Enqueue(("Copa", FinalDaCopa, null));
 
         int serieA = 1, serieB = 1;
 

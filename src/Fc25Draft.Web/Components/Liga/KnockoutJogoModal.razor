@@ -46,7 +46,7 @@
                 {
                     <PartidaStatsEditor PartidaId="partidaId" OnChanged="() => OnAlterado.InvokeAsync()" />
                 }
-                else if (!Jogo.PartidaId.HasValue)
+                else if (!Iniciada)
                 {
                     <div class="text-muted">Partida ainda não iniciada.</div>
                 }
@@ -69,7 +69,7 @@
                 else if (AdminAuth.IsAdmin && Jogo.TimeCasaId.HasValue && Jogo.TimeForaId.HasValue)
                 {
                     <div class="me-auto d-flex gap-2 flex-wrap">
-                        @if (!Jogo.PartidaId.HasValue)
+                        @if (!Iniciada)
                         {
                             <button type="button" class="btn btn-primary" @onclick="CriarPartida" disabled="@_saving">▶️ Iniciar partida</button>
                         }
@@ -95,6 +95,9 @@
     [Parameter] public EventCallback OnFechar { get; set; }
     /// <summary>Disparado quando placar/eventos/bracket mudam: o pai recarrega os jogos.</summary>
     [Parameter] public EventCallback OnAlterado { get; set; }
+
+    // A partida nasce agendada quando o confronto fecha; até alguém iniciar, não tem o que mostrar.
+    private bool Iniciada => Jogo.PartidaId.HasValue && Jogo.PartidaStatus != PartidaStatus.Agendada;
 
     private LigaKnockoutJogoDto? _jogoCarregado;
     private IReadOnlyList<LigaEventoDto> _eventos = Array.Empty<LigaEventoDto>();

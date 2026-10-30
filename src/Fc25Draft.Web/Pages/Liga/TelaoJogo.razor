@@ -216,7 +216,7 @@
                                         <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
                                     }
                                     <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · ⚽ {ga}" : "")</span></span>
-                                    <span class="chute">@p.GolsCasa – @p.GolsFora</span>
+                                    <span class="chute">@p.GolsCasa – @p.GolsFora@(p.Penaltis is { } pen ? $" (pên. {pen})" : "")</span>
                                     @if (p.Pontos is int pts)
                                     {
                                         <span class="pontos">@(pts > 0 ? $"+{pts}" : pts.ToString())</span>

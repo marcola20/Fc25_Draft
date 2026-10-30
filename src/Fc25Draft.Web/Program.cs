@@ -75,6 +75,19 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogError(ex, "Falha ao extrair as notas dos JSONs já importados");
     }
 
+    // Jogos do mata-mata já definidos antes de a partida nascer agendada: ganham a partida, e o bolão os vê.
+    try
+    {
+        var agendados = await scope.ServiceProvider.GetRequiredService<ILigaAdminService>()
+            .AgendarJogosDoMataMataAsync(null, CancellationToken.None);
+        if (agendados > 0)
+            app.Logger.LogInformation("Jogos do mata-mata agendados para o bolão: {Jogos}", agendados);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao agendar os jogos do mata-mata");
+    }
+
     // Cria tabelas de loteria se ainda não existirem (sem migration)
     await db.Database.ExecuteSqlRawAsync("""
         CREATE TABLE IF NOT EXISTS "LigaLoterias" (

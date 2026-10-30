@@ -31,8 +31,11 @@ public class BolaoService : IBolaoService
     {
         var rodadas = await CarregarAsync(ct);
 
+        // Pelo próximo jogo que ainda aceita palpite: a rodada do mata-mata junta as fases e não tem data própria.
         return await MontarAsync(
-            rodadas.Where(EstaAberta).OrderBy(r => r.Quando ?? DateTime.MaxValue).ThenBy(r => r.Numero),
+            rodadas.Where(EstaAberta)
+                .OrderBy(r => r.Jogos.Where(JogoAberto).Min(j => j.Quando) ?? DateTime.MaxValue)
+                .ThenBy(r => r.Numero),
             treinadorId, ct);
     }
 
@@ -40,9 +43,11 @@ public class BolaoService : IBolaoService
     {
         var rodadas = await CarregarAsync(ct);
 
+        // Pelo último jogo: a rodada do mata-mata não tem data própria, e os jogos dele, às vezes, também não.
         return await MontarAsync(
             rodadas.Where(r => !EstaAberta(r))
-                .OrderByDescending(r => r.Quando ?? DateTime.MinValue).ThenByDescending(r => r.Numero)
+                .OrderByDescending(r => r.Jogos.Max(j => j.Quando ?? j.EncerradaEm) ?? r.Quando ?? DateTime.MinValue)
+                .ThenByDescending(r => r.Numero)
                 .Take(quantas),
             treinadorId, ct);
     }
@@ -109,6 +114,11 @@ public class BolaoService : IBolaoService
             Conferir(jogadorCasa, jogo.CasaId, jogo.Casa, atual?.JogadorCasaId);
             Conferir(jogadorFora, jogo.ForaId, jogo.Fora, atual?.JogadorForaId);
 
+            // Quem passa nos pênaltis: só no jogo que precisa de vencedor e com empate no palpite.
+            var penaltis = jogo.Eliminatorio && palpite.GolsCasa == palpite.GolsFora ? palpite.PenaltisVencedorId : null;
+            if (penaltis is Guid time && time != jogo.CasaId && time != jogo.ForaId)
+                throw new InvalidOperationException("O time dos pênaltis não é desse jogo.");
+
             if (atual is null)
             {
                 _db.BolaoPalpites.Add(new BolaoPalpite
@@ -120,6 +130,7 @@ public class BolaoService : IBolaoService
                     GolsFora = palpite.GolsFora,
                     JogadorCasaId = jogadorCasa,
                     JogadorForaId = jogadorFora,
+                    PenaltisVencedorId = penaltis,
                     CriadoEm = Agora,
                     AtualizadoEm = Agora
                 });
@@ -127,12 +138,14 @@ public class BolaoService : IBolaoService
             }
 
             if (atual.GolsCasa == palpite.GolsCasa && atual.GolsFora == palpite.GolsFora
-                && atual.JogadorCasaId == jogadorCasa && atual.JogadorForaId == jogadorFora) continue;
+                && atual.JogadorCasaId == jogadorCasa && atual.JogadorForaId == jogadorFora
+                && atual.PenaltisVencedorId == penaltis) continue;
 
             atual.GolsCasa = palpite.GolsCasa;
             atual.GolsFora = palpite.GolsFora;
             atual.JogadorCasaId = jogadorCasa;
             atual.JogadorForaId = jogadorFora;
+            atual.PenaltisVencedorId = penaltis;
             atual.AtualizadoEm = Agora;
         }
 
@@ -164,7 +177,7 @@ public class BolaoService : IBolaoService
                 p.TreinadorId, p.Nome, clubes.GetValueOrDefault(p.TreinadorId),
                 p.GolsCasa, p.GolsFora,
                 jogo.Encerrado ? Apurar(p, jogo, lances).Total : null,
-                p.JogadorCasa, p.JogadorFora))
+                p.JogadorCasa, p.JogadorFora, NomeDoTime(jogo, p.PenaltisId)))
             .OrderByDescending(p => p.Pontos ?? 0).ThenBy(p => p.Nome)
             .ToArray();
     }
@@ -185,7 +198,8 @@ public class BolaoService : IBolaoService
                 g.Key.TreinadorId, g.Key.Nome, clubes.GetValueOrDefault(g.Key.TreinadorId),
                 g.Select(p => new BolaoPalpiteNoJogoDto(
                     p.PartidaId, p.GolsCasa, p.GolsFora, p.JogadorCasa, p.JogadorFora,
-                    jogos[p.PartidaId].Encerrado ? Apurar(p, jogos[p.PartidaId], lances).Total : null)).ToList()))
+                    jogos[p.PartidaId].Encerrado ? Apurar(p, jogos[p.PartidaId], lances).Total : null,
+                    NomeDoTime(jogos[p.PartidaId], p.PenaltisId))).ToList()))
             .OrderBy(p => p.Nome)
             .ToList();
 
@@ -294,9 +308,13 @@ public class BolaoService : IBolaoService
     // ── Bastidores ─────────────────────────────────────────────────────────────
 
     /// <param name="Quando">Horário do jogo: o próprio ou, sem ele, o da rodada.</param>
+    /// <param name="Eliminatorio">Jogo único que precisa de vencedor: empatado, vai para os pênaltis.</param>
+    /// <param name="PenaltisVencedorId">Quem passou nos pênaltis, quando o jogo foi para eles.</param>
+    /// <param name="EncerradaEm">Quando o jogo acabou (Brasília).</param>
     private record Jogo(
         Guid PartidaId, Guid CasaId, string Casa, Guid ForaId, string Fora, bool Comecou, bool Encerrado,
-        int GolsCasa, int GolsFora, bool IsWO, bool RegrasNovas, DateTime? Quando);
+        int GolsCasa, int GolsFora, bool IsWO, bool RegrasNovas, DateTime? Quando,
+        bool Eliminatorio = false, Guid? PenaltisVencedorId = null, DateTime? EncerradaEm = null);
 
     private record Rodada(
         Guid RodadaId, Guid LigaId, string Competicao, TipoCompetition Tipo, int Numero, bool Desempate,
@@ -304,7 +322,7 @@ public class BolaoService : IBolaoService
 
     private record Palpite(
         Guid TreinadorId, string Nome, Guid PartidaId, int GolsCasa, int GolsFora,
-        int? JogadorCasaId, string? JogadorCasa, int? JogadorForaId, string? JogadorFora);
+        int? JogadorCasaId, string? JogadorCasa, int? JogadorForaId, string? JogadorFora, Guid? PenaltisId);
 
     /// <summary>Quem fez gol ou deu assistência no jogo, quem entrou em campo e de que times há retrato da escalação.</summary>
     private sealed record Lances(HashSet<int> ComGA, HashSet<int> EmCampo, HashSet<Guid> TimesComEscalacao)
@@ -312,9 +330,9 @@ public class BolaoService : IBolaoService
         public static readonly Lances Vazio = new(new(), new(), new());
     }
 
-    private sealed record Apuracao(int Placar, int? ExtraCasa, int? ExtraFora)
+    private sealed record Apuracao(int Placar, int? ExtraCasa, int? ExtraFora, int? Penaltis)
     {
-        public int Total => Placar + (ExtraCasa ?? 0) + (ExtraFora ?? 0);
+        public int Total => Placar + (ExtraCasa ?? 0) + (ExtraFora ?? 0) + (Penaltis ?? 0);
     }
 
     private List<Rodada>? _cache;
@@ -349,10 +367,18 @@ public class BolaoService : IBolaoService
                     p.IniciadaEm,
                     p.EncerradaEm,
                     p.Status,
-                    p.DataHora
+                    p.DataHora,
+                    p.TemPenaltis,
+                    p.PenaltisVencedorId
                 }).ToList()
             })
             .ToListAsync(ct);
+
+        var doMataMata = (await _db.LigaKnockoutJogos.AsNoTracking()
+            .Where(k => k.PartidaId != null)
+            .Select(k => k.PartidaId!.Value)
+            .ToListAsync(ct))
+            .ToHashSet();
 
         _cache = rodadas
             .Where(r => r.Jogos.Count > 0)
@@ -365,13 +391,28 @@ public class BolaoService : IBolaoService
                     j.EncerradaEm is not null || j.Status == PartidaStatus.Encerrada,
                     j.GolsCasa, j.GolsFora, j.IsWO,
                     RegrasNovas(r.DataHora ?? j.EncerradaEm),
-                    j.DataHora ?? r.DataHora))
+                    j.DataHora ?? r.DataHora,
+                    PrecisaDeVencedor(r.Tipo, r.Numero, r.Desempate, doMataMata.Contains(j.PartidaId)),
+                    j.TemPenaltis ? j.PenaltisVencedorId : null,
+                    j.EncerradaEm is DateTime fim
+                        ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(fim, DateTimeKind.Utc), HorarioDeBrasilia.Fuso)
+                        : null))
                     .OrderBy(j => j.Quando ?? DateTime.MaxValue)
                     .ToList()))
             .ToList();
 
         return _cache;
     }
+
+    /// <summary>
+    /// Jogo único que precisa de vencedor, igual à importação do PES: Supercopa, mata-mata, jogos decisivos
+    /// e playoff de acesso (rodada de desempate). A mini liga é por pontos e aceita empate.
+    /// </summary>
+    private static bool PrecisaDeVencedor(TipoCompetition tipo, int numero, bool desempate, bool doMataMata) =>
+        tipo == TipoCompetition.Supercopa || doMataMata || desempate || numero == -1;
+
+    private static string? NomeDoTime(Jogo jogo, Guid? timeId) =>
+        timeId == jogo.CasaId ? jogo.Casa : timeId == jogo.ForaId ? jogo.Fora : null;
 
     /// <summary>Jogo sem data nem encerramento ainda está por vir, então já é das regras novas.</summary>
     private static bool RegrasNovas(DateTime? quando) =>
@@ -399,7 +440,8 @@ public class BolaoService : IBolaoService
             .Select(p => new Palpite(
                 p.TreinadorId, p.Treinador.Nome, p.PartidaId, p.GolsCasa, p.GolsFora,
                 p.JogadorCasaId, p.JogadorCasa != null ? p.JogadorCasa.Name : null,
-                p.JogadorForaId, p.JogadorFora != null ? p.JogadorFora.Name : null))
+                p.JogadorForaId, p.JogadorFora != null ? p.JogadorFora.Name : null,
+                p.PenaltisVencedorId))
             .ToListAsync(ct);
     }
 
@@ -443,14 +485,16 @@ public class BolaoService : IBolaoService
     private static Apuracao Apurar(Palpite p, Jogo jogo, IReadOnlyDictionary<Guid, Lances> lances)
     {
         var placar = BolaoPontuacao.Calcular(p.GolsCasa, p.GolsFora, jogo.GolsCasa, jogo.GolsFora, jogo.RegrasNovas);
+        var penaltis = BolaoPontuacao.Penaltis(p.PenaltisId, jogo.PenaltisVencedorId is not null, jogo.PenaltisVencedorId);
 
         // W.O. não tem lance: só o placar conta.
-        if (!jogo.RegrasNovas || jogo.IsWO) return new(placar, null, null);
+        if (!jogo.RegrasNovas || jogo.IsWO) return new(placar, null, null, penaltis);
 
         var doJogo = lances.GetValueOrDefault(jogo.PartidaId) ?? Lances.Vazio;
         return new(placar,
             Lado(p.GolsCasa, jogo.GolsCasa, p.JogadorCasaId, jogo.CasaId, doJogo),
-            Lado(p.GolsFora, jogo.GolsFora, p.JogadorForaId, jogo.ForaId, doJogo));
+            Lado(p.GolsFora, jogo.GolsFora, p.JogadorForaId, jogo.ForaId, doJogo),
+            penaltis);
     }
 
     /// <summary>
@@ -515,7 +559,9 @@ public class BolaoService : IBolaoService
                     meu?.JogadorCasaId, meu?.JogadorCasa,
                     meu?.JogadorForaId, meu?.JogadorFora,
                     apurado?.Placar, apurado?.ExtraCasa, apurado?.ExtraFora,
-                    JogoAberto(j), j.Quando);
+                    JogoAberto(j), j.Quando,
+                    j.Eliminatorio, meu?.PenaltisId, apurado?.Penaltis,
+                    j.Encerrado ? j.PenaltisVencedorId : null);
             }).ToList()))
             .ToArray();
     }

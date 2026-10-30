@@ -1964,7 +1964,10 @@ public class LigaPublicService : ILigaPublicService
             j.TimeCasaId, j.TimeCasa?.TeamName,
             j.TimeForaId, j.TimeFora?.TeamName,
             j.VencedorId, j.Vencedor?.TeamName,
-            j.PartidaId, j.Partida?.GolsCasa, j.Partida?.GolsFora,
+            j.PartidaId,
+            // Partida agendada ainda não tem placar: o 0 x 0 dela não é resultado.
+            j.Partida is { Status: not PartidaStatus.Agendada } ? j.Partida.GolsCasa : null,
+            j.Partida is { Status: not PartidaStatus.Agendada } ? j.Partida.GolsFora : null,
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
             j.Partida?.TemPenaltis ?? false,
             j.Partida?.YoutubeVideoId);

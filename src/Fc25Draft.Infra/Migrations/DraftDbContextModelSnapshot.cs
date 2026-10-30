@@ -259,6 +259,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid>("PartidaId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("PenaltisVencedorId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TreinadorId")
                         .HasColumnType("uuid");
 

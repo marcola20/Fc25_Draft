@@ -67,7 +67,14 @@ public interface ILigaAdminService
 
     // Knockout
     Task<IReadOnlyList<LigaKnockoutJogoDto>> GerarFaseKnockoutAsync(Guid ligaId, CancellationToken ct);
+    /// <summary>Começa a partida do jogo (a agendada ou, se não houver, uma nova já em andamento).</summary>
     Task<LigaPartidaDto> CriarPartidaKnockoutAsync(Guid knockoutJogoId, CancellationToken ct);
+
+    /// <summary>
+    /// Agenda a partida de todo jogo do mata-mata com os dois times definidos que ainda não tem, para o
+    /// bolão abrir o palpite antes da bola rolar. Sem liga, passa por todas as competições em andamento.
+    /// </summary>
+    Task<int> AgendarJogosDoMataMataAsync(Guid? ligaId, CancellationToken ct);
     Task<LigaKnockoutJogoDto> EncerrarKnockoutJogoAsync(Guid knockoutJogoId, LigaEncerrarKnockoutRequest request, CancellationToken ct);
 
     // Copa grupos

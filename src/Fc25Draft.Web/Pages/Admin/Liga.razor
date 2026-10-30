@@ -1016,9 +1016,9 @@
                                 @if (jogo.VencedorId is null && jogo.TimeCasaId.HasValue && jogo.TimeForaId.HasValue)
                                 {
                                     <div class="mt-1 d-flex gap-1 flex-wrap">
-                                        @if (!jogo.PartidaId.HasValue)
+                                        @if (!jogo.PartidaId.HasValue || jogo.PartidaStatus == PartidaStatus.Agendada)
                                         {
-                                            <button class="btn btn-sm btn-primary" @onclick="() => CriarPartidaKnockout(jogo)" disabled="@_saving">Criar Partida</button>
+                                            <button class="btn btn-sm btn-primary" @onclick="() => CriarPartidaKnockout(jogo)" disabled="@_saving">Iniciar Partida</button>
                                         }
                                         else
                                         {

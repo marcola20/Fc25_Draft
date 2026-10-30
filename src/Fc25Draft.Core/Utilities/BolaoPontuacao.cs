@@ -9,6 +9,10 @@ namespace Fc25Draft.Core.Utilities;
 /// a pessoa chutou 0, o clean sheet do adversário. Acertou +3, errou −1; o jogador que nem entrou em
 /// campo não conta.
 /// </para>
+/// <para>
+/// Jogo que precisa de vencedor (mata-mata, Supercopa, jogo decisivo) com empate no palpite: quem passa
+/// nos pênaltis vale +1. Errou, ou o jogo não foi para os pênaltis, não tira nada.
+/// </para>
 /// </summary>
 public static class BolaoPontuacao
 {
@@ -19,6 +23,8 @@ public static class BolaoPontuacao
 
     public const int ExtraAcerto = 3;
     public const int ExtraErro = -1;
+
+    public const int PenaltisAcerto = 1;
 
     /// <summary>
     /// Os pontos são recalculados a cada vez; as regras novas valem só para os jogos marcados a partir
@@ -49,6 +55,13 @@ public static class BolaoPontuacao
         if (!escolheuJogador) return null;
         if (participou) return ExtraAcerto;
         return entrou ? ExtraErro : null;
+    }
+
+    /// <summary>Quem passa nos pênaltis: nulo quando a pessoa não escolheu ninguém.</summary>
+    public static int? Penaltis(Guid? escolhido, bool foiParaPenaltis, Guid? vencedor)
+    {
+        if (escolhido is null) return null;
+        return foiParaPenaltis && escolhido == vencedor ? PenaltisAcerto : 0;
     }
 
     /// <summary>1 casa, -1 fora, 0 empate.</summary>
