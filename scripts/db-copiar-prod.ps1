@@ -48,6 +48,12 @@ Write-Host 'Restaurando no banco local...'
 docker exec $container psql -q -U postgres -d $banco -v ON_ERROR_STOP=1 --output=/dev/null --file=$arquivoDump
 if ($LASTEXITCODE -ne 0) { Falhar 'Falha ao restaurar os dados no banco local (veja a mensagem acima).' }
 
+# 4) Tira os celulares inscritos nas notificações: são os aparelhos de verdade das pessoas da liga, e o site
+#    rodando local mandaria notificação para eles. O SQL vai pela entrada do psql por causa das aspas.
+Write-Host 'Removendo os aparelhos inscritos nas notificações...'
+'DELETE FROM "InscricoesPush";' | docker exec -i $container psql -q -U postgres -d $banco -v ON_ERROR_STOP=1 --output=/dev/null
+if ($LASTEXITCODE -ne 0) { Falhar 'Falha ao remover os aparelhos inscritos nas notificações (InscricoesPush). Não rode o site local antes de apagar essas linhas.' }
+
 docker exec $container rm -f $arquivoDump | Out-Null
 Write-Host ''
 Write-Host 'Pronto! Banco local atualizado com os dados de produção.' -ForegroundColor Green

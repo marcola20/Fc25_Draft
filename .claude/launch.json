@@ -13,7 +13,8 @@
       "runtimeArgs": [
         "run", "-c", "Release", "--project", "src/Fc25Draft.Web", "--",
         "--urls=http://localhost:5199",
-        "--ConnectionStrings:DefaultConnection=Host=localhost;Port=5432;Database=cbfv_teste;Username=postgres;Password=1909"
+        "--ConnectionStrings:DefaultConnection=Host=localhost;Port=5432;Database=cbfv_teste;Username=postgres;Password=1909",
+        "--Push:Desligado=true"
       ],
       "port": 5199,
       "url": "http://localhost:5199"

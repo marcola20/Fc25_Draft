@@ -18,6 +18,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.Configure<SecurityOptions>(cfg.GetSection(SecurityOptions.SectionName));
             services.Configure<MarketOptions>(cfg.GetSection(MarketOptions.SectionName));
             services.Configure<EconomiaOptions>(cfg.GetSection(EconomiaOptions.SectionName));
+            services.Configure<PushOptions>(cfg.GetSection(PushOptions.SectionName));
 
             // Core/Infra
             // AddComConexaoPropria: serviços usados direto pelas páginas, cada um com a sua conexão

@@ -3,12 +3,14 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Options;
 using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Lib.Net.Http.WebPush;
 using Lib.Net.Http.WebPush.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -39,11 +41,13 @@ public class PushService : IPushService
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
     private readonly ILogger<PushService> _logger;
+    private readonly bool _desligado;
 
-    public PushService(DraftDbContext db, ILogger<PushService> logger, TimeProvider? time = null)
+    public PushService(DraftDbContext db, ILogger<PushService> logger, IOptions<PushOptions> options, TimeProvider? time = null)
     {
         _db = db;
         _logger = logger;
+        _desligado = options.Value.Desligado;
         _time = time ?? TimeProvider.System;
     }
 
@@ -398,6 +402,14 @@ public class PushService : IPushService
     private async Task<int> EnviarAsync(IReadOnlyCollection<InscricaoPush> inscricoes, Notificacao n, CancellationToken ct)
     {
         if (inscricoes.Count == 0) return 0;
+
+        if (_desligado)
+        {
+            // Push:Desligado (site rodando local com a cópia da produção): nada sai para os aparelhos.
+            _logger.LogInformation("Push desligado, não enviado para {Aparelhos} aparelho(s): {Titulo} — {Texto}",
+                inscricoes.Count, n.Titulo, n.Texto);
+            return 0;
+        }
 
         var chaves = await ChavesAsync(ct);
         using var vapid = new VapidAuthentication(chaves.PublicKey, chaves.PrivateKey) { Subject = Contato };
