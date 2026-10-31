@@ -474,6 +474,35 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("ClausulasRevenda", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ComissaoContrato", b =>
+                {
+                    b.Property<Guid>("ContratoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<short>("Cargo")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("ContratadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("ContratoId");
+
+                    b.HasIndex("TeamId", "Temporada", "Cargo")
+                        .IsUnique();
+
+                    b.ToTable("ComissaoContratos", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>
                 {
                     b.Property<Guid>("PagamentoId")
@@ -3880,6 +3909,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Devedor");
 
                     b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ComissaoContrato", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>

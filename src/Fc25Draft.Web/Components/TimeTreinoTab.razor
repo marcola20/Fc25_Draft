@@ -27,13 +27,13 @@ else if (_dados is { } dados)
                 @dados.Semana.ToString("dd/MM", Br) a @dados.FechaEm.AddDays(-1).ToString("dd/MM", Br) ·
                 o treino acontece domingo à meia-noite
             </span>
-            <span class="badge @(dados.Escolhidos >= Math.Min(TreinoCriterios.JogadoresPorSemana, podem.Count) && podem.Count > 0 ? "bg-success" : "bg-warning text-dark") ms-auto">
-                @dados.Escolhidos de @TreinoCriterios.JogadoresPorSemana
+            <span class="badge @(dados.Escolhidos >= Math.Min(dados.Vagas, podem.Count) && podem.Count > 0 ? "bg-success" : "bg-warning text-dark") ms-auto">
+                @dados.Escolhidos de @dados.Vagas
             </span>
         </div>
         <div class="card-body">
             <p class="small text-muted mb-3">
-                Escolha até @TreinoCriterios.JogadoresPorSemana jogadores de até @TreinoCriterios.IdadeMaxima anos e até
+                Escolha até @dados.Vagas jogadores de até @dados.IdadeMaxima anos e até
                 @TreinoCriterios.OverallMaximo de overall, e o foco de cada um. Quando a semana fecha, cada um ganha
                 <strong>+@TreinoCriterios.GanhoPorSemana em um atributo do foco</strong>, que vai para o PES. Quem passa de
                 @TreinoCriterios.OverallMaximo se forma e sai do treino. Semana sem treino é semana perdida.
@@ -41,7 +41,7 @@ else if (_dados is { } dados)
 
             @if (podem.Count == 0)
             {
-                <div class="alert alert-secondary mb-0">Ninguém no elenco pode treinar agora (até @TreinoCriterios.IdadeMaxima anos e até @TreinoCriterios.OverallMaximo de overall).</div>
+                <div class="alert alert-secondary mb-0">Ninguém no elenco pode treinar agora (até @dados.IdadeMaxima anos e até @TreinoCriterios.OverallMaximo de overall).</div>
             }
             else
             {
@@ -60,7 +60,7 @@ else if (_dados is { } dados)
                             @foreach (var j in podem)
                             {
                                 var foco = _escolhas.GetValueOrDefault(j.PlayerId);
-                                var lotado = foco is null && escolhidos >= TreinoCriterios.JogadoresPorSemana;
+                                var lotado = foco is null && escolhidos >= dados.Vagas;
                                 <tr class="@(foco is not null ? "table-success" : "")">
                                     <td>
                                         <a href="/players/details/@j.PlayerId">@j.Nome</a>
@@ -81,7 +81,7 @@ else if (_dados is { } dados)
                                         else
                                         {
                                             <select class="form-select form-select-sm" disabled="@(lotado || _salvando)"
-                                                    title="@(lotado ? $"Já tem {TreinoCriterios.JogadoresPorSemana} no treino: tire alguém antes" : "")"
+                                                    title="@(lotado ? $"Já tem {dados.Vagas} no treino: tire alguém antes" : "")"
                                                     value="@(foco is { } f ? ((short)f).ToString(CultureInfo.InvariantCulture) : "")"
                                                     @onchange="e => Escolher(j.PlayerId, e.Value?.ToString())">
                                                 <option value="">— fora do treino</option>
@@ -207,6 +207,8 @@ else if (_dados is { } dados)
         </div>
     </div>
 
+    <TimeComissaoCard TeamId="@TeamId" TeamToken="@TeamToken" Mudou="CarregarAsync" />
+
     @if (dados.UltimaSemana.Count > 0)
     {
         <div class="card mb-3">
@@ -225,7 +227,7 @@ else if (_dados is { } dados)
                             <span>+@TreinoCriterios.GanhoPorSemana @atributo</span>
                             @if (r.AtributoDoPadrinho is { } doPadrinho)
                             {
-                                <span> e +@PadrinhoCriterios.ExtraNoTreino @doPadrinho <span class="text-muted">(padrinho)</span></span>
+                                <span> e +@PadrinhoCriterios.ExtraNoTreino @doPadrinho <span class="text-muted">(a mais)</span></span>
                             }
                             @if (r.OverallDepois != r.OverallAntes)
                             {
@@ -305,7 +307,7 @@ else if (_dados is { } dados)
     {
         var podem = dados.Jogadores.Where(j => j.PorQueNaoTreina is null).Select(j => j.PlayerId).ToHashSet();
         return dados.UltimaSemana.Where(r => podem.Contains(r.PlayerId))
-            .Take(TreinoCriterios.JogadoresPorSemana)
+            .Take(dados.Vagas)
             .Select(r => new TreinoEscolhaRequest(r.PlayerId, r.Foco))
             .ToList();
     }

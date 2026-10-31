@@ -106,7 +106,7 @@ else
         new("mercado", "Leilão", l => l.Origem is "LEILAO" or "COMPRA_IMEDIATA"),
         new("transferencias", "Transferências", l => l.Origem is "TRANSFERENCIA" or "TROCA" or "EMPRESTIMO" or "OPCAO_COMPRA" or "VENDA_ADMIN" or "TROCA_ADMIN" or "REVENDA"),
         new("vendarapida", "Vendas rápidas", l => l.Origem == "VENDA_RAPIDA"),
-        new("premios", "Prêmios e organização", l => l.Origem is "PREMIACAO" or "DIRETORIA" or "BOLAO" or "DRAFT_EXPANSAO" or "EXPANSAO_CAIXA_INICIAL" or "AJUSTE_ADMIN"),
+        new("premios", "Prêmios e organização", l => l.Origem is "PREMIACAO" or "DIRETORIA" or "BOLAO" or "COMISSAO" or "DRAFT_EXPANSAO" or "EXPANSAO_CAIXA_INICIAL" or "AJUSTE_ADMIN"),
     ];
 
     private IEnumerable<ExtratoLancamentoDto> Visiveis =>
@@ -125,6 +125,7 @@ else
         "PREMIACAO" => "Premiação",
         "DIRETORIA" => "Bônus da diretoria",
         "BOLAO" => "Prêmio do bolão",
+        "COMISSAO" => "Comissão técnica",
         "DRAFT_EXPANSAO" => "Draft de expansão",
         "EXPANSAO_CAIXA_INICIAL" => "Caixa inicial",
         "AJUSTE_ADMIN" => "Ajuste",

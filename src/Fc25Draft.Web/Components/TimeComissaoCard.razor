@@ -1,0 +1,109 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IComissaoService ComissaoSvc
+@inject TreinoApiClient TreinoApi
+
+@if (_dados is { } dados)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-bold">💼 Comissão técnica</span>
+            @if (dados.Vale && dados.ContrataAte is { } ate)
+            {
+                <span class="text-muted small">
+                    @(dados.Aberta ? $"contratações até {ate.AddDays(-1).ToString("dd/MM", Br)}" : "prazo de contratação encerrado")
+                </span>
+            }
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">
+                Profissionais contratados com o caixa nas @(ComissaoCriterios.DiasParaContratar / 7) primeiras semanas da temporada;
+                valem a temporada inteira.
+                @if (!dados.Vale)
+                {
+                    <strong>Começa na temporada @ComissaoCriterios.ValeAPartirDaTemporada.</strong>
+                }
+            </p>
+            <div class="row g-2">
+                @foreach (var c in dados.Cargos)
+                {
+                    <div class="col-12 col-md-4">
+                        <div class="border rounded p-2 h-100 d-flex flex-column @(c.Contratado ? "border-success" : "")">
+                            <div class="fw-semibold">@ComissaoDoClube.Emoji(c.Cargo) @ComissaoDoClube.Nome(c.Cargo)</div>
+                            <div class="small text-muted flex-grow-1">@ComissaoDoClube.OQueFaz(c.Cargo).</div>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <span class="small fw-semibold">@Dinheiro.Curto(c.Preco)</span>
+                                @if (c.Contratado)
+                                {
+                                    <span class="badge bg-success ms-auto">Contratado</span>
+                                }
+                                else if (TeamToken is not null && dados.Aberta)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary ms-auto" @onclick="() => _confirmar = c.Cargo"
+                                            disabled="@(_salvando || dados.Caixa < c.Preco)"
+                                            title="@(dados.Caixa < c.Preco ? "Caixa insuficiente" : "")">Contratar</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            @if (_confirmar is { } cargo)
+            {
+                <div class="alert alert-warning mt-3 mb-0 d-flex align-items-center gap-2 flex-wrap">
+                    <span>
+                        Contratar o <strong>@ComissaoDoClube.Nome(cargo).ToLowerInvariant()</strong> por
+                        <strong>@Dinheiro.Curto(ComissaoCriterios.Preco(cargo))</strong> (sai do caixa agora, sem devolução)?
+                    </span>
+                    <button class="btn btn-sm btn-primary ms-auto" @onclick="() => ContratarAsync(cargo)" disabled="@_salvando">Confirmar</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmar = null" disabled="@_salvando">Cancelar</button>
+                </div>
+            }
+            @if (_erro is not null)
+            {
+                <div class="small text-danger mt-2">@_erro</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    /// <summary>Token do time dono da página: com ele dá para contratar.</summary>
+    [Parameter] public string? TeamToken { get; set; }
+
+    /// <summary>Avisa a aba do treino (as vagas e a idade mudam com o treinador da base).</summary>
+    [Parameter] public EventCallback Mudou { get; set; }
+
+    private ComissaoDoTimeDto? _dados;
+    private CargoDaComissao? _confirmar;
+    private bool _salvando;
+    private string? _erro;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _dados = await ComissaoSvc.DoTimeAsync(TeamId, CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task ContratarAsync(CargoDaComissao cargo)
+    {
+        if (TeamToken is null) return;
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            await TreinoApi.ContratarAsync(cargo, TeamToken);
+            _confirmar = null;
+            _dados = await ComissaoSvc.DoTimeAsync(TeamId, CancellationToken.None);
+            await Mudou.InvokeAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

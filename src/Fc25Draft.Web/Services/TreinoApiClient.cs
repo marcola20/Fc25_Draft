@@ -19,6 +19,9 @@ public class TreinoApiClient
     public Task ApadrinharAsync(int padrinhoId, int afilhadoId, string teamToken, CancellationToken ct = default) =>
         EnviarAsync(HttpMethod.Post, "api/treino/padrinho", new ApadrinharRequest(padrinhoId, afilhadoId), teamToken, ct);
 
+    public Task ContratarAsync(Fc25Draft.Core.Utilities.CargoDaComissao cargo, string teamToken, CancellationToken ct = default) =>
+        EnviarAsync(HttpMethod.Post, $"api/comissao/{cargo}", new { }, teamToken, ct);
+
     private async Task EnviarAsync<T>(HttpMethod metodo, string url, T corpo, string teamToken, CancellationToken ct)
     {
         var client = await _clientFactory.CreateAsync();

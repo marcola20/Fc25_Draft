@@ -29,7 +29,8 @@ public class TreinoService : ITreinoService
     public async Task<TreinoDoTimeDto> DoTimeAsync(Guid teamId, CancellationToken ct)
     {
         var semana = SemanaAtual;
-        var elenco = await ElencoAsync(teamId, ct);
+        var limites = await LimitesAsync(teamId, ct);
+        var elenco = await ElencoAsync(teamId, limites, ct);
         var daSemana = await _db.TreinosSemanais.AsNoTracking()
             .Where(t => t.TeamId == teamId && t.Semana == semana)
             .ToDictionaryAsync(t => t.PlayerId, t => t.Foco, ct);
@@ -65,17 +66,19 @@ public class TreinoService : ITreinoService
             .ToList();
 
         return new TreinoDoTimeDto(semana, TreinoDaSemana.FechaEm(semana), jogadores, ultima,
-            par is null ? null : await ParaDtoAsync(par, ct), veteranos, par is null && temporada is not null);
+            par is null ? null : await ParaDtoAsync(par, ct), veteranos, par is null && temporada is not null,
+            limites.Vagas, limites.IdadeMaxima, limites.TreinadorDeGoleiros);
     }
 
     public async Task SalvarAsync(Guid teamId, IReadOnlyList<TreinoEscolhaRequest> escolhas, CancellationToken ct)
     {
-        if (escolhas.Count > TreinoCriterios.JogadoresPorSemana)
-            throw new InvalidOperationException($"O treino da semana é de até {TreinoCriterios.JogadoresPorSemana} jogadores.");
+        var limites = await LimitesAsync(teamId, ct);
+        if (escolhas.Count > limites.Vagas)
+            throw new InvalidOperationException($"O treino da semana é de até {limites.Vagas} jogadores.");
         if (escolhas.Select(e => e.PlayerId).Distinct().Count() != escolhas.Count)
             throw new InvalidOperationException("O mesmo jogador foi escolhido duas vezes.");
 
-        var elenco = (await ElencoAsync(teamId, ct)).ToDictionary(j => j.PlayerId);
+        var elenco = (await ElencoAsync(teamId, limites, ct)).ToDictionary(j => j.PlayerId);
         foreach (var e in escolhas)
         {
             if (!elenco.TryGetValue(e.PlayerId, out var j))
@@ -129,6 +132,7 @@ public class TreinoService : ITreinoService
         var pares = temporada is null
             ? []
             : await _db.Apadrinhamentos.AsNoTracking().Where(p => p.Temporada == temporada).ToListAsync(ct);
+        var comTreinadorDeGoleiros = await ComissaoService.TimesComAsync(_db, temporada, CargoDaComissao.TreinadorDeGoleiros, ct);
 
         var treinaram = 0;
         var evolucoes = new List<(TreinoSemanal Treino, EvolucaoPes Evolucao)>();
@@ -159,9 +163,12 @@ public class TreinoService : ITreinoService
             var depois = antes.ToArray();
             depois[indice] = Math.Min(AtributosPes.Maximo, depois[indice] + TreinoCriterios.GanhoPorSemana);
 
-            // Com padrinho no clube, o afilhado rende mais: mais um ponto no foco (de novo no que mais pesa).
+            // Com padrinho no clube (ou, para o goleiro, treinador de goleiros), rende mais: mais um ponto no foco, de
+            // novo no que mais pesa. Os dois não somam.
             int? extra = null;
-            if (pares.Any(p => p.TeamId == t.TeamId && p.AfilhadoId == t.PlayerId && noElenco.Contains((p.TeamId, p.PadrinhoId))))
+            var comPadrinho = pares.Any(p => p.TeamId == t.TeamId && p.AfilhadoId == t.PlayerId && noElenco.Contains((p.TeamId, p.PadrinhoId)));
+            var goleiroComTreinador = comTreinadorDeGoleiros.Contains(t.TeamId) && jogador.Atributos.PosicaoPes == 0;
+            if (comPadrinho || goleiroComTreinador)
             {
                 extra = TreinoDaSemana.AtributoQueSobe(t.Foco, depois, jogador.Atributos.PosicaoPes.Value, dto.PeFracoUso,
                     dto.PeFracoPrecisao, t.PlayerId, t.Semana);
@@ -197,7 +204,9 @@ public class TreinoService : ITreinoService
         {
             var linhas = grupo.Select(t => t.Atributo is { } atributo
                 ? $"{t.Player.Name} +{TreinoCriterios.GanhoPorSemana} {atributo}"
-                  + (t.AtributoDoPadrinho is { } doPadrinho ? $" e +{PadrinhoCriterios.ExtraNoTreino} {doPadrinho} (padrinho)" : "")
+                  + (t.AtributoDoPadrinho is { } doPadrinho
+                      ? $" e +{PadrinhoCriterios.ExtraNoTreino} {doPadrinho} ({(pares.Any(p => p.TeamId == t.TeamId && p.AfilhadoId == t.PlayerId) ? "padrinho" : "treinador de goleiros")})"
+                      : "")
                   + (t.OverallDepois != t.OverallAntes ? $" (overall {t.OverallAntes} → {t.OverallDepois})" : "")
                 : $"{t.Player.Name}: {t.SemEfeito}");
             AvisosDoTime.Criar(_db, grupo.Key.TeamId, AvisosDoTime.Treino,
@@ -232,16 +241,17 @@ public class TreinoService : ITreinoService
             var chave = $"treino:{timeId}:{semana:yyyy-MM-dd}";
             if (await _db.NotificacoesEnviadas.AnyAsync(n => n.Chave == chave, ct)) continue;
 
-            var elenco = await ElencoAsync(timeId, ct);
+            var limites = await LimitesAsync(timeId, ct);
+            var elenco = await ElencoAsync(timeId, limites, ct);
             var podem = elenco.Count(j => j.PorQueNaoTreina is null);
             var escolhidos = await _db.TreinosSemanais.CountAsync(t => t.TeamId == timeId && t.Semana == semana, ct);
-            var faltam = Math.Min(TreinoCriterios.JogadoresPorSemana, podem) - escolhidos;
+            var faltam = Math.Min(limites.Vagas, podem) - escolhidos;
             if (faltam <= 0) continue;
 
             _db.NotificacoesEnviadas.Add(new NotificacaoEnviada { Chave = chave, EnviadaEm = utc });
             AvisosDoTime.Criar(_db, timeId, AvisosDoTime.Treino,
                 escolhidos == 0
-                    ? "🏋️ Você ainda não montou o treino da semana: escolha até 3 jovens antes de domingo à noite."
+                    ? $"🏋️ Você ainda não montou o treino da semana: escolha até {limites.Vagas} jovens antes de domingo à noite."
                     : $"🏋️ Ainda cabe{(faltam > 1 ? "m" : "")} {faltam} jogador{(faltam > 1 ? "es" : "")} no treino da semana: escolha antes de domingo à noite.",
                 $"/teams/details/{timeId}?aba=treino", utc);
             avisados++;
@@ -269,7 +279,7 @@ public class TreinoService : ITreinoService
         if (await ParAtivoAsync(teamId, temporada, ct) is not null)
             throw new InvalidOperationException("O time já tem padrinho nesta temporada: o par vale até um dos dois sair do clube.");
 
-        var elenco = (await ElencoAsync(teamId, ct)).ToDictionary(j => j.PlayerId);
+        var elenco = (await ElencoAsync(teamId, await LimitesAsync(teamId, ct), ct)).ToDictionary(j => j.PlayerId);
         if (!elenco.TryGetValue(padrinhoId, out var padrinho) || !elenco.TryGetValue(afilhadoId, out var afilhado))
             throw new InvalidOperationException("Padrinho e afilhado precisam estar no seu elenco.");
         if (padrinho.Emprestado)
@@ -338,7 +348,20 @@ public class TreinoService : ITreinoService
     private sealed record JogadorDoElenco(int PlayerId, string Nome, string Posicao, int Overall, int? Idade, bool Goleiro,
         string? PorQueNaoTreina, GrupoDePosicao Grupo, bool Emprestado);
 
-    private async Task<List<JogadorDoElenco>> ElencoAsync(Guid teamId, CancellationToken ct)
+    /// <summary>Vagas e idade do treino do time (o treinador da base aumenta) e se ele tem treinador de goleiros.</summary>
+    private sealed record Limites(int Vagas, int IdadeMaxima, bool TreinadorDeGoleiros);
+
+    private async Task<Limites> LimitesAsync(Guid teamId, CancellationToken ct)
+    {
+        var cargos = await ComissaoService.CargosAsync(_db, teamId, await TemporadaAtualAsync(ct), ct);
+        var base_ = cargos.Contains(CargoDaComissao.TreinadorDaBase);
+        return new Limites(
+            base_ ? ComissaoCriterios.VagasComTreinadorDaBase : TreinoCriterios.JogadoresPorSemana,
+            base_ ? ComissaoCriterios.IdadeComTreinadorDaBase : TreinoCriterios.IdadeMaxima,
+            cargos.Contains(CargoDaComissao.TreinadorDeGoleiros));
+    }
+
+    private async Task<List<JogadorDoElenco>> ElencoAsync(Guid teamId, Limites limites, CancellationToken ct)
     {
         var emprestados = await _db.Emprestimos.AsNoTracking()
             .Where(e => e.Status == EmprestimoStatus.Ativo && e.TomadorTeamId == teamId)
@@ -355,7 +378,7 @@ public class TreinoService : ITreinoService
                 .ToListAsync(ct))
             .Select(r => new JogadorDoElenco(r.PlayerId, r.Name, r.Posicao, r.Overall, r.Age,
                 r.PositionId == (short)PositionType.Goleiro,
-                TreinoDaSemana.PorQueNaoTreina(r.Age, r.Overall, r.TemAtributos, emprestados.Contains(r.PlayerId)),
+                TreinoDaSemana.PorQueNaoTreina(r.Age, r.Overall, r.TemAtributos, emprestados.Contains(r.PlayerId), limites.IdadeMaxima),
                 PapelDoJogador.Grupo(r.PositionId), emprestados.Contains(r.PlayerId)))
             .ToList();
     }

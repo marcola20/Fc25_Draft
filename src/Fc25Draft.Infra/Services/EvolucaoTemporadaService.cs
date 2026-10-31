@@ -114,6 +114,15 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
         // Padrinho que cumpriu a temporada com o afilhado treinando: cai menos.
         var padrinhos = await TreinoService.PadrinhosComBonusAsync(_db, temporada, ct);
 
+        // Preparador físico: os mais velhos de cada time que contratou caem menos.
+        var timesComPreparador = await ComissaoService.TimesComAsync(_db, temporada, CargoDaComissao.PreparadorFisico, ct);
+        var doPreparador = jogadores
+            .Where(j => j.TimeId is Guid t && timesComPreparador.Contains(t))
+            .GroupBy(j => j.TimeId)
+            .SelectMany(g => g.OrderByDescending(j => j.Idade).ThenByDescending(j => j.Overall).Take(ComissaoCriterios.VeteranosDoPreparador))
+            .Select(j => j.PlayerId)
+            .ToHashSet();
+
         var resultado = new List<Calculo>(jogadores.Count);
         foreach (var j in jogadores)
         {
@@ -134,7 +143,8 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var dto = j.Atributos is null ? null : AtributosPes.ParaDto(j.Atributos);
             var goleiro = dto?.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
             var surpresa = surpresasCanceladas?.Contains(j.PlayerId) == true ? 0 : EvolucaoTemporada.Surpresa(temporada, j.PlayerId, j.Idade);
-            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, surpresa, padrinhos.GetValueOrDefault(j.PlayerId));
+            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, surpresa, padrinhos.GetValueOrDefault(j.PlayerId),
+                doPreparador.Contains(j.PlayerId));
             var pontos = conta.Total;
             var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId, pontos, goleiro);
 

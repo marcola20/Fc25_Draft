@@ -41,7 +41,10 @@ public record TreinoDoTimeDto(
     IReadOnlyList<TreinoResultadoDto> UltimaSemana,
     PadrinhoDto? Padrinho = null,
     IReadOnlyList<PadrinhoCandidatoDto>? Veteranos = null,
-    bool PodeApadrinhar = false)
+    bool PodeApadrinhar = false,
+    int Vagas = TreinoCriterios.JogadoresPorSemana,
+    int IdadeMaxima = TreinoCriterios.IdadeMaxima,
+    bool TreinadorDeGoleiros = false)
 {
     public int Escolhidos => Jogadores.Count(j => j.Foco is not null);
 }

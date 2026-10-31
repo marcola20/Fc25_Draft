@@ -88,11 +88,13 @@ public static class TreinoDaSemana
         : [FocoDoTreino.Finalizacao, FocoDoTreino.Passe, FocoDoTreino.Defesa, FocoDoTreino.Fisico];
 
     /// <summary>Por que ele não pode treinar (nulo = pode).</summary>
-    public static string? PorQueNaoTreina(int? idade, int overall, bool temAtributosDoJogo, bool emprestado)
+    /// <param name="idadeMaxima">Com treinador da base, maior que <see cref="TreinoCriterios.IdadeMaxima"/>.</param>
+    public static string? PorQueNaoTreina(int? idade, int overall, bool temAtributosDoJogo, bool emprestado,
+        int idadeMaxima = TreinoCriterios.IdadeMaxima)
     {
         if (emprestado) return "emprestado: quem treina é o dono";
         if (!temAtributosDoJogo) return "sem atributos do jogo no site";
-        if (idade is not int i || i > TreinoCriterios.IdadeMaxima) return $"mais de {TreinoCriterios.IdadeMaxima} anos";
+        if (idade is not int i || i > idadeMaxima) return $"mais de {idadeMaxima} anos";
         if (overall > TreinoCriterios.OverallMaximo) return $"overall acima de {TreinoCriterios.OverallMaximo}";
         return null;
     }
