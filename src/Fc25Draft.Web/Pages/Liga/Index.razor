@@ -1094,7 +1094,7 @@
 <!-- Modal de jogo do mata-mata -->
 @if (_jogoKnockoutAberto is not null)
 {
-    <KnockoutJogoModal Jogo="_jogoKnockoutAberto" OnFechar="() => _jogoKnockoutAberto = null" OnAlterado="AtualizarAposKnockout" />
+    <KnockoutJogoModal Jogo="_jogoKnockoutAberto" LigaNome="@LigaNome" OnFechar="() => _jogoKnockoutAberto = null" OnAlterado="AtualizarAposKnockout" />
 }
 
 <!-- Match Details Modal -->

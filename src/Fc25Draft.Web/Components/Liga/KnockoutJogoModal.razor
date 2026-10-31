@@ -14,7 +14,7 @@
                     <small class="text-muted d-block">@Jogo.FaseLabel</small>
                     <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
                     @(Jogo.TimeCasaNome ?? "A definir")
-                    <span class="text-muted mx-2">@(Jogo.GolsCasa?.ToString() ?? "—") – @(Jogo.GolsFora?.ToString() ?? "—")</span>
+                    <span class="text-muted mx-2">@(Iniciada ? $"{Jogo.GolsCasa ?? 0} – {Jogo.GolsFora ?? 0}" : "x")</span>
                     @(Jogo.TimeForaNome ?? "A definir")
                     <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
                 </h5>
@@ -46,14 +46,23 @@
                 {
                     <PartidaStatsEditor PartidaId="partidaId" OnChanged="() => OnAlterado.InvokeAsync()" />
                 }
-                else if (!Iniciada)
+                else if (Jogo.PartidaId is not Guid pid)
                 {
-                    <div class="text-muted">Partida ainda não iniciada.</div>
+                    <div class="text-muted">Partida ainda não agendada.</div>
                 }
                 else
                 {
-                <PartidaTelaoLink PartidaId="Jogo.PartidaId.Value" YoutubeVideoId="@Jogo.YoutubeVideoId" OnAlterado="() => OnAlterado.InvokeAsync()" />
-                <PartidaAbas PartidaId="Jogo.PartidaId.Value" CasaId="Jogo.TimeCasaId" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" Eventos="_eventos" Escalacoes="_escalacoes" />
+                @* Igual ao jogo da liga: agendada já mostra telão, reações, prévia e formações. *@
+                <PartidaTelaoLink PartidaId="pid" YoutubeVideoId="@Jogo.YoutubeVideoId" OnAlterado="() => OnAlterado.InvokeAsync()" />
+                <ReacoesJogo PartidaId="pid" Class="mb-3" />
+                @if (Jogo.PartidaStatus == PartidaStatus.Encerrada)
+                {
+                    <CraqueDaPartidaCard Escalacoes="_escalacoes" PartidaId="pid"
+                                         CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")"
+                                         GolsCasa="Jogo.GolsCasa ?? 0" GolsFora="Jogo.GolsFora ?? 0"
+                                         Rotulo="@(string.IsNullOrEmpty(LigaNome) ? Jogo.FaseLabel : $"{Jogo.FaseLabel} · {LigaNome}")" />
+                }
+                <PartidaAbas PartidaId="pid" CasaId="Jogo.TimeCasaId" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" Eventos="_eventos" Escalacoes="_escalacoes" />
                 }
             </div>
             <div class="modal-footer">
@@ -92,6 +101,8 @@
 @code {
     /// <summary>Jogo exibido. O pai deve repassar a versão atualizada após <see cref="OnAlterado"/>.</summary>
     [Parameter, EditorRequired] public LigaKnockoutJogoDto Jogo { get; set; } = null!;
+    /// <summary>Nome da competição, para o rótulo do card do craque.</summary>
+    [Parameter] public string? LigaNome { get; set; }
     [Parameter] public EventCallback OnFechar { get; set; }
     /// <summary>Disparado quando placar/eventos/bracket mudam: o pai recarrega os jogos.</summary>
     [Parameter] public EventCallback OnAlterado { get; set; }
