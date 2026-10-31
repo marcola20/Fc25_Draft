@@ -6,8 +6,14 @@ namespace Fc25Draft.Core.Interfaces;
 /// <summary>Picks do próximo draft: de quem é cada uma (elas entram nas propostas entre times).</summary>
 public interface IPicksDoDraftService
 {
-    /// <summary>Todas as picks do próximo draft (1ª e 2ª rodada de cada time) e o dono de cada uma.</summary>
+    /// <summary>Picks dos drafts abertos (o próximo e um que esteja acontecendo), com dono, posição e proteção.</summary>
     Task<PicksDoProximoDraftDto> ProximoDraftAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Depois da loteria, a pick protegida que caiu dentro da proteção volta para quem protegeu (que devolve o
+    /// combinado). Retorna quantas voltaram.
+    /// </summary>
+    Task<int> ResolverProtecoesAsync(CancellationToken ct);
 
     /// <summary>Notícias do Plantão: picks que mudaram de dono.</summary>
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);

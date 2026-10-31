@@ -17,7 +17,8 @@ public record CreateTransferOfferDto(
     decimal? BuyOptionPrice = null,
     PickRefDto[]? TargetPicks = null,
     PickRefDto[]? OfferedPicks = null,
-    decimal? BuybackPrice = null);
+    decimal? BuybackPrice = null,
+    PickProtecaoDto[]? Protecoes = null);
 
 public record RespondToOfferDto(
     OfferStatus Response);

@@ -10,6 +10,12 @@ namespace Fc25Draft.Core.Entities
         public int TotalRounds { get; set; }
         public DateTime CreatedAtUtc { get; set; }
 
+        /// <summary>
+        /// Temporada cuja classificação definiu o draft (o da loteria). Nulo nos drafts antigos e nos que não saem da
+        /// loteria (expansão, complementar).
+        /// </summary>
+        public int? Temporada { get; set; }
+
         public DraftTipo Tipo { get; set; } = DraftTipo.Normal;
 
         /// <summary>

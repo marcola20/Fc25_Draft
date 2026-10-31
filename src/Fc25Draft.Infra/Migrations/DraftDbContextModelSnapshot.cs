@@ -611,6 +611,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int?>("TempoPorEscolhaMinutos")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("Temporada")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Tipo")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -2347,11 +2350,26 @@ namespace Fc25Draft.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("Compensacao")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<Guid>("DonoId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("NegociadaEm")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool?>("ProtecaoAcionada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ProtecaoResolvidaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("ProtegidaAte")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ProtetorId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Rodada")
                         .HasColumnType("integer");
@@ -3541,8 +3559,14 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid>("TimeOriginalId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("Compensacao")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<bool>("IsTarget")
                         .HasColumnType("boolean");
+
+                    b.Property<int?>("ProtegidaAte")
+                        .HasColumnType("integer");
 
                     b.HasKey("OfferId", "Temporada", "Rodada", "TimeOriginalId");
 

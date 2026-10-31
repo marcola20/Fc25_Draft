@@ -22,6 +22,21 @@ public class PickDoDraft
 
     public DateTime NegociadaEm { get; set; }
 
+    /// <summary>
+    /// Pick protegida: se cair até essa posição na loteria, volta para <see cref="ProtetorId"/>, que paga
+    /// <see cref="Compensacao"/> a quem estava com ela. Nulo = sem proteção.
+    /// </summary>
+    public int? ProtegidaAte { get; set; }
+
+    /// <summary>Quem protegeu (quem cedeu a pick com a proteção) e a recebe de volta se ela acionar.</summary>
+    public Guid? ProtetorId { get; set; }
+
+    public decimal? Compensacao { get; set; }
+
+    /// <summary>A loteria saiu e a proteção foi conferida (acionou ou não).</summary>
+    public DateTime? ProtecaoResolvidaEm { get; set; }
+    public bool? ProtecaoAcionada { get; set; }
+
     public Team TimeOriginal { get; set; } = null!;
     public Team Dono { get; set; } = null!;
 }
@@ -37,6 +52,12 @@ public class TransferOfferPick
     public int Rodada { get; set; }
     public Guid TimeOriginalId { get; set; }
     public bool IsTarget { get; set; }
+
+    /// <summary>Quem cede protege a pick até essa posição da loteria (nulo = sem proteção).</summary>
+    public int? ProtegidaAte { get; set; }
+
+    /// <summary>O que quem cede devolve a quem recebeu se a proteção acionar.</summary>
+    public decimal? Compensacao { get; set; }
 
     public TransferOffer Offer { get; set; } = null!;
     public Team TimeOriginal { get; set; } = null!;

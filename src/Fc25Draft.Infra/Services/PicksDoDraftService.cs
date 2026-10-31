@@ -27,10 +27,15 @@ public class PicksDoDraftService : IPicksDoDraftService
 
     public async Task<PicksDoProximoDraftDto> ProximoDraftAsync(CancellationToken ct)
     {
-        var (temporada, aberta) = await SituacaoAsync(_db, HorarioDeBrasilia.Agora(_time), ct);
-        if (temporada is not int t) return new PicksDoProximoDraftDto(null, false, []);
-        return new PicksDoProximoDraftDto(t, aberta, await PicksAsync(_db, t, ct));
+        var agora = HorarioDeBrasilia.Agora(_time);
+        var atual = await TemporadaAtualAsync(_db, agora, ct);
+        var picks = new List<PickDoDraftDto>();
+        foreach (var t in await TemporadasNegociaveisAsync(_db, agora, ct))
+            picks.AddRange(await PicksAsync(_db, t, ct));
+        return new PicksDoProximoDraftDto(atual, picks.Any(p => !p.Usada), picks);
     }
+
+    public Task<int> ResolverProtecoesAsync(CancellationToken ct) => ResolverProtecoesAsync(_db, _time.GetUtcNow().UtcDateTime, ct);
 
     public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct)
     {
@@ -61,25 +66,50 @@ public class PicksDoDraftService : IPicksDoDraftService
 
     // ── Para as propostas e o draft ────────────────────────────────────────────
 
-    /// <summary>
-    /// Temporada do próximo draft (a em andamento: o draft sai da classificação dela) e se as picks ainda se negociam
-    /// (fecha quando a loteria desse draft termina).
-    /// </summary>
-    public static async Task<(int? Temporada, bool Aberta)> SituacaoAsync(DraftDbContext db, DateTime agoraBrasilia, CancellationToken ct)
-    {
-        var serieA = await db.Ligas.AsNoTracking()
+    /// <summary>Temporada em andamento (a Série A mais recente que já começou): é dela o próximo draft.</summary>
+    public static async Task<int?> TemporadaAtualAsync(DraftDbContext db, DateTime agoraBrasilia, CancellationToken ct) =>
+        await db.Ligas.AsNoTracking()
             .Where(l => l.Tipo == TipoCompetition.Liga && l.DataInicio <= agoraBrasilia
                         && (l.Divisao == null || l.Divisao == Divisao.SerieA))
             .OrderByDescending(l => l.DataInicio)
-            .Select(l => new { l.LigaId, l.Temporada })
+            .Select(l => l.Temporada)
             .FirstOrDefaultAsync(ct);
-        if (serieA?.Temporada is not int temporada) return (null, false);
 
-        var loteriaFeita = await db.LigaLoterias.AsNoTracking().AnyAsync(l => l.LigaId == serieA.LigaId && l.IsFinished, ct);
-        return (temporada, !loteriaFeita);
+    /// <summary>
+    /// Drafts cujas picks se negociam: o da temporada em andamento (até a última pick dele ser usada) e o de uma
+    /// temporada anterior que ainda está acontecendo (a virada pode vir no meio do draft).
+    /// </summary>
+    public static async Task<List<int>> TemporadasNegociaveisAsync(DraftDbContext db, DateTime agoraBrasilia, CancellationToken ct)
+    {
+        var temporadas = new List<int>();
+        if (await TemporadaAtualAsync(db, agoraBrasilia, ct) is int atual
+            && !await db.Drafts.AnyAsync(d => d.Temporada == atual && d.Picks.All(p => p.PlayerId != null), ct))
+            temporadas.Add(atual);
+        temporadas.AddRange(await db.Drafts.AsNoTracking()
+            .Where(d => d.Temporada != null && !temporadas.Contains(d.Temporada.Value) && d.Picks.Any(p => p.PlayerId == null))
+            .Select(d => d.Temporada!.Value)
+            .ToListAsync(ct));
+        return temporadas;
     }
 
-    /// <summary>Todas as picks do draft da temporada, com o dono de cada uma.</summary>
+    /// <summary>Posição de cada time em cada rodada, se a loteria do draft da temporada já terminou: (rodada, time) → posição.</summary>
+    public static async Task<Dictionary<(int Rodada, Guid Time), int>> PosicoesAsync(DraftDbContext db, int temporada, CancellationToken ct)
+    {
+        var serieA = await db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada == temporada && l.Tipo == TipoCompetition.Liga && (l.Divisao == null || l.Divisao == Divisao.SerieA))
+            .Select(l => l.LigaId)
+            .FirstOrDefaultAsync(ct);
+        var picks = await db.LigaLoterias.AsNoTracking()
+            .Where(l => l.LigaId == serieA && l.IsFinished)
+            .OrderByDescending(l => l.CriadoEm)
+            .Take(1)
+            .SelectMany(l => l.Picks)
+            .Select(p => new { p.Rodada, p.TimeId, p.PickNumero })
+            .ToListAsync(ct);
+        return picks.GroupBy(p => (p.Rodada, p.TimeId)).ToDictionary(g => g.Key, g => g.First().PickNumero);
+    }
+
+    /// <summary>Todas as picks do draft da temporada, com o dono, a posição (depois da loteria) e a proteção.</summary>
     public static async Task<IReadOnlyList<PickDoDraftDto>> PicksAsync(DraftDbContext db, int temporada, CancellationToken ct)
     {
         var times = await db.LigaTimes.AsNoTracking()
@@ -87,16 +117,29 @@ public class PicksDoDraftService : IPicksDoDraftService
             .Select(t => new { t.TimeId, t.Time.TeamName })
             .Distinct()
             .ToListAsync(ct);
-        var nomes = times.ToDictionary(t => t.TimeId, t => t.TeamName);
-        var donos = await DonosAsync(db, temporada, ct);
+        var nomes = await db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+        var registros = (await db.PicksDoDraft.AsNoTracking().Where(p => p.Temporada == temporada).ToListAsync(ct))
+            .ToDictionary(p => (p.Rodada, p.TimeOriginalId));
+        var posicoes = await PosicoesAsync(db, temporada, ct);
+        var usadas = (await db.DraftPicks.AsNoTracking()
+                .Where(p => p.Draft.Temporada == temporada && p.PlayerId != null)
+                .Select(p => new { p.RoundNumber, p.PickInRound })
+                .ToListAsync(ct))
+            .Select(p => (p.RoundNumber, p.PickInRound))
+            .ToHashSet();
 
         return times
             .SelectMany(t => Rodadas.Select(r =>
             {
-                var dono = donos.GetValueOrDefault((r, t.TimeId), t.TimeId);
-                return new PickDoDraftDto(temporada, r, t.TimeId, t.TeamName, dono, nomes.GetValueOrDefault(dono, "?"));
+                var registro = registros.GetValueOrDefault((r, t.TimeId));
+                var dono = registro?.DonoId ?? t.TimeId;
+                int? posicao = posicoes.TryGetValue((r, t.TimeId), out var pos) ? pos : null;
+                return new PickDoDraftDto(temporada, r, t.TimeId, t.TeamName, dono, nomes.GetValueOrDefault(dono, "?"),
+                    posicao, posicao is int x && usadas.Contains((r, x)),
+                    registro?.ProtegidaAte, registro?.ProtetorId is Guid protetor ? nomes.GetValueOrDefault(protetor) : null,
+                    registro?.Compensacao, registro?.ProtecaoAcionada);
             }))
-            .OrderBy(p => p.Rodada).ThenBy(p => p.TimeOriginalNome)
+            .OrderBy(p => p.Temporada).ThenBy(p => p.Rodada).ThenBy(p => p.Posicao ?? int.MaxValue).ThenBy(p => p.TimeOriginalNome)
             .ToList();
     }
 
@@ -109,29 +152,44 @@ public class PicksDoDraftService : IPicksDoDraftService
         .ToDictionary(p => (p.Rodada, p.TimeOriginalId), p => p.DonoId);
 
     /// <summary>
-    /// Confere que as picks são do próximo draft, ainda se negociam e são todas de <paramref name="dono"/>. Devolve o
-    /// texto do problema, ou nulo se está tudo certo.
+    /// Confere que as picks ainda se negociam (não foram usadas) e são todas de <paramref name="dono"/>, e que a
+    /// proteção pedida faz sentido (antes da loteria, numa pick que ainda não tem). Devolve o problema ou nulo.
     /// </summary>
     public static async Task<string?> ProblemaAsync(DraftDbContext db, DateTime agoraBrasilia, IEnumerable<PickRefDto> picks,
-        Guid dono, string nomeDoDono, CancellationToken ct)
+        Guid dono, string nomeDoDono, CancellationToken ct, IReadOnlyDictionary<PickRefDto, PickProtecaoDto>? protecoes = null)
     {
         var lista = picks.ToList();
         if (lista.Count == 0) return null;
 
-        var (temporada, aberta) = await SituacaoAsync(db, agoraBrasilia, ct);
-        if (temporada is null || !aberta) return "As picks do draft não se negociam mais: a loteria já aconteceu.";
+        var negociaveis = await TemporadasNegociaveisAsync(db, agoraBrasilia, ct);
+        var todas = new Dictionary<PickRefDto, PickDoDraftDto>();
+        foreach (var t in lista.Select(p => p.Temporada).Distinct().Where(negociaveis.Contains))
+            foreach (var pick in await PicksAsync(db, t, ct))
+                todas[pick.Ref] = pick;
 
-        var todas = (await PicksAsync(db, temporada.Value, ct)).ToDictionary(p => p.Ref);
         foreach (var p in lista)
         {
-            if (!todas.TryGetValue(p, out var pick)) return "Essa pick não é do próximo draft.";
+            if (!todas.TryGetValue(p, out var pick)) return "Essa pick não se negocia mais (o draft dela já acabou).";
+            if (pick.Usada) return $"A pick {pick.Rotulo} já foi usada no draft.";
             if (pick.DonoId != dono) return $"A pick da {pick.Rotulo} não é do {nomeDoDono}.";
+            if (protecoes?.GetValueOrDefault(p) is { } protecao)
+            {
+                if (pick.Posicao is not null) return $"A pick {pick.Rotulo} já tem posição: proteção só antes da loteria.";
+                if (pick.ProtegidaAte is not null && pick.ProtecaoAcionada is null)
+                    return $"A pick da {pick.Rotulo} já tem proteção (até a #{pick.ProtegidaAte}).";
+                if (protecao.ProtegidaAte < 1) return "A proteção tem que ser até uma posição (#1 ou mais).";
+                if (protecao.Compensacao < 0) return "A devolução da proteção não pode ser negativa.";
+            }
         }
         return null;
     }
 
-    /// <summary>Passa as picks para <paramref name="novoDono"/> (não salva: entra no SaveChanges da proposta).</summary>
-    public static async Task TransferirAsync(DraftDbContext db, IEnumerable<PickRefDto> picks, Guid novoDono, DateTime agora, CancellationToken ct)
+    /// <summary>
+    /// Passa as picks de <paramref name="antigoDono"/> para <paramref name="novoDono"/>, com a proteção que vier
+    /// junto (quem cede protege). Se o draft já foi gerado, quem escolhe naquela posição muda também. Não salva.
+    /// </summary>
+    public static async Task TransferirAsync(DraftDbContext db, IEnumerable<TransferOfferPick> picks, Guid antigoDono, Guid novoDono,
+        DateTime agora, CancellationToken ct)
     {
         foreach (var p in picks)
         {
@@ -139,17 +197,92 @@ public class PicksDoDraftService : IPicksDoDraftService
                 x => x.Temporada == p.Temporada && x.Rodada == p.Rodada && x.TimeOriginalId == p.TimeOriginalId, ct);
             if (registro is null)
             {
-                db.PicksDoDraft.Add(new PickDoDraft
+                registro = new PickDoDraft
                 {
-                    PickDoDraftId = Guid.NewGuid(), Temporada = p.Temporada, Rodada = p.Rodada,
-                    TimeOriginalId = p.TimeOriginalId, DonoId = novoDono, NegociadaEm = agora
-                });
+                    PickDoDraftId = Guid.NewGuid(), Temporada = p.Temporada, Rodada = p.Rodada, TimeOriginalId = p.TimeOriginalId
+                };
+                db.PicksDoDraft.Add(registro);
             }
-            else
+            // Pela Entry: com os times já carregados no contexto, mudar só o campo deixaria o EF voltar o vínculo antigo.
+            db.Entry(registro).Property(x => x.DonoId).CurrentValue = novoDono;
+            registro.NegociadaEm = agora;
+            if (p.ProtegidaAte is int ate)
             {
-                registro.DonoId = novoDono;
-                registro.NegociadaEm = agora;
+                registro.ProtegidaAte = ate;
+                registro.ProtetorId = antigoDono;
+                registro.Compensacao = p.Compensacao ?? 0m;
+                registro.ProtecaoResolvidaEm = null;
+                registro.ProtecaoAcionada = null;
+            }
+
+            await MudarNoDraftAsync(db, p.Temporada, p.Rodada, p.TimeOriginalId, novoDono, ct);
+        }
+    }
+
+    /// <summary>Se o draft da temporada já foi gerado e a pick não foi usada, quem escolhe nela passa a ser o dono.</summary>
+    private static async Task MudarNoDraftAsync(DraftDbContext db, int temporada, int rodada, Guid timeOriginal, Guid dono, CancellationToken ct)
+    {
+        var posicoes = await PosicoesAsync(db, temporada, ct);
+        if (!posicoes.TryGetValue((rodada, timeOriginal), out var posicao)) return;
+        var noDraft = await db.DraftPicks.FirstOrDefaultAsync(
+            x => x.Draft.Temporada == temporada && x.RoundNumber == rodada && x.PickInRound == posicao && x.PlayerId == null, ct);
+        if (noDraft is not null) db.Entry(noDraft).Property(x => x.TeamId).CurrentValue = dono;
+    }
+
+    /// <summary>
+    /// Depois da loteria, confere as picks protegidas: a que caiu dentro da proteção volta para quem protegeu, que
+    /// paga a devolução a quem estava com ela. Salva. Retorna quantas voltaram.
+    /// </summary>
+    public static async Task<int> ResolverProtecoesAsync(DraftDbContext db, DateTime agoraUtc, CancellationToken ct)
+    {
+        var pendentes = await db.PicksDoDraft
+            .Where(p => p.ProtegidaAte != null && p.ProtecaoResolvidaEm == null)
+            .ToListAsync(ct);
+        if (pendentes.Count == 0) return 0;
+
+        var voltaram = 0;
+        var nomes = await db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+        foreach (var temporada in pendentes.GroupBy(p => p.Temporada))
+        {
+            var posicoes = await PosicoesAsync(db, temporada.Key, ct);
+            if (posicoes.Count == 0) continue; // a loteria ainda não terminou
+
+            foreach (var pick in temporada)
+            {
+                if (!posicoes.TryGetValue((pick.Rodada, pick.TimeOriginalId), out var posicao)) continue;
+                pick.ProtecaoResolvidaEm = agoraUtc;
+                pick.ProtecaoAcionada = posicao <= pick.ProtegidaAte;
+                var rotulo = $"#{posicao} da {pick.Rodada}ª rodada (do {nomes.GetValueOrDefault(pick.TimeOriginalId)})";
+                if (pick.ProtecaoAcionada != true || pick.ProtetorId is not Guid protetorId || protetorId == pick.DonoId)
+                    continue;
+
+                // Caiu dentro da proteção: a pick volta e quem protegeu devolve o combinado.
+                var quemPerde = pick.DonoId;
+                db.Entry(pick).Property(x => x.DonoId).CurrentValue = protetorId;
+                await MudarNoDraftAsync(db, pick.Temporada, pick.Rodada, pick.TimeOriginalId, protetorId, ct);
+                if (pick.Compensacao is > 0 && await db.Teams.FirstOrDefaultAsync(t => t.TeamId == protetorId, ct) is { } protetor
+                    && await db.Teams.FirstOrDefaultAsync(t => t.TeamId == quemPerde, ct) is { } perdeu)
+                {
+                    var valor = pick.Compensacao.Value;
+                    protetor.Budget = decimal.Round(protetor.Budget - valor, 2, MidpointRounding.AwayFromZero);
+                    perdeu.Budget = decimal.Round(perdeu.Budget + valor, 2, MidpointRounding.AwayFromZero);
+                    var descricao = $"Proteção da pick {rotulo}: a pick voltou para o {protetor.TeamName}";
+                    ExtratoCaixa.Lancar(db, protetorId, -valor, ExtratoCaixa.Transferencia, descricao, agoraUtc);
+                    ExtratoCaixa.Lancar(db, quemPerde, valor, ExtratoCaixa.Transferencia, descricao, agoraUtc);
+                }
+
+                var devolucao = pick.Compensacao is > 0 ? $" e devolveu {pick.Compensacao.Value / 1_000_000m:0.#} mi" : "";
+                AvisosDoTime.Criar(db, quemPerde, AvisosDoTime.Proposta,
+                    $"🛡️ A pick {rotulo} era protegida até a #{pick.ProtegidaAte}: voltou para o {nomes.GetValueOrDefault(protetorId)}{devolucao}.",
+                    "/picks", agoraUtc);
+                AvisosDoTime.Criar(db, protetorId, AvisosDoTime.Proposta,
+                    $"🛡️ A proteção acionou: a pick {rotulo} voltou para você{(devolucao.Length > 0 ? $" (você devolveu {pick.Compensacao!.Value / 1_000_000m:0.#} mi)" : "")}.",
+                    "/picks", agoraUtc);
+                voltaram++;
             }
         }
+
+        await db.SaveChangesAsync(ct);
+        return voltaram;
     }
 }

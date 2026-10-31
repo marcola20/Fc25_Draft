@@ -70,6 +70,8 @@ public class NotificacoesService : BackgroundService
         await TentarAsync("papel no elenco", s => s.GetRequiredService<IParticipacaoService>().GravarPapeisAsync(ct));
         // A semana fechou (segunda, 0h de Brasília): o treino acontece e o aviso sai nesta mesma checagem.
         await TentarAsync("treino da semana", s => s.GetRequiredService<ITreinoService>().TreinarSemanasFechadasAsync(ct));
+        // A loteria terminou: as picks protegidas que caíram dentro da proteção voltam.
+        await TentarAsync("picks protegidas", s => s.GetRequiredService<IPicksDoDraftService>().ResolverProtecoesAsync(ct));
         // Antes dos avisos: o que a diretoria gravar sai como notificação nesta mesma checagem.
         if (diretoria)
         {

@@ -349,13 +349,15 @@
 
                     @if (_picks is { Aberta: true } picks && _newOfferType != OfferType.Loan && Guid.TryParse(_selectedTargetTeamId, out var adversarioId))
                     {
-                        var deles = picks.Picks.Where(pk => pk.DonoId == adversarioId).ToList();
-                        var minhas = picks.Picks.Where(pk => pk.DonoId == TeamId).ToList();
+                        var deles = picks.Picks.Where(pk => pk.DonoId == adversarioId && !pk.Usada).ToList();
+                        var minhas = picks.Picks.Where(pk => pk.DonoId == TeamId && !pk.Usada).ToList();
+                        var escolhidas = picks.Picks.Where(pk => _selectedTargetPicks.Contains(pk.Ref) || _selectedOfferedPicks.Contains(pk.Ref)).ToList();
                         <div class="mt-3">
-                            <label class="form-label mb-1">Picks do próximo draft</label>
+                            <label class="form-label mb-1">Picks do draft</label>
                             <div class="small text-muted mb-2">
-                                A pick vale a posição que o time dono dela pela classificação tirar na loteria. Negócio só de
-                                picks (e dinheiro) vale fora da janela e não conta no limite de transferências.
+                                Antes da loteria, a pick vale a posição que o time dono dela pela classificação tirar; depois, já
+                                tem número (#3). Negocia até ser usada no draft. Negócio só de picks (e dinheiro) vale fora da
+                                janela e não conta no limite de transferências.
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                                 <span class="small text-muted me-1">Pedir:</span>
@@ -377,6 +379,36 @@
                                             @onclick="() => TogglePick(_selectedOfferedPicks, pk.Ref)">🔄 @pk.Rotulo</button>
                                 }
                             </div>
+                            @foreach (var pk in escolhidas)
+                            {
+                                var refPk = pk.Ref;
+                                @if (pk.Posicao is null && (pk.ProtegidaAte is null || pk.ProtecaoAcionada is not null))
+                                {
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mt-2 small">
+                                        <span>🛡️ Proteção da <strong>@pk.Rotulo</strong>:</span>
+                                        <select class="form-select form-select-sm w-auto"
+                                                value="@(_protecaoAte.GetValueOrDefault(refPk).ToString(CultureInfo.InvariantCulture))"
+                                                @onchange="e => DefinirProtecao(refPk, e.Value?.ToString())">
+                                            <option value="0">sem proteção</option>
+                                            @foreach (var ate in new[] { 1, 2, 3, 4, 5, 6, 8, 10 })
+                                            {
+                                                <option value="@ate">protegida até a #@ate</option>
+                                            }
+                                        </select>
+                                        @if (_protecaoAte.GetValueOrDefault(refPk) > 0)
+                                        {
+                                            <span>se acionar, quem cede devolve R$</span>
+                                            <input type="text" class="form-control form-control-sm w-auto" inputmode="decimal" style="max-width:9rem"
+                                                   value="@FormatMoneyInput(_protecaoDevolucao.GetValueOrDefault(refPk))"
+                                                   @onchange="e => DefinirDevolucao(refPk, e.Value?.ToString())" placeholder="0,00" />
+                                        }
+                                    </div>
+                                }
+                                else if (pk.ProtegidaAte is int jaProtegida && pk.ProtecaoAcionada is null)
+                                {
+                                    <div class="small text-muted mt-2">🛡️ A @pk.Rotulo já é protegida até a #@jaProtegida (volta para o @pk.ProtetorNome se cair até lá).</div>
+                                }
+                            }
                         </div>
                     }
 
@@ -540,11 +572,11 @@
                             <div class="col-sm-8">
                                 @foreach (var pk in _detailOffer.TargetPicks ?? [])
                                 {
-                                    <span class="badge bg-danger me-1 mb-1">🔄 @pk.Rotulo (pedida)</span>
+                                    <span class="badge bg-danger me-1 mb-1">🔄 @pk.Rotulo (pedida)@(pk.ProtegidaAte is int a3 ? $" · 🛡️ protegida até a #{a3}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
                                 }
                                 @foreach (var pk in _detailOffer.OfferedPicks ?? [])
                                 {
-                                    <span class="badge bg-success me-1 mb-1">🔄 @pk.Rotulo (oferecida)</span>
+                                    <span class="badge bg-success me-1 mb-1">🔄 @pk.Rotulo (oferecida)@(pk.ProtegidaAte is int a4 ? $" · 🛡️ protegida até a #{a4}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
                                 }
                             </div>
                         </div>
@@ -688,6 +720,8 @@
     private HashSet<PickRefDto> _selectedTargetPicks = new();
     private HashSet<PickRefDto> _selectedOfferedPicks = new();
     private PicksDoProximoDraftDto? _picks;
+    private Dictionary<PickRefDto, int> _protecaoAte = new();
+    private Dictionary<PickRefDto, decimal> _protecaoDevolucao = new();
     private decimal _newOfferMoney;
     private string _selectedPayerTeamId = string.Empty;
     private decimal _newOfferSellOn;
@@ -853,10 +887,35 @@
             _selectedOfferedPlayerIds.Add(playerGuid);
     }
 
-    private static void TogglePick(HashSet<PickRefDto> selecionadas, PickRefDto pick)
+    private void TogglePick(HashSet<PickRefDto> selecionadas, PickRefDto pick)
     {
         if (!selecionadas.Remove(pick))
             selecionadas.Add(pick);
+        else
+        {
+            _protecaoAte.Remove(pick);
+            _protecaoDevolucao.Remove(pick);
+        }
+    }
+
+    private void DefinirProtecao(PickRefDto pick, string? valor) =>
+        _protecaoAte[pick] = int.TryParse(valor, out var ate) ? ate : 0;
+
+    private void DefinirDevolucao(PickRefDto pick, string? valor)
+    {
+        var cleaned = new string((valor ?? "").Where(c => char.IsDigit(c) || c == ',').ToArray());
+        _protecaoDevolucao[pick] = decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var v)
+            ? Math.Max(0, decimal.Round(v, 2, MidpointRounding.AwayFromZero))
+            : 0m;
+    }
+
+    private PickProtecaoDto[]? ProtecoesEscolhidas()
+    {
+        var lista = _protecaoAte
+            .Where(p => p.Value > 0 && (_selectedTargetPicks.Contains(p.Key) || _selectedOfferedPicks.Contains(p.Key)))
+            .Select(p => new PickProtecaoDto(p.Key, p.Value, _protecaoDevolucao.GetValueOrDefault(p.Key)))
+            .ToArray();
+        return lista.Length == 0 ? null : lista;
     }
 
     private async Task RespondAsync(Guid offerId, OfferStatus response)
@@ -924,6 +983,9 @@
         // As picks pedidas eram minhas (viram oferecidas) e as oferecidas eram deles (viram pedidas).
         _selectedTargetPicks = (offer.OfferedPicks ?? []).Select(pk => pk.Ref).ToHashSet();
         _selectedOfferedPicks = (offer.TargetPicks ?? []).Select(pk => pk.Ref).ToHashSet();
+        var comProtecao = (offer.TargetPicks ?? []).Concat(offer.OfferedPicks ?? []).Where(pk => pk.ProtegidaAte is not null).ToList();
+        _protecaoAte = comProtecao.ToDictionary(pk => pk.Ref, pk => pk.ProtegidaAte!.Value);
+        _protecaoDevolucao = comProtecao.ToDictionary(pk => pk.Ref, pk => pk.Compensacao ?? 0m);
 
         if (_newOfferType == OfferType.Swap)
         {
@@ -1010,7 +1072,8 @@
                 BuyOptionPrice: _newOfferType == OfferType.Loan && _newOfferBuyOption > 0 ? _newOfferBuyOption : null,
                 TargetPicks: _newOfferType == OfferType.Loan || _selectedTargetPicks.Count == 0 ? null : _selectedTargetPicks.ToArray(),
                 OfferedPicks: _newOfferType == OfferType.Loan || _selectedOfferedPicks.Count == 0 ? null : _selectedOfferedPicks.ToArray(),
-                BuybackPrice: PodeTerRecompra && _newOfferBuyback > 0 ? _newOfferBuyback : null);
+                BuybackPrice: PodeTerRecompra && _newOfferBuyback > 0 ? _newOfferBuyback : null,
+                Protecoes: _newOfferType == OfferType.Loan ? null : ProtecoesEscolhidas());
 
             await OffersApi.CreateOfferAsync(dto, TeamToken);
             _success = _counterOfferParentId.HasValue ? "Contraproposta enviada!" : "Proposta enviada!";
@@ -1036,6 +1099,8 @@
         _selectedOfferedPlayerIds.Clear();
         _selectedTargetPicks.Clear();
         _selectedOfferedPicks.Clear();
+        _protecaoAte.Clear();
+        _protecaoDevolucao.Clear();
         _targetRoster.Clear();
         _newOfferType = OfferType.Sale;
         _newOfferMoney = 0;
@@ -1113,11 +1178,11 @@
                         <strong>Picks do draft:</strong>
                         @foreach (var pk in offer.TargetPicks ?? [])
                         {
-                            <span class="badge bg-danger me-1" title="Pedida (vai para o @offer.FromTeamName)">🔄 @pk.Rotulo</span>
+                            <span class="badge bg-danger me-1" title="Pedida (vai para o @offer.FromTeamName)">🔄 @pk.Rotulo@(pk.ProtegidaAte is int a1 ? $" · 🛡️ até #{a1}" : "")</span>
                         }
                         @foreach (var pk in offer.OfferedPicks ?? [])
                         {
-                            <span class="badge bg-success me-1" title="Oferecida (vai para o @offer.ToTeamName)">🔄 @pk.Rotulo</span>
+                            <span class="badge bg-success me-1" title="Oferecida (vai para o @offer.ToTeamName)">🔄 @pk.Rotulo@(pk.ProtegidaAte is int a2 ? $" · 🛡️ até #{a2}" : "")</span>
                         }
                     </div>
                 }

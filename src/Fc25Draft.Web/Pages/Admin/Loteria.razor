@@ -568,8 +568,10 @@
             int totalTeams = r1.Count;
             int totalRounds = r2.Count > 0 ? 2 : 1;
 
-            // Picks negociadas: quem escolhe é o dono atual, não o time que tirou a posição na loteria.
+            // Picks negociadas: quem escolhe é o dono atual, não o time que tirou a posição na loteria. As protegidas
+            // que caíram dentro da proteção voltam antes.
             var temporada = await Db.Ligas.Where(l => l.LigaId == s.LigaId).Select(l => l.Temporada).FirstOrDefaultAsync();
+            await Fc25Draft.Infra.Services.PicksDoDraftService.ResolverProtecoesAsync(Db, DateTime.UtcNow, CancellationToken.None);
             var donos = temporada is int t
                 ? await Fc25Draft.Infra.Services.PicksDoDraftService.DonosAsync(Db, t, CancellationToken.None)
                 : new Dictionary<(int Rodada, Guid TimeOriginal), Guid>();
@@ -582,7 +584,8 @@
                 TempoPorEscolhaMinutos = _tempoPorEscolha is > 0 ? _tempoPorEscolha : null,
                 TotalTeams   = totalTeams,
                 TotalRounds  = totalRounds,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                Temporada    = temporada
             };
 
             draft.Rounds.Add(new DraftRound

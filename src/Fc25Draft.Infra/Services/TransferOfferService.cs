@@ -100,10 +100,15 @@ public class TransferOfferService : ITransferOfferService
         }
 
         // As pedidas são de quem recebe a proposta; as oferecidas, de quem propõe.
+        // Proteção: quem cede a pick protege (antes da loteria); vale para pedidas e oferecidas.
+        var protecoes = (dto.Protecoes ?? [])
+            .Where(pr => targetPicks.Contains(pr.Pick) || offeredPicks.Contains(pr.Pick))
+            .GroupBy(pr => pr.Pick)
+            .ToDictionary(g => g.Key, g => g.First());
         var agoraBrasilia = HorarioDeBrasilia.Agora(_timeProvider);
-        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, targetPicks, toTeam.TeamId, toTeam.TeamName, ct) is { } erroPedidas)
+        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, targetPicks, toTeam.TeamId, toTeam.TeamName, ct, protecoes) is { } erroPedidas)
             throw new InvalidOperationException(erroPedidas);
-        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, offeredPicks, fromTeam.TeamId, fromTeam.TeamName, ct) is { } erroOferecidas)
+        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, offeredPicks, fromTeam.TeamId, fromTeam.TeamName, ct, protecoes) is { } erroOferecidas)
             throw new InvalidOperationException(erroOferecidas);
 
         var targetPlayers = await _db.Players
@@ -205,7 +210,11 @@ public class TransferOfferService : ITransferOfferService
             .Select(x => new TransferOfferPick
             {
                 OfferId = offer.OfferId, Temporada = x.pk.Temporada, Rodada = x.pk.Rodada,
-                TimeOriginalId = x.pk.TimeOriginalId, IsTarget = x.Item2
+                TimeOriginalId = x.pk.TimeOriginalId, IsTarget = x.Item2,
+                ProtegidaAte = protecoes.GetValueOrDefault(x.pk)?.ProtegidaAte,
+                Compensacao = protecoes.GetValueOrDefault(x.pk) is { } pr
+                    ? decimal.Round(pr.Compensacao, 2, MidpointRounding.AwayFromZero)
+                    : null
             })
             .ToList();
         var nomes = await NomesDosTimesAsync(offer.Picks.Select(pk => pk.TimeOriginalId), ct);
@@ -320,8 +329,8 @@ public class TransferOfferService : ITransferOfferService
                 await CriarRecompraAsync(offer, precoDaRecompra, now, ct);
 
             // As pedidas vão para quem propôs; as oferecidas, para quem recebeu.
-            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => p.IsTarget).Select(Ref), offer.FromTeamId, now, ct);
-            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => !p.IsTarget).Select(Ref), offer.ToTeamId, now, ct);
+            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => p.IsTarget), offer.ToTeamId, offer.FromTeamId, now, ct);
+            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => !p.IsTarget), offer.FromTeamId, offer.ToTeamId, now, ct);
             await CancelConflictingOffersAsync(offer, ct);
         }
 
@@ -788,10 +797,12 @@ public class TransferOfferService : ITransferOfferService
     private async Task EnsurePicksAsync(TransferOffer offer, CancellationToken ct)
     {
         var agora = HorarioDeBrasilia.Agora(_timeProvider);
+        var protecoes = offer.Picks.Where(p => p.ProtegidaAte is not null)
+            .ToDictionary(Ref, p => new PickProtecaoDto(Ref(p), p.ProtegidaAte!.Value, p.Compensacao ?? 0m));
         var erro = await PicksDoDraftService.ProblemaAsync(_db, agora, offer.Picks.Where(p => p.IsTarget).Select(Ref),
-                       offer.ToTeamId, offer.ToTeam.TeamName, ct)
+                       offer.ToTeamId, offer.ToTeam.TeamName, ct, protecoes)
                    ?? await PicksDoDraftService.ProblemaAsync(_db, agora, offer.Picks.Where(p => !p.IsTarget).Select(Ref),
-                       offer.FromTeamId, offer.FromTeam.TeamName, ct);
+                       offer.FromTeamId, offer.FromTeam.TeamName, ct, protecoes);
         if (erro is not null)
             throw new InvalidOperationException($"A proposta não vale mais: {erro} Recuse-a ou peça uma nova.");
     }
@@ -833,7 +844,8 @@ public class TransferOfferService : ITransferOfferService
     {
         var partes = new List<string>();
         string Picks(bool pedidas) => string.Join(", ", offer.Picks.Where(p => p.IsTarget == pedidas)
-            .Select(p => $"pick da {p.Rodada}ª rodada do {NomeDoTime(p, nomes)}"));
+            .Select(p => $"pick da {p.Rodada}ª rodada do {NomeDoTime(p, nomes)}"
+                         + (p.ProtegidaAte is int ate ? $" (protegida até a #{ate})" : "")));
         var pedidos = string.Join(", ", alvos.Select(p => p.Name).Append(Picks(true)).Where(x => x.Length > 0));
         var dados = string.Join(", ", oferecidos.Select(p => p.Name).Append(Picks(false)).Where(x => x.Length > 0));
         if (pedidos.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empréstimo de " : "pede ") + pedidos);
@@ -1200,7 +1212,9 @@ public class TransferOfferService : ITransferOfferService
         // A pick pedida é de quem recebe a proposta; a oferecida, de quem propõe.
         List<PickDoDraftDto> Picks(bool pedidas) => offer.Picks.Where(p => p.IsTarget == pedidas)
             .Select(p => new PickDoDraftDto(p.Temporada, p.Rodada, p.TimeOriginalId, NomeDoTime(p, nomes),
-                pedidas ? toTeam.TeamId : fromTeam.TeamId, pedidas ? toTeam.TeamName : fromTeam.TeamName))
+                pedidas ? toTeam.TeamId : fromTeam.TeamId, pedidas ? toTeam.TeamName : fromTeam.TeamName,
+                ProtegidaAte: p.ProtegidaAte, ProtetorNome: p.ProtegidaAte is null ? null : pedidas ? toTeam.TeamName : fromTeam.TeamName,
+                Compensacao: p.Compensacao))
             .ToList();
 
         string? moneyPayerName = null;
