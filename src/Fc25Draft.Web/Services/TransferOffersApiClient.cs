@@ -129,6 +129,17 @@ public class TransferOffersApiClient
         await EnsureSuccessAsync(response, ct);
     }
 
+    /// <summary>Quem vendeu usa a cláusula de recompra.</summary>
+    public async Task RecomprarAsync(Guid direitoId, string teamToken, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/offers/recompra/{direitoId}");
+        request.Headers.TryAddWithoutValidation("X-Team-Token", teamToken.Trim());
+
+        using var response = await client.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
     /// <summary>A conversa: o papel do jogador no elenco desce um degrau.</summary>
     public async Task ConversarAsync(Guid playerGuid, string teamToken, CancellationToken ct = default)
     {

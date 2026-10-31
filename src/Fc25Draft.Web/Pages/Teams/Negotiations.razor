@@ -8,6 +8,7 @@
 @inject Fc25Draft.Core.Interfaces.ITransferConfigService TransferConfigSvc
 @inject Fc25Draft.Core.Interfaces.IEmprestimoService EmprestimoSvc
 @inject Fc25Draft.Core.Interfaces.IPicksDoDraftService PicksSvc
+@inject Fc25Draft.Core.Interfaces.ITransferOfferService OffersSvc
 @inject IJSRuntime JS
 
 <div class="mt-3">
@@ -44,7 +45,7 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link @(ActiveSubTab == SubTab.Loans ? "active" : "")"
                     type="button" @onclick="() => SwitchSubTab(SubTab.Loans)">
-                Empréstimos
+                Empréstimos e recompras
                 @if (_loans.Count > 0)
                 {
                     <span class="badge bg-secondary ms-1">@_loans.Count</span>
@@ -165,6 +166,39 @@
         @* ===== EMPRÉSTIMOS ===== *@
         @if (ActiveSubTab == SubTab.Loans)
         {
+            @if (_recompras.Count > 0)
+            {
+                <h6 class="mt-2">🔁 Cláusulas de recompra</h6>
+                <ul class="list-group mb-4">
+                    @foreach (var r in _recompras)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2 @(r.Vale ? "" : "text-muted")">
+                            <div>
+                                <a href="/players/details/@r.PlayerId">@r.PlayerName</a>
+                                <div class="small text-muted">
+                                    @(r.VendedorId == TeamId ? $"Você vendeu para o {r.CompradorNome}" : $"Você comprou do {r.VendedorNome}")
+                                    · recompra por @FormatCurrency(r.Preco)
+                                    @if (!r.Vale)
+                                    {
+                                        <text> · não vale mais: @r.Situacao</text>
+                                    }
+                                </div>
+                            </div>
+                            @if (r.Vale && r.VendedorId == TeamId)
+                            {
+                                <button class="btn btn-sm btn-outline-success" disabled="@_processing" @onclick="() => RecomprarAsync(r)">
+                                    Recomprar por @FormatCurrency(r.Preco)
+                                </button>
+                            }
+                            else if (r.Vale)
+                            {
+                                <span class="badge bg-warning text-dark">O @r.VendedorNome pode recomprar</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
             <p class="text-muted small">
                 Empréstimos vão até o fim da temporada: quando a próxima começa, o jogador volta sozinho para o dono.
                 Com opção de compra, quem pegou emprestado pode ficar com ele em definitivo pagando o valor combinado.
@@ -395,6 +429,26 @@
                             </div>
                         }
                     </div>
+
+                    @if (PodeTerRecompra)
+                    {
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-5">
+                                <label class="form-label">🔁 Recompra (opcional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="text" class="form-control" inputmode="decimal"
+                                           value="@FormatMoneyInput(_newOfferBuyback)"
+                                           @onchange="OnBuybackChanged"
+                                           placeholder="Sem recompra" />
+                                </div>
+                            </div>
+                            <div class="col-md-7 small text-muted d-flex align-items-end">
+                                O @QuemVende pode comprar o jogador de volta por esse valor até o fim da temporada, enquanto
+                                ele estiver no clube que comprou. Se ele for vendido ou emprestado, a recompra cai.
+                            </div>
+                        </div>
+                    }
 
                     <div class="mt-3">
                         <label class="form-label">Cláusulas e Bônus</label>
@@ -637,6 +691,14 @@
     private decimal _newOfferMoney;
     private string _selectedPayerTeamId = string.Empty;
     private decimal _newOfferSellOn;
+    private decimal _newOfferBuyback;
+    private List<DireitoDeRecompraDto> _recompras = new();
+
+    /// <summary>Venda de um jogador só: dá para pôr cláusula de recompra para quem vende.</summary>
+    private bool PodeTerRecompra =>
+        _newOfferType == OfferType.Sale && _selectedTargetPlayerIds.Count + _selectedOfferedPlayerIds.Count == 1;
+
+    private string QuemVende => _selectedTargetPlayerIds.Count == 1 ? TargetTeamName : "seu time";
     private decimal _newOfferBuyOption;
     private string? _newOfferClauses;
     private string? _newOfferNotes;
@@ -738,6 +800,7 @@
 
             _loans = (await EmprestimoSvc.ListarAtivosAsync(TeamId, CancellationToken.None)).ToList();
             _picks = await PicksSvc.ProximoDraftAsync(CancellationToken.None);
+            _recompras = (await OffersSvc.RecomprasDoTimeAsync(TeamId, CancellationToken.None)).ToList();
             _loansUsed = (await TeamsApi.GetByIdAsync(TeamId))?.LoanCount ?? 0;
         }
         catch (Exception ex)
@@ -853,6 +916,7 @@
         _newOfferType = Enum.TryParse<OfferType>(offer.Type, out var t) ? t : OfferType.Sale;
         _newOfferMoney = offer.Money;
         _newOfferSellOn = offer.SellOnPercentage;
+        _newOfferBuyback = offer.BuybackPrice ?? 0m;
         _newOfferBuyOption = offer.BuyOptionPrice ?? 0m;
         _newOfferClauses = offer.Clauses;
         _newOfferNotes = offer.Notes;
@@ -945,7 +1009,8 @@
                 ParentOfferId: _counterOfferParentId,
                 BuyOptionPrice: _newOfferType == OfferType.Loan && _newOfferBuyOption > 0 ? _newOfferBuyOption : null,
                 TargetPicks: _newOfferType == OfferType.Loan || _selectedTargetPicks.Count == 0 ? null : _selectedTargetPicks.ToArray(),
-                OfferedPicks: _newOfferType == OfferType.Loan || _selectedOfferedPicks.Count == 0 ? null : _selectedOfferedPicks.ToArray());
+                OfferedPicks: _newOfferType == OfferType.Loan || _selectedOfferedPicks.Count == 0 ? null : _selectedOfferedPicks.ToArray(),
+                BuybackPrice: PodeTerRecompra && _newOfferBuyback > 0 ? _newOfferBuyback : null);
 
             await OffersApi.CreateOfferAsync(dto, TeamToken);
             _success = _counterOfferParentId.HasValue ? "Contraproposta enviada!" : "Proposta enviada!";
@@ -977,6 +1042,7 @@
         _selectedPayerTeamId = string.Empty;
         _newOfferSellOn = 0;
         _newOfferBuyOption = 0;
+        _newOfferBuyback = 0;
         _newOfferClauses = null;
         _newOfferNotes = null;
     }
@@ -1072,6 +1138,11 @@
                     <div class="mt-1"><strong>Opção de compra:</strong> @FormatCurrency(opcaoCard)</div>
                 }
 
+                @if (offer.BuybackPrice is decimal recompraCard)
+                {
+                    <div class="mt-1"><strong>🔁 Recompra:</strong> @FormatCurrency(recompraCard) <span class="text-muted small">(quem vende pode comprar de volta até o fim da temporada)</span></div>
+                }
+
                 @if (offer.SellOnPercentage > 0)
                 {
                     <div class="mt-1"><strong>Revenda futura:</strong> @offer.SellOnPercentage.ToString("F2", BrazilCulture)%</div>
@@ -1135,6 +1206,37 @@
     /// <summary>Emprestado não entra em proposta nenhuma até voltar para o dono.</summary>
     private static List<TeamRosterPlayerDto> Negotiable(TeamRosterDto? roster)
         => roster?.Jogadores?.Where(p => p.EmprestadoPor is null).ToList() ?? new();
+
+    private void OnBuybackChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        var cleaned = new string(raw.Where(c => char.IsDigit(c) || c == ',').ToArray());
+        _newOfferBuyback = decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, BrazilCulture, out var parsed)
+            ? Math.Max(0, decimal.Round(parsed, 2, MidpointRounding.AwayFromZero))
+            : 0m;
+    }
+
+    private async Task RecomprarAsync(DireitoDeRecompraDto direito)
+    {
+        if (string.IsNullOrEmpty(TeamToken)) return;
+        _processing = true;
+        _error = null;
+        _success = null;
+        try
+        {
+            await OffersApi.RecomprarAsync(direito.DireitoId, TeamToken);
+            _success = $"🔁 {direito.PlayerName} voltou para o seu time por {FormatCurrency(direito.Preco)}.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
 
     private void OnBuyOptionChanged(ChangeEventArgs e)
     {

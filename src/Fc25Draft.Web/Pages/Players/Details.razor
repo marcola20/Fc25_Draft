@@ -10,6 +10,7 @@
 @inject IPricingService Pricing
 @inject IParticipacaoService ParticipacaoSvc
 @inject ITreinoService TreinoSvc
+@inject ITransferOfferService OffersSvc
 @inject IFotosJogadoresService Fotos
 @inject IJSRuntime JS
 @inject EscudoService Escudos
@@ -92,6 +93,13 @@ else
                             <span class="badge text-bg-light border"
                                   title="@($"Treino da semana nesta temporada: {string.Join(", ", _treinos.Where(t => t.Atributo is not null).GroupBy(t => t.Atributo).Select(g => $"{g.Key} +{g.Count() * TreinoCriterios.GanhoPorSemana}"))}")">
                                 🏋️ Treino +@(_treinos.Where(t => t.Atributo is not null).Sum(t => TreinoCriterios.GanhoPorSemana + (t.AtributoDoPadrinho is null ? 0 : PadrinhoCriterios.ExtraNoTreino)))
+                            </span>
+                        }
+                        @if (_recompra is { } recompra)
+                        {
+                            <span class="badge text-bg-light border"
+                                  title="O @recompra.VendedorNome pode comprar de volta até o fim da temporada, enquanto ele estiver no @recompra.CompradorNome">
+                                🔁 Recompra do @recompra.VendedorNome · @Dinheiro.Curto(recompra.Preco)
                             </span>
                         }
                         @if (_padrinho is { } par)
@@ -389,6 +397,7 @@ else
     private ParticipacaoJogador? _participacao;
     private IReadOnlyList<TreinoResultadoDto> _treinos = [];
     private PadrinhoDto? _padrinho;
+    private DireitoDeRecompraDto? _recompra;
 
     private async Task LoadPlayerAsync()
     {
@@ -398,6 +407,7 @@ else
         _participacao = null;
         _treinos = [];
         _padrinho = null;
+        _recompra = null;
 
         try
         {
@@ -412,6 +422,7 @@ else
                 _participacao = player.TeamId is null ? null : await ParticipacaoSvc.GetAsync(player.PlayerId, CancellationToken.None);
                 _treinos = await TreinoSvc.DoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _padrinho = await TreinoSvc.PadrinhoDoJogadorAsync(player.PlayerId, CancellationToken.None);
+                _recompra = await OffersSvc.RecompraDoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
                 _versaoFoto = _foto.Versao;
             }

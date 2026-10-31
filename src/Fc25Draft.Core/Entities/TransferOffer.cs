@@ -29,6 +29,12 @@ public class TransferOffer
     public ICollection<TransferOffer> CounterOffers { get; set; } = new List<TransferOffer>();
     public ICollection<TransferOfferPlayer> Players { get; set; } = new List<TransferOfferPlayer>();
 
+    /// <summary>
+    /// Cláusula de recompra (só venda de um jogador): quem vende pode comprar de volta por esse preço até o fim da
+    /// temporada. Nulo = sem cláusula.
+    /// </summary>
+    public decimal? BuybackPrice { get; set; }
+
     /// <summary>Picks do próximo draft na proposta (com ou sem jogadores).</summary>
     public ICollection<TransferOfferPick> Picks { get; set; } = new List<TransferOfferPick>();
 }

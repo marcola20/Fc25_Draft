@@ -30,4 +30,16 @@ public interface ITransferOfferService
 
     /// <summary>Compra direta de um jogador negociável pelo preço pedido: vira uma proposta de venda já aceita.</summary>
     Task<TransferOfferListItemDto> BuyListedPlayerAsync(Guid buyerTeamId, Guid playerGuid, decimal expectedPrice, CancellationToken ct);
+
+    /// <summary>Cláusulas de recompra em que o time é o vendedor ou o comprador (as que ainda valem primeiro).</summary>
+    Task<IReadOnlyList<DireitoDeRecompraDto>> RecomprasDoTimeAsync(Guid teamId, CancellationToken ct);
+
+    /// <summary>A cláusula de recompra que vale sobre o jogador (nulo se não tem).</summary>
+    Task<DireitoDeRecompraDto?> RecompraDoJogadorAsync(int playerId, CancellationToken ct);
+
+    /// <summary>
+    /// Quem vendeu exerce a recompra: paga o preço combinado e o jogador volta (precisa da janela aberta e conta no
+    /// limite de transferências).
+    /// </summary>
+    Task<TransferOfferListItemDto> RecomprarAsync(Guid teamId, Guid direitoId, CancellationToken ct);
 }

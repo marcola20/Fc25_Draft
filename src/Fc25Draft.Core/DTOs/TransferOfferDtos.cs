@@ -16,7 +16,8 @@ public record CreateTransferOfferDto(
     Guid? ParentOfferId,
     decimal? BuyOptionPrice = null,
     PickRefDto[]? TargetPicks = null,
-    PickRefDto[]? OfferedPicks = null);
+    PickRefDto[]? OfferedPicks = null,
+    decimal? BuybackPrice = null);
 
 public record RespondToOfferDto(
     OfferStatus Response);
@@ -42,7 +43,24 @@ public record TransferOfferListItemDto(
     DateTime UpdatedAtUtc,
     decimal? BuyOptionPrice = null,
     IReadOnlyList<PickDoDraftDto>? TargetPicks = null,
-    IReadOnlyList<PickDoDraftDto>? OfferedPicks = null);
+    IReadOnlyList<PickDoDraftDto>? OfferedPicks = null,
+    decimal? BuybackPrice = null);
+
+/// <summary>Cláusula de recompra: quem vendeu pode comprar de volta pelo preço combinado até o fim da temporada.</summary>
+/// <param name="Vale">Ainda dá para recomprar (mesma temporada, jogador no clube que comprou, não exercida).</param>
+/// <param name="Situacao">Por que não vale mais (exercida, jogador saiu, temporada acabou); nulo se vale.</param>
+public record DireitoDeRecompraDto(
+    Guid DireitoId,
+    int PlayerId,
+    Guid PlayerGuid,
+    string PlayerName,
+    Guid VendedorId,
+    string VendedorNome,
+    Guid CompradorId,
+    string CompradorNome,
+    decimal Preco,
+    bool Vale,
+    string? Situacao);
 
 public record TransferOfferPlayerDto(
     int PlayerId,

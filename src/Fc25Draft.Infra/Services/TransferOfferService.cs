@@ -58,6 +58,17 @@ public class TransferOfferService : ITransferOfferService
             ? decimal.Round(dto.BuyOptionPrice.Value, 2, MidpointRounding.AwayFromZero)
             : (decimal?)null;
 
+        // Cláusula de recompra: só em venda de um jogador (o preço é dele), e o direito é de quem vende.
+        decimal? recompra = null;
+        if (dto.BuybackPrice is > 0)
+        {
+            if (dto.Type != OfferType.Sale)
+                throw new ArgumentException("A cláusula de recompra só vale em venda.");
+            if (distinctTargets.Length + distinctOffered.Length != 1)
+                throw new ArgumentException("A cláusula de recompra é para a venda de um jogador só.");
+            recompra = decimal.Round(dto.BuybackPrice.Value, 2, MidpointRounding.AwayFromZero);
+        }
+
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var fromTeam = await _db.Teams.AsNoTracking()
@@ -161,6 +172,7 @@ public class TransferOfferService : ITransferOfferService
             MoneyPayerTeamId = dto.Money > 0 ? dto.MoneyPayerTeamId : null,
             SellOnPercentage = decimal.Round(dto.SellOnPercentage, 2, MidpointRounding.AwayFromZero),
             BuyOptionPrice = buyOptionPrice,
+            BuybackPrice = recompra,
             Clauses = dto.Clauses?.Trim(),
             Notes = dto.Notes?.Trim(),
             ParentOfferId = dto.ParentOfferId,
@@ -304,6 +316,8 @@ public class TransferOfferService : ITransferOfferService
                 await ExecutarSoPicksAsync(offer, ct);
             else
                 await ExecuteTransferAsync(offer, ct);
+            if (offer.BuybackPrice is decimal precoDaRecompra && offer.Players.Count == 1)
+                await CriarRecompraAsync(offer, precoDaRecompra, now, ct);
 
             // As pedidas vão para quem propôs; as oferecidas, para quem recebeu.
             await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => p.IsTarget).Select(Ref), offer.FromTeamId, now, ct);
@@ -630,6 +644,121 @@ public class TransferOfferService : ITransferOfferService
         return MapToDto(offer, buyer, seller, new[] { roster.Player }, Array.Empty<Player>());
     }
 
+    // ── Cláusula de recompra ───────────────────────────────────────────────────
+
+    /// <summary>A venda aceita tinha recompra: quem cedeu o jogador ganha o direito de comprá-lo de volta.</summary>
+    private async Task CriarRecompraAsync(TransferOffer offer, decimal preco, DateTime now, CancellationToken ct)
+    {
+        var vendido = offer.Players.Single();
+        var (temporada, _) = await ComissaoService.TemporadaAtualAsync(_db, HorarioDeBrasilia.Agora(_timeProvider), ct);
+        _db.DireitosDeRecompra.Add(new DireitoDeRecompra
+        {
+            DireitoId = Guid.NewGuid(),
+            PlayerId = vendido.PlayerId,
+            VendedorId = vendido.IsTarget ? offer.ToTeamId : offer.FromTeamId,
+            CompradorId = vendido.IsTarget ? offer.FromTeamId : offer.ToTeamId,
+            Preco = preco,
+            Temporada = temporada,
+            OfferId = offer.OfferId,
+            CriadoEm = now
+        });
+    }
+
+    public async Task<IReadOnlyList<DireitoDeRecompraDto>> RecomprasDoTimeAsync(Guid teamId, CancellationToken ct) =>
+        (await RecomprasAsync(d => d.VendedorId == teamId || d.CompradorId == teamId, ct))
+        .OrderBy(d => !d.Vale).ThenBy(d => d.PlayerName)
+        .ToList();
+
+    public async Task<DireitoDeRecompraDto?> RecompraDoJogadorAsync(int playerId, CancellationToken ct) =>
+        (await RecomprasAsync(d => d.PlayerId == playerId && d.ExercidaEm == null, ct)).FirstOrDefault(d => d.Vale);
+
+    private async Task<List<DireitoDeRecompraDto>> RecomprasAsync(
+        System.Linq.Expressions.Expression<Func<DireitoDeRecompra, bool>> filtro, CancellationToken ct)
+    {
+        var (temporada, _) = await ComissaoService.TemporadaAtualAsync(_db, HorarioDeBrasilia.Agora(_timeProvider), ct);
+        var direitos = await _db.DireitosDeRecompra.AsNoTracking()
+            .Where(filtro)
+            .Select(d => new
+            {
+                d.DireitoId, d.PlayerId, d.Player.PlayerGuid, d.Player.Name, d.VendedorId, Vendedor = d.Vendedor.TeamName,
+                d.CompradorId, Comprador = d.Comprador.TeamName, d.Preco, d.Temporada, d.ExercidaEm,
+                TimeAtual = _db.TeamRosters.Where(r => r.PlayerId == d.PlayerId).Select(r => (Guid?)r.TeamId).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+
+        return direitos.Select(d =>
+        {
+            var situacao = d.ExercidaEm is not null ? "recompra feita"
+                : d.Temporada != temporada ? "a temporada acabou"
+                : d.TimeAtual != d.CompradorId ? $"o jogador saiu do {d.Comprador}"
+                : null;
+            return new DireitoDeRecompraDto(d.DireitoId, d.PlayerId, d.PlayerGuid, d.Name, d.VendedorId, d.Vendedor,
+                d.CompradorId, d.Comprador, d.Preco, situacao is null, situacao);
+        }).ToList();
+    }
+
+    public Task<TransferOfferListItemDto> RecomprarAsync(Guid teamId, Guid direitoId, CancellationToken ct) =>
+        EmTransacaoSerializavelAsync(() => RecomprarNaTransacaoAsync(teamId, direitoId, ct), ct);
+
+    private async Task<TransferOfferListItemDto> RecomprarNaTransacaoAsync(Guid teamId, Guid direitoId, CancellationToken ct)
+    {
+        var direito = await _db.DireitosDeRecompra.FirstOrDefaultAsync(d => d.DireitoId == direitoId, ct)
+            ?? throw new KeyNotFoundException("Cláusula de recompra não encontrada.");
+        if (direito.VendedorId != teamId)
+            throw new InvalidOperationException("Só quem vendeu o jogador pode recomprar.");
+        var situacao = (await RecomprasAsync(d => d.DireitoId == direitoId, ct)).Single();
+        if (!situacao.Vale)
+            throw new InvalidOperationException($"A recompra não vale mais: {situacao.Situacao}.");
+
+        var roster = await _db.TeamRosters
+            .Include(r => r.Player).ThenInclude(p => p.Position)
+            .FirstAsync(r => r.PlayerId == direito.PlayerId && r.TeamId == direito.CompradorId, ct);
+        var vendedor = await _db.Teams.FirstAsync(t => t.TeamId == direito.VendedorId, ct);
+        var comprador = await _db.Teams.FirstAsync(t => t.TeamId == direito.CompradorId, ct);
+
+        var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
+        EnsureMercadoAberto(cfg);
+        EnsureTransferLimit(cfg, vendedor);
+        await EnsureNotOnLoanAsync([roster.Player], ct);
+
+        // Uma venda já aceita: quem vendeu paga o preço combinado e o jogador volta.
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var offer = new TransferOffer
+        {
+            OfferId = Guid.NewGuid(),
+            FromTeamId = vendedor.TeamId,
+            ToTeamId = comprador.TeamId,
+            Type = OfferType.Sale,
+            Status = OfferStatus.Accepted,
+            Money = direito.Preco,
+            MoneyPayerTeamId = vendedor.TeamId,
+            Notes = "Recompra pela cláusula da venda.",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        offer.Players.Add(new TransferOfferPlayer { OfferId = offer.OfferId, PlayerId = roster.PlayerId, IsTarget = true, Player = roster.Player });
+
+        await _db.TransferOffers.AddAsync(offer, ct);
+        await ExecuteTransferAsync(offer, ct);
+        await CancelConflictingOffersAsync(offer, ct);
+        direito.ExercidaEm = now;
+
+        AvisosDoTime.Criar(_db, comprador.TeamId, AvisosDoTime.PropostaAceita,
+            $"O {vendedor.TeamName} usou a cláusula de recompra: {roster.Player.Name} volta para ele por {direito.Preco.ToString("C0", BrCulture)}.",
+            $"/teams/details/{comprador.TeamId}", now);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new InvalidOperationException("Este jogador acabou de ser negociado com outro time.");
+        }
+
+        return MapToDto(offer, vendedor, comprador, new[] { roster.Player }, Array.Empty<Player>());
+    }
+
     private async Task CancelConflictingOffersAsync(TransferOffer acceptedOffer, CancellationToken ct)
     {
         var involvedPlayerIds = acceptedOffer.Players.Select(p => p.PlayerId).ToList();
@@ -711,6 +840,8 @@ public class TransferOfferService : ITransferOfferService
         if (dados.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empresta " : "oferece ") + dados);
         if (offer.Money > 0)
             partes.Add($"{(offer.MoneyPayerTeamId == quemFez ? "paga" : "pede")} {offer.Money.ToString("C0", BrCulture)}");
+        if (offer.BuybackPrice is decimal recompra)
+            partes.Add($"com recompra por {recompra.ToString("C0", BrCulture)}");
         return partes.Count == 0 ? "sem jogadores, picks nem dinheiro" : string.Join(", ", partes);
     }
 
@@ -1101,7 +1232,8 @@ public class TransferOfferService : ITransferOfferService
             offer.UpdatedAtUtc,
             offer.BuyOptionPrice,
             Picks(true),
-            Picks(false));
+            Picks(false),
+            offer.BuybackPrice);
     }
 
     private static TransferOfferPlayerDto MapPlayerDto(Player p)

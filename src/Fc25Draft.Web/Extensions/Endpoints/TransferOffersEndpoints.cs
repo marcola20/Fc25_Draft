@@ -15,6 +15,7 @@ public static class TransferOffersEndpoints
         offersApi.MapPost("/", HandleCreateAsync);
         offersApi.MapPost("/{offerId:guid}/respond", HandleRespondAsync);
         offersApi.MapPost("/{offerId:guid}/cancel", HandleCancelAsync);
+        offersApi.MapPost("/recompra/{direitoId:guid}", HandleRecomprarAsync);
         offersApi.MapGet("/received", HandleGetReceivedAsync);
         offersApi.MapGet("/sent", HandleGetSentAsync);
         offersApi.MapGet("/finished", HandleGetFinishedAsync);
@@ -52,6 +53,32 @@ public static class TransferOffersEndpoints
         catch (ArgumentException ex)
         {
             return Results.BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Quem vendeu usa a cláusula de recompra.</summary>
+    private static async Task<IResult> HandleRecomprarAsync(
+        Guid direitoId,
+        ITransferOfferService service,
+        DraftDbContext db,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var teamId = await ResolveTeamIdAsync(httpContext, db, ct);
+        if (teamId is null)
+            return Results.Unauthorized();
+
+        try
+        {
+            return Results.Ok(await service.RecomprarAsync(teamId.Value, direitoId, ct));
         }
         catch (KeyNotFoundException ex)
         {

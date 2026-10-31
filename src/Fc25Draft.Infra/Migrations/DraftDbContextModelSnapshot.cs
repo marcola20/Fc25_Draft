@@ -503,6 +503,47 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("ComissaoContratos", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DireitoDeRecompra", b =>
+                {
+                    b.Property<Guid>("DireitoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompradorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("ExercidaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("OfferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Preco")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("VendedorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DireitoId");
+
+                    b.HasIndex("CompradorId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("VendedorId");
+
+                    b.ToTable("DireitosDeRecompra", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>
                 {
                     b.Property<Guid>("PagamentoId")
@@ -3430,6 +3471,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<decimal?>("BuyOptionPrice")
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal?>("BuybackPrice")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("Clauses")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -3977,6 +4021,33 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.DireitoDeRecompra", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Comprador")
+                        .WithMany()
+                        .HasForeignKey("CompradorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Vendedor")
+                        .WithMany()
+                        .HasForeignKey("VendedorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Comprador");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("Vendedor");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.DiretoriaPagamento", b =>
