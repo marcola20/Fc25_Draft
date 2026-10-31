@@ -27,6 +27,7 @@ internal static class AvisosDoTime
     public const string Carreira = "CARREIRA";
     public const string Insatisfeito = "INSATISFEITO";
     public const string Incomodado = "INCOMODADO";
+    public const string Bolao = "BOLAO";
     public const string PediuParaSair = "PEDIU_PARA_SAIR";
     public const string Promessa = "PROMESSA";
 

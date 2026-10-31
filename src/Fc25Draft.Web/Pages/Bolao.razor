@@ -32,12 +32,19 @@
         Placar invertido (chutou 2x1, deu 1x2), @Sinal(BolaoPontuacao.PlacarInvertido).
         Cada jogo fecha quando a bola rola nele — chegou com a rodada em andamento, ainda dá para palpitar nos que faltam.
     </p>
-    <p class="text-muted small mb-4">
+    <p class="text-muted small mb-2">
         <strong>Apostas extras</strong>, uma de cada lado do jogo: escolha um jogador do time — fez gol ou deu
         assistência, @Sinal(BolaoPontuacao.ExtraAcerto); passou em branco, @Sinal(BolaoPontuacao.ExtraErro); se nem entrou
         em campo, não conta. Chutou 0 para um time? Aquele lado vira o 🧤 clean sheet do adversário, com os mesmos pontos.
         No mata-mata (e nos outros jogos que precisam de vencedor), chutou empate? Escolha quem passa nos
         🥅 pênaltis: acertou, @Sinal(BolaoPontuacao.PenaltisAcerto).
+    </p>
+    <p class="small mb-4">
+        💰 <strong>O bolão paga o clube</strong> (a partir da temporada @BolaoPremios.ValeAPartirDaTemporada): quem faz mais
+        pontos na rodada leva <strong>@BolaoPremios.Rotulo(BolaoPremios.PorRodada)</strong> para o caixa do clube que treina
+        (empate em pontos e cravadas divide). No fim da temporada, o geral paga
+        @string.Join(", ", BolaoPremios.Geral.Select((v, i) => $"{i + 1}º {BolaoPremios.Rotulo(v)}")).
+        Treinador e auxiliar ganham cada um o seu; quem está sem clube joga, mas não recebe.
     </p>
 
     @if (_carregando)
@@ -242,6 +249,13 @@
                         </table>
                     </div>
                     <div class="card-footer bg-white">
+                        @foreach (var premio in _premiosDasRodadas[rodada.RodadaId])
+                        {
+                            <div class="small mb-1">
+                                🎯 <strong>@premio.Nome</strong> ganhou a rodada com @premio.Pontos pontos:
+                                @(premio.TimeNome is { } clube ? $"{BolaoPremios.Rotulo(premio.Valor)} para o caixa do {clube}" : "estava sem clube e não recebeu")
+                            </div>
+                        }
                         <a href="/bolao/ranking?rodada=@rodada.RodadaId" class="small">Ver o que o pessoal chutou nessa rodada →</a>
                         @if (AdminAuth.IsAdmin)
                         {
@@ -268,6 +282,7 @@
     private IReadOnlyList<BolaoRodadaDto> _abertas = Array.Empty<BolaoRodadaDto>();
     private int _aindaVem;
     private IReadOnlyList<BolaoRodadaDto> _fechadas = Array.Empty<BolaoRodadaDto>();
+    private ILookup<Guid, BolaoPremioDto> _premiosDasRodadas = Array.Empty<BolaoPremioDto>().ToLookup(p => Guid.Empty);
     private IReadOnlyDictionary<Guid, IReadOnlyList<BolaoJogadorOpcaoDto>> _elencos = new Dictionary<Guid, IReadOnlyList<BolaoJogadorOpcaoDto>>();
 
     // O que está digitado na tela, por rodada e jogo, antes de salvar.
@@ -321,6 +336,10 @@
             _aindaVem = abertas.Count - naTela.Count;
             _abertas = naTela;
             _fechadas = await BolaoSvc.RodadasFechadasAsync(_eu?.TreinadorId, 3, CancellationToken.None);
+            var fechadas = _fechadas.Select(r => r.RodadaId).ToHashSet();
+            _premiosDasRodadas = (await BolaoSvc.PremiosAsync(null, CancellationToken.None))
+                .Where(p => p.RodadaId is Guid id && fechadas.Contains(id))
+                .ToLookup(p => p.RodadaId!.Value);
             _resumo = _eu is null ? null : await BolaoSvc.ResumoAsync(_eu.TreinadorId, CancellationToken.None);
 
             // Elencos dos times das rodadas abertas, para a aposta G/A.

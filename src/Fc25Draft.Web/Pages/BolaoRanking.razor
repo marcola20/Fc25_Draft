@@ -48,8 +48,48 @@
 
         <div class="card">
             <div class="card-header fw-bold">@(_temporada is null ? "Todas as temporadas" : $"Temporada {_temporada}")</div>
-            @Tabela(_ranking)
+            @if (_temporada >= BolaoPremios.ValeAPartirDaTemporada)
+            {
+                <div class="card-body py-2 small text-muted border-bottom">
+                    💰 No fim da temporada, o geral paga ao clube:
+                    @string.Join(", ", BolaoPremios.Geral.Select((v, i) => $"{i + 1}º {BolaoPremios.Rotulo(v)}")).
+                    Cada rodada paga @BolaoPremios.Rotulo(BolaoPremios.PorRodada) a quem fizer mais pontos.
+                </div>
+            }
+            @Tabela(_ranking, _temporada >= BolaoPremios.ValeAPartirDaTemporada)
         </div>
+
+        @if (_premios.Count > 0)
+        {
+            <div class="card mt-4">
+                <div class="card-header fw-bold">💰 Prêmios pagos@(_temporada is null ? "" : $" em {_temporada}")</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                            @foreach (var premio in _premios)
+                            {
+                                <tr>
+                                    <td class="text-muted small text-nowrap">@premio.PagoEm.ToString("dd/MM", Br)</td>
+                                    <td>@premio.Motivo.Replace("Bolão: ", "")</td>
+                                    <td><strong>@premio.Nome</strong> <span class="text-muted small">@premio.Pontos pts</span></td>
+                                    <td class="text-end text-nowrap">
+                                        @if (premio.TimeNome is { } clube)
+                                        {
+                                            <span class="fw-semibold text-success">@BolaoPremios.Rotulo(premio.Valor)</span>
+                                            <span class="text-muted small">→ @clube</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">sem clube, não recebeu</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -63,6 +103,7 @@
     private IReadOnlyList<int> _temporadas = Array.Empty<int>();
     private IReadOnlyList<BolaoRankingLinhaDto> _ranking = Array.Empty<BolaoRankingLinhaDto>();
     private IReadOnlyList<BolaoRankingLinhaDto> _rankingDaRodada = Array.Empty<BolaoRankingLinhaDto>();
+    private IReadOnlyList<BolaoPremioDto> _premios = Array.Empty<BolaoPremioDto>();
     private BolaoRodadaDto? _daRodada;
 
     protected override async Task OnInitializedAsync()
@@ -93,6 +134,7 @@
     private async Task CarregarRanking()
     {
         _ranking = await BolaoSvc.RankingAsync(_temporada, CancellationToken.None);
+        _premios = await BolaoSvc.PremiosAsync(_temporada, CancellationToken.None);
         await CarregarPerfisAsync(_ranking);
     }
 
@@ -107,7 +149,9 @@
             _perfis[id] = perfil;
     }
 
-    private RenderFragment Tabela(IReadOnlyList<BolaoRankingLinhaDto> linhas) =>@<div>
+    /// <param name="valendoGeral">Temporada com prêmio: mostra quanto cada um levaria se acabasse agora.</param>
+    private RenderFragment Tabela(IReadOnlyList<BolaoRankingLinhaDto> linhas, bool valendoGeral = false) =>@<div>
+        @{ var levaria = valendoGeral ? BolaoPremios.Rateio(linhas, BolaoPremios.Geral).ToDictionary(v => v.Linha.TreinadorId, v => v.Valor) : new(); }
         @if (linhas.Count == 0)
         {
             <div class="card-body text-muted">Ninguém palpitou ainda.</div>
@@ -142,7 +186,13 @@
                                     <a href="/treinadores/@linha.TreinadorId"><NomeTreinador Nome="@linha.Nome" Apelido="@perfil?.Apelido" /></a>
                                     <span class="text-muted small">@(linha.TimeNome ?? "sem clube")</span>
                                 </td>
-                                <td class="text-center fw-bold">@linha.Pontos</td>
+                                <td class="text-center fw-bold">
+                                    @linha.Pontos
+                                    @if (levaria.TryGetValue(linha.TreinadorId, out var valor))
+                                    {
+                                        <span class="badge bg-success-subtle text-success-emphasis ms-1" title="Quanto o clube leva se a temporada acabar assim">💰 @BolaoPremios.Rotulo(valor)</span>
+                                    }
+                                </td>
                                 <td class="text-center">@linha.Cravadas</td>
                                 <td class="text-center">@linha.Acertos</td>
                                 <td class="text-center text-muted">@linha.Palpites</td>

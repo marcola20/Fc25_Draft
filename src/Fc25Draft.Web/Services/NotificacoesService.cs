@@ -74,6 +74,7 @@ public class NotificacoesService : BackgroundService
             await TentarAsync("diretoria", s => s.GetRequiredService<IDiretoriaService>().ProcessarJogosRecentesAsync(ct));
             await TentarAsync("insatisfeitos", s => s.GetRequiredService<IParticipacaoService>().AvisarInsatisfeitosAsync(ct));
             await TentarAsync("incomodados", s => s.GetRequiredService<IParticipacaoService>().AvisarIncomodadosAsync(ct));
+            await TentarAsync("prêmios do bolão", s => s.GetRequiredService<IBolaoService>().PagarPremiosAsync(ct));
             await TentarAsync("pediu para sair", s => s.GetRequiredService<IPedidoDeSaidaService>().ProcessarAsync(ct));
         }
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));

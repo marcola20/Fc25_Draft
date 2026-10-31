@@ -41,4 +41,13 @@ public interface IBolaoService
     Task<IReadOnlyList<int>> TemporadasAsync(CancellationToken ct);
 
     Task<BolaoResumoDoTreinadorDto> ResumoAsync(Guid treinadorId, CancellationToken ct);
+
+    /// <summary>
+    /// Paga ao clube de quem ganhou as rodadas que fecharam e o geral da temporada que acabou
+    /// (<see cref="Utilities.BolaoPremios"/>). Retorna quantos prêmios pagou.
+    /// </summary>
+    Task<int> PagarPremiosAsync(CancellationToken ct);
+
+    /// <summary>Prêmios pagos, de uma temporada ou de todas, do mais novo para o mais antigo.</summary>
+    Task<IReadOnlyList<BolaoPremioDto>> PremiosAsync(int? temporada, CancellationToken ct);
 }

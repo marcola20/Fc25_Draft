@@ -279,6 +279,60 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("BolaoPalpites", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.BolaoPremio", b =>
+                {
+                    b.Property<Guid>("PremioId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTime>("PagoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Pontos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Posicao")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("RodadaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("PremioId");
+
+                    b.HasIndex("Chave")
+                        .IsUnique();
+
+                    b.HasIndex("Temporada");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.ToTable("BolaoPremios", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.BudgetLedger", b =>
                 {
                     b.Property<Guid>("BudgetLedgerId")
@@ -3653,6 +3707,23 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("JogadorFora");
 
                     b.Navigation("Partida");
+
+                    b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.BolaoPremio", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Time");
 
                     b.Navigation("Treinador");
                 });

@@ -105,6 +105,20 @@ public record BolaoRankingLinhaDto(
 public record BolaoPalpiteRequest(
     Guid PartidaId, int GolsCasa, int GolsFora, int? JogadorCasaId = null, int? JogadorForaId = null, Guid? PenaltisVencedorId = null);
 
+/// <summary>Um prêmio do bolão pago (ou que o vencedor não recebeu por estar sem clube).</summary>
+/// <param name="RodadaId">Nulo = geral da temporada.</param>
+/// <param name="TimeNome">Clube que recebeu; nulo = estava sem clube.</param>
+public record BolaoPremioDto(
+    int Temporada,
+    Guid? RodadaId,
+    string Nome,
+    string? TimeNome,
+    int Posicao,
+    int Pontos,
+    decimal Valor,
+    string Motivo,
+    DateTime PagoEm);
+
 /// <summary>O que a pessoa fez no bolão, para a página de carreira.</summary>
 public record BolaoResumoDoTreinadorDto(
     int Pontos,

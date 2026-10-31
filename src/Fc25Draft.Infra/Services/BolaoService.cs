@@ -305,6 +305,117 @@ public class BolaoService : IBolaoService
             rodadasVencidas);
     }
 
+    public async Task<int> PagarPremiosAsync(CancellationToken ct)
+    {
+        var rodadas = (await CarregarAsync(ct))
+            .Where(r => r.Temporada >= BolaoPremios.ValeAPartirDaTemporada)
+            .ToList();
+        if (rodadas.Count == 0) return 0;
+
+        var apuradas = (await _db.BolaoPremios.AsNoTracking()
+                .Select(p => new { p.RodadaId, p.Temporada })
+                .ToListAsync(ct))
+            .ToList();
+        var rodadasApuradas = apuradas.Where(a => a.RodadaId != null).Select(a => a.RodadaId!.Value).ToHashSet();
+        var geraisApurados = apuradas.Where(a => a.RodadaId == null).Select(a => a.Temporada).ToHashSet();
+
+        var ligas = await _db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada >= BolaoPremios.ValeAPartirDaTemporada)
+            .Select(l => new { l.LigaId, l.Temporada, l.Tipo, l.Status })
+            .ToListAsync(ct);
+        var encerradas = ligas.Where(l => l.Status == LigaStatus.Encerrada).Select(l => l.LigaId).ToHashSet();
+
+        var pagos = 0;
+        foreach (var rodada in rodadas.Where(r => !rodadasApuradas.Contains(r.RodadaId)))
+        {
+            // Fechou: todos os jogos encerrados. O mata-mata junta as fases numa rodada só, que cresce a cada fase
+            // sorteada: espera a competição acabar.
+            if (!rodada.Jogos.All(j => j.Encerrado)) continue;
+            if (rodada.Numero == 0 && !encerradas.Contains(rodada.LigaId)) continue;
+
+            var vencedores = BolaoPremios.Rateio(await RankingDaRodadaAsync(rodada.RodadaId, ct), [BolaoPremios.PorRodada]);
+            pagos += await PagarAsync(rodada.Temporada!.Value, rodada.RodadaId, $"rodada:{rodada.RodadaId}", vencedores,
+                (_, _) => $"Bolão: venceu {Titulo(rodada)}", ct);
+        }
+
+        // Geral: a temporada acabou quando a Supercopa dela já foi jogada e todas as competições estão encerradas.
+        foreach (var temporada in ligas.GroupBy(l => l.Temporada!.Value))
+        {
+            if (geraisApurados.Contains(temporada.Key)) continue;
+            if (!temporada.Any(l => l.Tipo == TipoCompetition.Supercopa) || temporada.Any(l => l.Status != LigaStatus.Encerrada))
+                continue;
+
+            var vencedores = BolaoPremios.Rateio(await RankingAsync(temporada.Key, ct), BolaoPremios.Geral);
+            pagos += await PagarAsync(temporada.Key, null, $"geral:{temporada.Key}", vencedores,
+                (posicao, _) => $"Bolão: {posicao}º no geral da temporada {temporada.Key}", ct);
+        }
+
+        return pagos;
+    }
+
+    /// <summary>
+    /// Paga cada vencedor no clube que ele treina agora (técnico ou auxiliar) e grava o prêmio. Sem vencedor, grava
+    /// só a marca de apurado.
+    /// </summary>
+    private async Task<int> PagarAsync(int temporada, Guid? rodadaId, string chave,
+        IReadOnlyList<(BolaoRankingLinhaDto Linha, int Posicao, decimal Valor)> vencedores,
+        Func<int, decimal, string> motivo, CancellationToken ct)
+    {
+        var agora = _time.GetUtcNow().UtcDateTime;
+        if (vencedores.Count == 0)
+        {
+            _db.BolaoPremios.Add(new BolaoPremio
+            {
+                PremioId = Guid.NewGuid(), Chave = $"{chave}:-", Temporada = temporada, RodadaId = rodadaId,
+                Motivo = "Ninguém pontuou", PagoEm = agora
+            });
+            await _db.SaveChangesAsync(ct);
+            return 0;
+        }
+
+        var ids = vencedores.Select(v => v.Linha.TreinadorId).ToList();
+        var clubes = await _db.TreinadorPassagens.AsNoTracking()
+            .Where(p => p.Ate == null && ids.Contains(p.TreinadorId))
+            .Select(p => new { p.TreinadorId, p.TimeId })
+            .ToListAsync(ct);
+
+        var pagos = 0;
+        foreach (var (linha, posicao, valor) in vencedores)
+        {
+            var timeId = clubes.FirstOrDefault(c => c.TreinadorId == linha.TreinadorId)?.TimeId;
+            var texto = motivo(posicao, valor);
+            var time = timeId is Guid id ? await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == id, ct) : null;
+
+            _db.BolaoPremios.Add(new BolaoPremio
+            {
+                PremioId = Guid.NewGuid(), Chave = $"{chave}:{linha.TreinadorId}", Temporada = temporada,
+                RodadaId = rodadaId, TreinadorId = linha.TreinadorId, TimeId = time?.TeamId, Posicao = posicao,
+                Pontos = linha.Pontos, Valor = time is null ? 0m : valor,
+                Motivo = texto.Length > 160 ? texto[..157] + "..." : texto, PagoEm = agora
+            });
+            if (time is null) continue;
+
+            time.Budget = decimal.Round(time.Budget + valor, 2, MidpointRounding.AwayFromZero);
+            ExtratoCaixa.Lancar(_db, time.TeamId, valor, ExtratoCaixa.Bolao, $"{texto} ({linha.Nome}, {linha.Pontos} pontos)", agora);
+            AvisosDoTime.Criar(_db, time.TeamId, AvisosDoTime.Bolao,
+                $"🎯 {linha.Nome} {(rodadaId is null ? $"ficou em {posicao}º no geral do bolão" : "ganhou a rodada do bolão")} "
+                + $"com {linha.Pontos} pontos: {BolaoPremios.Rotulo(valor)} para o caixa do {time.TeamName}.",
+                "/bolao/ranking", agora);
+            pagos++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return pagos;
+    }
+
+    public async Task<IReadOnlyList<BolaoPremioDto>> PremiosAsync(int? temporada, CancellationToken ct) =>
+        await _db.BolaoPremios.AsNoTracking()
+            .Where(p => p.TreinadorId != null && (temporada == null || p.Temporada == temporada))
+            .OrderByDescending(p => p.PagoEm).ThenBy(p => p.Posicao)
+            .Select(p => new BolaoPremioDto(p.Temporada, p.RodadaId, p.Treinador!.Nome,
+                p.Time != null ? p.Time.TeamName : null, p.Posicao, p.Pontos, p.Valor, p.Motivo, p.PagoEm))
+            .ToListAsync(ct);
+
     // ── Bastidores ─────────────────────────────────────────────────────────────
 
     /// <param name="Quando">Horário do jogo: o próprio ou, sem ele, o da rodada.</param>
