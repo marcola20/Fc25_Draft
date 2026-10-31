@@ -64,6 +64,10 @@ else if (_dados is { } dados)
                                 <tr class="@(foco is not null ? "table-success" : "")">
                                     <td>
                                         <a href="/players/details/@j.PlayerId">@j.Nome</a>
+                                        @if (dados.Padrinho?.AfilhadoId == j.PlayerId)
+                                        {
+                                            <span title="Afilhado de @dados.Padrinho.PadrinhoNome: rende +@PadrinhoCriterios.ExtraNoTreino a mais no treino">🤝</span>
+                                        }
                                         <span class="text-muted small">@j.Posicao</span>
                                     </td>
                                     <td class="text-center">@j.Idade</td>
@@ -124,6 +128,85 @@ else if (_dados is { } dados)
         </div>
     </div>
 
+    <div class="card mb-3">
+        <div class="card-header fw-bold">🤝 Padrinho</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">
+                Um veterano de @PadrinhoCriterios.IdadeMinima anos ou mais adota um jovem da mesma posição que pode treinar.
+                O afilhado ganha +@PadrinhoCriterios.ExtraNoTreino a mais em cada semana de treino. Se ele treinar pelo menos
+                @PadrinhoCriterios.TreinosParaOBonus semanas com o padrinho, o padrinho ganha +@PadrinhoCriterios.BonusNaVirada
+                na evolução da virada. Um par por temporada; se um dos dois sair do clube, dá para formar outro.
+            </p>
+            @if (dados.Padrinho is { } par)
+            {
+                <div>
+                    <a href="/players/details/@par.PadrinhoId" class="fw-semibold">@par.PadrinhoNome</a> é padrinho de
+                    <a href="/players/details/@par.AfilhadoId" class="fw-semibold">@par.AfilhadoNome</a>
+                    <span class="badge @(par.Treinos >= PadrinhoCriterios.TreinosParaOBonus ? "bg-success" : "bg-secondary") ms-1"
+                          title="Semanas que o afilhado treinou com o padrinho">
+                        @Math.Min(par.Treinos, PadrinhoCriterios.TreinosParaOBonus)/@PadrinhoCriterios.TreinosParaOBonus treinos
+                    </span>
+                </div>
+                @if (par.Treinos >= PadrinhoCriterios.TreinosParaOBonus)
+                {
+                    <div class="small text-success mt-1">O bônus do padrinho na virada está garantido (se ele seguir no clube).</div>
+                }
+            }
+            else if (!dados.PodeApadrinhar)
+            {
+                <div class="small text-muted">Sem temporada em andamento.</div>
+            }
+            else if (TeamToken is null)
+            {
+                <div class="small text-muted">O time ainda não escolheu padrinho nesta temporada.</div>
+            }
+            else
+            {
+                var veteranos = dados.Veteranos ?? [];
+                var padrinhoEscolhido = veteranos.FirstOrDefault(v => v.PlayerId == _padrinhoId);
+                var afilhados = podem.Where(j => padrinhoEscolhido is not null && j.Grupo == padrinhoEscolhido.Grupo).ToList();
+                @if (veteranos.Count == 0)
+                {
+                    <div class="small text-muted">Ninguém no elenco tem @PadrinhoCriterios.IdadeMinima anos ou mais.</div>
+                }
+                else
+                {
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small mb-1">Padrinho</label>
+                            <select class="form-select form-select-sm" @onchange="e => EscolherPadrinho(e.Value?.ToString())">
+                                <option value="">— escolha um veterano</option>
+                                @foreach (var v in veteranos)
+                                {
+                                    <option value="@v.PlayerId" selected="@(v.PlayerId == _padrinhoId)">@v.Nome (@v.Posicao, @v.Idade anos, @v.Overall)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small mb-1">Afilhado</label>
+                            <select class="form-select form-select-sm" disabled="@(padrinhoEscolhido is null)"
+                                    @onchange="e => _afilhadoId = int.TryParse(e.Value?.ToString(), out var id) ? id : null">
+                                <option value="">@(padrinhoEscolhido is null ? "— escolha o padrinho antes" : afilhados.Count == 0 ? "— nenhum jovem dessa posição pode treinar" : "— escolha um jovem")</option>
+                                @foreach (var a in afilhados)
+                                {
+                                    <option value="@a.PlayerId" selected="@(a.PlayerId == _afilhadoId)">@a.Nome (@a.Posicao, @a.Idade anos, @a.Overall)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button class="btn btn-primary btn-sm w-100" @onclick="ApadrinharAsync"
+                                    disabled="@(_salvando || _padrinhoId is null || _afilhadoId is null)">🤝 Apadrinhar</button>
+                        </div>
+                    </div>
+                    @if (_erroPadrinho is not null)
+                    {
+                        <div class="small text-danger mt-2">@_erroPadrinho</div>
+                    }
+                }
+            }
+        </div>
+    </div>
+
     @if (dados.UltimaSemana.Count > 0)
     {
         <div class="card mb-3">
@@ -140,6 +223,10 @@ else if (_dados is { } dados)
                         else if (r.Atributo is { } atributo)
                         {
                             <span>+@TreinoCriterios.GanhoPorSemana @atributo</span>
+                            @if (r.AtributoDoPadrinho is { } doPadrinho)
+                            {
+                                <span> e +@PadrinhoCriterios.ExtraNoTreino @doPadrinho <span class="text-muted">(padrinho)</span></span>
+                            }
                             @if (r.OverallDepois != r.OverallAntes)
                             {
                                 <span class="fw-semibold text-success"> · overall @r.OverallAntes → @r.OverallDepois</span>
@@ -183,6 +270,9 @@ else if (_dados is { } dados)
     private bool _salvando;
     private string? _erro;
     private string? _ok;
+    private int? _padrinhoId;
+    private int? _afilhadoId;
+    private string? _erroPadrinho;
 
     protected override async Task OnParametersSetAsync() => await CarregarAsync();
 
@@ -225,6 +315,28 @@ else if (_dados is { } dados)
         if (_dados is null) return;
         _escolhas = Repetiveis(_dados).ToDictionary(e => e.PlayerId, e => (FocoDoTreino?)e.Foco);
         await SalvarAsync();
+    }
+
+    private void EscolherPadrinho(string? valor)
+    {
+        _padrinhoId = int.TryParse(valor, out var id) ? id : null;
+        _afilhadoId = null;
+        _erroPadrinho = null;
+    }
+
+    private async Task ApadrinharAsync()
+    {
+        if (TeamToken is null || _padrinhoId is not int padrinho || _afilhadoId is not int afilhado) return;
+        _salvando = true;
+        _erroPadrinho = null;
+        try
+        {
+            await TreinoApi.ApadrinharAsync(padrinho, afilhado, TeamToken);
+            await CarregarAsync();
+            _ok = "🤝 Padrinho escolhido.";
+        }
+        catch (Exception ex) { _erroPadrinho = ex.Message; }
+        finally { _salvando = false; }
     }
 
     private async Task SalvarAsync()

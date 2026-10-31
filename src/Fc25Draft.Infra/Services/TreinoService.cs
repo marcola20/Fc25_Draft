@@ -37,14 +37,14 @@ public class TreinoService : ITreinoService
         var inicio = await InicioDaTemporadaAsync(ct);
         var ganhos = (await _db.TreinosSemanais.AsNoTracking()
                 .Where(t => t.TeamId == teamId && t.Atributo != null && t.AplicadoEm >= inicio)
-                .Select(t => t.PlayerId)
+                .Select(t => new { t.PlayerId, ComPadrinho = t.AtributoDoPadrinho != null })
                 .ToListAsync(ct))
-            .GroupBy(id => id)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .GroupBy(t => t.PlayerId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => TreinoCriterios.GanhoPorSemana + (t.ComPadrinho ? PadrinhoCriterios.ExtraNoTreino : 0)));
 
         var jogadores = elenco
             .Select(j => new TreinoJogadorDto(j.PlayerId, j.Nome, j.Posicao, j.Overall, j.Idade, j.Goleiro, j.PorQueNaoTreina,
-                daSemana.TryGetValue(j.PlayerId, out var foco) ? foco : null, ganhos.GetValueOrDefault(j.PlayerId)))
+                daSemana.TryGetValue(j.PlayerId, out var foco) ? foco : null, ganhos.GetValueOrDefault(j.PlayerId), j.Grupo))
             // Quem pode treinar primeiro, os mais novos antes.
             .OrderBy(j => j.PorQueNaoTreina is not null).ThenBy(j => j.Idade ?? 99).ThenByDescending(j => j.Overall)
             .ToList();
@@ -53,10 +53,19 @@ public class TreinoService : ITreinoService
         var ultima = await _db.TreinosSemanais.AsNoTracking()
             .Where(t => t.TeamId == teamId && t.Semana == passada)
             .Select(t => new TreinoResultadoDto(t.Semana, t.PlayerId, t.Player.Name, t.Foco, t.Atributo,
-                t.OverallAntes, t.OverallDepois, t.SemEfeito, t.AplicadoEm))
+                t.OverallAntes, t.OverallDepois, t.SemEfeito, t.AplicadoEm, t.AtributoDoPadrinho))
             .ToListAsync(ct);
 
-        return new TreinoDoTimeDto(semana, TreinoDaSemana.FechaEm(semana), jogadores, ultima);
+        var temporada = await TemporadaAtualAsync(ct);
+        var par = await ParAtivoAsync(teamId, temporada, ct);
+        var veteranos = elenco
+            .Where(j => j.Idade >= PadrinhoCriterios.IdadeMinima && !j.Emprestado)
+            .OrderByDescending(j => j.Overall)
+            .Select(j => new PadrinhoCandidatoDto(j.PlayerId, j.Nome, j.Posicao, j.Idade, j.Overall, j.Grupo))
+            .ToList();
+
+        return new TreinoDoTimeDto(semana, TreinoDaSemana.FechaEm(semana), jogadores, ultima,
+            par is null ? null : await ParaDtoAsync(par, ct), veteranos, par is null && temporada is not null);
     }
 
     public async Task SalvarAsync(Guid teamId, IReadOnlyList<TreinoEscolhaRequest> escolhas, CancellationToken ct)
@@ -116,6 +125,11 @@ public class TreinoService : ITreinoService
             .Select(r => (r.TeamId, r.PlayerId))
             .ToHashSet();
 
+        var temporada = await TemporadaAtualAsync(ct);
+        var pares = temporada is null
+            ? []
+            : await _db.Apadrinhamentos.AsNoTracking().Where(p => p.Temporada == temporada).ToListAsync(ct);
+
         var treinaram = 0;
         var evolucoes = new List<(TreinoSemanal Treino, EvolucaoPes Evolucao)>();
         foreach (var t in pendentes)
@@ -144,13 +158,25 @@ public class TreinoService : ITreinoService
 
             var depois = antes.ToArray();
             depois[indice] = Math.Min(AtributosPes.Maximo, depois[indice] + TreinoCriterios.GanhoPorSemana);
-            AtributosPes.Todos[indice].Set(dto, depois[indice]);
+
+            // Com padrinho no clube, o afilhado rende mais: mais um ponto no foco (de novo no que mais pesa).
+            int? extra = null;
+            if (pares.Any(p => p.TeamId == t.TeamId && p.AfilhadoId == t.PlayerId && noElenco.Contains((p.TeamId, p.PadrinhoId))))
+            {
+                extra = TreinoDaSemana.AtributoQueSobe(t.Foco, depois, jogador.Atributos.PosicaoPes.Value, dto.PeFracoUso,
+                    dto.PeFracoPrecisao, t.PlayerId, t.Semana);
+                if (extra is int i) depois[i] = Math.Min(AtributosPes.Maximo, depois[i] + PadrinhoCriterios.ExtraNoTreino);
+            }
+
+            for (var i = 0; i < depois.Length; i++)
+                AtributosPes.Todos[i].Set(dto, depois[i]);
             AtributosPes.Aplicar(dto, jogador.Atributos);
 
             t.OverallAntes = jogador.Overall;
             OverallPes.Recalcular(jogador);
             t.OverallDepois = jogador.Overall;
             t.Atributo = AtributosPes.Todos[indice].Nome;
+            t.AtributoDoPadrinho = extra is int e ? AtributosPes.Todos[e].Nome : null;
 
             var evolucao = new EvolucaoPes
             {
@@ -171,6 +197,7 @@ public class TreinoService : ITreinoService
         {
             var linhas = grupo.Select(t => t.Atributo is { } atributo
                 ? $"{t.Player.Name} +{TreinoCriterios.GanhoPorSemana} {atributo}"
+                  + (t.AtributoDoPadrinho is { } doPadrinho ? $" e +{PadrinhoCriterios.ExtraNoTreino} {doPadrinho} (padrinho)" : "")
                   + (t.OverallDepois != t.OverallAntes ? $" (overall {t.OverallAntes} → {t.OverallDepois})" : "")
                 : $"{t.Player.Name}: {t.SemEfeito}");
             AvisosDoTime.Criar(_db, grupo.Key.TeamId, AvisosDoTime.Treino,
@@ -231,8 +258,64 @@ public class TreinoService : ITreinoService
             .Where(t => t.PlayerId == playerId && t.AplicadoEm != null && t.AplicadoEm >= inicio)
             .OrderBy(t => t.Semana)
             .Select(t => new TreinoResultadoDto(t.Semana, t.PlayerId, t.Player.Name, t.Foco, t.Atributo,
-                t.OverallAntes, t.OverallDepois, t.SemEfeito, t.AplicadoEm))
+                t.OverallAntes, t.OverallDepois, t.SemEfeito, t.AplicadoEm, t.AtributoDoPadrinho))
             .ToListAsync(ct);
+    }
+
+    public async Task ApadrinharAsync(Guid teamId, int padrinhoId, int afilhadoId, CancellationToken ct)
+    {
+        var temporada = await TemporadaAtualAsync(ct)
+            ?? throw new InvalidOperationException("Não há temporada em andamento.");
+        if (await ParAtivoAsync(teamId, temporada, ct) is not null)
+            throw new InvalidOperationException("O time já tem padrinho nesta temporada: o par vale até um dos dois sair do clube.");
+
+        var elenco = (await ElencoAsync(teamId, ct)).ToDictionary(j => j.PlayerId);
+        if (!elenco.TryGetValue(padrinhoId, out var padrinho) || !elenco.TryGetValue(afilhadoId, out var afilhado))
+            throw new InvalidOperationException("Padrinho e afilhado precisam estar no seu elenco.");
+        if (padrinho.Emprestado)
+            throw new InvalidOperationException($"{padrinho.Nome} está emprestado: não pode ser padrinho.");
+        if (!(padrinho.Idade >= PadrinhoCriterios.IdadeMinima))
+            throw new InvalidOperationException($"Padrinho precisa ter pelo menos {PadrinhoCriterios.IdadeMinima} anos.");
+        if (afilhado.PorQueNaoTreina is { } motivo)
+            throw new InvalidOperationException($"{afilhado.Nome} não pode ser afilhado: {motivo}.");
+        if (padrinho.Grupo != afilhado.Grupo)
+            throw new InvalidOperationException("Padrinho e afilhado precisam ser da mesma posição.");
+
+        _db.Apadrinhamentos.Add(new Apadrinhamento
+        {
+            ApadrinhamentoId = Guid.NewGuid(), TeamId = teamId, Temporada = temporada,
+            PadrinhoId = padrinhoId, AfilhadoId = afilhadoId, CriadoEm = _time.GetUtcNow().UtcDateTime
+        });
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<PadrinhoDto?> PadrinhoDoJogadorAsync(int playerId, CancellationToken ct)
+    {
+        var timeId = await _db.TeamRosters.AsNoTracking().Where(r => r.PlayerId == playerId).Select(r => (Guid?)r.TeamId).FirstOrDefaultAsync(ct);
+        if (timeId is not Guid time) return null;
+        var par = await ParAtivoAsync(time, await TemporadaAtualAsync(ct), ct);
+        return par is not null && (par.PadrinhoId == playerId || par.AfilhadoId == playerId) ? await ParaDtoAsync(par, ct) : null;
+    }
+
+    /// <summary>
+    /// Padrinhos que ganham o bônus na evolução da virada de <paramref name="temporada"/>: seguem no clube do par e o
+    /// afilhado treinou com eles pelo menos <see cref="PadrinhoCriterios.TreinosParaOBonus"/> semanas. Padrinho → afilhado.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<int, string>> PadrinhosComBonusAsync(DraftDbContext db, int temporada, CancellationToken ct)
+    {
+        var pares = await db.Apadrinhamentos.AsNoTracking()
+            .Where(p => p.Temporada == temporada
+                        && db.TeamRosters.Any(r => r.TeamId == p.TeamId && r.PlayerId == p.PadrinhoId))
+            .Select(p => new
+            {
+                p.PadrinhoId, Afilhado = p.Afilhado.Name,
+                Treinos = db.TreinosSemanais.Count(t => t.TeamId == p.TeamId && t.PlayerId == p.AfilhadoId
+                                                         && t.AtributoDoPadrinho != null && t.AplicadoEm >= p.CriadoEm)
+            })
+            .ToListAsync(ct);
+        return pares.Where(p => p.Treinos >= PadrinhoCriterios.TreinosParaOBonus)
+            .GroupBy(p => p.PadrinhoId)
+            .ToDictionary(g => g.Key, g => g.First().Afilhado);
     }
 
     public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct)
@@ -252,7 +335,8 @@ public class TreinoService : ITreinoService
 
     // ── Bastidores ─────────────────────────────────────────────────────────────
 
-    private sealed record JogadorDoElenco(int PlayerId, string Nome, string Posicao, int Overall, int? Idade, bool Goleiro, string? PorQueNaoTreina);
+    private sealed record JogadorDoElenco(int PlayerId, string Nome, string Posicao, int Overall, int? Idade, bool Goleiro,
+        string? PorQueNaoTreina, GrupoDePosicao Grupo, bool Emprestado);
 
     private async Task<List<JogadorDoElenco>> ElencoAsync(Guid teamId, CancellationToken ct)
     {
@@ -271,8 +355,41 @@ public class TreinoService : ITreinoService
                 .ToListAsync(ct))
             .Select(r => new JogadorDoElenco(r.PlayerId, r.Name, r.Posicao, r.Overall, r.Age,
                 r.PositionId == (short)PositionType.Goleiro,
-                TreinoDaSemana.PorQueNaoTreina(r.Age, r.Overall, r.TemAtributos, emprestados.Contains(r.PlayerId))))
+                TreinoDaSemana.PorQueNaoTreina(r.Age, r.Overall, r.TemAtributos, emprestados.Contains(r.PlayerId)),
+                PapelDoJogador.Grupo(r.PositionId), emprestados.Contains(r.PlayerId)))
             .ToList();
+    }
+
+    /// <summary>O par do time na temporada que ainda vale (os dois no clube); nulo se não tem.</summary>
+    private async Task<Apadrinhamento?> ParAtivoAsync(Guid teamId, int? temporada, CancellationToken ct) =>
+        temporada is null
+            ? null
+            : await _db.Apadrinhamentos.AsNoTracking()
+                .Where(p => p.TeamId == teamId && p.Temporada == temporada
+                            && _db.TeamRosters.Any(r => r.TeamId == teamId && r.PlayerId == p.PadrinhoId)
+                            && _db.TeamRosters.Any(r => r.TeamId == teamId && r.PlayerId == p.AfilhadoId))
+                .OrderByDescending(p => p.CriadoEm)
+                .FirstOrDefaultAsync(ct);
+
+    private async Task<PadrinhoDto> ParaDtoAsync(Apadrinhamento par, CancellationToken ct)
+    {
+        var nomes = await _db.Players.AsNoTracking()
+            .Where(p => p.PlayerId == par.PadrinhoId || p.PlayerId == par.AfilhadoId)
+            .ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
+        var treinos = await _db.TreinosSemanais.CountAsync(
+            t => t.TeamId == par.TeamId && t.PlayerId == par.AfilhadoId && t.AtributoDoPadrinho != null && t.AplicadoEm >= par.CriadoEm, ct);
+        return new PadrinhoDto(par.PadrinhoId, nomes[par.PadrinhoId], par.AfilhadoId, nomes[par.AfilhadoId], treinos);
+    }
+
+    /// <summary>Temporada em andamento: a da Série A mais recente que já começou.</summary>
+    private async Task<int?> TemporadaAtualAsync(CancellationToken ct)
+    {
+        var hoje = AgoraBrasilia;
+        return await _db.Ligas.AsNoTracking()
+            .Where(l => l.Tipo == TipoCompetition.Liga && l.DataInicio <= hoje)
+            .OrderByDescending(l => l.DataInicio)
+            .Select(l => l.Temporada)
+            .FirstOrDefaultAsync(ct);
     }
 
     /// <summary>Começo da temporada atual: o da Série A mais recente que já começou.</summary>

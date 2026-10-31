@@ -91,8 +91,15 @@ else
                         {
                             <span class="badge text-bg-light border"
                                   title="@($"Treino da semana nesta temporada: {string.Join(", ", _treinos.Where(t => t.Atributo is not null).GroupBy(t => t.Atributo).Select(g => $"{g.Key} +{g.Count() * TreinoCriterios.GanhoPorSemana}"))}")">
-                                🏋️ Treino +@(treinou * TreinoCriterios.GanhoPorSemana)
+                                🏋️ Treino +@(_treinos.Where(t => t.Atributo is not null).Sum(t => TreinoCriterios.GanhoPorSemana + (t.AtributoDoPadrinho is null ? 0 : PadrinhoCriterios.ExtraNoTreino)))
                             </span>
+                        }
+                        @if (_padrinho is { } par)
+                        {
+                            <a href="/players/details/@(par.PadrinhoId == player.PlayerId ? par.AfilhadoId : par.PadrinhoId)" class="badge text-bg-light border text-decoration-none"
+                               title="@(par.PadrinhoId == player.PlayerId ? $"Padrinho: o afilhado já treinou {par.Treinos} de {PadrinhoCriterios.TreinosParaOBonus} semanas para o bônus da virada" : "Afilhado: rende mais no treino da semana")">
+                                🤝 @(par.PadrinhoId == player.PlayerId ? $"Padrinho de {par.AfilhadoNome}" : $"Afilhado de {par.PadrinhoNome}")
+                            </a>
                         }
                         @if (_participacao?.Papel is { } papel)
                         {
@@ -381,6 +388,7 @@ else
     private decimal? _valorDeMercado;
     private ParticipacaoJogador? _participacao;
     private IReadOnlyList<TreinoResultadoDto> _treinos = [];
+    private PadrinhoDto? _padrinho;
 
     private async Task LoadPlayerAsync()
     {
@@ -389,6 +397,7 @@ else
         _valorDeMercado = null;
         _participacao = null;
         _treinos = [];
+        _padrinho = null;
 
         try
         {
@@ -402,6 +411,7 @@ else
                 _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
                 _participacao = player.TeamId is null ? null : await ParticipacaoSvc.GetAsync(player.PlayerId, CancellationToken.None);
                 _treinos = await TreinoSvc.DoJogadorAsync(player.PlayerId, CancellationToken.None);
+                _padrinho = await TreinoSvc.PadrinhoDoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
                 _versaoFoto = _foto.Versao;
             }

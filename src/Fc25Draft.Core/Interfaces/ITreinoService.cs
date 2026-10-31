@@ -21,6 +21,15 @@ public interface ITreinoService
     /// <summary>Os treinos do jogador na temporada atual (no clube em que ele está).</summary>
     Task<IReadOnlyList<TreinoResultadoDto>> DoJogadorAsync(int playerId, CancellationToken ct);
 
+    /// <summary>
+    /// Forma o par de padrinho e afilhado do time na temporada: um veterano e um jovem que pode treinar, da mesma
+    /// posição. Um par por temporada; se um dos dois saiu do clube, dá para formar outro.
+    /// </summary>
+    Task ApadrinharAsync(Guid teamId, int padrinhoId, int afilhadoId, CancellationToken ct);
+
+    /// <summary>Par de quem é padrinho ou afilhado no clube atual (nulo se não é).</summary>
+    Task<PadrinhoDto?> PadrinhoDoJogadorAsync(int playerId, CancellationToken ct);
+
     /// <summary>Notícias do Plantão: quem se formou no treino (passou do overall do treino).</summary>
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 }

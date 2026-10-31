@@ -190,6 +190,38 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("AlbumConquistas", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Apadrinhamento", b =>
+                {
+                    b.Property<Guid>("ApadrinhamentoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AfilhadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("PadrinhoId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ApadrinhamentoId");
+
+                    b.HasIndex("AfilhadoId");
+
+                    b.HasIndex("PadrinhoId");
+
+                    b.HasIndex("TeamId", "Temporada");
+
+                    b.ToTable("Apadrinhamentos", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.AvisoTime", b =>
                 {
                     b.Property<Guid>("AvisoId")
@@ -3486,6 +3518,10 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("AtributoDoPadrinho")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<DateTime>("EscolhidoEm")
                         .HasColumnType("timestamp without time zone");
 
@@ -3718,6 +3754,33 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Time");
 
                     b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Apadrinhamento", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Afilhado")
+                        .WithMany()
+                        .HasForeignKey("AfilhadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Padrinho")
+                        .WithMany()
+                        .HasForeignKey("PadrinhoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Afilhado");
+
+                    b.Navigation("Padrinho");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.AvisoTime", b =>

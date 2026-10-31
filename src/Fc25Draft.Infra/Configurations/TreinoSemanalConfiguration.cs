@@ -18,6 +18,7 @@ public class TreinoSemanalConfiguration : IEntityTypeConfiguration<TreinoSemanal
 
         b.Property(x => x.Foco).HasConversion<short>();
         b.Property(x => x.Atributo).HasMaxLength(40);
+        b.Property(x => x.AtributoDoPadrinho).HasMaxLength(40);
         b.Property(x => x.SemEfeito).HasMaxLength(120);
 
         b.HasOne(x => x.Team).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Cascade);

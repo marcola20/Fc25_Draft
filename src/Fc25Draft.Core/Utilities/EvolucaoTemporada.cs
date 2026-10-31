@@ -95,7 +95,8 @@ public static class EvolucaoTemporada
     }
 
     /// <param name="surpresa">Explosão (+) ou queda de rendimento (−) sorteada para o jogador; 0 = nenhuma.</param>
-    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d, int surpresa = 0)
+    /// <param name="afilhado">Foi padrinho na temporada (com o afilhado treinando o bastante): nome do afilhado.</param>
+    public static VariacaoCalculada Calcular(int idade, bool goleiro, DesempenhoTemporada d, int surpresa = 0, string? afilhado = null)
     {
         var motivos = new List<string>();
         var curva = Curva(idade, goleiro);
@@ -145,6 +146,12 @@ public static class EvolucaoTemporada
                 desempenho--;
                 motivos.Add($"nota {nota.ToString("0.0", Br)}: −1");
             }
+        }
+
+        if (afilhado is not null && !d.SemClube)
+        {
+            desempenho += PadrinhoCriterios.BonusNaVirada;
+            motivos.Add($"padrinho de {afilhado}: {Sinal(PadrinhoCriterios.BonusNaVirada)}");
         }
 
         if (surpresa > 0) motivos.Add($"💥 explosão: {Sinal(surpresa)}");

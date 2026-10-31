@@ -24,6 +24,9 @@ public class TreinoSemanal
     /// <summary>Atributo que subiu (nome do PES); nulo se não subiu.</summary>
     public string? Atributo { get; set; }
 
+    /// <summary>Atributo que subiu a mais por ele ter padrinho no clube; nulo se não teve.</summary>
+    public string? AtributoDoPadrinho { get; set; }
+
     public int? OverallAntes { get; set; }
     public int? OverallDepois { get; set; }
 

@@ -111,6 +111,9 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             .GroupBy(t => (t.PlayerId, t.ToTeamId!.Value))
             .ToDictionary(g => g.Key, g => g.Max(t => t.PerformedAtUtc));
 
+        // Padrinho que cumpriu a temporada com o afilhado treinando: cai menos.
+        var padrinhos = await TreinoService.PadrinhosComBonusAsync(_db, temporada, ct);
+
         var resultado = new List<Calculo>(jogadores.Count);
         foreach (var j in jogadores)
         {
@@ -131,7 +134,7 @@ public class EvolucaoTemporadaService : IEvolucaoTemporadaService
             var dto = j.Atributos is null ? null : AtributosPes.ParaDto(j.Atributos);
             var goleiro = dto?.PosicaoPes is int pp ? pp == 0 : j.PositionId == (short)PositionType.Goleiro;
             var surpresa = surpresasCanceladas?.Contains(j.PlayerId) == true ? 0 : EvolucaoTemporada.Surpresa(temporada, j.PlayerId, j.Idade);
-            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, surpresa);
+            var conta = EvolucaoTemporada.Calcular(j.Idade, goleiro, desempenho, surpresa, padrinhos.GetValueOrDefault(j.PlayerId));
             var pontos = conta.Total;
             var afetados = EvolucaoTemporada.AtributosAfetados(temporada, j.PlayerId, pontos, goleiro);
 

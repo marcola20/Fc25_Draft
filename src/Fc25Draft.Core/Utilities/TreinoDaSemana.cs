@@ -43,6 +43,25 @@ public static class TreinoCriterios
         };
 }
 
+/// <summary>
+/// Padrinho: um veterano do elenco adota um jovem da mesma posição (um par por time por temporada). O afilhado rende
+/// mais no treino da semana; o padrinho, que se sente útil, cai menos na evolução da virada.
+/// </summary>
+public static class PadrinhoCriterios
+{
+    /// <summary>Padrinho tem pelo menos essa idade.</summary>
+    public const int IdadeMinima = 30;
+
+    /// <summary>Quanto o afilhado ganha a mais em cada semana que treina (além do +1 do treino).</summary>
+    public const int ExtraNoTreino = 1;
+
+    /// <summary>Semanas de treino do afilhado (com o padrinho) para o padrinho ganhar o bônus da virada.</summary>
+    public const int TreinosParaOBonus = 4;
+
+    /// <summary>Pontos a mais na evolução da virada para o padrinho (dentro dos limites de sempre).</summary>
+    public const int BonusNaVirada = 1;
+}
+
 public static class TreinoDaSemana
 {
     public static string Emoji(FocoDoTreino foco) => foco switch
