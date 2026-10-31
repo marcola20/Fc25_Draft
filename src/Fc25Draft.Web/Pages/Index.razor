@@ -9,6 +9,7 @@
 @inject IPremiosService PremiosSvc
 @inject ITreinadorService TreinadorNoticiasSvc
 @inject IParticipacaoService ParticipacaoSvc
+@inject ITreinoService TreinoSvc
 
 @implements IDisposable
 
@@ -91,6 +92,7 @@ else
             try { noticias.AddRange(await PremiosSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await TreinadorNoticiasSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await ParticipacaoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await TreinoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).Take(NoticiasNaPaginaInicial).ToList();
         }
         catch { }

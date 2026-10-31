@@ -173,6 +173,12 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Treino ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Treino">
+                🏋️ Treino
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Extrato ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Extrato">
                 Extrato
@@ -211,6 +217,10 @@ else
     else if (_activeMainTab == MainTab.Transferencias)
     {
         <TimeTransferenciasTab @key="@($"transferencias-{Id}")" TeamId="@Id" />
+    }
+    else if (_activeMainTab == MainTab.Treino)
+    {
+        <TimeTreinoTab @key="@($"treino-{Id}")" TeamId="@Id" TeamToken="@(_canQuickSell ? _currentTeamToken : null)" />
     }
     else if (_activeMainTab == MainTab.Extrato)
     {
@@ -677,7 +687,7 @@ else
     [Parameter, SupplyParameterFromQuery(Name = "negociar")]
     public Guid? NegociarJogador { get; set; }
 
-    /// <summary>Aba que a página já abre (?aba=extrato vem da Minha Área).</summary>
+    /// <summary>Aba que a página já abre (?aba=extrato vem da Minha Área; ?aba=treino, do lembrete do treino).</summary>
     [Parameter, SupplyParameterFromQuery(Name = "aba")]
     public string? Aba { get; set; }
 
@@ -749,7 +759,12 @@ else
         }
 
         _carregadoId = Id;
-        _activeMainTab = string.Equals(Aba, "extrato", StringComparison.OrdinalIgnoreCase) ? MainTab.Extrato : MainTab.Info;
+        _activeMainTab = Aba?.ToLowerInvariant() switch
+        {
+            "extrato" => MainTab.Extrato,
+            "treino" => MainTab.Treino,
+            _ => MainTab.Info
+        };
         _quickSellSuccessMessage = null;
         _perfil = null;
 
@@ -1381,7 +1396,8 @@ else
         Retrospectiva,
         Transferencias,
         Negotiations,
-        Extrato
+        Extrato,
+        Treino
     }
 
     private enum RosterSortColumn

@@ -3473,6 +3473,59 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("TreinadorPassagens", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TreinoSemanal", b =>
+                {
+                    b.Property<Guid>("TreinoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AplicadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Atributo")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("EscolhidoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("EvolucaoPesId")
+                        .HasColumnType("integer");
+
+                    b.Property<short>("Foco")
+                        .HasColumnType("smallint");
+
+                    b.Property<int?>("OverallAntes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OverallDepois")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SemEfeito")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("Semana")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TreinoId");
+
+                    b.HasIndex("AplicadoEm");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeamId", "Semana", "PlayerId")
+                        .IsUnique();
+
+                    b.ToTable("TreinosSemanais", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.TrocaFigurinhaItem", b =>
                 {
                     b.Property<Guid>("TrocaId")
@@ -5016,6 +5069,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Time");
 
                     b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TreinoSemanal", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.TrocaFigurinhaItem", b =>

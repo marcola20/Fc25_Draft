@@ -68,6 +68,8 @@ public class NotificacoesService : BackgroundService
         await TentarAsync("vez no draft", s => AvisarVezNoDraftAsync(s, ct));
         // Logo que chega: o papel sai do elenco que ele encontrou.
         await TentarAsync("papel no elenco", s => s.GetRequiredService<IParticipacaoService>().GravarPapeisAsync(ct));
+        // A semana fechou (segunda, 0h de Brasília): o treino acontece e o aviso sai nesta mesma checagem.
+        await TentarAsync("treino da semana", s => s.GetRequiredService<ITreinoService>().TreinarSemanasFechadasAsync(ct));
         // Antes dos avisos: o que a diretoria gravar sai como notificação nesta mesma checagem.
         if (diretoria)
         {
@@ -75,6 +77,7 @@ public class NotificacoesService : BackgroundService
             await TentarAsync("insatisfeitos", s => s.GetRequiredService<IParticipacaoService>().AvisarInsatisfeitosAsync(ct));
             await TentarAsync("incomodados", s => s.GetRequiredService<IParticipacaoService>().AvisarIncomodadosAsync(ct));
             await TentarAsync("prêmios do bolão", s => s.GetRequiredService<IBolaoService>().PagarPremiosAsync(ct));
+            await TentarAsync("lembrete do treino", s => s.GetRequiredService<ITreinoService>().LembrarAsync(ct));
             await TentarAsync("pediu para sair", s => s.GetRequiredService<IPedidoDeSaidaService>().ProcessarAsync(ct));
         }
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));

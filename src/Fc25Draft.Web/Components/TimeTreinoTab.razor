@@ -1,0 +1,248 @@
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject ITreinoService TreinoSvc
+@inject TreinoApiClient TreinoApi
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_erro is not null && _dados is null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar o treino:</strong> @_erro</div>
+}
+else if (_dados is { } dados)
+{
+    var podem = dados.Jogadores.Where(j => j.PorQueNaoTreina is null).ToList();
+    var naoPodem = dados.Jogadores.Where(j => j.PorQueNaoTreina is not null && j.GanhosNaTemporada == 0).ToList();
+    var formados = dados.Jogadores.Where(j => j.PorQueNaoTreina is not null && j.GanhosNaTemporada > 0).ToList();
+    var escolhidos = _escolhas.Count(e => e.Value is not null);
+
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-bold">🏋️ Treino da semana</span>
+            <span class="text-muted small">
+                @dados.Semana.ToString("dd/MM", Br) a @dados.FechaEm.AddDays(-1).ToString("dd/MM", Br) ·
+                o treino acontece domingo à meia-noite
+            </span>
+            <span class="badge @(dados.Escolhidos >= Math.Min(TreinoCriterios.JogadoresPorSemana, podem.Count) && podem.Count > 0 ? "bg-success" : "bg-warning text-dark") ms-auto">
+                @dados.Escolhidos de @TreinoCriterios.JogadoresPorSemana
+            </span>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">
+                Escolha até @TreinoCriterios.JogadoresPorSemana jogadores de até @TreinoCriterios.IdadeMaxima anos e até
+                @TreinoCriterios.OverallMaximo de overall, e o foco de cada um. Quando a semana fecha, cada um ganha
+                <strong>+@TreinoCriterios.GanhoPorSemana em um atributo do foco</strong>, que vai para o PES. Quem passa de
+                @TreinoCriterios.OverallMaximo se forma e sai do treino. Semana sem treino é semana perdida.
+            </p>
+
+            @if (podem.Count == 0)
+            {
+                <div class="alert alert-secondary mb-0">Ninguém no elenco pode treinar agora (até @TreinoCriterios.IdadeMaxima anos e até @TreinoCriterios.OverallMaximo de overall).</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Jogador</th>
+                                <th class="text-center">Idade</th>
+                                <th class="text-center">Overall</th>
+                                <th class="text-center" title="Atributos que já subiram no treino nesta temporada">Treinou</th>
+                                <th style="min-width:11rem;">Foco</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in podem)
+                            {
+                                var foco = _escolhas.GetValueOrDefault(j.PlayerId);
+                                var lotado = foco is null && escolhidos >= TreinoCriterios.JogadoresPorSemana;
+                                <tr class="@(foco is not null ? "table-success" : "")">
+                                    <td>
+                                        <a href="/players/details/@j.PlayerId">@j.Nome</a>
+                                        <span class="text-muted small">@j.Posicao</span>
+                                    </td>
+                                    <td class="text-center">@j.Idade</td>
+                                    <td class="text-center">@j.Overall</td>
+                                    <td class="text-center">@(j.GanhosNaTemporada > 0 ? $"+{j.GanhosNaTemporada}" : "—")</td>
+                                    <td>
+                                        @if (TeamToken is null)
+                                        {
+                                            <span>@(foco is { } f ? $"{TreinoDaSemana.Emoji(f)} {TreinoDaSemana.Nome(f)}" : "—")</span>
+                                        }
+                                        else
+                                        {
+                                            <select class="form-select form-select-sm" disabled="@(lotado || _salvando)"
+                                                    title="@(lotado ? $"Já tem {TreinoCriterios.JogadoresPorSemana} no treino: tire alguém antes" : "")"
+                                                    value="@(foco is { } f ? ((short)f).ToString(CultureInfo.InvariantCulture) : "")"
+                                                    @onchange="e => Escolher(j.PlayerId, e.Value?.ToString())">
+                                                <option value="">— fora do treino</option>
+                                                @foreach (var opcao in TreinoDaSemana.Focos(j.Goleiro))
+                                                {
+                                                    <option value="@(((short)opcao).ToString(CultureInfo.InvariantCulture))">@TreinoDaSemana.Emoji(opcao) @TreinoDaSemana.Nome(opcao)</option>
+                                                }
+                                            </select>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (TeamToken is not null)
+                {
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <button class="btn btn-primary btn-sm" @onclick="SalvarAsync" disabled="@(_salvando || !Mudou)">
+                            @if (_salvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            Salvar o treino
+                        </button>
+                        @if (Repetiveis(dados).Count > 0 && escolhidos == 0)
+                        {
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="RepetirAsync" disabled="@_salvando">
+                                🔁 Repetir o da semana passada
+                            </button>
+                        }
+                        @if (_ok is not null)
+                        {
+                            <span class="text-success small">@_ok</span>
+                        }
+                        @if (_erro is not null)
+                        {
+                            <span class="text-danger small">@_erro</span>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    @if (dados.UltimaSemana.Count > 0)
+    {
+        <div class="card mb-3">
+            <div class="card-header fw-bold">Semana passada</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var r in dados.UltimaSemana)
+                {
+                    <li class="list-group-item small">
+                        @TreinoDaSemana.Emoji(r.Foco) <a href="/players/details/@r.PlayerId">@r.Nome</a>:
+                        @if (r.AplicadoEm is null)
+                        {
+                            <span class="text-muted">o treino acontece em instantes</span>
+                        }
+                        else if (r.Atributo is { } atributo)
+                        {
+                            <span>+@TreinoCriterios.GanhoPorSemana @atributo</span>
+                            @if (r.OverallDepois != r.OverallAntes)
+                            {
+                                <span class="fw-semibold text-success"> · overall @r.OverallAntes → @r.OverallDepois</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">@r.SemEfeito</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (formados.Count > 0)
+    {
+        <p class="small text-muted mb-1">
+            🎓 Já saíram do treino nesta temporada: @string.Join(", ", formados.Select(j => $"{j.Nome} (+{j.GanhosNaTemporada}, {j.PorQueNaoTreina})")).
+        </p>
+    }
+    @if (naoPodem.Count > 0)
+    {
+        <p class="small text-muted mb-0">
+            Fora do treino: @naoPodem.Count jogador@(naoPodem.Count == 1 ? "" : "es") (passaram da idade ou do overall, emprestados ou sem atributos do jogo).
+        </p>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    /// <summary>Token do time dono da página: com ele dá para mexer; sem ele, só ver.</summary>
+    [Parameter] public string? TeamToken { get; set; }
+
+    private TreinoDoTimeDto? _dados;
+    private Dictionary<int, FocoDoTreino?> _escolhas = new();
+    private bool _loading = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    protected override async Task OnParametersSetAsync() => await CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _dados = await TreinoSvc.DoTimeAsync(TeamId, CancellationToken.None);
+            _escolhas = _dados.Jogadores.Where(j => j.Foco is not null).ToDictionary(j => j.PlayerId, j => j.Foco);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private bool Mudou =>
+        _dados is not null
+        && !_escolhas.Where(e => e.Value is not null).OrderBy(e => e.Key)
+            .SequenceEqual(_dados.Jogadores.Where(j => j.Foco is not null).OrderBy(j => j.PlayerId)
+                .Select(j => new KeyValuePair<int, FocoDoTreino?>(j.PlayerId, j.Foco)));
+
+    private void Escolher(int playerId, string? valor)
+    {
+        _ok = null;
+        _erro = null;
+        _escolhas[playerId] = short.TryParse(valor, out var foco) ? (FocoDoTreino)foco : null;
+    }
+
+    /// <summary>Quem treinou na semana passada e ainda pode treinar.</summary>
+    private static List<TreinoEscolhaRequest> Repetiveis(TreinoDoTimeDto dados)
+    {
+        var podem = dados.Jogadores.Where(j => j.PorQueNaoTreina is null).Select(j => j.PlayerId).ToHashSet();
+        return dados.UltimaSemana.Where(r => podem.Contains(r.PlayerId))
+            .Take(TreinoCriterios.JogadoresPorSemana)
+            .Select(r => new TreinoEscolhaRequest(r.PlayerId, r.Foco))
+            .ToList();
+    }
+
+    private async Task RepetirAsync()
+    {
+        if (_dados is null) return;
+        _escolhas = Repetiveis(_dados).ToDictionary(e => e.PlayerId, e => (FocoDoTreino?)e.Foco);
+        await SalvarAsync();
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (TeamToken is null) return;
+        _salvando = true;
+        _erro = null;
+        _ok = null;
+        try
+        {
+            var escolhas = _escolhas.Where(e => e.Value is not null)
+                .Select(e => new TreinoEscolhaRequest(e.Key, e.Value!.Value))
+                .ToList();
+            await TreinoApi.SalvarAsync(escolhas, TeamToken);
+            await CarregarAsync();
+            _ok = escolhas.Count == 0 ? "Treino desta semana limpo." : "✅ Treino salvo.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

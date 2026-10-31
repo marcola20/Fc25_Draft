@@ -9,6 +9,7 @@
 @inject IMinhaAreaService MinhaArea
 @inject IPricingService Pricing
 @inject IParticipacaoService ParticipacaoSvc
+@inject ITreinoService TreinoSvc
 @inject IFotosJogadoresService Fotos
 @inject IJSRuntime JS
 @inject EscudoService Escudos
@@ -85,6 +86,13 @@ else
                         else if (_participacao is { Incomodado: true })
                         {
                             <span class="badge bg-warning text-dark" title="Se não jogar o próximo jogo do clube, fica 😤 insatisfeito">😐 Incomodado</span>
+                        }
+                        @if (_treinos.Count(t => t.Atributo is not null) is > 0 and var treinou)
+                        {
+                            <span class="badge text-bg-light border"
+                                  title="@($"Treino da semana nesta temporada: {string.Join(", ", _treinos.Where(t => t.Atributo is not null).GroupBy(t => t.Atributo).Select(g => $"{g.Key} +{g.Count() * TreinoCriterios.GanhoPorSemana}"))}")">
+                                🏋️ Treino +@(treinou * TreinoCriterios.GanhoPorSemana)
+                            </span>
                         }
                         @if (_participacao?.Papel is { } papel)
                         {
@@ -372,6 +380,7 @@ else
     // com a variação pela participação no clube.
     private decimal? _valorDeMercado;
     private ParticipacaoJogador? _participacao;
+    private IReadOnlyList<TreinoResultadoDto> _treinos = [];
 
     private async Task LoadPlayerAsync()
     {
@@ -379,6 +388,7 @@ else
         errorMessage = null;
         _valorDeMercado = null;
         _participacao = null;
+        _treinos = [];
 
         try
         {
@@ -391,6 +401,7 @@ else
             {
                 _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
                 _participacao = player.TeamId is null ? null : await ParticipacaoSvc.GetAsync(player.PlayerId, CancellationToken.None);
+                _treinos = await TreinoSvc.DoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
                 _versaoFoto = _foto.Versao;
             }
