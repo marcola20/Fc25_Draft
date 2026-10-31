@@ -2300,6 +2300,39 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("PerfisTreinadores", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PickDoDraft", b =>
+                {
+                    b.Property<Guid>("PickDoDraftId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DonoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NegociadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Rodada")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TimeOriginalId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PickDoDraftId");
+
+                    b.HasIndex("DonoId");
+
+                    b.HasIndex("TimeOriginalId");
+
+                    b.HasIndex("Temporada", "Rodada", "TimeOriginalId")
+                        .IsUnique();
+
+                    b.ToTable("PicksDoDraft", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
                     b.Property<int>("PlayerId")
@@ -3448,6 +3481,30 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("ToTeamId");
 
                     b.ToTable("TransferOffers");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferPick", b =>
+                {
+                    b.Property<Guid>("OfferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Rodada")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TimeOriginalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsTarget")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("OfferId", "Temporada", "Rodada", "TimeOriginalId");
+
+                    b.HasIndex("TimeOriginalId");
+
+                    b.ToTable("TransferOfferPicks", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferPlayer", b =>
@@ -4762,6 +4819,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Treinador");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PickDoDraft", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Dono")
+                        .WithMany()
+                        .HasForeignKey("DonoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "TimeOriginal")
+                        .WithMany()
+                        .HasForeignKey("TimeOriginalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Dono");
+
+                    b.Navigation("TimeOriginal");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Team", "CurrentTeam")
@@ -5136,6 +5212,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("ToTeam");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferPick", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.TransferOffer", "Offer")
+                        .WithMany("Picks")
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "TimeOriginal")
+                        .WithMany()
+                        .HasForeignKey("TimeOriginalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
+
+                    b.Navigation("TimeOriginal");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOfferPlayer", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.TransferOffer", "Offer")
@@ -5385,6 +5480,8 @@ namespace Fc25Draft.Infra.Migrations
             modelBuilder.Entity("Fc25Draft.Core.Entities.TransferOffer", b =>
                 {
                     b.Navigation("CounterOffers");
+
+                    b.Navigation("Picks");
 
                     b.Navigation("Players");
                 });

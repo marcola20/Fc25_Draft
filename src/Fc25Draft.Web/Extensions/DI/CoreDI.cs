@@ -44,6 +44,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IPapelNoElencoService, PapelNoElencoService>();
             services.AddComConexaoPropria<ITreinoService, TreinoService>();
             services.AddComConexaoPropria<IComissaoService, ComissaoService>();
+            services.AddComConexaoPropria<IPicksDoDraftService, PicksDoDraftService>();
             services.AddComConexaoPropria<ISobeEDesceService, SobeEDesceService>();
             services.AddComConexaoPropria<IValorDoJogadorService, ValorDoJogadorService>();
             services.AddScoped<IPricingService, PricingService>();

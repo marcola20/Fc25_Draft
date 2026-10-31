@@ -28,4 +28,7 @@ public class TransferOffer
     public TransferOffer? ParentOffer { get; set; }
     public ICollection<TransferOffer> CounterOffers { get; set; } = new List<TransferOffer>();
     public ICollection<TransferOfferPlayer> Players { get; set; } = new List<TransferOfferPlayer>();
+
+    /// <summary>Picks do próximo draft na proposta (com ou sem jogadores).</summary>
+    public ICollection<TransferOfferPick> Picks { get; set; } = new List<TransferOfferPick>();
 }

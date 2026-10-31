@@ -14,7 +14,9 @@ public record CreateTransferOfferDto(
     string? Clauses,
     string? Notes,
     Guid? ParentOfferId,
-    decimal? BuyOptionPrice = null);
+    decimal? BuyOptionPrice = null,
+    PickRefDto[]? TargetPicks = null,
+    PickRefDto[]? OfferedPicks = null);
 
 public record RespondToOfferDto(
     OfferStatus Response);
@@ -38,7 +40,9 @@ public record TransferOfferListItemDto(
     IReadOnlyList<TransferOfferPlayerDto> OfferedPlayers,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    decimal? BuyOptionPrice = null);
+    decimal? BuyOptionPrice = null,
+    IReadOnlyList<PickDoDraftDto>? TargetPicks = null,
+    IReadOnlyList<PickDoDraftDto>? OfferedPicks = null);
 
 public record TransferOfferPlayerDto(
     int PlayerId,

@@ -1,0 +1,61 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IPicksDoDraftService PicksSvc
+
+@* Dono de cada pick do próximo draft: as negociadas aparecem com quem comprou. *@
+@if (_dados is { Temporada: int temporada } dados)
+{
+    <section class="picks-section">
+        <div class="picks-section-header">
+            <span class="picks-section-icon">🔄</span>
+            <h3>Donos das picks do próximo draft</h3>
+        </div>
+        <p class="picks-section-desc">
+            As picks do draft do fim da temporada @temporada entram nas propostas entre times (aba Negociações).
+            A pick vale a posição que o time dono dela pela classificação tirar na loteria; quando o draft é gerado,
+            quem escolhe é o dono atual.
+            @(dados.Aberta ? "Negociação aberta até a loteria." : "A loteria já aconteceu: as picks não se negociam mais.")
+        </p>
+        @if (dados.Picks.Count == 0)
+        {
+            <p class="text-muted small">Sem times inscritos na temporada.</p>
+        }
+        else
+        {
+            var negociadas = dados.Picks.Where(p => p.Negociada).ToList();
+            @if (negociadas.Count == 0)
+            {
+                <p class="small text-muted">Nenhuma pick negociada ainda: cada time tem as suas duas.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Pick</th><th>Dono hoje</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in negociadas)
+                            {
+                                <tr>
+                                    <td>@p.Rotulo</td>
+                                    <td class="fw-semibold">@p.DonoNome</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </section>
+}
+
+@code {
+    private PicksDoProximoDraftDto? _dados;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _dados = await PicksSvc.ProximoDraftAsync(CancellationToken.None); }
+        catch { /* sem a lista, a página mostra só as regras */ }
+    }
+}

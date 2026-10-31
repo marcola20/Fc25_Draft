@@ -3,6 +3,7 @@ using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,12 +28,19 @@ public class TransferOfferService : ITransferOfferService
         if (dto.FromTeamId == dto.ToTeamId) throw new ArgumentException("Os times devem ser diferentes.");
         var distinctTargets = (dto.TargetPlayerIds ?? Array.Empty<Guid>()).Distinct().ToArray();
         var distinctOffered = (dto.OfferedPlayerIds ?? Array.Empty<Guid>()).Distinct().ToArray();
+        var targetPicks = (dto.TargetPicks ?? []).Distinct().ToArray();
+        var offeredPicks = (dto.OfferedPicks ?? []).Distinct().ToArray();
+        // Negócio só de picks (e dinheiro): vale fora da janela e não conta no limite de transferências.
+        var soPicks = distinctTargets.Length == 0 && distinctOffered.Length == 0;
 
-        if (distinctTargets.Length == 0 && distinctOffered.Length == 0)
-            throw new ArgumentException("Selecione ao menos um jogador na negociação.");
+        if (soPicks && targetPicks.Length == 0 && offeredPicks.Length == 0)
+            throw new ArgumentException("Selecione ao menos um jogador ou uma pick do draft na negociação.");
 
-        if (dto.Type == OfferType.Swap && distinctOffered.Length == 0)
-            throw new ArgumentException("Selecione ao menos um jogador para enviar na troca.");
+        if (dto.Type == OfferType.Swap && distinctOffered.Length == 0 && offeredPicks.Length == 0)
+            throw new ArgumentException("Selecione ao menos um jogador ou pick para enviar na troca.");
+
+        if (dto.Type == OfferType.Loan && (targetPicks.Length > 0 || offeredPicks.Length > 0))
+            throw new ArgumentException("Empréstimo não leva pick do draft.");
 
         if (dto.Money > 0 && dto.MoneyPayerTeamId is null)
             throw new ArgumentException("Informe qual time paga o valor em dinheiro.");
@@ -61,21 +69,31 @@ public class TransferOfferService : ITransferOfferService
             ?? throw new KeyNotFoundException("Time de destino não encontrado.");
 
         var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
-        EnsureMercadoAberto(cfg);
+        if (!soPicks)
+        {
+            EnsureMercadoAberto(cfg);
 
-        if (dto.Type == OfferType.Loan)
-        {
-            EnsureLoanLimit(cfg, distinctTargets.Length > 0 ? fromTeam : toTeam);
+            if (dto.Type == OfferType.Loan)
+            {
+                EnsureLoanLimit(cfg, distinctTargets.Length > 0 ? fromTeam : toTeam);
+            }
+            else if (dto.Type == OfferType.Swap)
+            {
+                EnsureTransferLimit(cfg, fromTeam);
+                EnsureTransferLimit(cfg, toTeam);
+            }
+            else
+            {
+                EnsureTransferLimit(cfg, fromTeam);
+            }
         }
-        else if (dto.Type == OfferType.Swap)
-        {
-            EnsureTransferLimit(cfg, fromTeam);
-            EnsureTransferLimit(cfg, toTeam);
-        }
-        else
-        {
-            EnsureTransferLimit(cfg, fromTeam);
-        }
+
+        // As pedidas são de quem recebe a proposta; as oferecidas, de quem propõe.
+        var agoraBrasilia = HorarioDeBrasilia.Agora(_timeProvider);
+        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, targetPicks, toTeam.TeamId, toTeam.TeamName, ct) is { } erroPedidas)
+            throw new InvalidOperationException(erroPedidas);
+        if (await PicksDoDraftService.ProblemaAsync(_db, agoraBrasilia, offeredPicks, fromTeam.TeamId, fromTeam.TeamName, ct) is { } erroOferecidas)
+            throw new InvalidOperationException(erroOferecidas);
 
         var targetPlayers = await _db.Players
             .Include(p => p.Position)
@@ -171,15 +189,23 @@ public class TransferOfferService : ITransferOfferService
         }
 
         offer.Players = offerPlayers;
+        offer.Picks = targetPicks.Select(pk => (pk, true)).Concat(offeredPicks.Select(pk => (pk, false)))
+            .Select(x => new TransferOfferPick
+            {
+                OfferId = offer.OfferId, Temporada = x.pk.Temporada, Rodada = x.pk.Rodada,
+                TimeOriginalId = x.pk.TimeOriginalId, IsTarget = x.Item2
+            })
+            .ToList();
+        var nomes = await NomesDosTimesAsync(offer.Picks.Select(pk => pk.TimeOriginalId), ct);
 
         AvisosDoTime.Criar(_db, toTeam.TeamId, AvisosDoTime.Proposta,
-            $"{(dto.ParentOfferId.HasValue ? "Contraproposta" : "Proposta")} do {fromTeam.TeamName}: {Resumo(offer, targetPlayers, offeredPlayers, fromTeam.TeamId)}",
+            $"{(dto.ParentOfferId.HasValue ? "Contraproposta" : "Proposta")} do {fromTeam.TeamName}: {Resumo(offer, targetPlayers, offeredPlayers, fromTeam.TeamId, nomes)}",
             "/minha-area", now);
 
         await _db.TransferOffers.AddAsync(offer, ct);
         await _db.SaveChangesAsync(ct);
 
-        return MapToDto(offer, fromTeam, toTeam, targetPlayers, offeredPlayers);
+        return MapToDto(offer, fromTeam, toTeam, targetPlayers, offeredPlayers, nomes);
     }
 
     public Task<TransferOfferListItemDto> RespondToOfferAsync(Guid offerId, Guid teamId, OfferStatus response, CancellationToken ct)
@@ -214,10 +240,12 @@ public class TransferOfferService : ITransferOfferService
         var offer = await _db.TransferOffers
             .Include(o => o.Players).ThenInclude(p => p.Player).ThenInclude(p => p.Position)
             .Include(o => o.Players).ThenInclude(p => p.Player).ThenInclude(p => p.TeamRosters)
+            .Include(o => o.Picks).ThenInclude(p => p.TimeOriginal)
             .Include(o => o.FromTeam)
             .Include(o => o.ToTeam)
             .FirstOrDefaultAsync(o => o.OfferId == offerId, ct)
             ?? throw new KeyNotFoundException("Proposta não encontrada.");
+        var soPicks = offer.Players.Count == 0;
 
         if (offer.ToTeamId != teamId)
             throw new InvalidOperationException("Apenas o time destinatário pode responder a esta proposta.");
@@ -228,10 +256,16 @@ public class TransferOfferService : ITransferOfferService
         if (offer.CreatedAtUtc < _timeProvider.GetUtcNow().UtcDateTime.AddHours(-TransferOffer.HorasParaExpirar))
             throw new InvalidOperationException($"Esta proposta expirou: ficou mais de {TransferOffer.HorasParaExpirar} horas sem resposta.");
 
-        if (response == OfferStatus.Accepted)
+        if (response == OfferStatus.Accepted && soPicks)
+        {
+            // Só picks: sem janela nem limite, mas as picks ainda precisam ser de quem as cede.
+            await EnsurePicksAsync(offer, ct);
+        }
+        else if (response == OfferStatus.Accepted)
         {
             var cfg = await _db.TransferConfigs.AsNoTracking().FirstOrDefaultAsync(ct) ?? TransferConfig.Default();
             EnsureMercadoAberto(cfg);
+            await EnsurePicksAsync(offer, ct);
             if (offer.Type == OfferType.Loan)
             {
                 EnsureLoanLimit(cfg, LoanBorrower(offer) == offer.FromTeamId ? offer.FromTeam : offer.ToTeam);
@@ -266,7 +300,14 @@ public class TransferOfferService : ITransferOfferService
 
         if (response == OfferStatus.Accepted)
         {
-            await ExecuteTransferAsync(offer, ct);
+            if (soPicks)
+                await ExecutarSoPicksAsync(offer, ct);
+            else
+                await ExecuteTransferAsync(offer, ct);
+
+            // As pedidas vão para quem propôs; as oferecidas, para quem recebeu.
+            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => p.IsTarget).Select(Ref), offer.FromTeamId, now, ct);
+            await PicksDoDraftService.TransferirAsync(_db, offer.Picks.Where(p => !p.IsTarget).Select(Ref), offer.ToTeamId, now, ct);
             await CancelConflictingOffersAsync(offer, ct);
         }
 
@@ -594,19 +635,83 @@ public class TransferOfferService : ITransferOfferService
         var involvedPlayerIds = acceptedOffer.Players.Select(p => p.PlayerId).ToList();
         await PropostasPendentes.CancelarComJogadoresAsync(_db, involvedPlayerIds, acceptedOffer.OfferId,
             "um jogador dela acabou de ser negociado.", _timeProvider.GetUtcNow().UtcDateTime, ct);
+
+        // Pick que mudou de dono: as outras propostas pendentes com ela não valem mais.
+        if (acceptedOffer.Picks.Count == 0) return;
+        var chaves = acceptedOffer.Picks.Select(p => $"{p.Temporada}:{p.Rodada}:{p.TimeOriginalId}").ToHashSet();
+        var agora = _timeProvider.GetUtcNow().UtcDateTime;
+        var pendentes = await _db.TransferOffers
+            .Include(o => o.Picks)
+            .Where(o => o.OfferId != acceptedOffer.OfferId && o.Status == OfferStatus.Pending && o.Picks.Any())
+            .ToListAsync(ct);
+        foreach (var o in pendentes.Where(o => o.Picks.Any(p => chaves.Contains($"{p.Temporada}:{p.Rodada}:{p.TimeOriginalId}"))))
+        {
+            o.Status = OfferStatus.Cancelled;
+            o.UpdatedAtUtc = agora;
+            AvisosDoTime.Criar(_db, o.FromTeamId, AvisosDoTime.PropostaCancelada,
+                "Sua proposta foi cancelada: uma pick do draft dela acabou de ser negociada.", "/minha-area", agora);
+        }
     }
 
+    private static PickRefDto Ref(TransferOfferPick p) => new(p.Temporada, p.Rodada, p.TimeOriginalId);
+
+    /// <summary>As picks da proposta ainda são de quem as cede (e o draft ainda não foi sorteado).</summary>
+    private async Task EnsurePicksAsync(TransferOffer offer, CancellationToken ct)
+    {
+        var agora = HorarioDeBrasilia.Agora(_timeProvider);
+        var erro = await PicksDoDraftService.ProblemaAsync(_db, agora, offer.Picks.Where(p => p.IsTarget).Select(Ref),
+                       offer.ToTeamId, offer.ToTeam.TeamName, ct)
+                   ?? await PicksDoDraftService.ProblemaAsync(_db, agora, offer.Picks.Where(p => !p.IsTarget).Select(Ref),
+                       offer.FromTeamId, offer.FromTeam.TeamName, ct);
+        if (erro is not null)
+            throw new InvalidOperationException($"A proposta não vale mais: {erro} Recuse-a ou peça uma nova.");
+    }
+
+    /// <summary>Negócio só de picks: move o dinheiro (se houver); não conta no limite de transferências.</summary>
+    private async Task ExecutarSoPicksAsync(TransferOffer offer, CancellationToken ct)
+    {
+        if (offer.Money <= 0 || offer.MoneyPayerTeamId is not Guid pagadorId) return;
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var recebedorId = pagadorId == offer.FromTeamId ? offer.ToTeamId : offer.FromTeamId;
+        var pagador = await _db.Teams.FirstAsync(t => t.TeamId == pagadorId, ct);
+        var recebedor = await _db.Teams.FirstAsync(t => t.TeamId == recebedorId, ct);
+        if (pagador.Budget - pagador.BudgetBlocked < offer.Money)
+            throw new InvalidOperationException($"Saldo insuficiente no time {pagador.TeamName}.");
+
+        pagador.Budget = decimal.Round(pagador.Budget - offer.Money, 2, MidpointRounding.AwayFromZero);
+        recebedor.Budget = decimal.Round(recebedor.Budget + offer.Money, 2, MidpointRounding.AwayFromZero);
+        var descricao = $"Picks do draft entre {offer.FromTeam.TeamName} e {offer.ToTeam.TeamName}: "
+                        + string.Join(", ", offer.Picks.Select(p => $"{p.Rodada}ª rodada do {p.TimeOriginal.TeamName}"));
+        ExtratoCaixa.Lancar(_db, pagadorId, -offer.Money, ExtratoCaixa.Transferencia, descricao, now);
+        ExtratoCaixa.Lancar(_db, recebedorId, offer.Money, ExtratoCaixa.Transferencia, descricao, now);
+    }
+
+    private async Task<Dictionary<Guid, string>> NomesDosTimesAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        var lista = ids.Distinct().ToList();
+        return lista.Count == 0
+            ? []
+            : await _db.Teams.AsNoTracking().Where(t => lista.Contains(t.TeamId)).ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+    }
+
+    private static string NomeDoTime(TransferOfferPick p, IReadOnlyDictionary<Guid, string>? nomes) =>
+        p.TimeOriginal?.TeamName ?? nomes?.GetValueOrDefault(p.TimeOriginalId) ?? "?";
+
     /// <summary>Resumo da proposta do ponto de vista de quem a fez ("pede X, oferece Y, paga R$ 10 mi").</summary>
-    private static string Resumo(TransferOffer offer, IEnumerable<Player> alvos, IEnumerable<Player> oferecidos, Guid quemFez)
+    private static string Resumo(TransferOffer offer, IEnumerable<Player> alvos, IEnumerable<Player> oferecidos, Guid quemFez,
+        IReadOnlyDictionary<Guid, string>? nomes = null)
     {
         var partes = new List<string>();
-        var pedidos = string.Join(", ", alvos.Select(p => p.Name));
-        var dados = string.Join(", ", oferecidos.Select(p => p.Name));
+        string Picks(bool pedidas) => string.Join(", ", offer.Picks.Where(p => p.IsTarget == pedidas)
+            .Select(p => $"pick da {p.Rodada}ª rodada do {NomeDoTime(p, nomes)}"));
+        var pedidos = string.Join(", ", alvos.Select(p => p.Name).Append(Picks(true)).Where(x => x.Length > 0));
+        var dados = string.Join(", ", oferecidos.Select(p => p.Name).Append(Picks(false)).Where(x => x.Length > 0));
         if (pedidos.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empréstimo de " : "pede ") + pedidos);
         if (dados.Length > 0) partes.Add((offer.Type == OfferType.Loan ? "empresta " : "oferece ") + dados);
         if (offer.Money > 0)
             partes.Add($"{(offer.MoneyPayerTeamId == quemFez ? "paga" : "pede")} {offer.Money.ToString("C0", BrCulture)}");
-        return partes.Count == 0 ? "sem jogadores nem dinheiro" : string.Join(", ", partes);
+        return partes.Count == 0 ? "sem jogadores, picks nem dinheiro" : string.Join(", ", partes);
     }
 
     private IQueryable<TransferOffer> QueryOffers()
@@ -615,6 +720,7 @@ public class TransferOfferService : ITransferOfferService
             .Include(o => o.FromTeam)
             .Include(o => o.ToTeam)
             .Include(o => o.Players).ThenInclude(p => p.Player).ThenInclude(p => p.Position)
+            .Include(o => o.Picks).ThenInclude(p => p.TimeOriginal)
             .AsNoTracking();
     }
 
@@ -957,8 +1063,15 @@ public class TransferOfferService : ITransferOfferService
 
     private static TransferOfferListItemDto MapToDto(
         TransferOffer offer, Team fromTeam, Team toTeam,
-        IReadOnlyCollection<Player> targetPlayers, IReadOnlyCollection<Player> offeredPlayers)
+        IReadOnlyCollection<Player> targetPlayers, IReadOnlyCollection<Player> offeredPlayers,
+        IReadOnlyDictionary<Guid, string>? nomes = null)
     {
+        // A pick pedida é de quem recebe a proposta; a oferecida, de quem propõe.
+        List<PickDoDraftDto> Picks(bool pedidas) => offer.Picks.Where(p => p.IsTarget == pedidas)
+            .Select(p => new PickDoDraftDto(p.Temporada, p.Rodada, p.TimeOriginalId, NomeDoTime(p, nomes),
+                pedidas ? toTeam.TeamId : fromTeam.TeamId, pedidas ? toTeam.TeamName : fromTeam.TeamName))
+            .ToList();
+
         string? moneyPayerName = null;
         if (offer.MoneyPayerTeamId.HasValue)
         {
@@ -986,7 +1099,9 @@ public class TransferOfferService : ITransferOfferService
             offeredPlayers.Select(MapPlayerDto).ToList(),
             offer.CreatedAtUtc,
             offer.UpdatedAtUtc,
-            offer.BuyOptionPrice);
+            offer.BuyOptionPrice,
+            Picks(true),
+            Picks(false));
     }
 
     private static TransferOfferPlayerDto MapPlayerDto(Player p)

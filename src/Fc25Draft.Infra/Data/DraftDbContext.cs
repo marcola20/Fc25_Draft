@@ -68,6 +68,8 @@ public class DraftDbContext : DbContext
     public DbSet<TreinoSemanal> TreinosSemanais => Set<TreinoSemanal>();
     public DbSet<Apadrinhamento> Apadrinhamentos => Set<Apadrinhamento>();
     public DbSet<ComissaoContrato> ComissaoContratos => Set<ComissaoContrato>();
+    public DbSet<PickDoDraft> PicksDoDraft => Set<PickDoDraft>();
+    public DbSet<TransferOfferPick> TransferOfferPicks => Set<TransferOfferPick>();
     public DbSet<VotacaoPremios> VotacoesPremios => Set<VotacaoPremios>();
     public DbSet<PremioCandidato> PremiosCandidatos => Set<PremioCandidato>();
     public DbSet<PremioVoto> PremiosVotos => Set<PremioVoto>();

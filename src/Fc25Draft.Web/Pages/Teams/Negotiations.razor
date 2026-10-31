@@ -7,6 +7,7 @@
 @inject TeamsApiClient TeamsApi
 @inject Fc25Draft.Core.Interfaces.ITransferConfigService TransferConfigSvc
 @inject Fc25Draft.Core.Interfaces.IEmprestimoService EmprestimoSvc
+@inject Fc25Draft.Core.Interfaces.IPicksDoDraftService PicksSvc
 @inject IJSRuntime JS
 
 <div class="mt-3">
@@ -312,6 +313,39 @@
                         </div>
                     }
 
+                    @if (_picks is { Aberta: true } picks && _newOfferType != OfferType.Loan && Guid.TryParse(_selectedTargetTeamId, out var adversarioId))
+                    {
+                        var deles = picks.Picks.Where(pk => pk.DonoId == adversarioId).ToList();
+                        var minhas = picks.Picks.Where(pk => pk.DonoId == TeamId).ToList();
+                        <div class="mt-3">
+                            <label class="form-label mb-1">Picks do próximo draft</label>
+                            <div class="small text-muted mb-2">
+                                A pick vale a posição que o time dono dela pela classificação tirar na loteria. Negócio só de
+                                picks (e dinheiro) vale fora da janela e não conta no limite de transferências.
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <span class="small text-muted me-1">Pedir:</span>
+                                @if (deles.Count == 0) { <span class="small text-muted">o time não tem picks</span> }
+                                @foreach (var pk in deles)
+                                {
+                                    var sel = _selectedTargetPicks.Contains(pk.Ref);
+                                    <button type="button" class="btn btn-sm @(sel ? "btn-danger" : "btn-outline-secondary")"
+                                            @onclick="() => TogglePick(_selectedTargetPicks, pk.Ref)">🔄 @pk.Rotulo</button>
+                                }
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <span class="small text-muted me-1">Oferecer:</span>
+                                @if (minhas.Count == 0) { <span class="small text-muted">você não tem picks</span> }
+                                @foreach (var pk in minhas)
+                                {
+                                    var sel = _selectedOfferedPicks.Contains(pk.Ref);
+                                    <button type="button" class="btn btn-sm @(sel ? "btn-success" : "btn-outline-secondary")"
+                                            @onclick="() => TogglePick(_selectedOfferedPicks, pk.Ref)">🔄 @pk.Rotulo</button>
+                                }
+                            </div>
+                        </div>
+                    }
+
                     <div class="row g-3 mt-2">
                         <div class="col-md-5">
                             <label class="form-label">Valor em dinheiro</label>
@@ -440,6 +474,23 @@
                                 @foreach (var p in _detailOffer.OfferedPlayers)
                                 {
                                     <span class="badge bg-success me-1 mb-1">@p.Name (@p.Position, OVR @p.Overall)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if ((_detailOffer.TargetPicks?.Count ?? 0) + (_detailOffer.OfferedPicks?.Count ?? 0) > 0)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-sm-4"><strong>Picks do draft:</strong></div>
+                            <div class="col-sm-8">
+                                @foreach (var pk in _detailOffer.TargetPicks ?? [])
+                                {
+                                    <span class="badge bg-danger me-1 mb-1">🔄 @pk.Rotulo (pedida)</span>
+                                }
+                                @foreach (var pk in _detailOffer.OfferedPicks ?? [])
+                                {
+                                    <span class="badge bg-success me-1 mb-1">🔄 @pk.Rotulo (oferecida)</span>
                                 }
                             </div>
                         </div>
@@ -580,6 +631,9 @@
     private OfferType _newOfferType = OfferType.Sale;
     private HashSet<Guid> _selectedTargetPlayerIds = new();
     private HashSet<Guid> _selectedOfferedPlayerIds = new();
+    private HashSet<PickRefDto> _selectedTargetPicks = new();
+    private HashSet<PickRefDto> _selectedOfferedPicks = new();
+    private PicksDoProximoDraftDto? _picks;
     private decimal _newOfferMoney;
     private string _selectedPayerTeamId = string.Empty;
     private decimal _newOfferSellOn;
@@ -683,6 +737,7 @@
             _myRoster = Negotiable(myRosterDto);
 
             _loans = (await EmprestimoSvc.ListarAtivosAsync(TeamId, CancellationToken.None)).ToList();
+            _picks = await PicksSvc.ProximoDraftAsync(CancellationToken.None);
             _loansUsed = (await TeamsApi.GetByIdAsync(TeamId))?.LoanCount ?? 0;
         }
         catch (Exception ex)
@@ -706,6 +761,7 @@
     {
         _selectedTargetTeamId = e.Value?.ToString() ?? string.Empty;
         _selectedTargetPlayerIds.Clear();
+        _selectedTargetPicks.Clear();
         _targetRoster.Clear();
 
         if (Guid.TryParse(_selectedTargetTeamId, out var targetId))
@@ -732,6 +788,12 @@
     {
         if (!_selectedOfferedPlayerIds.Remove(playerGuid))
             _selectedOfferedPlayerIds.Add(playerGuid);
+    }
+
+    private static void TogglePick(HashSet<PickRefDto> selecionadas, PickRefDto pick)
+    {
+        if (!selecionadas.Remove(pick))
+            selecionadas.Add(pick);
     }
 
     private async Task RespondAsync(Guid offerId, OfferStatus response)
@@ -795,6 +857,9 @@
         _newOfferClauses = offer.Clauses;
         _newOfferNotes = offer.Notes;
         _selectedPayerTeamId = offer.MoneyPayerTeamId?.ToString() ?? string.Empty;
+        // As picks pedidas eram minhas (viram oferecidas) e as oferecidas eram deles (viram pedidas).
+        _selectedTargetPicks = (offer.OfferedPicks ?? []).Select(pk => pk.Ref).ToHashSet();
+        _selectedOfferedPicks = (offer.TargetPicks ?? []).Select(pk => pk.Ref).ToHashSet();
 
         if (_newOfferType == OfferType.Swap)
         {
@@ -851,8 +916,9 @@
             if (!Guid.TryParse(_selectedTargetTeamId, out var targetTeamId))
                 throw new InvalidOperationException("Selecione um time adversário.");
 
-            if (_selectedTargetPlayerIds.Count == 0 && _selectedOfferedPlayerIds.Count == 0)
-                throw new InvalidOperationException("Selecione ao menos um jogador na negociação.");
+            if (_selectedTargetPlayerIds.Count == 0 && _selectedOfferedPlayerIds.Count == 0
+                && _selectedTargetPicks.Count == 0 && _selectedOfferedPicks.Count == 0)
+                throw new InvalidOperationException("Selecione ao menos um jogador ou uma pick do draft na negociação.");
 
             if (_newOfferType == OfferType.Loan && _selectedTargetPlayerIds.Count > 0 && _selectedOfferedPlayerIds.Count > 0)
                 throw new InvalidOperationException("No empréstimo os jogadores vão para um time só: peça ou ofereça, não os dois.");
@@ -877,7 +943,9 @@
                 Clauses: _newOfferClauses,
                 Notes: _newOfferNotes,
                 ParentOfferId: _counterOfferParentId,
-                BuyOptionPrice: _newOfferType == OfferType.Loan && _newOfferBuyOption > 0 ? _newOfferBuyOption : null);
+                BuyOptionPrice: _newOfferType == OfferType.Loan && _newOfferBuyOption > 0 ? _newOfferBuyOption : null,
+                TargetPicks: _newOfferType == OfferType.Loan || _selectedTargetPicks.Count == 0 ? null : _selectedTargetPicks.ToArray(),
+                OfferedPicks: _newOfferType == OfferType.Loan || _selectedOfferedPicks.Count == 0 ? null : _selectedOfferedPicks.ToArray());
 
             await OffersApi.CreateOfferAsync(dto, TeamToken);
             _success = _counterOfferParentId.HasValue ? "Contraproposta enviada!" : "Proposta enviada!";
@@ -901,6 +969,8 @@
         _selectedTargetTeamId = string.Empty;
         _selectedTargetPlayerIds.Clear();
         _selectedOfferedPlayerIds.Clear();
+        _selectedTargetPicks.Clear();
+        _selectedOfferedPicks.Clear();
         _targetRoster.Clear();
         _newOfferType = OfferType.Sale;
         _newOfferMoney = 0;
@@ -967,6 +1037,21 @@
                         @foreach (var p in offer.OfferedPlayers)
                         {
                             <span class="badge bg-success me-1">@p.Name (@p.Position, @p.Overall)</span>
+                        }
+                    </div>
+                }
+
+                @if ((offer.TargetPicks?.Count ?? 0) + (offer.OfferedPicks?.Count ?? 0) > 0)
+                {
+                    <div class="mt-1">
+                        <strong>Picks do draft:</strong>
+                        @foreach (var pk in offer.TargetPicks ?? [])
+                        {
+                            <span class="badge bg-danger me-1" title="Pedida (vai para o @offer.FromTeamName)">🔄 @pk.Rotulo</span>
+                        }
+                        @foreach (var pk in offer.OfferedPicks ?? [])
+                        {
+                            <span class="badge bg-success me-1" title="Oferecida (vai para o @offer.ToTeamName)">🔄 @pk.Rotulo</span>
                         }
                     </div>
                 }
