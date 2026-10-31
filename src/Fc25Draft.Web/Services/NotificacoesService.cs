@@ -66,11 +66,14 @@ public class NotificacoesService : BackgroundService
     {
         // Uma falha numa parte não pode parar as outras nem o serviço.
         await TentarAsync("vez no draft", s => AvisarVezNoDraftAsync(s, ct));
+        // Logo que chega: o papel sai do elenco que ele encontrou.
+        await TentarAsync("papel no elenco", s => s.GetRequiredService<IParticipacaoService>().GravarPapeisAsync(ct));
         // Antes dos avisos: o que a diretoria gravar sai como notificação nesta mesma checagem.
         if (diretoria)
         {
             await TentarAsync("diretoria", s => s.GetRequiredService<IDiretoriaService>().ProcessarJogosRecentesAsync(ct));
             await TentarAsync("insatisfeitos", s => s.GetRequiredService<IParticipacaoService>().AvisarInsatisfeitosAsync(ct));
+            await TentarAsync("incomodados", s => s.GetRequiredService<IParticipacaoService>().AvisarIncomodadosAsync(ct));
             await TentarAsync("pediu para sair", s => s.GetRequiredService<IPedidoDeSaidaService>().ProcessarAsync(ct));
         }
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));

@@ -266,6 +266,9 @@ public class LigaTemporadaService : ILigaTemporadaService
             await new EmprestimoService(_db).DevolverTodosAsync("fim-de-temporada", ct);
             await LimparMercadoAsync(request, ct);
 
+            // Papel no elenco da temporada nova, pelo que cada um jogou na que acabou (a primeira virada liga a regra).
+            await new PapelNoElencoService(_db, new ParticipacaoService(_db)).RefazerNaViradaAsync(request.TemporadaOrigem, ct);
+
             await tx.CommitAsync(ct);
         });
 

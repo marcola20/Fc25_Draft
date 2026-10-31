@@ -29,6 +29,15 @@ namespace Fc25Draft.Core.Entities
         /// <summary>Já quebraram uma promessa com ele neste clube: voltou à lista pela metade e não aceita outra.</summary>
         public bool PromessaQuebrada { get; set; }
 
+        /// <summary>
+        /// Papel no elenco: o que ele espera do clube. Gravado logo que chega (pela chegada), na virada (pelo que jogou)
+        /// e na conversa. Nulo = ainda não gravado (a conta deduz pela chegada).
+        /// </summary>
+        public Utilities.PapelNoElenco? Papel { get; set; }
+
+        /// <summary>O clube rebaixou o papel dele numa conversa (o valor cai um pouco por alguns jogos).</summary>
+        public DateTime? ConversaEm { get; set; }
+
         public Team Team { get; set; } = null!;
         public Player Player { get; set; } = null!;
     }

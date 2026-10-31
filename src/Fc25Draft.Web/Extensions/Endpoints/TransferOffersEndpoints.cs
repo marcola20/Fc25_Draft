@@ -27,6 +27,7 @@ public static class TransferOffersEndpoints
         listApi.MapPut("/{playerGuid:guid}", HandleSetAskingPriceAsync);
         listApi.MapPost("/{playerGuid:guid}/buy", HandleBuyListedAsync);
         listApi.MapPost("/{playerGuid:guid}/promessa", HandlePrometerAsync);
+        listApi.MapPost("/{playerGuid:guid}/conversa", HandleConversarAsync);
 
         return api;
     }
@@ -77,6 +78,33 @@ public static class TransferOffersEndpoints
         try
         {
             await service.PrometerAsync(teamId.Value, playerGuid, ct);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>A conversa: o papel do jogador no elenco desce um degrau.</summary>
+    private static async Task<IResult> HandleConversarAsync(
+        Guid playerGuid,
+        IPapelNoElencoService service,
+        DraftDbContext db,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var teamId = await ResolveTeamIdAsync(httpContext, db, ct);
+        if (teamId is null)
+            return Results.Unauthorized();
+
+        try
+        {
+            await service.ConversarAsync(teamId.Value, playerGuid, ct);
             return Results.NoContent();
         }
         catch (KeyNotFoundException ex)

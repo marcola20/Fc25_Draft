@@ -80,7 +80,18 @@ else
                         }
                         @if (_participacao is { Insatisfeito: true } insatisfeito)
                         {
-                            <span class="badge bg-danger" title="Tem nível para jogar e quase não joga: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular">😤 Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
+                            <span class="badge bg-danger" title="Joga menos do que o papel dele pede: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular">😤 Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
+                        }
+                        else if (_participacao is { Incomodado: true })
+                        {
+                            <span class="badge bg-warning text-dark" title="Se não jogar o próximo jogo do clube, fica 😤 insatisfeito">😐 Incomodado</span>
+                        }
+                        @if (_participacao?.Papel is { } papel)
+                        {
+                            <span class="badge text-bg-light border"
+                                  title="@($"{PapelDoJogador.OQueEspera(papel.Papel, papel.Janela)}.{(papel.PrataDaCasa ? " Prata da casa: tem mais paciência." : "")}{(_participacao.NaConversa ? " Teve a conversa: valor mais baixo por alguns jogos." : "")}")">
+                                @PapelDoJogador.Emoji(papel.Papel) @PapelDoJogador.Nome(papel.Papel)@(papel.PrataDaCasa ? " · prata da casa" : "")
+                            </span>
                         }
                     </div>
                     <div class="jogador-hero-sub">
@@ -114,7 +125,7 @@ else
                             {
                                 <div class="jogador-hero-variacao @(comVariacao.Variacao > 0 ? "text-success" : "text-danger")">
                                     @(comVariacao.Travada ? "🔒" : comVariacao.Variacao > 0 ? "▲" : "▼") @Participacao.Rotulo(comVariacao.Variacao)
-                                    @(comVariacao.Travada ? "travado: pediu para sair" : comVariacao.ChegouEmBaixa ? "chegou em baixa" : "pela participação")
+                                    @(comVariacao.Travada ? "travado: pediu para sair" : comVariacao.ChegouEmBaixa ? "chegou em baixa" : comVariacao.NaConversa ? "pela participação e a conversa" : "pela participação")
                                 </div>
                             }
                         </div>

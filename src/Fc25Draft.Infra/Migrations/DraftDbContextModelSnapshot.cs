@@ -2841,6 +2841,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<DateTime?>("ConversaEm")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<bool>("IsAdmin")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -3137,8 +3140,14 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<decimal?>("AskingPrice")
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<DateTime?>("ConversaEm")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime?>("ListedAtUtc")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<short?>("Papel")
+                        .HasColumnType("smallint");
 
                     b.Property<DateTime?>("PromessaEm")
                         .HasColumnType("timestamp without time zone");
@@ -3190,6 +3199,9 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("MinRosterSize")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PapelNoElencoDesde")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime?>("PedidoDeSaidaDesde")
                         .HasColumnType("timestamp without time zone");

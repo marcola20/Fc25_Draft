@@ -61,6 +61,8 @@ public sealed record MudancaDeHumor(Guid PartidaId, DateTime Data, bool Insatisf
 /// <param name="ChegouEmBaixa">Pediu para sair do clube anterior: o preço em baixa vale até a carência acabar.</param>
 /// <param name="Travada">Pediu para sair e está na lista: a variação é a travada naquele momento.</param>
 /// <param name="Saida">Caminho de saída (pediu para sair, promessa); nulo para quem não tem clube.</param>
+/// <param name="Papel">O papel no elenco (nulo enquanto a regra do papel não está no ar).</param>
+/// <param name="Incomodado">Não está insatisfeito, mas fica se não jogar o próximo jogo do clube.</param>
 public sealed record ParticipacaoJogador(
     Guid TimeId,
     int Jogos,
@@ -72,10 +74,18 @@ public sealed record ParticipacaoJogador(
     IReadOnlyList<MudancaDeHumor> Humor,
     bool ChegouEmBaixa = false,
     bool Travada = false,
-    SituacaoDeSaida? Saida = null)
+    SituacaoDeSaida? Saida = null,
+    Expectativa? Papel = null,
+    bool Incomodado = false)
 {
     /// <summary>Ainda sem jogos suficientes no clube para o valor mudar.</summary>
     public bool EmCarencia => Jogos < ParticipacaoCriterios.JogosParaValer;
+
+    /// <summary>Jogos que contam para ficar insatisfeito (prata da casa tem mais).</summary>
+    public int JanelaDoInsatisfeito => Papel?.Janela ?? ParticipacaoCriterios.JanelaDoInsatisfeito;
+
+    /// <summary>Ainda com o valor mais baixo pela conversa que rebaixou o papel.</summary>
+    public bool NaConversa { get; init; }
 
     /// <summary>Quando ficou insatisfeito pela última vez (nulo se não está).</summary>
     public MudancaDeHumor? InsatisfeitoDesde => Insatisfeito ? Humor.LastOrDefault(h => h.Insatisfeito) : null;
@@ -109,9 +119,26 @@ public static class Participacao
     /// carência (a satisfação volta, o preço não).
     /// </param>
     /// <param name="variacaoTravada">Pediu para sair e está na lista: o preço fica travado nessa variação.</param>
+    /// <param name="papel">
+    /// Papel no elenco: nos jogos a partir de <see cref="Expectativa.ValeDesde"/> ele decide quando o jogador reclama, e
+    /// o valor não cai enquanto ele cumpre o papel. Nulo (ou jogos antes disso) = a regra antiga, pelo
+    /// <paramref name="temNivel"/>.
+    /// </param>
     public static ParticipacaoJogador Calcular(Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel,
-        decimal? variacaoHerdada = null, decimal? variacaoTravada = null)
+        decimal? variacaoHerdada = null, decimal? variacaoTravada = null, Expectativa? papel = null)
     {
+        // Reclama no jogo i? Pela regra do papel nos jogos em que ela vale, pela antiga nos de antes.
+        bool Reclama(IReadOnlyList<JogoDoJogador> lista, int i, out decimal percentual)
+        {
+            var regraDoPapel = papel is not null && lista[i].Data >= papel.ValeDesde;
+            var janelaDoJogo = regraDoPapel ? papel!.Janela : ParticipacaoCriterios.JanelaDoInsatisfeito;
+            percentual = PercentualNaJanela(lista, i, janelaDoJogo);
+            if (i + 1 < janelaDoJogo) return false;
+            return regraDoPapel
+                ? papel!.Reclama(percentual)
+                : temNivel && percentual <= ParticipacaoCriterios.InsatisfeitoAte;
+        }
+
         // Humor jogo a jogo: entra quando a janela do insatisfeito fecha abaixo do limite; sai com titular seguido.
         var humor = new List<MudancaDeHumor>();
         var insatisfeito = false;
@@ -120,7 +147,7 @@ public static class Participacao
         {
             var jogo = jogos[i];
             titularSeguido = jogo.Titular ? titularSeguido + 1 : 0;
-            var percentual = PercentualNaJanela(jogos, i, ParticipacaoCriterios.JanelaDoInsatisfeito);
+            var reclama = Reclama(jogos, i, out var percentual);
 
             if (insatisfeito)
             {
@@ -130,23 +157,34 @@ public static class Participacao
                     humor.Add(new MudancaDeHumor(jogo.PartidaId, jogo.Data, false, percentual));
                 }
             }
-            else if (temNivel
-                     && i + 1 >= ParticipacaoCriterios.JanelaDoInsatisfeito
-                     && percentual <= ParticipacaoCriterios.InsatisfeitoAte)
+            else if (reclama)
             {
                 insatisfeito = true;
                 humor.Add(new MudancaDeHumor(jogo.PartidaId, jogo.Data, true, percentual));
             }
         }
 
+        // Incomodado: se não jogar o próximo, reclama (só com a regra do papel, que tem o aviso).
+        var incomodado = false;
+        if (papel is not null && !insatisfeito && jogos.Count > 0)
+        {
+            var comOProximo = jogos.Append(new JogoDoJogador(Guid.Empty, DateTime.MaxValue, false, false)).ToList();
+            incomodado = Reclama(comOProximo, comOProximo.Count - 1, out _);
+        }
+
         var janela = jogos.TakeLast(ParticipacaoCriterios.JanelaDeJogos).ToList();
         decimal? percentualAtual = janela.Count == 0 ? null : janela.Sum(j => j.Peso) / janela.Count;
 
         var variacao = 0m;
+        var naConversa = papel?.ConversaEm is DateTime conversa
+                         && jogos.Count(j => j.Data > conversa) < PapelCriterios.JogosDaConversa;
         if (jogos.Count >= ParticipacaoCriterios.JogosParaValer && percentualAtual is decimal p)
         {
             variacao = VariacaoDaFaixa(p);
+            // Cumprindo o papel (o reserva que entra de vez em quando, a promessa), o valor não cai.
+            if (papel is not null && p >= PapelCriterios.CumpreOPapel(papel.Papel)) variacao = Math.Max(variacao, 0m);
             if (insatisfeito) variacao += ParticipacaoCriterios.DescontoDoInsatisfeito;
+            if (naConversa) variacao += PapelCriterios.DescontoDaConversa;
             if (goleiro) variacao = Math.Max(variacao, ParticipacaoCriterios.PisoDoGoleiro);
         }
 
@@ -164,14 +202,21 @@ public static class Participacao
             insatisfeito,
             humor,
             chegouEmBaixa && variacaoTravada is null,
-            variacaoTravada is not null);
+            variacaoTravada is not null,
+            Papel: papel,
+            Incomodado: incomodado)
+        {
+            NaConversa = naConversa
+        };
     }
 
-    /// <summary>A conta depois de cada jogo: o jogo i usa só os jogos até ele.</summary>
+    /// <summary>A conta depois de cada jogo: o jogo i usa só os jogos até ele (e o papel só depois que ele valeu).</summary>
     public static IReadOnlyList<PontoDeParticipacao> Historico(
-        Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel, decimal? variacaoHerdada = null) =>
+        Guid timeId, IReadOnlyList<JogoDoJogador> jogos, bool goleiro, bool temNivel, decimal? variacaoHerdada = null,
+        Expectativa? papel = null) =>
         jogos.Select((jogo, i) => new PontoDeParticipacao(jogo,
-                Calcular(timeId, jogos.Take(i + 1).ToList(), goleiro, temNivel, variacaoHerdada)))
+                Calcular(timeId, jogos.Take(i + 1).ToList(), goleiro, temNivel, variacaoHerdada,
+                    papel: papel is not null && jogo.Data >= papel.ValeDesde ? papel : null)))
             .ToList();
 
     /// <summary>"+15%", "−30%" (sinal de menos de verdade) ou "0%".</summary>

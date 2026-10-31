@@ -33,6 +33,9 @@ public class Team
     /// </summary>
     public int? TransferLimitOverride { get; set; }
 
+    /// <summary>Quando o time teve a conversa que rebaixa o papel de um jogador (uma por temporada; a virada limpa).</summary>
+    public DateTime? ConversaEm { get; set; }
+
     public ICollection<TeamRoster> Roster { get; set; } = new List<TeamRoster>();
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();
     public ICollection<MarketBid> MarketBids { get; set; } = new List<MarketBid>();

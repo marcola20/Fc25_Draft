@@ -28,4 +28,19 @@ public interface IParticipacaoService
 
     /// <summary>Avisa o técnico quando um jogador dele fica insatisfeito (jogos recentes). Retorna quantos avisos.</summary>
     Task<int> AvisarInsatisfeitosAsync(CancellationToken ct);
+
+    /// <summary>Avisa o técnico quando um jogador fica 😐 incomodado (reclama se não jogar o próximo). Retorna quantos.</summary>
+    Task<int> AvisarIncomodadosAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Grava o papel de quem chegou depois que a regra do papel entrou no ar (pela chegada e pelo elenco de agora, que
+    /// é o que ele encontrou). Retorna quantos gravou.
+    /// </summary>
+    Task<int> GravarPapeisAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Papel de cada jogador com clube na temporada nova, pelo que jogou em <paramref name="temporada"/> (a que acabou).
+    /// Precisa da regra do papel no ar.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, PapelNoElenco>> PapeisNaViradaAsync(int temporada, CancellationToken ct);
 }

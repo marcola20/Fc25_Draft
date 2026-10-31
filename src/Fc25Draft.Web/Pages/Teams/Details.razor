@@ -310,6 +310,10 @@ else
                                 <td class="text-start text-nowrap">
                                     <FotoJogador PlayerId="@player.PlayerId" Tamanho="28" Classe="me-2" />
                                     <a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a>
+                                    @if (player.Participacao is { Papel: { } papel } comPapel)
+                                    {
+                                        <span class="ms-1" role="img" aria-label="@PapelDoJogador.Nome(papel.Papel)" title="@TituloPapel(comPapel)">@PapelDoJogador.Emoji(papel.Papel)</span>
+                                    }
                                     @if (player.AskingPrice is decimal preco)
                                     {
                                         <span class="badge bg-warning text-dark ms-1" title="Negociável: qualquer time pode comprar direto por este valor">
@@ -335,6 +339,10 @@ else
                                     @if (player.Participacao is { Insatisfeito: true } insatisfeito)
                                     {
                                         <span class="badge bg-danger ms-1" title="@TituloInsatisfeito(insatisfeito)">😤</span>
+                                    }
+                                    else if (player.Participacao is { Incomodado: true })
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="Incomodado: se não jogar o próximo jogo do clube, fica 😤 insatisfeito">😐</span>
                                     }
                                 </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
@@ -370,6 +378,17 @@ else
                                         }
                                         else
                                         {
+                                        @if (PodeConversar(player))
+                                        {
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary me-1"
+                                                style="padding: 2px 6px; line-height: 1;"
+                                                title="Conversa: rebaixar o papel dele no elenco"
+                                                aria-label="Conversa com @player.Name"
+                                                @onclick="() => AbrirConversa(player)">
+                                            🗣️
+                                        </button>
+                                        }
                                         <button type="button"
                                                 class="btn btn-sm me-1 @(player.AskingPrice is null ? "btn-outline-warning" : "btn-warning")"
                                                 style="padding: 2px 6px; line-height: 1;"
@@ -556,6 +575,50 @@ else
     <div class="modal-backdrop fade show"></div>
 }
 
+@if (_conversaTarget is { Participacao.Papel: { } papelAlvo } && PapelDoJogador.UmDegrauAbaixo(papelAlvo.Papel) is { } papelNovo)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🗣️ Conversa com @_conversaTarget.Name</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="FecharConversa" disabled="@_conversaProcessando"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Hoje ele é <strong>@PapelDoJogador.Emoji(papelAlvo.Papel) @PapelDoJogador.Nome(papelAlvo.Papel)</strong>:
+                        @PapelDoJogador.OQueEspera(papelAlvo.Papel, papelAlvo.Janela).
+                    </p>
+                    <p>
+                        Na conversa você explica que ele vai jogar menos e o papel passa a
+                        <strong>@PapelDoJogador.Emoji(papelNovo) @PapelDoJogador.Nome(papelNovo)</strong>:
+                        @PapelDoJogador.OQueEspera(papelNovo, papelAlvo.Janela).
+                    </p>
+                    <p class="mb-0">
+                        Ele não gosta: o valor de mercado cai @Participacao.Rotulo(PapelCriterios.DescontoDaConversa) pelos próximos
+                        @PapelCriterios.JogosDaConversa jogos do clube. É <strong>uma conversa por temporada</strong> para o time todo.
+                    </p>
+                    @if (!string.IsNullOrEmpty(_conversaErro))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">@_conversaErro</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="FecharConversa" disabled="@_conversaProcessando">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConversarAsync" disabled="@_conversaProcessando">
+                        @if (_conversaProcessando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        🗣️ Conversar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @if (_listingTarget is not null)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
@@ -626,6 +689,9 @@ else
     private RosterPlayerViewModel? _saidaTarget;
     private bool _saidaProcessando;
     private string? _saidaErro;
+    private RosterPlayerViewModel? _conversaTarget;
+    private bool _conversaProcessando;
+    private string? _conversaErro;
 
     private TeamDetailsDto? team;
     private int _maxQuickSell = 5;
@@ -1072,6 +1138,74 @@ else
         p.Travada ? "Preço travado: pediu para sair e está na lista"
         : p.ChegouEmBaixa ? $"Chegou em baixa: pediu para sair do clube anterior (vale até ele ter {ParticipacaoCriterios.JogosParaValer} jogos aqui)"
         : $"Participação de {(p.Percentual is decimal pct ? $"{pct * 100:0}%" : "—")} nos últimos {p.Jogos} jogos do clube";
+
+    private static string TituloPapel(ParticipacaoJogador p) =>
+        p.Papel is not { } papel ? ""
+        : $"{PapelDoJogador.Nome(papel.Papel)}: {PapelDoJogador.OQueEspera(papel.Papel, papel.Janela)}."
+          + (papel.PrataDaCasa ? " Prata da casa: tem mais paciência." : "")
+          + (p.NaConversa ? $" Teve a conversa: valor {Participacao.Rotulo(PapelCriterios.DescontoDaConversa)} por alguns jogos." : "");
+
+    // Titular e disputa podem descer; quem pediu para sair só tem a promessa.
+    private bool PodeConversar(RosterPlayerViewModel player) =>
+        _canQuickSell && player.EmprestadoPor is null
+        && player.Participacao is { Papel: { } papel, Saida.NaLista: false }
+        && PapelDoJogador.UmDegrauAbaixo(papel.Papel) is not null;
+
+    private void AbrirConversa(RosterPlayerViewModel player)
+    {
+        if (!PodeConversar(player))
+            return;
+
+        _conversaTarget = player;
+        _conversaErro = null;
+    }
+
+    private void FecharConversa()
+    {
+        if (_conversaProcessando)
+            return;
+
+        _conversaTarget = null;
+        _conversaErro = null;
+    }
+
+    private async Task ConversarAsync()
+    {
+        if (_conversaTarget is null || string.IsNullOrWhiteSpace(_currentTeamToken))
+            return;
+
+        _conversaProcessando = true;
+        _conversaErro = null;
+        try
+        {
+            await OffersApi.ConversarAsync(_conversaTarget.PlayerGuid, _currentTeamToken);
+
+            var participacao = await ParticipacaoSvc.GetAsync(_conversaTarget.PlayerId, default);
+            var preco = await PricingService.CalculateForPlayerAsync(_conversaTarget.PlayerId, default);
+            var index = _rosterPlayers.FindIndex(p => p.PlayerGuid == _conversaTarget.PlayerGuid);
+            if (index >= 0)
+                _rosterPlayers[index] = _rosterPlayers[index] with
+                {
+                    BasePrice = preco.BasePrice,
+                    Participacao = participacao is { } part && part.TimeId == Id ? part : null
+                };
+            teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
+            ApplyRosterSort();
+
+            _quickSellSuccessMessage = participacao?.Papel is { } papel
+                ? $"🗣️ Conversa feita: {_conversaTarget.Name} agora é {PapelDoJogador.Emoji(papel.Papel)} {PapelDoJogador.Nome(papel.Papel)}."
+                : $"🗣️ Conversa feita com {_conversaTarget.Name}.";
+            _conversaTarget = null;
+        }
+        catch (Exception ex)
+        {
+            _conversaErro = ex.Message;
+        }
+        finally
+        {
+            _conversaProcessando = false;
+        }
+    }
 
     private void AbrirSaida(RosterPlayerViewModel player)
     {

@@ -13,6 +13,7 @@ public class TeamRosterConfiguration : IEntityTypeConfiguration<TeamRoster>
 
         e.Property(x => x.AskingPrice).HasColumnType("numeric(18,2)");
         e.Property(x => x.VariacaoCongelada).HasColumnType("numeric(6,4)");
+        e.Property(x => x.Papel).HasConversion<short>();
 
         e.HasOne(x => x.Team)
          .WithMany(t => t.Roster)

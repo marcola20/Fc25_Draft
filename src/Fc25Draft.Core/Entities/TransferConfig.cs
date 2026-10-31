@@ -43,6 +43,12 @@ public class TransferConfig
     /// </summary>
     public DateTime? PedidoDeSaidaDesde { get; set; }
 
+    /// <summary>
+    /// O papel no elenco (titular, disputa, rotação, promessa) vale a partir daqui: a virada que ligou a regra.
+    /// Nulo = a regra antiga do insatisfeito (overall perto da média do XI).
+    /// </summary>
+    public DateTime? PapelNoElencoDesde { get; set; }
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>
