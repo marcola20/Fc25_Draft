@@ -83,6 +83,7 @@ public class LayoutNavigationService
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
             new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
             new("Metas da Diretoria", "/admin/diretoria", "oi oi-briefcase"),
+            new("Treino da Semana", "/admin/treinos", "oi oi-pulse"),
             new("Prêmios da Temporada", "/admin/premios", "oi oi-star"),
             new("Gerenciar Regulamento", "/admin/regulamento", "oi oi-document")
         }, RequiredRole: "Admin", CollapseByDefault: true),
@@ -602,6 +603,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Diretoria")
+            }
+        },
+        ["/admin/treinos"] = new PageDefinition
+        {
+            Route = "/admin/treinos",
+            Title = "Treino da Semana",
+            Subtitle = "Quem montou o treino, quem falta e o que subiu — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Treino da Semana")
             }
         },
         ["/admin/diretoria"] = new PageDefinition

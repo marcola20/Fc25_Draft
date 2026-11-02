@@ -133,7 +133,8 @@ else if (_dados is { } dados)
         <div class="card-body">
             <p class="small text-muted mb-2">
                 Um veterano de @PadrinhoCriterios.IdadeMinima anos ou mais adota um jovem da mesma posição que pode treinar.
-                O afilhado ganha +@PadrinhoCriterios.ExtraNoTreino a mais em cada semana de treino. Se ele treinar pelo menos
+                O afilhado <strong>não treina sozinho</strong>: ele precisa ser um dos escolhidos do treino da semana, e aí ganha
+                +@PadrinhoCriterios.ExtraNoTreino a mais (+@(TreinoCriterios.GanhoPorSemana + PadrinhoCriterios.ExtraNoTreino) no total). Se ele treinar pelo menos
                 @PadrinhoCriterios.TreinosParaOBonus semanas com o padrinho, o padrinho ganha +@PadrinhoCriterios.BonusNaVirada
                 na evolução da virada. Um par por temporada; se um dos dois sair do clube, dá para formar outro.
             </p>
@@ -150,6 +151,12 @@ else if (_dados is { } dados)
                 @if (par.Treinos >= PadrinhoCriterios.TreinosParaOBonus)
                 {
                     <div class="small text-success mt-1">O bônus do padrinho na virada está garantido (se ele seguir no clube).</div>
+                }
+                @if (dados.Jogadores.FirstOrDefault(j => j.PlayerId == par.AfilhadoId) is { PorQueNaoTreina: null, Foco: null })
+                {
+                    <div class="small text-warning mt-1">
+                        ⚠️ @par.AfilhadoNome não está no treino desta semana: escolha ele lá em cima para o padrinho render.
+                    </div>
                 }
             }
             else if (!dados.PodeApadrinhar)

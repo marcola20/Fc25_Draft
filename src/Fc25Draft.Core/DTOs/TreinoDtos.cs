@@ -59,3 +59,16 @@ public record PadrinhoDto(int PadrinhoId, string PadrinhoNome, int AfilhadoId, s
 public record PadrinhoCandidatoDto(int PlayerId, string Nome, string Posicao, int? Idade, int Overall, GrupoDePosicao Grupo);
 
 public record ApadrinharRequest(int PadrinhoId, int AfilhadoId);
+
+/// <summary>O treino de um time no painel do admin.</summary>
+/// <param name="PodemTreinar">Jogadores do elenco que podem treinar.</param>
+public record TreinoDoTimeNaLigaDto(Guid TeamId, string TeamName, TreinoDoTimeDto Treino, int PodemTreinar)
+{
+    /// <summary>Quantos dá para escolher nesta semana (as vagas, ou menos se não há tanta gente que pode).</summary>
+    public int Cabem => Math.Min(Treino.Vagas, PodemTreinar);
+    public bool Montou => Treino.Escolhidos >= Cabem;
+}
+
+/// <summary>O treino da semana de todos os times (painel do admin).</summary>
+/// <param name="EvolucoesPendentes">Evoluções do treino que ainda não foram para o save do PES.</param>
+public record TreinoDaLigaDto(DateTime Semana, DateTime FechaEm, IReadOnlyList<TreinoDoTimeNaLigaDto> Times, int EvolucoesPendentes);

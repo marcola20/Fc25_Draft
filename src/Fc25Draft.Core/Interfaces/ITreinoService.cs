@@ -30,6 +30,9 @@ public interface ITreinoService
     /// <summary>Par de quem é padrinho ou afilhado no clube atual (nulo se não é).</summary>
     Task<PadrinhoDto?> PadrinhoDoJogadorAsync(int playerId, CancellationToken ct);
 
+    /// <summary>O treino da semana de todos os times, a semana passada e as evoluções esperando o Editor PES (admin).</summary>
+    Task<TreinoDaLigaDto> DaLigaAsync(CancellationToken ct);
+
     /// <summary>Notícias do Plantão: quem se formou no treino (passou do overall do treino).</summary>
     Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 }

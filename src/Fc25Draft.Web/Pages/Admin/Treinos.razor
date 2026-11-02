@@ -1,0 +1,152 @@
+@page "/admin/treinos"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ITreinoService TreinoSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Treino da Semana — Admin</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger">@_erro</div>
+    }
+    else if (_dados is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        var montaram = _dados.Times.Count(t => t.Montou);
+        <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+            <div>
+                <div class="fw-semibold">
+                    Semana de @_dados.Semana.ToString("dd/MM", Br) a @_dados.FechaEm.AddDays(-1).ToString("dd/MM", Br)
+                </div>
+                <div class="small text-muted">O treino acontece domingo à meia-noite (Brasília).</div>
+            </div>
+            <span class="badge @(montaram == _dados.Times.Count ? "bg-success" : "bg-warning text-dark") fs-6">
+                @montaram de @_dados.Times.Count times montaram
+            </span>
+            <a href="/overall" class="badge @(_dados.EvolucoesPendentes > 0 ? "bg-danger" : "bg-secondary") fs-6 text-decoration-none"
+               title="Abra o Editor PES e clique em Gravar para levar ao save">
+                @_dados.EvolucoesPendentes evolução(ões) do treino esperando o Editor PES
+            </a>
+            <div class="form-check ms-auto">
+                <input class="form-check-input" type="checkbox" id="soFaltam" @bind="_soFaltam" />
+                <label class="form-check-label small" for="soFaltam">Só quem falta montar</label>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th class="text-center">Montou</th>
+                        <th>Treinando nesta semana</th>
+                        <th>Padrinho</th>
+                        <th>Semana passada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in _dados.Times.Where(t => !_soFaltam || !t.Montou))
+                    {
+                        var escolhidos = t.Treino.Jogadores.Where(j => j.Foco is not null).ToList();
+                        <tr>
+                            <td class="text-nowrap">
+                                <a href="/teams/details/@t.TeamId?aba=treino">@t.TeamName</a>
+                                @if (t.Treino.Vagas > TreinoCriterios.JogadoresPorSemana)
+                                {
+                                    <span class="small text-muted" title="Treinador da base: mais vagas e idade maior">🌱</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <span class="badge @(t.Montou ? "bg-success" : escolhidos.Count > 0 ? "bg-warning text-dark" : "bg-danger")"
+                                      title="@(t.PodemTreinar) jogador(es) do elenco podem treinar">
+                                    @escolhidos.Count/@t.Cabem
+                                </span>
+                            </td>
+                            <td class="small">
+                                @if (escolhidos.Count == 0)
+                                {
+                                    <span class="text-muted">@(t.PodemTreinar == 0 ? "ninguém pode treinar" : "—")</span>
+                                }
+                                @foreach (var j in escolhidos)
+                                {
+                                    <div>
+                                        @TreinoDaSemana.Emoji(j.Foco!.Value)
+                                        <a href="/players/details/@j.PlayerId">@j.Nome</a>
+                                        <span class="text-muted">(@j.Idade, @j.Overall) · @TreinoDaSemana.Nome(j.Foco.Value)</span>
+                                        @if (t.Treino.Padrinho?.AfilhadoId == j.PlayerId)
+                                        {
+                                            <span title="Afilhado: rende mais">🤝</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (t.Treino.Padrinho is { } par)
+                                {
+                                    <span>@par.PadrinhoNome → @par.AfilhadoNome</span>
+                                    <span class="text-muted">(@Math.Min(par.Treinos, PadrinhoCriterios.TreinosParaOBonus)/@PadrinhoCriterios.TreinosParaOBonus)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (t.Treino.UltimaSemana.Count == 0)
+                                {
+                                    <span class="text-muted">não treinou</span>
+                                }
+                                @foreach (var r in t.Treino.UltimaSemana)
+                                {
+                                    <div>
+                                        @r.Nome:
+                                        @if (r.Atributo is { } atributo)
+                                        {
+                                            <span>+1 @atributo@(r.AtributoDoPadrinho is { } extra ? $", +1 {extra}" : "")</span>
+                                            @if (r.OverallDepois != r.OverallAntes)
+                                            {
+                                                <span class="text-success fw-semibold"> (@r.OverallAntes → @r.OverallDepois)</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">@(r.SemEfeito ?? "acontece em instantes")</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private TreinoDaLigaDto? _dados;
+    private string? _erro;
+    private bool _soFaltam;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/treinos"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _dados = await TreinoSvc.DaLigaAsync(CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+}

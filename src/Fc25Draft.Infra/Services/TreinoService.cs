@@ -328,6 +328,26 @@ public class TreinoService : ITreinoService
             .ToDictionary(g => g.Key, g => g.First().Afilhado);
     }
 
+    public async Task<TreinoDaLigaDto> DaLigaAsync(CancellationToken ct)
+    {
+        var times = await _db.Teams.AsNoTracking()
+            .Where(t => !t.IsAdmin && t.Roster.Any())
+            .OrderBy(t => t.TeamName)
+            .Select(t => new { t.TeamId, t.TeamName })
+            .ToListAsync(ct);
+
+        var linhas = new List<TreinoDoTimeNaLigaDto>(times.Count);
+        foreach (var t in times)
+        {
+            var treino = await DoTimeAsync(t.TeamId, ct);
+            linhas.Add(new TreinoDoTimeNaLigaDto(t.TeamId, t.TeamName, treino, treino.Jogadores.Count(j => j.PorQueNaoTreina is null)));
+        }
+
+        var pendentes = await _db.EvolucoesPes.CountAsync(e => e.AplicadaNoJogoEmUtc == null && e.Motivo.StartsWith("Treino"), ct);
+        var semana = SemanaAtual;
+        return new TreinoDaLigaDto(semana, TreinoDaSemana.FechaEm(semana), linhas, pendentes);
+    }
+
     public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct)
     {
         var formados = await _db.TreinosSemanais.AsNoTracking()
