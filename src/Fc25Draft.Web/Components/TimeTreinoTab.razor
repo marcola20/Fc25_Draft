@@ -66,9 +66,9 @@ else if (_dados is { } dados)
                                         <a href="/players/details/@j.PlayerId">@j.Nome</a>
                                         @if (dados.Padrinho?.AfilhadoId == j.PlayerId)
                                         {
-                                            <span title="Afilhado de @dados.Padrinho.PadrinhoNome: rende +@PadrinhoCriterios.ExtraNoTreino a mais no treino">🤝</span>
+                                            <span class="ms-1" title="Afilhado de @dados.Padrinho.PadrinhoNome: rende +@PadrinhoCriterios.ExtraNoTreino a mais no treino">🤝</span>
                                         }
-                                        <span class="text-muted small">@j.Posicao</span>
+                                        <span class="text-muted small ms-2">@j.Posicao</span>
                                     </td>
                                     <td class="text-center">@j.Idade</td>
                                     <td class="text-center">@j.Overall</td>
