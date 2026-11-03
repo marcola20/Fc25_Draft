@@ -23,29 +23,9 @@
         <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
     }
 
-    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
         <a href="/bolao/ranking" class="btn btn-sm btn-outline-secondary">🏅 Ranking</a>
     </div>
-    <p class="text-muted small mb-1">
-        Cravou o placar, @BolaoPontuacao.PlacarExato pontos. Acertou o vencedor e o placar de um dos times,
-        @BolaoPontuacao.VencedorEUmPlacar. Acertou só o resultado, @BolaoPontuacao.SoOVencedor.
-        Placar invertido (chutou 2x1, deu 1x2), @Sinal(BolaoPontuacao.PlacarInvertido).
-        Cada jogo fecha quando a bola rola nele — chegou com a rodada em andamento, ainda dá para palpitar nos que faltam.
-    </p>
-    <p class="text-muted small mb-2">
-        <strong>Apostas extras</strong>, uma de cada lado do jogo: escolha um jogador do time — fez gol ou deu
-        assistência, @Sinal(BolaoPontuacao.ExtraAcerto); passou em branco, @Sinal(BolaoPontuacao.ExtraErro); se nem entrou
-        em campo, não conta. Chutou 0 para um time? Aquele lado vira o 🧤 clean sheet do adversário, com os mesmos pontos.
-        No mata-mata (e nos outros jogos que precisam de vencedor), chutou empate? Escolha quem passa nos
-        🥅 pênaltis: acertou, @Sinal(BolaoPontuacao.PenaltisAcerto).
-    </p>
-    <p class="small mb-4">
-        💰 <strong>O bolão paga o clube</strong> (a partir da temporada @BolaoPremios.ValeAPartirDaTemporada): quem faz mais
-        pontos na rodada leva <strong>@BolaoPremios.Rotulo(BolaoPremios.PorRodada)</strong> para o caixa do clube que treina
-        (empate em pontos e cravadas divide). No fim da temporada, o geral paga
-        @string.Join(", ", BolaoPremios.Geral.Select((v, i) => $"{i + 1}º {BolaoPremios.Rotulo(v)}")).
-        Treinador e auxiliar ganham cada um o seu; quem está sem clube joga, mas não recebe.
-    </p>
 
     @if (_carregando)
     {

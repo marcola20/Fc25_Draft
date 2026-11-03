@@ -691,7 +691,8 @@ public class LayoutNavigationService
         }
     };
 
-    public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin, bool isPrincipal = false)
+    /// <param name="sorteioDaCopaNoAr">A tela do sorteio da Copa só entra no menu enquanto há um sorteio no ar.</param>
+    public IReadOnlyList<MenuGroup> BuildMenu(bool isAdmin, bool isPrincipal = false, bool sorteioDaCopaNoAr = false)
     {
         var groups = new List<MenuGroup>();
 
@@ -704,6 +705,7 @@ public class LayoutNavigationService
 
             var filteredItems = group.Items
                 .Where(item => IsRoleAllowed(item.RequiredRole, isAdmin, isPrincipal))
+                .Where(item => sorteioDaCopaNoAr || item.Href != "/copa/sorteio")
                 .ToList();
 
             if (filteredItems.Count == 0)
