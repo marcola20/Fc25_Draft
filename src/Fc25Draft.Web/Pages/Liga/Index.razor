@@ -1487,7 +1487,7 @@
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
         _decisivoAberto = null;
         _viradaAberta = null;
-        _duplas = await LigaService.GetDuplasAsync(ligaId, CancellationToken.None);
+        _duplas = await LigaService.GetDuplasAsync(ligaId, null, CancellationToken.None);
         _selecoes = await LigaService.GetSelecoesDasRodadasAsync(ligaId, CancellationToken.None);
         _notas = await LigaService.GetMediasNotasAsync(ligaId, CancellationToken.None);
         _disciplina = await LigaService.GetDisciplinaAsync(ligaId, CancellationToken.None);

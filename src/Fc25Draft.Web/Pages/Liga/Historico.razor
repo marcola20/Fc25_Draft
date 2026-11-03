@@ -20,9 +20,21 @@
     }
     else
     {
-        <div class="mb-3">
-            <h1 class="h3">Histórico de Estatísticas</h1>
-            <p class="text-muted">Estatísticas de todas as competições</p>
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+            <div>
+                <h1 class="h3">Histórico de Estatísticas</h1>
+                <p class="text-muted mb-0">@(_temporada is int ano ? $"Estatísticas da temporada {ano}" : "Estatísticas de todas as competições")</p>
+            </div>
+            @if (_temporadas.Count > 0)
+            {
+                <select class="form-select w-auto" value="@(_temporada?.ToString() ?? "")" @onchange="TrocarTemporada" disabled="@_carregandoTemporada">
+                    <option value="">Todas as temporadas</option>
+                    @foreach (var t in _temporadas)
+                    {
+                        <option value="@t">Temporada @t</option>
+                    }
+                </select>
+            }
         </div>
 
         <ul class="nav nav-tabs mb-3">
@@ -250,6 +262,9 @@
     private string _aba = "artilheiros";
     private IReadOnlyList<DuplaDto> _duplas = Array.Empty<DuplaDto>();
     private IReadOnlyList<CarrascoDto> _carrascos = Array.Empty<CarrascoDto>();
+    private IReadOnlyList<int> _temporadas = Array.Empty<int>();
+    private int? _temporada;
+    private bool _carregandoTemporada;
 
     private string _sortBy = "gols";
     private bool _sortAsc = false;
@@ -386,10 +401,8 @@
     {
         try
         {
-            _artilheiros = await LigaService.GetHistoricoArtilheirosAsync(CancellationToken.None);
-            _goleiros = await LigaService.GetHistoricoGoleirosAsync(CancellationToken.None);
-            _duplas = await LigaService.GetDuplasAsync(null, CancellationToken.None);
-            _carrascos = await LigaService.GetCarrascosAsync(CancellationToken.None);
+            _temporadas = await LigaService.GetTemporadasAsync(CancellationToken.None);
+            await CarregarAsync();
         }
         catch (Exception ex)
         {
@@ -398,6 +411,35 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _artilheiros = await LigaService.GetHistoricoArtilheirosAsync(_temporada, CancellationToken.None);
+        _goleiros = await LigaService.GetHistoricoGoleirosAsync(_temporada, CancellationToken.None);
+        _duplas = await LigaService.GetDuplasAsync(null, _temporada, CancellationToken.None);
+        _carrascos = await LigaService.GetCarrascosAsync(_temporada, CancellationToken.None);
+    }
+
+    private async Task TrocarTemporada(ChangeEventArgs e)
+    {
+        _temporada = int.TryParse(e.Value?.ToString(), out var t) ? t : null;
+        _page = 1;
+        _jogadorSelecionado = null;
+        _goleiroSelecionado = null;
+        _carregandoTemporada = true;
+        try
+        {
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _carregandoTemporada = false;
         }
     }
 

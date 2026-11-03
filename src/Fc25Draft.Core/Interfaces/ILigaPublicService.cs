@@ -38,16 +38,20 @@ public interface ILigaPublicService
 
     /// <summary>Dados do telão de um jogo: times, competição e o vídeo do YouTube.</summary>
     Task<TelaoJogoDto?> GetTelaoJogoAsync(Guid partidaId, CancellationToken ct);
-    Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct);
+    /// <summary>Gols e assistências por jogador, de todas as competições ou só das de uma temporada.</summary>
+    Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(int? temporada, CancellationToken ct);
     Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct);
-    Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(CancellationToken ct);
+    Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(int? temporada, CancellationToken ct);
+
+    /// <summary>Temporadas que já têm competição, da mais recente para a mais antiga.</summary>
+    Task<IReadOnlyList<int>> GetTemporadasAsync(CancellationToken ct);
     Task<MomentosDosGolsDto> GetMomentosDosGolsAsync(Guid ligaId, CancellationToken ct);
 
-    /// <summary>Duplas de gol de uma competição, ou de todas (ligaId nulo).</summary>
-    Task<IReadOnlyList<DuplaDto>> GetDuplasAsync(Guid? ligaId, CancellationToken ct);
+    /// <summary>Duplas de gol de uma competição, ou de todas (ligaId nulo); temporada restringe às dela.</summary>
+    Task<IReadOnlyList<DuplaDto>> GetDuplasAsync(Guid? ligaId, int? temporada, CancellationToken ct);
 
-    /// <summary>Jogadores e os times contra quem marcaram, em todas as competições.</summary>
-    Task<IReadOnlyList<CarrascoDto>> GetCarrascosAsync(CancellationToken ct);
+    /// <summary>Jogadores e os times contra quem marcaram, em todas as competições ou só nas de uma temporada.</summary>
+    Task<IReadOnlyList<CarrascoDto>> GetCarrascosAsync(int? temporada, CancellationToken ct);
 
     /// <summary>Histórico de gols/assistências dos jogadores enquanto defenderam este time (inclui quem já saiu).</summary>
     Task<TimeHistoricoDto?> GetHistoricoTimeAsync(Guid timeId, CancellationToken ct);

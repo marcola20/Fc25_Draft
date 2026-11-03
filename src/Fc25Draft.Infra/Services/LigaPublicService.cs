@@ -557,11 +557,13 @@ public class LigaPublicService : ILigaPublicService
             : numeroDaRodada > 0 ? $"{numeroDaRodada}ª rodada" : "Jogo extra";
 
     /// <summary>Gols (sem os contra) e os jogos deles, de uma competição ou de todas.</summary>
-    private async Task<(List<LanceGolInput> Gols, List<JogoGolInput> Jogos)> GolsComJogosAsync(Guid? ligaId, CancellationToken ct)
+    private async Task<(List<LanceGolInput> Gols, List<JogoGolInput> Jogos)> GolsComJogosAsync(Guid? ligaId, int? temporada, CancellationToken ct)
     {
         var eventos = _db.LigaEventos.AsNoTracking().Where(e => e.Tipo == TipoEvento.Gol);
         if (ligaId is not null)
             eventos = eventos.Where(e => e.Partida.Rodada.LigaId == ligaId);
+        if (temporada is not null)
+            eventos = eventos.Where(e => e.Partida.Rodada.Liga.Temporada == temporada);
 
         var gols = await eventos
             .Select(e => new LanceGolInput(e.PartidaId, e.TimeId, e.JogadorId, e.Jogador.Name,
@@ -588,17 +590,17 @@ public class LigaPublicService : ILigaPublicService
         return (gols, jogos);
     }
 
-    public async Task<IReadOnlyList<DuplaDto>> GetDuplasAsync(Guid? ligaId, CancellationToken ct)
+    public async Task<IReadOnlyList<DuplaDto>> GetDuplasAsync(Guid? ligaId, int? temporada, CancellationToken ct)
     {
         var nomes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
-        var (gols, jogos) = await GolsComJogosAsync(ligaId, ct);
+        var (gols, jogos) = await GolsComJogosAsync(ligaId, temporada, ct);
         return DuplasECarrascos.Duplas(gols, jogos, nomes);
     }
 
-    public async Task<IReadOnlyList<CarrascoDto>> GetCarrascosAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<CarrascoDto>> GetCarrascosAsync(int? temporada, CancellationToken ct)
     {
         var nomes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
-        var (gols, jogos) = await GolsComJogosAsync(null, ct);
+        var (gols, jogos) = await GolsComJogosAsync(null, temporada, ct);
         return DuplasECarrascos.Carrascos(gols, jogos, nomes);
     }
 
@@ -962,12 +964,13 @@ public class LigaPublicService : ILigaPublicService
         return lista.Distinct().ToList();
     }
 
-    public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(int? temporada, CancellationToken ct)
     {
         // Projeta apenas os campos necessários dos gols (evita carregar entidades inteiras).
         var gols = await _db.LigaEventos
             .AsNoTracking()
-            .Where(e => e.Tipo == TipoEvento.Gol)
+            .Where(e => e.Tipo == TipoEvento.Gol
+                        && (temporada == null || e.Partida.Rodada.Liga.Temporada == temporada))
             .Select(e => new GolFlat(
                 e.JogadorId,
                 e.Jogador.Name,
@@ -1001,7 +1004,7 @@ public class LigaPublicService : ILigaPublicService
             .ToDictionary(g => g.Key, g => g.Count());
 
         // Jogos só existem nas competições que já tinham o contador; nas demais fica null.
-        var participacoes = await GetParticipacoesAsync(null, null, ct);
+        var participacoes = await GetParticipacoesAsync(await LigasDaTemporadaAsync(temporada, ct), null, ct);
         var ligasComContagem = participacoes.Select(p => p.LigaId).ToHashSet();
         var jogosPorJogadorLiga = participacoes
             .GroupBy(p => (p.JogadorId, p.LigaId))
@@ -1047,6 +1050,21 @@ public class LigaPublicService : ILigaPublicService
 
         return resultado;
     }
+
+    /// <summary>Competições de uma temporada; nulo (sem filtro) quando a temporada não é informada.</summary>
+    private async Task<Guid[]?> LigasDaTemporadaAsync(int? temporada, CancellationToken ct) =>
+        temporada is null
+            ? null
+            : await _db.Ligas.AsNoTracking().Where(l => l.Temporada == temporada).Select(l => l.LigaId).ToArrayAsync(ct);
+
+    /// <summary>Temporadas que já têm competição, da mais recente para a mais antiga.</summary>
+    public async Task<IReadOnlyList<int>> GetTemporadasAsync(CancellationToken ct) =>
+        await _db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada != null)
+            .Select(l => l.Temporada!.Value)
+            .Distinct()
+            .OrderByDescending(t => t)
+            .ToListAsync(ct);
 
     private sealed record CleanSheetFlat(int JogadorId, string JogadorNome, Guid TimeId, Guid PartidaId, Guid LigaId);
 
@@ -1097,9 +1115,9 @@ public class LigaPublicService : ILigaPublicService
             .ToList();
     }
 
-    public async Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(int? temporada, CancellationToken ct)
     {
-        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(null, ct);
+        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(await LigasDaTemporadaAsync(temporada, ct), ct);
         var ligaIds = cleanSheets.Select(c => c.LigaId).Distinct().ToList();
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => ligaIds.Contains(l.LigaId))
@@ -1123,7 +1141,7 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<HistoricoArtilheiroDto?> GetHistoricoArtilheiroDetalheAsync(int jogadorId, CancellationToken ct)
     {
-        var historico = await GetHistoricoArtilheirosAsync(ct);
+        var historico = await GetHistoricoArtilheirosAsync(null, ct);
         return historico.FirstOrDefault(h => h.JogadorId == jogadorId);
     }
 
