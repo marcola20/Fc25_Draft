@@ -2,33 +2,90 @@
     max-width: 860px;
 }
 
+/* Texto de leitura: corpo em cinza, o que importa em branco. */
+.como-overall p,
+.como-overall li {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--bs-secondary-color);
+}
+
+.como-overall strong {
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.como-overall ol li::marker {
+    font-family: var(--bs-font-monospace);
+    color: var(--bs-tertiary-color);
+}
+
+.overall-sub {
+    margin: 0 0 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+/* Quanto cada atributo pesa: o que mais pesa em dourado, os outros em cinza. */
 .pesos {
     display: grid;
-    gap: 4px;
+    gap: 6px;
 }
 
 .peso-linha {
     display: grid;
     grid-template-columns: minmax(120px, 170px) 1fr 52px;
     align-items: center;
-    gap: 8px;
-    font-size: 0.9rem;
+    gap: 10px;
+    font-size: 0.875rem;
+}
+
+.peso-nome {
+    color: var(--bs-body-color);
 }
 
 .peso-barra {
-    background: var(--bs-secondary-bg);
+    background: var(--bs-tertiary-bg);
     border-radius: 3px;
-    height: 10px;
+    height: 6px;
     overflow: hidden;
 }
 
 .peso-barra > span {
     display: block;
     height: 100%;
-    background: var(--bs-primary, #0d6efd);
+    border-radius: 3px;
+    background: var(--bs-secondary-color);
+}
+
+.peso-barra > span.topo {
+    background: var(--cbfv-acento);
 }
 
 .peso-valor {
     text-align: right;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.overall-evolucao {
+    font-size: 0.875rem;
+}
+
+.overall-evolucao td:last-child {
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.overall-admin {
+    border-left: 3px solid var(--zona-playoff-rebaixamento);
+}
+
+@media (max-width: 575.98px) {
+    .peso-linha {
+        grid-template-columns: minmax(96px, 120px) 1fr 44px;
+    }
 }

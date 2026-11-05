@@ -15,8 +15,8 @@
 <PageHeader Title="Como o overall é calculado" />
 
 <div class="como-overall">
-    <div class="card mb-3">
-        <div class="card-body">
+    <div class="painel p-3 mb-4">
+        <div>
             <p>
                 O overall dos jogadores com atributos do PES <strong>não é digitado</strong>: sai dos atributos, pela mesma
                 conta que o PES 2021 faz. O jogo não guarda o overall em lugar nenhum; ele calcula na hora a partir de:
@@ -32,9 +32,9 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header"><strong>A conta</strong></div>
-        <div class="card-body">
+    <div class="secao-titulo"><h2>A conta</h2></div>
+    <div class="painel p-3 mb-4">
+        <div>
             <p>
                 A Konami não divulga a fórmula. A que o site usa foi ajustada com os jogadores do pesdb.net e conferida
                 com o overall que aparece no jogo: dos 511 jogadores da liga conferidos na tela do PES, <strong>485 batem
@@ -43,7 +43,7 @@
             <ol>
                 <li>
                     <strong>Nota base.</strong> Cada posição tem um peso para cada atributo. A soma de
-                    <em>peso × atributo</em> (mais o pé fraco) dá uma nota base, que fica perto do próprio overall.
+                    <span class="numero">peso × atributo</span> (mais o pé fraco) dá uma nota base, que fica perto do próprio overall.
                 </li>
                 <li>
                     <strong>Curva.</strong> Cada vez que a nota base passa de um degrau
@@ -61,9 +61,9 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header"><strong>Quanto cada atributo pesa</strong></div>
-        <div class="card-body">
+    <div class="secao-titulo"><h2>Quanto cada atributo pesa</h2></div>
+    <div class="painel p-3 mb-4">
+        <div>
             <div class="row g-2 mb-3">
                 <div class="col-sm-6 col-md-4">
                     <label class="form-label small mb-0" for="posicao">Posição no PES</label>
@@ -91,7 +91,7 @@
                 {
                     <div class="peso-linha">
                         <span class="peso-nome">@nome</span>
-                        <span class="peso-barra"><span style="width: @Largura(peso)"></span></span>
+                        <span class="peso-barra"><span class="@(peso == PesosQueContam[0].Peso ? "topo" : "")" style="width: @Largura(peso)"></span></span>
                         <span class="peso-valor">+@peso.ToString("0.00", Br)</span>
                     </div>
                 }
@@ -108,13 +108,13 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header"><strong>Evolução na venda rápida</strong></div>
-        <div class="card-body">
+    <div class="secao-titulo"><h2>Evolução na venda rápida</h2></div>
+    <div class="painel p-3 mb-4">
+        <div>
             <p>
                 Quando um jogador é vendido na venda rápida, ele evolui. O quanto depende do overall que ele tinha:
             </p>
-            <table class="table table-sm w-auto">
+            <table class="table table-sm w-auto overall-evolucao">
                 <thead><tr><th>Overall</th><th>Sobe</th></tr></thead>
                 <tbody>
                     <tr><td>até 74</td><td>não evolui</td></tr>
@@ -143,15 +143,15 @@
 
     @if (AdminAuth.IsAdmin)
     {
-        <div class="card mb-3 border-warning">
-            <div class="card-header"><strong>Administração</strong></div>
-            <div class="card-body">
+        <div class="secao-titulo"><h2>Administração</h2></div>
+        <div class="painel p-3 mb-4 overall-admin">
+            <div>
                 @if (_erro is not null)
                 {
                     <div class="alert alert-danger py-2">@_erro</div>
                 }
 
-                <h6>Evoluções esperando o Editor PES</h6>
+                <h3 class="overall-sub">Evoluções esperando o Editor PES</h3>
                 @if (_pendentes is null)
                 {
                     <button class="btn btn-outline-secondary btn-sm mb-3" @onclick="CarregarPendentesAsync">Ver pendentes</button>
@@ -179,12 +179,12 @@
                     </table>
                 }
 
-                <h6 class="mt-2">Recalcular o overall de todos pela fórmula</h6>
+                <h3 class="overall-sub mt-3">Recalcular o overall de todos pela fórmula</h3>
                 <p class="small text-muted">
                     Acerta o overall de todos os jogadores que têm atributos (normalmente o site já faz isso sozinho ao salvar
                     atributos). Primeiro mostra o que muda; só grava quando você confirmar.
                 </p>
-                <button class="btn btn-outline-primary btn-sm" disabled="@_processando" @onclick="() => RecalcularAsync(false)">Ver o que muda</button>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_processando" @onclick="() => RecalcularAsync(false)">Ver o que muda</button>
                 @if (_mudancas is { Count: > 0 } && !_gravado)
                 {
                     <button class="btn btn-warning btn-sm ms-2" disabled="@_processando" @onclick="() => RecalcularAsync(true)">
