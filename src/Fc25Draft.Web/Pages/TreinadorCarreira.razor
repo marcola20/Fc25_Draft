@@ -12,7 +12,7 @@
 
 <PageTitle>@(_carreira?.Nome ?? "Treinador")</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_carregando)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -27,61 +27,64 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            <FotoTreinador TreinadorId="@_carreira.TreinadorId" Tamanho="72" Versao="@_perfil?.VersaoFoto" Alt="@_carreira.Nome" />
-            <div class="flex-grow-1" style="min-width: 0;">
-                <h1 class="h3 mb-0"><NomeTreinador Nome="@_carreira.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
-                <div class="d-flex gap-1 flex-wrap"><PremiosConquistados TreinadorId="@_carreira.TreinadorId" /></div>
-                <div class="text-muted small d-flex align-items-center gap-1 flex-wrap">
-                    @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
+        <div class="painel treinador-hero mb-4">
+            <div class="treinador-hero-corpo">
+                <FotoTreinador TreinadorId="@_carreira.TreinadorId" Tamanho="96" Versao="@_perfil?.VersaoFoto" Alt="@_carreira.Nome" Classe="treinador-hero-foto" />
+                <div class="treinador-hero-info">
+                    <h1 class="treinador-hero-nome"><NomeTreinador Nome="@_carreira.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
+                    <div class="treinador-hero-sub">
+                        @if (_carreira.Passagens.FirstOrDefault(p => p.Atual) is { } hoje)
+                        {
+                            <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="" />
+                        }
+                        <span>@Situacao()</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap mt-2"><PremiosConquistados TreinadorId="@_carreira.TreinadorId" /></div>
+                    @if (!string.IsNullOrWhiteSpace(_perfil?.Frase))
                     {
-                        <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:20px;height:20px;object-fit:contain;" />
+                        <p class="treinador-hero-frase">“@_perfil.Frase”</p>
                     }
-                    @Situacao()
-                </div>
-                @if (!string.IsNullOrWhiteSpace(_perfil?.Frase))
-                {
-                    <div class="fst-italic text-body-secondary mt-1" style="overflow-wrap: anywhere;">“@_perfil.Frase”</div>
-                }
-            </div>
-            @if (_perfil?.Esquema is { } esquema)
-            {
-                <div class="text-center small text-muted">
-                    <CampinhoEsquema Esquema="@esquema" Largura="64" />
-                    <div>@esquema</div>
-                </div>
-            }
-            <a href="/treinadores" class="btn btn-sm btn-outline-secondary">👔 Todos os treinadores</a>
-        </div>
 
-        <div class="row g-3 mb-4">
-            @Numero("Temporadas", _carreira.Temporadas.Select(t => t.Temporada).Distinct().Count().ToString())
-            @Numero("Clubes", _carreira.Clubes.Count.ToString())
-            @Numero("Títulos", _carreira.TotalDeTitulos.ToString())
-            @if (_carreira.Retrospecto is { Jogos: > 0 } geral)
-            {
-                @Numero("Jogos", geral.Jogos.ToString())
-                @Numero("Aproveitamento", $"{geral.Aproveitamento.ToString("0.#", Br)}%")
-            }
+                    <div class="treinador-hero-numeros">
+                        @Numero("Temporadas", _carreira.Temporadas.Select(t => t.Temporada).Distinct().Count().ToString())
+                        @Numero("Clubes", _carreira.Clubes.Count.ToString())
+                        @Numero("Títulos", _carreira.TotalDeTitulos.ToString())
+                        @if (_carreira.Retrospecto is { Jogos: > 0 } geral)
+                        {
+                            @Numero("Jogos", geral.Jogos.ToString())
+                            @Numero("Aproveitamento", $"{geral.Aproveitamento.ToString("0.#", Br)}%")
+                        }
+                    </div>
+                </div>
+                <div class="treinador-hero-lado">
+                    <a href="/treinadores" class="treinador-hero-voltar"><Icone Nome="arrow-left" Tamanho="14" /> Treinadores</a>
+                    @if (_perfil?.Esquema is { } esquema)
+                    {
+                        <div class="text-center small text-body-secondary">
+                            <CampinhoEsquema Esquema="@esquema" Largura="64" />
+                            <div class="numero mt-1">@esquema</div>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
 
         @if (_carreira.Retrospecto is { Jogos: > 0 } retro)
         {
-            <div class="card mb-4">
-                <div class="card-header fw-bold">Retrospecto</div>
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-4">
-                        <div><span class="h5 text-success">@retro.Vitorias</span> <span class="text-muted small">vitórias</span></div>
-                        <div><span class="h5 text-secondary">@retro.Empates</span> <span class="text-muted small">empates</span></div>
-                        <div><span class="h5 text-danger">@retro.Derrotas</span> <span class="text-muted small">derrotas</span></div>
-                        <div><span class="h5">@retro.GolsPro<span class="text-muted">:</span>@retro.GolsContra</span> <span class="text-muted small">gols</span></div>
-                        <div><span class="h5">@(retro.Saldo > 0 ? "+" : "")@retro.Saldo</span> <span class="text-muted small">saldo</span></div>
-                        <div><span class="h5">@retro.Pontos</span> <span class="text-muted small">pontos somados</span></div>
-                    </div>
-                    <p class="text-muted small mb-0 mt-2">
-                        Contam só os jogos encerrados dentro do período em que ele estava no comando, em qualquer competição.
-                    </p>
+            <div class="secao-titulo"><h2>Retrospecto</h2></div>
+            <div class="painel p-3 mb-4">
+                <div class="retro-numeros">
+                    <div><span class="retro-valor texto-vitoria">@retro.Vitorias</span> <span class="retro-rotulo">vitórias</span></div>
+                    <div><span class="retro-valor">@retro.Empates</span> <span class="retro-rotulo">empates</span></div>
+                    <div><span class="retro-valor texto-derrota">@retro.Derrotas</span> <span class="retro-rotulo">derrotas</span></div>
+                    <div><span class="retro-valor">@retro.GolsPro<span class="text-body-tertiary">:</span>@retro.GolsContra</span> <span class="retro-rotulo">gols</span></div>
+                    <div><span class="retro-valor">@(retro.Saldo > 0 ? "+" : "")@retro.Saldo</span> <span class="retro-rotulo">saldo</span></div>
+                    <div><span class="retro-valor">@retro.Pontos</span> <span class="retro-rotulo">pontos somados</span></div>
                 </div>
+                <BarraRetrospecto Retrospecto="retro" Classe="my-3" />
+                <p class="text-body-tertiary small mb-0">
+                    Contam só os jogos encerrados dentro do período em que ele estava no comando, em qualquer competição.
+                </p>
             </div>
         }
 
@@ -89,143 +92,140 @@
         {
             var fregues = ConfrontoTreinadores.Fregues(_confrontos);
             var carrasco = ConfrontoTreinadores.Carrasco(_confrontos);
-            <div class="card mb-4">
-                <div class="card-header fw-bold d-flex align-items-center">
-                    <span>🆚 Confrontos com outros técnicos</span>
-                    <a href="/treinadores/@_carreira.TreinadorId/confrontos" class="btn btn-sm btn-outline-primary ms-auto">Ver todos</a>
-                </div>
-                <div class="card-body d-flex flex-wrap gap-4 align-items-center">
-                    <div><span class="h5">@_confrontos.Count</span> <span class="text-muted small">técnico@(_confrontos.Count == 1 ? "" : "s") enfrentado@(_confrontos.Count == 1 ? "" : "s")</span></div>
-                    @Duelo("🎯 Freguês", fregues)
-                    @Duelo("💀 Carrasco", carrasco)
-                    @Duelo("🔁 Rival", _confrontos[0])
+            <div class="secao-titulo">
+                <h2>Confrontos com outros técnicos <span class="numero text-body-tertiary">@_confrontos.Count</span></h2>
+                <a href="/treinadores/@_carreira.TreinadorId/confrontos">Ver todos <Icone Nome="arrow-right" Tamanho="14" /></a>
+            </div>
+            <div class="painel mb-4">
+                <div class="row g-0">
+                    @Duelo("Freguês", "quem ele mais venceu", fregues)
+                    @Duelo("Carrasco", "quem mais o venceu", carrasco)
+                    @Duelo("Rival", "quem ele mais enfrentou", _confrontos[0])
                 </div>
             </div>
         }
 
         @if (_carreira.Titulos.Count > 0)
         {
-            <div class="card mb-4">
-                <div class="card-header fw-bold">🏆 Galeria</div>
-                <div class="card-body d-flex flex-wrap gap-2">
-                    @foreach (var titulo in _carreira.Titulos)
-                    {
-                        <span class="badge bg-warning text-dark fs-6">@titulo</span>
-                    }
-                </div>
+            <div class="secao-titulo"><h2>Galeria <span class="numero text-body-tertiary">@_carreira.Titulos.Count</span></h2></div>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                @foreach (var titulo in _carreira.Titulos)
+                {
+                    <span class="chip chip-titulo"><Icone Nome="trophy" Tamanho="14" /> @titulo</span>
+                }
             </div>
         }
 
-        <div class="card mb-4">
-            <div class="card-header fw-bold">Carreira</div>
-            @if (_carreira.Temporadas.Count == 0)
-            {
-                <div class="card-body text-muted">Ainda não disputou nenhuma competição.</div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light">
+        <div class="secao-titulo"><h2>Carreira</h2></div>
+        @if (_carreira.Temporadas.Count == 0)
+        {
+            <div class="painel p-3 mb-4 text-body-secondary small">Ainda não disputou nenhuma competição.</div>
+        }
+        else
+        {
+            <div class="table-responsive painel mb-4">
+                <table class="table table-sm align-middle mb-0 carreira-tabela">
+                    <thead>
+                        <tr>
+                            <th>Temporada</th>
+                            <th>Clube</th>
+                            <th>Competição</th>
+                            <th class="text-center">Campanha</th>
+                            <th class="text-center">Posição</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in _carreira.Temporadas)
+                        {
                             <tr>
-                                <th>Temporada</th>
-                                <th>Clube</th>
-                                <th>Competição</th>
-                                <th class="text-center">Campanha</th>
-                                <th class="text-center">Posição</th>
-                                <th></th>
+                                <td class="numero">@t.Temporada</td>
+                                <td class="text-nowrap">
+                                    <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="" style="width:20px;height:20px;object-fit:contain;" class="me-1" />
+                                    @t.TimeNome
+                                    @if (t.Papel == PapelTreinador.Auxiliar)
+                                    {
+                                        <span class="etiqueta ms-1">auxiliar</span>
+                                    }
+                                </td>
+                                <td class="text-body-secondary">@t.Competicao</td>
+                                <td class="text-center text-nowrap">
+                                    @if (t.Retrospecto is { Jogos: > 0 } campanha)
+                                    {
+                                        <span class="numero" title="@campanha.Jogos jogos">@campanha.Vitorias<span class="text-body-tertiary">-</span>@campanha.Empates<span class="text-body-tertiary">-</span>@campanha.Derrotas</span>
+                                        <span class="text-body-tertiary small numero">@campanha.Aproveitamento.ToString("0.#", Br)%</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-tertiary">—</span>
+                                    }
+                                </td>
+                                <td class="text-center text-nowrap">
+                                    @if (t.Posicao is { } pos)
+                                    {
+                                        <span class="numero">@pos<span class="text-body-tertiary small">º de @t.TotalTimes</span></span>
+                                    }
+                                    else if (t.Fase is { Length: > 0 } fase)
+                                    {
+                                        <span>@fase</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-tertiary">—</span>
+                                    }
+                                </td>
+                                <td class="small">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        @if (t.Campeao)
+                                        {
+                                            <span class="etiqueta acento"><Icone Nome="trophy" Tamanho="12" /> Campeão</span>
+                                        }
+                                        @if (t.Desfecho == "Rebaixado")
+                                        {
+                                            <span class="etiqueta perigo">Rebaixado</span>
+                                        }
+                                        else if (t.Desfecho == "Acesso")
+                                        {
+                                            <span class="etiqueta sucesso">Acesso</span>
+                                        }
+                                        @if (!t.Campeao && t.Movimento is { Length: > 0 } mov)
+                                        {
+                                            <span class="text-body-secondary">@mov</span>
+                                        }
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var t in _carreira.Temporadas)
-                            {
-                                <tr>
-                                    <td class="fw-semibold">@t.Temporada</td>
-                                    <td>
-                                        <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain;" class="me-1" />
-                                        @t.TimeNome
-                                        @if (t.Papel == PapelTreinador.Auxiliar)
-                                        {
-                                            <span class="badge bg-info text-dark ms-1">auxiliar</span>
-                                        }
-                                    </td>
-                                    <td>@t.Competicao</td>
-                                    <td class="text-center text-nowrap">
-                                        @if (t.Retrospecto is { Jogos: > 0 } campanha)
-                                        {
-                                            <span title="@campanha.Jogos jogos">@campanha.Vitorias<span class="text-muted">-</span>@campanha.Empates<span class="text-muted">-</span>@campanha.Derrotas</span>
-                                            <span class="text-muted small">@campanha.Aproveitamento.ToString("0.#", Br)%</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                    </td>
-                                    <td class="text-center">
-                                        @if (t.Posicao is { } pos)
-                                        {
-                                            <span>@pos<span class="text-muted small">º de @t.TotalTimes</span></span>
-                                        }
-                                        else if (t.Fase is { Length: > 0 } fase)
-                                        {
-                                            <span>@fase</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                    </td>
-                                    <td class="small">
-                                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            @if (t.Campeao)
-                                            {
-                                                <span class="badge bg-warning text-dark">🏆 Campeão</span>
-                                            }
-                                            @if (t.Desfecho == "Rebaixado")
-                                            {
-                                                <span class="badge bg-danger">Rebaixado</span>
-                                            }
-                                            else if (t.Desfecho == "Acesso")
-                                            {
-                                                <span class="badge bg-success">Acesso</span>
-                                            }
-                                            @if (!t.Campeao && t.Movimento is { Length: > 0 } mov)
-                                            {
-                                                <span class="text-muted">@mov</span>
-                                            }
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
 
-        <div class="card">
-            <div class="card-header fw-bold">Passagens</div>
+        <div class="secao-titulo"><h2>Passagens</h2></div>
+        <div class="painel">
             <ul class="list-group list-group-flush">
                 @foreach (var p in _carreira.Passagens)
                 {
-                    <li class="list-group-item d-flex align-items-center gap-2">
-                        <img src="@EscudoService.GetEscudo(p.TimeNome)" alt="" style="width:26px;height:26px;object-fit:contain;" />
-                        <span class="fw-semibold">@p.TimeNome</span>
-                        <span class="badge @(p.Papel == PapelTreinador.Auxiliar ? "bg-info text-dark" : "bg-primary")">
-                            @(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador")
-                        </span>
-                        @if (p.Retrospecto is { Jogos: > 0 } campanha)
-                        {
-                            <span class="text-muted small">
-                                @campanha.Jogos jogos · @campanha.Vitorias<span class="text-muted">-</span>@campanha.Empates<span class="text-muted">-</span>@campanha.Derrotas · @campanha.Aproveitamento.ToString("0.#", Br)%
-                            </span>
-                        }
-                        @if (p.MotivoTexto is { } motivo)
-                        {
-                            <span class="badge @(p.MotivoSaida == MotivoSaidaTreinador.Demitido ? "bg-danger" : "bg-warning text-dark")">@motivo</span>
-                        }
-                        <span class="text-muted small ms-auto">
-                            @p.Desde.ToString("MMM/yyyy", Br) — @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MMM/yyyy", Br))
+                    <li class="list-group-item passagem">
+                        <img src="@EscudoService.GetEscudo(p.TimeNome)" alt="" />
+                        <div class="passagem-info">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-medium">@p.TimeNome</span>
+                                <span class="etiqueta">@(p.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador")</span>
+                                @if (p.MotivoTexto is { } motivo)
+                                {
+                                    <span class="etiqueta @(p.MotivoSaida == MotivoSaidaTreinador.Demitido ? "perigo" : "aviso")">@motivo</span>
+                                }
+                            </div>
+                            @if (p.Retrospecto is { Jogos: > 0 } campanha)
+                            {
+                                <div class="small text-body-secondary numero">
+                                    @campanha.Jogos jogos · @campanha.Vitorias-@campanha.Empates-@campanha.Derrotas · @campanha.Aproveitamento.ToString("0.#", Br)%
+                                </div>
+                            }
+                        </div>
+                        <span class="passagem-periodo">
+                            @p.Desde.ToString("MMM/yyyy", Br) – @(p.Ate is null ? "hoje" : p.Ate.Value.ToString("MMM/yyyy", Br))
                         </span>
                     </li>
                 }
@@ -271,19 +271,19 @@
     }
 
     /// <summary>Um destaque do resumo de confrontos, levando direto para o duelo na página de confrontos.</summary>
-    private RenderFragment Duelo(string rotulo, TreinadorConfrontoDto? c) => @<div class="d-flex align-items-center gap-2">
-        <span class="text-muted small">@rotulo</span>
+    private RenderFragment Duelo(string rotulo, string dica, TreinadorConfrontoDto? c) => @<div class="col-md-4 duelo">
+        <div class="duelo-rotulo">@rotulo <span class="d-none d-xl-inline">· @dica</span></div>
         @if (c is null)
         {
-            <span class="text-muted small">—</span>
+            <div class="text-body-tertiary small">Ninguém ainda</div>
         }
         else
         {
             var perfil = _perfisAdversarios.GetValueOrDefault(c.AdversarioId);
-            <a href="/treinadores/@TreinadorId/confrontos?contra=@c.AdversarioId" class="d-flex align-items-center gap-1 text-reset text-decoration-none">
-                <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="24" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
-                <span class="fw-semibold"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
-                <span class="small text-muted">@c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas@(c.ComAuxiliar ? "*" : "")</span>
+            <a href="/treinadores/@TreinadorId/confrontos?contra=@c.AdversarioId" class="duelo-link">
+                <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="28" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" Classe="duelo-foto" />
+                <span class="fw-medium text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
+                <span class="small text-body-tertiary text-nowrap numero">@c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas@(c.ComAuxiliar ? "*" : "")</span>
             </a>
         }
     </div>;
@@ -316,12 +316,8 @@
         return ultima is null ? "Sem passagens registradas" : $"Sem clube — último foi o {ultima.TimeNome}";
     }
 
-    private RenderFragment Numero(string rotulo, string valor) => @<div class="col-4 col-md-2">
-        <div class="card text-center h-100">
-            <div class="card-body py-2">
-                <div class="h4 mb-0">@valor</div>
-                <div class="small text-muted">@rotulo</div>
-            </div>
-        </div>
+    private RenderFragment Numero(string rotulo, string valor) => @<div>
+        <div class="treinador-hero-rotulo">@rotulo</div>
+        <div class="treinador-hero-valor">@valor</div>
     </div>;
 }

@@ -1,0 +1,230 @@
+/* Apresentação do técnico, no molde da ficha do jogador: foto, nome, clube e os números da carreira. */
+.treinador-hero {
+    padding: 1.5rem;
+}
+
+.treinador-hero-corpo {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+.treinador-hero-corpo ::deep .treinador-hero-foto {
+    flex-shrink: 0;
+    border-radius: 0.75rem;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}
+
+.treinador-hero-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.treinador-hero-nome {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 500;
+    line-height: 1.15;
+    color: var(--bs-emphasis-color);
+    overflow-wrap: anywhere;
+}
+
+.treinador-hero-sub {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.25rem;
+    color: var(--bs-secondary-color);
+}
+
+.treinador-hero-sub img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.treinador-hero-frase {
+    margin: 0.75rem 0 0;
+    color: var(--bs-secondary-color);
+    overflow-wrap: anywhere;
+}
+
+.treinador-hero-numeros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2rem;
+    margin-top: 1.25rem;
+}
+
+.treinador-hero-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}
+
+.treinador-hero-valor {
+    font-size: 1.25rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.treinador-hero-lado {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.treinador-hero-voltar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+}
+
+.treinador-hero-voltar:hover {
+    color: var(--bs-emphasis-color);
+}
+
+/* Retrospecto: os números grandes em linha, a barra V/E/D embaixo. */
+.retro-numeros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 2rem;
+}
+
+.retro-valor {
+    font-size: 1.5rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.retro-valor.texto-vitoria { color: var(--cbfv-vitoria); }
+.retro-valor.texto-derrota { color: var(--cbfv-derrota); }
+
+.retro-rotulo {
+    font-size: 0.8125rem;
+    color: var(--bs-tertiary-color);
+}
+
+/* Freguês, carrasco e rival lado a lado (no celular, um embaixo do outro). */
+.duelo {
+    padding: 0.75rem 1rem;
+    min-width: 0;
+}
+
+.duelo + .duelo {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.duelo-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+    margin-bottom: 0.375rem;
+}
+
+.duelo-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.duelo-link:hover {
+    color: var(--bs-emphasis-color);
+}
+
+.duelo-link ::deep .duelo-foto {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.carreira-tabela {
+    font-size: 0.875rem;
+}
+
+.passagem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: transparent;
+}
+
+.passagem img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.passagem-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.passagem-periodo {
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+    color: var(--bs-tertiary-color);
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    .duelo + .duelo {
+        border-top: 0;
+        border-left: 1px solid var(--bs-border-color);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .treinador-hero {
+        padding: 1.25rem;
+    }
+
+    .treinador-hero-corpo {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .treinador-hero-numeros,
+    .treinador-hero-info > .d-flex {
+        justify-content: center;
+    }
+
+    /* No celular o texto quebra: o escudo vai junto, na mesma linha do texto. */
+    .treinador-hero-sub {
+        display: block;
+    }
+
+    .treinador-hero-sub img {
+        margin-right: 0.25rem;
+        vertical-align: -0.3em;
+    }
+
+    .treinador-hero-lado {
+        flex-direction: row-reverse;
+        align-items: center;
+        justify-content: space-between;
+        align-self: stretch;
+    }
+
+    .passagem {
+        flex-wrap: wrap;
+    }
+
+    .passagem-periodo {
+        width: 100%;
+        padding-left: 2.5rem;
+    }
+}

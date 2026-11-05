@@ -8,7 +8,7 @@
 
 <PageTitle>Confrontos · @(_treinador?.Nome ?? "Treinador")</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_carregando)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -23,11 +23,11 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" />
+        <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" Classe="confrontos-foto" />
             <div class="flex-grow-1" style="min-width: 0;">
-                <h1 class="h4 mb-0"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
-                <div class="text-muted small">
+                <h1 class="confrontos-nome"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" Completo="true" /></h1>
+                <div class="text-body-secondary small">
                     @if (_confrontos.Count == 0)
                     {
                         <span>Ainda não enfrentou nenhum técnico.</span>
@@ -38,22 +38,22 @@
                     }
                 </div>
             </div>
-            <a href="/treinadores/@TreinadorId" class="btn btn-sm btn-outline-secondary">← Carreira</a>
+            <a href="/treinadores/@TreinadorId" class="btn btn-sm btn-outline-secondary"><Icone Nome="arrow-left" Tamanho="14" /> Carreira</a>
         </div>
 
         @if (_confrontos.Count > 0)
         {
-            <div class="card mb-3">
+            <div class="painel mb-3">
                 <div class="row g-0 confrontos-destaques">
-                @Destaque("🎯 Freguês", "quem ele mais venceu", ConfrontoTreinadores.Fregues(_confrontos))
-                @Destaque("💀 Carrasco", "quem mais o venceu", ConfrontoTreinadores.Carrasco(_confrontos))
-                @Destaque("🔁 Rival", "quem ele mais enfrentou", _confrontos[0])
+                @Destaque("Freguês", "quem ele mais venceu", ConfrontoTreinadores.Fregues(_confrontos))
+                @Destaque("Carrasco", "quem mais o venceu", ConfrontoTreinadores.Carrasco(_confrontos))
+                @Destaque("Rival", "quem ele mais enfrentou", _confrontos[0])
                 </div>
             </div>
 
             <div class="row g-3">
                 <div class="col-lg-7 order-lg-2">
-                    <div class="card confrontos-painel" tabindex="-1" @ref="_painel">
+                    <div class="painel confrontos-painel" tabindex="-1" @ref="_painel">
                         @if (_selecionado is { } s)
                         {
                             var r = s.Retrospecto;
@@ -61,57 +61,57 @@
                             <div class="card-body">
                                 <div class="confrontos-duelo text-center">
                                     <div>
-                                        <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" />
-                                        <div class="fw-semibold mt-1 text-truncate"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" /></div>
+                                        <FotoTreinador TreinadorId="@TreinadorId" Tamanho="56" Versao="@_perfil?.VersaoFoto" Alt="@_treinador.Nome" Classe="confrontos-foto" />
+                                        <div class="fw-medium mt-1 text-truncate"><NomeTreinador Nome="@_treinador.Nome" Apelido="@_perfil?.Apelido" /></div>
                                     </div>
                                     <div class="align-self-center">
                                         <div class="confrontos-placar">
-                                            <div><div class="valor text-success">@r.Vitorias</div><div class="small text-muted"><span class="d-none d-sm-inline">vitórias</span><span class="d-sm-none">V</span></div></div>
-                                            <div><div class="valor text-secondary">@r.Empates</div><div class="small text-muted"><span class="d-none d-sm-inline">empates</span><span class="d-sm-none">E</span></div></div>
-                                            <div><div class="valor text-danger">@r.Derrotas</div><div class="small text-muted"><span class="d-none d-sm-inline">derrotas</span><span class="d-sm-none">D</span></div></div>
+                                            <div><div class="valor texto-vitoria">@r.Vitorias</div><div class="small text-body-tertiary"><span class="d-none d-sm-inline">vitórias</span><span class="d-sm-none">V</span></div></div>
+                                            <div><div class="valor">@r.Empates</div><div class="small text-body-tertiary"><span class="d-none d-sm-inline">empates</span><span class="d-sm-none">E</span></div></div>
+                                            <div><div class="valor texto-derrota">@r.Derrotas</div><div class="small text-body-tertiary"><span class="d-none d-sm-inline">derrotas</span><span class="d-sm-none">D</span></div></div>
                                         </div>
                                     </div>
                                     <div>
                                         <a href="/treinadores/@s.AdversarioId" class="text-reset text-decoration-none">
-                                            <FotoTreinador TreinadorId="@s.AdversarioId" Tamanho="56" Versao="@adv?.VersaoFoto" Alt="@s.AdversarioNome" />
-                                            <div class="fw-semibold mt-1 text-truncate"><NomeTreinador Nome="@s.AdversarioNome" Apelido="@adv?.Apelido" /></div>
+                                            <FotoTreinador TreinadorId="@s.AdversarioId" Tamanho="56" Versao="@adv?.VersaoFoto" Alt="@s.AdversarioNome" Classe="confrontos-foto" />
+                                            <div class="fw-medium mt-1 text-truncate"><NomeTreinador Nome="@s.AdversarioNome" Apelido="@adv?.Apelido" /></div>
                                         </a>
                                     </div>
                                 </div>
 
                                 <BarraRetrospecto Retrospecto="r" Classe="my-3" />
 
-                                <div class="d-flex justify-content-center flex-wrap gap-4 small text-muted mb-3">
-                                    <span><strong class="text-body">@r.Jogos</strong> jogo@(r.Jogos == 1 ? "" : "s")@if (s.ComAuxiliar) {<span class="text-warning" title="Com um dos dois de auxiliar">*</span>}</span>
-                                    <span>gols <strong class="text-body">@r.GolsPro x @r.GolsContra</strong></span>
-                                    <span>aproveitamento <strong class="text-body">@r.Aproveitamento.ToString("0.#", Br)%</strong></span>
+                                <div class="d-flex justify-content-center flex-wrap gap-4 small text-body-secondary mb-3">
+                                    <span><strong class="text-body-emphasis fw-medium numero">@r.Jogos</strong> jogo@(r.Jogos == 1 ? "" : "s")@if (s.ComAuxiliar) {<span class="texto-aviso" title="Com um dos dois de auxiliar">*</span>}</span>
+                                    <span>gols <strong class="text-body-emphasis fw-medium placar">@r.GolsPro x @r.GolsContra</strong></span>
+                                    <span>aproveitamento <strong class="text-body-emphasis fw-medium numero">@r.Aproveitamento.ToString("0.#", Br)%</strong></span>
                                 </div>
 
                                 <ul class="list-unstyled small mb-0">
                                     @foreach (var j in s.Jogos)
                                     {
-                                        <li class="d-flex align-items-center gap-2 py-2 border-top">
-                                            <span class="badge @CorDoResultado(j.Resultado)" style="width: 1.6rem;">@j.Resultado</span>
+                                        <li class="d-flex align-items-center gap-2 py-2 border-top confrontos-jogo">
+                                            <span class="badge @CorDoResultado(j.Resultado)" style="width: 1.5rem;">@j.Resultado</span>
                                             <div class="flex-grow-1" style="min-width: 0;">
                                             <div>
                                                 @if (j.EmCasa)
                                                 {
-                                                    <span>@j.TimeNome <strong>@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
+                                                    <span>@j.TimeNome <strong class="placar">@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
                                                 }
                                                 else
                                                 {
-                                                    <span>@j.AdversarioTimeNome <strong>@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
+                                                    <span>@j.AdversarioTimeNome <strong class="placar">@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
                                                 }
                                                 @if (j.IsWO)
                                                 {
-                                                    <span class="badge bg-secondary ms-1">W.O.</span>
+                                                    <span class="etiqueta ms-1">W.O.</span>
                                                 }
                                                 @if (j.ComAuxiliar)
                                                 {
-                                                    <span class="badge text-bg-warning ms-1">* @QuemEraAuxiliar(j, s)</span>
+                                                    <span class="etiqueta aviso ms-1">* @QuemEraAuxiliar(j, s)</span>
                                                 }
                                             </div>
-                                            <div class="text-muted text-truncate">@j.Data.ToString("dd/MM/yy", Br) · @j.Competicao</div>
+                                            <div class="text-body-tertiary text-truncate">@j.Data.ToString("dd/MM/yy", Br) · @j.Competicao</div>
                                             </div>
                                         </li>
                                     }
@@ -122,7 +122,7 @@
                 </div>
 
                 <div class="col-lg-5 order-lg-1">
-                    <div class="list-group">
+                    <div class="list-group confrontos-lista">
                         @foreach (var c in _confrontos)
                         {
                             var perfil = Perfil(c.AdversarioId);
@@ -130,13 +130,13 @@
                             <button type="button" class="list-group-item list-group-item-action @(ativo ? "active" : "")"
                                     @onclick="() => SelecionarAsync(c.AdversarioId)">
                                 <div class="d-flex align-items-center gap-2">
-                                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="32" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
+                                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="32" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" Classe="confrontos-foto" />
                                     <div class="flex-grow-1" style="min-width: 0;">
                                         <div class="d-flex justify-content-between gap-2">
-                                            <span class="fw-semibold text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
-                                            <span class="small text-nowrap">
+                                            <span class="fw-medium text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
+                                            <span class="small text-nowrap numero">
                                                 @c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas
-                                                <span class="@(ativo ? "" : "text-muted")">· @c.Retrospecto.Jogos J@(c.ComAuxiliar ? "*" : "")</span>
+                                                <span class="text-body-tertiary">· @c.Retrospecto.Jogos J@(c.ComAuxiliar ? "*" : "")</span>
                                             </span>
                                         </div>
                                         <BarraRetrospecto Retrospecto="c.Retrospecto" Classe="mt-1" Fina="true" />
@@ -145,9 +145,9 @@
                             </button>
                         }
                     </div>
-                    <p class="text-muted small mt-2 mb-0">
+                    <p class="text-body-tertiary small mt-2 mb-0">
                         Contam os jogos encerrados em que os dois estavam no comando, com qualquer clube. Pênaltis contam como empate.
-                        <span class="text-warning">*</span> Jogo em que um dos dois estava no banco como auxiliar.
+                        <span class="texto-aviso">*</span> Jogo em que um dos dois estava no banco como auxiliar.
                     </p>
                 </div>
             </div>
@@ -234,27 +234,27 @@
 
     private static string CorDoResultado(string resultado) => resultado switch
     {
-        "V" => "bg-success",
-        "D" => "bg-danger",
-        _ => "bg-secondary"
+        "V" => "resultado-v",
+        "D" => "resultado-d",
+        _ => "resultado-e"
     };
 
     /// <summary>No celular vira uma linha só (rótulo e técnico lado a lado); do tablet para cima, uma coluna.</summary>
     private RenderFragment Destaque(string titulo, string dica, TreinadorConfrontoDto? c) => @<div class="col-md-4 confrontos-destaque">
         <div class="d-flex d-md-block align-items-center gap-2 px-3 py-2">
-            <div class="small text-muted text-nowrap confrontos-destaque-titulo">@titulo <span class="opacity-75 d-none d-xl-inline">· @dica</span></div>
+            <div class="small text-body-tertiary text-nowrap confrontos-destaque-titulo">@titulo <span class="d-none d-xl-inline">· @dica</span></div>
             @if (c is null)
             {
-                <div class="text-muted small">Ninguém ainda</div>
+                <div class="text-body-tertiary small">Ninguém ainda</div>
             }
             else
             {
                 var perfil = Perfil(c.AdversarioId);
                 <button type="button" class="btn btn-link p-0 text-reset text-decoration-none d-flex align-items-center gap-2 mt-md-1 text-start"
                         style="min-width: 0;" @onclick="() => SelecionarAsync(c.AdversarioId)">
-                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="24" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" />
-                    <span class="fw-semibold text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
-                    <span class="small text-muted text-nowrap">@c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas@(c.ComAuxiliar ? "*" : "")</span>
+                    <FotoTreinador TreinadorId="@c.AdversarioId" Tamanho="24" Versao="@perfil?.VersaoFoto" Alt="@c.AdversarioNome" Classe="confrontos-foto" />
+                    <span class="fw-medium text-truncate"><NomeTreinador Nome="@c.AdversarioNome" Apelido="@perfil?.Apelido" /></span>
+                    <span class="small text-body-tertiary text-nowrap numero">@c.Retrospecto.Vitorias-@c.Retrospecto.Empates-@c.Retrospecto.Derrotas@(c.ComAuxiliar ? "*" : "")</span>
                 </button>
             }
         </div>

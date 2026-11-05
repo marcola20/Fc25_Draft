@@ -7,7 +7,7 @@
 
 <PageTitle>Treinadores</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_carregando)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -22,14 +22,14 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary">🏆 Hall da Fama</a>
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
+            <p class="text-body-secondary small mb-0">Quem comanda cada clube da CBFV. Clique no técnico para ver a carreira</p>
+            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary"><Icone Nome="trophy" Tamanho="14" /> Hall da Fama</a>
         </div>
-        <p class="text-muted small mb-4">Quem comanda cada clube da CBFV — clique no nome para ver a carreira.</p>
 
         @if (_noComando.Count > 0)
         {
-            <h2 class="h5 border-bottom pb-2 mb-3">No comando</h2>
+            <div class="secao-titulo"><h2>No comando <span class="numero text-body-tertiary">@_noComando.Count</span></h2></div>
             <div class="row g-3 mb-4">
                 @foreach (var t in _noComando)
                 {
@@ -40,7 +40,7 @@
 
         @if (_semTime.Count > 0)
         {
-            <h2 class="h5 border-bottom pb-2 mb-3">Sem clube</h2>
+            <div class="secao-titulo"><h2>Sem clube <span class="numero text-body-tertiary">@_semTime.Count</span></h2></div>
             <div class="row g-3">
                 @foreach (var t in _semTime)
                 {
@@ -74,33 +74,32 @@
         finally { _carregando = false; }
     }
 
-    private RenderFragment Card(TreinadorDto t) => @<div class="card h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-            @if (t.Hoje is { } hoje)
-            {
-                <img src="@EscudoService.GetEscudo(hoje.TimeNome)" alt="@hoje.TimeNome" style="width:44px;height:44px;object-fit:contain;" />
-            }
-            <div class="flex-grow-1">
-                <a href="/treinadores/@t.TreinadorId" class="fw-semibold text-decoration-none">@t.Nome</a>
-                <div class="small text-muted">
-                    @if (t.Hoje is { } atual)
-                    {
-                        <span>@(atual.Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Treinador") do @atual.TimeNome</span>
-                    }
-                    else if (!t.Ativo)
-                    {
-                        <span>Fora da liga — último clube: @(t.Passagens.FirstOrDefault()?.TimeNome ?? "—")</span>
-                    }
-                    else
-                    {
-                        <span>Sem clube no momento</span>
-                    }
-                </div>
+    // O cartão inteiro leva à carreira: foto do técnico, nome e o clube de hoje com o escudo.
+    private RenderFragment Card(TreinadorDto t) => @<a href="/treinadores/@t.TreinadorId" class="treinador painel @(t.Hoje is null && !t.Ativo ? "fora" : "")">
+        <FotoTreinador TreinadorId="@t.TreinadorId" Tamanho="48" Alt="@t.Nome" Classe="treinador-foto" />
+        <div class="treinador-info">
+            <div class="treinador-nome">
+                <span class="text-truncate">@t.Nome</span>
+                @if (t.Passagens.Count > 1)
+                {
+                    <span class="treinador-clubes"><span class="numero">@t.Passagens.Count</span> clubes</span>
+                }
             </div>
-            @if (t.Passagens.Count > 1)
-            {
-                <span class="badge bg-light text-dark border">@t.Passagens.Count clubes</span>
-            }
+            <div class="treinador-clube">
+                @if (t.Hoje is { } atual)
+                {
+                    <img src="@EscudoService.GetEscudo(atual.TimeNome)" alt="" />
+                    <span class="text-truncate">@(atual.Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Treinador") do @atual.TimeNome</span>
+                }
+                else if (!t.Ativo)
+                {
+                    <span class="text-truncate">Fora da liga · último clube: @(t.Passagens.FirstOrDefault()?.TimeNome ?? "—")</span>
+                }
+                else
+                {
+                    <span>Sem clube no momento</span>
+                }
+            </div>
         </div>
-    </div>;
+    </a>;
 }
