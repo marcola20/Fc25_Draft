@@ -13,22 +13,70 @@
 
 @implements IDisposable
 
-<div class="row mb-3 g-2 align-items-end">
-    <div class="col-md-4">
-        <label class="form-label" for="playerSearch">Pesquisar</label>
-        <form class="d-flex" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
-            <input id="playerSearch" class="form-control me-2" placeholder="Procurar por nome" @bind="search" />
-            <button type="submit" class="btn btn-primary">Buscar</button>
-        </form>
+@* Barra de ações (baixar a lista e, para o admin, criar e importar) e um painel só com todos os filtros. *@
+<div class="lista-acoes">
+    @if (AdminAuth.IsAdmin)
+    {
+        <div class="d-flex gap-2" role="group" aria-label="Ações administrativas">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="CreatePlayer"><Icone Nome="plus" Tamanho="14" /> Novo jogador</button>
+            <label class="btn btn-sm btn-outline-secondary mb-0">
+                @if (isImporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Importando...</span>
+                }
+                else
+                {
+                    <span>Importar CSV</span>
+                }
+                <InputFile @key="importInputKey" OnChange="OnCsvSelected" accept=".csv" class="d-none" disabled="@isImporting" />
+            </label>
+        </div>
+    }
+    <div class="ms-auto">
+        @if (isDownloadDropdownOpen)
+        {
+            <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="CloseDownloadDropdown"></div>
+        }
+        <div class="position-relative" style="z-index: 1010;">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    id="playerDownloadMenu"
+                    title="Baixa a lista de acordo com os filtros aplicados"
+                    disabled="@(isLoading || totalPlayers == 0)"
+                    @onclick="ToggleDownloadDropdown"
+                    aria-expanded="@isDownloadDropdownOpen">
+                <Icone Nome="download" Tamanho="14" /> Baixar lista
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow-sm @(isDownloadDropdownOpen ? "show" : string.Empty)"
+                 aria-labelledby="playerDownloadMenu"
+                 style="z-index: 1050;@(isDownloadDropdownOpen ? string.Empty : " display: none;")"
+                 @onclick:stopPropagation>
+                <h6 class="dropdown-header">@GetDownloadSummary()</h6>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("csv"))">CSV</button>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("xlsx"))">Excel (XLSX)</button>
+                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("json"))">JSON</button>
+            </div>
+        </div>
     </div>
-    <div class="col-md-3">
+</div>
+
+<form class="filtros-jogadores" @onsubmit="OnSearchAsync" @onsubmit:preventDefault>
+    <div class="filtro filtro-nome">
+        <label class="form-label" for="playerSearch">Jogador</label>
+        <div class="campo-busca">
+            <Icone Nome="search" Tamanho="14" Classe="campo-busca-icone" />
+            <input id="playerSearch" class="form-control form-control-sm" placeholder="Nome" @bind="search" />
+        </div>
+    </div>
+    <div class="filtro">
         <label class="form-label" for="playerPositionFilter">Posições</label>
         @if (isPositionDropdownOpen)
         {
             <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="ClosePositionDropdown"></div>
         }
         <div class="position-relative" style="z-index: 1010;">
-            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start text-wrap d-flex align-items-center justify-content-between"
+            <button class="form-select form-select-sm w-100 text-start d-flex align-items-center"
                     type="button"
                     id="playerPositionFilter"
                     @onclick="TogglePositionDropdown"
@@ -64,107 +112,29 @@
             </div>
         </div>
     </div>
-    <div class="col-md-2 pt-4">
-        <div class="form-check">
-            <input id="onlyAvailableCheck" class="form-check-input" type="checkbox" checked="@onlyAvailable" @onchange="OnOnlyAvailableChanged" />
-            <label class="form-check-label" for="onlyAvailableCheck">Somente disponíveis</label>
+    <div class="filtro filtro-faixa">
+        <label class="form-label" for="overallMin">Overall</label>
+        <div class="input-group input-group-sm">
+            <InputNumber id="overallMin" class="form-control" @bind-Value="overallMin" min="70" max="99" placeholder="de" aria-label="Overall mínimo" />
+            <InputNumber id="overallMax" class="form-control" @bind-Value="overallMax" min="70" max="99" placeholder="até" aria-label="Overall máximo" />
         </div>
     </div>
-    <div class="col-md-3 text-md-end">
-        @if (AdminAuth.IsAdmin)
-        {
-            <div class="btn-group ms-2" role="group" aria-label="Ações administrativas">
-                <button class="btn btn-success" @onclick="CreatePlayer">Novo Jogador</button>
-                <label class="btn btn-outline-success mb-0">
-                    @if (isImporting)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Importando...</span>
-                    }
-                    else
-                    {
-                        <span>Importar CSV</span>
-                    }
-                    <InputFile @key="importInputKey" OnChange="OnCsvSelected" accept=".csv" class="d-none" disabled="@isImporting" />
-                </label>
-            </div>
-        }
-    </div>
-</div>
-
-<div class="row mb-3 g-2 align-items-end">
-    <div class="col-4 col-sm-auto flex-sm-grow-0 flex-grow-1">
-        <label class="form-label mb-1" for="overallMin">Overall mínimo</label>
-        <InputNumber id="overallMin"
-                     class="form-control"
-                     style="height: 38px; font-size: 0.95rem;"
-                     @bind-Value="overallMin"
-                     min="70" max="99" />
-    </div>
-    <div class="col-5 col-sm-auto flex-sm-grow-0 flex-grow-1">
-        <label class="form-label mb-1" for="overallMax">Overall máximo</label>
-        <InputNumber id="overallMax"
-                     class="form-control"
-                     style="height: 38px; font-size: 0.95rem;"
-                     @bind-Value="overallMax"
-                     min="70" max="99" />
-    </div>
-    <div class="col-4 col-sm-auto flex-sm-grow-0 flex-grow-1">
-        <label class="form-label mb-1" for="idadeMin">Idade mínima</label>
-        <InputNumber id="idadeMin"
-                     class="form-control"
-                     style="height: 38px; font-size: 0.95rem; max-width: 8rem;"
-                     @bind-Value="idadeMin"
-                     min="14" max="50" />
-    </div>
-    <div class="col-5 col-sm-auto flex-sm-grow-0 flex-grow-1">
-        <label class="form-label mb-1" for="idadeMax">Idade máxima</label>
-        <div class="d-flex gap-1">
-            <InputNumber id="idadeMax"
-                         class="form-control"
-                         style="height: 38px; font-size: 0.95rem; max-width: 8rem;"
-                         @bind-Value="idadeMax"
-                         min="14" max="50" />
-            <button type="button" class="btn btn-outline-success text-nowrap" style="height: 38px;"
-                    title="Só quem pode entrar no draft (até @IdadeDoDraft anos)" @onclick="SoSub23Async">Sub-@IdadeDoDraft</button>
+    <div class="filtro filtro-faixa">
+        <label class="form-label" for="idadeMin">Idade</label>
+        <div class="input-group input-group-sm">
+            <InputNumber id="idadeMin" class="form-control" @bind-Value="idadeMin" min="14" max="50" placeholder="de" aria-label="Idade mínima" />
+            <InputNumber id="idadeMax" class="form-control" @bind-Value="idadeMax" min="14" max="50" placeholder="até" aria-label="Idade máxima" />
+            <button type="button" class="btn btn-outline-secondary" title="Só quem pode entrar no draft (até @IdadeDoDraft anos)" @onclick="SoSub23Async">Sub-@IdadeDoDraft</button>
         </div>
     </div>
-    <div class="col-3 col-sm-auto pt-md-4">
-        <button type="button"
-                class="btn btn-outline-primary w-100 w-sm-auto"
-                style="height: 40px; padding: 0 18px; font-size: 0.95rem; font-weight: 500;"
-                @onclick="ApplyFiltersAsync">
-            Filtrar
-        </button>
+    <div class="filtro-disponiveis form-check form-switch">
+        <input id="onlyAvailableCheck" class="form-check-input" type="checkbox" role="switch" checked="@onlyAvailable" @onchange="OnOnlyAvailableChanged" />
+        <label class="form-check-label" for="onlyAvailableCheck">Só disponíveis</label>
     </div>
-    <div class="col-12 col-sm-auto pt-md-4 ms-sm-auto">
-        @if (isDownloadDropdownOpen)
-        {
-            <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1000;" @onclick="CloseDownloadDropdown"></div>
-        }
-        <div class="position-relative" style="z-index: 1010;">
-            <button type="button"
-                    class="btn btn-outline-secondary dropdown-toggle w-100 w-sm-auto"
-                    style="height: 40px; padding: 0 18px; font-size: 0.95rem; font-weight: 500;"
-                    id="playerDownloadMenu"
-                    title="Baixa a lista de acordo com os filtros aplicados"
-                    disabled="@(isLoading || totalPlayers == 0)"
-                    @onclick="ToggleDownloadDropdown"
-                    aria-expanded="@isDownloadDropdownOpen">
-                Baixar lista
-            </button>
-            <div class="dropdown-menu dropdown-menu-end shadow-sm @(isDownloadDropdownOpen ? "show" : string.Empty)"
-                 aria-labelledby="playerDownloadMenu"
-                 style="z-index: 1050;@(isDownloadDropdownOpen ? string.Empty : " display: none;")"
-                 @onclick:stopPropagation>
-                <h6 class="dropdown-header">@GetDownloadSummary()</h6>
-                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("csv"))">CSV</button>
-                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("xlsx"))">Excel (XLSX)</button>
-                <button type="button" class="dropdown-item" @onclick="@(() => DownloadExport("json"))">JSON</button>
-            </div>
-        </div>
+    <div class="filtro-acoes">
+        <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
     </div>
-</div>
+</form>
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
@@ -194,17 +164,17 @@
 
 @if (isLoading)
 {
-    <p><em>Carregando...</em></p>
+    <div class="text-center py-5"><span class="spinner-border" role="status" aria-label="Carregando"></span></div>
 }
 else if (players.Count == 0)
 {
-    <p>@GetPlayersSummary()</p>
+    <div class="alert alert-secondary">@GetPlayersSummary()</div>
 }
 else
 {
-    <p class="text-muted">@GetPlayersSummary()</p>
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <p class="lista-resumo">@GetPlayersSummary()</p>
+    <div class="table-responsive painel">
+        <table class="table table-hover align-middle mb-0 tabela-jogadores">
             <thead>
                 <tr>
                     <th>Nome</th>
@@ -212,50 +182,53 @@ else
                     <th>Posição</th>
                     <th>
                         <button type="button"
-                                class="btn btn-link p-0 text-decoration-none"
+                                class="ordenar @(sortBy == "overall" ? "ativo" : "")"
                                 @onclick="@(() => ChangeSort("overall"))">
                             Overall
                             @if (sortBy == "overall")
                             {
-                                <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                <Icone Nome="@(sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                             }
                         </button>
                     </th>
                     <th>
                         <button type="button"
-                                class="btn btn-link p-0 text-decoration-none"
+                                class="ordenar @(sortBy == "age" ? "ativo" : "")"
                                 @onclick="@(() => ChangeSort("age"))">
                             Idade
                             @if (sortBy == "age")
                             {
-                                <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                <Icone Nome="@(sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                             }
                         </button>
                     </th>
                     <th>Status</th>
                     <th>Time</th>
-                    <th class="text-end">Ações</th>
+                    @if (AdminAuth.IsAdmin)
+                    {
+                        <th class="text-end"><span class="visually-hidden">Ações</span></th>
+                    }
                 </tr>
             </thead>
             <tbody>
                 @foreach (var player in players)
                 {
                     <tr>
-                        <td class="text-nowrap"><FotoJogador PlayerId="@player.PlayerId" Tamanho="32" Classe="me-2" /><a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a></td>
+                        <td class="text-nowrap"><FotoJogador PlayerId="@player.PlayerId" Tamanho="32" Classe="me-2" /><a href="/players/details/@player.PlayerId" class="jogador-nome">@player.Name</a></td>
                         <td class="text-center"><Bandeira Pais="@player.Pais" Largura="22" /></td>
                         <td>@player.PositionName</td>
-                        <td>@player.Overall</td>
-                        <td>@(player.Age?.ToString() ?? "-")</td>
-                        <td>@player.Status</td>
-                        <td>@(string.IsNullOrWhiteSpace(player.TeamName) ? "-" : player.TeamName)</td>
-                        <td class="text-end">
-                            <button class="btn btn-link" @onclick="() => ViewDetails(player.PlayerId)">Detalhes</button>
-                            @if (AdminAuth.IsAdmin)
-                            {
-                                <button class="btn btn-link" @onclick="() => EditPlayer(player.PlayerId)">Editar</button>
-                                <button class="btn btn-link text-danger" @onclick="() => ConfirmDelete(player.PlayerId)">Excluir</button>
-                            }
-                        </td>
+                        <td><span class="ovr @Fc25Draft.Core.Utilities.AtributosPes.Faixa(player.Overall)">@player.Overall</span></td>
+                        <td class="numero">@(player.Age?.ToString() ?? "—")</td>
+                        <td><span class="etiqueta @(player.Status == "Disponível" ? "sucesso" : "")">@player.Status</span></td>
+                        <td class="text-body-secondary">@(string.IsNullOrWhiteSpace(player.TeamName) ? "—" : player.TeamName)</td>
+                        @* O nome já leva aos detalhes; editar e excluir só para o admin. *@
+                        @if (AdminAuth.IsAdmin)
+                        {
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-secondary btn-icone" title="Editar" aria-label="Editar @player.Name" @onclick="() => EditPlayer(player.PlayerId)"><Icone Nome="pencil" Tamanho="14" /></button>
+                                <button class="btn btn-sm btn-outline-secondary btn-icone acao-perigo" title="Excluir" aria-label="Excluir @player.Name" @onclick="() => ConfirmDelete(player.PlayerId)"><Icone Nome="x" Tamanho="14" /></button>
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -722,18 +695,18 @@ else
     {
         if (totalPlayers == 0)
         {
-            return "Nenhum jogador encontrado.";
+            return "Nenhum jogador encontrado com esses filtros";
         }
 
         if (players.Count == 0)
         {
-            return $"Nenhum jogador nesta página. Total de {totalPlayers} jogadores.";
+            return $"Nenhum jogador nesta página. {totalPlayers} jogadores no total";
         }
 
         var start = (currentPage - 1) * PageSize + 1;
         var end = Math.Min(totalPlayers, start + players.Count - 1);
 
-        return $"Mostrando {start}-{end} de {totalPlayers} jogadores.";
+        return $"{start}–{end} de {totalPlayers} jogadores";
     }
 
     private string GetSelectedPositionsLabel()

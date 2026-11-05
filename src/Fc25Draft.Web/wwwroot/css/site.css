@@ -1239,3 +1239,9 @@ a.text-primary:hover {
     transform: rotate(45deg);
     vertical-align: 0.0625rem;
 }
+
+/* Paginação quebra de linha no celular em vez de alargar a página. */
+.pagination {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+}
