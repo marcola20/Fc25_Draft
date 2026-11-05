@@ -1289,3 +1289,5 @@ a.text-primary:hover {
     border-radius: 50%;
     background: var(--faixa-cor, var(--bs-tertiary-color));
 }
+
+.texto-aviso { color: var(--zona-playoff-rebaixamento) !important; }

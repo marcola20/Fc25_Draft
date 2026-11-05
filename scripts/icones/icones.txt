@@ -98,3 +98,10 @@ medal
 info
 eye
 eye-off
+mail
+ban
+hourglass
+clipboard-list
+alarm-clock
+landmark
+circle-alert

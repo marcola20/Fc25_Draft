@@ -17,7 +17,7 @@
 
 <PageTitle>Minha Área</PageTitle>
 
-<div class="container-fluid py-3" style="max-width: 1200px;">
+<div style="max-width: 1200px;">
     @if (!_authPronto)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -26,10 +26,10 @@
     {
         <div class="card mx-auto" style="max-width: 520px;">
             <div class="card-body">
-                <h1 class="h4 mb-2">👤 Minha Área</h1>
+                <h1 class="h4 mb-2">Minha Área</h1>
                 <p class="text-muted small">
                     Tudo do seu time num lugar só: leilões, propostas, draft, escolha automática e jogadores que você observa.
-                    Entre com o seu token (pelo botão Login no topo) ou cole aqui:
+                    Entre com o seu token (pelo botão Entrar no topo) ou cole aqui:
                 </p>
                 <div class="input-group">
                     <input type="password" class="form-control" placeholder="Seu token" value="@_tokenDigitado"
@@ -47,34 +47,39 @@
     {
         var d = _dados;
 
-        <div class="card mb-3">
-            <div class="card-body d-flex flex-wrap align-items-center gap-3">
-                <img src="@Escudos.GetEscudo(d.TeamName)" alt="" width="64" height="64" style="object-fit: contain;" />
-                <div class="me-auto">
-                    <h1 class="h3 mb-0">@d.TeamName</h1>
-                    <div class="text-muted small">👤 Minha Área@(string.IsNullOrWhiteSpace(d.OwnerName) ? "" : $" · técnico {d.OwnerName}")</div>
-                </div>
-                <div class="text-center px-3">
-                    <div class="small text-muted">Caixa livre</div>
-                    <div class="fs-5 fw-bold text-success">@Dinheiro.Curto(d.CaixaLivre)</div>
+        @* Topo: o time de quem entrou, os dois números que mais importam e os atalhos do dia a dia. *@
+        <section class="area-topo">
+            <img src="@Escudos.GetEscudo(d.TeamName)" alt="" width="64" height="64" class="area-escudo" />
+            <div class="area-quem">
+                <span class="area-rotulo">Minha Área</span>
+                <h1>@d.TeamName</h1>
+                @if (!string.IsNullOrWhiteSpace(d.OwnerName))
+                {
+                    <span class="area-dono">Técnico @d.OwnerName</span>
+                }
+            </div>
+            <dl class="area-numeros">
+                <div>
+                    <dt>Caixa livre</dt>
+                    <dd class="numero">@Dinheiro.Curto(d.CaixaLivre)</dd>
                     @if (d.CaixaBloqueado > 0)
                     {
-                        <div class="small text-muted">@Dinheiro.Curto(d.CaixaBloqueado) presos em lances</div>
+                        <dd class="area-detalhe">@Dinheiro.Curto(d.CaixaBloqueado) presos em lances</dd>
                     }
                 </div>
-                <div class="text-center px-3">
-                    <div class="small text-muted">Elenco</div>
-                    <div class="fs-5 fw-bold @(d.AbaixoDoMinimo ? "text-danger" : "")">@d.Elenco</div>
-                    <div class="small text-muted">jogadores</div>
+                <div>
+                    <dt>Elenco</dt>
+                    <dd class="numero @(d.AbaixoDoMinimo ? "texto-derrota" : "")">@d.Elenco</dd>
+                    <dd class="area-detalhe">jogadores</dd>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="/teams/details/@d.TeamId" class="btn btn-sm btn-outline-primary">Página do time</a>
-                    <a href="/teams/@d.TeamId/lineups" class="btn btn-sm btn-outline-primary">Escalações</a>
-                    <a href="/teams/details/@d.TeamId?aba=extrato" class="btn btn-sm btn-outline-primary">Extrato</a>
-                    <BotaoAgenda TeamId="@d.TeamId" Classe="btn-sm btn-outline-primary" />
-                    <a href="/mercado" class="btn btn-sm btn-outline-primary">Mercado</a>
-                </div>
-            </div>
+            </dl>
+        </section>
+        <div class="area-atalhos">
+            <a href="/teams/details/@d.TeamId" class="btn btn-sm btn-outline-secondary"><Icone Nome="shield" Tamanho="14" /> Página do time</a>
+            <a href="/teams/@d.TeamId/lineups" class="btn btn-sm btn-outline-secondary"><Icone Nome="users" Tamanho="14" /> Escalações</a>
+            <a href="/teams/details/@d.TeamId?aba=extrato" class="btn btn-sm btn-outline-secondary"><Icone Nome="banknote" Tamanho="14" /> Extrato</a>
+            <BotaoAgenda TeamId="@d.TeamId" Classe="btn-sm btn-outline-secondary" />
+            <a href="/mercado" class="btn btn-sm btn-outline-secondary"><Icone Nome="gavel" Tamanho="14" /> Mercado</a>
         </div>
 
         @if (d.AbaixoDoMinimo)
@@ -88,14 +93,14 @@
 
         @if (d.Pendencias is { Count: > 0 } pendencias)
         {
-            <div class="card mb-3 border-warning">
-                <div class="card-header fw-bold">📋 Para resolver</div>
+            <div class="card mb-3 area-resolver">
+                <div class="card-header fw-semibold d-flex align-items-center gap-2"><Icone Nome="triangle-alert" Tamanho="14" Classe="texto-aviso" /> Para resolver</div>
                 <ul class="list-group list-group-flush">
                     @foreach (var p in pendencias)
                     {
                         <li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-2">
                             <span>@p.Texto</span>
-                            <a class="btn btn-sm btn-outline-primary ms-auto" href="@p.Link">Resolver</a>
+                            <a class="btn btn-sm btn-outline-secondary ms-auto" href="@p.Link">Resolver</a>
                         </li>
                     }
                 </ul>
@@ -112,7 +117,7 @@
         {
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-center">
-                    <strong>🔔 Avisos</strong>
+                    <strong>Avisos</strong>
                     @if (_avisos.Any(x => !x.Lido))
                     {
                         <button type="button" class="btn btn-sm btn-link ms-auto p-0" @onclick="MarcarAvisosComoLidosAsync">Marcar como lidos</button>
@@ -123,7 +128,7 @@
                     {
                         <li class="list-group-item small @(aviso.Lido ? "" : "bg-body-secondary")">
                             <a class="text-body text-decoration-none d-flex gap-2" href="@(aviso.Link ?? "/minha-area")">
-                                <span>@AvisosSino.Icone(aviso.Tipo)</span>
+                                <span class="text-body-tertiary"><Icone Nome="@AvisosSino.IconeDoAviso(aviso.Tipo)" Tamanho="14" /></span>
                                 <span class="flex-grow-1">@aviso.Texto</span>
                                 <span class="text-muted text-nowrap">@AvisosSino.Quando(aviso.CriadoEmUtc)</span>
                             </a>
@@ -136,7 +141,7 @@
         @if (d.Disciplina is { Count: > 0 } disciplina)
         {
             <div class="card mb-3">
-                <div class="card-header fw-bold">🟥 Suspensos e pendurados</div>
+                <div class="card-header fw-semibold d-flex align-items-center gap-2"><span class="cartao-icone vermelho"></span> Suspensos e pendurados</div>
                 <ul class="list-group list-group-flush">
                     @foreach (var item in disciplina.OrderByDescending(x => x.Suspenso))
                     {
@@ -159,8 +164,8 @@
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <strong>🔨 Meus leilões</strong>
-                        <a href="/mercado" class="small text-primary">Ir ao mercado →</a>
+                        <strong>Meus leilões</strong>
+                        <a href="/mercado" class="small text-body-secondary">Ir ao mercado <Icone Nome="arrow-right" Tamanho="12" /></a>
                     </div>
                     @if (d.Leiloes.Count == 0)
                     {
@@ -186,7 +191,7 @@
                                             </div>
                                             <div class="small text-muted">@Dinheiro.Prazo(l.TerminaEm)</div>
                                         </div>
-                                        <span class="badge @(l.EstouGanhando ? "bg-success" : "bg-danger") text-nowrap">@(l.EstouGanhando ? "✅ Ganhando" : "⚠️ Superado")</span>
+                                        <span class="etiqueta @(l.EstouGanhando ? "sucesso" : "perigo")">@(l.EstouGanhando ? "Ganhando" : "Superado")</span>
                                     </div>
                                 </li>
                             }
@@ -198,8 +203,8 @@
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <strong>🤝 Propostas pendentes</strong>
-                        <a href="/teams/details/@d.TeamId" class="small text-primary">Negociações →</a>
+                        <strong>Propostas pendentes</strong>
+                        <a href="/teams/details/@d.TeamId" class="small text-body-secondary">Negociações <Icone Nome="arrow-right" Tamanho="12" /></a>
                     </div>
                     @if (d.Propostas.Count == 0)
                     {
@@ -232,7 +237,7 @@
 
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
-                    <div class="card-header"><strong>🏈 Draft</strong></div>
+                    <div class="card-header"><strong>Draft</strong></div>
                     <div class="card-body">
                         @if (d.Draft is null)
                         {
@@ -246,7 +251,7 @@
                         {
                             <div class="alert alert-success py-2 mb-2">
                                 ⏰ <strong>É a sua vez!</strong> Rodada @d.Draft.ProximaRodada, escolha geral @d.Draft.ProximaEscolhaGeral.
-                                <a href="/draft" class="alert-link ms-1">Escolher agora →</a>
+                                <a href="/draft" class="alert-link ms-1">Escolher agora <Icone Nome="arrow-right" Tamanho="12" /></a>
                             </div>
                         }
                         else
@@ -261,7 +266,7 @@
                         @if (d.EscolhaAutomatica is { } a)
                         {
                             <div class="small">
-                                🤖 Escolha automática@(a.ProximoDraft ? " (próximo draft)" : ""):
+                                Escolha automática@(a.ProximoDraft ? " (próximo draft)" : ""):
                                 @if (!a.Configurada)
                                 {
                                     <span class="text-danger">não configurada.</span>
@@ -275,7 +280,7 @@
                                     <span class="text-success fw-semibold">ligada</span>
                                     <span>· @(a.Modo == DraftAutoPickModo.Jogador ? "por jogador" : "por posição") · @a.Jogadores jogador(es) na lista.</span>
                                 }
-                                <a href="/draft/automatico" class="text-primary ms-1">@(a.Configurada ? "Editar" : "Montar lista") →</a>
+                                <a href="/draft/automatico" class="ms-1">@(a.Configurada ? "Editar" : "Montar lista") <Icone Nome="arrow-right" Tamanho="12" /></a>
                             </div>
                         }
                     </div>
@@ -284,7 +289,7 @@
 
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
-                    <div class="card-header"><strong>⭐ Jogadores que observo</strong></div>
+                    <div class="card-header"><strong>Jogadores que observo</strong></div>
                     <div class="card-body pb-2">
                         <JogadorBusca Placeholder="Adicionar jogador para observar" OnEscolhido="p => AlternarObservadoAsync(p.PlayerId)" />
                         <div class="small text-muted mt-1">Quem entrar num leilão aparece no topo, com o lance atual.</div>
@@ -304,10 +309,10 @@
                                             @if (emLeilao)
                                             {
                                                 <div class="small">
-                                                    🔨 <strong>Em leilão agora</strong>: @Dinheiro.Curto(o.LeilaoLanceAtual!.Value)
-                                                    @(o.LeilaoEuLidero ? "· você lidera ✅" : o.LeilaoLiderNome is null ? "· sem lances" : $"· líder {o.LeilaoLiderNome}")
+                                                    <strong>Em leilão agora</strong>: @Dinheiro.Curto(o.LeilaoLanceAtual!.Value)
+                                                    @(o.LeilaoEuLidero ? "· você lidera" : o.LeilaoLiderNome is null ? "· sem lances" : $"· líder {o.LeilaoLiderNome}")
                                                     · @Dinheiro.Prazo(o.LeilaoTerminaEm!.Value)
-                                                    <a href="/mercado" class="text-primary ms-1">Dar lance →</a>
+                                                    <a href="/mercado" class="ms-1">Dar lance <Icone Nome="arrow-right" Tamanho="12" /></a>
                                                 </div>
                                             }
                                             else
@@ -315,7 +320,7 @@
                                                 <div class="small text-muted">@(o.TimeNome is null ? "Livre (sem time)" : $"No {o.TimeNome}")</div>
                                             }
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Parar de observar" @onclick="() => AlternarObservadoAsync(o.PlayerId)">✕</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Parar de observar" aria-label="Parar de observar" @onclick="() => AlternarObservadoAsync(o.PlayerId)"><Icone Nome="x" Tamanho="14" /></button>
                                     </div>
                                 </li>
                             }

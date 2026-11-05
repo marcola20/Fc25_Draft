@@ -10,7 +10,7 @@
 {
     <div class="card mb-3 meu-perfil">
         <div class="card-header d-flex align-items-center gap-2">
-            <strong>🧑‍💼 Meu perfil</strong>
+            <strong>Meu perfil</strong>
             <span class="small text-muted ms-auto d-none d-sm-inline">Aparece no telão, no clube, na carreira e na figurinha de técnico</span>
         </div>
         <div class="card-body">
@@ -19,7 +19,7 @@
                     <FotoTreinador TreinadorId="@p.TreinadorId" Tamanho="96" Versao="@p.VersaoFoto" Alt="@p.Nome" Lazy="false" />
                     <div class="d-flex flex-wrap justify-content-center gap-2 small">
                         <label class="btn btn-link btn-sm p-0">
-                            📷 @(p.TemFoto ? "Trocar" : "Pôr foto")
+                            <Icone Nome="camera" Tamanho="14" /> @(p.TemFoto ? "Trocar" : "Pôr foto")
                             <input type="file" id="fotoTreinadorArquivo" accept="image/*" class="d-none" @onchange="TrocarFotoAsync" />
                         </label>
                         @if (p.TemFoto)
@@ -58,7 +58,7 @@
                         Nas listas você aparece como <strong>@(string.IsNullOrWhiteSpace(_apelido) ? p.Nome : _apelido.Trim())</strong>.
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                        <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="SalvarAsync">💾 Salvar perfil</button>
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@_ocupado" @onclick="SalvarAsync">Salvar perfil</button>
                         @if (_mensagem is not null)
                         {
                             <span class="small @(_falhou ? "text-danger" : "text-success")">@_mensagem</span>

@@ -1,0 +1,95 @@
+.area-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.area-escudo {
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+.area-quem {
+    display: flex;
+    flex: 1 1 14rem;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.area-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}
+
+.area-quem h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 500;
+    line-height: 1.15;
+    color: var(--bs-emphasis-color);
+}
+
+.area-dono {
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.area-numeros {
+    display: flex;
+    gap: 1px;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-border-color);
+}
+
+.area-numeros > div {
+    min-width: 9rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--bs-body-bg);
+}
+
+.area-numeros dt {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--bs-tertiary-color);
+}
+
+.area-numeros dd {
+    margin: 0.125rem 0 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+}
+
+.area-numeros dd.area-detalhe {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--bs-tertiary-color);
+}
+
+.area-atalhos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.area-resolver {
+    border-color: rgba(201, 148, 40, 0.45);
+}
+
+@media (max-width: 575.98px) {
+    .area-numeros {
+        width: 100%;
+    }
+
+    .area-numeros > div {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}

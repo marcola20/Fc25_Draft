@@ -27,7 +27,7 @@
                     {
                         <li class="list-group-item small @(aviso.Lido ? "" : "bg-body-secondary")">
                             <a class="text-body text-decoration-none d-flex gap-2" href="@(aviso.Link ?? "/minha-area")" @onclick="Fechar">
-                                <span>@Icone(aviso.Tipo)</span>
+                                <span class="text-body-tertiary"><Icone Nome="@IconeDoAviso(aviso.Tipo)" Tamanho="14" /></span>
                                 <span class="flex-grow-1">
                                     @aviso.Texto
                                     <span class="d-block text-muted">@Quando(aviso.CriadoEmUtc)</span>
@@ -92,31 +92,32 @@
         });
     }
 
-    public static string Icone(string tipo) => tipo switch
+    /// <summary>Ícone do lucide para cada tipo de aviso (sino do topo e Minha Área).</summary>
+    public static string IconeDoAviso(string tipo) => tipo switch
     {
-        "PROPOSTA" => "📨",
-        "PROPOSTA_ACEITA" => "✅",
-        "PROPOSTA_RECUSADA" => "❌",
-        "PROPOSTA_CANCELADA" => "🚫",
-        "LANCE_SUPERADO" => "⚠️",
-        "LEILAO_FECHANDO" => "⏳",
-        "LEILAO_VENCIDO" => "🏆",
-        "VENDA_LISTA" => "💰",
-        "REVENDA" => "💸",
-        "PROPOSTA_EXPIRADA" => "⌛",
-        "CAIXA_NEGATIVO" => "🔴",
-        "ESCALACAO" => "📋",
-        "VEZ_DRAFT" => "⏰",
-        "DIRETORIA" => "🏛️",
-        "VIRADA" => "🔄",
-        "CARREIRA" => "👋",
-        "INSATISFEITO" => "😤",
-        "INCOMODADO" => "😐",
-        "BOLAO" => "🎯",
-        "TREINO" => "🏋️",
-        "PEDIU_PARA_SAIR" => "🚪",
-        "PROMESSA" => "🤝",
-        _ => "🔔"
+        "PROPOSTA" => "mail",
+        "PROPOSTA_ACEITA" => "circle-check",
+        "PROPOSTA_RECUSADA" => "circle-x",
+        "PROPOSTA_CANCELADA" => "ban",
+        "LANCE_SUPERADO" => "triangle-alert",
+        "LEILAO_FECHANDO" => "hourglass",
+        "LEILAO_VENCIDO" => "trophy",
+        "VENDA_LISTA" => "banknote",
+        "REVENDA" => "repeat",
+        "PROPOSTA_EXPIRADA" => "clock",
+        "CAIXA_NEGATIVO" => "circle-alert",
+        "ESCALACAO" => "clipboard-list",
+        "VEZ_DRAFT" => "alarm-clock",
+        "DIRETORIA" => "landmark",
+        "VIRADA" => "refresh-cw",
+        "CARREIRA" => "hand",
+        "INSATISFEITO" => "frown",
+        "INCOMODADO" => "meh",
+        "BOLAO" => "target",
+        "TREINO" => "activity",
+        "PEDIU_PARA_SAIR" => "door-open",
+        "PROMESSA" => "handshake",
+        _ => "bell"
     };
 
     /// <summary>"agora", "há 5 min", "há 3 h", "há 2 dias".</summary>
