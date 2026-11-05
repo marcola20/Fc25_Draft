@@ -50,6 +50,9 @@
     [Parameter] public bool MostrarBotao { get; set; } = true;
     [Parameter] public string TextoBotao { get; set; } = "Compartilhar";
 
+    /// <summary>Largura (px) da imagem gerada; 0 usa a padrão do app.js (700).</summary>
+    [Parameter] public int Largura { get; set; }
+
     /// <summary>Página do site que vai junto na legenda (o padrão é a Liga).</summary>
     [Parameter] public string Link { get; set; } = "/liga";
     [Parameter] public RenderFragment? ChildContent { get; set; }
@@ -70,7 +73,7 @@
 
         try
         {
-            await JS.InvokeAsync<string>("fc25ShareImage.capture", Id, Arquivo, Caption);
+            await JS.InvokeAsync<string>("fc25ShareImage.capture", Id, Arquivo, Caption, Largura);
         }
         catch
         {

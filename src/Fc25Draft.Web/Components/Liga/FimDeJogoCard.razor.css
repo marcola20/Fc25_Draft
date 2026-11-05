@@ -85,9 +85,10 @@
 
 .jogador { font-weight: 600; color: var(--bs-body-color); }
 
+/* Fonte do texto, não a mono: na mono o apóstrofo do minuto sai solto ("38 '"). */
 .minutos {
-    font-family: var(--bs-font-monospace);
-    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+    font-size: .8rem;
     color: var(--bs-secondary-color);
 }
 
