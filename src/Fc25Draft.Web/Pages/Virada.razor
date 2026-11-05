@@ -7,7 +7,7 @@
 
 <PageTitle>Virada de Temporada</PageTitle>
 
-<div class="container-fluid py-3" style="max-width: 1100px;">
+<div>
     @if (_carregando)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -21,7 +21,7 @@
         @if (_temporadas.Count > 1)
         {
             <div class="d-flex align-items-center gap-2 mb-3">
-                <label class="form-label mb-0">Temporada</label>
+                <label class="small text-body-secondary mb-0">Temporada</label>
                 <select class="form-select form-select-sm w-auto" @onchange="TrocarAsync">
                     @foreach (var t in _temporadas)
                     {
@@ -31,7 +31,7 @@
             </div>
         }
 
-        <p class="text-muted small">
+        <p class="text-body-secondary small mb-4" style="max-width: 48rem;">
             No fim de cada temporada os jogadores envelhecem e evoluem: os jovens sobem, os veteranos caem, e o desempenho
             (ser titular, a nota do PES) pesa na conta. De vez em quando alguém explode ou entra em queda de rendimento.
             Os mais velhos anunciam a despedida e se aposentam na virada seguinte.
@@ -44,13 +44,13 @@
         else
         {
             <ShareableCard Id="cap-virada" Titulo="@($"Virada {_temporada} → {_temporada + 1}")" Subtitulo="Quem subiu e quem caiu" Arquivo="@($"cbfv-virada-{_temporada}.png")">
-                <div class="row g-3 mb-3">
+                <div class="row g-3 mb-4">
                     <div class="col-12 col-md-6">
-                        <h2 class="h6">📈 Quem mais subiu</h2>
+                        <div class="secao-titulo"><h2>Quem mais subiu</h2></div>
                         @Lista(MaisSubiram)
                     </div>
                     <div class="col-12 col-md-6">
-                        <h2 class="h6">📉 Quem mais caiu</h2>
+                        <div class="secao-titulo"><h2>Quem mais caiu</h2></div>
                         @Lista(MaisCairam)
                     </div>
                 </div>
@@ -58,7 +58,7 @@
 
             @if (Surpresas.Any())
             {
-                <h2 class="h6 mt-3">💥 Fora da curva</h2>
+                <div class="secao-titulo"><h2>Fora da curva</h2></div>
                 @Lista(Surpresas)
             }
         }
@@ -70,23 +70,27 @@
                 : _aposentadoria.Aposentados.Where(a => a.AposentadoNaTemporada == _temporada).ToList();
             @if (aposentados.Count > 0)
             {
-                <h2 class="h6 mt-4">🎖️ Penduraram as chuteiras depois de @_temporada</h2>
+                <div class="secao-titulo mt-4"><h2>Penduraram as chuteiras depois de @_temporada</h2></div>
                 <div class="d-flex flex-wrap gap-2 mb-2">
                     @foreach (var a in aposentados)
                     {
-                        <a href="@($"/players/details/{a.PlayerId}")" class="badge bg-secondary text-decoration-none">@a.Nome (@a.Idade)</a>
+                        <a href="@($"/players/details/{a.PlayerId}")" class="chip virada-chip">@a.Nome <span class="numero text-body-tertiary">@a.Idade</span></a>
                     }
                 </div>
             }
 
             @if (_aposentadoria.Anunciados.Count > 0)
             {
-                <h2 class="h6 mt-4">👋 Anunciaram que @_aposentadoria.Temporada é a última temporada</h2>
+                <div class="secao-titulo mt-4"><h2>Anunciaram que @_aposentadoria.Temporada é a última temporada</h2></div>
                 <div class="d-flex flex-wrap gap-2">
                     @foreach (var a in _aposentadoria.Anunciados)
                     {
-                        <a href="@($"/players/details/{a.PlayerId}")" class="badge bg-warning text-dark text-decoration-none">
-                            @a.Nome (@a.Idade@(a.TimeNome is null ? "" : $", {a.TimeNome}"))
+                        <a href="@($"/players/details/{a.PlayerId}")" class="chip virada-chip">
+                            @if (a.TimeNome is not null)
+                            {
+                                <img src="@EscudoService.GetEscudo(a.TimeNome)" alt="" width="16" height="16" style="object-fit: contain;" />
+                            }
+                            @a.Nome <span class="numero text-body-tertiary">@a.Idade</span>
                         </a>
                     }
                 </div>
@@ -150,26 +154,35 @@
         if (int.TryParse(e.Value?.ToString(), out var t)) await CarregarAsync(t);
     }
 
+    // Uma linha da virada: escudo, nome e idade; à direita o overall de antes, o de agora (na cor do PES) e a diferença.
     private RenderFragment Lista(IEnumerable<EvolucaoLinhaDto> linhas) => __builder =>
     {
+        <div class="painel">
         <ul class="list-group list-group-flush">
             @foreach (var l in linhas)
             {
-                <li class="list-group-item d-flex align-items-center gap-2 px-1 py-1">
+                <li class="list-group-item virada-linha">
                     @if (l.TimeNome is not null)
                     {
-                        <img src="@EscudoService.GetEscudo(l.TimeNome)" alt="" style="width:20px;height:20px;object-fit:contain;" />
+                        <img src="@EscudoService.GetEscudo(l.TimeNome)" alt="" width="20" height="20" />
                     }
-                    <a href="@($"/players/details/{l.PlayerId}")" class="text-reset fw-semibold text-truncate">@l.Nome</a>
-                    <span class="small text-muted">@l.Idade anos</span>
-                    @if (l.Surpresa > 0) { <span title="Explosão">💥</span> }
-                    @if (l.Surpresa < 0) { <span title="Queda de rendimento">📉</span> }
-                    <span class="ms-auto text-nowrap">
-                        @l.OverallAntes → <strong>@l.OverallDepois</strong>
-                        <span class="small @(l.Variacao > 0 ? "text-success" : "text-danger")">(@EvolucaoTemporada.Sinal(l.Variacao))</span>
+                    else
+                    {
+                        <span class="virada-sem-time"></span>
+                    }
+                    <a href="@($"/players/details/{l.PlayerId}")" class="virada-nome text-truncate">@l.Nome</a>
+                    <span class="small text-body-tertiary text-nowrap">@l.Idade anos</span>
+                    @if (l.Surpresa > 0) { <span class="etiqueta acento" title="Explosão"><Icone Nome="zap" Tamanho="12" /> explodiu</span> }
+                    @if (l.Surpresa < 0) { <span class="etiqueta perigo" title="Queda de rendimento"><Icone Nome="trending-down" Tamanho="12" /> queda</span> }
+                    <span class="ms-auto d-inline-flex align-items-center gap-2 text-nowrap">
+                        <span class="numero text-body-tertiary">@l.OverallAntes</span>
+                        <Icone Nome="arrow-right" Tamanho="12" Classe="text-body-tertiary" />
+                        <span class="ovr @AtributosPes.Faixa(l.OverallDepois)">@l.OverallDepois</span>
+                        <span class="numero small virada-diferenca @(l.Variacao > 0 ? "texto-vitoria" : "texto-derrota")">@EvolucaoTemporada.Sinal(l.Variacao)</span>
                     </span>
                 </li>
             }
         </ul>
+        </div>
     };
 }

@@ -1,0 +1,55 @@
+.list-group-item {
+    background: transparent;
+}
+
+.virada-linha {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+}
+
+.virada-linha img {
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.virada-sem-time {
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.virada-nome {
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+    min-width: 0;
+}
+
+.virada-nome:hover {
+    color: var(--bs-link-hover-color);
+}
+
+.virada-diferenca {
+    min-width: 1.75rem;
+    text-align: right;
+}
+
+.virada-chip {
+    color: var(--bs-body-color);
+    text-decoration: none;
+}
+
+.virada-chip:hover {
+    color: var(--bs-emphasis-color);
+    border-color: var(--bs-secondary-color);
+}
+
+/* No celular a linha quebra: nome, idade e selo em cima; o overall desce em vez de espremer o nome. */
+@media (max-width: 575.98px) {
+    .virada-linha {
+        flex-wrap: wrap;
+        row-gap: 0.25rem;
+    }
+}
