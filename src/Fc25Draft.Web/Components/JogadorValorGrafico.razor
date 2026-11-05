@@ -16,7 +16,9 @@ else if (_d is not { Pontos.Count: > 0 })
 else if (_d is { } d)
 {
     var pontos = d.Pontos;
+    var pago = d.Chegada?.Valor;
     var valores = pontos.Select(p => (double)p.Valor).Append((double)d.ValorSemVariacao).ToList();
+    if (pago is decimal pg) valores.Add((double)pg);
     var max = valores.Max();
     var min = valores.Min();
     var folga = Math.Max((max - min) * 0.2, max * 0.03);
@@ -45,6 +47,28 @@ else if (_d is { } d)
             }
         </div>
         <div class="card-body">
+            @if (d.Chegada is { } chegada)
+            {
+                <div class="small mb-2">
+                    Chegou ao @d.TimeNome em @Dia(chegada.Data) @chegada.Como@(chegada.Valor is null ? "." : " por ")
+                    @if (chegada.Valor is decimal custou)
+                    {
+                        var diferenca = (ultimo.Valor - custou) / custou;
+                        <span><strong>@Dinheiro.Curto(custou)</strong>.</span>
+                        <span class="text-muted">Hoje vale @Dinheiro.Curto(ultimo.Valor)</span>
+                        @if (Math.Abs(diferenca) >= 0.005m)
+                        {
+                            <span class="fw-semibold @(diferenca > 0 ? "text-success" : "text-danger")">
+                                (@(diferenca > 0 ? "+" : "−")@Math.Abs(diferenca * 100).ToString("0", Brasil)% sobre o que custou)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">(o mesmo que custou)</span>
+                        }
+                    }
+                </div>
+            }
             <svg viewBox="0 0 @Num(largura) @Num(altura)" class="w-100 valor-grafico" style="max-height: 250px;" role="img"
                  aria-label="Valor de @Dinheiro.Curto(pontos[0].Valor) para @Dinheiro.Curto(ultimo.Valor) em @pontos.Count jogos">
                 @* Referência: o valor sem a participação (de quem acabou de chegar). *@
@@ -52,6 +76,14 @@ else if (_d is { } d)
                       stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 4" />
                 <text x="@Num(largura - margemX + 20)" y="@Num(Y(d.ValorSemVariacao) + 13)" text-anchor="end" class="vg-ref"
                       fill="currentColor" opacity="0.55">sem participação · @Dinheiro.Curto(d.ValorSemVariacao).Replace("R$ ", "")</text>
+                @if (pago is decimal custo)
+                {
+                    @* Referência: o que custou na chegada (rótulo à esquerda, o outro fica à direita). *@
+                    <line x1="@Num(margemX - 20)" x2="@Num(largura - margemX + 20)" y1="@Num(Y(custo))" y2="@Num(Y(custo))"
+                          stroke="var(--bs-info)" stroke-opacity="0.6" stroke-dasharray="2 4" />
+                    <g><text x="@Num(margemX - 20)" y="@Num(Y(custo) + 13)" text-anchor="start" class="vg-ref"
+                          fill="var(--bs-info)">custou · @Dinheiro.Curto(custo).Replace("R$ ", "")</text></g>
+                }
 
                 @if (pontos.Count > 1)
                 {
