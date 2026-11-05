@@ -13,7 +13,7 @@
 
 <PageTitle>Virada de Temporada</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -50,7 +50,7 @@
         <AposentadoriaCard Temporada="@_temporada" />
 
         <div class="card mb-3">
-            <div class="card-header fw-bold">Calendário</div>
+            <div class="card-header fw-medium">Calendário</div>
             <div class="card-body">
                 <p class="text-muted small mb-2">
                     A temporada abre no domingo da Supercopa, e é dessa data que saem todas as rodadas, as janelas de
@@ -84,7 +84,7 @@
             <div class="row g-3 mb-3">
                 <div class="col-12 col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header fw-bold">Divisões</div>
+                        <div class="card-header fw-medium">Divisões</div>
                         <ul class="list-group list-group-flush">
                             @foreach (var liga in new[] { _resumo.SerieA, _resumo.SerieB }.Where(l => l is not null))
                             {
@@ -105,7 +105,7 @@
 
                 <div class="col-12 col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header fw-bold">Playoff de acesso</div>
+                        <div class="card-header fw-medium">Playoff de acesso</div>
                         <div class="card-body">
                             @if (_resumo.Playoffs.Count == 0)
                             {
@@ -156,7 +156,7 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-header fw-bold">Supercopa</div>
+                <div class="card-header fw-medium">Supercopa</div>
                 <div class="card-body">
                     @{ var sc = _resumo.Supercopa; }
                     @if (sc.ComSemifinal)
@@ -191,7 +191,7 @@
                         }
                         @if (sc.CampeaoNome is not null)
                         {
-                            <span class="badge bg-warning text-dark mb-2">🏆 Campeão: @sc.CampeaoNome</span>
+                            <span class="badge bg-warning text-dark mb-2"><Icone Nome="trophy" Tamanho="14" /> Campeão: @sc.CampeaoNome</span>
                         }
                     }
                     else
@@ -206,7 +206,7 @@
                             }
                             @if (sc.CampeaoNome is not null)
                             {
-                                <span class="badge bg-warning text-dark">🏆 Campeão: @sc.CampeaoNome</span>
+                                <span class="badge bg-warning text-dark"><Icone Nome="trophy" Tamanho="14" /> Campeão: @sc.CampeaoNome</span>
                             }
                         </div>
                     }
@@ -245,7 +245,7 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-header fw-bold">Como a temporada termina</div>
+                <div class="card-header fw-medium">Como a temporada termina</div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead>
@@ -268,7 +268,7 @@
             </div>
 
             <div class="card">
-                <div class="card-header fw-bold">Gerar temporada @(_temporada + 1)</div>
+                <div class="card-header fw-medium">Gerar temporada @(_temporada + 1)</div>
                 <div class="card-body">
                     @if (_resumo.Impedimento is not null)
                     {

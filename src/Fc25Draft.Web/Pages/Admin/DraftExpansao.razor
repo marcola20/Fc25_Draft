@@ -14,7 +14,7 @@
 
 <PageTitle>Draft de Expansão</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -66,7 +66,7 @@
             <div class="row g-3 mb-3">
                 <div class="col-12 col-xl-8">
                     <div class="card">
-                        <div class="card-header fw-bold">Times existentes</div>
+                        <div class="card-header fw-medium">Times existentes</div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
@@ -117,7 +117,7 @@
 
                 <div class="col-12 col-xl-4">
                     <div class="card">
-                        <div class="card-header fw-bold">Times novos</div>
+                        <div class="card-header fw-medium">Times novos</div>
                         <ul class="list-group list-group-flush">
                             @foreach (var t in r.TimesNovos)
                             {
@@ -134,7 +134,7 @@
             @if (r.EscolhasFeitas > 0)
             {
                 <div class="card mb-3">
-                    <div class="card-header fw-bold">Escolhas</div>
+                    <div class="card-header fw-medium">Escolhas</div>
                     <div class="table-responsive">
                         <table class="table table-sm mb-0">
                             <thead>
@@ -162,7 +162,7 @@
             @if (r.Concluido)
             {
                 <div class="card mb-3">
-                    <div class="card-header fw-bold">Caixa dos times novos</div>
+                    <div class="card-header fw-medium">Caixa dos times novos</div>
                     <div class="card-body">
                         <p class="small text-muted mb-2">
                             Caixa médio dos times existentes (já com a compensação): <strong>@Dinheiro(r.CaixaMedioExistentes)</strong>.
@@ -180,7 +180,7 @@
                 </div>
 
                 <div class="card mb-3">
-                    <div class="card-header fw-bold">Draft complementar (jogadores livres, só times novos)</div>
+                    <div class="card-header fw-medium">Draft complementar (jogadores livres, só times novos)</div>
                     <div class="card-body">
                         <div class="row g-2 align-items-end">
                             <div class="col-12 col-md-4">
@@ -218,7 +218,7 @@
         @if (_resumo is null || _resumo.Concluido)
         {
             <div class="card">
-                <div class="card-header fw-bold">Novo draft de expansão</div>
+                <div class="card-header fw-medium">Novo draft de expansão</div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-12 col-lg-5">

@@ -31,14 +31,14 @@
         }
 
         <div class="card mb-3">
-            <div class="card-header fw-bold">🎁 Dar pacotes</div>
+            <div class="card-header fw-medium"><Icone Nome="gift" Tamanho="14" /> Dar pacotes</div>
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-5">
                         <label class="form-label">Para quem</label>
                         <select class="form-select" @bind="_treinadorId">
                             <option value="">Escolha…</option>
-                            <option value="@Todos">👥 Todos da liga (@NaLiga pessoas)</option>
+                            <option value="@Todos">Todos da liga (@NaLiga pessoas)</option>
                             @foreach (var t in _lista)
                             {
                                 <option value="@t.TreinadorId">@t.Nome@(t.TimeAtual is null ? "" : $" · {t.TimeAtual}")@(t.Ativo ? "" : " (fora da liga)")</option>
@@ -55,14 +55,14 @@
                     </div>
                     <div class="col-12 col-md-2">
                         <button class="btn @(_estrelas ? "btn-warning" : "btn-success") w-100" disabled="@(_salvando || string.IsNullOrEmpty(_treinadorId))" @onclick="DarAsync">
-                            @(_estrelas ? "🌟 Dar" : "Dar")
+                            @(_estrelas ? "Dar" : "Dar")
                         </button>
                     </div>
                 </div>
                 <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" id="pacote-estrelas" @bind="_estrelas" />
                     <label class="form-check-label" for="pacote-estrelas">
-                        🌟 <strong>Estrelas</strong> — pacote de festa: quando a pessoa abrir, a tela solta fogos e estrelas
+                        <Icone Nome="sparkles" Tamanho="14" /> <strong>Estrelas</strong> — pacote de festa: quando a pessoa abrir, a tela solta fogos e estrelas
                     </label>
                 </div>
                 <p class="small text-muted mb-0 mt-2">
@@ -78,7 +78,7 @@
                     Os pacotes dos jogos e do bolão saem sozinhos a cada 5 minutos. Para não esperar (ex.: acabou de
                     encerrar um jogo), confira agora — rodar de novo não dá pacote em dobro.
                 </div>
-                <button class="btn btn-outline-primary" disabled="@_salvando" @onclick="ReconciliarAsync">🔄 Conferir jogos e bolão agora</button>
+                <button class="btn btn-outline-primary" disabled="@_salvando" @onclick="ReconciliarAsync"><Icone Nome="refresh-cw" Tamanho="14" /> Conferir jogos e bolão agora</button>
             </div>
         </div>
 
@@ -89,7 +89,7 @@
                     @if (_ativo.ContaJogosAntesDoLancamento)
                     {
                         <div class="flex-grow-1 small text-muted">
-                            ✓ Os jogos de @_ativo.Temporada encerrados antes do lançamento do álbum também dão pacote
+                            <Icone Nome="check" Tamanho="14" /> Os jogos de @_ativo.Temporada encerrados antes do lançamento do álbum também dão pacote
                             (jogo, dia de jogo e bolão). A conferência de cima já inclui esses jogos.
                         </div>
                     }
@@ -100,14 +100,14 @@
                             (@BrazilTime.FormatDateTime(_ativo.LancadoEm, "dd/MM")) ainda não deram pacote. Isto passa a contar esses
                             jogos e já dá a todo mundo o que falta: pacotes dos jogos, do dia de jogo e do bolão. Não tem volta.
                         </div>
-                        <button class="btn btn-outline-success" disabled="@_salvando" @onclick="ContarJogosAntesAsync">🎁 Dar os pacotes dos jogos antes do lançamento</button>
+                        <button class="btn btn-outline-success" disabled="@_salvando" @onclick="ContarJogosAntesAsync"><Icone Nome="gift" Tamanho="14" /> Dar os pacotes dos jogos antes do lançamento</button>
                     }
                 </div>
             </div>
         }
 
         <div class="card">
-            <div class="card-header fw-bold">Pacotes de cada pessoa@(_ativo is null ? "" : $" · {_ativo.Nome}")</div>
+            <div class="card-header fw-medium">Pacotes de cada pessoa@(_ativo is null ? "" : $" · {_ativo.Nome}")</div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
                     <thead>
@@ -216,7 +216,7 @@
         Guid id = default;
         if (!paraTodos && !Guid.TryParse(_treinadorId, out id)) return;
 
-        var pacotes = $"{_quantidade} pacote{(_quantidade == 1 ? "" : "s")}{(_estrelas ? " com estrelas 🌟" : "")}";
+        var pacotes = $"{_quantidade} pacote{(_quantidade == 1 ? "" : "s")}{(_estrelas ? " com estrelas " : "")}";
         if (paraTodos && !await JS.InvokeAsync<bool>("confirm", $"Dar {pacotes} para cada uma das {NaLiga} pessoas da liga?"))
             return;
 

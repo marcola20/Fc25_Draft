@@ -108,3 +108,15 @@ circle-alert
 swords
 brain
 rotate-ccw
+
+# Admin
+gift
+save
+rocket
+sparkles
+dices
+link
+vote
+bot
+copy
+minus

@@ -115,13 +115,13 @@ else
                     <div class="lineup-changes-banner">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                             <div class="lineup-changes-banner-title mb-0">
-                                🔔 Mudanças desde a última vez que você viu
+                                <Icone Nome="bell" Tamanho="14" /> Mudanças desde a última vez que você viu
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-outline-success"
                                     @onclick="() => AcknowledgeAsync(lineup.LineupId, lineup.UpdatedAtUtc)"
                                     disabled="@IsAcknowledging(lineup.LineupId)">
-                                @(IsAcknowledging(lineup.LineupId) ? "Marcando..." : "✓ Marcar como visto")
+                                @(IsAcknowledging(lineup.LineupId) ? "Marcando..." : "Marcar como visto")
                             </button>
                         </div>
                         <ul class="lineup-changes-list mb-0 mt-2">

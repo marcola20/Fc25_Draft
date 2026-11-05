@@ -14,7 +14,7 @@
 
 <PageTitle>Prêmios da temporada — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -51,7 +51,7 @@
                         antes de abrir.
                     </p>
                     <button class="btn btn-primary" @onclick="Criar" disabled="@_salvando">
-                        ⚙️ Criar a votação de @_temporada
+                        <Icone Nome="settings" Tamanho="14" /> Criar a votação de @_temporada
                     </button>
                 </div>
             </div>
@@ -68,15 +68,15 @@
                         @switch (v.Situacao)
                         {
                             case SituacaoVotacao.Preparando:
-                                <button class="btn btn-success" @onclick="Abrir" disabled="@_salvando">🗳️ Abrir a votação</button>
+                                <button class="btn btn-success" @onclick="Abrir" disabled="@_salvando"><Icone Nome="vote" Tamanho="14" /> Abrir a votação</button>
                                 break;
                             case SituacaoVotacao.Aberta:
                                 <button class="btn btn-outline-secondary" @onclick="VoltarParaMontagem" disabled="@_salvando">↩ Voltar a mexer nos finalistas</button>
-                                <button class="btn btn-warning" @onclick="Encerrar" disabled="@_salvando">🔒 Encerrar a votação</button>
+                                <button class="btn btn-warning" @onclick="Encerrar" disabled="@_salvando"><Icone Nome="lock" Tamanho="14" /> Encerrar a votação</button>
                                 break;
                             case SituacaoVotacao.Encerrada:
                                 <button class="btn btn-outline-secondary" @onclick="Reabrir" disabled="@_salvando">↩ Reabrir</button>
-                                <button class="btn btn-primary" @onclick="Publicar" disabled="@_salvando">🏆 Publicar o resultado</button>
+                                <button class="btn btn-primary" @onclick="Publicar" disabled="@_salvando"><Icone Nome="trophy" Tamanho="14" /> Publicar o resultado</button>
                                 break;
                         }
                     </div>
@@ -89,7 +89,7 @@
                     <div class="card-header d-flex align-items-center gap-2">
                         <span class="fw-semibold">Quem votou</span>
                         <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _verCedulas = !_verCedulas">
-                            👁 @(_verCedulas ? "Esconder" : "Ver") os votos de cada um <span class="text-muted small">(secreto)</span>
+                            <Icone Nome="eye" Tamanho="14" /> @(_verCedulas ? "Esconder" : "Ver") os votos de cada um <span class="text-muted small">(secreto)</span>
                         </button>
                     </div>
                     <div class="card-body small">
@@ -163,7 +163,7 @@
                                     }
                                     else if (c.Vencedor && v.Situacao == SituacaoVotacao.Publicada)
                                     {
-                                        <span>🏆</span>
+                                        <span><Icone Nome="trophy" Tamanho="14" /></span>
                                     }
                                     @if (c.TimeNome is { Length: > 0 } time)
                                     {
@@ -188,7 +188,7 @@
                                     else
                                     {
                                         <button class="btn btn-sm btn-outline-danger ms-auto" title="Tirar dos finalistas"
-                                                @onclick="() => Fazer(() => PremiosSvc.RemoverCandidatoAsync(c.CandidatoId, default))" disabled="@_salvando">✕</button>
+                                                @onclick="() => Fazer(() => PremiosSvc.RemoverCandidatoAsync(c.CandidatoId, default))" disabled="@_salvando"><Icone Nome="x" Tamanho="14" /></button>
                                     }
                                 </div>
 
@@ -377,9 +377,9 @@
     private static string Etapa(SituacaoVotacao s) => s switch
     {
         SituacaoVotacao.Preparando => "1. Montando os finalistas (ninguém vê ainda)",
-        SituacaoVotacao.Aberta => "2. 🗳️ Votação aberta",
+        SituacaoVotacao.Aberta => "2. Votação aberta",
         SituacaoVotacao.Encerrada => "3. Apuração: confira os vencedores (empate você decide) e publique",
-        _ => "4. 🏆 Resultado publicado: dê o +1 over"
+        _ => "4. Resultado publicado: dê o +1 over"
     };
 
     /// <summary>Na linha de corte com outro de mesmos votos, quando não cabem todos.</summary>
@@ -406,7 +406,7 @@
         <div class="d-flex align-items-center gap-2 flex-wrap mt-2 ms-4 small">
             @if (c.OverAplicadoEm is DateTime quando)
             {
-                <span class="text-success">✅ +1 over em <strong>@c.OverParaNome</strong> (@quando.ToString("dd/MM HH:mm", Br)) — vai para o save pelo Editor PES</span>
+                <span class="text-success"><Icone Nome="circle-check" Tamanho="14" /> +1 over em <strong>@c.OverParaNome</strong> (@quando.ToString("dd/MM HH:mm", Br)) — vai para o save pelo Editor PES</span>
                 <button class="btn btn-sm btn-outline-secondary" disabled="@_salvando"
                         @onclick="() => DesfazerOver(c)">Desfazer</button>
             }

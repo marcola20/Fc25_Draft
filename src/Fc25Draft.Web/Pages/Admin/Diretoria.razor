@@ -11,7 +11,7 @@
 
 <PageTitle>Diretoria — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -35,7 +35,7 @@
                     <option value="@t" selected="@(t == _temporada)">@t</option>
                 }
             </select>
-            <button class="btn btn-primary" @onclick="GerarAsync" disabled="@_salvando">⚙️ @(_painel?.MetasGeradas == true ? "Gerar as metas de novo" : "Gerar as metas")</button>
+            <button class="btn btn-primary" @onclick="GerarAsync" disabled="@_salvando"><Icone Nome="settings" Tamanho="14" /> @(_painel?.MetasGeradas == true ? "Gerar as metas de novo" : "Gerar as metas")</button>
             <a href="/diretoria" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
         </div>
 
@@ -56,7 +56,7 @@
         @if (Pendentes > 0 && _aba != "demissoes")
         {
             <div class="alert alert-danger d-flex align-items-center gap-2">
-                <span>🚪 @(Pendentes == 1 ? "1 pedido de demissão esperando" : $"{Pendentes} pedidos de demissão esperando") a sua decisão.</span>
+                <span><Icone Nome="door-open" Tamanho="14" /> @(Pendentes == 1 ? "1 pedido de demissão esperando" : $"{Pendentes} pedidos de demissão esperando") a sua decisão.</span>
                 <button class="btn btn-sm btn-outline-danger ms-auto" @onclick='() => _aba = "demissoes"'>Ver</button>
             </div>
         }
@@ -205,8 +205,8 @@
                                         @if (pedido.Status == StatusPedidoDemissao.Pendente)
                                         {
                                             <div class="d-flex gap-1 justify-content-end">
-                                                <button class="btn btn-sm btn-danger" @onclick="() => DecidirAsync(pedido, true)" disabled="@_salvando">🚪 Demitir</button>
-                                                <button class="btn btn-sm btn-outline-success" @onclick="() => DecidirAsync(pedido, false)" disabled="@_salvando">🤝 Manter</button>
+                                                <button class="btn btn-sm btn-danger" @onclick="() => DecidirAsync(pedido, true)" disabled="@_salvando"><Icone Nome="door-open" Tamanho="14" /> Demitir</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => DecidirAsync(pedido, false)" disabled="@_salvando"><Icone Nome="handshake" Tamanho="14" /> Manter</button>
                                             </div>
                                         }
                                         else
@@ -291,7 +291,7 @@
                             else
                             {
                                 <button class="btn btn-success btn-sm" @onclick="() => PagarAsync(previa)" disabled="@(_salvando || !previa.PodePagar)">
-                                    💰 Pagar @Moeda(previa.Total)
+                                    <Icone Nome="banknote" Tamanho="14" /> Pagar @Moeda(previa.Total)
                                 </button>
                             }
                         </div>

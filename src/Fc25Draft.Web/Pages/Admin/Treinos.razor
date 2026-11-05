@@ -10,7 +10,7 @@
 
 <PageTitle>Treino da Semana — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger">@_erro</div>
@@ -62,7 +62,7 @@
                                 <a href="/teams/details/@t.TeamId?aba=treino">@t.TeamName</a>
                                 @if (t.Treino.Vagas > TreinoCriterios.JogadoresPorSemana)
                                 {
-                                    <span class="small text-muted" title="Treinador da base: mais vagas e idade maior">🌱</span>
+                                    <span class="small text-muted" title="Treinador da base: mais vagas e idade maior"><Icone Nome="sprout" Tamanho="14" /></span>
                                 }
                             </td>
                             <td class="text-center">
@@ -84,7 +84,7 @@
                                         <span class="text-muted">(@j.Idade, @j.Overall) · @TreinoDaSemana.Nome(j.Foco.Value)</span>
                                         @if (t.Treino.Padrinho?.AfilhadoId == j.PlayerId)
                                         {
-                                            <span title="Afilhado: rende mais">🤝</span>
+                                            <span title="Afilhado: rende mais"><Icone Nome="handshake" Tamanho="14" /></span>
                                         }
                                     </div>
                                 }

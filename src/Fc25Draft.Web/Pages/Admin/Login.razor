@@ -5,12 +5,12 @@
 
 <PageTitle>Admin - Entrar</PageTitle>
 
-<div class="d-flex align-items-center justify-content-center min-vh-100" style="background: linear-gradient(135deg, #0d1b2a 0%, #1a2f4a 100%);">
-    <div class="card shadow-lg" style="width: 100%; max-width: 400px; border: none; border-radius: 12px;">
-        <div class="card-body p-4">
+<div class="d-flex align-items-center justify-content-center py-5" style="min-height: 60vh;">
+    <div class="painel w-100" style="max-width: 400px;">
+        <div class="p-4">
             <div class="text-center mb-4">
-                <h1 class="h4 fw-bold text-white mb-2">Acesso Admin</h1>
-                <p class="text-muted small">Informe seu token para continuar</p>
+                <h1 class="h5 fw-medium text-body-emphasis mb-1">Acesso admin</h1>
+                <p class="text-body-secondary small mb-0">Informe seu token para continuar</p>
             </div>
 
             @if (!string.IsNullOrEmpty(_erro))
@@ -22,11 +22,11 @@
             }
 
             <div class="mb-3">
-                <label for="tokenInput" class="form-label fw-semibold">Token</label>
+                <label for="tokenInput" class="form-label">Token</label>
                 <input
                     id="tokenInput"
                     type="password"
-                    class="form-control form-control-lg"
+                    class="form-control"
                     placeholder="Cole seu token de admin aqui"
                     @bind="_token"
                     @bind:event="oninput"
@@ -36,15 +36,15 @@
             </div>
 
             <button
-                class="btn btn-primary btn-lg w-100 fw-semibold"
+                class="btn btn-primary w-100"
                 @onclick="SubmeterAsync"
                 disabled="@(_carregando || string.IsNullOrWhiteSpace(_token))">
                 @(_carregando ? "Autenticando..." : "Entrar como Admin")
             </button>
 
             <div class="text-center mt-3">
-                <a href="/" class="text-muted text-decoration-none small">
-                    ← Voltar ao início
+                <a href="/" class="text-body-secondary text-decoration-none small d-inline-flex align-items-center gap-1">
+                    <Icone Nome="arrow-left" Tamanho="14" /> Voltar ao início
                 </a>
             </div>
         </div>

@@ -13,7 +13,7 @@
 
 <PageTitle>Premiação — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -41,14 +41,14 @@
                     <option value="@p.PremiacaoId" selected="@(p.PremiacaoId == _atual?.PremiacaoId)">@p.Nome</option>
                 }
             </select>
-            <button class="btn btn-primary" @onclick="() => _mostrarNova = !_mostrarNova">➕ Nova temporada</button>
+            <button class="btn btn-primary" @onclick="() => _mostrarNova = !_mostrarNova"><Icone Nome="plus" Tamanho="14" /> Nova temporada</button>
             <a href="/premiacao" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
         </div>
 
         @if (_mostrarNova)
         {
             <div class="card mb-3">
-                <div class="card-header fw-bold">Nova premiação</div>
+                <div class="card-header fw-medium">Nova premiação</div>
                 <div class="card-body">
                     <div class="row g-2 align-items-end">
                         <div class="col-6 col-md-2">
@@ -108,7 +108,7 @@
                             <span class="fw-bold">@bloco.Titulo</span>
                             <span class="text-muted small">@bloco.Ajuda</span>
                             <div class="ms-auto d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarLinha(bloco)">➕ Linha</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarLinha(bloco)"><Icone Nome="plus" Tamanho="14" /> Linha</button>
                             </div>
                         </div>
                         @if (linhasDoBloco.Count == 0)
@@ -166,7 +166,7 @@
 
                 <div class="card mb-3">
                     <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                        <span class="fw-bold">🏛️ Bônus da diretoria</span>
+                        <span class="fw-bold"><Icone Nome="landmark" Tamanho="14" /> Bônus da diretoria</span>
                         <span class="text-muted small">pago a quem cumpre ou supera a meta da temporada (0 = sem bônus)</span>
                         <a href="/admin/diretoria" class="ms-auto small">Metas e pagamento</a>
                     </div>
@@ -189,14 +189,14 @@
                                 <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_bonusCopaSuperada" />
                             </div>
                             <div class="col-12 col-md-4">
-                                <button class="btn btn-outline-success btn-sm" @onclick="SalvarBonusAsync" disabled="@_salvando">💾 Salvar bônus</button>
+                                <button class="btn btn-outline-success btn-sm" @onclick="SalvarBonusAsync" disabled="@_salvando"><Icone Nome="save" Tamanho="14" /> Salvar bônus</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">💾 Salvar valores</button>
+                    <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando"><Icone Nome="save" Tamanho="14" /> Salvar valores</button>
                     <button class="btn btn-outline-secondary" @onclick="RecarregarAtualAsync" disabled="@_salvando">Desfazer alterações</button>
                     <button class="btn btn-outline-danger ms-auto" @onclick="ExcluirAsync" disabled="@_salvando">Excluir premiação</button>
                 </div>
@@ -260,7 +260,7 @@
                                 else
                                 {
                                     <button class="btn btn-success btn-sm" @onclick="() => PagarAsync(previa)" disabled="@(_salvando || !previa.PodePagar)">
-                                        💰 Pagar @Moeda(previa.Total)
+                                        <Icone Nome="banknote" Tamanho="14" /> Pagar @Moeda(previa.Total)
                                     </button>
                                 }
                             </div>

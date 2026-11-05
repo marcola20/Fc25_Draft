@@ -22,7 +22,7 @@
 
 <PageTitle>Administração da Liga</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <h1 class="h3 mb-3">Administração da Liga</h1>
 
     @if (!string.IsNullOrEmpty(_erro))
@@ -77,7 +77,7 @@
         <div class="row g-3">
             <div class="col-12 col-lg-5">
                 <div class="card">
-                    <div class="card-header fw-bold">@(_editandoLigaId.HasValue ? "Editar Liga" : "Nova Liga")</div>
+                    <div class="card-header fw-medium">@(_editandoLigaId.HasValue ? "Editar Liga" : "Nova Liga")</div>
                     <div class="card-body">
                         <div class="mb-2">
                             <label class="form-label">Nome</label>
@@ -146,7 +146,7 @@
 
             <div class="col-12 col-lg-7">
                 <div class="card">
-                    <div class="card-header fw-bold">Ligas</div>
+                    <div class="card-header fw-medium">Ligas</div>
                     <div class="list-group list-group-flush">
                         @foreach (var liga in _ligas)
                         {
@@ -167,7 +167,7 @@
                                     <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
                                     @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
                                     {
-                                        <span class="badge ms-1 bg-warning text-dark">🏆 Campeão: @liga.CampeaoNome</span>
+                                        <span class="badge ms-1 bg-warning text-dark"><Icone Nome="trophy" Tamanho="14" /> Campeão: @liga.CampeaoNome</span>
                                     }
                                     <div class="small text-muted">@liga.DataInicio.ToLocalTime().ToString("dd/MM/yyyy") – @liga.DataFim.ToLocalTime().ToString("dd/MM/yyyy")</div>
                                 </div>
@@ -220,7 +220,7 @@
                             <button type="button" class="btn-close" @onclick="CancelarDelete"></button>
                         </div>
                         <div class="modal-body">
-                            <p><strong>⚠️ Confirmar exclusão</strong></p>
+                            <p><strong><Icone Nome="triangle-alert" Tamanho="14" /> Confirmar exclusão</strong></p>
                             <p>Você tem certeza que deseja apagar a liga "<strong>@_ligaParaDeleter.Nome</strong>"?</p>
                             <p class="text-danger">Todos os dados serão deletados permanentemente (rodadas, partidas, classificação, etc).</p>
                         </div>
@@ -314,13 +314,13 @@
                     <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
                         <button class="btn btn-outline-primary" @onclick="SalvarPotes" disabled="@(_saving || SorteioAoVivo.EmAndamento)">Confirmar potes</button>
                         <button class="btn btn-success" @onclick="SortearCopa" disabled="@(_saving || _sorteio?.PodeSortear != true || SorteioAoVivo.EmAndamento)">
-                            🎲 @(_sorteio?.JaSorteada == true ? "Sortear de novo ao vivo" : "Sortear e revelar ao vivo")
+                            <Icone Nome="dices" Tamanho="14" /> @(_sorteio?.JaSorteada == true ? "Sortear de novo ao vivo" : "Sortear e revelar ao vivo")
                         </button>
                         @if (SorteioAoVivo.EmAndamento)
                         {
                             <button class="btn btn-outline-secondary" @onclick="() => SorteioAoVivo.RevelarTudo()">⏩ Revelar tudo</button>
                         }
-                        <a class="btn btn-outline-dark" href="/copa/sorteio" target="_blank">📺 Tela do sorteio</a>
+                        <a class="btn btn-outline-dark" href="/copa/sorteio" target="_blank"><Icone Nome="tv" Tamanho="14" /> Tela do sorteio</a>
                         @if (_sorteio?.Impedimento is not null)
                         {
                             <span class="text-muted small">@_sorteio.Impedimento</span>
@@ -337,7 +337,7 @@
                 @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
                 {
                     <div class="alert alert-warning">
-                        🎲 Sorteio @(SorteioAoVivo.EmAndamento ? "acontecendo ao vivo" : "revelado") — acompanhe abaixo ou na
+                        <Icone Nome="dices" Tamanho="14" /> Sorteio @(SorteioAoVivo.EmAndamento ? "acontecendo ao vivo" : "revelado") — acompanhe abaixo ou na
                         <a href="/copa/sorteio" target="_blank">tela do sorteio</a>.
                         @if (!SorteioAoVivo.EmAndamento)
                         {
@@ -352,7 +352,7 @@
                         {
                             <div class="col-12 col-md-6">
                                 <div class="card h-100">
-                                    <div class="card-header fw-bold">Grupo @grupo.Key</div>
+                                    <div class="card-header fw-medium">Grupo @grupo.Key</div>
                                     <ul class="list-group list-group-flush">
                                         @foreach (var t in grupo.OrderBy(x => x.Pote))
                                         {
@@ -436,7 +436,7 @@
                 {
                     <div class="col-12 col-md-6 col-xl-3">
                         <div class="card">
-                            <div class="card-header fw-bold">Grupo @grupo configurado</div>
+                            <div class="card-header fw-medium">Grupo @grupo configurado</div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var g in _grupos.Where(x => x.Grupo == grupo))
                                 {
@@ -613,7 +613,7 @@
     @if (_tab == "times" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Liga)
     {
         <div class="card">
-            <div class="card-header fw-bold d-flex flex-wrap align-items-center gap-2">
+            <div class="card-header fw-medium d-flex flex-wrap align-items-center gap-2">
                 Times participantes
                 <span class="badge bg-primary">@_timesLigaSel.Count selecionados</span>
                 @if (_ligaAtual.Status != LigaStatus.Criada)
@@ -658,7 +658,7 @@
             <button class="btn btn-primary btn-sm" @onclick="CriarRodada" disabled="@_saving">+ Criar Rodada</button>
             <button class="btn btn-outline-secondary btn-sm" @onclick="GerarRodadasAuto" disabled="@_saving">Gerar Automático (todas)</button>
             <button class="btn btn-outline-secondary btn-sm" @onclick="AplicarCalendario" disabled="@_saving" title="Marca as rodadas com as datas do calendário da temporada">
-                📅 Aplicar datas do calendário
+                <Icone Nome="calendar" Tamanho="14" /> Aplicar datas do calendário
             </button>
         </div>
 
@@ -720,7 +720,7 @@
                             {
                                 <button type="button" class="btn btn-link btn-sm p-0 small text-muted text-decoration-none"
                                         title="Mudar a data só desta rodada" @onclick="() => EditarDataRodada(r)">
-                                    @(r.DataHora is DateTime quando ? quando.ToString("ddd dd/MM · HH:mm", Br) : "sem data") ✏️
+                                    @(r.DataHora is DateTime quando ? quando.ToString("ddd dd/MM · HH:mm", Br) : "sem data") <Icone Nome="pencil" Tamanho="14" />
                                 </button>
                             }
                             <div class="small text-muted">@r.TotalPartidas partidas</div>
@@ -840,7 +840,7 @@
                             <button type="button" class="btn btn-sm btn-light border text-nowrap"
                                     title="@(p.HorarioProprio ? "Horário próprio deste jogo" : "Segue o horário da rodada") — clique para mudar"
                                     @onclick="() => EditarHorario(p)">
-                                🕒 @(p.DataHora?.ToString("HH:mm", Br) ?? "sem hora")@(p.HorarioProprio ? "" : "*") ✏️
+                                <Icone Nome="clock" Tamanho="14" /> @(p.DataHora?.ToString("HH:mm", Br) ?? "sem hora")@(p.HorarioProprio ? "" : "*") <Icone Nome="pencil" Tamanho="14" />
                             </button>
                         }
                         <span class="fw-semibold">@p.TimeCasaNome</span>
@@ -937,7 +937,7 @@
         <div class="row g-3">
             <div class="col-12 col-lg-4">
                 <div class="card">
-                    <div class="card-header fw-bold">Nova Punição</div>
+                    <div class="card-header fw-medium">Nova Punição</div>
                     <div class="card-body">
                         <div class="mb-2">
                             <label class="form-label small">Time</label>
@@ -963,7 +963,7 @@
             </div>
             <div class="col-12 col-lg-8">
                 <div class="card">
-                    <div class="card-header fw-bold">Punições Aplicadas</div>
+                    <div class="card-header fw-medium">Punições Aplicadas</div>
                     <div class="list-group list-group-flush">
                         @foreach (var p in _punicoes)
                         {
@@ -1011,7 +1011,7 @@
                                 <div class="fw-semibold">@(jogo.TimeCasaNome ?? "A definir") @(jogo.GolsCasa?.ToString() ?? "—") × @(jogo.GolsFora?.ToString() ?? "—") @(jogo.TimeForaNome ?? "A definir")</div>
                                 @if (jogo.VencedorNome is not null)
                                 {
-                                    <div class="small text-success mt-1">✓ @jogo.VencedorNome</div>
+                                    <div class="small text-success mt-1"><Icone Nome="check" Tamanho="14" /> @jogo.VencedorNome</div>
                                 }
                                 @if (jogo.VencedorId is null && jogo.TimeCasaId.HasValue && jogo.TimeForaId.HasValue)
                                 {

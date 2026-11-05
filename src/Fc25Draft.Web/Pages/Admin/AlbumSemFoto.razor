@@ -39,7 +39,7 @@
 
         @if (_semFoto.Count == 0)
         {
-            <div class="alert alert-success">Todo mundo do álbum tem foto. 🎉</div>
+            <div class="alert alert-success">Todo mundo do álbum tem foto.</div>
         }
         else
         {
@@ -67,11 +67,11 @@
                                     }
                                     @if (f.Raridade == RaridadeFigurinha.Lendaria)
                                     {
-                                        <span class="badge text-bg-dark ms-1">★ lendária</span>
+                                        <span class="badge text-bg-dark ms-1"><Icone Nome="star" Tamanho="14" /> lendária</span>
                                     }
                                     else if (f.Raridade == RaridadeFigurinha.Brilhante)
                                     {
-                                        <span class="badge text-bg-warning ms-1">✨ brilhante</span>
+                                        <span class="badge text-bg-warning ms-1"><Icone Nome="sparkles" Tamanho="14" /> brilhante</span>
                                     }
                                 </span>
                                 @if (f.TreinadorId is { } pessoa)

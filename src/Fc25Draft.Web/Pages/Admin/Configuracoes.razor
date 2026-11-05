@@ -13,7 +13,7 @@
 
 <PageTitle>Configurações</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <h1 class="h3 mb-3">Configurações</h1>
 
     @if (_erro is not null)
@@ -41,7 +41,7 @@
             <div class="row g-3">
                 <div class="col-12 col-xl-7">
                     <div class="card mb-3">
-                        <div class="card-header fw-bold">Fórmula base</div>
+                        <div class="card-header fw-medium">Fórmula base</div>
                         <div class="card-body">
                             <p class="text-muted small mb-3">
                                 Preço base = <strong>peso da posição</strong> × <strong>fator de overall</strong> × <strong>fator de idade</strong> × <strong>escala base</strong>,
@@ -83,7 +83,7 @@
                     </div>
 
                     <div class="card mb-3">
-                        <div class="card-header fw-bold">Fatores de idade</div>
+                        <div class="card-header fw-medium">Fatores de idade</div>
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-6 col-md-3"><label class="form-label">Até 22</label><input type="number" step="any" class="form-control" @bind="_f22" /></div>
@@ -106,7 +106,7 @@
 
                 <div class="col-12 col-xl-5">
                     <div class="card">
-                        <div class="card-header fw-bold">Prévia (com os valores acima, sem salvar)</div>
+                        <div class="card-header fw-medium">Prévia (com os valores acima, sem salvar)</div>
                         <div class="table-responsive">
                             <table class="table table-sm mb-0">
                                 <thead>
@@ -144,7 +144,7 @@
             <div class="row g-3">
                 <div class="col-12 col-lg-7">
                     <div class="card">
-                        <div class="card-header fw-bold">Limites de transferências</div>
+                        <div class="card-header fw-medium">Limites de transferências</div>
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-12 col-md-4">
@@ -225,7 +225,7 @@
 
                 <div class="col-12 col-lg-5">
                     <div class="card border-danger">
-                        <div class="card-header fw-bold text-danger">Zerar vendas rápidas</div>
+                        <div class="card-header fw-medium text-danger">Zerar vendas rápidas</div>
                         <div class="card-body">
                             <p class="text-muted small mb-3">
                                 Zera o contador de quick-sells de <strong>todos os times</strong>, liberando o limite da janela novamente.
@@ -296,7 +296,7 @@
 
                 <div class="col-12 col-lg-7">
                     <div class="card border-danger">
-                        <div class="card-header fw-bold text-danger">Transferências por janela dos times</div>
+                        <div class="card-header fw-medium text-danger">Transferências por janela dos times</div>
                         <div class="card-body">
                             <p class="text-muted small mb-3">
                                 Zera o contador de transferências e o de empréstimos de <strong>todos os times</strong> (use na virada de janela/temporada).
@@ -366,7 +366,7 @@
 
                 <div class="col-12 col-lg-7">
                     <div class="card">
-                        <div class="card-header fw-bold">Mínimo de elenco temporário</div>
+                        <div class="card-header fw-medium">Mínimo de elenco temporário</div>
                         <div class="card-body pb-0">
                             <p class="text-muted small mb-2">
                                 Libera um time para ficar abaixo do mínimo geral (@_minRosterSalvo) por um tempo, por exemplo quem perdeu jogadores

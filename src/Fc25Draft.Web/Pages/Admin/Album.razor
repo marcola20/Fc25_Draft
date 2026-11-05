@@ -34,8 +34,8 @@
                     <option value="@t">@t@(album is null ? " · sem álbum" : album.Ativo ? " · álbum ativo" : " · álbum antigo")</option>
                 }
             </select>
-            <a href="/admin/album/pacotes" class="btn btn-outline-secondary">🎁 Dar pacotes</a>
-            <a href="/admin/album/sem-foto" class="btn btn-outline-secondary">📷 Sem foto</a>
+            <a href="/admin/album/pacotes" class="btn btn-outline-secondary"><Icone Nome="gift" Tamanho="14" /> Dar pacotes</a>
+            <a href="/admin/album/sem-foto" class="btn btn-outline-secondary"><Icone Nome="camera" Tamanho="14" /> Sem foto</a>
             <a href="/album" class="btn btn-outline-secondary" target="_blank">Ver o álbum</a>
         </div>
 
@@ -44,7 +44,7 @@
             @* ---- Álbum já lançado ---- *@
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                    <strong>🎴 @ad.Album.Nome</strong>
+                    <strong>@ad.Album.Nome</strong>
                     @if (ad.Album.Ativo)
                     {
                         <span class="badge text-bg-success">Ativo</span>
@@ -56,8 +56,8 @@
                         <div class="col-6 col-md-2"><div class="h4 mb-0">@ad.Clubes</div><div class="small text-muted">clubes</div></div>
                         <div class="col-6 col-md-2"><div class="h4 mb-0">@ad.PorRaridade.Total</div><div class="small text-muted">figurinhas</div></div>
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Comuns</div><div class="small text-muted">comuns</div></div>
-                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Brilhantes</div><div class="small text-muted">✨ brilhantes</div></div>
-                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Brilhantes</div><div class="small text-muted"><Icone Nome="sparkles" Tamanho="14" /> brilhantes</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@ad.PorRaridade.Lendarias</div><div class="small text-muted"><Icone Nome="star" Tamanho="14" /> lendárias</div></div>
                         <div class="col-6 col-md-2">
                             <a href="/admin/album/sem-foto" class="text-decoration-none">
                                 <div class="h5 mb-0 @(ad.SemFoto + ad.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@(ad.SemFoto + ad.TecnicosSemFoto)</div>
@@ -68,7 +68,7 @@
                     @if (ad.Tecnicos > 0)
                     {
                         <div class="small mt-2">
-                            🧑‍💼 <strong>@ad.Tecnicos</strong> figurinha@(ad.Tecnicos == 1 ? "" : "s") de técnico (contam como brilhantes) ·
+                            <Icone Nome="briefcase" Tamanho="14" /> <strong>@ad.Tecnicos</strong> figurinha@(ad.Tecnicos == 1 ? "" : "s") de técnico (contam como brilhantes) ·
                             <span class="@(ad.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@ad.TecnicosSemFoto sem foto no perfil</span>
                         </div>
                     }
@@ -88,7 +88,7 @@
             @if (ad.Album.Ativo)
             {
                 <div class="card mb-3">
-                    <div class="card-header fw-bold">🔄 Atualizar com os elencos de hoje</div>
+                    <div class="card-header fw-medium"><Icone Nome="refresh-cw" Tamanho="14" /> Atualizar com os elencos de hoje</div>
                     <div class="card-body">
                         <p class="small text-muted">
                             Depois do mercado e das trocas de técnico, deixa o álbum igual aos elencos de hoje sem ninguém perder
@@ -123,12 +123,12 @@
                                     }
                                 </div>
 
-                                @ListaDeMudancas("➕ Entram", at.Entram, mostrarDe: false)
-                                @ListaDeMudancas("➡️ Mudam de clube", at.Mudam, mostrarDe: true)
+                                @ListaDeMudancas("Entram", at.Entram, mostrarDe: false)
+                                @ListaDeMudancas("Mudam de clube", at.Mudam, mostrarDe: true)
                                 @ListaDeMudancas("↩️ Voltam ao álbum", at.Voltam, mostrarDe: false)
-                                @ListaDeMudancas("➖ Saem do álbum", at.Saem, mostrarDe: true)
+                                @ListaDeMudancas("Saem do álbum", at.Saem, mostrarDe: true)
 
-                                <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="AtualizarAlbumAsync">✅ Aplicar a atualização</button>
+                                <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="AtualizarAlbumAsync"><Icone Nome="circle-check" Tamanho="14" /> Aplicar a atualização</button>
                             }
                         }
                     </div>
@@ -136,14 +136,14 @@
             }
 
             <div class="card mb-3">
-                <div class="card-header fw-bold">🎯 Pacotes do bolão</div>
+                <div class="card-header fw-medium"><Icone Nome="target" Tamanho="14" /> Pacotes do bolão</div>
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-end gap-2">
                         <div>
                             <label class="form-label">Pontos por pacote</label>
                             <input type="number" class="form-control" style="width: 8rem;" min="1" max="1000" @bind="_pontosBolao" />
                         </div>
-                        <button class="btn btn-success" disabled="@(_salvando || _pontosBolao == ad.PontosBolaoPorPacote)" @onclick="SalvarPontosBolaoAsync">💾 Salvar</button>
+                        <button class="btn btn-success" disabled="@(_salvando || _pontosBolao == ad.PontosBolaoPorPacote)" @onclick="SalvarPontosBolaoAsync"><Icone Nome="save" Tamanho="14" /> Salvar</button>
                     </div>
                     <p class="small text-muted mb-0 mt-2">
                         A cada @ad.PontosBolaoPorPacote pontos no bolão de @ad.Album.Temporada (só jogos encerrados depois do
@@ -157,12 +157,12 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-header fw-bold">★ Lendárias — Melhores de @(ad.Album.Temporada - 1)</div>
+                <div class="card-header fw-medium"><Icone Nome="star" Tamanho="14" /> Lendárias — Melhores de @(ad.Album.Temporada - 1)</div>
                 <div class="card-body">
                     <LendariasEditor Candidatos="@ad.Candidatos" Escolhidas="@_escolhidas" Temporada="@ad.Album.Temporada"
                                      Fixas="@ad.LendariasFixas" OnChange="StateHasChanged" />
-                    <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="SalvarLendariasAsync">💾 Salvar lendárias</button>
-                    <div class="small text-muted mt-1">A lendária que já saiu em pacote (🔒) fica; as outras dá para trocar a qualquer hora.</div>
+                    <button class="btn btn-success mt-2" disabled="@_salvando" @onclick="SalvarLendariasAsync"><Icone Nome="save" Tamanho="14" /> Salvar lendárias</button>
+                    <div class="small text-muted mt-1">A lendária que já saiu em pacote (<Icone Nome="lock" Tamanho="14" />) fica; as outras dá para trocar a qualquer hora.</div>
                     @if (ad.Lendarias.Count > 0)
                     {
                         <div class="grade-cartas mt-3">
@@ -182,7 +182,7 @@
             @* ---- Prévia do lançamento ---- *@
             var contagem = Contagem(pv);
             <div class="card mb-3">
-                <div class="card-header fw-bold">Prévia do álbum de @pv.Temporada</div>
+                <div class="card-header fw-medium">Prévia do álbum de @pv.Temporada</div>
                 <div class="card-body">
                     <p class="small text-muted mb-3">
                         O álbum é um retrato dos elencos <strong>de hoje</strong>: nome, posição, overall e clube ficam como estão
@@ -192,12 +192,12 @@
                         <div class="col-6 col-md-2"><div class="h4 mb-0">@pv.Clubes.Count</div><div class="small text-muted">clubes</div></div>
                         <div class="col-6 col-md-2"><div class="h4 mb-0">@contagem.Total</div><div class="small text-muted">figurinhas</div></div>
                         <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Comuns</div><div class="small text-muted">comuns</div></div>
-                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Brilhantes</div><div class="small text-muted">✨ brilhantes</div></div>
-                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Lendarias</div><div class="small text-muted">★ lendárias</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Brilhantes</div><div class="small text-muted"><Icone Nome="sparkles" Tamanho="14" /> brilhantes</div></div>
+                        <div class="col-4 col-md-2"><div class="h5 mb-0">@contagem.Lendarias</div><div class="small text-muted"><Icone Nome="star" Tamanho="14" /> lendárias</div></div>
                         <div class="col-6 col-md-2"><div class="h5 mb-0 @(pv.SemFoto + pv.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@(pv.SemFoto + pv.TecnicosSemFoto)</div><div class="small text-muted">sem foto</div></div>
                     </div>
                     <div class="small mb-2">
-                        🧑‍💼 <strong>@pv.Tecnicos</strong> técnico@(pv.Tecnicos == 1 ? "" : "s") e auxiliar@(pv.Tecnicos == 1 ? "" : "es") entram
+                        <Icone Nome="briefcase" Tamanho="14" /> <strong>@pv.Tecnicos</strong> técnico@(pv.Tecnicos == 1 ? "" : "s") e auxiliar@(pv.Tecnicos == 1 ? "" : "es") entram
                         (quem tem passagem aberta no clube), logo depois do escudo ·
                         <span class="@(pv.TecnicosSemFoto > 0 ? "text-warning" : "text-success")">@pv.TecnicosSemFoto sem foto no perfil</span>
                     </div>
@@ -232,7 +232,7 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-header fw-bold">★ Lendárias — Melhores de @(pv.Temporada - 1)</div>
+                <div class="card-header fw-medium"><Icone Nome="star" Tamanho="14" /> Lendárias — Melhores de @(pv.Temporada - 1)</div>
                 <div class="card-body">
                     <p class="small text-muted">
                         Sugestão: maiores médias de nota do PES em @(pv.Temporada - 1) (mínimo de @AlbumFigurinhas.MinimoJogosParaSugestao jogos;
@@ -248,7 +248,7 @@
                         <label class="form-label">Nome do álbum</label>
                         <input class="form-control" style="min-width: 260px;" @bind="_nome" placeholder="@pv.NomeSugerido" />
                     </div>
-                    <button class="btn btn-success" disabled="@(_salvando || pv.Clubes.Count == 0)" @onclick="LancarAsync">🚀 Lançar o álbum</button>
+                    <button class="btn btn-success" disabled="@(_salvando || pv.Clubes.Count == 0)" @onclick="LancarAsync"><Icone Nome="rocket" Tamanho="14" /> Lançar o álbum</button>
                     <button class="btn btn-outline-secondary" disabled="@_salvando" @onclick="PreviaAsync">Atualizar prévia</button>
                 </div>
             </div>
@@ -463,7 +463,7 @@
                                 <td>@l.Nome</td>
                                 <td>@l.PosicaoSigla</td>
                                 <td class="text-center">@l.Overall</td>
-                                <td>@(l.Raridade switch { RaridadeFigurinha.Lendaria => "★ lendária", RaridadeFigurinha.Brilhante => "✨ brilhante", _ => "comum" })</td>
+                                <td>@(l.Raridade switch { RaridadeFigurinha.Lendaria => "lendária", RaridadeFigurinha.Brilhante => "brilhante", _ => "comum" })</td>
                                 @if (mostrarDe) { <td>@l.De</td> }
                                 @if (linhas.Any(x => x.Para is not null)) { <td>@l.Para</td> }
                                 <td class="text-center">@(l.Donos > 0 ? l.Donos : "—")</td>

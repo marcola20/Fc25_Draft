@@ -15,7 +15,7 @@
 
 <PageTitle>Treinadores — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -32,7 +32,7 @@
     else
     {
         <div class="card mb-3">
-            <div class="card-header fw-bold">@(_editando is null ? "Novo treinador" : $"Editando {_editando.Nome}")</div>
+            <div class="card-header fw-medium">@(_editando is null ? "Novo treinador" : $"Editando {_editando.Nome}")</div>
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-4">

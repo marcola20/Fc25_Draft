@@ -11,7 +11,7 @@
 
 <PageTitle>Regulamento — Admin</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -39,14 +39,14 @@
                     <option value="@r.RegulamentoId" selected="@(r.RegulamentoId == _atual?.RegulamentoId)">@r.Titulo</option>
                 }
             </select>
-            <button class="btn btn-primary" @onclick="() => _mostrarNovo = !_mostrarNovo">➕ Nova temporada</button>
+            <button class="btn btn-primary" @onclick="() => _mostrarNovo = !_mostrarNovo"><Icone Nome="plus" Tamanho="14" /> Nova temporada</button>
             <a href="/regulamento" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
         </div>
 
         @if (_mostrarNovo)
         {
             <div class="card mb-3">
-                <div class="card-header fw-bold">Novo regulamento</div>
+                <div class="card-header fw-medium">Novo regulamento</div>
                 <div class="card-body">
                     <div class="row g-2 align-items-end">
                         <div class="col-6 col-md-2">
@@ -116,7 +116,7 @@
             }
 
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando">💾 Salvar</button>
+                <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando"><Icone Nome="save" Tamanho="14" /> Salvar</button>
                 <button class="btn btn-outline-secondary" @onclick="RecarregarAsync" disabled="@_salvando">Desfazer alterações</button>
                 <button class="btn btn-outline-danger ms-auto" @onclick="ExcluirAsync" disabled="@_salvando">Excluir regulamento</button>
             </div>

@@ -20,7 +20,7 @@
 <PageTitle>Loteria do Draft — Admin</PageTitle>
 
 <div class="container-fluid py-3" style="max-width:860px">
-    <h1 class="h3 mb-1">🎰 Loteria do Draft</h1>
+    <h1 class="h3 mb-1">Loteria do Draft</h1>
     <p class="text-muted mb-3">Controle do sorteio das picks. Todos os espectadores veem em tempo real.</p>
 
     @if (!string.IsNullOrEmpty(_erro))
@@ -40,7 +40,7 @@
     @if (_escolhasIniciais?.Selection is { } selecao)
     {
         <div class="alert alert-info">
-            <div class="fw-semibold mb-1">🤖 Escolhas automáticas feitas na abertura do draft</div>
+            <div class="fw-semibold mb-1"><Icone Nome="bot" Tamanho="14" /> Escolhas automáticas feitas na abertura do draft</div>
             <div style="white-space: pre-line;">@selecao.Mensagem</div>
             <button type="button" class="btn btn-success btn-sm mt-2" @onclick="CompartilharEscolhasAsync">Compartilhar no WhatsApp</button>
         </div>
@@ -49,7 +49,7 @@
     @if (LotteryService.State is null)
     {
         <div class="card mb-3">
-            <div class="card-header fw-bold">Configurar Loteria</div>
+            <div class="card-header fw-medium">Configurar Loteria</div>
             <div class="card-body">
                 <p class="text-muted small">
                     Regra com Série A (@LoteriaDraft.TimesSerieA times) e Série B (@LoteriaDraft.TimesSerieB times), a mesma de <a href="/picks" target="_blank">Picks do Draft</a>.
@@ -64,7 +64,7 @@
                 {
                     <div class="row g-3 mb-3">
                         <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold">🏆 Série A <span class="text-muted fw-normal">(Round 1)</span></label>
+                            <label class="form-label fw-semibold"><Icone Nome="trophy" Tamanho="14" /> Série A <span class="text-muted fw-normal">(Round 1)</span></label>
                             <select class="form-select" @bind="_serieAId">
                                 <option value="">— Selecione —</option>
                                 @foreach (var l in Ligas(TipoCompetition.Liga, Divisao.SerieA))
@@ -74,7 +74,7 @@
                             </select>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold">🥈 Série B <span class="text-muted fw-normal">(Round 1)</span></label>
+                            <label class="form-label fw-semibold"><Icone Nome="medal" Tamanho="14" /> Série B <span class="text-muted fw-normal">(Round 1)</span></label>
                             <select class="form-select" @bind="_serieBId">
                                 <option value="">— Selecione —</option>
                                 @foreach (var l in Ligas(TipoCompetition.Liga, Divisao.SerieB))
@@ -84,7 +84,7 @@
                             </select>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold">🥇 Copa <span class="text-muted fw-normal">(Round 2)</span></label>
+                            <label class="form-label fw-semibold"><Icone Nome="medal" Tamanho="14" /> Copa <span class="text-muted fw-normal">(Round 2)</span></label>
                             <select class="form-select" @bind="_copaIdSelecionada">
                                 <option value="">— Selecione —</option>
                                 @foreach (var l in Ligas(TipoCompetition.Copa, null))
@@ -98,7 +98,7 @@
                 <button class="btn btn-success fw-semibold"
                         disabled="@(_serieAId == Guid.Empty || _serieBId == Guid.Empty || _carregando)"
                         @onclick="IniciarLoteria">
-                    🚀 Começar Loteria
+                    <Icone Nome="rocket" Tamanho="14" /> Começar Loteria
                 </button>
             </div>
         </div>
@@ -108,22 +108,22 @@
         var s = LotteryService.State;
 
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-            <span class="badge bg-primary fs-6">🏆 @s.LigaNome</span>
+            <span class="badge bg-primary fs-6"><Icone Nome="trophy" Tamanho="14" /> @s.LigaNome</span>
             @if (!string.IsNullOrEmpty(s.CopaLigaNome))
             {
-                <span class="badge bg-info text-dark fs-6">🥇 @s.CopaLigaNome</span>
+                <span class="badge bg-info text-dark fs-6"><Icone Nome="medal" Tamanho="14" /> @s.CopaLigaNome</span>
             }
             <span class="badge @(s.Rodada == 1 ? "bg-success" : "bg-warning text-dark") fs-6">Round @s.Rodada</span>
             @if (s.IsFinished) { <span class="badge bg-secondary fs-6">Encerrado</span> }
             <div class="ms-auto d-flex gap-2">
-                <button class="btn btn-sm btn-outline-danger" @onclick="Reset">✖ Resetar</button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="Reset"><Icone Nome="x" Tamanho="14" /> Resetar</button>
             </div>
         </div>
 
         @if (s.IsFinished)
         {
             <div class="card mb-3">
-                <div class="card-header fw-bold">⚙️ Configurar Draft</div>
+                <div class="card-header fw-medium"><Icone Nome="settings" Tamanho="14" /> Configurar Draft</div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
@@ -169,7 +169,7 @@
                     </div>
                     <div class="mt-3">
                         <button class="btn btn-success fw-semibold" @onclick="CriarDraft" disabled="@_carregando">
-                            🏈 Gerar Draft
+                            <Icone Nome="flag" Tamanho="14" /> Gerar Draft
                         </button>
                         <span class="text-muted small ms-2">Min/Máx opcionais — deixe vazio para sem restrição</span>
                     </div>
@@ -180,7 +180,7 @@
         @if (!s.IsFinished)
         {
             <div class="card mb-3">
-                <div class="card-header fw-bold">Controles</div>
+                <div class="card-header fw-medium">Controles</div>
                 <div class="card-body d-flex gap-2 flex-wrap">
                     @if (s.HasPending)
                     {
@@ -197,13 +197,13 @@
                             ⏭ Seguir para Round 2
                         </button>
                         <button class="btn btn-outline-secondary fw-semibold" @onclick="() => Finish()" disabled="@_carregando">
-                            ✅ Finalizar
+                            <Icone Nome="circle-check" Tamanho="14" /> Finalizar
                         </button>
                     }
                     @if (s.Round2Done)
                     {
                         <button class="btn btn-outline-secondary fw-semibold" @onclick="() => Finish()" disabled="@_carregando">
-                            ✅ Finalizar
+                            <Icone Nome="circle-check" Tamanho="14" /> Finalizar
                         </button>
                     }
                 </div>
@@ -219,8 +219,8 @@
                     : s.Revealed.OrderBy(p => p.PickNumero).ToList();
                 <div class="col-12 @(s.Rodada == 2 || s.Round1Results.Count > 0 ? "col-md-6" : "")">
                     <div class="card h-100">
-                        <div class="card-header fw-bold">
-                            🏆 Round 1
+                        <div class="card-header fw-medium">
+                            <Icone Nome="trophy" Tamanho="14" /> Round 1
                             @if (s.Rodada == 1 && s.HasPending)
                             {
                                 <span class="badge bg-success ms-2">ao vivo</span>
@@ -257,8 +257,8 @@
                     : s.Revealed.OrderBy(p => p.PickNumero).ToList();
                 <div class="col-12 @(s.Round1Results.Count > 0 ? "col-md-6" : "")">
                     <div class="card h-100">
-                        <div class="card-header fw-bold">
-                            🎲 Round 2
+                        <div class="card-header fw-medium">
+                            <Icone Nome="dices" Tamanho="14" /> Round 2
                             @if (s.Rodada == 2 && s.HasPending)
                             {
                                 <span class="badge bg-success ms-2">ao vivo</span>
@@ -301,7 +301,7 @@
         </div>
 
         <div class="mt-2 text-muted" style="font-size:.82rem">
-            <a href="/loteria" target="_blank">🔗 Abrir página pública da loteria</a>
+            <a href="/loteria" target="_blank"><Icone Nome="link" Tamanho="14" /> Abrir página pública da loteria</a>
         </div>
     }
 </div>
