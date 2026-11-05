@@ -12,8 +12,8 @@
 
 <PageTitle>Comparar jogadores</PageTitle>
 
-<div class="comparar py-3 @(SlotsVisiveis > 2 ? "largo" : "")">
-    <p class="text-muted small text-center mb-3">
+<div class="comparar @(SlotsVisiveis > 2 ? "largo" : "")">
+    <p class="text-body-secondary small text-center mb-3">
         Dá para comparar até @Maximo jogadores, e o link guarda todos: dá para mandar no grupo.
     </p>
 
@@ -23,15 +23,15 @@
             var l = i;
             var jogador = Jogador(l)?.Jogador;
             <div class="@ColunaCard">
-                <div class="card h-100 jogador-card lado-@l">
-                    <div class="card-body">
+                <div class="painel h-100 jogador-card lado-@l">
+                    <div class="jogador-card-corpo">
                         <div class="d-flex gap-2 align-items-start">
                             <div class="flex-grow-1">
                                 <JogadorBusca Placeholder="@Placeholder(l, jogador)" OnEscolhido="j => Escolher(l, j.PlayerId)" />
                             </div>
                             @if (_ids[l] is not null)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Tirar da comparação" @onclick="() => Remover(l)">✕</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-icone" title="Tirar da comparação" @onclick="() => Remover(l)"><Icone Nome="x" Tamanho="14" /></button>
                             }
                         </div>
 
@@ -42,20 +42,24 @@
                         else if (jogador is not null)
                         {
                             <div class="d-flex align-items-center gap-3 mt-3">
-                                <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="64" Classe="" />
+                                <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="64" Classe="jogador-card-foto" />
                                 <div class="min-w-0">
                                     <a href="/players/details/@jogador.PlayerId" class="nome text-decoration-none">@jogador.Nome</a>
-                                    <div class="text-muted small">
-                                        @jogador.PositionName · Overall <strong>@jogador.Overall</strong>@(jogador.Idade is int idade ? $" · {idade} anos" : "")
+                                    <div class="d-flex flex-wrap align-items-center gap-1 column-gap-2 small text-body-secondary mt-1">
+                                        <span class="ovr @AtributosPes.Faixa(jogador.Overall)" title="Overall">@jogador.Overall</span>
+                                        <span>@jogador.PositionName@(jogador.Idade is int idade ? $" · {idade} anos" : "")</span>
                                     </div>
-                                    <div class="small">
+                                    <div class="small mt-1">
                                         @if (jogador.TimeAtualId is Guid timeId)
                                         {
-                                            <a href="/teams/details/@timeId" class="text-primary">@jogador.TimeAtualNome</a>
+                                            <a href="/teams/details/@timeId" class="jogador-card-time">
+                                                <img src="@Escudos.GetEscudo(jogador.TimeAtualNome)" alt="" />
+                                                @jogador.TimeAtualNome
+                                            </a>
                                         }
                                         else
                                         {
-                                            <span class="text-muted">Sem time</span>
+                                            <span class="text-body-tertiary">Sem time</span>
                                         }
                                     </div>
                                 </div>
@@ -65,7 +69,7 @@
                                 <div class="d-flex flex-wrap gap-1 mt-3">
                                     @foreach (var t in jogador.Estatisticas.Titulos)
                                     {
-                                        <span class="badge bg-warning text-dark fw-normal">🏆 @t.Competicao</span>
+                                        <span class="etiqueta acento"><Icone Nome="trophy" Tamanho="12" /> @t.Competicao</span>
                                     }
                                 </div>
                             }
@@ -78,20 +82,20 @@
 
     @if (_comparados.Count >= 2)
     {
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <ul class="nav nav-pills">
                 <li class="nav-item">
-                    <button type="button" class="nav-link @(VerAtributos ? "" : "active")" @onclick="() => Navegar(atributos: false)">📊 Estatísticas</button>
+                    <button type="button" class="nav-link @(VerAtributos ? "" : "active")" @onclick="() => Navegar(atributos: false)">Estatísticas</button>
                 </li>
                 <li class="nav-item">
-                    <button type="button" class="nav-link @(VerAtributos ? "active" : "")" @onclick="() => Navegar(atributos: true)">🧬 Atributos</button>
+                    <button type="button" class="nav-link @(VerAtributos ? "active" : "")" @onclick="() => Navegar(atributos: true)">Atributos</button>
                 </li>
             </ul>
             @if (!VerAtributos && _temporada is int temporada)
             {
                 <div class="btn-group btn-group-sm" role="group" aria-label="Recorte das estatísticas">
-                    <button type="button" class="btn @(SoTemporada ? "btn-outline-secondary" : "btn-secondary")" @onclick="() => Navegar(soTemporada: false)">Carreira toda</button>
-                    <button type="button" class="btn @(SoTemporada ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => Navegar(soTemporada: true)">Só a temporada @temporada</button>
+                    <button type="button" class="btn btn-outline-secondary @(SoTemporada ? "" : "active")" @onclick="() => Navegar(soTemporada: false)">Carreira toda</button>
+                    <button type="button" class="btn btn-outline-secondary @(SoTemporada ? "active" : "")" @onclick="() => Navegar(soTemporada: true)">Só a temporada @temporada</button>
                 </div>
             }
         </div>
@@ -106,8 +110,8 @@
         }
         else
         {
-            <div class="card">
-                <div class="card-body py-2">
+            <div class="painel comparacao">
+                <div>
                     @Cabecalho()
                     @if (_comparados.Any(c => c.Atributos?.Altura is not null))
                     {
@@ -129,7 +133,7 @@
                 </div>
             </div>
 
-            <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-muted">
+            <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-body-tertiary">
                 <span>Atributos do PES, como estão hoje. A barra vai de @AtributosPes.Minimo a @AtributosPes.Maximo.</span>
                 @if (comAtributos < _comparados.Count)
                 {
@@ -141,8 +145,8 @@
     else if (_comparados.Count >= 2)
     {
         var todos = _comparados.Select(c => c.N).ToList();
-        <div class="card">
-            <div class="card-body py-2">
+        <div class="painel comparacao">
+            <div>
                 @Cabecalho()
                 @Linha("Overall", c => c.Jogador.Overall)
                 @Linha("Valor de mercado", c => (double)c.Valor, Milhoes)
@@ -150,8 +154,8 @@
                 {
                     @Linha("Jogos", c => c.N.Jogos, rodape: todos.Any(n => n.JogosParcial) ? "*" : null)
                 }
-                @Linha("⚽ Gols", c => c.N.Gols)
-                @Linha("🅰️ Assistências", c => c.N.Assistencias)
+                @Linha("Gols", c => c.N.Gols)
+                @Linha("Assistências", c => c.N.Assistencias)
                 @Linha("G/A", c => c.N.Gols + c.N.Assistencias)
                 @if (todos.Any(n => n.GolsPorJogo is not null))
                 {
@@ -159,19 +163,19 @@
                 }
                 @if (todos.Any(n => n.CleanSheets is not null))
                 {
-                    @Linha("🧤 Clean sheets", c => c.N.CleanSheets)
+                    @Linha("Clean sheets", c => c.N.CleanSheets)
                 }
-                @Linha("🏆 Títulos", c => c.N.Titulos)
-                @Linha("🎩 Hat-tricks", c => c.N.Hattricks)
+                @Linha("Títulos", c => c.N.Titulos)
+                @Linha("Hat-tricks", c => c.N.Hattricks)
                 @Linha("Recorde de gols num jogo", c => c.N.MaisGolsNumJogo)
-                @Linha("🟨 Amarelos", c => c.N.Amarelos, menorMelhor: true)
-                @Linha("🟥 Vermelhos", c => c.N.Vermelhos, menorMelhor: true)
+                @Linha("Amarelos", c => c.N.Amarelos, menorMelhor: true)
+                @Linha("Vermelhos", c => c.N.Vermelhos, menorMelhor: true)
                 @Linha("Competições", c => c.N.Competicoes)
                 @Linha(SoTemporada ? "Clubes na temporada" : "Clubes na carreira", c => c.N.Clubes, destacar: false)
             </div>
         </div>
 
-        <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-muted">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mt-2 small text-body-tertiary">
             <span>
                 @(SoTemporada ? $"Só a temporada {_temporada}, em todas as competições." : "Carreira de todas as temporadas e competições.")
                 Barra colorida: quem leva vantagem. Nos cartões, ganha quem tem menos.
