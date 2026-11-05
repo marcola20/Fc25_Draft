@@ -12,7 +12,7 @@
 
 <PageTitle>Reta final</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
         @if (_ligas.Count > 0)
         {
@@ -25,7 +25,7 @@
         }
         @if (_liga is not null)
         {
-            <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simular placares</a>
+            <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary"><Icone Nome="calculator" Tamanho="14" /> Simular placares</a>
         }
     </div>
 
@@ -62,8 +62,8 @@
             }
         </p>
 
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
+        <div class="table-responsive painel mb-3">
+            <table class="table table-sm table-hover align-middle mb-0">
                 <thead class="table-dark">
                     <tr>
                         <th style="width:38px;">#</th>
@@ -100,9 +100,9 @@
         </div>
 
         <div class="d-flex flex-wrap gap-3 small text-muted">
-            <span><span class="badge bg-success">garantido</span> já é dele</span>
-            <span><span class="badge bg-primary">garante com X pts</span> depende só dele</span>
-            <span><span class="badge bg-warning text-dark">precisa de ajuda</span> depende de outros resultados</span>
+            <span><span class="etiqueta sucesso">garantido</span> já é dele</span>
+            <span><span class="etiqueta acento">garante com X pts</span> depende só dele</span>
+            <span><span class="etiqueta aviso">precisa de ajuda</span> depende de outros resultados</span>
             <span><span class="text-muted">—</span> não alcança mais</span>
         </div>
     }
@@ -194,17 +194,17 @@
         switch (meta.Situacao)
         {
             case SituacaoObjetivo.Garantido:
-                <span class="badge bg-success">garantido</span>
+                <span class="etiqueta sucesso">garantido</span>
                 break;
             case SituacaoObjetivo.Impossivel:
                 <span class="text-muted">—</span>
                 break;
             case SituacaoObjetivo.DependeDeSi:
-                <span class="badge bg-primary" title="Garante sozinho com @meta.PontosParaGarantir pontos dos @(faltam * 3) que ainda disputa">garante com @meta.PontosParaGarantir pts</span>
+                <span class="etiqueta acento" title="Garante sozinho com @meta.PontosParaGarantir pontos dos @(faltam * 3) que ainda disputa">garante com @meta.PontosParaGarantir pts</span>
                 <div class="small text-muted">@Chance(meta.Chance)</div>
                 break;
             default:
-                <span class="badge bg-warning text-dark">precisa de ajuda</span>
+                <span class="etiqueta aviso">precisa de ajuda</span>
                 <div class="small text-muted">@Chance(meta.Chance)</div>
                 break;
         }

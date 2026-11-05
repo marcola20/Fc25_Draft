@@ -107,3 +107,4 @@ landmark
 circle-alert
 swords
 brain
+rotate-ccw

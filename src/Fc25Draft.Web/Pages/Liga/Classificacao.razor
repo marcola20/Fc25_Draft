@@ -9,7 +9,7 @@
 
 <PageTitle>Classificação</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
         @if (_ligas is not null && _ligas.Count > 1)
         {
@@ -59,8 +59,8 @@
                            Titulo="@LigaNome"
                            Subtitulo='@($"Classificação — Grupo {grupo}")'
                            Arquivo='@($"cbfv-grupo-{grupo}.png")'>
-            <div class="table-responsive mb-4">
-                <table class="table table-sm table-hover align-middle">
+            <div class="table-responsive painel mb-4">
+                <table class="table table-sm table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
                             <th>#</th>
@@ -82,7 +82,7 @@
                             var grupoPos = posicoes[i];
                             var emDecisao = posicoes.Count(x => x == grupoPos) > 1;
                             <tr class="@CopaRowClass(grupoPos, emDecisao)" title="@(emDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
-                                <td><span class="badge @CopaBadgeClass(grupoPos, emDecisao)">@grupoPos</span></td>
+                                <td><span class="@CopaBadgeClass(grupoPos, emDecisao)">@grupoPos</span></td>
                                 <td class="fw-semibold">@item.TimeNome</td>
                                 <td class="text-center fw-bold">@item.Pontos</td>
                                 <td class="text-center">@item.Jogos</td>
@@ -91,7 +91,7 @@
                                 <td class="text-center">@item.Derrotas</td>
                                 <td class="text-center">@item.GolsPro</td>
                                 <td class="text-center">@item.GolsContra</td>
-                                <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")">
+                                <td class="text-center @(item.SaldoGols > 0 ? "texto-vitoria" : item.SaldoGols < 0 ? "texto-derrota" : "")">
                                     @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                                 </td>
                             </tr>
@@ -116,7 +116,7 @@
                         <span class="fw-semibold">@jd.TimeForaNome</span>
                         @if (_decisivos.VencedorEntre(jd.TimeCasaId, jd.TimeForaId) is Guid vencedorId)
                         {
-                            <span class="badge bg-success">
+                            <span class="etiqueta sucesso">
                                 Classificado: @(vencedorId == jd.TimeCasaId ? jd.TimeCasaNome : jd.TimeForaNome)
                             </span>
                         }
@@ -131,17 +131,17 @@
         }
 
         <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
-            <span><span class="badge bg-success me-1">●</span> Avança (1º-2º do grupo)</span>
-            <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
-            <span><span class="badge bg-primary me-1">●</span> Empatados (Pts, V e SG) — jogo decisivo</span>
+            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-titulo"></span>Avança (1º-2º do grupo)</span>
+            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-rebaixamento"></span>Eliminado</span>
+            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-empate"></span>Empatados (Pts, V e SG): jogo decisivo</span>
         </div>
     }
     else
     {
         <!-- Liga: tabela única -->
         <ShareableCard Id="cap-classif-liga" Titulo="@LigaNome" Subtitulo="Classificação" Arquivo="cbfv-classificacao.png">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
+        <div class="table-responsive painel mb-3">
+            <table class="table table-sm table-hover align-middle mb-0">
                 <thead class="table-dark">
                     <tr>
                         <th>#</th>
@@ -164,7 +164,7 @@
                     {
                         <tr class="@GetRowClass(item)">
                             <td>
-                                <span class="badge @GetBadgeClass(item)">@Posicao(item)</span>
+                                <span class="@GetBadgeClass(item)">@Posicao(item)</span>
                             </td>
                             <td class="fw-semibold">@item.TimeNome</td>
                             <td class="text-center fw-bold">@item.Pontos</td>
@@ -174,12 +174,12 @@
                             <td class="text-center">@item.Derrotas</td>
                             <td class="text-center">@item.GolsPro</td>
                             <td class="text-center">@item.GolsContra</td>
-                            <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")">
+                            <td class="text-center @(item.SaldoGols > 0 ? "texto-vitoria" : item.SaldoGols < 0 ? "texto-derrota" : "")">
                                 @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                             </td>
                             <td class="text-center d-none d-md-table-cell">@item.CartoesAmarelos</td>
                             <td class="text-center d-none d-md-table-cell text-danger">@item.CartoesVermelhos</td>
-                            <td class="text-center d-none d-md-table-cell @(item.PontosDescontados > 0 ? "text-danger fw-bold" : "text-muted")">
+                            <td class="text-center d-none d-md-table-cell @(item.PontosDescontados > 0 ? "texto-derrota fw-semibold" : "text-muted")">
                                 @(item.PontosDescontados > 0 ? $"-{item.PontosDescontados}" : "—")
                             </td>
                         </tr>
@@ -191,11 +191,11 @@
         <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
             @foreach (var zona in LigaZonas.ZonasDaTabela(_regra, _classif.Count))
             {
-                <span><span class="badge @ZonaEstilo.Badge(zona) me-1">●</span> @LigaZonas.Rotulo(zona)</span>
+                <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor @ZonaEstilo.Linha(zona)"></span>@LigaZonas.Rotulo(zona)</span>
             }
             @if (_classif.Any(EmpateNoTopo))
             {
-                <span><span class="badge @ZonaEstilo.BadgeEmpateTopo me-1">●</span> @RotuloEmpate</span>
+                <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor @ZonaEstilo.LinhaEmpateTopo"></span>@RotuloEmpate</span>
             }
         </div>
         </ShareableCard>
@@ -320,7 +320,7 @@
         emDecisao ? "table-primary" : pos <= 2 ? "table-success" : "table-danger";
 
     private static string CopaBadgeClass(int pos, bool emDecisao) =>
-        emDecisao ? "bg-primary" : pos <= 2 ? "bg-success" : "bg-danger";
+        emDecisao ? ZonaEstilo.BadgeEmpateTopo : pos <= 2 ? "num-posicao zona-titulo" : "num-posicao zona-rebaixamento";
 
     private static string StatusLabel(LigaStatus s) => s switch
     {
