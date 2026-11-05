@@ -1,0 +1,71 @@
+.tm-nome {
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.tm-nome:hover {
+    color: var(--bs-link-hover-color);
+}
+
+::deep .tm-foto {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}
+
+::deep .tm-taca {
+    color: var(--cbfv-acento-texto);
+}
+
+/* Os números do período: rótulo pequeno, valor grande, detalhe em cinza. */
+.termo-numero {
+    padding: 0.875rem 1rem;
+}
+
+.termo-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}
+
+.termo-valor {
+    margin-top: 0.125rem;
+    font-size: 1.25rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.termo-detalhe {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+}
+
+.list-group-item {
+    background: transparent;
+}
+
+/* Gasto por posição: a posição que mais gastou em dourado, as outras em cinza. */
+.tm-barra {
+    background: var(--bs-tertiary-bg);
+}
+
+.tm-barra .progress-bar {
+    background: var(--bs-secondary-color);
+    border-radius: 3px;
+}
+
+.tm-barra .progress-bar.topo {
+    background: var(--cbfv-acento);
+}
+
+.tm-time-topo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.tm-mov:last-child {
+    border-bottom: 0 !important;
+}

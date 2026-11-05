@@ -7,8 +7,8 @@
 
 <PageTitle>Termômetro do Mercado</PageTitle>
 
-<div class="container-fluid py-3">
-    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+<div>
+    <div class="d-flex align-items-center justify-content-between gap-3 mb-2 flex-wrap">
         @if (_janelas.Count > 0)
         {
             <select class="form-select form-select-sm w-auto" value="@(_janela?.ToString() ?? "")" @onchange="TrocarJanelaAsync" disabled="@_loading">
@@ -19,9 +19,9 @@
                 <option value="">Todas as janelas</option>
             </select>
         }
-        <a href="/market/transfers" class="btn btn-sm btn-outline-secondary">📜 Histórico de transferências</a>
+        <a href="/market/transfers" class="btn btn-sm btn-outline-secondary"><Icone Nome="history" Tamanho="14" /> Histórico de transferências</a>
     </div>
-    <p class="text-muted small mb-3">
+    <p class="text-body-secondary small mb-4">
         Leilões do mercado, vendas entre times, trocas e empréstimos. Uma janela junta os ciclos abertos na mesma época.
     </p>
 
@@ -39,38 +39,39 @@
     }
     else if (_t is not null)
     {
-        <div class="row g-2 mb-4">
-            @Numero("💰 Movimentado", Moeda(_t.Movimentado), $"{_t.Transferencias} contratações")
-            @Numero("🔨 Leilões vendidos", $"{_t.LeiloesVendidos} de {_t.ItensLeiloados}", _t.ItensLeiloados == 0 ? "" : $"{_t.LeiloesVendidos * 100 / _t.ItensLeiloados}% dos jogadores")
-            @Numero("🙋 Lances", _t.Lances.ToString(), _t.ItensLeiloados == 0 ? "" : $"{(double)_t.Lances / _t.ItensLeiloados:0.0} por jogador")
-            @Numero("⚡ Compra imediata", _t.ComprasImediatas.ToString(), "pagaram o valor cheio")
-            @Numero("📈 Ágio médio", _t.AgioMedio is double a ? Agio(a) : "—", "acima do preço base")
+        <div class="row g-2 mb-4 termo-numeros">
+            @Numero("Movimentado", Moeda(_t.Movimentado), $"{_t.Transferencias} contratações")
+            @Numero("Leilões vendidos", $"{_t.LeiloesVendidos} de {_t.ItensLeiloados}", _t.ItensLeiloados == 0 ? "" : $"{_t.LeiloesVendidos * 100 / _t.ItensLeiloados}% dos jogadores")
+            @Numero("Lances", _t.Lances.ToString(), _t.ItensLeiloados == 0 ? "" : $"{(double)_t.Lances / _t.ItensLeiloados:0.0} por jogador")
+            @Numero("Compra imediata", _t.ComprasImediatas.ToString(), "pagaram o valor cheio")
+            @Numero("Ágio médio", _t.AgioMedio is double a ? Agio(a) : "—", "acima do preço base")
         </div>
 
         <div class="row g-4 mb-4">
             <div class="col-12 col-xl-6">
-                <h5>🔥 Mais disputados</h5>
+                <div class="secao-titulo"><h2>Mais disputados</h2></div>
                 @if (_t.MaisDisputados.Count == 0)
                 {
-                    <p class="text-muted">Nenhum lance no período.</p>
+                    <div class="painel p-3 small text-body-secondary">Nenhum lance no período.</div>
                 }
                 else
                 {
-                    <ul class="list-group">
+                    <div class="painel">
+                    <ul class="list-group list-group-flush">
                         @foreach (var d in _t.MaisDisputados)
                         {
                             <li class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start gap-2">
-                                    <FotoJogador PlayerId="@d.PlayerId" Tamanho="40" Classe="" />
+                                    <FotoJogador PlayerId="@d.PlayerId" Tamanho="40" Classe="tm-foto" />
                                     <div class="me-auto">
-                                        <a href="/players/details/@d.PlayerId" class="fw-semibold text-primary">@d.JogadorNome</a>
+                                        <a href="/players/details/@d.PlayerId" class="tm-nome">@d.JogadorNome</a>
                                         <span class="small text-muted">· @d.Posicao · @d.Overall</span>
                                         <div class="small text-muted">
                                             @d.Times time@(d.Times == 1 ? "" : "s") na disputa ·
                                             @Moeda(d.PrecoBase)
                                             @if (d.PrecoFinal is decimal final)
                                             {
-                                                <span class="ms-1">→ <strong class="text-body">@Moeda(final)</strong> (@Agio(d.Agio!.Value))</span>
+                                                <span class="ms-1">→ <span class="text-body-emphasis numero">@Moeda(final)</span> <span class="numero">(@Agio(d.Agio!.Value))</span></span>
                                             }
                                             else
                                             {
@@ -79,50 +80,59 @@
                                         </div>
                                         @if (d.VencedorNome is not null)
                                         {
-                                            <div class="small">🏆 @d.VencedorNome @(d.CompraImediata ? "· ⚡ compra imediata" : "")</div>
+                                            <div class="small d-flex align-items-center gap-1 flex-wrap text-body-secondary">
+                                                <Icone Nome="trophy" Tamanho="12" Classe="tm-taca" /> <span class="text-body">@d.VencedorNome</span>
+                                                @if (d.CompraImediata)
+                                                {
+                                                    <span class="etiqueta"><Icone Nome="zap" Tamanho="12" /> compra imediata</span>
+                                                }
+                                            </div>
                                         }
                                     </div>
-                                    <span class="badge bg-danger rounded-pill text-nowrap">@d.Lances lance@(d.Lances == 1 ? "" : "s")</span>
+                                    <span class="etiqueta acento text-nowrap"><span class="numero">@d.Lances</span> lance@(d.Lances == 1 ? "" : "s")</span>
                                 </div>
                             </li>
                         }
                     </ul>
+                    </div>
                 }
             </div>
 
             <div class="col-12 col-xl-6">
-                <h5>💸 Maiores contratações</h5>
+                <div class="secao-titulo"><h2>Maiores contratações</h2></div>
                 @if (_t.MaioresContratacoes.Count == 0)
                 {
-                    <p class="text-muted">Nenhuma contratação no período.</p>
+                    <div class="painel p-3 small text-body-secondary">Nenhuma contratação no período.</div>
                 }
                 else
                 {
-                    <ol class="list-group list-group-numbered">
+                    <div class="painel">
+                    <ol class="list-group list-group-flush list-group-numbered">
                         @foreach (var c in _t.MaioresContratacoes)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
                                 <div class="ms-2 me-auto d-flex align-items-center">
-                                    <FotoJogador PlayerId="@c.PlayerId" Tamanho="40" Classe="me-2" />
+                                    <FotoJogador PlayerId="@c.PlayerId" Tamanho="40" Classe="me-2 tm-foto" />
                                     <div>
-                                    <a href="/players/details/@c.PlayerId" class="fw-semibold text-primary">@c.JogadorNome</a>
+                                    <a href="/players/details/@c.PlayerId" class="tm-nome">@c.JogadorNome</a>
                                     <span class="small text-muted">· @c.Posicao</span>
                                     <div class="small text-muted">
-                                        @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<strong class="text-body">@c.ParaTime</strong> · @BrazilTime.ConvertFromUtc(c.Data).ToString("dd/MM")
+                                        @c.Tipo.ToDisplayName() · @(c.DeTime is null ? "" : $"{c.DeTime} → ")<span class="text-body">@c.ParaTime</span> · @BrazilTime.ConvertFromUtc(c.Data).ToString("dd/MM")
                                     </div>
                                     </div>
                                 </div>
-                                <span class="fw-bold text-nowrap">@Moeda(c.Valor)</span>
+                                <span class="fw-medium numero text-nowrap">@Moeda(c.Valor)</span>
                             </li>
                         }
                     </ol>
+                    </div>
                 }
             </div>
         </div>
 
-        <h5>🏦 Times no mercado</h5>
-        <div class="table-responsive mb-4">
-            <table class="table table-sm table-hover align-middle text-center" style="font-size: 0.875rem;">
+        <div class="secao-titulo"><h2>Times no mercado</h2></div>
+        <div class="table-responsive painel mb-4">
+            <table class="table table-sm table-hover align-middle text-center mb-0" style="font-size: 0.875rem;">
                 <thead class="table-dark">
                     <tr>
                         <th class="text-start">Time</th>
@@ -141,15 +151,15 @@
                         <tr>
                             <td class="text-start text-nowrap">
                                 <img src="@Escudos.GetEscudo(t.TimeNome)" alt="" width="20" height="20" class="me-1" style="object-fit: contain;" />
-                                <a href="/teams/details/@t.TimeId" class="text-primary">@t.TimeNome</a>
+                                <a href="/teams/details/@t.TimeId" class="tm-nome">@t.TimeNome</a>
                             </td>
-                            <td>@t.Compras</td>
-                            <td class="text-nowrap text-danger">@Moeda(t.Gasto)</td>
-                            <td>@t.Vendas</td>
-                            <td class="text-nowrap text-success">@Moeda(t.Recebido)</td>
-                            <td class="text-nowrap fw-semibold @(t.Saldo >= 0 ? "text-success" : "text-danger")">@(t.Saldo > 0 ? "+" : "")@Moeda(t.Saldo)</td>
-                            <td>@t.Lances</td>
-                            <td>@t.LeiloesVencidos</td>
+                            <td class="numero">@t.Compras</td>
+                            <td class="text-nowrap numero texto-derrota">@Moeda(t.Gasto)</td>
+                            <td class="numero">@t.Vendas</td>
+                            <td class="text-nowrap numero texto-vitoria">@Moeda(t.Recebido)</td>
+                            <td class="text-nowrap fw-medium numero @(t.Saldo >= 0 ? "texto-vitoria" : "texto-derrota")">@(t.Saldo > 0 ? "+" : "")@Moeda(t.Saldo)</td>
+                            <td class="numero text-body-secondary">@t.Lances</td>
+                            <td class="numero text-body-secondary">@t.LeiloesVencidos</td>
                         </tr>
                     }
                 </tbody>
@@ -158,73 +168,80 @@
 
         <div class="row g-4">
             <div class="col-12 col-lg-6">
-                <h5>🤑 Pechinchas</h5>
-                <p class="text-muted small mb-2">Leilões que saíram no lance mais perto do preço base (compra imediata não entra).</p>
+                <div class="secao-titulo"><h2>Pechinchas</h2></div>
+                <p class="text-body-secondary small mb-3">Leilões que saíram no lance mais perto do preço base (compra imediata não entra).</p>
                 @if (_t.Pechinchas.Count == 0)
                 {
-                    <p class="text-muted">Nenhum leilão vendido por lance no período.</p>
+                    <div class="painel p-3 small text-body-secondary">Nenhum leilão vendido por lance no período.</div>
                 }
                 else
                 {
-                    <ul class="list-group">
+                    <div class="painel">
+                    <ul class="list-group list-group-flush">
                         @foreach (var p in _t.Pechinchas)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
-                                <FotoJogador PlayerId="@p.PlayerId" Tamanho="40" Classe="" />
+                                <FotoJogador PlayerId="@p.PlayerId" Tamanho="40" Classe="tm-foto" />
                                 <div class="me-auto">
-                                    <a href="/players/details/@p.PlayerId" class="fw-semibold text-primary">@p.JogadorNome</a>
+                                    <a href="/players/details/@p.PlayerId" class="tm-nome">@p.JogadorNome</a>
                                     <span class="small text-muted">· @p.Posicao · @p.Overall</span>
                                     <div class="small text-muted">@Moeda(p.PrecoFinal!.Value) · @p.VencedorNome</div>
                                 </div>
-                                <span class="badge bg-success rounded-pill text-nowrap">@Agio(p.Agio!.Value)</span>
+                                <span class="etiqueta sucesso numero text-nowrap">@Agio(p.Agio!.Value)</span>
                             </li>
                         }
                     </ul>
+                    </div>
                 }
             </div>
 
             <div class="col-12 col-lg-6">
-                <h5>📊 Gasto por posição</h5>
+                <div class="secao-titulo"><h2>Gasto por posição</h2></div>
                 @if (_t.Posicoes.Count == 0)
                 {
-                    <p class="text-muted">Nenhuma contratação no período.</p>
+                    <div class="painel p-3 small text-body-secondary">Nenhuma contratação no período.</div>
                 }
                 else
                 {
                     var maior = _t.Posicoes.Max(p => p.Gasto);
+                    <div class="painel px-3 pt-3 pb-1">
                     @foreach (var p in _t.Posicoes)
                     {
-                        <div class="mb-2">
-                            <div class="d-flex justify-content-between small">
-                                <span>@p.Posicao <span class="text-muted">· @p.Contratacoes</span></span>
-                                <span class="fw-semibold">@Moeda(p.Gasto)</span>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>@p.Posicao <span class="text-body-tertiary">· <span class="numero">@p.Contratacoes</span></span></span>
+                                <span class="fw-medium numero">@Moeda(p.Gasto)</span>
                             </div>
-                            <div class="progress" style="height: 8px;">
-                                <div class="progress-bar" style="width: @((maior == 0 ? 0 : p.Gasto / maior * 100).ToString("0", CultureInfo.InvariantCulture))%;"></div>
+                            <div class="progress tm-barra" style="height: 6px;">
+                                <div class="progress-bar @(p.Gasto == maior ? "topo" : "")" style="width: @((maior == 0 ? 0 : p.Gasto / maior * 100).ToString("0", CultureInfo.InvariantCulture))%;"></div>
                             </div>
                         </div>
                     }
+                    </div>
                 }
             </div>
         </div>
 
         @if (_movimentos.Count > 0)
         {
-            <h5 class="mt-4">🔄 Chegadas e saídas</h5>
-            <p class="text-muted small mb-2">Quem chegou e quem saiu de cada time, de leilão a empréstimo.</p>
+            <div class="secao-titulo mt-4"><h2>Chegadas e saídas</h2></div>
+            <p class="text-body-secondary small mb-3">Quem chegou e quem saiu de cada time, de leilão a empréstimo.</p>
             <div class="row g-3">
                 @foreach (var time in _movimentos)
                 {
                     <div class="col-12 col-lg-6 col-xxl-4" @key="time.TimeId">
-                        <div class="card h-100">
-                            <div class="card-header d-flex align-items-center gap-2 py-2">
+                        <div class="painel h-100">
+                            <div class="tm-time-topo">
                                 <img src="@Escudos.GetEscudo(time.TimeNome)" alt="" width="22" height="22" style="object-fit: contain;" />
-                                <a href="/teams/details/@time.TimeId" class="fw-semibold text-primary me-auto">@time.TimeNome</a>
-                                <span class="small text-muted text-nowrap">⬇️ @time.Chegadas.Count · ⬆️ @time.Saidas.Count</span>
+                                <a href="/teams/details/@time.TimeId" class="tm-nome me-auto">@time.TimeNome</a>
+                                <span class="small text-nowrap d-inline-flex align-items-center gap-2">
+                                    <span class="texto-vitoria d-inline-flex align-items-center gap-1" title="Chegaram"><Icone Nome="arrow-down" Tamanho="12" /><span class="numero">@time.Chegadas.Count</span></span>
+                                    <span class="texto-derrota d-inline-flex align-items-center gap-1" title="Saíram"><Icone Nome="arrow-up" Tamanho="12" /><span class="numero">@time.Saidas.Count</span></span>
+                                </span>
                             </div>
-                            <div class="card-body py-2">
-                                @Lista("Chegaram", "text-success", time.Chegadas, chegando: true)
-                                @Lista("Saíram", "text-danger", time.Saidas, chegando: false)
+                            <div class="px-3 py-2">
+                                @Lista("Chegaram", "texto-vitoria", time.Chegadas, chegando: true)
+                                @Lista("Saíram", "texto-derrota", time.Saidas, chegando: false)
                             </div>
                         </div>
                     </div>
@@ -302,7 +319,7 @@
 
     private static RenderFragment Lista(string titulo, string cor, IReadOnlyList<TermometroMovimentoDto> movimentos, bool chegando) => __builder =>
     {
-        <div class="small fw-semibold @cor mt-1">@titulo</div>
+        <div class="small fw-medium @cor mt-2">@titulo</div>
         @if (movimentos.Count == 0)
         {
             <div class="small text-muted mb-1">ninguém</div>
@@ -312,10 +329,10 @@
             <ul class="list-unstyled small mb-1">
                 @foreach (var m in movimentos)
                 {
-                    <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
-                        <FotoJogador PlayerId="@m.PlayerId" Tamanho="28" Classe="" />
+                    <li class="d-flex justify-content-between align-items-center gap-2 py-2 border-bottom tm-mov">
+                        <FotoJogador PlayerId="@m.PlayerId" Tamanho="28" Classe="tm-foto" />
                         <div class="me-auto">
-                            <a href="/players/details/@m.PlayerId" class="text-primary">@m.JogadorNome</a>
+                            <a href="/players/details/@m.PlayerId" class="tm-nome">@m.JogadorNome</a>
                             <span class="text-muted">· @m.Posicao · @m.Overall</span>
                             <div class="text-muted">
                                 @m.Tipo@(m.OutroTimeNome is null ? "" : (chegando ? " · de " : " · para ") + m.OutroTimeNome)
@@ -323,7 +340,7 @@
                         </div>
                         @if (m.Valor is decimal valor && valor > 0)
                         {
-                            <span class="fw-semibold text-nowrap">@Moeda(valor)</span>
+                            <span class="fw-medium numero text-nowrap">@Moeda(valor)</span>
                         }
                     </li>
                 }
@@ -334,12 +351,10 @@
     private static RenderFragment Numero(string rotulo, string valor, string detalhe) => __builder =>
     {
         <div class="col-6 col-md-4 col-xl">
-            <div class="card text-center h-100">
-                <div class="card-body py-2">
-                    <div class="small text-muted">@rotulo</div>
-                    <div class="fs-5 fw-bold">@valor</div>
-                    <div class="small text-muted">@detalhe</div>
-                </div>
+            <div class="painel h-100 termo-numero">
+                <div class="termo-rotulo">@rotulo</div>
+                <div class="termo-valor">@valor</div>
+                <div class="termo-detalhe">@detalhe</div>
             </div>
         </div>
     };
