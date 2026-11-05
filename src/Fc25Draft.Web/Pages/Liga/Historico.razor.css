@@ -1,0 +1,55 @@
+/* Busca com a lupa dentro do campo e o X para limpar no canto. */
+.campo-busca {
+    position: relative;
+}
+
+.campo-busca ::deep .campo-busca-icone {
+    position: absolute;
+    top: 50%;
+    left: 0.625rem;
+    transform: translateY(-50%);
+    color: var(--bs-tertiary-color);
+    pointer-events: none;
+}
+
+.campo-busca input {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+.campo-busca-limpar {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: none;
+    color: var(--bs-tertiary-color);
+    transform: translateY(-50%);
+}
+
+.campo-busca-limpar:hover {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-emphasis-color);
+}
+
+/* As competições do jogador aberto: um degrau de superfície abaixo da linha. */
+.historico-detalhe {
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+}
+
+.historico-detalhe .table {
+    --bs-table-bg: transparent;
+}
+
+tbody tr[style*="cursor:pointer"]:has(+ tr .historico-detalhe) > td {
+    background: var(--bs-tertiary-bg);
+}

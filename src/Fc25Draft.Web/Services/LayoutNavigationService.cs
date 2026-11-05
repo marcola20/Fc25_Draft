@@ -292,6 +292,18 @@ public class LayoutNavigationService
                 new("Edições")
             }
         },
+        ["/liga/historico"] = new PageDefinition
+        {
+            Route = "/liga/historico",
+            Title = "Histórico",
+            Subtitle = "Artilheiros, goleiros, duplas e carrascos",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Liga", "/liga"),
+                new("Histórico")
+            }
+        },
         ["/liga/classificacao"] = new PageDefinition
         {
             Route = "/liga/classificacao",

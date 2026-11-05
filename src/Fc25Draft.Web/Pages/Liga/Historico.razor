@@ -7,9 +7,9 @@
 @implements IDisposable
 @inject ILigaPublicService LigaService
 
-<PageTitle>Histórico - Artilheiros</PageTitle>
+<PageTitle>Histórico</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -20,14 +20,11 @@
     }
     else
     {
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
-            <div>
-                <h1 class="h3">Histórico de Estatísticas</h1>
-                <p class="text-muted mb-0">@(_temporada is int ano ? $"Estatísticas da temporada {ano}" : "Estatísticas de todas as competições")</p>
-            </div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <p class="text-body-secondary small mb-0">@(_temporada is int ano ? $"Estatísticas da temporada {ano}" : "Estatísticas de todas as competições")</p>
             @if (_temporadas.Count > 0)
             {
-                <select class="form-select w-auto" value="@(_temporada?.ToString() ?? "")" @onchange="TrocarTemporada" disabled="@_carregandoTemporada">
+                <select class="form-select form-select-sm w-auto" value="@(_temporada?.ToString() ?? "")" @onchange="TrocarTemporada" disabled="@_carregandoTemporada">
                     <option value="">Todas as temporadas</option>
                     @foreach (var t in _temporadas)
                     {
@@ -39,16 +36,16 @@
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <button class="nav-link @(_aba == "artilheiros" ? "active" : "")" @onclick='() => TrocarAba("artilheiros")'>⚽ Artilheiros</button>
+                <button class="nav-link @(_aba == "artilheiros" ? "active" : "")" @onclick='() => TrocarAba("artilheiros")'>Artilheiros</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link @(_aba == "goleiros" ? "active" : "")" @onclick='() => TrocarAba("goleiros")'>🧤 Goleiros</button>
+                <button class="nav-link @(_aba == "goleiros" ? "active" : "")" @onclick='() => TrocarAba("goleiros")'>Goleiros</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link @(_aba == "duplas" ? "active" : "")" @onclick='() => TrocarAba("duplas")'>🤝 Duplas</button>
+                <button class="nav-link @(_aba == "duplas" ? "active" : "")" @onclick='() => TrocarAba("duplas")'>Duplas</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link @(_aba == "carrascos" ? "active" : "")" @onclick='() => TrocarAba("carrascos")'>💀 Carrascos</button>
+                <button class="nav-link @(_aba == "carrascos" ? "active" : "")" @onclick='() => TrocarAba("carrascos")'>Carrascos</button>
             </li>
         </ul>
 
@@ -65,16 +62,16 @@
 
         <div class="row mb-3">
             <div class="col-md-6 col-lg-4">
-                <div class="input-group">
-                    <span class="input-group-text">🔎</span>
+                <div class="campo-busca">
+                    <Icone Nome="search" Tamanho="14" Classe="campo-busca-icone" />
                     @* Input não controlado: sem value="@..." o re-render do Blazor Server não
                        sobrescreve o que o usuário ainda está digitando. O @key recria o elemento
                        (vazio) quando a busca é limpa. *@
-                    <input @key="_buscaInputKey" class="form-control" placeholder="Pesquisar jogador pelo nome"
+                    <input @key="_buscaInputKey" class="form-control form-control-sm" placeholder="Jogador"
                            @oninput="OnBuscaChanged" />
                     @if (!string.IsNullOrWhiteSpace(_buscaRaw))
                     {
-                        <button type="button" class="btn btn-outline-secondary" @onclick="LimparBusca">✕</button>
+                        <button type="button" class="campo-busca-limpar" title="Limpar a busca" @onclick="LimparBusca"><Icone Nome="x" Tamanho="14" /></button>
                     }
                 </div>
             </div>
@@ -93,33 +90,33 @@
             }
             else
             {
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                <div class="table-responsive painel mb-3">
+                    <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
                         <thead class="table-dark">
                             <tr>
                                 <th style="width:40px;">#</th>
                                 <th>Goleiro</th>
-                                <th class="text-center" style="width:130px;">🧤 Clean sheets</th>
+                                <th class="text-center" style="width:130px;">Clean sheets</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var (item, idx) in goleiros.Select((x, i) => (x, i + 1)))
                             {
                                 <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarGoleiro(item)'>
-                                    <td class="fw-bold text-muted">@idx</td>
+                                    <td class="numero text-body-tertiary">@idx</td>
                                     <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
-                                    <td class="text-center fw-bold">@item.CleanSheets</td>
+                                    <td class="text-center fw-semibold numero">@item.CleanSheets</td>
                                 </tr>
                                 @if (_goleiroSelecionado == item)
                                 {
                                     <tr>
                                         <td colspan="3" class="p-0 border-0">
-                                            <div class="p-3 bg-light border-top border-bottom">
-                                                <table class="table table-sm table-striped mb-0">
+                                            <div class="historico-detalhe">
+                                                <table class="table table-sm mb-0">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Competição</th>
-                                                            <th class="text-center" style="width:70px;">🧤</th>
+                                                            <th class="text-center" style="width:110px;">Clean sheets</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -129,9 +126,9 @@
                                                                 <td>
                                                                     <span>@comp.NomeCompeticao</span>
                                                                     <br />
-                                                                    <small class="text-muted">@(comp.TipoCompeticao == TipoCompetition.Copa ? "Copa" : "Liga")</small>
+                                                                    <small class="text-body-tertiary">@(comp.TipoCompeticao == TipoCompetition.Copa ? "Copa" : "Liga")</small>
                                                                 </td>
-                                                                <td class="text-center fw-bold">@comp.CleanSheets</td>
+                                                                <td class="text-center fw-semibold numero">@comp.CleanSheets</td>
                                                             </tr>
                                                         }
                                                     </tbody>
@@ -156,20 +153,38 @@
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-hover align-middle" style="font-size:0.875rem;">
+            <div class="table-responsive painel mb-3">
+                <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
                     <thead class="table-dark">
                         <tr>
                             <th style="width:40px;">#</th>
                             <th>Jogador</th>
-                            <th class="text-center" style="width:90px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
-                                ⚽ Gols @SortIcon("gols")
+                            <th class="text-center" style="width:90px;">
+                                <button type="button" class="ordenar @(_sortBy == "gols" ? "ativo" : "")" @onclick='() => SetSort("gols")'>
+                                Gols
+                                @if (_sortBy == "gols")
+                                {
+                                    <Icone Nome="@(_sortAsc ? "arrow-up" : "arrow-down")" Tamanho="12" />
+                                }
+                                </button>
                             </th>
-                            <th class="text-center" style="width:130px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
-                                🅰️ Assist. @SortIcon("assistencias")
+                            <th class="text-center" style="width:130px;">
+                                <button type="button" class="ordenar @(_sortBy == "assistencias" ? "ativo" : "")" @onclick='() => SetSort("assistencias")'>
+                                Assist.
+                                @if (_sortBy == "assistencias")
+                                {
+                                    <Icone Nome="@(_sortAsc ? "arrow-up" : "arrow-down")" Tamanho="12" />
+                                }
+                                </button>
                             </th>
-                            <th class="text-center" style="width:90px;cursor:pointer;user-select:none;" @onclick='() => SetSort("ga")'>
-                                G/A @SortIcon("ga")
+                            <th class="text-center" style="width:90px;">
+                                <button type="button" class="ordenar @(_sortBy == "ga" ? "ativo" : "")" @onclick='() => SetSort("ga")' title="Gols + assistências">
+                                G/A
+                                @if (_sortBy == "ga")
+                                {
+                                    <Icone Nome="@(_sortAsc ? "arrow-up" : "arrow-down")" Tamanho="12" />
+                                }
+                                </button>
                             </th>
                         </tr>
                     </thead>
@@ -177,24 +192,24 @@
                         @foreach (var (item, idx) in PagedItems.Select((x, i) => (x, (_page - 1) * _pageSize + i + 1)))
                         {
                             <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
-                                <td style="width:40px;" class="fw-bold text-muted">@idx</td>
+                                <td style="width:40px;" class="numero text-body-tertiary">@idx</td>
                                 <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
-                                <td class="text-center fw-bold" style="width:90px;">@item.TotalGols</td>
-                                <td class="text-center text-muted" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
-                                <td class="text-center fw-bold" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>
+                                <td class="text-center fw-semibold numero" style="width:90px;">@item.TotalGols</td>
+                                <td class="text-center text-body-secondary numero" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
+                                <td class="text-center numero" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>
                             </tr>
                             @if (_jogadorSelecionado == item)
                             {
                                 <tr>
                                     <td colspan="5" class="p-0 border-0">
-                                        <div class="p-3 bg-light border-top border-bottom">
+                                        <div class="historico-detalhe">
                                             <div class="table-responsive">
-                                                <table class="table table-sm table-striped mb-0">
+                                                <table class="table table-sm mb-0">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Competição</th>
                                                             <th class="text-center" style="width:70px;" title="Jogos">J</th>
-                                                            <th class="text-center" style="width:70px;">⚽</th>
+                                                            <th class="text-center" style="width:70px;">Gols</th>
                                                             <th class="text-center" style="width:70px;">Assist.</th>
                                                             <th class="text-center" style="width:70px;">G/A</th>
                                                         </tr>
@@ -206,12 +221,12 @@
                                                                 <td>
                                                                     <span>@comp.NomeCompeticion</span>
                                                                     <br />
-                                                                    <small class="text-muted">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
+                                                                    <small class="text-body-tertiary">@(comp.TipoCompeticion == TipoCompetition.Copa ? "Copa" : "Liga")</small>
                                                                 </td>
-                                                                <td class="text-center">@(comp.Jogos?.ToString() ?? "-")</td>
-                                                                <td class="text-center fw-bold">@comp.Gols</td>
-                                                                <td class="text-center text-muted">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
-                                                                <td class="text-center fw-bold">@(comp.Gols + comp.Assistencias)</td>
+                                                                <td class="text-center numero">@(comp.Jogos?.ToString() ?? "—")</td>
+                                                                <td class="text-center fw-semibold numero">@comp.Gols</td>
+                                                                <td class="text-center text-body-secondary numero">@(comp.Assistencias > 0 ? comp.Assistencias.ToString() : "—")</td>
+                                                                <td class="text-center numero">@(comp.Gols + comp.Assistencias)</td>
                                                             </tr>
                                                         }
                                                     </tbody>
@@ -231,7 +246,7 @@
                 <nav class="d-flex justify-content-center mt-2">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item @(_page == 1 ? "disabled" : "")">
-                            <button class="page-link" @onclick="() => GoToPage(_page - 1)" disabled="@(_page == 1)">‹</button>
+                            <button class="page-link" @onclick="() => GoToPage(_page - 1)" disabled="@(_page == 1)" title="Anterior"><Icone Nome="chevron-left" Tamanho="14" /></button>
                         </li>
                         @for (int p = 1; p <= _totalPages; p++)
                         {
@@ -241,11 +256,11 @@
                             </li>
                         }
                         <li class="page-item @(_page == _totalPages ? "disabled" : "")">
-                            <button class="page-link" @onclick="() => GoToPage(_page + 1)" disabled="@(_page == _totalPages)">›</button>
+                            <button class="page-link" @onclick="() => GoToPage(_page + 1)" disabled="@(_page == _totalPages)" title="Próxima"><Icone Nome="chevron-right" Tamanho="14" /></button>
                         </li>
                     </ul>
                 </nav>
-                <p class="text-center text-muted small mt-1">@_totalFiltrados jogadores · página @_page de @_totalPages</p>
+                <p class="text-center text-body-tertiary small mt-2">@_totalFiltrados jogadores · página @_page de @_totalPages</p>
             }
         }
         }
@@ -389,12 +404,6 @@
         if (p < 1 || p > _totalPages) return;
         _page = p;
         _jogadorSelecionado = null;
-    }
-
-    private string SortIcon(string col)
-    {
-        if (_sortBy != col) return "⇅";
-        return _sortAsc ? "↑" : "↓";
     }
 
     protected override async Task OnInitializedAsync()
