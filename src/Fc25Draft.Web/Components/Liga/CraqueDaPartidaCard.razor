@@ -15,7 +15,7 @@
             <div class="rotulo"><Icone Nome="star" Tamanho="14" /> Craque da partida</div>
             <div class="nome">@c.Jogador.JogadorNome</div>
             <div class="time">
-                <img src="@Escudos.GetEscudo(c.TimeNome)" alt="" />
+                <span class="escudo" style="@FimDeJogoCard.FundoDe(Escudos.GetEscudo(c.TimeNome))"></span>
                 <span>@c.TimeNome · @c.Jogador.Posicao</span>
             </div>
             <div class="numeros">

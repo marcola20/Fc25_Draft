@@ -43,7 +43,8 @@
 }
 
 .time { display: flex; align-items: center; gap: .35rem; font-size: .85rem; opacity: .9; min-width: 0; }
-.time img { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+/* Escudo como fundo com contain: na imagem compartilhada o object-fit é ignorado e o escudo achatava. */
+.time .escudo { width: 22px; height: 22px; flex-shrink: 0; background: center / contain no-repeat; }
 .time span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .numeros { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-weight: 700; }

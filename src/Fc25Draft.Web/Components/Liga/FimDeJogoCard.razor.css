@@ -32,9 +32,11 @@
 }
 
 .escudo {
-    width: 72px;
-    height: 72px;
-    object-fit: contain;
+    width: 88px;
+    height: 88px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .time {
@@ -49,7 +51,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-top: 14px;
+    padding-top: 20px;
     font-family: var(--bs-font-monospace);
     font-size: 3.2rem;
     font-weight: 600;

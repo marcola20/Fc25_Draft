@@ -67,13 +67,20 @@
         .Select(e => new Expulso(e.JogadorNome, e.Minuto))
         .ToList();
 
+    // O GetEscudo já devolve o escudo padrão quando o time não tem arquivo.
+    private string FundoEscudo(string nome) => FundoDe(Escudos.GetEscudo(nome));
+
+    /// <summary>background-image com o endereço protegido do apóstrofo (nome de arquivo com ').</summary>
+    public static string FundoDe(string url) => "background-image: url('" + url.Replace("'", "%27") + "')";
+
     private static string Minutos(IEnumerable<int?> minutos) =>
         string.Join(", ", minutos.Where(m => m.HasValue).Select(m => $"{m}'"));
 
     private RenderFragment Lado(string nome, List<Marcador> gols, List<Expulso> expulsos) => __builder =>
     {
         <div class="lado">
-            <img class="escudo" src="@Escudos.GetEscudo(nome)" alt="" onerror="this.src='/images/escudos/escudo.png'" />
+            @* Fundo com contain, e não <img>: o html2canvas ignora object-fit e achatava o escudo. *@
+            <div class="escudo" role="img" aria-label="@nome" style="@FundoEscudo(nome)"></div>
             <div class="time">@nome</div>
             @if (gols.Count > 0 || expulsos.Count > 0)
             {
