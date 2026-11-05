@@ -1,49 +1,34 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Enums
 
-<div class="card @(Destaque ? "border-warning border-2" : "") h-100"
-     style="@(OnClick.HasDelegate ? "cursor:pointer;" : "")"
+@{ var (fase, confronto) = DividirLabel(Jogo.FaseLabel); }
+<div class="ko-card @(Destaque ? "destaque" : "") @(OnClick.HasDelegate ? "clicavel" : "")"
      @onclick="() => OnClick.InvokeAsync(Jogo)">
-    <div class="card-header d-flex justify-content-between align-items-center py-1 px-2 @(Destaque ? "bg-warning text-dark" : "bg-dark text-white")">
-        @{ var (fase, confronto) = DividirLabel(Jogo.FaseLabel); }
-        <div class="lh-sm" style="min-width:0">
-            <small class="fw-bold d-block">@fase</small>
+    <div class="ko-topo">
+        <div style="min-width:0">
+            <div class="ko-fase">
+                @if (Destaque)
+                {
+                    <Icone Nome="trophy" Tamanho="12" />
+                }
+                @fase
+            </div>
             @if (confronto is not null)
             {
-                <small class="d-block text-truncate" style="opacity:.75;font-size:.72rem">@confronto</small>
+                <div class="ko-confronto text-truncate" title="@confronto">@confronto</div>
             }
         </div>
         @if (Jogo.PartidaStatus.HasValue)
         {
-            <span class="badge @StatusBadge(Jogo.PartidaStatus.Value) ms-1 flex-shrink-0">@StatusLabel(Jogo.PartidaStatus.Value)</span>
+            <span class="etiqueta @StatusEtiqueta(Jogo.PartidaStatus.Value) flex-shrink-0">@StatusLabel(Jogo.PartidaStatus.Value)</span>
         }
     </div>
-    <div class="card-body py-2 px-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold @(IsVencedor(Jogo.TimeCasaId) ? "text-success" : "") d-flex align-items-center gap-1" style="min-width:0">
-                <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                <span class="text-truncate">@(Jogo.TimeCasaNome ?? "A definir")</span>
-            </span>
-            <span class="badge bg-secondary fs-6 ms-2 flex-shrink-0">@(Jogo.GolsCasa?.ToString() ?? "—")</span>
-        </div>
-        <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-semibold @(IsVencedor(Jogo.TimeForaId) ? "text-success" : "") d-flex align-items-center gap-1" style="min-width:0">
-                <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                <span class="text-truncate">@(Jogo.TimeForaNome ?? "A definir")</span>
-            </span>
-            <span class="badge bg-secondary fs-6 ms-2 flex-shrink-0">@(Jogo.GolsFora?.ToString() ?? "—")</span>
-        </div>
+    <div class="ko-corpo">
+        @Linha(Jogo.TimeCasaId, Jogo.TimeCasaNome, Jogo.GolsCasa)
+        @Linha(Jogo.TimeForaId, Jogo.TimeForaNome, Jogo.GolsFora)
         @if (Jogo.TemPenaltis && Jogo.VencedorNome is not null)
         {
-            <div class="mt-1 text-center">
-                <small class="text-muted">Nos pênaltis: <strong>@Jogo.VencedorNome</strong></small>
-            </div>
-        }
-        @if (Jogo.VencedorId.HasValue && !Jogo.TemPenaltis)
-        {
-            <div class="mt-1 text-center">
-                <small class="text-success fw-bold">✓ @Jogo.VencedorNome</small>
-            </div>
+            <div class="ko-penaltis">Nos pênaltis: <span class="text-body-emphasis">@Jogo.VencedorNome</span></div>
         }
     </div>
 </div>
@@ -54,6 +39,21 @@
     [Parameter] public EventCallback<LigaKnockoutJogoDto> OnClick { get; set; }
 
     private bool IsVencedor(Guid? timeId) => timeId.HasValue && timeId == Jogo.VencedorId;
+
+    /// <summary>Uma linha do confronto: quem passou fica forte, quem caiu fica apagado.</summary>
+    private RenderFragment Linha(Guid? timeId, string? nome, int? gols)
+    {
+        var estado = !Jogo.VencedorId.HasValue ? "" : IsVencedor(timeId) ? "vencedor" : "eliminado";
+        return @<div class="ko-linha @estado">
+            <img src="@EscudoUrl(nome)" alt="" width="20" height="20" onerror="this.src='/images/escudos/escudo.png'" />
+            <span class="ko-time text-truncate">@(nome ?? "A definir")</span>
+            @if (estado == "vencedor" && Destaque)
+            {
+                <Icone Nome="trophy" Tamanho="14" Classe="ko-taca" />
+            }
+            <span class="ko-gols">@(gols?.ToString() ?? "–")</span>
+        </div>;
+    }
 
     // "Quartas 1 — 1º Grupo A x 2º Grupo B" vira título curto + confronto em linha menor,
     // para o cartão não quebrar em três linhas quando fica estreito.
@@ -73,11 +73,10 @@
         return $"/images/escudos/{clean}.png";
     }
 
-    private static string StatusBadge(PartidaStatus s) => s switch
+    private static string StatusEtiqueta(PartidaStatus s) => s switch
     {
-        PartidaStatus.EmAndamento => "bg-warning text-dark",
-        PartidaStatus.Encerrada => "bg-success",
-        _ => "bg-secondary"
+        PartidaStatus.EmAndamento => "perigo",
+        _ => ""
     };
 
     private static string StatusLabel(PartidaStatus s) => s switch

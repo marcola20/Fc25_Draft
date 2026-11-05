@@ -11,10 +11,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <small class="text-muted d-block">@Jogo.FaseLabel</small>
+                    <small class="text-body-tertiary d-block fs-6 fw-normal mb-1">@Jogo.FaseLabel</small>
                     <img src="@EscudoUrl(Jogo.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="me-2" />
                     @(Jogo.TimeCasaNome ?? "A definir")
-                    <span class="text-muted mx-2">@(Iniciada ? $"{Jogo.GolsCasa ?? 0} – {Jogo.GolsFora ?? 0}" : "x")</span>
+                    <span class="text-muted mx-2 placar">@(Iniciada ? $"{Jogo.GolsCasa ?? 0} – {Jogo.GolsFora ?? 0}" : "x")</span>
                     @(Jogo.TimeForaNome ?? "A definir")
                     <img src="@EscudoUrl(Jogo.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" class="ms-2" />
                 </h5>
@@ -68,26 +68,26 @@
             <div class="modal-footer">
                 @if (_encerrando)
                 {
-                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _encerrando = false">← Voltar</button>
+                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _encerrando = false"><Icone Nome="arrow-left" Tamanho="14" /> Voltar</button>
                     <button type="button" class="btn btn-warning" @onclick="ConfirmarEncerrar" disabled="@_saving">Confirmar encerramento</button>
                 }
                 else if (_showEditor)
                 {
-                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false">← Voltar</button>
+                    <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false"><Icone Nome="arrow-left" Tamanho="14" /> Voltar</button>
                 }
                 else if (AdminAuth.IsAdmin && Jogo.TimeCasaId.HasValue && Jogo.TimeForaId.HasValue)
                 {
                     <div class="me-auto d-flex gap-2 flex-wrap">
                         @if (!Iniciada)
                         {
-                            <button type="button" class="btn btn-primary" @onclick="CriarPartida" disabled="@_saving">▶️ Iniciar partida</button>
+                            <button type="button" class="btn btn-success" @onclick="CriarPartida" disabled="@_saving"><Icone Nome="play" Tamanho="14" /> Iniciar partida</button>
                         }
                         else
                         {
-                            <button type="button" class="btn btn-primary" @onclick="() => _showEditor = true">✏️ Editar stats</button>
+                            <button type="button" class="btn btn-primary" @onclick="() => _showEditor = true"><Icone Nome="pencil" Tamanho="14" /> Editar stats</button>
                             @if (!Jogo.VencedorId.HasValue)
                             {
-                                <button type="button" class="btn btn-warning" @onclick="MostrarEncerrar">🏁 Encerrar jogo</button>
+                                <button type="button" class="btn btn-warning" @onclick="MostrarEncerrar"><Icone Nome="square" Tamanho="14" /> Encerrar jogo</button>
                             }
                         }
                     </div>

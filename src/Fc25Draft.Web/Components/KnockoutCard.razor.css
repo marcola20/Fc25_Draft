@@ -1,0 +1,114 @@
+/* Um confronto do mata-mata: fase em cima, os dois times com o placar à direita. */
+.ko-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-body-bg);
+    box-shadow: var(--cbfv-sombra);
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+
+.ko-card.clicavel {
+    cursor: pointer;
+}
+
+.ko-card.clicavel:hover {
+    border-color: var(--bs-secondary-color);
+}
+
+/* A final ganha o dourado: borda, fase e a taça do campeão. */
+.ko-card.destaque {
+    border-color: rgba(201, 148, 40, 0.55);
+}
+
+.ko-topo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.ko-fase {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.destaque .ko-fase {
+    color: var(--cbfv-acento-texto);
+}
+
+.ko-confronto {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}
+
+.ko-corpo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.625rem 0.875rem 0.75rem;
+}
+
+.ko-linha {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.ko-linha img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.ko-time {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.ko-gols {
+    flex-shrink: 0;
+    min-width: 1.5rem;
+    text-align: right;
+    font-family: var(--bs-font-monospace);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.ko-linha.vencedor .ko-time {
+    color: var(--bs-emphasis-color);
+}
+
+.ko-linha.eliminado .ko-time,
+.ko-linha.eliminado .ko-gols {
+    color: var(--bs-tertiary-color);
+}
+
+.ko-linha.eliminado img {
+    opacity: 0.55;
+}
+
+.ko-linha ::deep .ko-taca {
+    color: var(--cbfv-acento-texto);
+}
+
+.ko-penaltis {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}

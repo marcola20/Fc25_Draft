@@ -10,7 +10,7 @@
 
 <PageTitle>Mata-Mata</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
         @if (_ligas is not null && _ligas.Count > 1)
         {
@@ -40,7 +40,7 @@
         @if (_jogos.Any(j => j.Fase is FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C))
         {
             <!-- Play-In (Liga apenas) -->
-            <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Play-In</h5>
+            <div class="secao-titulo"><h2>Play-In</h2></div>
             <div class="row g-3 mb-4">
                 @foreach (var fase in new[] { FaseKnockout.PlayIn_A, FaseKnockout.PlayIn_B, FaseKnockout.PlayIn_C })
                 {
@@ -58,7 +58,7 @@
         @if (_jogos.Any(j => j.Fase is FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4))
         {
             <!-- Quartas -->
-            <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Quartas de Final</h5>
+            <div class="secao-titulo"><h2>Quartas de final</h2></div>
             <div class="row g-3 mb-4 ko-quartas">
                 @foreach (var fase in new[] { FaseKnockout.QF1, FaseKnockout.QF2, FaseKnockout.QF3, FaseKnockout.QF4 })
                 {
@@ -74,7 +74,7 @@
         }
 
         <!-- Semis -->
-        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Semifinais</h5>
+        <div class="secao-titulo"><h2>Semifinais</h2></div>
         <div class="row g-3 mb-4">
             @foreach (var fase in new[] { FaseKnockout.Semi1, FaseKnockout.Semi2 })
             {
@@ -89,7 +89,7 @@
         </div>
 
         <!-- Final -->
-        <h5 class="text-uppercase text-muted small fw-bold mt-2 mb-2">Final</h5>
+        <div class="secao-titulo"><h2>Final</h2></div>
         @if (_jogos.FirstOrDefault(j => j.Fase == FaseKnockout.Final) is { } jogoFinal)
         {
             <div class="row g-3">
