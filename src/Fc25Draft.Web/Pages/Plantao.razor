@@ -11,19 +11,17 @@
 
 <PageTitle>Plantão CBFV</PageTitle>
 
-<div class="container-fluid py-3" style="max-width: 900px;">
-    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-        <div class="btn-group btn-group-sm" role="group" aria-label="Filtro">
-            <button type="button" class="btn @(_filtro is null ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(null)">Tudo</button>
-            <button type="button" class="btn @(_filtro == PlantaoCategoria.Jogo ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">⚽ Jogos</button>
-            <button type="button" class="btn @(_filtro == PlantaoCategoria.Mercado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">💸 Mercado</button>
-            <button type="button" class="btn @(_filtro == PlantaoCategoria.Diretoria ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Diretoria)">🏛️ Diretoria</button>
-            <button type="button" class="btn @(_filtro == PlantaoCategoria.Carreira ? "btn-primary" : "btn-outline-primary")" @onclick="() => Filtrar(PlantaoCategoria.Carreira)">👋 Carreira</button>
-        </div>
-    </div>
-    <p class="text-muted small mb-3">
+<div style="max-width: 900px;">
+    <p class="text-body-secondary small mb-3">
         Notícias sobre jogos, gols, títulos, transferências, diretoria e jogadores. Clique para ver o time ou o jogador.
     </p>
+    <ul class="nav nav-pills mb-4" role="tablist" aria-label="Filtro">
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro is null ? "active" : "")" @onclick="() => Filtrar(null)">Tudo</button></li>
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Jogo ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Jogo)">Jogos</button></li>
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Mercado ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">Mercado</button></li>
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Diretoria ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Diretoria)">Diretoria</button></li>
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Carreira ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Carreira)">Carreira</button></li>
+    </ul>
 
     @if (_loading)
     {
@@ -35,11 +33,18 @@
     }
     else if (!Filtradas.Any())
     {
-        <div class="alert alert-info">Nenhuma notícia ainda.</div>
+        <div class="alert alert-secondary">Nenhuma notícia ainda.</div>
     }
     else
     {
-        <PlantaoLista Noticias="@Filtradas.Take(_limite)" />
+        @* Como um caderno de esportes: as notícias agrupadas por dia, do mais recente para o mais antigo. *@
+        @foreach (var dia in Filtradas.Take(_limite).GroupBy(n => BrazilTime.ConvertFromUtc(n.Data).Date))
+        {
+            <section class="mb-4">
+                <div class="secao-titulo"><h2>@RotuloDoDia(dia.Key)</h2></div>
+                <PlantaoLista Noticias="@dia" SoHora="true" />
+            </section>
+        }
 
         @if (Filtradas.Count() > _limite)
         {
@@ -52,6 +57,17 @@
 
 @code {
     private const int PorPagina = 30;
+    private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    // "Hoje", "Ontem" ou o dia da semana com a data ("ter., 03/11").
+    private static string RotuloDoDia(DateTime dia)
+    {
+        var hoje = BrazilTime.ConvertFromUtc(DateTime.UtcNow).Date;
+        if (dia == hoje) return "Hoje";
+        if (dia == hoje.AddDays(-1)) return "Ontem";
+        var texto = dia.ToString("ddd, dd/MM", Br);
+        return char.ToUpper(texto[0], Br) + texto[1..];
+    }
 
     private IReadOnlyList<PlantaoNoticiaDto> _noticias = Array.Empty<PlantaoNoticiaDto>();
     private PlantaoCategoria? _filtro;

@@ -24,7 +24,7 @@
                         <span class="plantao-detalhe" title="@n.Detalhe">@n.Detalhe</span>
                     }
                 </span>
-                <span class="plantao-quando">@Quando(n.Data)</span>
+                <span class="plantao-quando">@(SoHora ? BrazilTime.ConvertFromUtc(n.Data).ToString("HH:mm") : Quando(n.Data))</span>
             </a>
         </li>
     }
@@ -47,6 +47,9 @@
     };
 
     [Parameter, EditorRequired] public IEnumerable<PlantaoNoticiaDto> Noticias { get; set; } = Array.Empty<PlantaoNoticiaDto>();
+
+    /// <summary>Só a hora (quando a lista já vem agrupada por dia, como na página do Plantão).</summary>
+    [Parameter] public bool SoHora { get; set; }
 
     // "hoje", "ontem", "há 3 dias"; depois de uma semana, a data.
     private static string Quando(DateTime utc)
