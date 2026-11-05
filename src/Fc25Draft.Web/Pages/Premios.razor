@@ -35,7 +35,7 @@
         </div>
         @if (AdminAuth.IsAdmin)
         {
-            <a href="/admin/premios" class="btn btn-sm btn-outline-secondary">⚙️ Montar a votação</a>
+            <a href="/admin/premios" class="btn btn-sm btn-outline-secondary"><Icone Nome="settings" Tamanho="14" /> Montar a votação</a>
         }
     }
     else
@@ -56,7 +56,7 @@
             <span class="text-muted small">@v.Votaram de @v.Eleitores já votaram</span>
             @if (AdminAuth.IsAdmin)
             {
-                <a href="/admin/premios?temporada=@v.Temporada" class="btn btn-sm btn-outline-secondary ms-auto">⚙️ Admin</a>
+                <a href="/admin/premios?temporada=@v.Temporada" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="settings" Tamanho="14" /> Admin</a>
             }
         </div>
         <p class="text-muted small mb-4">
@@ -79,7 +79,7 @@
             {
                 @if (_cedula?.Votos.Count > 0)
                 {
-                    <div class="alert alert-success py-2 small">✅ Seu voto está registrado. Dá para mudar até a votação fechar.</div>
+                    <div class="alert alert-success py-2 small">Seu voto está registrado. Dá para mudar até a votação fechar.</div>
                 }
 
                 @foreach (var categoria in v.Categorias)
@@ -92,7 +92,7 @@
                             <span class="fs-5">@regra.Emoji</span>
                             <span class="fw-bold">@regra.Sigla</span>
                             <span class="text-muted small">@regra.Nome</span>
-                            <span class="badge @(marcados == regra.Votos ? "bg-success" : "bg-secondary") ms-auto">@marcados de @regra.Votos</span>
+                            <span class="etiqueta numero @(marcados == regra.Votos ? "sucesso" : "") ms-auto">@marcados de @regra.Votos</span>
                         </div>
                         <div class="card-body">
                             <div class="mb-2">@regra.Pergunta <span class="text-muted small">— vote em @(regra.Votos == 1 ? "1" : $"até {regra.Votos}")</span></div>
@@ -137,7 +137,7 @@
                 }
 
                 <div class="d-flex justify-content-end mb-4">
-                    <button class="btn btn-success" @onclick="Votar" disabled="@_salvando">
+                    <button class="btn btn-primary" @onclick="Votar" disabled="@_salvando">
                         @(_cedula?.Votos.Count > 0 ? "Atualizar meu voto" : "Enviar meu voto")
                     </button>
                 </div>
@@ -145,7 +145,7 @@
         }
         else if (v.Situacao == SituacaoVotacao.Encerrada)
         {
-            <div class="alert alert-secondary">🗳️ Votação encerrada. O resultado sai assim que a apuração for publicada.</div>
+            <div class="alert alert-secondary">Votação encerrada. O resultado sai assim que a apuração for publicada.</div>
             @Finalistas(v)
         }
         else
@@ -166,7 +166,7 @@
                         @foreach (var c in categoria.Candidatos)
                         {
                             <li class="list-group-item d-flex align-items-center gap-2 @(c.Vencedor ? "fw-semibold" : "")" @key="c.CandidatoId">
-                                <span style="width:1.5rem;">@(c.Vencedor ? "🏆" : "")</span>
+                                <span style="width:1.5rem;" class="text-acento">@if (c.Vencedor) { <Icone Nome="trophy" Tamanho="14" /> }</span>
                                 @if (c.TimeNome is { Length: > 0 } time)
                                 {
                                     <img src="@EscudoService.GetEscudo(time)" alt="" title="@time" style="width:22px;height:22px;object-fit:contain;" />
@@ -184,7 +184,7 @@
                                 </span>
                                 <div class="flex-grow-1 d-none d-sm-block">
                                     <div class="progress" style="height:8px;">
-                                        <div class="progress-bar @(c.Vencedor ? "bg-warning" : "bg-secondary")" style="width:@((c.Votos ?? 0) * 100 / maximo)%;"></div>
+                                        <div class="progress-bar" style="width:@((c.Votos ?? 0) * 100 / maximo)%; background: @(c.Vencedor ? "var(--cbfv-acento)" : "var(--bs-tertiary-color)");"></div>
                                     </div>
                                 </div>
                                 <span class="text-nowrap ms-auto" style="min-width:4.5rem;text-align:right;">@(c.Votos ?? 0) @(c.Votos == 1 ? "voto" : "votos")</span>
@@ -319,9 +319,9 @@
 
     private static string TextoDaSituacao(SituacaoVotacao s) => s switch
     {
-        SituacaoVotacao.Aberta => "🗳️ votação aberta",
+        SituacaoVotacao.Aberta => "votação aberta",
         SituacaoVotacao.Encerrada => "apuração",
-        SituacaoVotacao.Publicada => "🏆 resultado",
+        SituacaoVotacao.Publicada => "resultado",
         _ => "em montagem"
     };
 
