@@ -26,14 +26,14 @@ else if (_dados is not null)
     {
         <div class="row g-2 mb-3">
             @Numero("Jogos", e.Competicoes.All(c => c.Jogos is null) ? "—" : $"{e.Jogos}{(e.JogosParcial ? "*" : "")}", "")
-            @Numero("⚽ Gols", e.Gols.ToString(), "")
-            @Numero("🅰️ Assist.", e.Assistencias.ToString(), "")
-            @Numero("G/A", (e.Gols + e.Assistencias).ToString(), "fw-bold")
+            @Numero("Gols", e.Gols.ToString(), "")
+            @Numero("Assist.", e.Assistencias.ToString(), "")
+            @Numero("G/A", (e.Gols + e.Assistencias).ToString(), "")
             @if (e.CleanSheets is int cs)
             {
-                @Numero("🧤 Clean sheets", cs.ToString(), "")
+                @Numero("Clean sheets", cs.ToString(), "")
             }
-            @Numero("🟨 / 🟥", $"{e.Amarelos} / {e.Vermelhos}", "")
+            @Numero("Cartões", $"{e.Amarelos} / {e.Vermelhos}", "")
         </div>
 
         @if (e.JogosParcial)
@@ -51,11 +51,11 @@ else if (_dados is not null)
             <div class="d-flex flex-wrap gap-2 mb-4">
                 @foreach (var t in e.Titulos)
                 {
-                    <span class="badge bg-warning text-dark fs-6 fw-normal">🏆 @t.Competicao <span class="small">(@t.TimeNome)</span></span>
+                    <span class="chip chip-titulo"><Icone Nome="trophy" Tamanho="14" /> @t.Competicao <span class="text-body-secondary">· @t.TimeNome</span></span>
                 }
                 @if (e.Hattricks > 0)
                 {
-                    <span class="badge bg-dark fs-6 fw-normal">🎩 @e.Hattricks hat-trick@(e.Hattricks > 1 ? "s" : "")</span>
+                    <span class="chip">@e.Hattricks hat-trick@(e.Hattricks > 1 ? "s" : "")</span>
                 }
                 @if (e.MaisGolsNumJogo >= 2)
                 {
@@ -72,14 +72,14 @@ else if (_dados is not null)
                         <th class="text-start">Competição</th>
                         <th class="text-start">Time</th>
                         <th title="Jogos">J</th>
-                        <th title="Gols">⚽</th>
-                        <th title="Assistências">🅰️</th>
+                        <th title="Gols">G</th>
+                        <th title="Assistências">A</th>
                         @if (e.CleanSheets is not null)
                         {
-                            <th title="Clean sheets">🧤</th>
+                            <th title="Clean sheets">CS</th>
                         }
-                        <th title="Cartões amarelos">🟨</th>
-                        <th title="Cartões vermelhos">🟥</th>
+                        <th title="Cartões amarelos"><span class="cartao-icone amarelo"></span></th>
+                        <th title="Cartões vermelhos"><span class="cartao-icone vermelho"></span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -88,7 +88,7 @@ else if (_dados is not null)
                         <tr class="@(c.Campeao ? "table-warning" : "")">
                             <td class="text-start">
                                 @c.Competicao
-                                @if (c.Campeao) { <span title="Campeão">🏆</span> }
+                                @if (c.Campeao) { <span title="Campeão"><Icone Nome="trophy" Tamanho="12" Classe="text-acento" /></span> }
                                 @if (c.SoElenco) { <span class="badge bg-light text-muted border fw-normal ms-1" title="Sem registro em campo: estava no elenco do time durante a competição">elenco</span> }
                             </td>
                             <td class="text-start"><a href="/teams/details/@c.TimeId" class="text-primary">@c.TimeNome</a></td>

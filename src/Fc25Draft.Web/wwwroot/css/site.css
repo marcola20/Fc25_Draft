@@ -529,7 +529,7 @@ h6.text-uppercase.text-muted {
 }
 
 /* Número da posição na tabela: quadradinho de 22px. */
-.posicao {
+.num-posicao {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1221,4 +1221,21 @@ a.text-primary:hover {
 /* Profissional contratado (comissão técnica do clube): linha fina verde. */
 .contratado {
     border-color: rgba(47, 158, 106, 0.45) !important;
+}
+
+/* Faixas de cor dos atributos e do overall, como no PES (90+ vermelho, 80+ laranja, 70+ amarelo). */
+.atr-90 { background: #d6404e; color: #fff; }
+.atr-80 { background: #e8772e; color: #fff; }
+.atr-70 { background: #e9b931; color: #1a1405; }
+.atr-baixo { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+
+/* Losango da legenda do valor jogo a jogo. */
+.losango {
+    display: inline-block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    margin-right: 0.25rem;
+    border-radius: 1px;
+    transform: rotate(45deg);
+    vertical-align: 0.0625rem;
 }

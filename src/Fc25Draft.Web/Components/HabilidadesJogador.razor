@@ -24,7 +24,7 @@
         }
         @foreach (var h in Habilidades)
         {
-            <span class="badge rounded-pill bg-primary me-1 mb-1">@h</span>
+            <span class="chip me-1 mb-1">@h</span>
         }
 
         <div class="grupo-titulo mt-3">Estilos de IA (@EstilosIa.Count)</div>
@@ -34,7 +34,7 @@
         }
         @foreach (var e in EstilosIa)
         {
-            <span class="badge rounded-pill bg-secondary me-1 mb-1">@e</span>
+            <span class="chip me-1 mb-1">@e</span>
         }
 
         @if (Atributos.Posicoes is { Length: > 0 } || Atributos.PosicaoPes is not null)

@@ -33,7 +33,7 @@ else if (_d is { } d)
 
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
-            <strong>💹 Valor no @d.TimeNome jogo a jogo</strong>
+            <strong>Valor no @d.TimeNome jogo a jogo</strong>
             <span class="small text-muted">
                 @Dinheiro.Curto(pontos[0].Valor) → <strong class="text-body">@Dinheiro.Curto(ultimo.Valor)</strong>
             </span>
@@ -55,7 +55,7 @@ else if (_d is { } d)
 
                 @if (pontos.Count > 1)
                 {
-                    <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5" stroke-linejoin="round"
+                    <polyline fill="none" stroke="var(--bs-tertiary-color)" stroke-width="2" stroke-linejoin="round"
                               points="@string.Join(" ", pontos.Select((p, i) => $"{Num(X(i))},{Num(Y(p.Valor))}"))" />
                 }
 
@@ -68,7 +68,10 @@ else if (_d is { } d)
                     </circle>
                     @if (p.Humor is string humor)
                     {
-                        <g><text x="@Num(X(i))" y="@Num(Y(p.Valor) - 24)" text-anchor="middle" class="vg-humor">@humor</text></g>
+                        @* Losango acima do ponto: vermelho quando ficou insatisfeito, verde quando fez as pazes. *@
+                        <rect x="@Num(X(i) - 3.5)" y="@Num(Y(p.Valor) - 27)" width="7" height="7" rx="1"
+                              transform="rotate(45 @Num(X(i)) @Num(Y(p.Valor) - 23.5))"
+                              fill="@(humor == "🤝" ? "var(--cbfv-vitoria)" : "var(--cbfv-derrota)")" />
                     }
                     @if (mudou)
                     {
@@ -86,7 +89,8 @@ else if (_d is { } d)
                 <span><span style="color: @Cor(ParticipouComo.Titular)">●</span> titular</span>
                 <span><span style="color: @Cor(ParticipouComo.EntrouDoBanco)">●</span> entrou do banco</span>
                 <span><span style="color: @Cor(ParticipouComo.NaoJogou)">●</span> não jogou</span>
-                <span>😤 ficou insatisfeito · 🤝 fez as pazes</span>
+                <span><span class="losango" style="background: var(--cbfv-derrota)"></span> ficou insatisfeito</span>
+                <span><span class="losango" style="background: var(--cbfv-vitoria)"></span> fez as pazes</span>
             </div>
             <div class="small text-muted mt-1">
                 Valor de mercado de hoje com a participação de cada momento (últimos @ParticipacaoCriterios.JanelaDeJogos jogos do clube).

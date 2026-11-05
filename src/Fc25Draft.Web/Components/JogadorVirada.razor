@@ -8,10 +8,10 @@
 {
     <div class="card mb-3">
         <div class="card-header d-flex align-items-center gap-2">
-            <strong>🔄 Virada de temporada</strong>
+            <strong>Virada de temporada</strong>
             @if (Admin)
             {
-                <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _ajustando = !_ajustando">✎ Ajuste manual</button>
+                <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _ajustando = !_ajustando"><Icone Nome="pencil" Tamanho="14" /> Ajuste manual</button>
             }
         </div>
         <div class="card-body small">
@@ -21,8 +21,8 @@
                     <span>Temporada @u.Temporada:</span>
                     <span class="badge @(u.Pontos > 0 ? "bg-success" : u.Pontos < 0 ? "bg-danger" : "bg-secondary")">@EvolucaoTemporada.Sinal(u.Pontos) pontos</span>
                     <span>overall @u.OverallAntes → <strong>@u.OverallDepois</strong></span>
-                    @if (u.Surpresa > 0) { <span class="badge bg-warning text-dark">💥 explosão</span> }
-                    @if (u.Surpresa < 0) { <span class="badge bg-dark">📉 queda de rendimento</span> }
+                    @if (u.Surpresa > 0) { <span class="etiqueta acento">explosão</span> }
+                    @if (u.Surpresa < 0) { <span class="etiqueta perigo">queda de rendimento</span> }
                 </div>
                 <div class="text-muted mt-1">@u.Explicacao</div>
             }

@@ -36,7 +36,7 @@ else
         </div>
         <div class="col-6 col-md-3">
             <div class="card text-center h-100"><div class="card-body py-2">
-                <div class="small text-muted">Melhor em campo</div><h4 class="mb-0">⭐ @_dados.VezesMelhorEmCampo</h4>
+                <div class="small text-muted">Melhor em campo</div><h4 class="mb-0 d-inline-flex align-items-center gap-1"><Icone Nome="star" Tamanho="18" Classe="text-acento" /> @_dados.VezesMelhorEmCampo</h4>
             </div></div>
         </div>
     </div>
@@ -78,7 +78,7 @@ else
                                 <span class="fw-semibold @CorDaNota(nota)">@nota.ToString("0.0")</span>
                                 @if (j.MelhorEmCampo)
                                 {
-                                    <span title="Melhor em campo">⭐</span>
+                                    <span title="Melhor em campo"><Icone Nome="star" Tamanho="12" Classe="text-acento" /></span>
                                 }
                             }
                             else
@@ -89,8 +89,8 @@ else
                         <td class="text-center">@(j.Gols > 0 ? j.Gols.ToString() : "")</td>
                         <td class="text-center">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "")</td>
                         <td class="text-center d-none d-md-table-cell">
-                            @for (var i = 0; i < j.Amarelos; i++) { <span>🟨</span> }
-                            @for (var i = 0; i < j.Vermelhos; i++) { <span>🟥</span> }
+                            @for (var i = 0; i < j.Amarelos; i++) { <span class="cartao-icone amarelo me-1" title="Amarelo"></span> }
+                            @for (var i = 0; i < j.Vermelhos; i++) { <span class="cartao-icone vermelho me-1" title="Vermelho"></span> }
                         </td>
                     </tr>
                 }
@@ -110,10 +110,10 @@ else
 
     private static string CorDoResultado(string? r) => r switch
     {
-        "V" => "bg-success",
-        "D" => "bg-danger",
-        "E" => "bg-secondary",
-        _ => "bg-info text-dark"
+        "V" => "resultado resultado-v",
+        "D" => "resultado resultado-d",
+        "E" => "resultado resultado-e",
+        _ => "resultado"
     };
 
     // Mesma leitura do PES: 7+ muito bom, 6 regular, abaixo de 5,5 ruim.

@@ -19,9 +19,9 @@ public static class ZonaEstilo
 
     public static string Linha(ZonaClassificacao zona) => Classe(zona) is { Length: > 0 } c ? $"linha-zona {c}" : "";
 
-    public static string Badge(ZonaClassificacao zona) => Classe(zona) is { Length: > 0 } c ? $"posicao {c}" : "posicao zona-neutra";
+    public static string Badge(ZonaClassificacao zona) => Classe(zona) is { Length: > 0 } c ? $"num-posicao {c}" : "num-posicao zona-neutra";
 
     /// <summary>Empate no topo em Pts, V, SG e GP: o título sai em jogo decisivo ou mini liga.</summary>
     public const string LinhaEmpateTopo = "linha-zona zona-empate";
-    public const string BadgeEmpateTopo = "posicao zona-empate";
+    public const string BadgeEmpateTopo = "num-posicao zona-empate";
 }

@@ -1,12 +1,8 @@
 /* Cartão de apresentação do jogador: foto, nome com o overall, dados e ações. */
 .jogador-hero {
-    border: 0;
-    border-radius: 1rem;
-    box-shadow: 0 8px 24px rgba(27, 38, 59, 0.08);
+    border-radius: 0.75rem;
     overflow: hidden;
-    background:
-        linear-gradient(135deg, rgba(13, 110, 253, 0.08), transparent 55%),
-        var(--bs-body-bg);
+    background: var(--bs-body-bg);
 }
 
 .jogador-hero-corpo {
@@ -27,9 +23,9 @@
 .jogador-hero-foto ::deep .jogador-hero-img {
     width: 120px !important;
     height: 150px !important;
-    border-radius: 0.9rem;
+    border-radius: 0.625rem;
     object-position: center top;
-    box-shadow: 0 0 0 4px var(--bs-body-bg), 0 0 0 6px var(--cbfv-azul), 0 6px 18px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 0 0 1px var(--bs-border-color);
 }
 
 .jogador-hero-foto-admin {
@@ -53,19 +49,23 @@
 .jogador-hero-nome {
     margin: 0;
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: 500;
+    line-height: 1.15;
     color: var(--bs-emphasis-color);
 }
 
+/* O overall na mesma faixa de cor dos atributos (a do PES). */
 .jogador-hero-overall {
-    font-size: 1.15rem;
-    padding: 0.4em 0.6em;
-    border-radius: 0.6rem;
-}
-
-.jogador-overall-laranja {
-    background-color: #fd7e14;
-    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 .jogador-hero-sub {
@@ -82,8 +82,13 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-weight: 600;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
     text-decoration: none;
+}
+
+.jogador-hero-time:hover {
+    color: var(--bs-link-hover-color);
 }
 
 .jogador-hero-time img {
@@ -100,21 +105,38 @@
 }
 
 .jogador-hero-variacao {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .jogador-hero-rotulo {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
 }
 
 .jogador-hero-valor {
-    font-size: 1.15rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
     color: var(--bs-emphasis-color);
+}
+
+.jogador-hero-link {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--bs-secondary-color);
+}
+
+.jogador-hero-voltar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
 }
 
 .jogador-hero-acoes {

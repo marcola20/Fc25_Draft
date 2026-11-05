@@ -5,8 +5,8 @@
 @* Selos dos prêmios de destaque ganhos (MVP 2010, ROY 2010...), na ficha do jogador ou do treinador. *@
 @foreach (var p in _premios)
 {
-    <a href="/premios?temporada=@p.Temporada" class="badge bg-warning text-dark text-decoration-none"
-       title="@Dica(p)">@p.Regra.Emoji @p.Titulo</a>
+    <a href="/premios?temporada=@p.Temporada" class="etiqueta acento"
+       title="@Dica(p)"><Icone Nome="trophy" Tamanho="12" /> @p.Titulo</a>
 }
 
 @code {

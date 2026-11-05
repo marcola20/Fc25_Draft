@@ -24,11 +24,11 @@
 
 @if (isLoading)
 {
-    <p><em>Carregando...</em></p>
+    <div class="text-center py-5"><span class="spinner-border" role="status" aria-label="Carregando"></span></div>
 }
 else if (player is null)
 {
-    <p>Jogador não encontrado.</p>
+    <div class="alert alert-secondary">Jogador não encontrado.</div>
 }
 else
 {
@@ -41,7 +41,7 @@ else
                     {
                         <div class="jogador-hero-foto-admin">
                             <label class="btn btn-link btn-sm p-0" title="Trocar a foto deste jogador">
-                                📷 Trocar
+                                <Icone Nome="camera" Tamanho="14" /> Trocar
                                 <input type="file" id="fotoJogadorArquivo" accept="image/*" class="d-none" @onchange="TrocarFotoAsync" />
                             </label>
                             @if (_foto?.TemFoto == true)
@@ -60,60 +60,60 @@ else
                 <div class="jogador-hero-info">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <h2 class="jogador-hero-nome">@player.Name</h2>
-                        <span class="badge jogador-hero-overall @CorDoOverall(player.Overall)" title="Overall">@player.Overall</span>
+                        <span class="jogador-hero-overall @AtributosPes.Faixa(player.Overall)" title="Overall">@player.Overall</span>
                         <PremiosConquistados PlayerId="@player.PlayerId" />
                         @if (player.AposentadoNaTemporada is int aposentou)
                         {
-                            <span class="badge bg-secondary" title="Pendurou as chuteiras">🎖️ Aposentado (última temporada: @aposentou)</span>
+                            <span class="etiqueta" title="Pendurou as chuteiras">Aposentado · última temporada @aposentou</span>
                         }
                         else if (player.UltimaTemporada is int ultima)
                         {
-                            <span class="badge bg-warning text-dark" title="Anunciou a despedida">👋 Última temporada: @ultima</span>
+                            <span class="etiqueta aviso" title="Anunciou a despedida">Última temporada: @ultima</span>
                         }
                         @if (_participacao?.Saida is { NaLista: true } saida)
                         {
-                            <a href="/mercado/lista" class="badge bg-danger text-decoration-none"
-                               title="@(saida.PromessaQuebrada ? "A promessa de colocar para jogar foi quebrada: está na lista pela metade da venda rápida" : "Seguiu insatisfeito no banco: está na lista pelo preço da venda rápida")">🚪 Pediu para sair</a>
+                            <a href="/mercado/lista" class="etiqueta perigo"
+                               title="@(saida.PromessaQuebrada ? "A promessa de colocar para jogar foi quebrada: está na lista pela metade da venda rápida" : "Seguiu insatisfeito no banco: está na lista pelo preço da venda rápida")"><Icone Nome="door-open" Tamanho="12" /> Pediu para sair</a>
                         }
                         else if (_participacao?.Saida is { PromessaEm: not null } promessa)
                         {
-                            <span class="badge bg-info text-dark"
-                                  title="O clube prometeu colocar para jogar: titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos até o @(PedidoDeSaidaCriterios.JogosDaPromessa)º jogo">🤝 Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
+                            <span class="etiqueta"
+                                  title="O clube prometeu colocar para jogar: titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos até o @(PedidoDeSaidaCriterios.JogosDaPromessa)º jogo"><Icone Nome="handshake" Tamanho="12" /> Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
                         }
                         @if (_participacao is { Insatisfeito: true } insatisfeito)
                         {
-                            <span class="badge bg-danger" title="Joga menos do que o papel dele pede: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular">😤 Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
+                            <span class="etiqueta perigo" title="Joga menos do que o papel dele pede: passa com @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos como titular"><Icone Nome="frown" Tamanho="12" /> Insatisfeito@(insatisfeito.InsatisfeitoDesde is { } desde ? $" desde {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde.Data, DateTimeKind.Utc), HorarioDeBrasilia.Fuso):dd/MM}" : "")</span>
                         }
                         else if (_participacao is { Incomodado: true })
                         {
-                            <span class="badge bg-warning text-dark" title="Se não jogar o próximo jogo do clube, fica 😤 insatisfeito">😐 Incomodado</span>
+                            <span class="etiqueta aviso" title="Se não jogar o próximo jogo do clube, fica insatisfeito"><Icone Nome="meh" Tamanho="12" /> Incomodado</span>
                         }
                         @if (_treinos.Count(t => t.Atributo is not null) is > 0 and var treinou)
                         {
-                            <span class="badge text-bg-light border"
+                            <span class="etiqueta"
                                   title="@($"Treino da semana nesta temporada: {string.Join(", ", _treinos.Where(t => t.Atributo is not null).GroupBy(t => t.Atributo).Select(g => $"{g.Key} +{g.Count() * TreinoCriterios.GanhoPorSemana}"))}")">
-                                🏋️ Treino +@(_treinos.Where(t => t.Atributo is not null).Sum(t => TreinoCriterios.GanhoPorSemana + (t.AtributoDoPadrinho is null ? 0 : PadrinhoCriterios.ExtraNoTreino)))
+                                <Icone Nome="activity" Tamanho="12" /> Treino +@(_treinos.Where(t => t.Atributo is not null).Sum(t => TreinoCriterios.GanhoPorSemana + (t.AtributoDoPadrinho is null ? 0 : PadrinhoCriterios.ExtraNoTreino)))
                             </span>
                         }
                         @if (_recompra is { } recompra)
                         {
-                            <span class="badge text-bg-light border"
+                            <span class="etiqueta"
                                   title="O @recompra.VendedorNome pode comprar de volta até o fim da temporada, enquanto ele estiver no @recompra.CompradorNome">
-                                🔁 Recompra do @recompra.VendedorNome · @Dinheiro.Curto(recompra.Preco)
+                                <Icone Nome="repeat" Tamanho="12" /> Recompra do @recompra.VendedorNome · @Dinheiro.Curto(recompra.Preco)
                             </span>
                         }
                         @if (_padrinho is { } par)
                         {
-                            <a href="/players/details/@(par.PadrinhoId == player.PlayerId ? par.AfilhadoId : par.PadrinhoId)" class="badge text-bg-light border text-decoration-none"
+                            <a href="/players/details/@(par.PadrinhoId == player.PlayerId ? par.AfilhadoId : par.PadrinhoId)" class="etiqueta"
                                title="@(par.PadrinhoId == player.PlayerId ? $"Padrinho: o afilhado já treinou {par.Treinos} de {PadrinhoCriterios.TreinosParaOBonus} semanas para o bônus da virada" : "Afilhado: rende mais no treino da semana")">
-                                🤝 @(par.PadrinhoId == player.PlayerId ? $"Padrinho de {par.AfilhadoNome}" : $"Afilhado de {par.PadrinhoNome}")
+                                <Icone Nome="handshake" Tamanho="12" /> @(par.PadrinhoId == player.PlayerId ? $"Padrinho de {par.AfilhadoNome}" : $"Afilhado de {par.PadrinhoNome}")
                             </a>
                         }
                         @if (_participacao?.Papel is { } papel)
                         {
-                            <span class="badge text-bg-light border"
+                            <span class="etiqueta"
                                   title="@($"{PapelDoJogador.OQueEspera(papel.Papel, papel.Janela)}.{(papel.PrataDaCasa ? " Prata da casa: tem mais paciência." : "")}{(_participacao.NaConversa ? " Teve a conversa: valor mais baixo por alguns jogos." : "")}")">
-                                @PapelDoJogador.Emoji(papel.Papel) @PapelDoJogador.Nome(papel.Papel)@(papel.PrataDaCasa ? " · prata da casa" : "")
+                                <Icone Nome="@IconeDoPapel(papel.Papel)" Tamanho="12" /> @PapelDoJogador.Nome(papel.Papel)@(papel.PrataDaCasa ? " · prata da casa" : "")
                             </span>
                         }
                     </div>
@@ -146,8 +146,8 @@ else
                             <div class="jogador-hero-valor">@(_valorDeMercado is decimal valor ? Dinheiro.Curto(valor) : "—")</div>
                             @if (_participacao is { Variacao: not 0m } comVariacao)
                             {
-                                <div class="jogador-hero-variacao @(comVariacao.Variacao > 0 ? "text-success" : "text-danger")">
-                                    @(comVariacao.Travada ? "🔒" : comVariacao.Variacao > 0 ? "▲" : "▼") @Participacao.Rotulo(comVariacao.Variacao)
+                                <div class="jogador-hero-variacao @(comVariacao.Variacao > 0 ? "texto-vitoria" : "texto-derrota")">
+                                    <Icone Nome="@(comVariacao.Travada ? "lock" : comVariacao.Variacao > 0 ? "arrow-up" : "arrow-down")" Tamanho="12" /> @Participacao.Rotulo(comVariacao.Variacao)
                                     @(comVariacao.Travada ? "travado: pediu para sair" : comVariacao.ChegouEmBaixa ? "chegou em baixa" : comVariacao.NaConversa ? "pela participação e a conversa" : "pela participação")
                                 </div>
                             }
@@ -182,7 +182,7 @@ else
                             <div>
                                 <div class="jogador-hero-rotulo">Rating</div>
                                 <div class="jogador-hero-valor">
-                                    @formula.ToString("0.00") <a href="/overall" class="small fw-normal">como é calculado</a>
+                                    @formula.ToString("0.00") <a href="/overall" class="jogador-hero-link">como é calculado</a>
                                 </div>
                             </div>
                         }
@@ -193,27 +193,25 @@ else
                     @* Treinador logado com o token do time não é administrador. *@
                     @if (AdminAuth.IsAdmin)
                     {
-                        <button class="btn btn-sm btn-primary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
-                            ✏️ Editar
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => Navigation.NavigateTo($"/players/edit/{player.PlayerId}")'>
+                            <Icone Nome="pencil" Tamanho="14" /> Editar
                         </button>
                     }
-                    <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-sm btn-outline-primary">⚖️ Comparar</a>
+                    <a href="/jogadores/comparar?a=@player.PlayerId" class="btn btn-sm btn-outline-secondary"><Icone Nome="arrow-left-right" Tamanho="14" /> Comparar</a>
                     @if (_podeObservar)
                     {
-                        <button type="button" class="btn btn-sm @(_observando ? "btn-warning" : "btn-outline-warning")" @onclick="AlternarObservacaoAsync"
+                        <button type="button" class="btn btn-sm btn-outline-secondary @(_observando ? "acao-ativa" : "")" @onclick="AlternarObservacaoAsync"
                                 title="@(_observando ? "Tirar da lista de observação" : "Acompanhar na Minha Área (avisa quando entrar em leilão)")">
-                            @(_observando ? "★ Observando" : "☆ Observar")
+                            <Icone Nome="star" Tamanho="14" /> @(_observando ? "Observando" : "Observar")
                         </button>
                     }
-                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => Navigation.NavigateTo("/players")'>
-                        ← Jogadores
-                    </button>
+                    <a href="/players" class="jogador-hero-voltar"><Icone Nome="arrow-left" Tamanho="14" /> Jogadores</a>
                 </div>
             </div>
         </div>
     </div>
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
+    <ul class="nav nav-tabs mb-4" role="tablist">
         @if (player.Atributos is not null)
         {
             <li class="nav-item" role="presentation">
@@ -293,14 +291,13 @@ else
 
     private enum Aba { Atributos, Habilidades, Jogos, Valor, Carreira }
 
-    // Mesma escala de cores dos atributos.
-    private static string CorDoOverall(int overall) => overall switch
+    // O Core marca o papel no elenco com um emoji; aqui ele vira um ícone do lucide.
+    private static string IconeDoPapel(PapelNoElenco papel) => papel switch
     {
-        >= 90 => "bg-danger",
-        >= 85 => "jogador-overall-laranja",
-        >= 80 => "bg-warning text-dark",
-        >= 75 => "bg-success",
-        _ => "bg-secondary"
+        PapelNoElenco.Titular => "star",
+        PapelNoElenco.Disputa => "repeat",
+        PapelNoElenco.Rotacao => "armchair",
+        _ => "sprout"
     };
 
     // Foto: origem (PES ou trocada à mão) e a versão que força o navegador a buscar a nova.

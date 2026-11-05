@@ -30,28 +30,10 @@
 .valor {
     min-width: 2.25rem;
     text-align: center;
-    font-weight: 700;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     border-radius: .25rem;
     padding: .05rem .35rem;
 }
 
-.atr-90 {
-    background: #dc3545;
-    color: #fff;
-}
 
-.atr-80 {
-    background: #fd7e14;
-    color: #fff;
-}
-
-.atr-70 {
-    background: #ffc107;
-    color: var(--bs-body-color);
-}
-
-.atr-baixo {
-    background: var(--bs-secondary-bg);
-    color: var(--bs-secondary-color);
-}
