@@ -599,8 +599,8 @@
                 }
                 else
                 {
-                    <h6 class="fw-semibold mb-1">Gols decisivos</h6>
-                    <p class="small text-muted mb-2">
+                    <h2 class="estat-titulo">Gols decisivos</h2>
+                    <p class="small text-body-secondary mb-3">
                         Gol da vitória: o que deixou o time na frente de vez num jogo ganho por um gol. Gol do empate: o que deixou o jogo igual no fim. Gol contra não entra.
                     </p>
                     @if (m.Decisivos.Count == 0)
@@ -609,8 +609,8 @@
                     }
                     else
                     {
-                        <div class="table-responsive mb-4">
-                            <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                        <div class="table-responsive painel mb-4">
+                            <table class="table table-hover align-middle mb-0 tabela-liga">
                                 <thead class="table-dark">
                                     <tr>
                                         <th style="width:35px;">#</th>
@@ -626,7 +626,7 @@
                                     {
                                         var d = m.Decisivos[i];
                                         <tr style="height:40px;cursor:pointer;" title="Ver os jogos" @onclick="() => _decisivoAberto = _decisivoAberto == d.JogadorId ? null : d.JogadorId">
-                                            <td class="fw-bold text-muted">@(i + 1)</td>
+                                            <td class="numero text-body-tertiary">@(i + 1)</td>
                                             <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                                 <FotoJogador PlayerId="@d.JogadorId" Tamanho="28" Classe="me-2" />
                                                 <a href="/players/details/@d.JogadorId" class="text-body">@d.JogadorNome</a>
@@ -637,7 +637,7 @@
                                             </td>
                                             <td class="text-center">@(d.DaVitoria > 0 ? d.DaVitoria.ToString() : "—")</td>
                                             <td class="text-center">@(d.DoEmpate > 0 ? d.DoEmpate.ToString() : "—")</td>
-                                            <td class="text-center fw-bold">@d.Total <span class="text-muted small">@(_decisivoAberto == d.JogadorId ? "▴" : "▾")</span></td>
+                                            <td class="text-center text-nowrap"><span class="fw-semibold numero">@d.Total</span> <Icone Nome="@(_decisivoAberto == d.JogadorId ? "chevron-up" : "chevron-down")" Tamanho="14" Classe="text-body-tertiary" /></td>
                                         </tr>
                                         @if (_decisivoAberto == d.JogadorId)
                                         {
@@ -647,9 +647,9 @@
                                                         @foreach (var j in d.Jogos)
                                                         {
                                                             <li class="list-group-item d-flex flex-wrap gap-2 align-items-center ps-5">
-                                                                <span class="text-muted" style="min-width:90px;">@j.Rotulo</span>
-                                                                <span>@j.CasaNome <strong>@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
-                                                                <span class="badge @(j.DaVitoria ? "bg-success" : "bg-secondary")">@(j.DaVitoria ? "Vitória" : "Empate")</span>
+                                                                <span class="text-body-tertiary" style="min-width:90px;">@j.Rotulo</span>
+                                                                <span>@j.CasaNome <strong class="placar">@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
+                                                                <span class="etiqueta @(j.DaVitoria ? "sucesso" : "")">@(j.DaVitoria ? "Vitória" : "Empate")</span>
                                                                 <span class="text-muted">@(j.DaVitoria ? "fez" : "empatou em") @j.PlacarCasa x @j.PlacarFora aos @(j.Minuto)'</span>
                                                             </li>
                                                         }
@@ -663,12 +663,12 @@
                         </div>
                     }
 
-                    <h6 class="fw-semibold mb-1">Viradas</h6>
-                    <p class="small text-muted mb-2">
+                    <h2 class="estat-titulo">Viradas</h2>
+                    <p class="small text-body-secondary mb-3">
                         Pontos buscados depois de sair atrás (virada vale 3, empate 1) e pontos que escaparam depois de estar na frente (empate tira 2, derrota 3).
                     </p>
-                    <div class="table-responsive mb-2">
-                        <table class="table table-sm table-hover align-middle text-center" style="font-size:0.85rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-sm table-hover align-middle text-center mb-0" style="font-size:0.8125rem;">
                             <thead class="table-dark">
                                 <tr>
                                     <th class="text-start">Time</th>
@@ -692,14 +692,14 @@
                                         </td>
                                         <td>@t.Viradas</td>
                                         <td>@t.EmpatesBuscados</td>
-                                        <td class="text-success fw-semibold">@t.PontosBuscados</td>
+                                        <td class="texto-vitoria">@t.PontosBuscados</td>
                                         <td>@t.VantagensPerdidas</td>
-                                        <td class="text-danger fw-semibold">@t.PontosPerdidos</td>
-                                        <td class="fw-bold text-nowrap @(t.Saldo > 0 ? "text-success" : t.Saldo < 0 ? "text-danger" : "")">
+                                        <td class="texto-derrota">@t.PontosPerdidos</td>
+                                        <td class="fw-semibold text-nowrap @(t.Saldo > 0 ? "texto-vitoria" : t.Saldo < 0 ? "texto-derrota" : "")">
                                             @(t.Saldo > 0 ? "+" : "")@t.Saldo
                                             @if (temJogos)
                                             {
-                                                <span class="text-muted small fw-normal">@(_viradaAberta == t.TimeId ? "▴" : "▾")</span>
+                                                <Icone Nome="@(_viradaAberta == t.TimeId ? "chevron-up" : "chevron-down")" Tamanho="14" Classe="text-body-tertiary" />
                                             }
                                         </td>
                                     </tr>
@@ -711,9 +711,9 @@
                                                     @foreach (var j in t.Jogos)
                                                     {
                                                         <li class="list-group-item d-flex flex-wrap gap-2 align-items-center ps-4">
-                                                            <span class="text-muted" style="min-width:90px;">@j.Rotulo</span>
-                                                            <span>@j.CasaNome <strong>@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
-                                                            <span class="badge @(j.Pontos > 0 ? "bg-success" : "bg-danger")">
+                                                            <span class="text-body-tertiary" style="min-width:90px;">@j.Rotulo</span>
+                                                            <span>@j.CasaNome <strong class="placar">@j.GolsCasa x @j.GolsFora</strong> @j.ForaNome</span>
+                                                            <span class="etiqueta @(j.Pontos > 0 ? "sucesso" : "perigo")">
                                                                 @(j.Tipo switch { TipoViradaJogo.Virada => "Virada", TipoViradaJogo.EmpateBuscado => "Empate buscado", _ => "Vantagem perdida" })
                                                                 @(j.Pontos > 0 ? "+" : "−")@Math.Abs(j.Pontos)
                                                             </span>
@@ -732,16 +732,16 @@
                     </div>
                     @if (m.Viradas.Count > 0)
                     {
-                        <ul class="list-group list-group-flush small mb-4">
+                        <ul class="list-group list-group-flush small mb-4 lista-viradas">
                             @foreach (var v in m.Viradas)
                             {
                                 var vencedor = v.VencedorId == v.CasaId ? v.CasaNome : v.ForaNome;
                                 <li class="list-group-item px-0 d-flex flex-wrap gap-2 align-items-center">
-                                    <span class="text-muted" style="min-width:90px;">@v.Rotulo</span>
-                                    <span class="@(v.VencedorId == v.CasaId ? "fw-bold" : "")">@v.CasaNome</span>
-                                    <span class="fw-bold">@v.GolsCasa x @v.GolsFora</span>
-                                    <span class="@(v.VencedorId == v.ForaId ? "fw-bold" : "")">@v.ForaNome</span>
-                                    <span class="text-success">· @vencedor virou depois de estar perdendo por @v.MaiorDesvantagem @(v.MaiorDesvantagem == 1 ? "gol" : "gols")</span>
+                                    <span class="text-body-tertiary" style="min-width:90px;">@v.Rotulo</span>
+                                    <span class="@(v.VencedorId == v.CasaId ? "fw-semibold" : "text-body-secondary")">@v.CasaNome</span>
+                                    <span class="fw-semibold placar">@v.GolsCasa x @v.GolsFora</span>
+                                    <span class="@(v.VencedorId == v.ForaId ? "fw-semibold" : "text-body-secondary")">@v.ForaNome</span>
+                                    <span class="texto-vitoria">@vencedor virou depois de estar perdendo por @v.MaiorDesvantagem @(v.MaiorDesvantagem == 1 ? "gol" : "gols")</span>
                                 </li>
                             }
                         </ul>
@@ -751,17 +751,17 @@
                         <div class="text-muted small mb-4">Nenhuma virada ainda.</div>
                     }
 
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                        <h6 class="fw-bold mb-0">⏱️ Gols por período</h6>
+                    <div class="d-flex flex-wrap align-items-center gap-3 mb-1">
+                        <h2 class="estat-titulo mb-0">Gols por período</h2>
                         <div class="btn-group btn-group-sm" role="group">
-                            <button class="btn @(_periodoSofridos ? "btn-outline-secondary" : "btn-success")" @onclick="() => _periodoSofridos = false">Feitos</button>
-                            <button class="btn @(_periodoSofridos ? "btn-danger" : "btn-outline-secondary")" @onclick="() => _periodoSofridos = true">Sofridos</button>
+                            <button class="btn btn-outline-secondary @(_periodoSofridos ? "" : "active")" @onclick="() => _periodoSofridos = false">Feitos</button>
+                            <button class="btn btn-outline-secondary @(_periodoSofridos ? "active" : "")" @onclick="() => _periodoSofridos = true">Sofridos</button>
                         </div>
                     </div>
-                    <p class="small text-muted mb-2">Gols @(_periodoSofridos ? "sofridos" : "feitos") em cada faixa de 15 minutos; os acréscimos do segundo tempo contam no último período.</p>
+                    <p class="small text-body-secondary mb-3">Gols @(_periodoSofridos ? "sofridos" : "feitos") em cada faixa de 15 minutos; os acréscimos do segundo tempo contam no último período.</p>
                     var maximo = Math.Max(1, m.PorPeriodo.SelectMany(t => _periodoSofridos ? t.Sofridos : t.Feitos).DefaultIfEmpty(0).Max());
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle text-center" style="font-size:0.85rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-sm align-middle text-center mb-0" style="font-size:0.8125rem;">
                             <thead class="table-dark">
                                 <tr>
                                     <th class="text-start">Time</th>
@@ -785,7 +785,7 @@
                                         {
                                             <td style="@CorDoPeriodo(v, maximo)">@(v > 0 ? v.ToString() : "")</td>
                                         }
-                                        <td class="fw-bold">@valores.Sum()</td>
+                                        <td class="fw-semibold numero">@valores.Sum()</td>
                                     </tr>
                                 }
                             </tbody>
@@ -813,16 +813,19 @@
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle text-center" style="font-size:0.85rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-sm table-hover align-middle text-center mb-0" style="font-size:0.8125rem;">
                             <thead class="table-dark">
                                 <tr>
                                     <th class="text-start">Time</th>
                                     @foreach (var coluna in ColunasDosTimes)
                                     {
                                         var c = coluna;
-                                        <th role="button" title="@c.Dica" @onclick="() => OrdenarTimes(c.Chave)" class="text-nowrap">
-                                            @c.Titulo@if (_ordemTimes == c.Chave) { <Icone Nome="@(_ordemTimesDesc ? "chevron-down" : "chevron-up")" Tamanho="12" /> }
+                                        <th class="text-nowrap" title="@c.Dica">
+                                            <button type="button" class="ordenar @(_ordemTimes == c.Chave ? "ativo" : "")" @onclick="() => OrdenarTimes(c.Chave)">
+                                                @c.Titulo
+                                                @if (_ordemTimes == c.Chave) { <Icone Nome="@(_ordemTimesDesc ? "arrow-down" : "arrow-up")" Tamanho="12" /> }
+                                            </button>
                                         </th>
                                     }
                                 </tr>
@@ -837,7 +840,7 @@
                                         </td>
                                         @foreach (var coluna in ColunasDosTimes)
                                         {
-                                            <td class="@(_ordemTimes == coluna.Chave ? "fw-semibold" : "")">@coluna.Texto(t)</td>
+                                            <td class="numero @(_ordemTimes == coluna.Chave ? "fw-semibold text-body-emphasis" : "text-body-secondary")">@coluna.Texto(t)</td>
                                         }
                                     </tr>
                                 }
@@ -883,7 +886,7 @@
                                 {
                                     var n = notas[i];
                                     <tr style="height:40px;">
-                                        <td class="fw-bold text-muted">@(i + 1)</td>
+                                        <td class="numero text-body-tertiary">@(i + 1)</td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <FotoJogador PlayerId="@n.JogadorId" Tamanho="28" Classe="me-2" />
                                             <a href="/players/details/@n.JogadorId" class="text-body">@n.JogadorNome</a> <span class="text-muted small">@n.Posicao</span>
@@ -929,7 +932,7 @@
                                 {
                                     r++;
                                     <tr style="height:40px;">
-                                        <td style="width:35px;" class="fw-bold text-muted">@r</td>
+                                        <td style="width:35px;" class="numero text-body-tertiary">@r</td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <FotoJogador PlayerId="@a.JogadorId" Tamanho="28" Classe="me-2" />
                                             <a href="/players/details/@a.JogadorId" class="text-body">@a.JogadorNome</a>
@@ -941,7 +944,7 @@
                                             }
                                             <span class="@(a.TimeId == Guid.Empty ? "fst-italic" : "")">@a.TimeNome</span>
                                         </td>
-                                        <td class="text-center fw-bold" style="width:50px;">@a.Gols</td>
+                                        <td class="text-center fw-semibold numero" style="width:50px;">@a.Gols</td>
                                         <td class="text-center text-muted" style="width:45px;">@(a.Assistencias > 0 ? a.Assistencias.ToString() : "—")</td>
                                     </tr>
                                 }
@@ -975,7 +978,7 @@
                                 {
                                     ra++;
                                     <tr style="height:40px;">
-                                        <td style="width:35px;" class="fw-bold text-muted">@ra</td>
+                                        <td style="width:35px;" class="numero text-body-tertiary">@ra</td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <FotoJogador PlayerId="@a.JogadorId" Tamanho="28" Classe="me-2" />
                                             <a href="/players/details/@a.JogadorId" class="text-body">@a.JogadorNome</a>
@@ -987,7 +990,7 @@
                                             }
                                             <span class="@(a.TimeId == Guid.Empty ? "fst-italic" : "")">@a.TimeNome</span>
                                         </td>
-                                        <td class="text-center fw-bold" style="width:60px;">@a.Assistencias</td>
+                                        <td class="text-center fw-semibold numero" style="width:60px;">@a.Assistencias</td>
                                     </tr>
                                 }
                             </tbody>
@@ -1063,7 +1066,7 @@
                                 {
                                     rc++;
                                     <tr style="height:40px;">
-                                        <td style="width:35px;" class="fw-bold text-muted">@rc</td>
+                                        <td style="width:35px;" class="numero text-body-tertiary">@rc</td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                             <FotoJogador PlayerId="@c.JogadorId" Tamanho="28" Classe="me-2" />
                                             <a href="/players/details/@c.JogadorId" class="text-body">@c.JogadorNome</a>
@@ -1250,7 +1253,7 @@
     /// <summary>Fundo da célula mais forte quanto mais gols no período (verde nos feitos, vermelho nos sofridos).</summary>
     private string CorDoPeriodo(int valor, int maximo) => valor <= 0
         ? ""
-        : $"background-color: rgba({(_periodoSofridos ? "220, 53, 69" : "25, 135, 84")}, {(0.12 + 0.55 * valor / maximo).ToString("0.00", CultureInfo.InvariantCulture)});";
+        : $"background-color: rgba({(_periodoSofridos ? "208, 82, 74" : "47, 158, 106")}, {(0.10 + 0.50 * valor / maximo).ToString("0.00", CultureInfo.InvariantCulture)});";
     private string _ordemTimes = "posse";
     private bool _ordemTimesDesc = true;
 

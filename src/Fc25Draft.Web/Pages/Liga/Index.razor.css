@@ -227,3 +227,15 @@
         padding: 0.75rem;
     }
 }
+
+/* Títulos das seções da aba Momentos (gols decisivos, viradas, períodos). */
+.estat-titulo {
+    margin: 0 0 0.25rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.lista-viradas .list-group-item {
+    background: transparent;
+}
