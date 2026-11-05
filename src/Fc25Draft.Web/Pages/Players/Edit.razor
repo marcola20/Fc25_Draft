@@ -11,6 +11,9 @@
 
 @implements IDisposable
 
+@* Nome da aba: o do jogador carregado (não o do campo, que muda enquanto digita). *@
+<PageTitle>@(_nomeCarregado is null ? Title : $"Editar {_nomeCarregado}")</PageTitle>
+
 <h3>@Title</h3>
 
 @if (!string.IsNullOrEmpty(errorMessage))
@@ -223,6 +226,7 @@ else
     private bool authInitialized;
 
     private string Title => Id.HasValue ? "Editar Jogador" : "Novo Jogador";
+    private string? _nomeCarregado;
 
     private double? OverallDaFormula => OverallPes.CalcularDoJogador(atributos);
 
@@ -277,6 +281,7 @@ else
             }
 
             model.Name = details.Name;
+            _nomeCarregado = details.Name;
             model.Age = details.Age;
             model.Pais = details.Pais;
             model.Overall = details.Overall;

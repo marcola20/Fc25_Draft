@@ -41,7 +41,15 @@ public sealed class AbasService
         // O cabeçalho (título, caminho, botões) é da página da frente: fica guardado na aba dela.
         _layout.StateChanged += () =>
         {
-            if (Ativa is { Instancia: not null } ativa && !_restaurandoCabecalho) ativa.Cabecalho = _layout.Atual;
+            if (Ativa is not { Instancia: not null } ativa || _restaurandoCabecalho) return;
+            ativa.Cabecalho = _layout.Atual;
+
+            // Página sem nome no menu nem <PageTitle>: fica com o título do cabeçalho que ela pôs.
+            if (ativa.Titulo == LayoutNavigationService.TituloSemNome && !string.IsNullOrWhiteSpace(_layout.Title))
+            {
+                ativa.Titulo = _layout.Title;
+                Mudou?.Invoke();
+            }
         };
     }
 
@@ -70,8 +78,11 @@ public sealed class AbasService
 
     public IEnumerable<Aba> Vivas => _abas.Where(a => a.Instancia is not null);
 
-    /// <summary>Chamado a cada navegação (e quando o login troca a página por "acesso restrito").</summary>
-    public void DefinirRota(RouteData rota, bool usaAbas)
+    /// <summary>
+    /// Chamado a cada navegação (e quando o login troca a página por "acesso restrito"). <paramref name="paginaDoEndereco"/>
+    /// é a página de verdade do endereço, para o nome da aba (a rota pode ser a do "acesso restrito").
+    /// </summary>
+    public void DefinirRota(RouteData rota, bool usaAbas, Type? paginaDoEndereco = null)
     {
         ReativouAgora = false;
         if (!usaAbas)
@@ -112,7 +123,7 @@ public sealed class AbasService
 
         if (aba is null)
         {
-            aba = NovaAba(url, fixa: false);
+            aba = NovaAba(url, fixa: false, paginaDoEndereco ?? rota.PageType);
             _abas.Add(aba);
         }
 
@@ -120,6 +131,9 @@ public sealed class AbasService
         var jaViva = aba.Instancia is { } viva && viva.Mesma(rota);
         if (!jaViva)
         {
+            // Outra página no mesmo endereço (entrou como admin e saiu o "acesso restrito"): o nome volta
+            // ao do menu, e o título da página nova chega depois.
+            if (aba.Instancia is { } antiga && antiga.Tipo != rota.PageType) aba.Titulo = aba.TituloDoMenu;
             aba.Instancia = new InstanciaDaAba(rota, ++_relogio);
         }
 
@@ -247,9 +261,26 @@ public sealed class AbasService
         Mudou?.Invoke();
     }
 
-    private Aba NovaAba(string url, bool fixa)
+    private Aba NovaAba(string url, bool fixa, Type? pagina = null)
     {
         var (titulo, icone, doMenu) = _menu.DescreverAba(Caminho(url));
+
+        // Endereço alternativo da mesma página ("/admin/lineups" = "/admin/escalacoes"): nome e ícone
+        // do endereço dela que está no menu.
+        if (!doMenu && pagina is not null)
+        {
+            foreach (var rota in pagina.GetCustomAttributes(typeof(RouteAttribute), inherit: false).Cast<RouteAttribute>())
+            {
+                if (rota.Template.Contains('{')) continue;
+                var outra = _menu.DescreverAba(rota.Template);
+                if (outra.DoMenu)
+                {
+                    (titulo, icone, doMenu) = outra;
+                    break;
+                }
+            }
+        }
+
         return new Aba(url, titulo, icone, fixa, doMenu);
     }
 

@@ -16,6 +16,9 @@
 
 @implements IDisposable
 
+@* Também é o nome da aba: "Escalações — Corinthians". *@
+<PageTitle>@(_nomeDoTime is null ? "Escalações" : $"Escalações — {_nomeDoTime}")</PageTitle>
+
 <PageHeader Title="Escalações"
             Subtitle="@pageSubtitle" />
 
@@ -831,6 +834,7 @@ else
     private string? currentTeamToken;
     private string? errorMessage;
     private string? pageSubtitle;
+    private string? _nomeDoTime;
     private Tab activeTab = Tab.Lineup;
     private string? _activeHint;
     private void ToggleHint(string id) => _activeHint = _activeHint == id ? null : id;
@@ -916,6 +920,7 @@ else
                     .ThenBy(l => l.CreatedAtUtc)
                     .ToList();
 
+                _nomeDoTime = adminRoster.TeamName;
                 pageSubtitle = $"Gerencie as escalações do {adminRoster.TeamName}.";
                 LayoutState.SetPage(pageDefinition, subtitle: pageSubtitle);
 
@@ -1025,6 +1030,7 @@ else
                 .ThenBy(l => l.CreatedAtUtc)
                 .ToList();
 
+            _nomeDoTime = roster.TeamName;
             pageSubtitle = $"Gerencie as escalações do {roster.TeamName}.";
             LayoutState.SetPage(pageDefinition, subtitle: pageSubtitle);
 

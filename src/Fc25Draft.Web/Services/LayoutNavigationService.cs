@@ -791,6 +791,9 @@ public class LayoutNavigationService
         ("/admin/", "settings")
     };
 
+    /// <summary>Nome da aba de página que não tem nome em lugar nenhum (a aba troca pelo título do cabeçalho, se vier).</summary>
+    public const string TituloSemNome = "Página";
+
     /// <summary>
     /// Nome e ícone da aba de uma página: o item do menu com esse endereço (o título vem da definição da
     /// página quando ela tem); fora do menu, a definição da página e o ícone do item "pai" no endereço.
@@ -814,7 +817,7 @@ public class LayoutNavigationService
                         .OrderByDescending(i => i.Href.Length)
                         .FirstOrDefault()?.Icon
                     ?? "file-text";
-        return (string.IsNullOrWhiteSpace(definicao?.Title) ? "Página" : definicao.Title, icone, false);
+        return (string.IsNullOrWhiteSpace(definicao?.Title) ? TituloSemNome : definicao.Title, icone, false);
     }
 
     public bool HasRoute(string route)

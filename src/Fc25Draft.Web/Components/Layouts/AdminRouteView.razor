@@ -46,7 +46,7 @@
 
         // Cada página do layout normal vira uma aba (o telão, com layout próprio, não).
         var layout = RouteData.PageType.GetCustomAttribute<LayoutAttribute>()?.LayoutType ?? DefaultLayout;
-        Abas.DefinirRota(_rotaEfetiva, usaAbas: layout == DefaultLayout);
+        Abas.DefinirRota(_rotaEfetiva, usaAbas: layout == DefaultLayout, paginaDoEndereco: RouteData.PageType);
     }
 
     private static bool ExigeAdmin(Type pagina) => ExigeAdminCache.GetOrAdd(pagina, tipo =>
