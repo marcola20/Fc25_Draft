@@ -57,10 +57,12 @@
                 <ReacoesJogo PartidaId="pid" Class="mb-3" />
                 @if (Jogo.PartidaStatus == PartidaStatus.Encerrada)
                 {
-                    <CraqueDaPartidaCard Escalacoes="_escalacoes" PartidaId="pid"
-                                         CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")"
-                                         GolsCasa="Jogo.GolsCasa ?? 0" GolsFora="Jogo.GolsFora ?? 0"
-                                         Rotulo="@(string.IsNullOrEmpty(LigaNome) ? Jogo.FaseLabel : $"{Jogo.FaseLabel} · {LigaNome}")" />
+                    <FimDeJogoCard PartidaId="pid" CasaId="Jogo.TimeCasaId"
+                                   CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")"
+                                   GolsCasa="Jogo.GolsCasa ?? 0" GolsFora="Jogo.GolsFora ?? 0"
+                                   Eventos="_eventos" Escalacoes="_escalacoes"
+                                   Rotulo="@(string.IsNullOrEmpty(LigaNome) ? Jogo.FaseLabel : $"{Jogo.FaseLabel} · {LigaNome}")"
+                                   Observacao="@(Jogo.TemPenaltis && Jogo.VencedorNome is { } v ? $"{v} venceu nos pênaltis" : null)" />
                 }
                 <PartidaAbas PartidaId="pid" CasaId="Jogo.TimeCasaId" CasaNome="@(Jogo.TimeCasaNome ?? "")" ForaNome="@(Jogo.TimeForaNome ?? "")" Eventos="_eventos" Escalacoes="_escalacoes" />
                 }

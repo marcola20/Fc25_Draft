@@ -15,7 +15,7 @@
             }
             else
             {
-                <Icone Nome="share-2" Tamanho="14" /><span>Compartilhar</span>
+                <Icone Nome="share-2" Tamanho="14" /><span>@TextoBotao</span>
             }
         </button>
     </div>
@@ -48,6 +48,7 @@
     [Parameter] public string? Subtitulo { get; set; }
     [Parameter] public string Arquivo { get; set; } = "cbfv.png";
     [Parameter] public bool MostrarBotao { get; set; } = true;
+    [Parameter] public string TextoBotao { get; set; } = "Compartilhar";
 
     /// <summary>Página do site que vai junto na legenda (o padrão é a Liga).</summary>
     [Parameter] public string Link { get; set; } = "/liga";

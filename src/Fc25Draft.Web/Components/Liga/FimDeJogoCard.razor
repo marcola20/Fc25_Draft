@@ -1,0 +1,104 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Enums
+@inject EscudoService Escudos
+
+@* O jogo encerrado pronto para mandar no grupo: o botão gera uma imagem com o placar, quem fez os gols,
+   as expulsões e o craque da partida. Na tela só aparecem o botão e o card do craque (o placar já está
+   no topo da janela do jogo); o placar grande é só da imagem. *@
+<ShareableCard Id="@($"cap-jogo-{PartidaId:N}")" Titulo="Fim de jogo"
+               Subtitulo="@($"{CasaNome} {GolsCasa} x {GolsFora} {ForaNome}")"
+               Arquivo="cbfv-fim-de-jogo.png" TextoBotao="Compartilhar jogo">
+    @* share-only some na tela; na captura quem mostra é o display do .fim-de-jogo (igual ao .share-brand). *@
+    <div class="fim-de-jogo share-only">
+        @if (!string.IsNullOrWhiteSpace(Rotulo))
+        {
+            <div class="competicao">@Rotulo</div>
+        }
+        <div class="confronto">
+            @Lado(CasaNome, GolsDe(casa: true), ExpulsosDe(casa: true))
+            <div class="marcador">
+                <span>@GolsCasa</span><span class="traco">–</span><span>@GolsFora</span>
+            </div>
+            @Lado(ForaNome, GolsDe(casa: false), ExpulsosDe(casa: false))
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Observacao))
+        {
+            <div class="observacao">@Observacao</div>
+        }
+    </div>
+
+    <CraqueDaPartidaCard Escalacoes="Escalacoes" />
+</ShareableCard>
+
+@code {
+    [Parameter, EditorRequired] public Guid PartidaId { get; set; }
+    [Parameter] public Guid? CasaId { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+    [Parameter] public int GolsCasa { get; set; }
+    [Parameter] public int GolsFora { get; set; }
+    [Parameter] public IReadOnlyList<LigaEventoDto> Eventos { get; set; } = Array.Empty<LigaEventoDto>();
+    [Parameter] public PartidaEscalacoesDto? Escalacoes { get; set; }
+
+    /// <summary>De onde é o jogo ("Rodada 5 · Brasileirão — Série A 2010").</summary>
+    [Parameter] public string? Rotulo { get; set; }
+
+    /// <summary>Linha embaixo do placar, como "Flamengo venceu nos pênaltis".</summary>
+    [Parameter] public string? Observacao { get; set; }
+
+    private record Marcador(string Nome, bool Contra, IReadOnlyList<int?> Minutos);
+    private record Expulso(string Nome, int? Minuto);
+
+    // O TimeId do gol contra é o time que ganhou o gol, então ele entra na lista de quem comemorou.
+    private bool DaCasa(LigaEventoDto ev) => CasaId is Guid id ? ev.TimeId == id : ev.TimeNome == CasaNome;
+
+    private IEnumerable<LigaEventoDto> EmOrdem() =>
+        Eventos.OrderBy(e => e.Minuto ?? int.MaxValue).ThenBy(e => e.CriadoEm);
+
+    /// <summary>Quem marcou, uma linha por jogador com todos os minutos ("Fernandão 23' 67'").</summary>
+    private List<Marcador> GolsDe(bool casa) => EmOrdem()
+        .Where(e => (e.Tipo is TipoEvento.Gol or TipoEvento.GolContra) && DaCasa(e) == casa)
+        .GroupBy(e => (e.JogadorId, Contra: e.Tipo == TipoEvento.GolContra))
+        .Select(g => new Marcador(g.First().JogadorNome, g.Key.Contra, g.Select(e => e.Minuto).ToList()))
+        .ToList();
+
+    private List<Expulso> ExpulsosDe(bool casa) => EmOrdem()
+        .Where(e => e.Tipo == TipoEvento.CartaoVermelho && DaCasa(e) == casa)
+        .Select(e => new Expulso(e.JogadorNome, e.Minuto))
+        .ToList();
+
+    private static string Minutos(IEnumerable<int?> minutos) =>
+        string.Join(", ", minutos.Where(m => m.HasValue).Select(m => $"{m}'"));
+
+    private RenderFragment Lado(string nome, List<Marcador> gols, List<Expulso> expulsos) => __builder =>
+    {
+        <div class="lado">
+            <img class="escudo" src="@Escudos.GetEscudo(nome)" alt="" onerror="this.src='/images/escudos/escudo.png'" />
+            <div class="time">@nome</div>
+            @if (gols.Count > 0 || expulsos.Count > 0)
+            {
+                <ul class="lances">
+                    @foreach (var g in gols)
+                    {
+                        <li>
+                            <Icone Nome="goal" Tamanho="13" />
+                            <span class="jogador">@g.Nome@(g.Contra ? " (contra)" : "")</span>
+                            <span class="minutos">@Minutos(g.Minutos)</span>
+                        </li>
+                    }
+                    @foreach (var x in expulsos)
+                    {
+                        <li>
+                            <span class="cartao-icone vermelho"></span>
+                            <span class="jogador">@x.Nome</span>
+                            @if (x.Minuto is int m)
+                            {
+                                <span class="minutos">@(m)'</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    };
+}
