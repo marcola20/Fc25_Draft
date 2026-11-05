@@ -12,15 +12,15 @@
     box-shadow: 0 .4rem 1.2rem rgba(91, 33, 182, .35);
 }
 
-.foto { flex-shrink: 0; line-height: 0; }
-
-.foto ::deep .foto-jogador {
-    width: 120px !important;
-    height: 150px !important;
+.foto {
+    flex-shrink: 0;
+    width: 120px;
+    height: 150px;
     border-radius: .7rem;
-    object-fit: cover;
-    object-position: center top;
     background-color: rgba(255, 255, 255, .12);
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
     box-shadow: 0 0 0 3px #e9c46a, 0 .3rem .8rem rgba(0, 0, 0, .4);
 }
 
@@ -50,6 +50,6 @@
 
 @media (max-width: 420px) {
     .craque { gap: .7rem; padding: .7rem; }
-    .foto ::deep .foto-jogador { width: 96px !important; height: 120px !important; }
+    .foto { width: 96px; height: 120px; }
     .nome { font-size: 1.2rem; }
 }

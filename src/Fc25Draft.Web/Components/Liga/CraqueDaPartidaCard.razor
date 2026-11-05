@@ -7,9 +7,10 @@
 @if (_craque is { } c)
 {
     <div class="craque">
-        <div class="foto">
-            <FotoJogador PlayerId="@c.Jogador.JogadorId" Tamanho="150" Lazy="false" Alt="@c.Jogador.JogadorNome" />
-        </div>
+        @* Foto como fundo, e não <img>: o html2canvas ignora object-fit e esticava a foto quadrada no retângulo.
+           Fundo com background-size: cover ele desenha certo. Mesmo endereço do FotoJogador. *@
+        <div class="foto" role="img" aria-label="@c.Jogador.JogadorNome"
+             style="background-image: url('/fotos/jogadores/@c.Jogador.JogadorId')"></div>
         <div class="info">
             <div class="rotulo"><Icone Nome="star" Tamanho="14" /> Craque da partida</div>
             <div class="nome">@c.Jogador.JogadorNome</div>

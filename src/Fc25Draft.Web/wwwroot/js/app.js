@@ -171,11 +171,9 @@ window.fc25ShareImage = (function () {
 
     // Largura fixa (px) do cartão gerado — mantém a imagem no formato "print"
     // legível no WhatsApp, independente da largura da página (evita banner esticado).
-    // Cada cartão pode pedir outra (o fim de jogo sai mais largo).
     const RENDER_WIDTH = 700;
 
-    async function toBlob(elementId, largura) {
-        const RENDER_WIDTH_ATUAL = largura > 0 ? largura : RENDER_WIDTH;
+    async function toBlob(elementId) {
         if (typeof html2canvas !== 'function') {
             throw new Error('html2canvas não carregado.');
         }
@@ -191,8 +189,8 @@ window.fc25ShareImage = (function () {
         // o tamanho certo do canvas, depois restaura o layout original.
         const prevWidth = el.style.width;
         const prevMaxWidth = el.style.maxWidth;
-        el.style.width = RENDER_WIDTH_ATUAL + 'px';
-        el.style.maxWidth = RENDER_WIDTH_ATUAL + 'px';
+        el.style.width = RENDER_WIDTH + 'px';
+        el.style.maxWidth = RENDER_WIDTH + 'px';
 
         try {
             const canvas = await comPrazo(html2canvas(el, {
@@ -214,8 +212,8 @@ window.fc25ShareImage = (function () {
                     if (!clonedEl) return;
                     // A imagem compartilhada sai sempre no tema claro, mesmo com o site no escuro.
                     clonedDoc.documentElement.setAttribute('data-bs-theme', 'light');
-                    clonedEl.style.width = RENDER_WIDTH_ATUAL + 'px';
-                    clonedEl.style.maxWidth = RENDER_WIDTH_ATUAL + 'px';
+                    clonedEl.style.width = RENDER_WIDTH + 'px';
+                    clonedEl.style.maxWidth = RENDER_WIDTH + 'px';
                     clonedEl.style.margin = '0';
                     // Revela elementos que só aparecem na imagem gerada.
                     clonedEl.querySelectorAll('.share-only').forEach(function (e) {
@@ -233,9 +231,9 @@ window.fc25ShareImage = (function () {
     }
 
     // Retorna: 'shared' | 'downloaded' | 'error'
-    async function capture(elementId, fileName, text, largura) {
+    async function capture(elementId, fileName, text) {
         try {
-            const blob = await toBlob(elementId, largura);
+            const blob = await toBlob(elementId);
             if (!blob) return 'error';
 
             const safeName = (fileName && fileName.trim()) ? fileName : 'cbfv.png';

@@ -7,7 +7,7 @@
    no topo da janela do jogo); o placar grande é só da imagem. *@
 <ShareableCard Id="@($"cap-jogo-{PartidaId:N}")" Titulo="Fim de jogo"
                Subtitulo="@($"{CasaNome} {GolsCasa} x {GolsFora} {ForaNome}")"
-               Arquivo="cbfv-fim-de-jogo.png" TextoBotao="Compartilhar jogo" Largura="960">
+               Arquivo="cbfv-fim-de-jogo.png" TextoBotao="Compartilhar jogo">
     @* share-only some na tela; na captura quem mostra é o display do .fim-de-jogo (igual ao .share-brand). *@
     <div class="fim-de-jogo share-only">
         @if (!string.IsNullOrWhiteSpace(Rotulo))
