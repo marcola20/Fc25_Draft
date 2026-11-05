@@ -21,7 +21,7 @@
 @implements IAsyncDisposable
 
 <PageHeader Title="Controle do Draft"
-            Subtitle="Gerencie o andamento do draft em tempo real."
+            Subtitle="A vez, o relógio e os jogadores disponíveis, ao vivo"
             Actions="@BuildDraftActions()" />
 
 @if (!string.IsNullOrEmpty(statusMessage))
@@ -33,7 +33,7 @@
     @if (lastSelection is not null)
     {
         <div class="mb-3">
-            <button class="btn btn-success" @onclick="CompartilharWhatsappAsync">Compartilhar no WhatsApp</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="CompartilharWhatsappAsync"><Icone Nome="share-2" Tamanho="14" /> Compartilhar no WhatsApp</button>
             @if (!string.IsNullOrEmpty(shareFeedback))
             {
                 <span class="ms-2 text-muted">@shareFeedback</span>
@@ -59,23 +59,23 @@
 @if (AvisoTempo.Ultimo is { } aviso && DateTime.UtcNow - aviso.Em < TimeSpan.FromHours(3) && !_avisoTempoFechado)
 {
     <div class="alert alert-warning alert-dismissible" role="status">
-        <div class="fw-semibold mb-1">⏱️ Tempo esgotado: o site escolheu (@BrazilTime.ConvertFromUtc(aviso.Em).ToString("HH:mm"))</div>
+        <div class="fw-semibold mb-1">Tempo esgotado: o site escolheu (@BrazilTime.ConvertFromUtc(aviso.Em).ToString("HH:mm"))</div>
         <div style="white-space: pre-line;">@aviso.Selecao.Mensagem</div>
-        <button type="button" class="btn btn-success btn-sm mt-2" @onclick="() => CompartilharAsync(aviso.Selecao)">Compartilhar no WhatsApp</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" @onclick="() => CompartilharAsync(aviso.Selecao)"><Icone Nome="share-2" Tamanho="14" /> Compartilhar no WhatsApp</button>
         <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => _avisoTempoFechado = true"></button>
     </div>
 }
 
 @if (state is { HasDraft: true, DraftCompleted: false })
 {
-    <p class="small mb-3">
-        🤖 Não vai estar online na sua vez? <a href="/draft/automatico" class="text-primary fw-semibold">Configure a escolha automática</a>.
+    <p class="aviso-draft">
+        <Icone Nome="list-checks" Tamanho="14" /> Não vai estar online na sua vez? <a href="/draft/automatico">Configure a escolha automática</a>
     </p>
 }
 
 @if (state is { IdadeMaxima: int idadeMaximaDoDraft, DraftCompleted: false, IsExpansao: false })
 {
-    <p class="small mb-3">🌱 Draft de jovens: só entram jogadores com até <strong>@idadeMaximaDoDraft anos</strong>.</p>
+    <p class="aviso-draft"><Icone Nome="sprout" Tamanho="14" /> Draft de jovens: só entram jogadores com até <strong>@idadeMaximaDoDraft anos</strong></p>
 }
 
 @if (state is { IsExpansao: true, DraftCompleted: false })
@@ -83,22 +83,26 @@
     @if (state.AguardandoProtecao)
     {
         <div class="alert alert-warning">
-            🛡️ <strong>Draft de expansão:</strong> os times existentes ainda estão definindo os jogadores protegidos.
+            <strong>Draft de expansão:</strong> os times existentes ainda estão definindo os jogadores protegidos.
             As escolhas começam quando o admin encerrar as listas. <a href="/draft/protecao">Montar minha lista de protegidos</a>
         </div>
     }
     else
     {
         <div class="alert alert-info">
-            🆕 <strong>Draft de expansão:</strong> os times novos escolhem jogadores não protegidos dos times existentes.
+            <strong>Draft de expansão:</strong> os times novos escolhem jogadores não protegidos dos times existentes.
             Quem perde um jogador recebe compensação pelo valor de mercado.
         </div>
     }
 }
 
-<DraftPlayerFilters Positions="@positions" IsLoading="@isLoadingPlayers" OnFilterChanged="@OnFilterChangedAsync" />
+@* Filtros e disponíveis só com draft em andamento (concluído ou sem draft, a lista fica vazia). *@
+@if (state is null || (state.HasDraft && !state.DraftCompleted))
+{
+    <DraftPlayerFilters Positions="@positions" IsLoading="@isLoadingPlayers" OnFilterChanged="@OnFilterChangedAsync" />
 
-<DraftPlayerTable Players="@availablePlayers" IsLoading="@isLoadingPlayers" DisableSelection="@DisableSelection" OnPlayerSelected="@OpenModal" />
+    <DraftPlayerTable Players="@availablePlayers" IsLoading="@isLoadingPlayers" DisableSelection="@DisableSelection" OnPlayerSelected="@OpenModal" />
+}
 
 @if (isModalOpen && selectedPlayer is not null)
 {
@@ -154,7 +158,7 @@
             var seq = 0;
             builder.OpenElement(seq++, "button");
             builder.AddAttribute(seq++, "type", "button");
-            builder.AddAttribute(seq++, "class", "btn btn-warning");
+            builder.AddAttribute(seq++, "class", "btn btn-sm btn-primary");
             builder.AddAttribute(seq++, "disabled", !CanGenerateDraft);
             builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, GenerateDraftAsync));
 
@@ -180,7 +184,7 @@
     {
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/draft/controle"),
-            subtitle: "Gerencie o andamento do draft em tempo real.",
+            subtitle: "A vez, o relógio e os jogadores disponíveis, ao vivo",
             actions: BuildDraftActions());
     }
 
@@ -188,7 +192,7 @@
     {
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/draft/controle"),
-            subtitle: "Gerencie o andamento do draft em tempo real.",
+            subtitle: "A vez, o relógio e os jogadores disponíveis, ao vivo",
             actions: BuildDraftActions());
 
         AdminAuth.AuthenticationChanged += OnAdminAuthChanged;
@@ -540,7 +544,7 @@
                     state = escolhasIniciais.State;
                     lastSelection = selecao;
                     shareFeedback = null;
-                    statusMessage += $"\n\n🤖 Escolhas automáticas feitas na abertura:\n{selecao.Mensagem}";
+                    statusMessage += $"\n\nEscolhas automáticas feitas na abertura:\n{selecao.Mensagem}";
                 }
                 else
                 {
@@ -664,7 +668,7 @@
             state = result.State;
             lastSelection = result.Selection;
             shareFeedback = null;
-            statusMessage = result.Selection?.Mensagem ?? "✅ Jogador selecionado com sucesso!";
+            statusMessage = result.Selection?.Mensagem ?? "Jogador escolhido";
             statusCss = "alert-success";
             await CarregarJogadoresAsync();
             CloseModal();

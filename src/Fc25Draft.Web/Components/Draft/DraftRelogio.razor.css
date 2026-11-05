@@ -1,0 +1,53 @@
+/* Relógio da vez: o tempo em mono, grande; vermelho quando está acabando. */
+.relogio {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-body-bg);
+    box-shadow: var(--cbfv-sombra);
+}
+
+.relogio.estourando {
+    border-color: rgba(208, 82, 74, 0.5);
+}
+
+.relogio-tempo {
+    font-size: 1.75rem;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--bs-emphasis-color);
+}
+
+.relogio.estourando .relogio-tempo {
+    color: var(--cbfv-derrota);
+}
+
+.relogio-tempo.pausado {
+    color: var(--bs-tertiary-color);
+}
+
+.relogio-info {
+    display: inline-block;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--bs-secondary-color);
+}
+
+.relogio-info strong {
+    font-weight: 500 !important;
+    color: var(--bs-body-color);
+}
+
+.relogio-info .d-block {
+    color: var(--bs-tertiary-color);
+}
+
+/* Ícone e texto lado a lado nos estados sem contagem. */
+.relogio-info ::deep .icone {
+    margin-right: 0.25rem;
+}

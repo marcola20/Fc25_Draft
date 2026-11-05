@@ -92,3 +92,4 @@ calendar-plus
 download
 check
 triangle-alert
+pause

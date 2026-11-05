@@ -1,44 +1,48 @@
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
 
 @if (IsLoading)
 {
-    <p><em>Carregando jogadores disponíveis...</em></p>
+    <div class="text-center py-4"><span class="spinner-border spinner-border-sm" aria-label="Carregando os jogadores disponíveis"></span></div>
 }
 else if (Players.Count == 0)
 {
-    <p>Nenhum jogador disponível para seleção.</p>
+    <div class="disponiveis-vazio">Nenhum jogador disponível para escolha</div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
+    <div class="table-responsive painel">
+        <table class="table table-hover align-middle mb-0 tabela-disponiveis">
             <thead>
                 <tr>
                     <th>Jogador</th>
                     <th>Posição</th>
-                    <th>Overall</th>
-                    <th>Idade</th>
+                    <th class="text-center">Overall</th>
+                    <th class="text-center">Idade</th>
                     @if (MostrarTime)
                     {
                         <th>Time atual</th>
                     }
-                    <th class="text-end">Ação</th>
+                    <th class="text-end"><span class="visually-hidden">Ação</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var player in Players)
                 {
                     <tr>
-                        <td>@player.Name</td>
-                        <td>@player.PositionName</td>
-                        <td>@player.Overall</td>
-                        <td>@(player.Age?.ToString() ?? "-")</td>
+                        <td class="text-nowrap">
+                            <FotoJogador PlayerId="@player.PlayerId" Tamanho="28" Classe="me-2" />
+                            <a href="/players/details/@player.PlayerId" class="disponivel-nome" target="_blank">@player.Name</a>
+                        </td>
+                        <td class="text-body-secondary">@player.PositionName</td>
+                        <td class="text-center"><span class="ovr @AtributosPes.Faixa(player.Overall)">@player.Overall</span></td>
+                        <td class="text-center numero">@(player.Age?.ToString() ?? "—")</td>
                         @if (MostrarTime)
                         {
-                            <td>@player.TeamName</td>
+                            <td class="text-body-secondary">@player.TeamName</td>
                         }
                         <td class="text-end">
-                            <button class="btn btn-primary" @onclick="() => OnPlayerSelected.InvokeAsync(player)" disabled="@DisableSelection">Escolher</button>
+                            <button class="btn btn-sm btn-primary" @onclick="() => OnPlayerSelected.InvokeAsync(player)" disabled="@DisableSelection">Escolher</button>
                         </td>
                     </tr>
                 }

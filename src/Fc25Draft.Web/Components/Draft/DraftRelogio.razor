@@ -8,26 +8,27 @@
 
 @if (State is { HasDraft: true, DraftCompleted: false })
 {
-    <div class="card mb-3 @(Estourando ? "border-danger" : "")">
-        <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+    <div class="relogio @(Estourando ? "estourando" : "")">
             @if (State.TempoPorEscolhaMinutos is null)
             {
-                <span class="text-muted small">⏱️ Sem limite de tempo por escolha.</span>
+                <span class="relogio-info"><Icone Nome="clock" Tamanho="14" /> Sem limite de tempo por escolha</span>
             }
             else if (State.Pausado)
             {
-                <span class="fw-semibold">⏸️ Relógio pausado</span>
-                <span class="text-muted small">(@Relogio.Formatar(Restante) restantes para @State.CurrentTeamName)</span>
+                <span class="relogio-tempo pausado placar">@Relogio.Formatar(Restante)</span>
+                <span class="relogio-info">Relógio pausado · restante para @State.CurrentTeamName</span>
             }
             else if (State.PrazoUtc is null)
             {
-                <span class="text-muted small">⏱️ @State.TempoPorEscolhaMinutos min por escolha: o relógio começa em instantes.</span>
+                <span class="relogio-info"><Icone Nome="clock" Tamanho="14" /> @State.TempoPorEscolhaMinutos min por escolha: o relógio começa em instantes</span>
             }
             else
             {
-                <span class="fs-4 fw-bold font-monospace @(Estourando ? "text-danger" : "")">⏱️ @Relogio.Formatar(Restante)</span>
-                <span class="small">para <strong>@State.CurrentTeamName</strong> escolher · @State.TempoPorEscolhaMinutos min por escolha</span>
-                <span class="small text-muted">Estourou: usa a escolha automática; sem lista, o melhor overall disponível.</span>
+                <span class="relogio-tempo placar" aria-live="off">@Relogio.Formatar(Restante)</span>
+                <span class="relogio-info">
+                    para <strong>@State.CurrentTeamName</strong> escolher · @State.TempoPorEscolhaMinutos min por escolha
+                    <span class="d-block">Estourou: vale a escolha automática; sem lista, o melhor overall disponível</span>
+                </span>
             }
 
             @if (IsAdmin)
@@ -36,28 +37,27 @@
                     <div class="input-group input-group-sm" style="width: 190px;">
                         <input type="number" min="1" class="form-control" placeholder="sem limite" title="Minutos por escolha"
                                value="@_minutos" @onchange="e => _minutos = int.TryParse(e.Value?.ToString(), out var m) ? m : null" />
-                        <button type="button" class="btn btn-outline-primary" disabled="@_salvando" @onclick="DefinirTempoAsync"
-                                title="A vez atual recomeça do zero">min ✓</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@_salvando" @onclick="DefinirTempoAsync"
+                                title="A vez atual recomeça do zero">Definir</button>
                     </div>
                     @if (State.TempoPorEscolhaMinutos is not null)
                     {
                         @if (State.Pausado)
                         {
-                            <button type="button" class="btn btn-sm btn-success" disabled="@_salvando" @onclick="RetomarAsync">▶️ Retomar</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_salvando" @onclick="RetomarAsync"><Icone Nome="play" Tamanho="14" /> Retomar</button>
                         }
                         else
                         {
-                            <button type="button" class="btn btn-sm btn-outline-warning" disabled="@_salvando" @onclick="PausarAsync">⏸️ Pausar</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_salvando" @onclick="PausarAsync"><Icone Nome="pause" Tamanho="14" /> Pausar</button>
                         }
                     }
-                    <a href="/draft/telao" target="_blank" class="btn btn-sm btn-dark">📺 Telão</a>
+                    <a href="/draft/telao" target="_blank" class="btn btn-sm btn-outline-secondary"><Icone Nome="tv" Tamanho="14" /> Telão</a>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_erro))
                 {
                     <div class="w-100 small text-danger">@_erro</div>
                 }
             }
-        </div>
     </div>
 }
 
