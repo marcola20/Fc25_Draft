@@ -7,18 +7,18 @@
 
 <PageTitle>Sobe e Desce</PageTitle>
 
-<div class="container-fluid py-3" style="max-width: 1100px;">
-    <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+<div>
+    <div class="d-flex align-items-center justify-content-between gap-3 mb-2 flex-wrap">
         <div class="btn-group btn-group-sm" role="group" aria-label="Período">
             @foreach (var (dias, nome) in Periodos)
             {
-                <button type="button" class="btn @(_dias == dias ? "btn-primary" : "btn-outline-primary")"
+                <button type="button" class="btn btn-outline-secondary @(_dias == dias ? "active" : "")"
                         @onclick="() => TrocarAsync(dias)" disabled="@_loading">@nome</button>
             }
         </div>
-        <a href="/mercado/termometro" class="btn btn-sm btn-outline-secondary">🌡️ Termômetro do Mercado</a>
+        <a href="/mercado/termometro" class="btn btn-sm btn-outline-secondary"><Icone Nome="thermometer" Tamanho="14" /> Termômetro do mercado</a>
     </div>
-    <p class="text-muted small mb-3">
+    <p class="text-body-secondary small mb-4">
         Quanto o valor de mercado de cada jogador mudou desde @(_d is null ? "o começo do período" : BrazilTime.ConvertFromUtc(_d.Desde).ToString("dd/MM")),
         pela participação nos jogos do clube: quem joga valoriza, quem fica no banco perde valor, e o insatisfeito perde mais.
         <a href="/manual">Como funciona</a>.
@@ -36,50 +36,52 @@
     {
         <div class="row g-4 mb-4">
             <div class="col-12 col-lg-6">
-                <h5>📈 Mais valorizados</h5>
+                <div class="secao-titulo"><h2>Mais valorizados</h2></div>
                 @Lista(_d.Valorizados, "Ninguém valorizou no período.")
             </div>
             <div class="col-12 col-lg-6">
-                <h5>📉 Mais desvalorizados</h5>
+                <div class="secao-titulo"><h2>Mais desvalorizados</h2></div>
                 @Lista(_d.Desvalorizados, "Ninguém desvalorizou no período.")
             </div>
         </div>
 
-        <h5>😤 Insatisfeitos agora</h5>
+        <div class="secao-titulo"><h2>Insatisfeitos agora <span class="numero text-body-tertiary">@_d.Insatisfeitos.Count</span></h2></div>
         @if (_d.Insatisfeitos.Count == 0)
         {
-            <p class="text-muted">Ninguém está insatisfeito com o banco.</p>
+            <div class="painel p-3 small text-body-secondary">Ninguém está insatisfeito com o banco.</div>
         }
         else
         {
-            <ul class="list-group mb-4">
+            <div class="painel mb-4">
+            <ul class="list-group list-group-flush">
                 @foreach (var j in _d.Insatisfeitos)
                 {
                     <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
-                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="" />
+                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="sd-foto" />
                         <div class="me-auto">
-                            <a href="/players/details/@j.PlayerId" class="fw-semibold text-primary">@j.Nome</a>
-                            <span class="small text-muted">· @j.Posicao · @j.Overall</span>
+                            <a href="/players/details/@j.PlayerId" class="sd-nome">@j.Nome</a>
+                            <span class="small text-body-tertiary">· @j.Posicao · <span class="numero">@j.Overall</span></span>
                             <div class="small text-muted">
                                 <img src="@Escudos.GetEscudo(j.TimeNome)" alt="" width="16" height="16" class="me-1" style="object-fit: contain;" />@j.TimeNome
                                 · participação @Pct(j.ParticipacaoAgora)
                             </div>
                             @if (j.PediuParaSair)
                             {
-                                <a href="/mercado/lista" class="badge bg-danger text-decoration-none">🚪 Pediu para sair · na lista</a>
+                                <a href="/mercado/lista" class="etiqueta perigo text-decoration-none mt-1"><Icone Nome="door-open" Tamanho="12" /> Pediu para sair · na lista</a>
                             }
                             else if (j.FaltamParaPedir is int faltam)
                             {
-                                <span class="badge bg-warning text-dark"
+                                <span class="etiqueta aviso mt-1"
                                       title="Se seguir insatisfeito, vai sozinho para a lista pelo preço da venda rápida">
-                                    @(faltam == 0 ? "🚪 Vai pedir para sair" : $"🚪 Pede para sair em {faltam} jogo{(faltam == 1 ? "" : "s")}")
+                                    <Icone Nome="door-open" Tamanho="12" /> @(faltam == 0 ? "Vai pedir para sair" : $"Pede para sair em {faltam} jogo{(faltam == 1 ? "" : "s")}")
                                 </span>
                             }
                         </div>
-                        <span class="fw-semibold text-nowrap">@Moeda(j.ValorAgora)</span>
+                        <span class="fw-medium numero text-nowrap">@Moeda(j.ValorAgora)</span>
                     </li>
                 }
             </ul>
+            </div>
         }
     }
 </div>
@@ -130,7 +132,7 @@
                 : $"participação {Pct(j.ParticipacaoAntes)} → {Pct(j.ParticipacaoAgora)}"
         };
         if (j.InsatisfeitoAgora && !j.InsatisfeitoAntes) partes.Add("😤 ficou insatisfeito");
-        else if (!j.InsatisfeitoAgora && j.InsatisfeitoAntes) partes.Add("🤝 fez as pazes");
+        else if (!j.InsatisfeitoAgora && j.InsatisfeitoAntes) partes.Add("fez as pazes");
         return string.Join(" · ", partes);
     }
 
@@ -153,35 +155,37 @@
     {
         @if (jogadores.Count == 0)
         {
-            <p class="text-muted">@vazio</p>
+            <div class="painel p-3 small text-body-secondary">@vazio</div>
         }
         else
         {
-            <ul class="list-group">
+            <div class="painel">
+            <ul class="list-group list-group-flush">
                 @foreach (var (j, i) in jogadores.Select((j, i) => (j, i + 1)))
                 {
                     var sobe = j.Diferenca > 0;
                     <li class="list-group-item d-flex align-items-start gap-2">
-                        <span class="text-muted small fw-semibold pt-2" style="min-width: 1.25rem;">@i</span>
-                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="flex-shrink-0" />
+                        <span class="numero text-body-tertiary small pt-2" style="min-width: 1.25rem;">@i</span>
+                        <FotoJogador PlayerId="@j.PlayerId" Tamanho="40" Classe="flex-shrink-0 sd-foto" />
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between align-items-baseline gap-2">
-                                <a href="/players/details/@j.PlayerId" class="fw-semibold text-primary">@j.Nome</a>
-                                <span class="fw-bold text-nowrap @(sobe ? "text-success" : "text-danger")">
-                                    @(sobe ? "▲ +" : "▼ −")@Moeda(Math.Abs(j.Diferenca))
+                                <a href="/players/details/@j.PlayerId" class="sd-nome">@j.Nome</a>
+                                <span class="sd-diferenca @(sobe ? "texto-vitoria" : "texto-derrota")">
+                                    <Icone Nome="@(sobe ? "arrow-up" : "arrow-down")" Tamanho="12" />@(sobe ? "+" : "−")@Moeda(Math.Abs(j.Diferenca))
                                 </span>
                             </div>
-                            <div class="small text-muted">
-                                @j.Posicao · @j.Overall ·
+                            <div class="small text-body-secondary">
+                                @j.Posicao · <span class="numero">@j.Overall</span> ·
                                 <img src="@Escudos.GetEscudo(j.TimeNome)" alt="" width="16" height="16" class="me-1" style="object-fit: contain;" />@j.TimeNome
-                                · @Moeda(j.ValorAntes) → <strong class="text-body">@Moeda(j.ValorAgora)</strong>
+                                · <span class="numero">@Moeda(j.ValorAntes) → <span class="text-body-emphasis">@Moeda(j.ValorAgora)</span></span>
                                 @(j.ValorAntes == 0 ? "" : $"({(j.ValorAgora / j.ValorAntes - 1) * 100:+0;−0;0}%)")
                             </div>
-                            <div class="small text-muted">@Motivo(j)</div>
+                            <div class="small text-body-tertiary">@Motivo(j)</div>
                         </div>
                     </li>
                 }
             </ul>
+            </div>
         }
     };
 }

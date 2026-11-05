@@ -1,0 +1,28 @@
+.sd-nome {
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.sd-nome:hover {
+    color: var(--bs-link-hover-color);
+}
+
+::deep .sd-foto {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}
+
+/* Quanto o valor mudou: seta, sinal e valor, na cor de quem subiu ou caiu. */
+.sd-diferenca {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.list-group-item {
+    background: transparent;
+}
