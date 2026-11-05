@@ -1,0 +1,43 @@
+.elenco-tabela {
+    font-size: 0.875rem;
+}
+
+.elenco-tabela > tbody > tr > td {
+    height: 3rem;
+}
+
+.elenco-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.elenco-time:hover {
+    color: var(--bs-link-hover-color);
+}
+
+.elenco-time img {
+    object-fit: contain;
+}
+
+/* Barra fina em relação ao elenco mais caro: o primeiro em dourado, os outros em cinza. */
+.elenco-barra {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bs-tertiary-bg);
+    overflow: hidden;
+}
+
+.elenco-barra span {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--bs-secondary-color);
+}
+
+.elenco-barra span.topo {
+    background: var(--cbfv-acento);
+}

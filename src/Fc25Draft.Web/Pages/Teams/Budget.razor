@@ -5,6 +5,7 @@
 @inject TeamsApiClient TeamsApiClient
 @inject IPricingService PricingService
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Budget> Logger
+@inject EscudoService Escudos
 
 <PageTitle>Valor de Elenco</PageTitle>
 
@@ -17,27 +18,27 @@
 }
 else if (_isLoading)
 {
-    <div class="alert alert-info" role="status">Carregando valor de elenco dos times...</div>
+    <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
 }
 else if (_rows.Count == 0)
 {
-    <div class="alert alert-warning" role="status">Nenhum time encontrado.</div>
+    <div class="painel p-3 small text-body-secondary">Nenhum time encontrado.</div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    var maior = _rows.Max(r => r.SquadValue);
+    <div class="table-responsive painel">
+        <table class="table table-hover align-middle mb-0 elenco-tabela">
             <thead>
                 <tr>
-                    <th scope="col">#</th>
+                    <th scope="col" style="width: 3rem;">#</th>
                     <th scope="col">Time</th>
-                    <th scope="col">Responsável</th>
+                    <th scope="col" class="d-none d-md-table-cell">Responsável</th>
+                    <th scope="col" class="d-none d-sm-table-cell" style="width: 30%;"></th>
                     <th scope="col" class="text-end">
-                        <button type="button"
-                                class="btn btn-link btn-sm p-0 text-decoration-none text-body fw-semibold"
-                                @onclick="ToggleSort">
-                            Valor de Elenco
-                            <span class="ms-1" aria-hidden="true">@(_sortDesc ? "↓" : "↑")</span>
+                        <button type="button" class="ordenar ativo" @onclick="ToggleSort">
+                            Valor de elenco
+                            <Icone Nome="@(_sortDesc ? "arrow-down" : "arrow-up")" Tamanho="12" />
                         </button>
                     </th>
                 </tr>
@@ -46,11 +47,20 @@ else
                 @for (var index = 0; index < _sortedRows.Count; index++)
                 {
                     var row = _sortedRows[index];
+                    var maisCaro = row.SquadValue == maior && maior > 0;
                     <tr>
-                        <td>@(index + 1)</td>
-                        <td class="fw-semibold">@row.TeamName</td>
-                        <td>@(string.IsNullOrWhiteSpace(row.OwnerName) ? "-" : row.OwnerName)</td>
-                        <td class="text-end text-nowrap">@FormatCurrency(row.SquadValue)</td>
+                        <td><span class="num-posicao @(maisCaro ? "podio" : "zona-neutra")">@(_sortDesc ? index + 1 : _sortedRows.Count - index)</span></td>
+                        <td class="text-nowrap">
+                            <a href="/teams/details/@row.TeamId" class="elenco-time">
+                                <img src="@Escudos.GetEscudo(row.TeamName)" alt="" width="24" height="24" />
+                                @row.TeamName
+                            </a>
+                        </td>
+                        <td class="d-none d-md-table-cell text-body-secondary">@(string.IsNullOrWhiteSpace(row.OwnerName) ? "—" : row.OwnerName)</td>
+                        <td class="d-none d-sm-table-cell">
+                            <div class="elenco-barra"><span class="@(maisCaro ? "topo" : "")" style="width: @Largura(row.SquadValue, maior)%;"></span></div>
+                        </td>
+                        <td class="text-end text-nowrap numero fw-medium text-body-emphasis">@FormatCurrency(row.SquadValue)</td>
                     </tr>
                 }
             </tbody>
@@ -140,6 +150,10 @@ else
     }
 
     private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+
+    // Largura da barra em relação ao elenco mais caro (o mais caro enche a barra).
+    private static string Largura(decimal valor, decimal maior) =>
+        (maior <= 0 ? 0 : valor / maior * 100).ToString("0.#", CultureInfo.InvariantCulture);
 
     private sealed record SquadValueRow(Guid TeamId, string TeamName, string? OwnerName, decimal SquadValue);
 }
