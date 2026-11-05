@@ -196,6 +196,9 @@
 </div>
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     private IReadOnlyList<LigaDto> _ligas = Array.Empty<LigaDto>();
     private LigaDto? _liga;
     private Guid _ligaId;
@@ -223,6 +226,7 @@
     // Chamado de novo ao trocar de competição, para o subtítulo não ficar com o nome anterior.
     private void AtualizarCabecalho()
     {
+        if (AbaAberta?.Escondida == true) return;
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/liga/simulacao"),
             breadcrumbs: new List<BreadcrumbSegment>

@@ -123,3 +123,6 @@ minus
 maximize
 cake
 send-horizontal
+
+# Abas
+ellipsis

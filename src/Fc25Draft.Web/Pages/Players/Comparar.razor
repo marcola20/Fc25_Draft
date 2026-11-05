@@ -193,6 +193,9 @@
 </div>
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     [Parameter, SupplyParameterFromQuery(Name = "a")] public int? A { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "b")] public int? B { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "c")] public int? C { get; set; }
@@ -253,6 +256,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (AbaAberta?.Escondida == true) return;
         if (!_temporadaBuscada)
         {
             _temporadaBuscada = true;

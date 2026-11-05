@@ -35,6 +35,12 @@
     min-width: 0;
 }
 
+.app-topo {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+}
+
 .app-shell.collapsed .app-main {
     margin-left: 0;
 }
@@ -98,6 +104,11 @@
 
     .app-main {
         min-height: auto;
+    }
+
+    /* No celular o topo não gruda (igual ao cabeçalho de antes). */
+    .app-topo {
+        position: relative;
     }
 
     .sidebar-overlay {

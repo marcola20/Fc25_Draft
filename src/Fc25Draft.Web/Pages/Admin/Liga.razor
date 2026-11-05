@@ -1088,6 +1088,9 @@
 }
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     [Parameter] public Guid? LigaId { get; set; }
     [Parameter] public Guid? RodadaId { get; set; }
     [SupplyParameterFromQuery(Name = "tab")] [Parameter] public string? TabQuery { get; set; }
@@ -1199,6 +1202,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (AbaAberta?.Escondida == true) return;
         await CarregarDados();
     }
 

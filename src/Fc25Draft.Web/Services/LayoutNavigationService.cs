@@ -778,6 +778,45 @@ public class LayoutNavigationService
             : (definicao.Title, definicao.Subtitle);
     }
 
+    // Ícone das páginas que não estão no menu (detalhe de time, de jogador...), pelo começo do endereço.
+    private static readonly (string Prefixo, string Icone)[] IconesForaDoMenu =
+    {
+        ("/teams/details/", "shield"),
+        ("/teams/", "users"),
+        ("/times/", "users"),
+        ("/players/", "user"),
+        ("/treinadores/", "briefcase"),
+        ("/market", "gavel"),
+        ("/mercado", "gavel"),
+        ("/admin/", "settings")
+    };
+
+    /// <summary>
+    /// Nome e ícone da aba de uma página: o item do menu com esse endereço (o título vem da definição da
+    /// página quando ela tem); fora do menu, a definição da página e o ícone do item "pai" no endereço.
+    /// <c>DoMenu</c> diz se o nome é o do menu; senão a aba aceita o título que a própria página põe.
+    /// </summary>
+    public (string Titulo, string Icone, bool DoMenu) DescreverAba(string caminho)
+    {
+        if (string.IsNullOrWhiteSpace(caminho) || caminho == "/") caminho = "/home";
+        if (!caminho.StartsWith('/')) caminho = "/" + caminho;
+
+        var itens = MenuDefinition.SelectMany(g => g.Items).ToList();
+        var definicao = GetPageDefinition(caminho);
+        var doMenu = itens.FirstOrDefault(i => string.Equals(i.Href, caminho, StringComparison.OrdinalIgnoreCase));
+        if (doMenu is not null)
+        {
+            return (string.IsNullOrWhiteSpace(definicao?.Title) ? doMenu.Title : definicao.Title, doMenu.Icon, true);
+        }
+
+        var icone = IconesForaDoMenu.FirstOrDefault(p => caminho.StartsWith(p.Prefixo, StringComparison.OrdinalIgnoreCase)).Icone
+                    ?? itens.Where(i => caminho.StartsWith(i.Href.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(i => i.Href.Length)
+                        .FirstOrDefault()?.Icon
+                    ?? "file-text";
+        return (string.IsNullOrWhiteSpace(definicao?.Title) ? "Página" : definicao.Title, icone, false);
+    }
+
     public bool HasRoute(string route)
     {
         if (string.IsNullOrWhiteSpace(route))

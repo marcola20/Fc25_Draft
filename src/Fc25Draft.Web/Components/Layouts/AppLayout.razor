@@ -11,6 +11,7 @@
 @inject ILogger<AppLayout> Logger
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject CopaSorteioAoVivoService SorteioDaCopa
+@inject AbasService Abas
 @implements IDisposable
 
 <div class="app-shell @(isSidebarCollapsed ? "collapsed" : string.Empty)">
@@ -18,6 +19,7 @@
         <Sidebar MenuGroups="menuGroups" />
     </div>
     <div class="app-main">
+        <div class="app-topo">
         <AppHeader Title="@LayoutState.Title"
                    Subtitle="@LayoutState.Subtitle"
                    Actions="@LayoutState.Actions"
@@ -30,6 +32,8 @@
                    SignIn="@OpenAdminModal"
                    SignOut="@SignOutAsync"
                    AvisosTeamId="@quemEntrou?.TeamId" />
+        <AbasFaixa />
+        </div>
 
         @if (!string.IsNullOrEmpty(adminBannerMessage))
         {
@@ -48,17 +52,43 @@
             }
             else
             {
-                @* Um erro numa página fica só nela: sem isto a exceção derruba a conexão inteira e o
-                   site todo para, com a faixa amarela de "Recarregar". *@
-                <ErrorBoundary @ref="erroNaPagina">
-                    <ChildContent>@Body</ChildContent>
-                    <ErrorContent>
-                        <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
-                            <span><strong>Algo deu errado nesta tela.</strong> O resto do site continua funcionando.</span>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="TentarDeNovo">Tentar de novo</button>
-                        </div>
-                    </ErrorContent>
-                </ErrorBoundary>
+                var comAba = Abas.RotaAtualTemAba(Navigation.Uri);
+
+                @* Cada aba aberta tem a página viva aqui dentro; só a ativa aparece. Assim, ao voltar
+                   para uma aba, rolagem, filtros e modal estão como ficaram. *@
+                @foreach (var aba in Abas.Vivas)
+                {
+                    var instancia = aba.Instancia!;
+                    var ativa = comAba && aba == Abas.Ativa;
+                    <div @key="instancia" class="app-aba-pagina" data-aba="@aba.Id" data-aba-ativa="@(ativa ? "" : null)" hidden="@(!ativa)">
+                        <CascadingValue Value="instancia.Contexto" IsFixed="true">
+                            @* Um erro numa página fica só nela: sem isto a exceção derruba a conexão inteira e o
+                               site todo para, com a faixa amarela de "Recarregar". *@
+                            <ErrorBoundary @ref="instancia.Erro">
+                                <ChildContent>@instancia.Conteudo</ChildContent>
+                                <ErrorContent>
+                                    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+                                        <span><strong>Algo deu errado nesta tela.</strong> O resto do site continua funcionando.</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => instancia.Erro?.Recover()">Tentar de novo</button>
+                                    </div>
+                                </ErrorContent>
+                            </ErrorBoundary>
+                        </CascadingValue>
+                    </div>
+                }
+
+                @* "Não encontrado" e afins: sem aba, o corpo normal. *@
+                @if (!comAba)
+                {
+                    <div class="app-pagina-solta">
+                        <ErrorBoundary @ref="erroNaPagina">
+                            <ChildContent>@Body</ChildContent>
+                            <ErrorContent>
+                                <div class="alert alert-warning" role="alert"><strong>Algo deu errado nesta tela.</strong></div>
+                            </ErrorContent>
+                        </ErrorBoundary>
+                    </div>
+                }
             }
         </section>
     </div>
@@ -122,9 +152,6 @@
     private string? homeRoute;
     private ErrorBoundary? erroNaPagina;
 
-    // Volta a mostrar a página (ela é criada de novo e recarrega os dados).
-    private void TentarDeNovo() => erroNaPagina?.Recover();
-
     protected override void OnInitialized()
     {
         initializationCts = new CancellationTokenSource();
@@ -132,11 +159,21 @@
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
         LayoutState.StateChanged += OnLayoutStateChanged;
         SorteioDaCopa.OnChange += OnSorteioDaCopaChanged;
+        Abas.Mudou += OnAbasMudou;
         homeRoute = NavigationService.HasRoute("/home") ? Navigation.ToAbsoluteUri("/home").ToString() : null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // A aba que voltou para a frente já está desenhada: avisa a página; e o menu que levou a "/liga"
+        // com a Liga aberta em outra edição põe o endereço dela na barra.
+        Abas.AvisarMostrada();
+        if (Abas.UrlParaCorrigir is { } corrigir)
+        {
+            Abas.UrlParaCorrigir = null;
+            Navigation.NavigateTo(corrigir, replace: true);
+        }
+
         if (!firstRender)
         {
             return;
@@ -402,7 +439,13 @@
         {
             // Ao trocar de página, o erro da página anterior não fica na tela.
             erroNaPagina?.Recover();
-            await UpdatePageDefinitionAsync(e.Location);
+            Abas.Ativa?.Instancia?.Erro?.Recover();
+
+            // Aba que já estava viva volta com o cabeçalho que tinha (o AbasService devolveu).
+            if (!Abas.ReativouAgora)
+            {
+                await UpdatePageDefinitionAsync(e.Location);
+            }
             await LogRouteVisitedAsync(e.Location);
             StateHasChanged();
         });
@@ -414,11 +457,17 @@
         {
             await AdminAuth.EnsureInitializedAsync();
             authReady = true;
+            Abas.AoMudarLogin();
             // Quem entrou pela página de login (ou saiu) também troca o rótulo e o sino de avisos.
             await AtualizarQuemEntrouAsync();
             await RebuildMenuAsync();
             StateHasChanged();
         });
+    }
+
+    private void OnAbasMudou()
+    {
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void OnLayoutStateChanged()
@@ -445,6 +494,7 @@
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
         LayoutState.StateChanged -= OnLayoutStateChanged;
         SorteioDaCopa.OnChange -= OnSorteioDaCopaChanged;
+        Abas.Mudou -= OnAbasMudou;
     }
 
     private record struct AuditContext(string UserId, string Role);

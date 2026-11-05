@@ -156,6 +156,9 @@
 </div>
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
     [Parameter] public Guid TreinadorId { get; set; }
@@ -175,6 +178,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (AbaAberta?.Escondida == true) return;
         if (_carregadoPara != TreinadorId)
         {
             _carregando = true;

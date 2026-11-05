@@ -2,6 +2,7 @@
 @using System.Reflection
 @implements IDisposable
 @inject AdminAuthService AdminAuth
+@inject AbasService Abas
 
 @* Página com [Authorize(Roles = "Admin")] só é montada para quem o servidor confirmou como admin.
    Antes disso (pré-render, token ainda não lido ou visitante comum) entra AcessoRestrito no lugar,
@@ -42,6 +43,10 @@
         _rotaEfetiva = !ExigeAdmin(RouteData.PageType) || AdminAuth.IsAdmin
             ? RouteData
             : new RouteData(typeof(AcessoRestrito), SemParametros);
+
+        // Cada página do layout normal vira uma aba (o telão, com layout próprio, não).
+        var layout = RouteData.PageType.GetCustomAttribute<LayoutAttribute>()?.LayoutType ?? DefaultLayout;
+        Abas.DefinirRota(_rotaEfetiva, usaAbas: layout == DefaultLayout);
     }
 
     private static bool ExigeAdmin(Type pagina) => ExigeAdminCache.GetOrAdd(pagina, tipo =>

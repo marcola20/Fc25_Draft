@@ -16,11 +16,15 @@
 </div>
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     [Parameter] public Guid PartidaId { get; set; }
     [SupplyParameterFromQuery(Name = "return")] [Parameter] public string? ReturnUrl { get; set; }
 
     protected override void OnParametersSet()
     {
+        if (AbaAberta?.Escondida == true) return;
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/admin/liga"),
             breadcrumbs: new List<BreadcrumbSegment>

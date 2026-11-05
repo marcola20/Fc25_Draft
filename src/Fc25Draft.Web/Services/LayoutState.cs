@@ -22,6 +22,18 @@ public class LayoutState
 
     public RenderFragment? Actions => _actions;
 
+    /// <summary>O cabeçalho como está agora, para a aba guardar e devolver quando voltar a ser a da frente.</summary>
+    public Retrato Atual => new(_currentDefinition, _breadcrumbs, _subtitle, _actions);
+
+    public void Restaurar(Retrato retrato) =>
+        SetPage(retrato.Definicao, retrato.Caminho, retrato.Subtitulo, retrato.Acoes);
+
+    public sealed record Retrato(
+        PageDefinition? Definicao,
+        IReadOnlyList<BreadcrumbSegment> Caminho,
+        string? Subtitulo,
+        RenderFragment? Acoes);
+
     public void SetPage(PageDefinition? definition, IReadOnlyList<BreadcrumbSegment>? breadcrumbs = null, string? subtitle = null, RenderFragment? actions = null)
     {
         _currentDefinition = definition;

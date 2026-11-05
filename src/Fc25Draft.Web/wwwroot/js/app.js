@@ -531,3 +531,155 @@ window.cbfvHolo = (function () {
         movimentoReduzido: function () { return reduzido.matches; }
     };
 })();
+
+// Faixa de abas (AbasFaixa.razor): guarda a lista no navegador, mede o que cabe na faixa, passa o
+// título que a página põe para o nome da aba e devolve a rolagem de cada aba quando ela volta.
+window.cbfvAbas = (function () {
+    const chave = 'cbfv-abas';
+    const celular = window.matchMedia('(max-width: 992px)');
+    const rolagens = new Map(); // id da aba -> { y, elementos: Map(elemento -> [topo, esquerda]) }
+    let dotnet = null;
+    let faixa = null;
+    let observadorTitulo = null;
+    let observadorTamanho = null;
+    let ativa = null;
+    let tituloDaPagina = document.title; // o último que o Blazor pôs
+    let tituloNosso = null;              // o que este script pôs (não é da página)
+    let foraAntes = '';
+
+    // Troca o texto do <title> sem trocar o nó: o Blazor guarda o nó dele e atualiza por ali
+    // (document.title = ... poria um nó novo e as mudanças da página não chegariam mais).
+    function porTitulo(t) {
+        const el = document.querySelector('head title');
+        if (el && el.firstChild && el.firstChild.nodeType === Node.TEXT_NODE) el.firstChild.data = t;
+        else document.title = t;
+    }
+
+    function elementoDaAba(id) {
+        return id == null ? null : document.querySelector('.app-aba-pagina[data-aba="' + id + '"]');
+    }
+
+    // Rolagem da página e dos contêineres de dentro dela, enquanto a aba está à mostra.
+    function aoRolar(e) {
+        const el = elementoDaAba(ativa);
+        if (!el || el.hidden) return;
+        let r = rolagens.get(ativa);
+        if (!r) { r = { y: 0, elementos: new Map() }; rolagens.set(ativa, r); }
+        const alvo = e.target;
+        if (alvo === document || alvo === document.documentElement || alvo === document.body) {
+            r.y = window.scrollY;
+        } else if (alvo instanceof Element && el.contains(alvo)) {
+            r.elementos.set(alvo, [alvo.scrollTop, alvo.scrollLeft]);
+        }
+    }
+
+    // O Blazor pôs o título de uma página: vai para o nome da aba dela, e o navegador volta a mostrar o
+    // da aba ativa (o .NET chama ativar de novo se o nome mudou).
+    // Clique que pode sair da aba (link, aba, menu): guarda onde a página estava antes de o Blazor trocar.
+    function aoApertar() {
+        const el = elementoDaAba(ativa);
+        if (!el || el.hidden) return;
+        const r = rolagens.get(ativa) || { y: 0, elementos: new Map() };
+        r.y = window.scrollY;
+        rolagens.set(ativa, r);
+    }
+
+    function aoMudarTitulo() {
+        // Mesmo texto de antes também conta: pode ser outra página (a aba dona do título mudou).
+        const t = document.title;
+        if (t === tituloNosso) return;
+        tituloDaPagina = t;
+        if (dotnet) dotnet.invokeMethodAsync('TituloDaPagina', t).catch(() => { });
+        if (tituloNosso) porTitulo(tituloNosso);
+    }
+
+    function medir() {
+        if (!faixa || !dotnet) return;
+        const lista = faixa.querySelector('.abas-lista');
+        const abas = Array.from(lista.querySelectorAll('.aba'));
+        abas.forEach(a => { a.style.display = ''; });
+        let fora = [];
+        if (!celular.matches) {
+            const larguras = abas.map(a => a.getBoundingClientRect().width);
+            const total = larguras.reduce((s, l) => s + l, 0);
+            // Com o "…" à mostra a lista fica mais estreita; a conta de "cabe tudo" é sem ele.
+            const mais = faixa.querySelector('.abas-mais');
+            const larguraMais = faixa.classList.contains('com-mais') && mais ? mais.getBoundingClientRect().width : 0;
+            const inteira = lista.clientWidth + larguraMais;
+            const disponivel = inteira - (larguraMais || 48);
+            if (total > inteira + 1) {
+                // A ativa sempre fica; as outras entram na ordem até encher (o "…" já tem lugar reservado).
+                const iAtiva = abas.findIndex(a => a.classList.contains('ativa'));
+                let usado = iAtiva >= 0 ? larguras[iAtiva] : 0;
+                abas.forEach((a, i) => {
+                    if (i === iAtiva) return;
+                    if (usado + larguras[i] <= disponivel) usado += larguras[i];
+                    else { a.style.display = 'none'; fora.push(Number(a.dataset.abaId)); }
+                });
+            }
+        } else {
+            const a = lista.querySelector('.aba.ativa');
+            if (a) a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+        const chaveFora = fora.join(',');
+        faixa.classList.toggle('com-mais', fora.length > 0);
+        if (chaveFora !== foraAntes) {
+            foraAntes = chaveFora;
+            dotnet.invokeMethodAsync('AbasForaDaFaixa', fora).catch(() => { });
+        }
+    }
+
+    return {
+        iniciar: function (elemento, ref) {
+            faixa = elemento;
+            dotnet = ref;
+            window.addEventListener('scroll', aoRolar, { capture: true, passive: true });
+            window.addEventListener('pointerdown', aoApertar, { capture: true, passive: true });
+            window.addEventListener('click', aoApertar, { capture: true, passive: true });
+            observadorTitulo = new MutationObserver(aoMudarTitulo);
+            observadorTitulo.observe(document.head, { subtree: true, childList: true, characterData: true });
+            if (window.ResizeObserver) {
+                observadorTamanho = new ResizeObserver(() => medir());
+                observadorTamanho.observe(faixa.querySelector('.abas-lista'));
+            }
+            celular.addEventListener('change', medir);
+            let guardadas = null;
+            try { guardadas = window.localStorage.getItem(chave); } catch { }
+            tituloDaPagina = document.title;
+            return { guardadas: guardadas, titulo: document.title };
+        },
+
+        guardar: function (json) {
+            try { window.localStorage.setItem(chave, json); } catch { }
+        },
+
+        /** A aba id está na frente com este título; rolar = acabou de voltar, devolve a rolagem dela. */
+        ativar: function (id, titulo, rolar) {
+            ativa = id;
+            if (titulo) { tituloNosso = titulo; porTitulo(titulo); }
+            else if (tituloNosso) { tituloNosso = null; porTitulo(tituloDaPagina); }
+            if (!rolar) return;
+            // Esta chamada chega depois do lote em que o Blazor voltou a rolagem para o topo. "instant": o
+            // site rola suave (scroll-behavior), e aqui é voltar para onde estava.
+            const r = rolagens.get(id);
+            window.scrollTo({ top: r ? r.y : 0, left: 0, behavior: 'instant' });
+            if (r) r.elementos.forEach((pos, el) => {
+                if (el.isConnected) el.scrollTo({ top: pos[0], left: pos[1], behavior: 'instant' });
+                else r.elementos.delete(el);
+            });
+        },
+
+        ajustar: function () { medir(); },
+
+        parar: function () {
+            window.removeEventListener('scroll', aoRolar, { capture: true });
+            window.removeEventListener('pointerdown', aoApertar, { capture: true });
+            window.removeEventListener('click', aoApertar, { capture: true });
+            celular.removeEventListener('change', medir);
+            if (observadorTitulo) observadorTitulo.disconnect();
+            if (observadorTamanho) observadorTamanho.disconnect();
+            dotnet = null;
+            faixa = null;
+        }
+    };
+})();

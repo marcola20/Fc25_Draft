@@ -1,0 +1,177 @@
+@implements IAsyncDisposable
+@inject AbasService Abas
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* Faixa de abas embaixo do topo: cada página aberta é uma aba (ícone, nome, X). A Central CBFV é a
+   primeira e não fecha. As que não cabem vão para o menu "…" do fim (no computador; no celular a faixa
+   rola de lado). A lista fica guardada no navegador e volta depois do F5. *@
+<nav class="abas-faixa" aria-label="Páginas abertas" @ref="_faixa">
+    <div class="abas-lista">
+        @foreach (var aba in Abas.Abas)
+        {
+            var ativa = aba == Abas.Ativa && Abas.RotaAtualTemAba(Navigation.Uri);
+            <div @key="aba.Id" class="aba @(ativa ? "ativa" : null) @(aba.Fixa ? "fixa" : null)" data-aba-id="@aba.Id" title="@aba.Titulo">
+                <a class="aba-link" href="@aba.Url" aria-current="@(ativa ? "page" : null)" @onclick="() => Ir(aba)" @onclick:preventDefault>
+                    <Icone Nome="@aba.Icone" Tamanho="14" />
+                    <span class="aba-nome">@aba.Titulo</span>
+                </a>
+                @if (!aba.Fixa)
+                {
+                    <button type="button" class="aba-fechar" aria-label="@($"Fechar {aba.Titulo}")" @onclick="() => Fechar(aba)">
+                        <Icone Nome="x" Tamanho="12" />
+                    </button>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="abas-mais">
+        <button type="button" class="abas-mais-botao" aria-label="Outras abas abertas" aria-expanded="@(_menuAberto ? "true" : "false")"
+                @onclick="() => _menuAberto = !_menuAberto">
+            <Icone Nome="ellipsis" Tamanho="16" />
+            <Icone Nome="chevron-down" Tamanho="12" />
+        </button>
+        @if (_menuAberto && _foraDaFaixa.Count > 0)
+        {
+            <button type="button" class="abas-mais-fundo" aria-label="Fechar a lista" @onclick="() => _menuAberto = false"></button>
+            <ul class="abas-mais-menu">
+                @foreach (var aba in Abas.Abas.Where(a => _foraDaFaixa.Contains(a.Id)))
+                {
+                    <li @key="aba.Id">
+                        <a href="@aba.Url" @onclick="() => Ir(aba)" @onclick:preventDefault>
+                            <Icone Nome="@aba.Icone" Tamanho="14" />
+                            <span class="aba-nome">@aba.Titulo</span>
+                        </a>
+                        @if (!aba.Fixa)
+                        {
+                            <button type="button" class="aba-fechar" aria-label="@($"Fechar {aba.Titulo}")" @onclick="() => Fechar(aba)">
+                                <Icone Nome="x" Tamanho="12" />
+                            </button>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</nav>
+
+@code {
+    private ElementReference _faixa;
+    private DotNetObjectReference<AbasFaixa>? _ref;
+    private HashSet<int> _foraDaFaixa = new();
+    private bool _menuAberto;
+    private bool _pronto;
+    private string? _guardado;
+    private int? _ativaNoNavegador;
+    private string? _tituloNoNavegador;
+
+    protected override void OnInitialized()
+    {
+        Abas.Mudou += AoMudar;
+        Navigation.LocationChanged += AoNavegar;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                _ref = DotNetObjectReference.Create(this);
+                var inicio = await JS.InvokeAsync<InicioDasAbas>("cbfvAbas.iniciar", _faixa, _ref);
+                Abas.Restaurar(inicio.Guardadas);
+                if (!string.IsNullOrWhiteSpace(inicio.Titulo)) Abas.DefinirTituloDaPagina(inicio.Titulo);
+                _pronto = true;
+                StateHasChanged();
+                return;
+            }
+
+            if (!_pronto) return;
+
+            var json = Abas.Serializar();
+            if (json != _guardado)
+            {
+                _guardado = json;
+                await JS.InvokeVoidAsync("cbfvAbas.guardar", json);
+            }
+
+            // Página que voltou para a frente: rolagem dela de volta. O título do navegador é sempre o da
+            // aba ativa (o Blazor mostraria o da última página aberta, que pode ser outra aba).
+            var ativa = Abas.RotaAtualTemAba(Navigation.Uri) ? Abas.Ativa : null;
+            var titulo = ativa is null ? null : $"{ativa.Titulo} · CBFV";
+            if (ativa?.Id != _ativaNoNavegador || titulo != _tituloNoNavegador)
+            {
+                var trocouDeAba = ativa?.Id != _ativaNoNavegador;
+                _ativaNoNavegador = ativa?.Id;
+                _tituloNoNavegador = titulo;
+                await JS.InvokeVoidAsync("cbfvAbas.ativar", ativa?.Id, titulo, trocouDeAba);
+            }
+
+            await JS.InvokeVoidAsync("cbfvAbas.ajustar", _faixa);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+            // Pré-render: sem JS ainda.
+        }
+    }
+
+    /// <summary>Abas que não couberam na faixa (o JS mede), para o menu "…".</summary>
+    [JSInvokable]
+    public void AbasForaDaFaixa(int[] ids)
+    {
+        var novas = ids.ToHashSet();
+        if (novas.SetEquals(_foraDaFaixa)) return;
+        _foraDaFaixa = novas;
+        if (_foraDaFaixa.Count == 0) _menuAberto = false;
+        StateHasChanged();
+    }
+
+    /// <summary>O título do navegador mudou (o &lt;PageTitle&gt; da página): vira o nome da aba dela.</summary>
+    [JSInvokable]
+    public void TituloDaPagina(string titulo) => Abas.DefinirTituloDaPagina(titulo);
+
+    // A aba clicada é a que vem para a frente, mesmo que outra esteja no mesmo endereço.
+    private void Ir(Aba aba)
+    {
+        _menuAberto = false;
+        Abas.Escolher(aba);
+        Navigation.NavigateTo(aba.Url);
+    }
+
+    private void Fechar(Aba aba)
+    {
+        var vizinha = Abas.Fechar(aba);
+        if (vizinha is not null) Ir(vizinha);
+    }
+
+    private void AoMudar() => _ = InvokeAsync(StateHasChanged);
+
+    private void AoNavegar(object? sender, LocationChangedEventArgs e)
+    {
+        _menuAberto = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Abas.Mudou -= AoMudar;
+        Navigation.LocationChanged -= AoNavegar;
+        try
+        {
+            await JS.InvokeVoidAsync("cbfvAbas.parar");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        _ref?.Dispose();
+    }
+
+    private sealed record InicioDasAbas(string? Guardadas, string? Titulo);
+}

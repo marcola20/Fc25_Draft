@@ -14,7 +14,8 @@
 @inject UltimaLigaVista UltimaLiga
 @implements IDisposable
 
-<PageTitle>Liga</PageTitle>
+@* O nome da edição também vira o nome da aba (as de outra edição ficam abertas lado a lado). *@
+<PageTitle>@(_liga?.Nome ?? "Liga")</PageTitle>
 
 <div class="liga">
     @if (_loading)

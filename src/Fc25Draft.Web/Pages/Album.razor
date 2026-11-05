@@ -295,6 +295,9 @@
 </div>
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     [SupplyParameterFromQuery(Name = "clube")]
     public Guid? Clube { get; set; }
 
@@ -328,6 +331,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (AbaAberta?.Escondida == true) return;
         if (!_carregando) await AbrirPaginaAsync();
     }
 

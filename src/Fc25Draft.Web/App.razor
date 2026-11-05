@@ -3,7 +3,7 @@
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AdminRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        <FocusOnNavigate RouteData="@routeData" Selector="[data-aba-ativa] h1, .app-pagina-solta h1" />
     </Found>
     <NotFound>
         <PageTitle>Não encontrado</PageTitle>

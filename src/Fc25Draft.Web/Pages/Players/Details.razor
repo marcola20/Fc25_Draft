@@ -17,6 +17,8 @@
 
 @implements IDisposable
 
+<PageTitle>@(player?.Name ?? "Jogador")</PageTitle>
+
 @if (!string.IsNullOrEmpty(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>

@@ -117,6 +117,9 @@
 }
 
 @code {
+    // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
     private readonly List<Position> positions = new();
     private readonly List<AvailablePlayerDto> availablePlayers = new();
     private DraftStateDto? state;
@@ -182,6 +185,7 @@
 
     private void RefreshDraftHeader()
     {
+        if (AbaAberta?.Escondida == true) return;
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/draft/controle"),
             subtitle: "A vez, o relógio e os jogadores disponíveis, ao vivo",
