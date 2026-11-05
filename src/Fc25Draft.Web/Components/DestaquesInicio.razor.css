@@ -85,12 +85,18 @@ a.capa-item:focus-visible {
     line-height: 1.375rem;
 }
 
+/* Empate de jogadores: um nome por linha, para todos aparecerem inteiros. */
 .capa-nomes {
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     margin: 0.125rem 0;
     font-size: 0.9375rem;
     font-weight: 500;
-    line-height: 1.5rem;
+    line-height: 1.375rem;
+}
+
+.capa-nomes a {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

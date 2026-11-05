@@ -184,11 +184,10 @@
                 </span>
                 <span class="capa-texto">
                     <span class="capa-rotulo">@tituloPlural da temporada</span>
-                    <span class="capa-nomes" title="@string.Join(", ", jogadores.Select(j => j.Nome))">
-                        @for (var i = 0; i < jogadores.Count; i++)
+                    <span class="capa-nomes">
+                        @foreach (var j in jogadores)
                         {
-                            var j = jogadores[i];
-                            <a href="/players/details/@j.JogadorId" title="@j.TimeNome">@j.Nome</a>@(i < jogadores.Count - 1 ? ", " : "")
+                            <a href="/players/details/@j.JogadorId" title="@j.Nome · @j.TimeNome">@j.Nome</a>
                         }
                     </span>
                     <span class="capa-meta"><span class="numero">@total</span> @unidadeTexto cada</span>
