@@ -19,12 +19,12 @@
         @foreach (var (de, ate, cor) in Faixas)
         {
             <rect x="@Num(esquerda)" y="@Num(Y(ate))" width="@Num(largura - esquerda - direita)" height="@Num(Y(de) - Y(ate))"
-                  fill="@cor" opacity="0.12" />
+                  fill="@cor" opacity="0.08" />
             <g><text x="@Num(esquerda - 6)" y="@Num(Y(de) + 4)" text-anchor="end" font-size="10" fill="currentColor" opacity="0.6">@de</text></g>
         }
-        <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5"
+        <polyline fill="none" stroke="var(--bs-tertiary-color)" stroke-width="2"
                   points="@Num(X(0)),@Num(Y(DiretoriaCriterios.ConfiancaInicial)) @string.Join(" ", pontos.Select((p, i) => $"{Num(X(i + 1))},{Num(Y(p.Valor))}"))" />
-        <circle cx="@Num(X(0))" cy="@Num(Y(DiretoriaCriterios.ConfiancaInicial))" r="3.5" fill="var(--cbfv-azul)">
+        <circle cx="@Num(X(0))" cy="@Num(Y(DiretoriaCriterios.ConfiancaInicial))" r="3.5" fill="var(--bs-tertiary-color)">
             <title>Início da temporada · @DiretoriaCriterios.ConfiancaInicial.ToString("0")</title>
         </circle>
         @for (var i = 0; i < pontos.Count; i++)
@@ -33,7 +33,7 @@
             if (p.Evento is EventoDiretoria evento)
             {
                 var (cx, cy) = (X(i + 1), Y(p.Valor));
-                <polygon points="@Num(cx),@Num(cy - 7) @Num(cx + 7),@Num(cy) @Num(cx),@Num(cy + 7) @Num(cx - 7),@Num(cy)" fill="var(--cbfv-roxo)">
+                <polygon points="@Num(cx),@Num(cy - 7) @Num(cx + 7),@Num(cy) @Num(cx),@Num(cy + 7) @Num(cx - 7),@Num(cy)" fill="var(--cbfv-acento)">
                     <title>@p.Data.AddHours(-3).ToString("dd/MM") · @Diretoria.NomeDoEvento(evento) → @p.Valor.ToString("0", Brasil)</title>
                 </polygon>
                 continue;
@@ -45,7 +45,7 @@
         }
     </svg>
     <div class="small text-muted">
-        Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); o losango roxo é uma decisão da diretoria
+        Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); o losango dourado é uma decisão da diretoria
         (voto de confiança ou técnico novo). Passe o mouse para ver o placar e quanto a confiança mudou.
     </div>
 }
@@ -55,11 +55,12 @@
 
     private static readonly (int De, int Ate, string Cor)[] Faixas =
     {
-        ((int)DiretoriaCriterios.LimitePrestigiado, 100, "#198754"),
-        ((int)DiretoriaCriterios.LimiteEstavel, (int)DiretoriaCriterios.LimitePrestigiado, "#0d6efd"),
-        ((int)DiretoriaCriterios.LimiteSobObservacao, (int)DiretoriaCriterios.LimiteEstavel, "#6c757d"),
-        ((int)DiretoriaCriterios.LimitePressionado, (int)DiretoriaCriterios.LimiteSobObservacao, "#ffc107"),
-        (0, (int)DiretoriaCriterios.LimitePressionado, "#dc3545")
+        // As mesmas cores das faixas do termômetro (site.css).
+        ((int)DiretoriaCriterios.LimitePrestigiado, 100, "var(--cbfv-vitoria)"),
+        ((int)DiretoriaCriterios.LimiteEstavel, (int)DiretoriaCriterios.LimitePrestigiado, "var(--zona-playoff-acesso)"),
+        ((int)DiretoriaCriterios.LimiteSobObservacao, (int)DiretoriaCriterios.LimiteEstavel, "var(--cbfv-empate)"),
+        ((int)DiretoriaCriterios.LimitePressionado, (int)DiretoriaCriterios.LimiteSobObservacao, "var(--zona-playoff-rebaixamento)"),
+        (0, (int)DiretoriaCriterios.LimitePressionado, "var(--cbfv-derrota)")
     };
 
     [Parameter, EditorRequired] public IReadOnlyList<DiretoriaPontoDto> Historico { get; set; } = Array.Empty<DiretoriaPontoDto>();

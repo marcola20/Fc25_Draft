@@ -1,17 +1,10 @@
 /* Confiança da diretoria: nome da faixa na cor dela, barra fina e o número. */
 .termometro {
-    --faixa-cor: var(--bs-tertiary-color);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
 }
-
-.faixa-prestigiado { --faixa-cor: var(--cbfv-vitoria); }
-.faixa-estavel { --faixa-cor: var(--zona-playoff-acesso); }
-.faixa-observacao { --faixa-cor: var(--cbfv-empate); }
-.faixa-pressionado { --faixa-cor: var(--zona-playoff-rebaixamento); }
-.faixa-balancando { --faixa-cor: var(--cbfv-derrota); }
 
 .termometro-faixa {
     min-width: 8.5rem;

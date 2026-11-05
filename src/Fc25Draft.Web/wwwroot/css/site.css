@@ -1274,3 +1274,18 @@ a.text-primary:hover {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
+
+/* Faixas de confiança da diretoria (termômetro, painel e gráfico). */
+.faixa-prestigiado { --faixa-cor: var(--cbfv-vitoria); }
+.faixa-estavel { --faixa-cor: var(--zona-playoff-acesso); }
+.faixa-observacao { --faixa-cor: var(--cbfv-empate); }
+.faixa-pressionado { --faixa-cor: var(--zona-playoff-rebaixamento); }
+.faixa-balancando { --faixa-cor: var(--cbfv-derrota); }
+
+.faixa-ponto {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--faixa-cor, var(--bs-tertiary-color));
+}

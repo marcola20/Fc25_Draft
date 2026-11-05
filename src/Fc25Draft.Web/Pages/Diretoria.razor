@@ -6,7 +6,7 @@
 
 <PageTitle>Diretoria</PageTitle>
 
-<div class="container-fluid py-3" style="max-width: 1100px;">
+<div style="max-width: 1100px;">
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -21,7 +21,7 @@
     }
     else
     {
-        <p class="text-muted small mb-3">
+        <p class="text-body-secondary small mb-3" style="max-width: 48rem;">
             Temporada @_painel.Temporada. Cada clube tem uma meta para a temporada e uma diretoria que sobe e desce
             a confiança no técnico a cada jogo. Clique num clube para ver a confiança jogo a jogo.
         </p>
@@ -31,11 +31,12 @@
             <div class="alert alert-warning small">A administração ainda não definiu as metas desta temporada; a confiança já está valendo.</div>
         }
 
+        @* Quantos clubes em cada faixa, com o ponto na cor da faixa (as mesmas do termômetro). *@
         <div class="d-flex flex-wrap gap-2 mb-3">
             @foreach (var faixa in Enum.GetValues<FaixaConfianca>().Reverse())
             {
                 var n = _painel.Times.Count(t => t.Faixa == faixa);
-                <span class="badge @DiretoriaLabels.Badge(faixa)">@DiretoriaLabels.Emoji(faixa) @DiretoriaLabels.Faixa(faixa): @n</span>
+                <span class="chip @ClasseDaFaixa(faixa)"><span class="faixa-ponto"></span>@DiretoriaLabels.Faixa(faixa) <span class="numero text-body-secondary">@n</span></span>
             }
         </div>
 
@@ -49,10 +50,10 @@
                             <a href="@($"/teams/details/{t.TimeId}")" class="d-flex align-items-center gap-2 text-decoration-none text-reset"
                                style="min-width: 12rem;" @onclick:stopPropagation="true">
                                 <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="Escudo @t.TimeNome" style="width:26px;height:26px;object-fit:contain;" />
-                                <span class="fw-semibold">@t.TimeNome</span>
+                                <span class="fw-medium">@t.TimeNome</span>
                                 @if (t.Divisao is Divisao d)
                                 {
-                                    <span class="badge @(d == Divisao.SerieA ? "bg-primary" : "bg-info text-dark")">@(d == Divisao.SerieA ? "A" : "B")</span>
+                                    <span class="etiqueta">Série @(d == Divisao.SerieA ? "A" : "B")</span>
                                 }
                             </a>
                             <div class="flex-grow-1"><DiretoriaTermometro Time="@t" /></div>
@@ -149,4 +150,13 @@
     }
 
     private void Alternar(Guid timeId) => _aberto = _aberto == timeId ? null : timeId;
+
+    private static string ClasseDaFaixa(FaixaConfianca faixa) => faixa switch
+    {
+        FaixaConfianca.Prestigiado => "faixa-prestigiado",
+        FaixaConfianca.Estavel => "faixa-estavel",
+        FaixaConfianca.SobObservacao => "faixa-observacao",
+        FaixaConfianca.Pressionado => "faixa-pressionado",
+        _ => "faixa-balancando"
+    };
 }
