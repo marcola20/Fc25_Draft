@@ -4,7 +4,7 @@
 
 @* Aposentadoria com aviso: quem anunciou antes se aposenta nesta virada; o sorteio sugere os anúncios desta temporada. *@
 <div class="card mb-3">
-    <div class="card-header fw-bold">👋 Aposentadorias — temporada @Temporada</div>
+    <div class="card-header fw-bold"><Icone Nome="hand" Tamanho="14" /> Aposentadorias — temporada @Temporada</div>
     <div class="card-body">
         @if (_erro is not null)
         {
@@ -40,12 +40,12 @@
             {
                 <p class="small mb-1">@string.Join(", ", _painel.ParaAposentar.Select(j => $"{j.Nome} ({j.Idade}, {j.TimeNome ?? "sem clube"})"))</p>
                 <button class="btn btn-danger btn-sm mb-3" @onclick="AposentarAsync" disabled="@_carregando">
-                    🎖️ Aposentar @_painel.ParaAposentar.Count jogador(es)
+                    <Icone Nome="medal" Tamanho="14" /> Aposentar @_painel.ParaAposentar.Count jogador(es)
                 </button>
             }
 
             @* 2. Decididos em segredo: o admin solta aos poucos *@
-            <h3 class="h6 mt-2">🤫 Guardados em segredo <span class="text-muted small">(já decidiram parar em @Temporada; ninguém sabe ainda)</span></h3>
+            <h3 class="h6 mt-2"><Icone Nome="eye-off" Tamanho="14" /> Guardados em segredo <span class="text-muted small">(já decidiram parar em @Temporada; ninguém sabe ainda)</span></h3>
             @if (_painel.Guardados.Count == 0)
             {
                 <p class="small text-muted">Ninguém.</p>
@@ -56,13 +56,13 @@
                     @foreach (var j in _painel.Guardados)
                     {
                         <li class="d-flex align-items-center gap-2 mb-1">
-                            <span>🤫 <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
-                            <button class="btn btn-link btn-sm p-0" @onclick="() => SoltarAsync(j)" disabled="@_carregando">📣 soltar agora</button>
+                            <span><Icone Nome="eye-off" Tamanho="14" /> <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
+                            <button class="btn btn-link btn-sm p-0" @onclick="() => SoltarAsync(j)" disabled="@_carregando"><Icone Nome="megaphone" Tamanho="14" /> soltar agora</button>
                             <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => CancelarAsync(j)" disabled="@_carregando">desistiu</button>
                         </li>
                     }
                 </ul>
-                <button class="btn btn-outline-primary btn-sm mb-3" @onclick="SoltarAleatorioAsync" disabled="@_carregando">🎲 Soltar um aleatório</button>
+                <button class="btn btn-outline-primary btn-sm mb-3" @onclick="SoltarAleatorioAsync" disabled="@_carregando"><Icone Nome="dices" Tamanho="14" /> Soltar um aleatório</button>
                 <p class="small text-muted mb-3">Quem não for solto até a virada se aposenta do mesmo jeito, sem o anúncio antes.</p>
             }
 
@@ -78,7 +78,7 @@
                     @foreach (var j in _painel.Anunciados)
                     {
                         <li class="d-flex align-items-center gap-2 mb-1">
-                            <span>👋 <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
+                            <span><Icone Nome="hand" Tamanho="14" /> <strong>@j.Nome</strong> — @j.Idade anos, @j.Overall, @(j.TimeNome ?? "sem clube")</span>
                             <button class="btn btn-link btn-sm p-0" @onclick="() => CancelarAsync(j)" disabled="@_carregando">desistiu</button>
                         </li>
                     }
@@ -117,10 +117,10 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-primary btn-sm" @onclick="GuardarAsync" disabled="@(_carregando || _marcados.Count == 0)">
-                    🤫 Decidir em segredo (@_marcados.Count)
+                    <Icone Nome="eye-off" Tamanho="14" /> Decidir em segredo (@_marcados.Count)
                 </button>
                 <button class="btn btn-outline-primary btn-sm" @onclick="AnunciarAsync" disabled="@(_carregando || _marcados.Count == 0)">
-                    👋 Anunciar já (@_marcados.Count)
+                    <Icone Nome="hand" Tamanho="14" /> Anunciar já (@_marcados.Count)
                 </button>
             </div>
             <p class="small text-muted mt-1 mb-0">
@@ -135,7 +135,7 @@
                     @foreach (var j in _painel.Aposentados)
                     {
                         <li class="d-flex align-items-center gap-2 mb-1">
-                            <span>🎖️ @j.Nome — última temporada @j.AposentadoNaTemporada</span>
+                            <span><Icone Nome="medal" Tamanho="14" /> @j.Nome — última temporada @j.AposentadoNaTemporada</span>
                             <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DesaposentarAsync(j)" disabled="@_carregando">desfazer</button>
                         </li>
                     }
@@ -221,7 +221,7 @@
         await Executar(async () =>
         {
             await AposentadoriaSvc.RevelarAsync(new[] { j.PlayerId }, CancellationToken.None);
-            _ok = $"👋 {j.Nome} anunciou a despedida.";
+            _ok = $"{j.Nome} anunciou a despedida.";
         });
     }
 
@@ -235,7 +235,7 @@
         await Executar(async () =>
         {
             await AposentadoriaSvc.RevelarAsync(new[] { j.PlayerId }, CancellationToken.None);
-            _ok = $"👋 {j.Nome} anunciou a despedida.";
+            _ok = $"{j.Nome} anunciou a despedida.";
         });
     }
 

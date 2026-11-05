@@ -5,7 +5,7 @@
 @* Admin: digitar ou corrigir os números do PES da partida (posse, chutes, passes…), para jogo que veio sem eles. *@
 <details class="card mb-4" open="@_aberto">
     <summary class="card-header fw-bold" @onclick="() => _aberto = !_aberto" @onclick:preventDefault>
-        📊 Números do PES
+        <Icone Nome="chart-column" Tamanho="14" /> Números do PES
         <span class="fw-normal small text-muted">· @(_preenchidos == 0 ? "sem números" : $"{_preenchidos} preenchido{(_preenchidos == 1 ? "" : "s")}")</span>
     </summary>
     @if (_aberto && _campos is not null)

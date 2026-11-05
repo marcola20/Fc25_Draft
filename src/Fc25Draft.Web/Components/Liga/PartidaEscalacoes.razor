@@ -50,7 +50,7 @@
                         <span class="lances">@Lances(j.JogadorId)</span>
                         @if (j.MelhorEmCampo)
                         {
-                            <span title="Melhor em campo">⭐</span>
+                            <span title="Melhor em campo"><Icone Nome="star" Tamanho="14" /></span>
                         }
                         @if (j.Nota is decimal nota)
                         {
@@ -72,15 +72,15 @@
         {
             if (ev.Tipo == TipoEvento.Gol && ev.JogadorId == jogadorId)
             {
-                <span title="Gol@(Min(ev.Minuto))">⚽</span>
+                <span title="Gol@(Min(ev.Minuto))"><Icone Nome="goal" Tamanho="14" /></span>
             }
             else if (ev.Tipo == TipoEvento.GolContra && ev.JogadorId == jogadorId)
             {
-                <span title="Gol contra@(Min(ev.Minuto))">⚽<sup class="text-danger fw-bold">GC</sup></span>
+                <span title="Gol contra@(Min(ev.Minuto))"><Icone Nome="goal" Tamanho="14" /><sup class="text-danger fw-bold">GC</sup></span>
             }
             if (ev.Tipo == TipoEvento.Gol && ev.AssistenteId == jogadorId)
             {
-                <span title="Assistência@(Min(ev.Minuto))">🎯</span>
+                <span title="Assistência@(Min(ev.Minuto))"><Icone Nome="target" Tamanho="14" /></span>
             }
             if (ev.Tipo == TipoEvento.CartaoAmarelo && ev.JogadorId == jogadorId)
             {

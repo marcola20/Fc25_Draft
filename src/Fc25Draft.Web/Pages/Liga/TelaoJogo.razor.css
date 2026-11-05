@@ -1,21 +1,27 @@
 /* Telão do jogo: vídeo grande e o chat ao lado, no mesmo clima do telão do draft. */
 .telao-jogo {
-    --fundo: #0b1622;
-    --painel: #13243a;
-    --borda: #1f3a5c;
-    --texto: #f1f5f9;
-    --suave: #94a3b8;
-    --destaque: #f4d35e;
-    --perigo: #ef4444;
+    --fundo: #0e1013;
+    --painel: #17191c;
+    --borda: rgba(232, 234, 237, 0.09);
+    --texto: #e8eaed;
+    --suave: #a2a7ae;
+    --destaque: #f2cd5c;
+    --perigo: #d0524a;
     height: 100vh;
     overflow: hidden;
-    background: radial-gradient(circle at top, #16304f 0%, var(--fundo) 60%);
+    background: var(--fundo);
     color: var(--texto);
     display: flex;
     flex-direction: column;
     padding: 1.2vh 1.5vw;
     gap: 1.2vh;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: 'Instrument Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Os ícones acompanham o tamanho da letra em volta (o telão mede tudo pela altura da tela). */
+.telao-jogo ::deep svg.icone {
+    width: 1em;
+    height: 1em;
 }
 
 .telao-jogo a { color: var(--destaque); }
@@ -47,7 +53,7 @@
 
 .logo { height: 6vh; }
 
-.competicao .nome { font-size: 2.4vh; font-weight: 800; }
+.competicao .nome { font-size: 2.4vh; font-weight: 600; }
 .competicao .sub { font-size: 1.7vh; color: var(--suave); text-transform: capitalize; }
 
 .placar {
@@ -62,7 +68,7 @@
     align-items: center;
     gap: .8vw;
     font-size: 2.8vh;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .time img { height: 6.5vh; width: 6.5vh; object-fit: contain; }
@@ -72,7 +78,7 @@
     align-items: center;
     gap: .6vw;
     font-size: 5vh;
-    font-weight: 900;
+    font-weight: 600;
     background: var(--painel);
     border: 1px solid var(--borda);
     border-radius: 1vh;
@@ -181,7 +187,7 @@
     border: 0;
     color: var(--suave);
     padding: 1vh 0;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     border-bottom: 3px solid transparent;
 }
@@ -206,7 +212,7 @@
 }
 
 .mensagem .cabeca img, .palpite img { width: 18px; height: 18px; object-fit: contain; }
-.mensagem .autor { font-weight: 700; color: var(--destaque); }
+.mensagem .autor { font-weight: 500; color: var(--destaque); }
 .mensagem.minha .autor { color: #7dd3fc; }
 .mensagem .hora { color: var(--suave); font-size: .7rem; }
 .mensagem .texto { font-size: .95rem; word-wrap: break-word; overflow-wrap: anywhere; }
@@ -248,7 +254,7 @@
     border: 0;
     border-radius: .6rem;
     padding: 0 .9rem;
-    font-weight: 800;
+    font-weight: 600;
     cursor: pointer;
 }
 
@@ -299,8 +305,8 @@
 }
 
 .palpite .autor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.palpite .chute { font-weight: 800; font-variant-numeric: tabular-nums; }
-.palpite .pontos { color: var(--destaque); font-weight: 700; min-width: 2.2rem; text-align: right; }
+.palpite .chute { font-weight: 600; font-variant-numeric: tabular-nums; }
+.palpite .pontos { color: var(--destaque); font-weight: 500; min-width: 2.2rem; text-align: right; }
 
 /* ── Celular: vídeo em cima, chat embaixo, página rola ── */
 @media (max-width: 900px) {

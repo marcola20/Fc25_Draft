@@ -513,7 +513,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">🚪 @_saidaTarget.Name pediu para sair</h5>
+                    <h5 class="modal-title"><Icone Nome="door-open" Tamanho="14" /> @_saidaTarget.Name pediu para sair</h5>
                     <button type="button" class="btn-close" aria-label="Fechar" @onclick="FecharSaida" disabled="@_saidaProcessando"></button>
                 </div>
                 <div class="modal-body">
@@ -536,7 +536,7 @@ else
                             pode comprar direto (com a janela aberta). Você não muda o preço nem tira da lista.
                         </p>
                         <p class="mb-2">
-                            <strong>🤝 Promessa:</strong> ele sai da lista e você tem @PedidoDeSaidaCriterios.JogosDaPromessa jogos
+                            <strong><Icone Nome="handshake" Tamanho="14" /> Promessa:</strong> ele sai da lista e você tem @PedidoDeSaidaCriterios.JogosDaPromessa jogos
                             para escalá-lo como titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos. Se não
                             cumprir, ele volta para a lista pela <strong>metade</strong> do preço da venda rápida (e a venda rápida
                             dele também cai pela metade). Uma promessa por vez.
@@ -563,7 +563,7 @@ else
                             {
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             }
-                            🤝 Tirar da lista prometendo jogar
+                            <Icone Nome="handshake" Tamanho="14" /> Tirar da lista prometendo jogar
                         </button>
                     }
                 </div>
@@ -579,7 +579,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">🗣️ Conversa com @_conversaTarget.Name</h5>
+                    <h5 class="modal-title"><Icone Nome="message-square" Tamanho="14" /> Conversa com @_conversaTarget.Name</h5>
                     <button type="button" class="btn-close" aria-label="Fechar" @onclick="FecharConversa" disabled="@_conversaProcessando"></button>
                 </div>
                 <div class="modal-body">
@@ -608,7 +608,7 @@ else
                         {
                             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                         }
-                        🗣️ Conversar
+                        <Icone Nome="message-square" Tamanho="14" /> Conversar
                     </button>
                 </div>
             </div>
@@ -1196,8 +1196,8 @@ else
             ApplyRosterSort();
 
             _quickSellSuccessMessage = participacao?.Papel is { } papel
-                ? $"🗣️ Conversa feita: {_conversaTarget.Name} agora é {PapelDoJogador.Emoji(papel.Papel)} {PapelDoJogador.Nome(papel.Papel)}."
-                : $"🗣️ Conversa feita com {_conversaTarget.Name}.";
+                ? $"Conversa feita: {_conversaTarget.Name} agora é {PapelDoJogador.Emoji(papel.Papel)} {PapelDoJogador.Nome(papel.Papel)}."
+                : $"Conversa feita com {_conversaTarget.Name}.";
             _conversaTarget = null;
         }
         catch (Exception ex)
@@ -1253,7 +1253,7 @@ else
             teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
             ApplyRosterSort();
 
-            _quickSellSuccessMessage = $"🤝 Promessa feita: {_saidaTarget.Name} saiu da lista. Escale ele como titular "
+            _quickSellSuccessMessage = $"Promessa feita: {_saidaTarget.Name} saiu da lista. Escale ele como titular "
                 + $"{ParticipacaoCriterios.TitularSeguidoParaResolver} jogos seguidos nos próximos {PedidoDeSaidaCriterios.JogosDaPromessa} jogos.";
             _saidaTarget = null;
         }

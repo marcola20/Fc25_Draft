@@ -17,12 +17,12 @@ else
         <div class="card-body">
             @if (estado.Terminado)
             {
-                <div class="sorteio-titulo">🏆 Sorteio encerrado</div>
+                <div class="sorteio-titulo"><Icone Nome="trophy" Tamanho="14" /> Sorteio encerrado</div>
                 <div class="text-muted">Grupos da @estado.LigaNome definidos.</div>
             }
             else if (ultima is null)
             {
-                <div class="sorteio-titulo">🎲 O sorteio vai começar</div>
+                <div class="sorteio-titulo"><Icone Nome="dices" Tamanho="14" /> O sorteio vai começar</div>
                 <div class="text-muted">Primeiro saem os cabeças de chave (pote 1).</div>
             }
             else

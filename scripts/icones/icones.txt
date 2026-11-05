@@ -121,3 +121,5 @@ bot
 copy
 minus
 maximize
+cake
+send-horizontal

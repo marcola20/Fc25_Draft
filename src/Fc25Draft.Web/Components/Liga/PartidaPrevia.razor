@@ -51,15 +51,15 @@
 
         @if (pv.Casa.Suspensos.Count + pv.Fora.Suspensos.Count > 0)
         {
-            @Linha("🟥 Suspensos", Nomes(pv.Casa.Suspensos), Nomes(pv.Fora.Suspensos))
+            @Linha("Suspensos", Nomes(pv.Casa.Suspensos), Nomes(pv.Fora.Suspensos))
         }
         @if (pv.Casa.Pendurados.Count + pv.Fora.Pendurados.Count > 0)
         {
-            @Linha("🟨 Pendurados", Nomes(pv.Casa.Pendurados), Nomes(pv.Fora.Pendurados))
+            @Linha("Pendurados", Nomes(pv.Casa.Pendurados), Nomes(pv.Fora.Pendurados))
         }
     </div>
 
-    <h6 class="mt-4 mb-2">🆚 Confronto direto</h6>
+    <h6 class="mt-4 mb-2"><Icone Nome="swords" Tamanho="14" /> Confronto direto</h6>
     @if (pv.Confronto.Jogos == 0)
     {
         <div class="text-muted small">Primeiro encontro entre os dois.</div>
@@ -89,7 +89,7 @@
 
     @if (pv.Treinadores is { } tr)
     {
-        <h6 class="mt-4 mb-2">👔 Duelo dos técnicos</h6>
+        <h6 class="mt-4 mb-2"><Icone Nome="briefcase" Tamanho="14" /> Duelo dos técnicos</h6>
         <div class="previa-confronto mb-2">
             <div>
                 <a href="/treinadores/@tr.Casa.TreinadorId" class="text-reset text-decoration-none">

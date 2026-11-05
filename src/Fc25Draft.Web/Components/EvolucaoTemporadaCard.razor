@@ -4,7 +4,7 @@
 
 @* Evolução de fim de temporada: curva de idade + desempenho, com prévia, confirmação única e desfazer. *@
 <div class="card mb-3">
-    <div class="card-header fw-bold">📈 Evolução da temporada @Temporada</div>
+    <div class="card-header fw-bold"><Icone Nome="trending-up" Tamanho="14" /> Evolução da temporada @Temporada</div>
     <div class="card-body">
         @if (_erro is not null)
         {
@@ -42,7 +42,7 @@
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                 @if (_previa.JaAplicada)
                 {
-                    <span class="badge bg-success">✅ Aplicada em @BrazilTime.ConvertFromUtc(_previa.AplicadaEm!.Value).ToString("dd/MM/yyyy HH:mm")</span>
+                    <span class="badge bg-success"><Icone Nome="circle-check" Tamanho="14" /> Aplicada em @BrazilTime.ConvertFromUtc(_previa.AplicadaEm!.Value).ToString("dd/MM/yyyy HH:mm")</span>
                 }
                 else
                 {
@@ -53,7 +53,7 @@
                 <span class="badge bg-secondary">= @_previa.Mantem mantêm</span>
                 @if (_previa.Linhas.Any(l => l.Surpresa != 0) || _canceladas.Count > 0)
                 {
-                    <span class="badge bg-info text-dark">💥 @_previa.Linhas.Count(l => l.Surpresa > 0) explosões · 📉 @_previa.Linhas.Count(l => l.Surpresa < 0) quedas de rendimento@(_canceladas.Count > 0 ? $" · {_canceladas.Count} cancelada(s)" : "")</span>
+                    <span class="badge bg-info text-dark"><Icone Nome="zap" Tamanho="14" /> @_previa.Linhas.Count(l => l.Surpresa > 0) explosões · <Icone Nome="trending-down" Tamanho="14" /> @_previa.Linhas.Count(l => l.Surpresa < 0) quedas de rendimento@(_canceladas.Count > 0 ? $" · {_canceladas.Count} cancelada(s)" : "")</span>
                 }
 
                 <input class="form-control form-control-sm ms-auto" style="max-width: 220px;" placeholder="Buscar jogador ou clube"
@@ -83,12 +83,12 @@
                                     @if (l.Surpresa != 0 && !_previa.JaAplicada)
                                     {
                                         <button class="btn btn-sm btn-link p-0 ms-1" title="Cancelar a surpresa deste jogador" @onclick="() => CancelarSurpresaAsync(l.PlayerId)">
-                                            @(l.Surpresa > 0 ? "💥" : "📉") cancelar
+                                            <Icone Nome="@(l.Surpresa > 0 ? "zap" : "trending-down")" Tamanho="14" /> cancelar
                                         </button>
                                     }
                                     else if (l.Surpresa != 0)
                                     {
-                                        <span>@(l.Surpresa > 0 ? "💥" : "📉")</span>
+                                        <span><Icone Nome="@(l.Surpresa > 0 ? "zap" : "trending-down")" Tamanho="14" /></span>
                                     }
                                 </td>
                                 <td class="small">@(l.TimeNome ?? "—")</td>
@@ -117,7 +117,7 @@
             <div class="d-flex gap-2 flex-wrap">
                 @if (!_previa.JaAplicada)
                 {
-                    <button class="btn btn-primary" @onclick="AplicarAsync" disabled="@_carregando">✅ Aplicar a evolução de @Temporada</button>
+                    <button class="btn btn-primary" @onclick="AplicarAsync" disabled="@_carregando"><Icone Nome="circle-check" Tamanho="14" /> Aplicar a evolução de @Temporada</button>
                     <button class="btn btn-outline-secondary" @onclick="CarregarAsync" disabled="@_carregando">Recalcular</button>
                 }
                 else if (_previa.PodeDesfazer)

@@ -22,18 +22,18 @@
                 {
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <span class="badge rounded-pill bg-light text-dark border" style="font-size: 13px;">
-                            ⚽ @_resumo.TotalGols gol@(_resumo.TotalGols == 1 ? "" : "s") em @_resumo.JogosEncerrados jogo@(_resumo.JogosEncerrados == 1 ? "" : "s")
+                            <Icone Nome="goal" Tamanho="14" /> @_resumo.TotalGols gol@(_resumo.TotalGols == 1 ? "" : "s") em @_resumo.JogosEncerrados jogo@(_resumo.JogosEncerrados == 1 ? "" : "s")
                         </span>
                         @if (_resumo.Artilheiros.Count > 0)
                         {
                             <span class="badge rounded-pill bg-warning text-dark" style="font-size: 13px;">
-                                🎯 @string.Join(", ", _resumo.Artilheiros.Select(a => a.Nome)) · @_resumo.Artilheiros[0].Gols gols
+                                <Icone Nome="target" Tamanho="14" /> @string.Join(", ", _resumo.Artilheiros.Select(a => a.Nome)) · @_resumo.Artilheiros[0].Gols gols
                             </span>
                         }
                         @if (_resumo.MaiorGoleada is { } g)
                         {
                             <span class="badge rounded-pill bg-dark" style="font-size: 13px;">
-                                💥 @g.TimeCasaNome @g.GolsCasa x @g.GolsFora @g.TimeForaNome
+                                <Icone Nome="zap" Tamanho="14" /> @g.TimeCasaNome @g.GolsCasa x @g.GolsFora @g.TimeForaNome
                             </span>
                         }
                     </div>

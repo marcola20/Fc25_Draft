@@ -13,7 +13,7 @@
                 <FotoJogador PlayerId="@c.Jogador.JogadorId" Tamanho="150" Lazy="false" Alt="@c.Jogador.JogadorNome" />
             </div>
             <div class="info">
-                <div class="rotulo">⭐ Craque da partida</div>
+                <div class="rotulo"><Icone Nome="star" Tamanho="14" /> Craque da partida</div>
                 <div class="nome">@c.Jogador.JogadorNome</div>
                 <div class="time">
                     <img src="@Escudos.GetEscudo(c.TimeNome)" alt="" />
@@ -26,11 +26,11 @@
                     }
                     @if (c.Gols > 0)
                     {
-                        <span>⚽ @c.Gols @(c.Gols == 1 ? "gol" : "gols")</span>
+                        <span><Icone Nome="goal" Tamanho="14" /> @c.Gols @(c.Gols == 1 ? "gol" : "gols")</span>
                     }
                     @if (c.Assistencias > 0)
                     {
-                        <span>🎯 @c.Assistencias @(c.Assistencias == 1 ? "assistência" : "assistências")</span>
+                        <span><Icone Nome="target" Tamanho="14" /> @c.Assistencias @(c.Assistencias == 1 ? "assistência" : "assistências")</span>
                     }
                 </div>
                 <div class="placar">

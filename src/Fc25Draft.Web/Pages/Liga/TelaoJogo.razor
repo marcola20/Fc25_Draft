@@ -75,8 +75,8 @@
             </div>
 
             <div class="acoes">
-                <span class="publico" title="Pessoas com o telão aberto agora">👀 @_assistindo</span>
-                <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia">⛶</button>
+                <span class="publico" title="Pessoas com o telão aberto agora"><Icone Nome="eye" Tamanho="14" /> @_assistindo</span>
+                <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia"><Icone Nome="maximize" Tamanho="14" /></button>
             </div>
         </header>
 
@@ -85,7 +85,7 @@
                 @if (string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId))
                 {
                     <div class="sem-video">
-                        <div class="icone">📺</div>
+                        <div class="icone"><Icone Nome="tv" Tamanho="14" /></div>
                         <div>O vídeo deste jogo ainda não foi publicado.</div>
                         <div class="suave">Deixe a página aberta e recarregue quando a estreia for marcada.</div>
                     </div>
@@ -110,9 +110,9 @@
 
             <aside class="lateral">
                 <nav class="abas">
-                    <button type="button" class="@(_aba == Aba.Chat ? "ativa" : "")" @onclick="() => { _aba = Aba.Chat; _rolarChat = true; }">💬 Chat</button>
-                    <button type="button" class="@(_aba == Aba.Palpites ? "ativa" : "")" @onclick="AbrirPalpites">🎯 Palpites</button>
-                    <button type="button" class="@(_aba == Aba.Times ? "ativa" : "")" @onclick="AbrirTimes">👕 Times</button>
+                    <button type="button" class="@(_aba == Aba.Chat ? "ativa" : "")" @onclick="() => { _aba = Aba.Chat; _rolarChat = true; }"><Icone Nome="message-circle" Tamanho="14" /> Chat</button>
+                    <button type="button" class="@(_aba == Aba.Palpites ? "ativa" : "")" @onclick="AbrirPalpites"><Icone Nome="target" Tamanho="14" /> Palpites</button>
+                    <button type="button" class="@(_aba == Aba.Times ? "ativa" : "")" @onclick="AbrirTimes"><Icone Nome="users" Tamanho="14" /> Times</button>
                 </nav>
 
                 @if (_aba == Aba.Chat)
@@ -136,7 +136,7 @@
                                     <span class="hora">@BrazilTime.FormatDateTime(m.EnviadaEm, "HH:mm")</span>
                                     @if (AdminAuth.IsAdmin)
                                     {
-                                        <button type="button" class="apagar" title="Apagar mensagem" @onclick="() => ApagarAsync(m)">✕</button>
+                                        <button type="button" class="apagar" title="Apagar mensagem" @onclick="() => ApagarAsync(m)"><Icone Nome="x" Tamanho="14" /></button>
                                     }
                                 </div>
                                 <div class="texto">@m.Texto</div>
@@ -167,7 +167,7 @@
                             <input type="text" @ref="_campoRef" @bind="_texto" @bind:event="oninput" maxlength="@TamanhoMaximo"
                                    placeholder="Comente como @_eu.Nome..." autocomplete="off" />
                             @* Sem disabled: botão desabilitado bloqueia o Enter de quem digita antes do servidor responder. *@
-                            <button type="submit" class="@(string.IsNullOrWhiteSpace(_texto) ? "vazio" : "")">➤</button>
+                            <button type="submit" class="@(string.IsNullOrWhiteSpace(_texto) ? "vazio" : "")"><Icone Nome="send-horizontal" Tamanho="14" /></button>
                         </form>
                         @if (_erro is not null)
                         {
@@ -215,7 +215,7 @@
                                     {
                                         <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
                                     }
-                                    <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · ⚽ {ga}" : "")</span></span>
+                                    <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · {ga}" : "")</span></span>
                                     <span class="chute">@p.GolsCasa – @p.GolsFora@(p.Penaltis is { } pen ? $" (pên. {pen})" : "")</span>
                                     @if (p.Pontos is int pts)
                                     {

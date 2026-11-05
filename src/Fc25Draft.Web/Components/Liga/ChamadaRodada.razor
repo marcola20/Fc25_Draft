@@ -12,7 +12,7 @@
 <div class="card mb-3">
     <div class="card-body py-2">
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="fw-semibold">📣 Mensagem do grupo</span>
+            <span class="fw-semibold"><Icone Nome="megaphone" Tamanho="14" /> Mensagem do grupo</span>
             <span class="text-muted small">Confrontos, horários, telão e bolão prontos para colar no WhatsApp.</span>
             <div class="ms-auto d-flex gap-2">
                 <button class="btn btn-sm btn-outline-primary" @onclick="GerarAsync" disabled="@_gerando">
@@ -20,7 +20,7 @@
                 </button>
                 @if (_texto is not null)
                 {
-                    <button class="btn btn-sm btn-success" @onclick="CopiarAsync">📋 Copiar</button>
+                    <button class="btn btn-sm btn-success" @onclick="CopiarAsync"><Icone Nome="copy" Tamanho="14" /> Copiar</button>
                 }
             </div>
         </div>

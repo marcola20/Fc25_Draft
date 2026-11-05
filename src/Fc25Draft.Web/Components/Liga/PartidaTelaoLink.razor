@@ -9,12 +9,12 @@
     <div class="d-flex align-items-center gap-2 flex-wrap mb-3 p-2 rounded" style="background:#0b1622;">
         @if (!string.IsNullOrWhiteSpace(_videoId))
         {
-            <a href="/telao/jogo/@PartidaId" class="btn btn-warning btn-sm fw-bold">📺 Ver no telão</a>
+            <a href="/telao/jogo/@PartidaId" class="btn btn-warning btn-sm fw-bold"><Icone Nome="tv" Tamanho="14" /> Ver no telão</a>
             <span class="small text-white-50">Vídeo, chat e palpites do jogo</span>
         }
         else
         {
-            <span class="small text-white-50">📺 Sem vídeo no telão ainda</span>
+            <span class="small text-white-50"><Icone Nome="tv" Tamanho="14" /> Sem vídeo no telão ainda</span>
         }
 
         @if (AdminAuth.IsAdmin)
@@ -34,7 +34,7 @@
             else
             {
                 <button type="button" class="btn btn-outline-light btn-sm ms-auto" @onclick="Editar">
-                    @(string.IsNullOrWhiteSpace(_videoId) ? "➕ Link do vídeo" : "✏️ Trocar vídeo")
+                    <Icone Nome="@(string.IsNullOrWhiteSpace(_videoId) ? "plus" : "pencil")" Tamanho="14" /> @(string.IsNullOrWhiteSpace(_videoId) ? "Link do vídeo" : "Trocar vídeo")
                 </button>
             }
         }

@@ -39,7 +39,7 @@
                         <FotoJogador PlayerId="@j.JogadorId" Tamanho="@(Compacto ? 24 : 42)" Alt="@j.JogadorNome" />
                         @if (j.MelhorEmCampo)
                         {
-                            <span class="melhor" title="Melhor em campo">⭐</span>
+                            <span class="melhor" title="Melhor em campo"><Icone Nome="star" Tamanho="12" /></span>
                         }
                         @if (j.Nota is decimal nota)
                         {
@@ -48,9 +48,21 @@
                     </div>
                     <div class="nome">@NomeCurto(j.JogadorNome)</div>
                     @{ var lances = Lances(j.JogadorId); }
-                    @if (lances.Length > 0)
+                    @if (lances.Count > 0)
                     {
-                        <div class="lances">@lances</div>
+                        <div class="lances">
+                            @foreach (var lance in lances)
+                            {
+                                @switch (lance.Tipo)
+                                {
+                                    case "gol": <Icone Nome="goal" Tamanho="12" Classe="lance-gol" /> break;
+                                    case "assist": <Icone Nome="target" Tamanho="12" Classe="lance-assist" /> break;
+                                    case "amarelo": <span class="cartao-icone amarelo"></span> break;
+                                    case "vermelho": <span class="cartao-icone vermelho"></span> break;
+                                    default: <span class="lance-saiu">▼@lance.Minuto'</span> break;
+                                }
+                            }
+                        </div>
                     }
                 </div>
             }
@@ -76,20 +88,20 @@
         return ultimo.Length <= 3 ? $"{partes[^2]} {ultimo}" : ultimo;
     }
 
-    /// <summary>O que o jogador fez no jogo, em ícones: ⚽ por gol, 🎯 por assistência, cartões e ▼ se saiu.</summary>
-    private string Lances(int jogadorId)
+    /// <summary>O que o jogador fez no jogo, em ordem: gol, assistência, cartões e a saída (com o minuto).</summary>
+    private List<(string Tipo, int? Minuto)> Lances(int jogadorId)
     {
-        if (Dados is null) return "";
-        var texto = new System.Text.StringBuilder();
+        var lances = new List<(string, int?)>();
+        if (Dados is null) return lances;
         foreach (var ev in Dados.Eventos)
         {
-            if (ev.Tipo == TipoEvento.Gol && ev.JogadorId == jogadorId) texto.Append('⚽');
-            if (ev.Tipo == TipoEvento.Gol && ev.AssistenteId == jogadorId) texto.Append("🎯");
-            if (ev.Tipo == TipoEvento.CartaoAmarelo && ev.JogadorId == jogadorId) texto.Append("🟨");
-            if (ev.Tipo == TipoEvento.CartaoVermelho && ev.JogadorId == jogadorId) texto.Append("🟥");
-            if (ev.Tipo == TipoEvento.Substituicao && ev.JogadorSaiuId == jogadorId) texto.Append($"▼{ev.Minuto}'");
+            if (ev.Tipo == TipoEvento.Gol && ev.JogadorId == jogadorId) lances.Add(("gol", ev.Minuto));
+            if (ev.Tipo == TipoEvento.Gol && ev.AssistenteId == jogadorId) lances.Add(("assist", ev.Minuto));
+            if (ev.Tipo == TipoEvento.CartaoAmarelo && ev.JogadorId == jogadorId) lances.Add(("amarelo", ev.Minuto));
+            if (ev.Tipo == TipoEvento.CartaoVermelho && ev.JogadorId == jogadorId) lances.Add(("vermelho", ev.Minuto));
+            if (ev.Tipo == TipoEvento.Substituicao && ev.JogadorSaiuId == jogadorId) lances.Add(("saiu", ev.Minuto));
         }
-        return texto.ToString();
+        return lances;
     }
 
     private string Dica(PartidaEscalacaoJogadorDto j) =>

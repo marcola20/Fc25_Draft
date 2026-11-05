@@ -3,7 +3,7 @@
 
 @* Aniversário dos jogadores (todos +1), uma vez por temporada. O Editor PES copia a idade do site para o save. *@
 <div class="card mb-3">
-    <div class="card-header fw-bold">🎂 Idade dos jogadores</div>
+    <div class="card-header fw-bold"><Icone Nome="cake" Tamanho="14" /> Idade dos jogadores</div>
     <div class="card-body">
         @if (_erro is not null)
         {
@@ -33,7 +33,7 @@
             @if (_situacao.JaEnvelhecida)
             {
                 <div class="alert alert-success py-2 mb-2">
-                    ✅ Os jogadores já fizeram aniversário na temporada @temporada
+                    <Icone Nome="circle-check" Tamanho="14" /> Os jogadores já fizeram aniversário na temporada @temporada
                     (@_situacao.JogadoresNoEnvelhecimento jogadores, em @BrazilTime.ConvertFromUtc(_situacao.AplicadoEm!.Value).ToString("dd/MM/yyyy HH:mm")).
                     Idade média hoje: @_situacao.IdadeMedia.ToString("0.0").
                 </div>
@@ -60,7 +60,7 @@
                     }
                 </ul>
                 <button class="btn btn-primary" @onclick="EnvelhecerAsync" disabled="@_salvando">
-                    🎂 Envelhecer todos (+1) na temporada @temporada
+                    <Icone Nome="cake" Tamanho="14" /> Envelhecer todos (+1) na temporada @temporada
                 </button>
             }
         }

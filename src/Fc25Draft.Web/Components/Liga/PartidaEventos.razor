@@ -79,7 +79,7 @@
             case TipoEvento.Gol:
             case TipoEvento.GolContra:
                 <div>
-                    <span>⚽</span>
+                    <span><Icone Nome="goal" Tamanho="14" /></span>
                     <a href="/players/details/@ev.JogadorId" class="fw-semibold text-body">@ev.JogadorNome</a>
                     @if (ev.Tipo == TipoEvento.GolContra)
                     {
@@ -95,7 +95,7 @@
             case TipoEvento.CartaoAmarelo:
             case TipoEvento.CartaoVermelho:
                 <div>
-                    <span>@(ev.Tipo == TipoEvento.CartaoAmarelo ? "🟨" : "🟥")</span>
+                    <span><span class="cartao-icone @(ev.Tipo == TipoEvento.CartaoAmarelo ? "amarelo" : "vermelho")"></span></span>
                     <a href="/players/details/@ev.JogadorId" class="text-body">@ev.JogadorNome</a>
                 </div>
                 break;
