@@ -40,8 +40,8 @@
     <!-- ═══ ROUND 1 ═══ -->
     <section class="picks-section">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🏆</span>
-            <h3>Round 1 — Liga</h3>
+            <Icone Nome="list-ordered" Tamanho="18" Classe="picks-section-icon" />
+            <h3>Round 1 · Liga</h3>
         </div>
         <p class="picks-section-desc">@_regra.R1Desc</p>
         @TabelaPicks(("Resultado na Liga", _regra.R1))
@@ -54,8 +54,8 @@
     <!-- ═══ ROUND 2 ═══ -->
     <section class="picks-section">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🥇</span>
-            <h3>Round 2 — Copa</h3>
+            <Icone Nome="shield" Tamanho="18" Classe="picks-section-icon" />
+            <h3>Round 2 · Copa</h3>
         </div>
         <p class="picks-section-desc">@_regra.R2Desc</p>
         @TabelaPicks(("Resultado na Copa", _regra.R2))
@@ -67,16 +67,16 @@
 
     <section class="picks-section">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🗺️</span>
-            <h3>Mapa de Picks — Round 1</h3>
+            <Icone Nome="layout-grid" Tamanho="18" Classe="picks-section-icon" />
+            <h3>Mapa de picks · Round 1</h3>
         </div>
         @MapaPicks(_regra.R1)
     </section>
 
     <section class="picks-section picks-section-sub">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🗺️</span>
-            <h3>Mapa de Picks — Round 2</h3>
+            <Icone Nome="layout-grid" Tamanho="18" Classe="picks-section-icon" />
+            <h3>Mapa de picks · Round 2</h3>
         </div>
         @MapaPicks(_regra.R2)
     </section>
@@ -235,6 +235,17 @@
 
     private RegraPicks _regra = RegraSerieB;
 
+    // Os dados das faixas marcam o tipo com um emoji; na tela ele vira um ícone do lucide.
+    private static string IconeDaFaixa(string emoji) => emoji switch
+    {
+        "🎰" => "ticket",
+        "⚖️" => "scale",
+        "🎖️" => "medal",
+        "🥈" => "medal",
+        "🏆" => "trophy",
+        _ => "chevron-right"
+    };
+
     private static RenderFragment TabelaPicks((string Cabecalho, IReadOnlyList<PickRow> Rows) t) => __builder =>
     {
         <div class="picks-table-wrap">
@@ -243,7 +254,7 @@
                     <tr>
                         <th>@t.Cabecalho</th>
                         <th>Times</th>
-                        <th>Picks Disponíveis</th>
+                        <th>Picks</th>
                         <th class="picks-th-range">Faixa</th>
                     </tr>
                 </thead>
@@ -253,7 +264,7 @@
                         <tr class="picks-row picks-row-@row.Tom">
                             <td>
                                 <div class="picks-stage-cell">
-                                    <span class="picks-stage-icon">@row.Icon</span>
+                                    <Icone Nome="@IconeDaFaixa(row.Icon)" Tamanho="16" Classe="picks-stage-icon" />
                                     <span class="picks-stage-name">@row.Stage</span>
                                 </div>
                             </td>
@@ -282,7 +293,7 @@
     {
         <section class="picks-section picks-section-sub">
             <div class="picks-section-header">
-                <span class="picks-section-icon">🎰</span>
+                <Icone Nome="ticket" Tamanho="18" Classe="picks-section-icon" />
                 <h3>@sec.Title</h3>
             </div>
             <p class="picks-section-desc">@sec.Desc</p>
@@ -302,7 +313,7 @@
                             {
                                 <div class="picks-lottery-card picks-lot-@entry.Tom">
                                     <div class="picks-lottery-team">
-                                        <span class="picks-lottery-icon">@entry.Icon</span>
+                                        <span class="picks-ponto picks-ponto-@entry.Tom" aria-hidden="true"></span>
                                         <div>
                                             <div class="picks-lottery-stage">@entry.Stage</div>
                                             <div class="picks-lottery-detail">@entry.Detail</div>
@@ -322,7 +333,7 @@
             </div>
 
             <div class="picks-lottery-note">
-                <span class="picks-lottery-note-icon">ℹ️</span>
+                <Icone Nome="info" Tamanho="16" Classe="picks-lottery-note-icon" />
                 <span>@sec.Note</span>
             </div>
         </section>
@@ -336,7 +347,7 @@
                 foreach (var pick in row.Picks)
                 {
                     <div class="picks-map-col">
-                        <div class="picks-map-num picks-chip-@row.Tom">#@pick</div>
+                        <div class="picks-chip picks-map-num picks-chip-@row.Tom">#@pick</div>
                         <div class="picks-map-label">@row.MapLabel</div>
                     </div>
                 }
@@ -345,9 +356,12 @@
     };
 }
 
+@* Estilo global de propósito: o DonosDasPicks usa as mesmas classes picks-*.
+   Cor das faixas: uma rampa só de dourado, da pick mais cedo (red/orange) para a mais tarde (green/silver);
+   o campeão (gold) fica com o contorno dourado. Os nomes red/orange/... vêm dos dados e ficaram como estão. *@
 <style>
     .picks-page {
-        max-width: 900px;
+        max-width: 960px;
         margin: 0 auto;
         padding-bottom: 3rem;
     }
@@ -364,187 +378,159 @@
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.1rem;
-        padding: 0.65rem 0.9rem;
+        gap: 0.125rem;
+        padding: 0.75rem 1rem;
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.55rem;
+        border-radius: 0.75rem;
         background: var(--bs-body-bg);
         color: var(--bs-body-color);
         text-align: left;
         cursor: pointer;
+        transition: background-color var(--cbfv-rapido) var(--cbfv-curva), border-color var(--cbfv-rapido) var(--cbfv-curva);
     }
 
-    .picks-tab:hover { border-color: color-mix(in srgb, var(--bs-primary, #0d6efd) 45%, transparent); }
+    .picks-tab:hover { background: var(--bs-secondary-bg); }
 
     .picks-tab.active {
-        border-color: var(--bs-primary, #0d6efd);
-        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, var(--bs-body-bg));
-        box-shadow: inset 0 -3px 0 var(--bs-primary, #0d6efd);
+        border-color: rgba(201, 148, 40, 0.55);
+        box-shadow: inset 0 -2px 0 var(--cbfv-acento);
     }
 
-    .picks-tab-title { font-weight: 700; font-size: 0.95rem; color: var(--bs-emphasis-color); }
-    .picks-tab-sub   { font-size: 0.75rem; color: var(--bs-secondary-color); }
+    .picks-tab-title { font-weight: 500; font-size: 0.9375rem; color: var(--bs-emphasis-color); }
+    .picks-tab-sub   { font-size: 0.75rem; color: var(--bs-tertiary-color); }
 
     .picks-divider {
+        margin: 2.5rem 0;
         border-color: var(--bs-border-color);
-        margin: 2rem 0;
-        opacity: 0.4;
+        opacity: 1;
     }
 
     .picks-section { margin-bottom: 0.5rem; }
-    .picks-section-sub { margin-top: 1.5rem; }
+    .picks-section-sub { margin-top: 2rem; }
 
     .picks-section-header {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        margin-bottom: 0.9rem;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
     }
 
-    .picks-section-icon { font-size: 1.4rem; line-height: 1; }
+    .picks-section-icon { color: var(--bs-tertiary-color); }
 
     .picks-section-header h3 {
-        font-size: 1.25rem;
-        font-weight: 700;
         margin: 0;
+        font-size: 1.125rem;
+        font-weight: 500;
         color: var(--bs-emphasis-color);
-        letter-spacing: -0.01em;
     }
 
     .picks-section-desc {
-        font-size: 0.9rem;
-        color: var(--bs-secondary-color);
-        margin-bottom: 1.1rem;
+        max-width: 48rem;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
         line-height: 1.6;
+        color: var(--bs-secondary-color);
     }
 
     .picks-card {
-        border-radius: 0.5rem;
-        padding: 1rem 1.2rem;
-        font-size: 0.92rem;
-        line-height: 1.65;
+        padding: 1rem 1.25rem;
+        border-radius: 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.6;
     }
 
     .picks-card-info {
-        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 7%, var(--bs-body-bg));
-        border: 1px solid color-mix(in srgb, var(--bs-primary, #0d6efd) 22%, transparent);
-        border-left: 4px solid var(--bs-primary, #0d6efd);
+        border: 1px solid var(--bs-border-color);
+        border-left: 3px solid var(--cbfv-acento);
+        background: var(--bs-body-bg);
         color: var(--bs-body-color);
     }
+
     .picks-card-info p { margin: 0; }
 
     .picks-table-wrap {
-        border: 1px solid var(--bs-border-color);
-        border-radius: 0.6rem;
         overflow-x: auto;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.75rem;
+        background: var(--bs-body-bg);
     }
 
     .picks-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.88rem;
+        font-size: 0.875rem;
     }
-
-    .picks-table thead tr { background: var(--bs-secondary-bg); }
 
     .picks-table th {
-        padding: 0.6rem 0.9rem;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--bs-secondary-color);
-        text-align: left;
+        padding: 0.625rem 1rem;
         border-bottom: 1px solid var(--bs-border-color);
+        color: var(--bs-tertiary-color);
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-align: left;
+        white-space: nowrap;
     }
 
-    .picks-th-range { text-align: right; }
+    .picks-th-range { text-align: right !important; }
 
     .picks-table td {
-        padding: 0.65rem 0.9rem;
-        vertical-align: middle;
+        padding: 0.625rem 1rem;
         border-bottom: 1px solid var(--bs-border-color);
+        vertical-align: middle;
     }
 
     .picks-table tbody tr:last-child td { border-bottom: none; }
 
-    .picks-row-red    { background: color-mix(in srgb, var(--bs-danger, #dc3545) 5%, var(--bs-body-bg)); }
-    .picks-row-orange { background: color-mix(in srgb, #e07b00 5%, var(--bs-body-bg)); }
-    .picks-row-blue   { background: color-mix(in srgb, var(--bs-primary, #0d6efd) 4%, var(--bs-body-bg)); }
-    .picks-row-green  { background: color-mix(in srgb, #198754 4%, var(--bs-body-bg)); }
-    .picks-row-silver { background: color-mix(in srgb, #6c757d 4%, var(--bs-body-bg)); }
-    .picks-row-gold   { background: color-mix(in srgb, #a07800 6%, var(--bs-body-bg)); }
-
     .picks-stage-cell { display: flex; align-items: center; gap: 0.5rem; }
-    .picks-stage-icon { font-size: 1.1rem; flex-shrink: 0; }
-    .picks-stage-name { font-weight: 600; color: var(--bs-emphasis-color); }
+    .picks-stage-icon { flex-shrink: 0; color: var(--bs-tertiary-color); }
+    .picks-stage-name { font-weight: 500; color: var(--bs-emphasis-color); }
 
     .picks-td-count { text-align: center; }
 
     .picks-count-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 1.8rem;
-        height: 1.6rem;
-        border-radius: 0.3rem;
-        font-size: 0.78rem;
-        font-weight: 700;
-        padding: 0 0.35rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        color: var(--bs-secondary-color);
     }
 
-    .picks-cnt-red    { background: rgba(220,53,69,0.14);   color: var(--bs-danger, #dc3545); }
-    .picks-cnt-orange { background: rgba(224,123,0,0.16);   color: var(--cbfv-laranja); }
-    .picks-cnt-blue   { background: rgba(13,110,253,0.12);  color: var(--bs-primary, #0d6efd); }
-    .picks-cnt-green  { background: rgba(25,135,84,0.12);   color: var(--cbfv-verde); }
-    .picks-cnt-silver { background: rgba(108,117,125,0.14); color: var(--bs-secondary-color); }
-    .picks-cnt-gold   { background: rgba(160,120,0,0.18);   color: var(--cbfv-dourado); }
-
-    .picks-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .picks-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
     .picks-chip {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 2rem;
-        height: 1.7rem;
-        border-radius: 0.35rem;
-        font-size: 0.78rem;
-        font-weight: 700;
+        height: 1.75rem;
+        border: 1px solid transparent;
+        border-radius: 0.375rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
     }
 
-    .picks-chip-red    { background: linear-gradient(135deg, #a01020, #dc3545); color: #fff; }
-    .picks-chip-orange { background: linear-gradient(135deg, #a05000, #e07b00); color: #fff; }
-    .picks-chip-blue   { background: linear-gradient(135deg, #1a5fb4, #3584e4); color: #fff; }
-    .picks-chip-green  { background: linear-gradient(135deg, #1c5829, #2ec27e); color: #fff; }
-    .picks-chip-silver { background: linear-gradient(135deg, #5a6370, #8d959e); color: #fff; }
-    .picks-chip-gold   { background: linear-gradient(135deg, #a07800, #e5a000); color: #fff; }
+    /* Rampa: 1 dourado cheio, 2 dourado claro, 3 superfície, 4 só a linha; o campeão com contorno dourado. */
+    .picks-chip-red    { background: var(--cbfv-acento); color: #1a1405; }
+    .picks-chip-orange { background: rgba(242, 205, 92, 0.32); color: var(--cbfv-acento-texto); }
+    .picks-chip-blue,
+    .picks-chip-purple { background: var(--bs-secondary-bg); color: var(--bs-emphasis-color); }
+    .picks-chip-green,
+    .picks-chip-silver { background: transparent; border-color: var(--bs-border-color); color: var(--bs-secondary-color); }
+    .picks-chip-gold   { background: transparent; border-color: var(--cbfv-acento); color: var(--cbfv-acento-texto); }
 
     .picks-td-range { text-align: right; }
 
     .picks-range-badge {
-        display: inline-block;
-        padding: 0.2rem 0.55rem;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        font-size: 0.8125rem;
+        color: var(--bs-secondary-color);
         white-space: nowrap;
     }
 
-    .picks-rng-red    { background: rgba(220,53,69,0.14);   color: var(--bs-danger, #dc3545); }
-    .picks-rng-orange { background: rgba(224,123,0,0.14);   color: var(--cbfv-laranja); }
-    .picks-rng-blue   { background: rgba(13,110,253,0.12);  color: var(--bs-primary, #0d6efd); }
-    .picks-rng-green  { background: rgba(25,135,84,0.12);   color: var(--cbfv-verde); }
-    .picks-rng-silver { background: rgba(108,117,125,0.14); color: var(--bs-secondary-color); }
-    .picks-rng-gold   { background: rgba(160,120,0,0.18);   color: var(--cbfv-dourado); }
-
-    /* Lottery cards */
+    /* Cartões da loteria */
     .picks-lottery-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 0.85rem;
+        gap: 0.75rem;
         margin-bottom: 1rem;
     }
 
@@ -555,68 +541,79 @@
     }
 
     .picks-lottery-card {
-        border-radius: 0.6rem;
-        padding: 1rem 1.1rem;
-        border: 1px solid var(--bs-border-color);
         display: flex;
         flex-direction: column;
-        gap: 0.7rem;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.75rem;
+        background: var(--bs-body-bg);
     }
 
-    .picks-lot-red    { border-left: 4px solid var(--bs-danger, #dc3545); background: color-mix(in srgb, var(--bs-danger, #dc3545) 6%, var(--bs-body-bg)); }
-    .picks-lot-orange { border-left: 4px solid #e07b00; background: color-mix(in srgb, #e07b00 6%, var(--bs-body-bg)); }
-    .picks-lot-blue   { border-left: 4px solid #1a5fb4; background: color-mix(in srgb, #1a5fb4 6%, var(--bs-body-bg)); }
-    .picks-lot-purple { border-left: 4px solid #6741d9; background: color-mix(in srgb, #6741d9 6%, var(--bs-body-bg)); }
+    .picks-lottery-team { display: flex; align-items: flex-start; gap: 0.625rem; }
 
-    .picks-lottery-team { display: flex; align-items: flex-start; gap: 0.6rem; }
-    .picks-lottery-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .picks-ponto {
+        flex-shrink: 0;
+        width: 0.625rem;
+        height: 0.625rem;
+        margin-top: 0.3125rem;
+        border-radius: 50%;
+    }
 
-    .picks-lottery-stage  { font-size: 0.9rem; font-weight: 700; color: var(--bs-emphasis-color); }
-    .picks-lottery-detail { font-size: 0.75rem; color: var(--bs-secondary-color); margin-top: 0.1rem; }
+    .picks-ponto-red    { background: var(--cbfv-acento); }
+    .picks-ponto-orange { background: rgba(242, 205, 92, 0.45); }
+    .picks-ponto-blue,
+    .picks-ponto-purple { background: var(--bs-tertiary-color); }
 
-    .picks-lottery-odds-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
+    .picks-lottery-stage  { font-size: 0.875rem; font-weight: 500; color: var(--bs-emphasis-color); }
+    .picks-lottery-detail { margin-top: 0.125rem; font-size: 0.75rem; color: var(--bs-tertiary-color); }
+
+    .picks-lottery-odds-wrap { display: flex; flex-direction: column; gap: 0.375rem; }
 
     .picks-lottery-pct {
         font-size: 1.5rem;
-        font-weight: 800;
-        color: var(--bs-emphasis-color);
+        font-weight: 500;
         line-height: 1;
+        font-variant-numeric: tabular-nums;
+        color: var(--bs-emphasis-color);
     }
 
     .picks-lottery-bar-bg {
-        height: 8px;
-        background: var(--bs-border-color);
-        border-radius: 999px;
+        height: 4px;
         overflow: hidden;
+        border-radius: 2px;
+        background: var(--bs-secondary-bg);
     }
 
-    .picks-lottery-bar { height: 100%; border-radius: 999px; }
+    .picks-lottery-bar { height: 100%; border-radius: 2px; }
 
-    .picks-lot-bar-red    { background: linear-gradient(90deg, #a01020, #dc3545); }
-    .picks-lot-bar-orange { background: linear-gradient(90deg, #c06800, #e8a400); }
-    .picks-lot-bar-blue   { background: linear-gradient(90deg, #1a3f80, #3584e4); }
-    .picks-lot-bar-purple { background: linear-gradient(90deg, #4a2da0, #9b6dff); }
+    .picks-lot-bar-red    { background: var(--cbfv-acento); }
+    .picks-lot-bar-orange { background: rgba(242, 205, 92, 0.55); }
+    .picks-lot-bar-blue,
+    .picks-lot-bar-purple { background: var(--bs-tertiary-color); }
 
     .picks-lottery-note {
         display: flex;
         align-items: flex-start;
         gap: 0.5rem;
-        background: var(--bs-secondary-bg);
-        border: 1px solid var(--bs-border-color);
-        border-radius: 0.5rem;
         padding: 0.75rem 1rem;
-        font-size: 0.85rem;
-        color: var(--bs-body-color);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.75rem;
+        background: var(--bs-body-bg);
+        font-size: 0.8125rem;
         line-height: 1.5;
+        color: var(--bs-secondary-color);
     }
 
-    .picks-lottery-note-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .picks-lottery-note strong { color: var(--bs-body-color); }
+
+    .picks-lottery-note-icon { flex-shrink: 0; margin-top: 0.125rem; color: var(--bs-tertiary-color); }
 
     /* Loteria em dois blocos */
     .picks-r2-blocks {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
+        gap: 1rem;
         margin-bottom: 1rem;
     }
 
@@ -625,54 +622,51 @@
     }
 
     .picks-r2-block {
+        padding: 1rem;
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.65rem;
-        padding: 1rem 1rem 1.1rem;
+        border-radius: 0.75rem;
     }
 
     .picks-r2-block-title {
-        font-size: 0.9rem;
-        font-weight: 700;
+        margin-bottom: 0.125rem;
+        font-size: 0.875rem;
+        font-weight: 500;
         color: var(--bs-emphasis-color);
-        margin-bottom: 0.2rem;
     }
 
     .picks-r2-block-sub {
+        margin-bottom: 0.75rem;
         font-size: 0.75rem;
-        color: var(--bs-secondary-color);
-        margin-bottom: 0.85rem;
+        color: var(--bs-tertiary-color);
     }
 
-    /* Pick map */
+    /* Mapa de picks */
     .picks-map {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
-        gap: 0.4rem;
+        grid-template-columns: repeat(auto-fill, minmax(4rem, 1fr));
+        gap: 0.5rem;
     }
 
     .picks-map-col {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.3rem;
+        gap: 0.25rem;
     }
 
     .picks-map-num {
         width: 100%;
+        height: auto;
+        padding: 0.5rem 0.25rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
         text-align: center;
-        padding: 0.6rem 0.3rem;
-        border-radius: 0.45rem;
-        font-size: 0.85rem;
-        font-weight: 800;
     }
 
     .picks-map-label {
-        font-size: 0.62rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        color: var(--bs-secondary-color);
-        text-align: center;
+        font-size: 0.6875rem;
         line-height: 1.2;
+        color: var(--bs-tertiary-color);
+        text-align: center;
     }
 </style>

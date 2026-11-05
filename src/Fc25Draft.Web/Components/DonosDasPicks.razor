@@ -7,7 +7,7 @@
 {
     <section class="picks-section">
         <div class="picks-section-header">
-            <span class="picks-section-icon">🔄</span>
+            <Icone Nome="arrow-left-right" Tamanho="18" Classe="picks-section-icon" />
             <h3>Picks negociadas</h3>
         </div>
         <p class="picks-section-desc">
@@ -26,7 +26,7 @@
             }
             else
             {
-                <div class="table-responsive">
+                <div class="table-responsive painel">
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr><th>Pick</th><th>Dono hoje</th><th>Proteção</th></tr>
@@ -36,11 +36,11 @@
                             {
                                 <tr class="@(p.Usada ? "text-muted" : "")">
                                     <td>@p.Rotulo @(p.Usada ? "(já usada)" : "")</td>
-                                    <td class="fw-semibold">@p.DonoNome</td>
+                                    <td class="fw-medium">@p.DonoNome</td>
                                     <td class="small">
                                         @if (p.ProtegidaAte is int ate)
                                         {
-                                            <span>🛡️ até a #@ate · volta para o @p.ProtetorNome</span>
+                                            <span class="d-inline-flex align-items-center gap-1"><Icone Nome="shield" Tamanho="12" /> protegida até a #@ate · volta para o @p.ProtetorNome</span>
                                             @(p.ProtecaoAcionada switch
                                             {
                                                 true => " (acionou: voltou)",

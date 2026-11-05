@@ -93,3 +93,6 @@ download
 check
 triangle-alert
 pause
+scale
+medal
+info

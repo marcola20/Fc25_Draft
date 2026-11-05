@@ -1245,3 +1245,32 @@ a.text-primary:hover {
     flex-wrap: wrap;
     row-gap: 0.25rem;
 }
+
+/* Cabeçalho de coluna que ordena e overall em chip na cor do PES (listas de jogadores). */
+.ordenar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--bs-tertiary-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.ordenar:hover,
+.ordenar.ativo {
+    color: var(--bs-emphasis-color);
+}
+
+.ovr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}

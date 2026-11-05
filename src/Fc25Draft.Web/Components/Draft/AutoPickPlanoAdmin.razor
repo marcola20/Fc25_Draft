@@ -7,7 +7,7 @@
 
 <div class="card border-warning mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>🛠️ Admin · Planejar o próximo draft</strong>
+        <strong>Admin · planejar o próximo draft</strong>
         <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AlternarAsync">
             @(_aberto ? "Fechar" : "Abrir")
         </button>
@@ -52,7 +52,7 @@
                                     <td>@(index + 1)</td>
                                     <td><input type="number" class="form-control form-control-sm" value="@r.Min" @onchange="e => r.Min = Numero(e)" placeholder="livre" /></td>
                                     <td><input type="number" class="form-control form-control-sm" value="@r.Max" @onchange="e => r.Max = Numero(e)" placeholder="livre" /></td>
-                                    <td><button type="button" class="btn btn-sm btn-outline-danger" title="Remover rodada" @onclick="() => _rodadas.RemoveAt(index)">✕</button></td>
+                                    <td><button type="button" class="btn btn-sm btn-outline-danger" title="Remover rodada" @onclick="() => _rodadas.RemoveAt(index)"><Icone Nome="x" Tamanho="14" /></button></td>
                                 </tr>
                             }
                         </tbody>
@@ -60,7 +60,7 @@
                 }
 
                 <div class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AdicionarRodada">+ Rodada</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AdicionarRodada"><Icone Nome="plus" Tamanho="14" /> Rodada</button>
                     <button type="button" class="btn btn-sm btn-success" disabled="@_salvando" @onclick="SalvarAsync">
                         @(_salvando ? "Salvando..." : "Salvar planejamento")
                     </button>
@@ -135,7 +135,7 @@
             _erro = false;
             _mensagem = _rodadas.Count == 0
                 ? "Planejamento removido."
-                : $"✅ Planejamento salvo: {_rodadas.Count} rodada(s).";
+                : $"Planejamento salvo: {_rodadas.Count} rodada(s)";
             await OnSalvo.InvokeAsync();
         }
         catch (InvalidOperationException ex)

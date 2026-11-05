@@ -185,9 +185,9 @@
                                 @if (PodeEditar)
                                 {
                                     <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
-                                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0 || isSubmitting)" @onclick="() => Move(index, -1)">↑</button>
-                                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == selected.Count - 1 || isSubmitting)" @onclick="() => Move(index, 1)">↓</button>
-                                        <button type="button" class="btn btn-outline-danger" title="Remover" disabled="@isSubmitting" @onclick="() => Remove(item.PlayerId)">✕</button>
+                                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0 || isSubmitting)" @onclick="() => Move(index, -1)"><Icone Nome="arrow-up" Tamanho="14" /></button>
+                                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == selected.Count - 1 || isSubmitting)" @onclick="() => Move(index, 1)"><Icone Nome="arrow-down" Tamanho="14" /></button>
+                                        <button type="button" class="btn btn-outline-danger" title="Remover" disabled="@isSubmitting" @onclick="() => Remove(item.PlayerId)"><Icone Nome="x" Tamanho="14" /></button>
                                     </div>
                                 }
                             </li>
@@ -236,49 +236,49 @@
         }
         else
         {
-            <p class="text-muted">@GetPlayersSummary()</p>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
+            <p class="small text-body-tertiary">@GetPlayersSummary()</p>
+            <div class="table-responsive painel">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.875rem;">
                     <thead>
                         <tr>
                             <th>Jogador</th>
                             <th>Posição</th>
                             <th>
-                                <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="@(() => ChangeSortAsync("overall"))">
+                                <button type="button" class="ordenar @(sortBy == "overall" ? "ativo" : "")" @onclick="@(() => ChangeSortAsync("overall"))">
                                     Overall
                                     @if (sortBy == "overall")
                                     {
-                                        <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                     }
                                 </button>
                             </th>
                             <th>
-                                <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="@(() => ChangeSortAsync("age"))">
+                                <button type="button" class="ordenar @(sortBy == "age" ? "ativo" : "")" @onclick="@(() => ChangeSortAsync("age"))">
                                     Idade
                                     @if (sortBy == "age")
                                     {
-                                        <span class="ms-1">@(sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                     }
                                 </button>
                             </th>
-                            <th class="text-end">Ação</th>
+                            <th class="text-end"><span class="visually-hidden">Ação</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var player in players)
                         {
                             var isSelected = IsSelected(player.PlayerId);
-                            <tr class="@(isSelected ? "table-success" : string.Empty)">
-                                <td>@player.Name</td>
-                                <td>@player.PositionName</td>
-                                <td>@player.Overall</td>
-                                <td>@(player.Age?.ToString() ?? "-")</td>
+                            <tr class="@(isSelected ? "linha-zona zona-titulo" : string.Empty)">
+                                <td class="fw-medium">@player.Name</td>
+                                <td class="text-body-secondary">@player.PositionName</td>
+                                <td><span class="ovr @Fc25Draft.Core.Utilities.AtributosPes.Faixa(player.Overall)">@player.Overall</span></td>
+                                <td class="numero">@(player.Age?.ToString() ?? "—")</td>
                                 <td class="text-end">
                                     @if (!PodeEditar)
                                     {
                                         @if (isSelected)
                                         {
-                                            <span class="badge bg-success">na lista</span>
+                                            <span class="etiqueta sucesso">na lista</span>
                                         }
                                     }
                                     else if (isSelected)
@@ -762,7 +762,7 @@
             var dto = await WishlistApi.SaveAsync(token, selected.Select(s => s.PlayerId).ToList());
             ApplyWishlist(dto);
             tokenNotice = null;
-            successMessage = $"✅ Lista de {dto.TeamName} enviada com sucesso na {dto.VersaoNome}!";
+            successMessage = $"Lista de {dto.TeamName} enviada na {dto.VersaoNome}";
             await LoadEdicoesAsync();
         }
         catch (InvalidOperationException ex)

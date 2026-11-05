@@ -15,7 +15,7 @@
 
 @implements IDisposable
 
-<PageHeader Title="🤖 Escolha automática"
+<PageHeader Title="Escolha automática"
             Subtitle="Monte sua lista de prioridades: quando chegar a sua vez, o site escolhe o primeiro jogador ainda disponível." />
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -40,7 +40,7 @@
         <div class="fw-semibold mb-1">Já era a sua vez: estas escolhas foram feitas agora.</div>
         <div style="white-space: pre-line;">@escolhasFeitas.Selection.Mensagem</div>
         <div class="mt-2">
-            <button class="btn btn-success btn-sm" @onclick="CompartilharWhatsappAsync">Compartilhar no WhatsApp</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="CompartilharWhatsappAsync"><Icone Nome="share-2" Tamanho="14" /> Compartilhar no WhatsApp</button>
             @if (!string.IsNullOrEmpty(shareFeedback))
             {
                 <span class="ms-2 small text-muted">@shareFeedback</span>
@@ -57,7 +57,7 @@
 @if (config is { ProximoDraft: true })
 {
     <div class="alert alert-primary">
-        <div class="fw-semibold mb-1">📅 Lista para o próximo draft</div>
+        <div class="fw-semibold mb-1">Lista para o próximo draft</div>
         <div class="small">
             Seu time não está no draft em andamento, então esta lista vale para o próximo.
             Rodadas planejadas: <strong>@string.Join(" · ", config.MinhasRodadas.Select(r => $"Rodada {r.Round}: {FaixaOverall(r.OverallMin, r.OverallMax)}"))</strong>.
@@ -728,8 +728,8 @@
             Aplicar(result.Config);
             escolhasFeitas = result.Escolhas;
             successMessage = ativo
-                ? "✅ Escolha automática salva e ligada."
-                : "✅ Lista salva. A escolha automática está desligada.";
+                ? "Escolha automática salva e ligada"
+                : "Lista salva. A escolha automática está desligada.";
             await CarregarJogadoresAsync();
         }
         catch (InvalidOperationException ex)

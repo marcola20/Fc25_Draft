@@ -25,9 +25,9 @@ else
                 @if (Editavel)
                 {
                     <div class="btn-group btn-group-sm" role="group" aria-label="Ordenar">
-                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0)" @onclick="() => OnSubir.InvokeAsync(index)">↑</button>
-                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == Itens.Count - 1)" @onclick="() => OnDescer.InvokeAsync(index)">↓</button>
-                        <button type="button" class="btn btn-outline-danger" title="Remover" @onclick="() => OnRemover.InvokeAsync(item.PlayerId)">✕</button>
+                        <button type="button" class="btn btn-outline-secondary" title="Subir" disabled="@(index == 0)" @onclick="() => OnSubir.InvokeAsync(index)"><Icone Nome="arrow-up" Tamanho="14" /></button>
+                        <button type="button" class="btn btn-outline-secondary" title="Descer" disabled="@(index == Itens.Count - 1)" @onclick="() => OnDescer.InvokeAsync(index)"><Icone Nome="arrow-down" Tamanho="14" /></button>
+                        <button type="button" class="btn btn-outline-danger" title="Remover" @onclick="() => OnRemover.InvokeAsync(item.PlayerId)"><Icone Nome="x" Tamanho="14" /></button>
                     </div>
                 }
             </li>
