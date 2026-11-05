@@ -6,7 +6,7 @@
     {
         <NavLink class="barra-inferior-item" href="@atalho.Href"
                  Match="@(atalho.Prefixo ? NavLinkMatch.Prefix : NavLinkMatch.All)">
-            <span class="@atalho.Icone" aria-hidden="true"></span>
+            <Icone Nome="@atalho.Icone" Tamanho="18" />
             <span class="barra-inferior-texto">@atalho.Texto</span>
         </NavLink>
     }
@@ -17,10 +17,10 @@
 
     private static readonly Atalho[] Atalhos =
     [
-        new("Início", "/home", "oi oi-home"),
-        new("Liga", "/liga", "oi oi-list-rich", Prefixo: true),
-        new("Mercado", "/mercado", "oi oi-cart", Prefixo: true),
-        new("Bolão", "/bolao", "oi oi-target", Prefixo: true),
-        new("Minha Área", "/minha-area", "oi oi-person"),
+        new("Início", "/home", "house"),
+        new("Liga", "/liga", "list-ordered", Prefixo: true),
+        new("Mercado", "/mercado", "gavel", Prefixo: true),
+        new("Bolão", "/bolao", "target", Prefixo: true),
+        new("Minha Área", "/minha-area", "user"),
     ];
 }

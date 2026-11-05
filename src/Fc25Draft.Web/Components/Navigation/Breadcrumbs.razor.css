@@ -1,23 +1,33 @@
 .app-breadcrumbs {
-    padding: 0 1.5rem;
-    margin-top: 1rem;
+    width: 100%;
+    max-width: 1600px;
+    padding: 1.25rem 2rem 0;
 }
 
 .app-breadcrumbs .breadcrumb {
-    margin-bottom: 0.5rem;
+    --bs-breadcrumb-divider-color: var(--bs-tertiary-color);
+    --bs-breadcrumb-item-active-color: var(--bs-secondary-color);
+    margin: 0;
+    font-size: 0.8125rem;
     background: transparent;
 }
 
-.app-breadcrumbs .breadcrumb-item + .breadcrumb-item::before {
-    color: var(--bs-secondary-color);
-}
-
 .app-breadcrumbs a {
-    color: var(--bs-emphasis-color);
+    color: var(--bs-tertiary-color);
     text-decoration: none;
 }
 
 .app-breadcrumbs a:hover,
-.app-breadcrumbs a:focus {
-    text-decoration: underline;
+.app-breadcrumbs a:focus-visible {
+    color: var(--bs-body-color);
+}
+
+.app-breadcrumbs [aria-current="page"] {
+    color: var(--bs-secondary-color);
+}
+
+@media (max-width: 992px) {
+    .app-breadcrumbs {
+        padding: 0.75rem 1rem 0;
+    }
 }

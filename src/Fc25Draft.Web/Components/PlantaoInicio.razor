@@ -4,13 +4,13 @@
 
 @if (Noticias.Count > 0)
 {
-    <div class="d-flex align-items-center justify-content-between mb-2">
-        <h5 class="text-uppercase text-muted small fw-bold mb-0">📰 Plantão CBFV</h5>
-        <a href="/plantao" class="small text-primary">Ver todas as notícias →</a>
-    </div>
-    <div class="mb-4">
+    <section class="mb-5" aria-labelledby="plantao-titulo">
+        <div class="secao-titulo">
+            <h2 id="plantao-titulo">Plantão CBFV</h2>
+            <a href="/plantao">Todas as notícias <Icone Nome="arrow-right" Tamanho="14" /></a>
+        </div>
         <PlantaoLista Noticias="@Noticias" />
-    </div>
+    </section>
 }
 
 @code {

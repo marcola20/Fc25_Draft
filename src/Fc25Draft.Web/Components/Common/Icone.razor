@@ -1,0 +1,17 @@
+@* Ícone do lucide em SVG: herda a cor do texto, traço 1.5. O desenho vem de IconesLucide.cs
+   (gerado por scripts/icones/gerar_icones.mjs). Nome desconhecido não desenha nada. *@
+@if (IconesLucide.Desenhos.TryGetValue(Nome, out var desenho))
+{
+    <svg class="icone @Classe" xmlns="http://www.w3.org/2000/svg" width="@Tamanho" height="@Tamanho" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="@Traco" stroke-linecap="round" stroke-linejoin="round"
+         aria-hidden="true" focusable="false">@((MarkupString)desenho)</svg>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Nome { get; set; } = string.Empty;
+    [Parameter] public int Tamanho { get; set; } = 16;
+    [Parameter] public string? Classe { get; set; }
+
+    // Abaixo de 16px o traço fino some; aí fica um pouco mais grosso.
+    private string Traco => Tamanho < 16 ? "1.75" : "1.5";
+}

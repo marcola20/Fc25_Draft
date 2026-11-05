@@ -14,66 +14,51 @@
 
 @implements IDisposable
 
-<PageHeader Title="Central CBFV"
-            Subtitle="Escolha uma das áreas para navegar pela plataforma." />
-
 <DestaquesInicio Dados="@_destaques" />
 
 <PlantaoInicio Noticias="@_noticias" />
 
-@if (!authReady)
-{
-    <div class="alert alert-info" role="status">
-        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-        Carregando preferências de acesso...
+<section aria-labelledby="atalhos-titulo">
+    <div class="secao-titulo">
+        <h2 id="atalhos-titulo">Atalhos</h2>
     </div>
-}
-else
-{
-    <div class="row g-4">
-        <div class="col-12 col-md-6 col-xl-3">
-            <DashboardCard Title="Times"
-                           Description="Gerencie elencos e acompanhe a composição das equipes."
-                           Href="/times/elencos"
-                           Icon="oi oi-people" />
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <DashboardCard Title="Draft"
-                           Description="Controle as escolhas e visualize informações do draft em andamento."
-                           Href="/draft/controle"
-                           Icon="oi oi-flag" />
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <DashboardCard Title="Mercado de Transferências"
-                           Description="Acompanhe negociações, histórico e itens disponíveis no mercado."
-                           Href="/mercado"
-                           Icon="oi oi-cart" />
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <DashboardCard Title="Regulamento"
-                           Description="Consulte as regras oficiais de transferências, janelas e contratos da liga."
-                           Href="/regulamento"
-                           Icon="oi oi-document" />
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <DashboardCard Title="Manual do Técnico"
-                           Description="Novo por aqui? Veja onde ir para escalar o time, participar do draft e negociar no mercado."
-                           Href="/manual"
-                           Icon="oi oi-book" />
-        </div>
-        @if (AdminAuth.IsAdmin)
+    <nav class="atalhos">
+        @foreach (var atalho in Atalhos)
         {
-            <div class="col-12 col-md-6 col-xl-3">
-                <DashboardCard Title="Administração"
-                               Description="Acesse configurações avançadas, ciclos e geração de itens."
-                               Href="/admin/ciclos"
-                               Icon="oi oi-cog" />
-            </div>
+            <a class="atalho" href="@atalho.Href">
+                <Icone Nome="@atalho.Icone" Tamanho="18" Classe="atalho-icone" />
+                <span class="atalho-texto">
+                    <span class="atalho-titulo">@atalho.Titulo</span>
+                    <span class="atalho-descricao">@atalho.Descricao</span>
+                </span>
+            </a>
         }
-    </div>
-}
+        @* O de administração só depois de saber quem entrou, para não piscar. *@
+        @if (authReady && AdminAuth.IsAdmin)
+        {
+            <a class="atalho" href="/admin/ciclos">
+                <Icone Nome="settings" Tamanho="18" Classe="atalho-icone" />
+                <span class="atalho-texto">
+                    <span class="atalho-titulo">Administração</span>
+                    <span class="atalho-descricao">Ciclos, configurações e geração de itens</span>
+                </span>
+            </a>
+        }
+    </nav>
+</section>
 
 @code {
+    private sealed record Atalho(string Titulo, string Descricao, string Href, string Icone);
+
+    private static readonly Atalho[] Atalhos =
+    [
+        new("Times", "Elencos e composição de cada clube", "/times/elencos", "users"),
+        new("Draft", "Escolhas e informações do draft em andamento", "/draft/controle", "flag"),
+        new("Mercado de Transferências", "Leilões, negociações e histórico", "/mercado", "gavel"),
+        new("Regulamento", "Regras de transferências, janelas e contratos", "/regulamento", "file-text"),
+        new("Manual do Técnico", "Onde escalar o time, entrar no draft e negociar", "/manual", "book-open"),
+    ];
+
     private bool authReady;
     private const int NoticiasNaPaginaInicial = 6;
 

@@ -5,11 +5,12 @@
 }
 
 .app-sidebar-container {
-    width: 280px;
-    flex: 0 0 280px;
-    background-color: #0d1b2a;
-    color: #fff;
-    transition: width .3s ease-in-out, flex-basis .3s ease-in-out, transform .3s ease-in-out, opacity .2s ease-in-out;
+    width: 256px;
+    flex: 0 0 256px;
+    background-color: var(--cbfv-moldura);
+    border-right: 1px solid var(--cbfv-moldura-linha);
+    color: var(--cbfv-moldura-texto);
+    transition: transform var(--cbfv-medio) var(--cbfv-curva), opacity var(--cbfv-medio) var(--cbfv-curva);
 }
 
 .app-shell:not(.collapsed) .app-sidebar-container {
@@ -32,7 +33,6 @@
     flex-grow: 1;
     min-height: 100vh;
     min-width: 0;
-    transition: margin .3s ease-in-out;
 }
 
 .app-shell.collapsed .app-main {
@@ -40,7 +40,9 @@
 }
 
 .app-content {
-    padding: 1.5rem;
+    width: 100%;
+    max-width: 1600px;
+    padding: 1.5rem 2rem 3rem;
 }
 
 .app-loading {
@@ -62,6 +64,9 @@
 
     /* Espaço para a barra de atalhos fixa no rodapé não cobrir o fim da página. */
     .app-content {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1rem;
         padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
     }
 
@@ -72,7 +77,7 @@
         height: 100vh;
         width: min(280px, 85vw);
         flex-basis: auto;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 0 24px rgba(0, 0, 0, 0.4);
         transform: translateX(-100%);
         opacity: 0;
         pointer-events: none;
@@ -98,7 +103,7 @@
         display: block;
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.4);
+        background: rgba(0, 0, 0, 0.48);
         border: none;
         padding: 0;
         margin: 0;

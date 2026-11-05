@@ -13,105 +13,105 @@ public class LayoutNavigationService
     {
         new("Início", new List<MenuItem>
         {
-            new("Central CBFV", "/home", "oi oi-home", MatchPrefix: true),
-            new("Plantão CBFV", "/plantao", "oi oi-bullhorn"),
-            new("Minha Área", "/minha-area", "oi oi-person"),
-            new("Manual do Técnico", "/manual", "oi oi-book")
+            new("Central CBFV", "/home", "house", MatchPrefix: true),
+            new("Plantão CBFV", "/plantao", "megaphone"),
+            new("Minha Área", "/minha-area", "user"),
+            new("Manual do Técnico", "/manual", "book-open")
         }),
         new("Competições", new List<MenuItem>
         {
-            new("Liga", "/liga", "oi oi-list-rich", MatchPrefix: true),
-            new("Bolão da rodada", "/bolao", "oi oi-target", MatchPrefix: true),
-            new("Prêmios da Temporada", "/premios", "oi oi-star"),
-            new("Power Ranking", "/power-ranking", "oi oi-pulse"),
-            new("Diretoria", "/diretoria", "oi oi-briefcase"),
-            new("Reta final", "/liga/reta-final", "oi oi-flag"),
-            new("Simulação", "/liga/simulacao", "oi oi-calculator"),
-            new("Sorteio da Copa", "/copa/sorteio", "oi oi-random"),
-            new("Edições", "/liga/edicoes", "oi oi-calendar"),
-            new("Formato da Competição", "/formato", "oi oi-grid-four-up"),
-            new("Regulamento", "/regulamento", "oi oi-document"),
-            new("Premiação", "/premiacao", "oi oi-dollar")
+            new("Liga", "/liga", "list-ordered", MatchPrefix: true),
+            new("Bolão da rodada", "/bolao", "target", MatchPrefix: true),
+            new("Prêmios da Temporada", "/premios", "star"),
+            new("Power Ranking", "/power-ranking", "activity"),
+            new("Diretoria", "/diretoria", "briefcase"),
+            new("Reta final", "/liga/reta-final", "flag"),
+            new("Simulação", "/liga/simulacao", "calculator"),
+            new("Sorteio da Copa", "/copa/sorteio", "shuffle"),
+            new("Edições", "/liga/edicoes", "calendar"),
+            new("Formato da Competição", "/formato", "layout-grid"),
+            new("Regulamento", "/regulamento", "file-text"),
+            new("Premiação", "/premiacao", "banknote")
         }),
         new("Clubes e Jogadores", new List<MenuItem>
         {
-            new("Elencos", "/times/elencos", "oi oi-people"),
-            new("Jogadores", "/players", "oi oi-person"),
-            new("Comparar Jogadores", "/jogadores/comparar", "oi oi-transfer"),
-            new("Treinadores", "/treinadores", "oi oi-briefcase"),
-            new("Valor de Elenco", "/times/caixa", "oi oi-dollar"),
-            new("Virada de Temporada", "/virada", "oi oi-loop-circular"),
-            new("Como o overall é calculado", "/overall", "oi oi-calculator")
+            new("Elencos", "/times/elencos", "users"),
+            new("Jogadores", "/players", "user"),
+            new("Comparar Jogadores", "/jogadores/comparar", "arrow-left-right"),
+            new("Treinadores", "/treinadores", "briefcase"),
+            new("Valor de Elenco", "/times/caixa", "banknote"),
+            new("Virada de Temporada", "/virada", "refresh-cw"),
+            new("Como o overall é calculado", "/overall", "calculator")
         }),
         new("Mercado", new List<MenuItem>
         {
-            new("Leilão", "/mercado", "oi oi-cart"),
-            new("Lista de Transferências", "/mercado/lista", "oi oi-tag"),
-            new("Termômetro do Mercado", "/mercado/termometro", "oi oi-graph"),
-            new("Sobe e Desce", "/mercado/sobe-e-desce", "oi oi-elevator"),
-            new("Histórico de Transferências", "/market/transfers", "oi oi-transfer", MatchPrefix: true),
-            new("Histórico de Lances", "/mercado/historico", "oi oi-clock")
+            new("Leilão", "/mercado", "gavel"),
+            new("Lista de Transferências", "/mercado/lista", "tag"),
+            new("Termômetro do Mercado", "/mercado/termometro", "thermometer"),
+            new("Sobe e Desce", "/mercado/sobe-e-desce", "arrow-up-down"),
+            new("Histórico de Transferências", "/market/transfers", "arrow-left-right", MatchPrefix: true),
+            new("Histórico de Lances", "/mercado/historico", "history")
         }),
         new("Draft", new List<MenuItem>
         {
-            new("Controle do Draft", "/draft/controle", "oi oi-flag", MatchPrefix: true),
-            new("Informações do Draft", "/draft/info", "oi oi-document"),
-            new("Pré-Draft", "/draft/pre-draft", "oi oi-star"),
-            new("Jogadores Protegidos", "/draft/protecao", "oi oi-shield"),
-            new("Escolha Automática", "/draft/automatico", "oi oi-list-rich"),
-            new("Picks do Draft", "/picks", "oi oi-tag"),
-            new("Loteria do Draft", "/loteria", "oi oi-random")
+            new("Controle do Draft", "/draft/controle", "flag", MatchPrefix: true),
+            new("Informações do Draft", "/draft/info", "file-text"),
+            new("Pré-Draft", "/draft/pre-draft", "star"),
+            new("Jogadores Protegidos", "/draft/protecao", "shield"),
+            new("Escolha Automática", "/draft/automatico", "list-checks"),
+            new("Picks do Draft", "/picks", "tag"),
+            new("Loteria do Draft", "/loteria", "ticket")
         }),
         new("Álbum", new List<MenuItem>
         {
-            new("Álbum de Figurinhas", "/album", "oi oi-image"),
-            new("Trocas", "/album/trocas", "oi oi-transfer"),
-            new("Colecionadores", "/album/colecionadores", "oi oi-badge")
+            new("Álbum de Figurinhas", "/album", "images"),
+            new("Trocas", "/album/trocas", "arrow-left-right"),
+            new("Colecionadores", "/album/colecionadores", "award")
         }),
         new("História", new List<MenuItem>
         {
-            new("Hall da Fama", "/hall-of-fame", "oi oi-badge"),
-            new("Recordes", "/liga/recordes", "oi oi-star"),
-            new("Ranking de Clubes", "/ranking-clubes", "oi oi-bar-chart")
+            new("Hall da Fama", "/hall-of-fame", "award"),
+            new("Recordes", "/liga/recordes", "star"),
+            new("Ranking de Clubes", "/ranking-clubes", "chart-column")
         }),
         new("Admin · Temporada", new List<MenuItem>
         {
-            new("Gerenciar Liga", "/admin/liga", "oi oi-wrench"),
-            new("Virada de Temporada", "/admin/temporada", "oi oi-loop-circular"),
-            new("Resultados Pendentes", "/admin/resultados-pendentes", "oi oi-lock-locked"),
-            new("Resumo da Rodada", "/admin/resumo-rodada", "oi oi-comment-square"),
-            new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "oi oi-badge"),
-            new("Gerenciar Premiação", "/admin/premiacao", "oi oi-dollar"),
-            new("Metas da Diretoria", "/admin/diretoria", "oi oi-briefcase"),
-            new("Treino da Semana", "/admin/treinos", "oi oi-pulse"),
-            new("Prêmios da Temporada", "/admin/premios", "oi oi-star"),
-            new("Gerenciar Regulamento", "/admin/regulamento", "oi oi-document")
+            new("Gerenciar Liga", "/admin/liga", "wrench"),
+            new("Virada de Temporada", "/admin/temporada", "refresh-cw"),
+            new("Resultados Pendentes", "/admin/resultados-pendentes", "lock"),
+            new("Resumo da Rodada", "/admin/resumo-rodada", "message-square"),
+            new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "award"),
+            new("Gerenciar Premiação", "/admin/premiacao", "banknote"),
+            new("Metas da Diretoria", "/admin/diretoria", "briefcase"),
+            new("Treino da Semana", "/admin/treinos", "activity"),
+            new("Prêmios da Temporada", "/admin/premios", "star"),
+            new("Gerenciar Regulamento", "/admin/regulamento", "file-text")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
         {
-            new("Negociações", "/admin/negociacoes", "oi oi-loop"),
-            new("Ciclos do Leilão", "/admin/ciclos", "oi oi-cog"),
-            new("Log de Ações", "/admin/log-acoes", "oi oi-list")
+            new("Negociações", "/admin/negociacoes", "repeat"),
+            new("Ciclos do Leilão", "/admin/ciclos", "settings"),
+            new("Log de Ações", "/admin/log-acoes", "list")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Draft", new List<MenuItem>
         {
-            new("Rodar a Loteria", "/admin/loteria", "oi oi-random"),
-            new("Draft de Expansão", "/admin/draft-expansao", "oi oi-plus"),
-            new("Listas do Pré-Draft", "/admin/pre-draft", "oi oi-star")
+            new("Rodar a Loteria", "/admin/loteria", "ticket"),
+            new("Draft de Expansão", "/admin/draft-expansao", "plus"),
+            new("Listas do Pré-Draft", "/admin/pre-draft", "star")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Álbum", new List<MenuItem>
         {
-            new("Lançar o Álbum", "/admin/album", "oi oi-image"),
-            new("Dar Pacotes", "/admin/album/pacotes", "oi oi-box"),
-            new("Figurinhas sem Foto", "/admin/album/sem-foto", "oi oi-camera-slr")
+            new("Lançar o Álbum", "/admin/album", "images"),
+            new("Dar Pacotes", "/admin/album/pacotes", "package"),
+            new("Figurinhas sem Foto", "/admin/album/sem-foto", "camera")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Sistema", new List<MenuItem>
         {
-            new("Gerenciar Treinadores", "/admin/treinadores", "oi oi-person"),
-            new("Cadastro de Times", "/teams", "oi oi-plus"),
-            new("Gerenciar Escalações", "/admin/escalacoes", "oi oi-people"),
-            new("Configurações", "/admin/configuracoes", "oi oi-cog"),
-            new("Administradores", "/admin/administradores", "oi oi-key", RequiredRole: "AdminPrincipal")
+            new("Gerenciar Treinadores", "/admin/treinadores", "user"),
+            new("Cadastro de Times", "/teams", "plus"),
+            new("Gerenciar Escalações", "/admin/escalacoes", "users"),
+            new("Configurações", "/admin/configuracoes", "settings"),
+            new("Administradores", "/admin/administradores", "key", RequiredRole: "AdminPrincipal")
         }, RequiredRole: "Admin", CollapseByDefault: true)
     };
 
@@ -121,7 +121,7 @@ public class LayoutNavigationService
         {
             Route = "/",
             Title = "Central CBFV",
-            Subtitle = "Visão geral das áreas principais",
+            Subtitle = "Destaques, notícias e atalhos da liga",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início")
@@ -131,7 +131,7 @@ public class LayoutNavigationService
         {
             Route = "/home",
             Title = "Central CBFV",
-            Subtitle = "Visão geral das áreas principais",
+            Subtitle = "Destaques, notícias e atalhos da liga",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início")

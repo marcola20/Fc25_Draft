@@ -1,7 +1,122 @@
 @import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+/* ── Base visual ───────────────────────────────────────────────────────────────
+   Caderno de esportes à noite: fundos num grafite neutro, o dourado do escudo só na seleção e no
+   que lidera, e a cor de verdade fica com o conteúdo (escudos, fotos, placares).
+   A moldura (menu, topo e barra do celular) é sempre escura; o miolo segue o tema. */
+:root {
+    /* Moldura: igual nos dois temas. */
+    --cbfv-moldura: #0e1013;
+    --cbfv-moldura-elevada: #171a1e;
+    --cbfv-moldura-linha: rgba(232, 234, 237, 0.08);
+    --cbfv-moldura-texto: #e8eaed;
+    --cbfv-moldura-texto-2: #a2a7ae;
+    --cbfv-moldura-texto-3: #6f757d;
+
+    /* Dourado do escudo: preenchimento e, sobre fundo claro, como texto. */
+    --cbfv-acento: #f2cd5c;
+    --cbfv-acento-texto: #8a6400;
+    --cbfv-acento-tinta: #1a1405;
+
+    /* Resultado da sequência (V/E/D): tons apagados que cabem na paleta. */
+    --cbfv-vitoria: #2f9e6a;
+    --cbfv-empate: #8b9098;
+    --cbfv-derrota: #d0524a;
+
+    --cbfv-curva: cubic-bezier(0.2, 0, 0, 1);
+    --cbfv-rapido: 120ms;
+    --cbfv-medio: 200ms;
+
+    --bs-body-font-family: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --bs-font-monospace: 'Geist Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+    --bs-body-font-size: 0.9375rem;
+    --bs-body-line-height: 1.5;
+    --bs-border-radius: 0.5rem;
+    --bs-border-radius-sm: 0.375rem;
+    --bs-border-radius-lg: 0.75rem;
+    --bs-border-radius-xl: 1rem;
+}
+
+[data-bs-theme="light"] {
+    --bs-body-bg: #ffffff;
+    --bs-body-bg-rgb: 255, 255, 255;
+    --bs-tertiary-bg: #f3f4f5;
+    --bs-tertiary-bg-rgb: 243, 244, 245;
+    --bs-secondary-bg: #e9ebed;
+    --bs-secondary-bg-rgb: 233, 235, 237;
+    --bs-body-color: #16181b;
+    --bs-body-color-rgb: 22, 24, 27;
+    --bs-emphasis-color: #0b0c0e;
+    --bs-emphasis-color-rgb: 11, 12, 14;
+    --bs-secondary-color: #565c63;
+    --bs-secondary-color-rgb: 86, 92, 99;
+    --bs-tertiary-color: #81878e;
+    --bs-tertiary-color-rgb: 129, 135, 142;
+    --bs-border-color: rgba(22, 24, 27, 0.1);
+    --bs-border-color-translucent: rgba(22, 24, 27, 0.08);
+    --bs-link-color: #16181b;
+    --bs-link-color-rgb: 22, 24, 27;
+    --bs-link-hover-color: #8a6400;
+    --bs-link-hover-color-rgb: 138, 100, 0;
+    --cbfv-sombra: 0 1px 2px rgba(16, 18, 21, 0.06);
+}
+
+[data-bs-theme="dark"] {
+    --bs-body-bg: #17191c;
+    --bs-body-bg-rgb: 23, 25, 28;
+    --bs-tertiary-bg: #111315;
+    --bs-tertiary-bg-rgb: 17, 19, 21;
+    --bs-secondary-bg: #202327;
+    --bs-secondary-bg-rgb: 32, 35, 39;
+    --bs-body-color: #e8eaed;
+    --bs-body-color-rgb: 232, 234, 237;
+    --bs-emphasis-color: #f6f7f8;
+    --bs-emphasis-color-rgb: 246, 247, 248;
+    --bs-secondary-color: #a2a7ae;
+    --bs-secondary-color-rgb: 162, 167, 174;
+    --bs-tertiary-color: #747a82;
+    --bs-tertiary-color-rgb: 116, 122, 130;
+    --bs-border-color: rgba(232, 234, 237, 0.09);
+    --bs-border-color-translucent: rgba(232, 234, 237, 0.07);
+    --bs-link-color: #e8eaed;
+    --bs-link-color-rgb: 232, 234, 237;
+    --bs-link-hover-color: #f2cd5c;
+    --bs-link-hover-color-rgb: 242, 205, 92;
+    --cbfv-acento-texto: #f2cd5c;
+    --cbfv-sombra: none;
+}
+
+body {
+    font-family: var(--bs-body-font-family);
+    font-size: var(--bs-body-font-size);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+/* Hierarquia por tamanho e cor, não por peso: o negrito do Bootstrap (700) vira 600. */
+.fw-bold, b, strong {
+    font-weight: 600 !important;
+}
+
+/* Números alinhados em coluna em todo o site (placares, tabelas, valores). */
+.table, .font-monospace, .numero {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Placar: números de largura fixa na fonte mono. */
+.placar {
+    font-family: var(--bs-font-monospace);
+    font-variant-numeric: tabular-nums;
+}
+
+.icone {
+    flex-shrink: 0;
+    vertical-align: -0.125em;
 }
 
 h1:focus {
@@ -9,19 +124,159 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #d1d1d1;
+    color: var(--bs-link-color);
     text-decoration: none !important;
+    transition: color var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+a:hover, .btn-link:hover {
+    color: var(--bs-link-hover-color);
+}
+
+/* Cartões: superfície do tema, linha fina, sem sombra no escuro. */
+.card {
+    --bs-card-border-color: var(--bs-border-color);
+    --bs-card-border-radius: 0.75rem;
+    --bs-card-inner-border-radius: calc(0.75rem - 1px);
+    --bs-card-cap-bg: transparent;
+    box-shadow: var(--cbfv-sombra);
+}
+
+/* Ação principal: texto principal como preenchimento (escuro no claro, quase branco no escuro). */
+.btn {
+    --bs-btn-font-weight: 500;
+    transition: color var(--cbfv-rapido) var(--cbfv-curva), background-color var(--cbfv-rapido) var(--cbfv-curva),
+        border-color var(--cbfv-rapido) var(--cbfv-curva), transform var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+.btn:active {
+    transform: scale(0.98);
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    --bs-btn-color: var(--bs-tertiary-bg);
+    --bs-btn-bg: var(--bs-body-color);
+    --bs-btn-border-color: var(--bs-body-color);
+    --bs-btn-hover-color: var(--bs-tertiary-bg);
+    --bs-btn-hover-bg: var(--bs-emphasis-color);
+    --bs-btn-hover-border-color: var(--bs-emphasis-color);
+    --bs-btn-active-color: var(--bs-tertiary-bg);
+    --bs-btn-active-bg: var(--bs-emphasis-color);
+    --bs-btn-active-border-color: var(--bs-emphasis-color);
+    --bs-btn-disabled-color: var(--bs-tertiary-bg);
+    --bs-btn-disabled-bg: var(--bs-secondary-color);
+    --bs-btn-disabled-border-color: var(--bs-secondary-color);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn:focus-visible, .btn-link.nav-link:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 2px var(--bs-body-bg), 0 0 0 4px rgba(242, 205, 92, 0.7);
+    border-color: var(--bs-border-color);
 }
+
+/* Botões da moldura escura (topo): superfície um degrau acima e linha fina, 32px. */
+.btn-moldura {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--cbfv-moldura-linha);
+    border-radius: 0.5rem;
+    background: var(--cbfv-moldura-elevada);
+    color: var(--cbfv-moldura-texto);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1;
+    transition: background-color var(--cbfv-rapido) var(--cbfv-curva), color var(--cbfv-rapido) var(--cbfv-curva),
+        transform var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+.btn-moldura:hover {
+    background: #1f2328;
+}
+
+.btn-moldura:active {
+    transform: scale(0.97);
+}
+
+.btn-moldura:focus-visible {
+    outline: 2px solid rgba(242, 205, 92, 0.7);
+    outline-offset: 2px;
+}
+
+.btn-moldura-icone {
+    width: 2rem;
+    padding: 0;
+    color: var(--cbfv-moldura-texto-2);
+}
+
+.btn-moldura-icone:hover {
+    color: var(--cbfv-moldura-texto);
+}
+
+.sino-contador {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 1rem;
+    height: 1rem;
+    padding: 0 0.25rem;
+    border-radius: 0.5rem;
+    background: var(--cbfv-derrota);
+    color: #fff;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    text-align: center;
+}
+
+/* Rótulo de seção ("Destaques", "Plantão CBFV"): frase normal, discreto, colado no que vem embaixo. */
+.secao-titulo {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 0.75rem;
+}
+
+.secao-titulo h2 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.secao-titulo a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+}
+
+.secao-titulo a:hover {
+    color: var(--bs-link-hover-color);
+}
+
+/* Sequência de resultados (V/E/D): a assinatura do site, usada onde houver campanha. */
+.sequencia {
+    display: inline-flex;
+    gap: 2px;
+    vertical-align: middle;
+}
+
+.sequencia > span {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 3px;
+    font: 500 0.5625rem/0.875rem var(--bs-font-monospace);
+    text-align: center;
+    color: #fff;
+}
+
+.sequencia .v { background: var(--cbfv-vitoria); }
+.sequencia .e { background: var(--cbfv-empate); }
+.sequencia .d { background: var(--cbfv-derrota); }
 
 .content {
     padding-top: 1.1rem;

@@ -4,9 +4,9 @@
 @implements IDisposable
 
 <nav class="app-sidebar" aria-label="Seções do sistema">
-    <div class="sidebar-logo">
-        <img src="/images/logobranca.png" alt="Logo da Liga" class="sidebar-logo-img" />
-    </div>
+    <a class="sidebar-logo" href="/home" aria-label="CBFV, página inicial">
+        <img src="/images/logobranca.png" alt="" class="sidebar-logo-img" />
+    </a>
 
     @if (MenuGroups?.Count > 0)
     {
@@ -24,6 +24,7 @@
                                 aria-expanded="@isExpanded.ToString().ToLower()"
                                 aria-controls="@groupId">
                             <span class="sidebar-group-title-text">@group.Title</span>
+                            <Icone Nome="chevron-down" Tamanho="14" Classe="sidebar-group-seta" />
                         </button>
                     </h2>
                     <div id="@groupId"
@@ -37,7 +38,7 @@
                                     var match = item.MatchPrefix ? NavLinkMatch.Prefix : NavLinkMatch.All;
                                     <li class="sidebar-item">
                                         <NavLink class="sidebar-link" href="@item.Href" Match="@match">
-                                            <span class="@item.Icon" aria-hidden="true"></span>
+                                            <Icone Nome="@item.Icon" Classe="sidebar-link-icone" />
                                             <span class="sidebar-link-text">@item.Title</span>
                                         </NavLink>
                                     </li>

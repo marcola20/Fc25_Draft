@@ -6,7 +6,7 @@
 
 @* Busca do topo: jogador pelo nome, time pelo nome ou pelo técnico. Setas escolhem, Enter abre, Esc fecha. *@
 <button type="button" class="busca-botao" @onclick="Abrir" aria-label="Buscar jogador ou time">
-    <span class="oi oi-magnifying-glass" aria-hidden="true"></span>
+    <Icone Nome="search" />
     <span class="busca-botao-texto">Buscar jogador ou time</span>
 </button>
 
@@ -15,7 +15,7 @@
     <div class="busca-fundo" @onclick="Fechar"></div>
     <div class="busca-painel" role="dialog" aria-label="Buscar">
         <div class="busca-campo">
-            <span class="oi oi-magnifying-glass text-muted" aria-hidden="true"></span>
+            <Icone Nome="search" Classe="text-body-secondary" />
             @* Campo não controlado (sem value="@..."): no Blazor Server o re-render apagaria letras de quem digita rápido.
                O painel é recriado a cada abertura, então o campo já começa vazio. *@
             <input @ref="_campo" type="text" inputmode="search" enterkeyhint="search" class="form-control border-0 shadow-none"

@@ -1,7 +1,8 @@
 @using Fc25Draft.Web.Models.Navigation
 @using System.Linq
 
-@if (Items?.Any() == true)
+@* Só aparece com pelo menos dois níveis: na página inicial "Início" sozinho não diz nada. *@
+@if (Items?.Count > 1)
 {
     <nav class="app-breadcrumbs" aria-label="Breadcrumb">
         <ol class="breadcrumb">

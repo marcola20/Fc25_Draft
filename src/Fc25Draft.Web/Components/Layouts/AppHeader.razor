@@ -4,7 +4,7 @@
     <div class="app-header-main">
         <div class="app-header-brand">
             <button type="button" class="toggle-sidebar" @onclick="ToggleSidebar" aria-label="Alternar menu">
-                <span class="oi oi-menu" aria-hidden="true"></span>
+                <Icone Nome="menu" Tamanho="18" />
             </button>
             <div class="app-header-titles">
                 @if (!string.IsNullOrWhiteSpace(HomeHref))
@@ -39,20 +39,18 @@
                 <span class="status-label">@AccessLabel</span>
                 @if (ShowAuthProgress)
                 {
-                    <span class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 }
                 else
                 {
-                    <div class="btn-group" role="group" aria-label="Controles de acesso">
-                        @if (IsAuthenticated)
-                        {
-                            <button class="btn btn-sm btn-outline-light" @onclick="SignOut">Sair</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-outline-light" @onclick="SignIn">Login</button>
-                        }
-                    </div>
+                    @if (IsAuthenticated)
+                    {
+                        <button type="button" class="btn-moldura" @onclick="SignOut">Sair</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn-moldura" @onclick="SignIn">Entrar</button>
+                    }
                 }
             </div>
         </div>

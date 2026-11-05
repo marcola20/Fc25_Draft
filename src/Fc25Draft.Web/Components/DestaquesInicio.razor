@@ -2,93 +2,92 @@
 @using Fc25Draft.Core.DTOs
 @inject EscudoService Escudos
 
-@* O que está acontecendo agora na liga: aparece no topo da Central CBFV.
-   Primeira linha só com times, segunda só com jogadores; cada linha divide a largura entre os seus cards. *@
+@* A capa da liga no topo da Central CBFV: uma linha com os times (líderes, melhor e pior fase) e outra com os
+   jogadores da temporada. As células dividem a largura e são separadas por linhas finas, como uma tabela de
+   jornal; a cor fica com os escudos, as fotos e a sequência de resultados. *@
 
 @if (_dados is not null && TemAlgo)
 {
-    <h5 class="text-uppercase text-muted small fw-bold mb-2">Destaques</h5>
+    <section class="destaques" aria-labelledby="destaques-titulo">
+        <div class="secao-titulo">
+            <h2 id="destaques-titulo">Destaques</h2>
+        </div>
 
-    @if (TemTime)
-    {
-        <div class="row g-3 mb-3">
-            @foreach (var lider in _dados.Lideres)
+        <div class="capa">
+            @if (TemTime)
             {
-                <div class="col-12 col-md">
-                    <a href="/liga?liga=@lider.LigaId" class="card h-100 text-decoration-none text-body border-warning">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
-                            <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
-                            <div class="min-w-0">
-                                <div class="small text-muted text-truncate">🏆 Líder · @lider.LigaNome</div>
-                                <div class="fs-5 fw-bold text-truncate">@lider.TimeNome</div>
-                                <div class="small text-muted">@lider.Pontos pontos em @lider.Jogos jogos</div>
-                            </div>
-                        </div>
-                    </a>
+                <div class="capa-linha">
+                    @foreach (var lider in _dados.Lideres)
+                    {
+                        <a href="/liga?liga=@lider.LigaId" class="capa-item capa-lider">
+                            <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" class="capa-escudo" width="44" height="44" />
+                            <span class="capa-texto">
+                                <span class="capa-rotulo">Líder · @lider.LigaNome</span>
+                                <span class="capa-nome">@lider.TimeNome</span>
+                                <span class="capa-meta"><span class="numero">@lider.Pontos</span> pontos em <span class="numero">@lider.Jogos</span> jogos</span>
+                            </span>
+                        </a>
+                    }
+
+                    @if (_dados.MelhorFase.Count > 0)
+                    {
+                        var n = _dados.MelhorFase[0].Jogos;
+                        @Fase(_dados.MelhorFase, "Em melhor fase",
+                            f => f.Vitorias == f.Jogos ? $"{n} vitórias seguidas" : $"Invicto há {n} jogos",
+                            $"Invictos há {n} jogos")
+                    }
+
+                    @if (_dados.PiorFase.Count > 0)
+                    {
+                        var n = _dados.PiorFase[0].Jogos;
+                        @Fase(_dados.PiorFase, "Em pior fase",
+                            f => f.Derrotas == f.Jogos ? $"{n} derrotas seguidas" : $"Sem vencer há {n} jogos",
+                            $"Sem vencer há {n} jogos")
+                    }
                 </div>
             }
 
-            @if (_dados.MelhorFase.Count > 0)
+            @if (TemJogador)
             {
-                var n = _dados.MelhorFase[0].Jogos;
-                @Fase(_dados.MelhorFase, "🔥 Em melhor fase", "border-success", "text-success",
-                    f => f.Vitorias == f.Jogos ? $"{n} vitórias seguidas" : $"Invicto há {n} jogos · {Retrospecto(f)}",
-                    $"Invictos há {n} jogos")
-            }
+                <div class="capa-linha">
+                    @if (_dados.Artilheiros.Count > 0)
+                    {
+                        @Contagem(_dados.Artilheiros, "Artilheiro", "Artilheiros", "gol", "gols")
+                    }
 
-            @if (_dados.PiorFase.Count > 0)
-            {
-                var n = _dados.PiorFase[0].Jogos;
-                @Fase(_dados.PiorFase, "🥶 Em pior fase", "border-danger", "text-danger",
-                    f => f.Derrotas == f.Jogos ? $"{n} derrotas seguidas" : $"Sem vencer há {n} jogos · {Retrospecto(f)}",
-                    $"Sem vencer há {n} jogos")
-            }
-        </div>
-    }
+                    @if (_dados.Garcons.Count > 0)
+                    {
+                        @Contagem(_dados.Garcons, "Garçom", "Garçons", "assistência", "assistências")
+                    }
 
-    @if (TemJogador)
-    {
-        <div class="row g-3 mb-4">
-            @if (_dados.Artilheiros.Count > 0)
-            {
-                @Contagem(_dados.Artilheiros, "⚽", "Artilheiro", "Artilheiros", "gol", "gols", "border-primary")
-            }
+                    @if (_dados.MelhorNota is { } nota)
+                    {
+                        <a href="/players/details/@nota.JogadorId" class="capa-item">
+                            <FotoJogador PlayerId="@nota.JogadorId" Tamanho="44" Classe="capa-foto" />
+                            <span class="capa-texto">
+                                <span class="capa-rotulo">Melhor nota</span>
+                                <span class="capa-nome">@nota.Nome</span>
+                                <span class="capa-meta">
+                                    <span class="numero">@nota.Media.ToString("0.00", Brasil)</span> em <span class="numero">@nota.Jogos</span> @(nota.Jogos == 1 ? "jogo" : "jogos") · @nota.TimeNome
+                                </span>
+                            </span>
+                        </a>
+                    }
 
-            @if (_dados.Garcons.Count > 0)
-            {
-                @Contagem(_dados.Garcons, "🎯", "Garçom", "Garçons", "assistência", "assistências", "border-info")
-            }
-
-            @if (_dados.MelhorNota is { } nota)
-            {
-                <div class="col-12 col-sm-6 col-xl">
-                    <a href="/players/details/@nota.JogadorId" class="card h-100 text-decoration-none text-body border-success">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
-                            <FotoJogador PlayerId="@nota.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
-                            <div class="min-w-0">
-                                <div class="small text-muted">⭐ Melhor nota</div>
-                                <div class="fs-5 fw-bold text-truncate">@nota.Nome</div>
-                                <div class="small text-muted text-truncate">
-                                    @nota.Media.ToString("0.00", Brasil) em @nota.Jogos @(nota.Jogos == 1 ? "jogo" : "jogos") · @nota.TimeNome
-                                </div>
-                            </div>
-                        </div>
-                    </a>
+                    @if (_dados.Paredoes.Count > 0)
+                    {
+                        @Contagem(_dados.Paredoes, "Paredão", "Paredões", "clean sheet", "clean sheets")
+                    }
                 </div>
             }
-
-            @if (_dados.Paredoes.Count > 0)
-            {
-                @Contagem(_dados.Paredoes, "🧤", "Paredão", "Paredões", "clean sheet", "clean sheets", "border-secondary")
-            }
         </div>
-    }
+    </section>
 }
 
 @code {
     private static readonly CultureInfo Brasil = CultureInfo.GetCultureInfo("pt-BR");
 
-    // Fotos sobrepostas no card de empate; os nomes aparecem todos.
+    // Fotos sobrepostas na célula de empate; os nomes aparecem todos.
     private const int FotosNoEmpate = 3;
 
     // Carregado pela página inicial (em sequência com o Plantão: as duas consultas usam a mesma conexão).
@@ -98,112 +97,102 @@
 
     private bool TemTime => _dados is not null && (_dados.Lideres.Count > 0 || _dados.MelhorFase.Count > 0 || _dados.PiorFase.Count > 0);
 
-    /// <summary>"3V 2E": o que o time fez na sequência, sem os zeros.</summary>
-    private static string Retrospecto(DestaqueFaseDto f) => string.Join(" ",
-        new[] { (f.Vitorias, "V"), (f.Empates, "E"), (f.Derrotas, "D") }.Where(x => x.Item1 > 0).Select(x => $"{x.Item1}{x.Item2}"));
-
-    /// <summary>Card da melhor/pior fase; no empate, todos os times com o retrospecto de cada um.</summary>
-    private RenderFragment Fase(IReadOnlyList<DestaqueFaseDto> times, string titulo, string borda, string cor,
-        Func<DestaqueFaseDto, string> sequencia, string sequenciaEmpate) => __builder =>
-    {
-        if (times.Count == 1)
-        {
-            var f = times[0];
-            <div class="col-12 col-md">
-                <a href="/teams/details/@f.TimeId" class="card h-100 text-decoration-none text-body @borda">
-                    <div class="card-body py-2 d-flex align-items-center gap-3">
-                        <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" />
-                        <div class="min-w-0">
-                            <div class="small text-muted">@titulo</div>
-                            <div class="fs-5 fw-bold text-truncate">@f.TimeNome</div>
-                            <div class="small @cor fw-semibold">@sequencia(f)</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-        }
-        else
-        {
-            <div class="col-12 col-md">
-                <div class="card h-100 @borda">
-                    <div class="card-body py-2 d-flex align-items-center gap-3">
-                        <div class="d-flex flex-shrink-0">
-                            @foreach (var (f, i) in times.Take(FotosNoEmpate).Select((f, i) => (f, i)))
-                            {
-                                <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" width="36" height="36"
-                                     style="object-fit: contain; @(i == 0 ? "" : "margin-left: -12px;")" />
-                            }
-                        </div>
-                        <div class="min-w-0">
-                            <div class="small text-muted">@titulo</div>
-                            @foreach (var f in times)
-                            {
-                                <div class="text-truncate lh-sm">
-                                    <a href="/teams/details/@f.TimeId" class="fw-bold text-body text-decoration-none">@f.TimeNome</a>
-                                    <span class="small text-muted">@Retrospecto(f)</span>
-                                </div>
-                            }
-                            <div class="small @cor fw-semibold">@sequenciaEmpate</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-    };
-
     private bool TemJogador => _dados is not null
         && (_dados.Artilheiros.Count > 0 || _dados.Garcons.Count > 0 || _dados.MelhorNota is not null || _dados.Paredoes.Count > 0);
 
     private bool TemAlgo => TemTime || TemJogador;
 
-    /// <summary>Card de quem lidera uma contagem; no empate, todos os empatados com o link de cada um.</summary>
-    private RenderFragment Contagem(IReadOnlyList<DestaqueJogadorDto> jogadores, string icone, string titulo,
-        string tituloPlural, string unidade, string unidadePlural, string borda) => __builder =>
+    /// <summary>"3V 2E": o que o time fez na sequência, sem os zeros (vai no título, para quem passa o mouse).</summary>
+    private static string Retrospecto(DestaqueFaseDto f) => string.Join(" ",
+        new[] { (f.Vitorias, "V"), (f.Empates, "E"), (f.Derrotas, "D") }.Where(x => x.Item1 > 0).Select(x => $"{x.Item1}{x.Item2}"));
+
+    /// <summary>Os jogos da sequência em quadradinhos, agrupados por resultado (a ordem dos jogos não vem no resumo).</summary>
+    private static RenderFragment Sequencia(DestaqueFaseDto f) => __builder =>
     {
-        var total = jogadores[0].Total;
-        var numero = $"{total} {(total == 1 ? unidade : unidadePlural)}";
-        if (jogadores.Count == 1)
+        <span class="sequencia" role="img" aria-label="@Retrospecto(f)" title="@Retrospecto(f)">
+            @for (var i = 0; i < f.Vitorias; i++) { <span class="v">V</span> }
+            @for (var i = 0; i < f.Empates; i++) { <span class="e">E</span> }
+            @for (var i = 0; i < f.Derrotas; i++) { <span class="d">D</span> }
+        </span>
+    };
+
+    /// <summary>Célula da melhor/pior fase; no empate, todos os times com a sequência de cada um.</summary>
+    private RenderFragment Fase(IReadOnlyList<DestaqueFaseDto> times, string titulo,
+        Func<DestaqueFaseDto, string> sequencia, string sequenciaEmpate) => __builder =>
+    {
+        if (times.Count == 1)
         {
-            var j = jogadores[0];
-            <div class="col-12 col-sm-6 col-xl">
-                <a href="/players/details/@j.JogadorId" class="card h-100 text-decoration-none text-body @borda">
-                    <div class="card-body py-2 d-flex align-items-center gap-3">
-                        <FotoJogador PlayerId="@j.JogadorId" Tamanho="48" Classe="flex-shrink-0" />
-                        <div class="min-w-0">
-                            <div class="small text-muted">@icone @titulo da temporada</div>
-                            <div class="fs-5 fw-bold text-truncate">@j.Nome</div>
-                            <div class="small text-muted text-truncate">@numero · @j.TimeNome</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
+            var f = times[0];
+            <a href="/teams/details/@f.TimeId" class="capa-item">
+                <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" class="capa-escudo" width="44" height="44" />
+                <span class="capa-texto">
+                    <span class="capa-rotulo">@titulo</span>
+                    <span class="capa-nome">@f.TimeNome</span>
+                    <span class="capa-meta capa-meta-sequencia">@Sequencia(f) @sequencia(f)</span>
+                </span>
+            </a>
         }
         else
         {
-            <div class="col-12 col-sm-6 col-xl">
-                <div class="card h-100 @borda">
-                    <div class="card-body py-2 d-flex align-items-center gap-3">
-                        <div class="d-flex flex-shrink-0">
-                            @foreach (var (j, i) in jogadores.Take(FotosNoEmpate).Select((j, i) => (j, i)))
-                            {
-                                <span style="@(i == 0 ? "" : "margin-left: -18px;")">
-                                    <FotoJogador PlayerId="@j.JogadorId" Tamanho="40" Classe="border border-2 border-dark rounded-circle" />
-                                </span>
-                            }
-                        </div>
-                        <div class="min-w-0">
-                            <div class="small text-muted">@icone @tituloPlural da temporada</div>
-                            <div class="fw-bold lh-sm">
-                                @for (var i = 0; i < jogadores.Count; i++)
-                                {
-                                    var j = jogadores[i];
-                                    <a href="/players/details/@j.JogadorId" class="text-body text-decoration-none" title="@j.TimeNome">@j.Nome</a>@(i < jogadores.Count - 1 ? ", " : "")
-                                }
-                            </div>
-                            <div class="small text-muted">@numero cada</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="capa-item">
+                <span class="capa-empilhado">
+                    @foreach (var f in times.Take(FotosNoEmpate))
+                    {
+                        <img src="@Escudos.GetEscudo(f.TimeNome)" alt="" class="capa-escudo" width="36" height="36" />
+                    }
+                </span>
+                <span class="capa-texto">
+                    <span class="capa-rotulo">@titulo</span>
+                    @foreach (var f in times)
+                    {
+                        <span class="capa-nome-lista">
+                            <a href="/teams/details/@f.TimeId">@f.TimeNome</a> @Sequencia(f)
+                        </span>
+                    }
+                    <span class="capa-meta">@sequenciaEmpate</span>
+                </span>
+            </div>
+        }
+    };
+
+    /// <summary>Célula de quem lidera uma contagem; no empate, todos os empatados com o link de cada um.</summary>
+    private RenderFragment Contagem(IReadOnlyList<DestaqueJogadorDto> jogadores, string titulo,
+        string tituloPlural, string unidade, string unidadePlural) => __builder =>
+    {
+        var total = jogadores[0].Total;
+        var unidadeTexto = total == 1 ? unidade : unidadePlural;
+        if (jogadores.Count == 1)
+        {
+            var j = jogadores[0];
+            <a href="/players/details/@j.JogadorId" class="capa-item">
+                <FotoJogador PlayerId="@j.JogadorId" Tamanho="44" Classe="capa-foto" />
+                <span class="capa-texto">
+                    <span class="capa-rotulo">@titulo da temporada</span>
+                    <span class="capa-nome">@j.Nome</span>
+                    <span class="capa-meta"><span class="numero">@total</span> @unidadeTexto · @j.TimeNome</span>
+                </span>
+            </a>
+        }
+        else
+        {
+            <div class="capa-item">
+                <span class="capa-empilhado">
+                    @foreach (var j in jogadores.Take(FotosNoEmpate))
+                    {
+                        <FotoJogador PlayerId="@j.JogadorId" Tamanho="36" Classe="capa-foto" />
+                    }
+                </span>
+                <span class="capa-texto">
+                    <span class="capa-rotulo">@tituloPlural da temporada</span>
+                    <span class="capa-nomes" title="@string.Join(", ", jogadores.Select(j => j.Nome))">
+                        @for (var i = 0; i < jogadores.Count; i++)
+                        {
+                            var j = jogadores[i];
+                            <a href="/players/details/@j.JogadorId" title="@j.TimeNome">@j.Nome</a>@(i < jogadores.Count - 1 ? ", " : "")
+                        }
+                    </span>
+                    <span class="capa-meta"><span class="numero">@total</span> @unidadeTexto cada</span>
+                </span>
             </div>
         }
     };

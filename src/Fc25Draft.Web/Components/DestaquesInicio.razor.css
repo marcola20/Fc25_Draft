@@ -1,0 +1,151 @@
+.destaques {
+    margin-bottom: 2rem;
+}
+
+/* Um painel só, dividido em células por linhas finas (o fundo aparece pelo vão de 1px). */
+.capa {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-border-color);
+    box-shadow: var(--cbfv-sombra);
+}
+
+.capa-linha {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1px;
+}
+
+.capa-item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    min-width: 0;
+    padding: 1rem 1.25rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: background-color var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+a.capa-item:hover {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+a.capa-item:focus-visible {
+    outline: 2px solid rgba(242, 205, 92, 0.7);
+    outline-offset: -2px;
+}
+
+.capa-escudo {
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+.capa-texto {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.capa-rotulo {
+    overflow: hidden;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--bs-tertiary-color);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capa-lider .capa-rotulo {
+    color: var(--cbfv-acento-texto);
+}
+
+.capa-nome {
+    overflow: hidden;
+    margin: 0.125rem 0;
+    font-size: 1.0625rem;
+    font-weight: 500;
+    line-height: 1.5rem;
+    color: var(--bs-emphasis-color);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capa-nome-lista {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.375rem;
+}
+
+.capa-nomes {
+    overflow: hidden;
+    margin: 0.125rem 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capa-nomes a,
+.capa-nome-lista a {
+    color: var(--bs-emphasis-color);
+}
+
+.capa-nomes a:hover,
+.capa-nome-lista a:hover {
+    color: var(--bs-link-hover-color);
+}
+
+.capa-meta {
+    overflow: hidden;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--bs-secondary-color);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capa-meta .numero {
+    color: var(--bs-body-color);
+}
+
+.capa-meta-sequencia {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    white-space: normal;
+}
+
+/* Escudos ou fotos sobrepostos quando há empate. */
+.capa-empilhado {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.capa-empilhado > :not(:first-child) {
+    margin-left: -0.75rem;
+}
+
+.capa-item ::deep .capa-foto {
+    box-shadow: 0 0 0 2px var(--bs-body-bg);
+}
+
+@media (max-width: 575.98px) {
+    .capa-linha {
+        grid-template-columns: 1fr;
+    }
+
+    .capa-item {
+        padding: 0.75rem 1rem;
+    }
+}

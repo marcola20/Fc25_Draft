@@ -5,13 +5,13 @@
 @* Sino de avisos do time de quem entrou: conta os não lidos e abre a lista; abrir marca tudo como lido. *@
 @if (TeamId is not null)
 {
-    <div class="position-relative me-2">
-        <button type="button" class="btn btn-sm btn-outline-light position-relative" @onclick="AlternarAsync"
+    <div class="position-relative">
+        <button type="button" class="btn-moldura btn-moldura-icone position-relative" @onclick="AlternarAsync"
                 aria-label="Avisos@(_naoLidos > 0 ? $" ({_naoLidos} novos)" : "")" title="Avisos">
-            🔔
+            <Icone Nome="bell" />
             @if (_naoLidos > 0)
             {
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">@(_naoLidos > 9 ? "9+" : _naoLidos)</span>
+                <span class="sino-contador numero">@(_naoLidos > 9 ? "9+" : _naoLidos)</span>
             }
         </button>
 

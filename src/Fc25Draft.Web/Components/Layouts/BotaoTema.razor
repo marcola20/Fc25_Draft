@@ -2,11 +2,11 @@
    tema do sistema. Antes do primeiro render no navegador o ícone ainda não sabe o tema e fica oculto. *@
 @inject IJSRuntime JS
 
-<button type="button" class="btn btn-sm btn-outline-light me-2 @(_escuro is null ? "invisible" : "")"
+<button type="button" class="btn-moldura btn-moldura-icone @(_escuro is null ? "invisible" : "")"
         @onclick="AlternarAsync"
         title="@(_escuro == true ? "Usar tema claro" : "Usar tema escuro")"
         aria-label="@(_escuro == true ? "Usar tema claro" : "Usar tema escuro")">
-    @(_escuro == true ? "☀️" : "🌙")
+    <Icone Nome="@(_escuro == true ? "sun" : "moon")" />
 </button>
 
 @code {

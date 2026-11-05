@@ -1,19 +1,26 @@
+/* Menu lateral: a parte mais densa do site. Linhas de 32px, ícones numa coluna só, o grupo colado nos
+   seus itens e afastado do grupo de cima. A página aberta ganha um degrau de superfície e o ícone dourado. */
 .app-sidebar {
     height: 100%;
     overflow-y: auto;
-    padding: 1.5rem 1rem;
+    padding: 0 0.75rem 1.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(232, 234, 237, 0.12) transparent;
 }
 
-.sidebar-group + .sidebar-group {
-    margin-top: 1.5rem;
+.sidebar-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1.5rem 0 1.25rem;
+    margin: 0 0 0.5rem;
+    border-bottom: 1px solid var(--cbfv-moldura-linha);
 }
 
-.sidebar-group-title {
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.08rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 0.75rem;
+.sidebar-logo-img {
+    width: 72px;
+    height: auto;
+    object-fit: contain;
 }
 
 .sidebar-group-list {
@@ -22,174 +29,150 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 2px;
 }
 
-.sidebar-link {
+.app-sidebar ::deep .sidebar-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.75rem;
+    gap: 0.625rem;
+    height: 2rem;
+    padding: 0 0.625rem;
     border-radius: 0.5rem;
-    color: rgba(255, 255, 255, 0.85);
-    text-decoration: none;
-    transition: background-color .2s ease-in-out, color .2s ease-in-out;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--cbfv-moldura-texto-2) !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+    transition: background-color var(--cbfv-rapido) var(--cbfv-curva), color var(--cbfv-rapido) var(--cbfv-curva);
 }
 
-.sidebar-link:hover,
-.sidebar-link:focus {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
+.app-sidebar ::deep .sidebar-link-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.sidebar-link.active {
-    background-color: #f4d35e;
-    color: #0d1b2a;
+.app-sidebar ::deep .sidebar-link .sidebar-link-icone {
+    color: var(--cbfv-moldura-texto-3);
+    transition: color var(--cbfv-rapido) var(--cbfv-curva);
 }
 
-.sidebar-link.active .sidebar-link-text {
-    font-weight: 600;
+.app-sidebar ::deep .sidebar-link:hover {
+    background-color: rgba(232, 234, 237, 0.04);
+    color: var(--cbfv-moldura-texto) !important;
 }
 
-.sidebar-link .oi {
-    font-size: 1.1rem;
+.app-sidebar ::deep .sidebar-link:hover .sidebar-link-icone {
+    color: var(--cbfv-moldura-texto-2);
+}
+
+.app-sidebar ::deep .sidebar-link:focus-visible {
+    outline: 2px solid rgba(242, 205, 92, 0.7);
+    outline-offset: -2px;
+}
+
+.app-sidebar ::deep .sidebar-link.active {
+    background-color: var(--cbfv-moldura-elevada);
+    box-shadow: inset 0 0 0 1px var(--cbfv-moldura-linha);
+    color: var(--cbfv-moldura-texto) !important;
+}
+
+.app-sidebar ::deep .sidebar-link.active .sidebar-link-text {
+    font-weight: 500;
+}
+
+.app-sidebar ::deep .sidebar-link.active .sidebar-link-icone {
+    color: var(--cbfv-acento);
 }
 
 .sidebar-empty {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
+    padding: 0.5rem 0.625rem;
+    color: var(--cbfv-moldura-texto-3);
+    font-size: 0.875rem;
 }
-
-.app-sidebar a,
-.sidebar-link {
-    color: rgba(255, 255, 255, 0.85) !important;
-    text-decoration: none !important;
-}
-
-    .app-sidebar a:hover,
-    .sidebar-link:hover {
-        color: #ffffff !important;
-        text-decoration: none !important;
-    }
-
-    .sidebar-link.active {
-        color: #0d1b2a !important;
-        background-color: #f4d35e !important;
-        text-decoration: none !important;
-    }
-
-    .app-sidebar a:link,
-    .app-sidebar a:visited,
-    .app-sidebar a:active {
-        color: rgba(255, 255, 255, 0.85) !important;
-        text-decoration: none !important;
-    }
-
-
 
 @media (max-width: 992px) {
     .app-sidebar {
-        padding-top: 4.5rem;
+        padding-top: 3.5rem;
     }
 }
 
-.sidebar-logo {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0.2rem 1rem 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 0.5rem;
-}
-
-.sidebar-logo-img {
-    width: 110px;
-    height: auto;
-    object-fit: contain;
-}
-
-/* Accordion Styles */
+/* Grupos (acordeão do Bootstrap sem a caixa dele) */
 .accordion {
-    --bs-accordion-bg: transparent !important;
-    --bs-accordion-active-bg: transparent !important;
-    --bs-accordion-border-color: transparent !important;
-    --bs-accordion-btn-active-bg: transparent !important;
+    --bs-accordion-bg: transparent;
+    --bs-accordion-active-bg: transparent;
+    --bs-accordion-border-color: transparent;
+    --bs-accordion-btn-focus-box-shadow: none;
 }
 
 .accordion-item {
-    background-color: transparent !important;
-    border: none !important;
-    margin-bottom: 0.5rem;
+    background-color: transparent;
+    border: none;
 }
 
 .accordion-header {
-    margin-bottom: 0;
+    margin: 0;
 }
 
 .accordion-button {
-    padding: 0.75rem 0;
-    font-size: 0.95rem;
-    letter-spacing: 0.08rem;
-    color: rgba(255, 255, 255, 0.6);
-    text-transform: uppercase;
-    background-color: transparent;
-    border: none;
-    box-shadow: none;
-    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
+    height: 2rem;
+    margin-top: 0.75rem;
+    padding: 0 0.625rem;
+    border: none;
+    border-radius: 0.5rem;
+    background-color: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--cbfv-moldura-texto-3);
+    transition: color var(--cbfv-rapido) var(--cbfv-curva);
 }
 
-.accordion-button:not(.collapsed) {
+.accordion-item:first-child .accordion-button {
+    margin-top: 0.25rem;
+}
+
+/* Some a seta do Bootstrap: a nossa é um ícone do lucide. */
+.accordion-button::after {
+    display: none;
+}
+
+.accordion-button:not(.collapsed),
+.accordion-button:hover {
     background-color: transparent;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--cbfv-moldura-texto-2);
     box-shadow: none;
 }
 
 .accordion-button:focus {
-    background-color: transparent;
-    border-color: transparent;
     box-shadow: none;
-    color: rgba(255, 255, 255, 0.85);
 }
 
-.accordion-button::after {
-    content: '';
-    position: relative;
-    display: inline-block;
-    width: 0.8rem;
-    height: 0.8rem;
+.accordion-button:focus-visible {
+    outline: 2px solid rgba(242, 205, 92, 0.7);
+    outline-offset: -2px;
+}
+
+.accordion-button ::deep .sidebar-group-seta {
     margin-left: auto;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='rgba(255,255,255,0.6)'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-size: 100%;
-    transition: transform 0.2s ease-in-out;
+    transform: rotate(-90deg);
+    transition: transform var(--cbfv-medio) var(--cbfv-curva);
 }
 
-.accordion-button:not(.collapsed)::after {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='rgba(255,255,255,0.85)'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
-    transform: rotate(-180deg);
-}
-
-.accordion-collapse {
-    transition: height 0.2s ease-in-out;
+.accordion-button:not(.collapsed) ::deep .sidebar-group-seta {
+    transform: rotate(0deg);
 }
 
 .accordion-body {
-    padding: 0.75rem 0 1rem 0;
+    padding: 0.25rem 0 0;
 }
 
 .sidebar-group-title-text {
-    display: inline-block;
     flex: 1;
-}
-
-/* Ensure sidebar items stay white in accordion */
-.accordion-body .sidebar-link {
-    color: rgba(255, 255, 255, 0.85) !important;
-}
-
-.accordion-body .sidebar-link:hover {
-    color: #fff !important;
+    text-align: left;
 }
