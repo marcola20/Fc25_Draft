@@ -12,8 +12,7 @@ else
         @foreach (var m in Metas)
         {
             <li class="d-flex flex-wrap align-items-center gap-2">
-                <span class="badge @(m.Tipo == TipoCompetition.Copa ? "bg-success" : m.Divisao == Divisao.SerieB ? "bg-info text-dark" : "bg-primary")"
-                      style="min-width: 4.5rem;">@LigaLabels.Competicao(m.Tipo, m.Divisao)</span>
+                <span class="etiqueta" style="min-width: 4.5rem; justify-content: center;">@LigaLabels.Competicao(m.Tipo, m.Divisao)</span>
                 <span class="fw-semibold">@m.Meta</span>
                 @if (m.AjustadaPeloAdmin)
                 {
@@ -21,13 +20,15 @@ else
                 }
                 @if (!string.IsNullOrEmpty(m.Andamento))
                 {
-                    <span class="small @(m.DentroDaMeta == true ? "text-success" : m.DentroDaMeta == false ? "text-danger" : "text-muted")">
-                        · @m.Andamento@(m.DentroDaMeta == true ? " ✓" : m.DentroDaMeta == false ? " ✗" : "")
+                    <span class="small d-inline-flex align-items-center gap-1 @(m.DentroDaMeta == true ? "texto-vitoria" : m.DentroDaMeta == false ? "texto-derrota" : "text-body-secondary")">
+                        · @m.Andamento
+                        @if (m.DentroDaMeta == true) { <Icone Nome="check" Tamanho="12" /> }
+                        else if (m.DentroDaMeta == false) { <Icone Nome="x" Tamanho="12" /> }
                     </span>
                 }
                 @if (m.Situacao != SituacaoMeta.EmAndamento)
                 {
-                    <span class="badge @DiretoriaLabels.SituacaoBadge(m.Situacao)">@DiretoriaLabels.SituacaoEmoji(m.Situacao) @DiretoriaLabels.Situacao(m.Situacao)</span>
+                    <span class="etiqueta @EtiquetaDaSituacao(m.Situacao)">@DiretoriaLabels.Situacao(m.Situacao)</span>
                 }
                 @if (MostrarExpectativa && m.PosicaoEsperada is int esperada)
                 {
@@ -49,4 +50,12 @@ else
 
     /// <summary>Mostra de onde a meta saiu (posição esperada, histórico, XI, pote).</summary>
     [Parameter] public bool MostrarExpectativa { get; set; }
+
+    private static string EtiquetaDaSituacao(SituacaoMeta situacao) => situacao switch
+    {
+        SituacaoMeta.Cumprida => "sucesso",
+        SituacaoMeta.Superada => "acento",
+        SituacaoMeta.Fracassada => "perigo",
+        _ => ""
+    };
 }

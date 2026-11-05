@@ -1,0 +1,53 @@
+/* Confiança da diretoria: nome da faixa na cor dela, barra fina e o número. */
+.termometro {
+    --faixa-cor: var(--bs-tertiary-color);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.faixa-prestigiado { --faixa-cor: var(--cbfv-vitoria); }
+.faixa-estavel { --faixa-cor: var(--zona-playoff-acesso); }
+.faixa-observacao { --faixa-cor: var(--cbfv-empate); }
+.faixa-pressionado { --faixa-cor: var(--zona-playoff-rebaixamento); }
+.faixa-balancando { --faixa-cor: var(--cbfv-derrota); }
+
+.termometro-faixa {
+    min-width: 8.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--faixa-cor);
+}
+
+.termometro-barra {
+    flex: 1 1 6rem;
+    height: 0.375rem;
+    overflow: hidden;
+    border-radius: 0.1875rem;
+    background: var(--bs-secondary-bg);
+}
+
+.termometro-barra > div {
+    height: 100%;
+    border-radius: 0.1875rem;
+    background: var(--faixa-cor);
+}
+
+.termometro-valor {
+    min-width: 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-emphasis-color);
+}
+
+.termometro-variacao {
+    display: inline-flex;
+    align-items: center;
+    min-width: 3rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-tertiary-color);
+}

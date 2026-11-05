@@ -14,7 +14,7 @@
             }
             @if (Papel is not null)
             {
-                <span class="badge @(Papel == PapelTreinador.Auxiliar ? "text-bg-info" : "text-bg-primary")">@(Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico")</span>
+                <span class="etiqueta">@(Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico")</span>
             }
         </div>
         @if (!string.IsNullOrWhiteSpace(Perfil.Frase))

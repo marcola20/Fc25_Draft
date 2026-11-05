@@ -3,15 +3,15 @@
 @* Assinar os jogos do time na agenda do celular. O menu abre pelo Blazor (o site não carrega o JS do Bootstrap). *@
 <div class="position-relative d-inline-block">
     <button type="button" class="btn @Classe" @onclick="() => _aberto = !_aberto" aria-expanded="@(_aberto ? "true" : "false")">
-        📅 Adicionar à agenda
+        <Icone Nome="calendar-plus" Tamanho="14" /> Adicionar à agenda
     </button>
     @if (_aberto)
     {
         <div class="agenda-fundo" @onclick="() => _aberto = false"></div>
         <div class="dropdown-menu show agenda-menu">
-            <a class="dropdown-item" href="@Webcal" @onclick="() => _aberto = false">🍎 iPhone, iPad ou Mac</a>
-            <a class="dropdown-item" href="@Google" target="_blank" rel="noopener" @onclick="() => _aberto = false">📆 Google Agenda (Android)</a>
-            <a class="dropdown-item" href="@Arquivo" download="cbfv-jogos.ics" @onclick="() => _aberto = false">⬇️ Baixar o arquivo .ics</a>
+            <a class="dropdown-item" href="@Webcal" @onclick="() => _aberto = false">iPhone, iPad ou Mac</a>
+            <a class="dropdown-item" href="@Google" target="_blank" rel="noopener" @onclick="() => _aberto = false">Google Agenda (Android)</a>
+            <a class="dropdown-item" href="@Arquivo" download="cbfv-jogos.ics" @onclick="() => _aberto = false"><Icone Nome="download" Tamanho="14" Classe="me-1" /> Baixar o arquivo .ics</a>
             <div class="dropdown-divider"></div>
             <div class="px-3 small text-muted">
                 Entram todos os jogos do time com dia marcado. A agenda se atualiza sozinha: jogo remarcado e placar

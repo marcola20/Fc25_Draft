@@ -7,24 +7,25 @@ public static class TimeJogoEstilo
 {
     public static string Badge(string? resultado) => resultado switch
     {
-        "V" => "bg-success",
-        "D" => "bg-danger",
-        "E" => "bg-secondary",
-        _ => "bg-light text-dark"
+        "V" => "resultado resultado-v",
+        "D" => "resultado resultado-d",
+        "E" => "resultado resultado-e",
+        _ => "resultado"
     };
 
     public static string Texto(string? resultado) => resultado switch
     {
-        "V" => "text-success",
-        "D" => "text-danger",
+        "V" => "texto-vitoria",
+        "D" => "texto-derrota",
         _ => ""
     };
 
-    public static string Emoji(string? resultado) => resultado switch
+    /// <summary>Ícone do lucide para a sequência atual (vitórias, derrotas ou invencibilidade).</summary>
+    public static string Icone(string? resultado) => resultado switch
     {
-        "V" => "🔥",
-        "D" => "🥶",
-        _ => "🛡️"
+        "V" => "flame",
+        "D" => "trending-down",
+        _ => "shield"
     };
 
     /// <summary>Placar do ponto de vista do time (gols pró primeiro), com W.O. e pênaltis.</summary>

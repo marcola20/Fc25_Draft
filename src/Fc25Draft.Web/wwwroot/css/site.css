@@ -448,6 +448,13 @@ a:hover, .btn-link:hover {
     box-shadow: var(--cbfv-sombra);
 }
 
+/* Painel que também é table-responsive: a tabela larga rola para o lado (o overflow:hidden cortaria). */
+.painel.table-responsive {
+    position: relative; /* prende os elementos absolutos (ex.: .visually-hidden) dentro da rolagem */
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
 .painel > .table,
 .painel > .table-responsive > .table {
     margin-bottom: 0;
@@ -572,6 +579,104 @@ h6.text-uppercase.text-muted {
 .estado-token.ok::before {
     background: var(--cbfv-vitoria);
 }
+
+/* Etiqueta: texto pequeno numa caixinha de linha fina (no lugar dos badges coloridos). */
+.etiqueta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    vertical-align: 0.0625rem;
+}
+
+.etiqueta.acento { border-color: rgba(201, 148, 40, 0.45); color: var(--cbfv-acento-texto); }
+.etiqueta.perigo { border-color: rgba(208, 82, 74, 0.45); color: var(--cbfv-derrota); }
+.etiqueta.aviso { border-color: rgba(201, 148, 40, 0.45); color: var(--zona-playoff-rebaixamento); }
+.etiqueta.sucesso { border-color: rgba(47, 158, 106, 0.45); color: var(--cbfv-vitoria); }
+
+/* Chip: etiqueta um pouco maior, para listas como a trajetória do time. */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.75rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
+    font-size: 0.8125rem;
+    color: var(--bs-body-color);
+    white-space: nowrap;
+}
+
+.chip .legenda-cor {
+    --zona-cor: var(--bs-tertiary-color);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 2px;
+}
+
+.chip.zona-titulo .legenda-cor,
+.chip.zona-playoff-acesso .legenda-cor,
+.chip.zona-playoff-rebaixamento .legenda-cor,
+.chip.zona-rebaixamento .legenda-cor,
+.chip.zona-empate .legenda-cor {
+    --zona-cor: inherit;
+    background: var(--zona-cor);
+}
+
+.chip-titulo {
+    border-color: rgba(201, 148, 40, 0.45);
+    color: var(--cbfv-acento-texto);
+}
+
+.chip .chip-sobe { color: var(--cbfv-vitoria); }
+.chip .chip-cai { color: var(--cbfv-derrota); }
+
+/* Botão só com ícone (32px). */
+.btn-icone {
+    width: 2rem;
+    height: 2rem;
+    padding: 0 !important;
+}
+
+.btn-sm.btn-icone {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.btn-outline-secondary.acao-perigo:hover:not(:disabled) {
+    border-color: rgba(208, 82, 74, 0.5);
+    color: var(--cbfv-derrota);
+}
+
+.btn-outline-secondary.acao-ativa {
+    border-color: rgba(201, 148, 40, 0.5);
+    color: var(--cbfv-acento-texto);
+}
+
+/* Resultado (V/E/D) em badge: quadradinho nas cores da sequência. */
+.badge.resultado {
+    border-radius: 0.25rem !important;
+    background: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+}
+
+.badge.resultado-v { background: var(--cbfv-vitoria); color: #fff; }
+.badge.resultado-e { background: var(--cbfv-empate); color: #fff; }
+.badge.resultado-d { background: var(--cbfv-derrota); color: #fff; }
+
+.texto-vitoria { color: var(--cbfv-vitoria) !important; }
+.texto-derrota { color: var(--cbfv-derrota) !important; }
 
 /* Rótulo de seção ("Destaques", "Plantão CBFV"): frase normal, discreto, colado no que vem embaixo. */
 .secao-titulo {

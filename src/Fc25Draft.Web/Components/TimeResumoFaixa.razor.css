@@ -1,0 +1,60 @@
+/* Uma faixa de painel com três colunas separadas por linhas finas. */
+.faixa-time {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-border-color);
+    box-shadow: var(--cbfv-sombra);
+}
+
+.faixa-item {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--bs-body-bg);
+}
+
+.faixa-proximo {
+    flex: 1 1 16rem;
+}
+
+.faixa-rotulo {
+    font-size: 0.75rem;
+    color: var(--bs-tertiary-color);
+}
+
+.faixa-valor {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+}
+
+.faixa-valor a {
+    color: var(--bs-emphasis-color);
+}
+
+.faixa-valor a:hover {
+    color: var(--bs-link-hover-color);
+}
+
+.faixa-meta {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--bs-secondary-color);
+}
+
+@media (max-width: 575.98px) {
+    .faixa-item {
+        flex: 1 1 100%;
+    }
+}

@@ -17,10 +17,11 @@
 @inject TeamAccessService TeamAccess
 @inject TransferOffersApiClient OffersApi
 @inject IEmprestimoService EmprestimoSvc
+@inject EscudoService Escudos
 
 @implements IDisposable
 
-<h3>Detalhes do Time</h3>
+<PageTitle>@(team?.TeamName ?? "Time")</PageTitle>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -34,88 +35,106 @@
 
 @if (isLoading)
 {
-    <p><em>Carregando...</em></p>
+    <div class="text-center py-5"><span class="spinner-border" role="status" aria-label="Carregando"></span></div>
 }
 else if (team is null)
 {
-    <p>Time não encontrado.</p>
+    <div class="alert alert-secondary">Time não encontrado.</div>
 }
 else
 {
-    <dl class="row">
-        <dt class="col-sm-3">Nome do Time</dt>
-        <dd class="col-sm-9">@team.TeamName</dd>
+    <section class="time-topo" aria-label="@team.TeamName">
+        <img src="@Escudos.GetEscudo(team.TeamName)" alt="" class="time-escudo" width="80" height="80" />
+        <div class="time-identidade">
+            <h1>@team.TeamName</h1>
+            <p class="time-comissao">
+                <span>Técnico <strong>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "—" : team.OwnerName)</strong></span>
+                @if (!string.IsNullOrWhiteSpace(team.AuxiliarName))
+                {
+                    <span>Auxiliar <strong>@team.AuxiliarName</strong></span>
+                }
+            </p>
 
-        <dt class="col-sm-3">Responsável</dt>
-        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(team.OwnerName) ? "-" : team.OwnerName)</dd>
+            @if (_trajetoria.Count > 0 || _titulosCopas.Count > 0)
+            {
+                <div class="trajetoria" aria-label="Trajetória">
+                    @if (_titulos > 0)
+                    {
+                        <span class="chip chip-titulo"><Icone Nome="trophy" Tamanho="14" /> @_titulos título@(_titulos > 1 ? "s" : "")</span>
+                    }
+                    @foreach (var c in _titulosCopas)
+                    {
+                        <span class="chip chip-titulo" title="@c.LigaNome">
+                            <Icone Nome="trophy" Tamanho="14" /> @(c.Temporada is int ano ? $"{ano} · " : "")@LigaLabels.Competicao(c.Tipo, null)
+                        </span>
+                    }
+                    @foreach (var tr in _trajetoria)
+                    {
+                        <span class="chip @ZonaEstilo.Linha(tr.Zona)" title="@tr.LigaNome">
+                            <span class="legenda-cor"></span>
+                            @tr.Temporada · @LigaLabels.DivisaoNome(tr.Divisao) · <span class="numero">@(tr.Posicao)º</span>@(tr.Encerrada ? "" : " (em andamento)")
+                            @if (tr.Campeao) { <Icone Nome="trophy" Tamanho="12" Classe="text-acento" /> }
+                            @if (tr.Movimento == "Promovido") { <Icone Nome="arrow-up" Tamanho="12" Classe="chip-sobe" /> }
+                            @if (tr.Movimento == "Rebaixado") { <Icone Nome="arrow-down" Tamanho="12" Classe="chip-cai" /> }
+                        </span>
+                    }
+                </div>
+            }
+        </div>
 
-        @if (!string.IsNullOrWhiteSpace(team.AuxiliarName))
-        {
-            <dt class="col-sm-3">Auxiliar</dt>
-            <dd class="col-sm-9">@team.AuxiliarName</dd>
-        }
+        <dl class="time-numeros">
+            <div>
+                <dt>Jogadores</dt>
+                <dd class="numero">@team.Jogadores</dd>
+            </div>
+            <div>
+                <dt>Valor do elenco</dt>
+                <dd class="numero">@FormatCurrency(teamAmount ?? 0m)</dd>
+            </div>
+            @* O caixa é só do próprio time (e da organização): os outros não veem. *@
+            @if (_canQuickSell || AdminAuth.IsAdmin)
+            {
+                <div>
+                    <dt>Caixa</dt>
+                    <dd class="numero">@team.Caixa</dd>
+                </div>
+            }
+        </dl>
+    </section>
 
-        <dt class="col-sm-3">Jogadores</dt>
-        <dd class="col-sm-9">@team.Jogadores</dd>
-
-        @* O caixa é só do próprio time (e da organização): os outros não veem. *@
-        @if (_canQuickSell || AdminAuth.IsAdmin)
-        {
-            <dt class="col-sm-3">Caixa</dt>
-            <dd class="col-sm-9">@team.Caixa</dd>
-        }
-
-        <dt class="col-sm-3">Valor do Time</dt>
-        <dd class="col-sm-9">@FormatCurrency(teamAmount ?? 0m)</dd>
-
+    <div class="time-acoes">
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateToLineups">
+            <Icone Nome="users" Tamanho="14" /> Gerenciar escalações
+        </button>
+        <BotaoAgenda TeamId="@Id" Classe="btn-sm btn-outline-secondary" />
         @if (AdminAuth.IsAdmin)
         {
-            @if (!string.IsNullOrWhiteSpace(team.Token))
-            {
-                <dt class="col-sm-3">Token do treinador</dt>
-                <dd class="col-sm-9"><code>@team.Token</code></dd>
-            }
-
-            @if (!string.IsNullOrWhiteSpace(team.AuxToken))
-            {
-                <dt class="col-sm-3">Token do auxiliar</dt>
-                <dd class="col-sm-9"><code>@team.AuxToken</code></dd>
-            }
-
-            <dt class="col-sm-3">Acesso</dt>
-            <dd class="col-sm-9">
-                <a href="/admin/treinadores">Cadastro de treinadores</a>
-                <span class="text-muted small">— o token é da pessoa, não do time</span>
-            </dd>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick='() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")'>
+                <Icone Nome="pencil" Tamanho="14" /> Editar
+            </button>
         }
-    </dl>
+    </div>
 
-    @if (_trajetoria.Count > 0 || _titulosCopas.Count > 0)
+    @if (AdminAuth.IsAdmin && (!string.IsNullOrWhiteSpace(team.Token) || !string.IsNullOrWhiteSpace(team.AuxToken)))
     {
-        <div class="mb-3">
-            <div class="text-uppercase text-muted small fw-bold mb-2">Trajetória</div>
-            <div class="d-flex flex-wrap gap-2">
-                @if (_titulos > 0)
+        <details class="time-admin">
+            <summary><Icone Nome="key" Tamanho="14" /> Tokens de acesso</summary>
+            <dl>
+                @if (!string.IsNullOrWhiteSpace(team.Token))
                 {
-                    <span class="badge bg-warning text-dark">🏆 @_titulos título@(_titulos > 1 ? "s" : "")</span>
+                    <dt>Treinador</dt>
+                    <dd><code>@team.Token</code></dd>
                 }
-                @foreach (var c in _titulosCopas)
+                @if (!string.IsNullOrWhiteSpace(team.AuxToken))
                 {
-                    <span class="badge bg-success" title="@c.LigaNome">
-                        @(c.Temporada is int ano ? $"{ano} · " : "")@LigaLabels.Competicao(c.Tipo, null) · Campeão 🏆
-                    </span>
+                    <dt>Auxiliar</dt>
+                    <dd><code>@team.AuxToken</code></dd>
                 }
-                @foreach (var t in _trajetoria)
-                {
-                    <span class="badge @ZonaEstilo.Badge(t.Zona)" title="@t.LigaNome">
-                        @t.Temporada · @LigaLabels.DivisaoNome(t.Divisao) · @(t.Posicao)º@(t.Encerrada ? "" : " (em andamento)")
-                        @if (t.Campeao) { <text> 🏆</text> }
-                        @if (t.Movimento == "Promovido") { <text> ⬆</text> }
-                        @if (t.Movimento == "Rebaixado") { <text> ⬇</text> }
-                    </span>
-                }
-            </div>
-        </div>
+            </dl>
+            <p class="small text-body-secondary mb-0">
+                O token é da pessoa, não do time: <a href="/admin/treinadores">cadastro de treinadores</a>.
+            </p>
+        </details>
     }
 
     <TimeResumoFaixa Perfil="@_perfil" />
@@ -126,16 +145,7 @@ else
 
     <ComissaoTecnica TeamId="@Id" />
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <button type="button"
-                class="btn btn-outline-primary"
-                @onclick="NavigateToLineups">
-            Gerenciar escalações
-        </button>
-        <BotaoAgenda TeamId="@Id" />
-    </div>
-
-    <ul class="nav nav-tabs mb-3" role="tablist">
+    <ul class="nav nav-tabs mt-4 mb-4" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Info ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Info">
@@ -175,7 +185,7 @@ else
         <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Treino ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Treino">
-                🏋️ Treino
+                Treino
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -234,8 +244,10 @@ else
         <div class="alert alert-warning mt-3" role="alert">@_teamTokenErrorMessage</div>
     }
 
-    <section class="mt-4">
-        <h4>Elenco</h4>
+    <section>
+        <div class="secao-titulo">
+            <h2>Elenco</h2>
+        </div>
 
         @if (_canQuickSell && _quickSellBloqueado)
         {
@@ -254,8 +266,8 @@ else
         }
         else
         {
-            <div class="table-responsive-sm p-0">
-                <table class="table table-striped table-sm mb-0">
+            <div class="table-responsive painel">
+                <table class="table table-hover align-middle mb-0 tabela-elenco">
                     <thead>
                         <tr class="align-middle text-center">
                             <th scope="col" class="text-start text-nowrap">Jogador</th>
@@ -266,7 +278,7 @@ else
                                     Posição
                                     @if (_activeSortColumn == RosterSortColumn.Position)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(_sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Position)</span>
                                     }
                                 </button>
@@ -278,7 +290,7 @@ else
                                     Overall
                                     @if (_activeSortColumn == RosterSortColumn.Overall)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(_sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Overall)</span>
                                     }
                                 </button>
@@ -290,19 +302,19 @@ else
                                     Idade
                                     @if (_activeSortColumn == RosterSortColumn.Age)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(_sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.Age)</span>
                                     }
                                 </button>
                             </th>
-                            <th scope="col" class="text-center text-nowrap">
+                            <th scope="col" class="text-end text-nowrap">
                                 <button type="button"
                                         class="@GetSortButtonClass(RosterSortColumn.BasePrice)"
                                         @onclick="() => ToggleRosterSort(RosterSortColumn.BasePrice)">
                                     Preço base
                                     @if (_activeSortColumn == RosterSortColumn.BasePrice)
                                     {
-                                        <span class="ms-1" aria-hidden="true">@(_sortDescending ? "↓" : "↑")</span>
+                                        <Icone Nome="@(_sortDescending ? "arrow-down" : "arrow-up")" Tamanho="12" />
                                         <span class="visually-hidden">@GetSortDirectionDescription(RosterSortColumn.BasePrice)</span>
                                     }
                                 </button>
@@ -319,52 +331,52 @@ else
                             <tr class="align-middle text-center">
                                 <td class="text-start text-nowrap">
                                     <FotoJogador PlayerId="@player.PlayerId" Tamanho="28" Classe="me-2" />
-                                    <a href="/players/details/@player.PlayerId" class="text-primary">@player.Name</a>
+                                    <a href="/players/details/@player.PlayerId" class="jogador-nome">@player.Name</a>
                                     @if (player.Participacao is { Papel: { } papel } comPapel)
                                     {
-                                        <span class="ms-1" role="img" aria-label="@PapelDoJogador.Nome(papel.Papel)" title="@TituloPapel(comPapel)">@PapelDoJogador.Emoji(papel.Papel)</span>
+                                        <span class="papel ms-1" role="img" aria-label="@PapelDoJogador.Nome(papel.Papel)" title="@TituloPapel(comPapel)"><Icone Nome="@IconeDoPapel(papel.Papel)" Tamanho="14" /></span>
                                     }
                                     @if (player.AskingPrice is decimal preco)
                                     {
-                                        <span class="badge bg-warning text-dark ms-1" title="Negociável: qualquer time pode comprar direto por este valor">
-                                            À venda · @FormatCurrency(preco)
+                                        <span class="etiqueta acento ms-1" title="Negociável: qualquer time pode comprar direto por este valor">
+                                            <Icone Nome="tag" Tamanho="12" /> À venda · @FormatCurrency(preco)
                                         </span>
                                     }
                                     @if (player.EmprestadoPor is string dono)
                                     {
-                                        <span class="badge bg-info text-dark ms-1" title="Volta para o dono no fim da temporada">
+                                        <span class="etiqueta ms-1" title="Volta para o dono no fim da temporada">
                                             Emprestado pelo @dono
                                         </span>
                                     }
                                     @if (player.Participacao?.Saida is { NaLista: true } saida)
                                     {
-                                        <span class="badge bg-danger ms-1"
-                                              title="@(saida.PromessaQuebrada ? "Promessa quebrada: voltou à lista pela metade da venda rápida e só sai vendido" : "Pediu para sair: está na lista pelo preço da venda rápida e só sai dela com a promessa de colocar para jogar")">🚪 Pediu para sair</span>
+                                        <span class="etiqueta perigo ms-1"
+                                              title="@(saida.PromessaQuebrada ? "Promessa quebrada: voltou à lista pela metade da venda rápida e só sai vendido" : "Pediu para sair: está na lista pelo preço da venda rápida e só sai dela com a promessa de colocar para jogar")"><Icone Nome="door-open" Tamanho="12" /> Pediu para sair</span>
                                     }
                                     else if (player.Participacao?.Saida is { PromessaEm: not null } promessa)
                                     {
-                                        <span class="badge bg-info text-dark ms-1"
-                                              title="Promessa de colocar para jogar: ele precisa ser titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos. Faltam @promessa.FaltamDaPromessa jogo(s); se não acontecer, volta à lista pela metade do preço.">🤝 Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
+                                        <span class="etiqueta ms-1"
+                                              title="Promessa de colocar para jogar: ele precisa ser titular @ParticipacaoCriterios.TitularSeguidoParaResolver jogos seguidos. Faltam @promessa.FaltamDaPromessa jogo(s); se não acontecer, volta à lista pela metade do preço."><Icone Nome="handshake" Tamanho="12" /> Promessa · @promessa.JogosDaPromessa/@PedidoDeSaidaCriterios.JogosDaPromessa</span>
                                     }
                                     @if (player.Participacao is { Insatisfeito: true } insatisfeito)
                                     {
-                                        <span class="badge bg-danger ms-1" title="@TituloInsatisfeito(insatisfeito)">😤</span>
+                                        <span class="etiqueta perigo ms-1" title="@TituloInsatisfeito(insatisfeito)"><Icone Nome="frown" Tamanho="12" /> Insatisfeito</span>
                                     }
                                     else if (player.Participacao is { Incomodado: true })
                                     {
-                                        <span class="badge bg-warning text-dark ms-1" title="Incomodado: se não jogar o próximo jogo do clube, fica 😤 insatisfeito">😐</span>
+                                        <span class="etiqueta aviso ms-1" title="Incomodado: se não jogar o próximo jogo do clube, fica insatisfeito"><Icone Nome="meh" Tamanho="12" /> Incomodado</span>
                                     }
                                 </td>
                                 <td class="text-center text-nowrap">@player.Position</td>
-                                <td>@player.Overall</td>
-                                <td>@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
-                                <td class="text-nowrap">
+                                <td class="numero fw-semibold">@player.Overall</td>
+                                <td class="numero">@(player.Age?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
+                                <td class="text-nowrap text-end numero">
                                     @FormatCurrency(player.BasePrice)
                                     @if (player.Participacao is { Variacao: not 0m } part)
                                     {
-                                        <span class="small fw-semibold @(part.Variacao > 0 ? "text-success" : "text-danger")"
+                                        <span class="variacao-valor @(part.Variacao > 0 ? "sobe" : "cai")"
                                               title="@TituloVariacao(part)">
-                                            @(part.Travada ? "🔒" : part.Variacao > 0 ? "▲" : "▼")@Participacao.Rotulo(part.Variacao)
+                                            <Icone Nome="@(part.Travada ? "lock" : part.Variacao > 0 ? "arrow-up" : "arrow-down")" Tamanho="12" />@Participacao.Rotulo(part.Variacao)
                                         </span>
                                     }
                                 </td>
@@ -378,12 +390,11 @@ else
                                         @if (player.Participacao?.Saida is { NaLista: true })
                                         {
                                         <button type="button"
-                                                class="btn btn-sm btn-danger me-1"
-                                                style="padding: 2px 6px; line-height: 1;"
+                                                class="btn btn-sm btn-outline-secondary btn-icone acao-perigo me-1"
                                                 title="Pediu para sair: ver a promessa de colocar para jogar"
                                                 aria-label="Pediu para sair: @player.Name"
                                                 @onclick="() => AbrirSaida(player)">
-                                            🚪
+                                            <Icone Nome="door-open" Tamanho="14" />
                                         </button>
                                         }
                                         else
@@ -391,42 +402,28 @@ else
                                         @if (PodeConversar(player))
                                         {
                                         <button type="button"
-                                                class="btn btn-sm btn-outline-secondary me-1"
-                                                style="padding: 2px 6px; line-height: 1;"
+                                                class="btn btn-sm btn-outline-secondary btn-icone me-1"
                                                 title="Conversa: rebaixar o papel dele no elenco"
                                                 aria-label="Conversa com @player.Name"
                                                 @onclick="() => AbrirConversa(player)">
-                                            🗣️
+                                            <Icone Nome="message-circle" Tamanho="14" />
                                         </button>
                                         }
                                         <button type="button"
-                                                class="btn btn-sm me-1 @(player.AskingPrice is null ? "btn-outline-warning" : "btn-warning")"
-                                                style="padding: 2px 6px; line-height: 1;"
+                                                class="btn btn-sm btn-outline-secondary btn-icone me-1 @(player.AskingPrice is null ? "" : "acao-ativa")"
                                                 title="@(player.AskingPrice is null ? "Colocar como negociável" : "Alterar preço ou tirar da lista")"
                                                 aria-label="Negociável: @player.Name"
                                                 @onclick="() => OpenListingModal(player)">
-                                            🏷️
+                                            <Icone Nome="tag" Tamanho="14" />
                                         </button>
                                         }
-                                        <button type="button" 
-                                                class="btn btn-outline-danger btn-sm btn-icon"
-                                                style="border-width: 2px;
-                                                       border-color: red;
-                                                       color: red;
-                                                       padding: 2px 4px;
-                                                       line-height: 1;
-                                                       transition: background-color 0.2s ease;"
-                                                title="@(_quickSellBloqueado ? "Vendas rápidas bloqueadas no momento" : "Quicksell")"
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary btn-icone acao-perigo"
+                                                title="@(_quickSellBloqueado ? "Vendas rápidas bloqueadas no momento" : "Venda rápida")"
                                                 disabled="@_quickSellBloqueado"
                                                 aria-label="Vender rapidamente @player.Name"
-                                                onmouseover="this.style.backgroundColor='rgba(255, 0, 0, 0.1)';"
-                                                onmouseout="this.style.backgroundColor='transparent';"
                                                 @onclick="() => OpenQuickSellModal(player)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                 width="16" height="16" fill="red">
-                                                <path d="M7 2v10h3v10l7-12h-4l4-8z" />
-                                            </svg>
-                                            <span class="visually-hidden">Venda rápida</span>
+                                            <Icone Nome="zap" Tamanho="14" />
                                         </button>
                                     </td>
                                 }
@@ -452,17 +449,8 @@ else
         }
     </section>
 
-    <div class="d-flex gap-2 mt-4">
-        @if (AdminAuth.IsAdmin)
-        {
-            <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo($"/teams/edit/{team.TeamId}")'>
-                Editar
-            </button>
-        }
-
-        <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/teams")'>
-            Voltar
-        </button>
+    <div class="mt-4">
+        <a href="/teams" class="small text-body-secondary"><Icone Nome="arrow-left" Tamanho="14" /> Todos os times</a>
     </div>
 
     } @* end Info tab *@
@@ -1343,7 +1331,7 @@ else
 
     private string GetSortButtonClass(RosterSortColumn column)
     {
-        var classes = "btn btn-link btn-sm p-0 text-decoration-none text-body";
+        var classes = "btn btn-link btn-sm p-0 text-decoration-none ordenar";
         if (_activeSortColumn == column)
         {
             classes += " fw-semibold";
@@ -1377,7 +1365,18 @@ else
         Navigation.NavigateTo($"/teams/{Id}/lineups");
     }
 
-    private static string FormatCurrency(decimal value) => value.ToString("C", BrazilCulture);
+    // Valores redondos sem os centavos ("R$ 26.444.500"); com centavos, o formato completo.
+    private static string FormatCurrency(decimal value) =>
+        value.ToString(value == decimal.Truncate(value) ? "C0" : "C", BrazilCulture);
+
+    // O Core marca o papel no elenco com um emoji; aqui ele vira um ícone do lucide.
+    private static string IconeDoPapel(PapelNoElenco papel) => papel switch
+    {
+        PapelNoElenco.Titular => "star",
+        PapelNoElenco.Disputa => "repeat",
+        PapelNoElenco.Rotacao => "armchair",
+        _ => "sprout"
+    };
 
     public void Dispose()
     {

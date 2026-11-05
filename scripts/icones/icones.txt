@@ -76,3 +76,19 @@ circle-x
 hand
 clock
 sliders-horizontal
+
+# Time
+arrow-up
+arrow-down
+armchair
+sprout
+door-open
+handshake
+frown
+meh
+lock
+message-circle
+calendar-plus
+download
+check
+triangle-alert
