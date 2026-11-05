@@ -27,11 +27,11 @@
                 <span class="reg-temporada-titulo">@_regulamento.Titulo</span>
                 @if (_regulamentos.Count > 0 && _regulamento.Temporada != _regulamentos[0].Temporada)
                 {
-                    <span class="badge bg-secondary">Regulamento antigo</span>
+                    <span class="etiqueta">Regulamento antigo</span>
                 }
                 else
                 {
-                    <span class="badge bg-success">Em vigor</span>
+                    <span class="etiqueta sucesso">Em vigor</span>
                 }
             </div>
             @if (_regulamentos.Count > 1)
@@ -81,8 +81,8 @@
         align-items: center;
         gap: 0.75rem;
         flex-wrap: wrap;
-        margin-bottom: 1.25rem;
-        padding-bottom: 0.75rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
         border-bottom: 1px solid var(--bs-border-color);
     }
 
@@ -94,22 +94,22 @@
     }
 
     .reg-temporada-badge {
-        font-weight: 800;
-        font-size: 1.05rem;
+        font-weight: 500;
+        font-size: 1.125rem;
         color: var(--bs-emphasis-color);
     }
 
     .reg-temporada-titulo {
-        font-size: 0.9rem;
+        font-size: 0.875rem;
         color: var(--bs-secondary-color);
     }
 
     .reg-temporada-bar select { margin-left: auto; }
 </style>
 <style>
+    /* Páginas de leitura (manual e regulamento): coluna de texto, seções numeradas, cartões neutros. */
     .regulamento-page {
-        max-width: 900px;
-        margin: 0 auto;
+        max-width: 860px;
         padding-bottom: 3rem;
     }
 
@@ -120,93 +120,62 @@
     .reg-section-header {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        margin-bottom: 1.25rem;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
     }
 
     .reg-section-icon {
-        font-size: 1.5rem;
-        line-height: 1;
+        display: none;
     }
 
     .reg-section-header h3 {
-        font-size: 1.35rem;
-        font-weight: 700;
+        font-size: 1.125rem;
+        font-weight: 500;
         margin: 0;
         color: var(--bs-emphasis-color);
-        letter-spacing: -0.01em;
-    }
-
-    .reg-section-desc {
-        color: var(--bs-secondary-color);
-        margin-bottom: 1.5rem;
-        font-size: 0.95rem;
     }
 
     .reg-card {
         background: var(--bs-body-bg);
         border: 1px solid var(--bs-border-color);
-        border-left: 4px solid var(--bs-primary, #0d6efd);
-        border-radius: 0.5rem;
-        padding: 1.1rem 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .reg-card-warning {
-        border-left-color: var(--bs-warning, #ffc107);
-    }
-
-    .reg-card-muted {
-        border-left-color: var(--bs-secondary, #6c757d);
-    }
-
-    .reg-card-final {
-        border-left-color: var(--bs-success, #198754);
-        background: color-mix(in srgb, var(--bs-success, #198754) 6%, var(--bs-body-bg));
+        border-radius: 0.75rem;
+        padding: 1.25rem;
     }
 
     .reg-card-title {
-        font-size: 1rem;
-        font-weight: 600;
-        margin-bottom: 0.6rem;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
         color: var(--bs-emphasis-color);
     }
 
-    .reg-icon-inline {
-        font-size: 1rem;
-        margin-left: auto;
-    }
-
     .reg-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1.5rem;
-        height: 1.5rem;
-        background: var(--bs-primary, #0d6efd);
-        color: #fff;
-        border-radius: 50%;
-        font-size: 0.75rem;
-        font-weight: 700;
+        width: 1.375rem;
+        height: 1.375rem;
+        background: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        color: var(--bs-secondary-color);
+        border-radius: 0.375rem;
+        font: 500 0.6875rem/1 var(--bs-font-monospace);
         flex-shrink: 0;
     }
 
-    .reg-badge-warning {
-        background: var(--bs-warning, #ffc107);
-        color: var(--bs-body-color);
-    }
-
-    .reg-badge-muted {
-        background: var(--bs-secondary, #6c757d);
-    }
-
     .reg-desc {
-        font-size: 0.9rem;
+        font-size: 0.875rem;
         color: var(--bs-secondary-color);
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.625rem;
+        line-height: 1.6;
+    }
+
+    .reg-desc strong {
+        font-weight: 500;
+        color: var(--bs-body-color);
     }
 
     .reg-list {
@@ -215,33 +184,74 @@
         margin: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.375rem;
     }
 
+    /* Texto corrido: o negrito e o resto da frase na mesma linha; o ponto fica pendurado à esquerda. */
     .reg-list li {
-        font-size: 0.92rem;
-        line-height: 1.55;
-        display: flex;
-        gap: 0.5rem;
-        align-items: flex-start;
+        position: relative;
+        padding-left: 1rem;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--bs-body-color);
+    }
+
+    .reg-list li strong {
+        font-weight: 500;
     }
 
     .reg-bullet {
-        color: var(--bs-primary, #0d6efd);
-        font-weight: 700;
-        flex-shrink: 0;
-        margin-top: 0.05rem;
+        position: absolute;
+        left: 0;
+        color: var(--bs-tertiary-color);
+    }
+
+    .reg-section-desc {
+        color: var(--bs-secondary-color);
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .reg-card {
+        margin-bottom: 0.75rem;
+    }
+
+    /* Avisos do regulamento: traço amarelo à esquerda, sem fundo. */
+    .reg-card-warning {
+        border-left: 3px solid var(--zona-playoff-rebaixamento);
+    }
+
+    .reg-card-muted {
+        background: var(--bs-tertiary-bg);
+    }
+
+    .reg-card-final {
+        border-left: 3px solid var(--cbfv-vitoria);
+    }
+
+    .reg-icon-inline {
+        display: none;
+    }
+
+    .reg-badge-warning {
+        border-color: rgba(201, 148, 40, 0.45);
+        color: var(--zona-playoff-rebaixamento);
+    }
+
+    .reg-badge-muted {
+        color: var(--bs-tertiary-color);
     }
 
     .reg-divider {
         border-color: var(--bs-border-color);
         margin: 2rem 0;
-        opacity: 0.5;
+        opacity: 1;
     }
 
+    /* Quadros de contrato: cabeçalho neutro com a cor só num traço em cima. */
     .reg-contract {
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         overflow: hidden;
         height: 100%;
     }
@@ -250,26 +260,20 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.7rem 1rem;
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: #fff;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        font-size: 0.9375rem;
+        color: var(--bs-emphasis-color);
+        background: var(--bs-tertiary-bg);
+        border-bottom: 1px solid var(--bs-border-color);
     }
 
-    .reg-contract-header-blue {
-        background: var(--bs-primary, #0d6efd);
-    }
-
-    .reg-contract-header-green {
-        background: var(--bs-success, #198754);
-    }
-
-    .reg-contract-header-orange {
-        background: #e07b00;
-    }
+    .reg-contract-header-blue { box-shadow: inset 0 2px 0 var(--cbfv-acento); }
+    .reg-contract-header-green { box-shadow: inset 0 2px 0 var(--cbfv-vitoria); }
+    .reg-contract-header-orange { box-shadow: inset 0 2px 0 var(--zona-playoff-rebaixamento); }
 
     .reg-contract-body {
-        padding: 1rem 1.1rem;
+        padding: 1rem;
         background: var(--bs-body-bg);
     }
 
@@ -277,9 +281,9 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.4rem 0;
+        padding: 0.5rem 0;
         border-bottom: 1px solid var(--bs-border-color);
-        font-size: 0.88rem;
+        font-size: 0.875rem;
     }
 
     .reg-contract-row:last-child {
@@ -287,38 +291,33 @@
     }
 
     .reg-contract-row-highlight {
-        background: color-mix(in srgb, var(--bs-primary, #0d6efd) 8%, transparent);
-        border-radius: 0.3rem;
-        padding-left: 0.4rem;
-        padding-right: 0.4rem;
+        background: var(--bs-tertiary-bg);
+        border-radius: 0.375rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
         border-bottom: none !important;
     }
 
-    .reg-contract-label {
+    .reg-contract-label,
+    .reg-contract-team-label {
         font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--bs-secondary-color);
+        font-weight: 400;
+        color: var(--bs-tertiary-color);
+    }
+
+    .reg-contract-team-label {
+        margin-bottom: 0.25rem;
     }
 
     .reg-contract-value {
-        font-weight: 600;
-        font-size: 0.9rem;
+        font-weight: 500;
+        font-size: 0.875rem;
+        font-variant-numeric: tabular-nums;
         color: var(--bs-emphasis-color);
     }
 
     .reg-contract-team-block {
         margin-bottom: 0.5rem;
-    }
-
-    .reg-contract-team-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--bs-secondary-color);
-        margin-bottom: 0.25rem;
     }
 
     .reg-contract-items {
@@ -328,21 +327,21 @@
     }
 
     .reg-contract-items li {
-        font-size: 0.9rem;
+        font-size: 0.875rem;
         font-weight: 500;
-        padding: 0.15rem 0;
+        padding: 0.125rem 0;
         color: var(--bs-emphasis-color);
     }
 
     .reg-contract-swap-icon {
         text-align: center;
-        font-size: 1.4rem;
-        color: var(--bs-secondary-color);
-        margin: 0.4rem 0;
+        font-size: 1.25rem;
+        color: var(--bs-tertiary-color);
+        margin: 0.375rem 0;
         line-height: 1;
     }
 
-    /* ── Cláusulas Contratuais ── */
+    /* ── Cláusulas contratuais ── */
     .clausulas-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -358,7 +357,7 @@
 
     .clausula-card {
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         overflow: hidden;
     }
 
@@ -375,35 +374,36 @@
     .clausula-card-header {
         display: flex;
         align-items: center;
-        gap: 0.55rem;
-        padding: 0.65rem 1rem;
-        font-weight: 700;
-        font-size: 0.9rem;
-        color: #fff;
-        letter-spacing: 0.01em;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        font-size: 0.9375rem;
+        color: var(--bs-emphasis-color);
+        background: var(--bs-tertiary-bg);
+        border-bottom: 1px solid var(--bs-border-color);
     }
 
     .clausula-icon {
-        font-size: 1.1rem;
+        display: none;
     }
 
-    .clausula-header-orange { background: #e07b00; }
-    .clausula-header-blue   { background: var(--bs-primary, #0d6efd); }
-    .clausula-header-green  { background: var(--bs-success, #198754); }
-    .clausula-header-gold   { background: #a07800; }
+    .clausula-header-orange { box-shadow: inset 0 2px 0 var(--zona-playoff-rebaixamento); }
+    .clausula-header-blue   { box-shadow: inset 0 2px 0 var(--bs-secondary-color); }
+    .clausula-header-green  { box-shadow: inset 0 2px 0 var(--cbfv-vitoria); }
+    .clausula-header-gold   { box-shadow: inset 0 2px 0 var(--cbfv-acento); }
 
     .clausula-card-body {
-        padding: 0.75rem 1rem;
+        padding: 0.875rem 1rem;
         background: var(--bs-body-bg);
         display: flex;
         flex-direction: column;
-        gap: 0.6rem;
+        gap: 0.625rem;
     }
 
     .clausula-body-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 0.6rem;
+        gap: 0.625rem;
     }
 
     @@media (max-width: 600px) {
@@ -417,26 +417,29 @@
         align-items: flex-start;
         gap: 0.5rem;
         font-size: 0.875rem;
-        line-height: 1.5;
+        line-height: 1.55;
     }
 
+    /* Etiqueta do tipo de cláusula, no molde da .etiqueta do site. */
     .clausula-tag {
         flex-shrink: 0;
-        display: inline-block;
-        padding: 0.15rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        margin-top: 0.1rem;
+        display: inline-flex;
+        align-items: center;
+        height: 1.25rem;
+        padding: 0 0.375rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.375rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        margin-top: 0.125rem;
         white-space: nowrap;
+        color: var(--bs-secondary-color);
     }
 
-    .tag-orange { background: rgba(224,123,0,0.15);  color: var(--cbfv-laranja); }
-    .tag-blue   { background: rgba(13,110,253,0.12); color: var(--bs-primary, #0d6efd); }
-    .tag-green  { background: rgba(25,135,84,0.12);  color: var(--bs-success, #198754); }
-    .tag-gold   { background: rgba(160,120,0,0.15);  color: var(--cbfv-dourado); }
+    .tag-orange { border-color: rgba(201, 148, 40, 0.45); color: var(--zona-playoff-rebaixamento); }
+    .tag-blue   { color: var(--bs-body-color); }
+    .tag-green  { border-color: rgba(47, 158, 106, 0.45); color: var(--cbfv-vitoria); }
+    .tag-gold   { border-color: rgba(201, 148, 40, 0.45); color: var(--cbfv-acento-texto); }
 
     .clausula-text {
         color: var(--bs-body-color);
@@ -444,16 +447,16 @@
 
     /* Regras gerais */
     .clausulas-rules {
-        background: color-mix(in srgb, var(--bs-secondary, #6c757d) 7%, var(--bs-body-bg));
+        background: var(--bs-tertiary-bg);
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         padding: 1rem 1.25rem;
     }
 
     .clausulas-rules-title {
-        font-weight: 700;
-        font-size: 0.95rem;
-        margin-bottom: 0.6rem;
+        font-weight: 500;
+        font-size: 0.9375rem;
+        margin-bottom: 0.625rem;
         color: var(--bs-emphasis-color);
     }
 </style>
