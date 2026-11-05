@@ -1,6 +1,7 @@
+/* Forma recente nos quadradinhos da assinatura do site (mesmas cores da .sequencia). */
 .forma {
     display: inline-flex;
-    gap: 3px;
+    gap: 2px;
     vertical-align: middle;
 }
 
@@ -8,15 +9,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 17px;
-    height: 17px;
-    border-radius: 50%;
-    font-size: 9px;
-    font-weight: 700;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 3px;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.5625rem;
+    font-weight: 500;
     line-height: 1;
     color: #fff;
 }
 
-.forma-v { background-color: #198754; }
-.forma-e { background-color: #8a9199; }
-.forma-d { background-color: #dc3545; }
+.forma-v { background-color: var(--cbfv-vitoria); }
+.forma-e { background-color: var(--cbfv-empate); }
+.forma-d { background-color: var(--cbfv-derrota); }

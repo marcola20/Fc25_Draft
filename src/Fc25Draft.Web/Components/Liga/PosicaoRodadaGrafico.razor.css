@@ -14,10 +14,10 @@
 .rolagem { overflow-x: auto; }
 .rolagem svg { display: block; width: 100%; height: auto; }
 
-.faixa.acesso { fill: var(--bs-success-bg-subtle); }
-.faixa.playoff-acesso { fill: var(--bs-info-bg-subtle); }
-.faixa.playoff-rebaixamento { fill: var(--bs-warning-bg-subtle); }
-.faixa.rebaixamento { fill: var(--bs-danger-bg-subtle); }
+.faixa.acesso { fill: var(--zona-titulo); fill-opacity: 0.1; }
+.faixa.playoff-acesso { fill: var(--zona-playoff-acesso); fill-opacity: 0.1; }
+.faixa.playoff-rebaixamento { fill: var(--zona-playoff-rebaixamento); fill-opacity: 0.1; }
+.faixa.rebaixamento { fill: var(--zona-rebaixamento); fill-opacity: 0.1; }
 
 .eixo { font-size: 11px; fill: var(--bs-secondary-color); }
 

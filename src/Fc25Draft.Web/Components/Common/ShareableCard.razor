@@ -7,7 +7,7 @@
 @if (MostrarBotao)
 {
     <div class="d-flex justify-content-end mb-2">
-        <button type="button" class="btn btn-sm btn-success" @onclick="Share" disabled="@_sharing">
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Share" disabled="@_sharing">
             @if (_sharing)
             {
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -15,7 +15,7 @@
             }
             else
             {
-                <span>📷 Compartilhar</span>
+                <Icone Nome="share-2" Tamanho="14" /><span>Compartilhar</span>
             }
         </button>
     </div>

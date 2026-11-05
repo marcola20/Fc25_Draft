@@ -52,3 +52,25 @@ x
 chevron-down
 chevron-right
 arrow-right
+
+# Liga
+library
+trophy
+share-2
+chevron-up
+chevron-left
+tv
+star
+pencil
+play
+square
+arrow-left
+crown
+zap
+goal
+flame
+trending-down
+trending-up
+circle-check
+circle-x
+hand

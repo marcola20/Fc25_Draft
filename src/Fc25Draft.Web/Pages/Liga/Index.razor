@@ -16,7 +16,7 @@
 
 <PageTitle>Liga</PageTitle>
 
-<div class="container-fluid py-3">
+<div class="liga">
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -34,11 +34,21 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            <h1 class="h3 mb-0">@_liga.Nome</h1>
+        <div class="liga-topo">
+            <div class="liga-titulo">
+                <h1>@_liga.Nome</h1>
+                <p>
+                    @LigaLabels.Status(_liga.Status, _liga.Tipo)
+                    @if (_liga.Status == LigaStatus.Encerrada && !string.IsNullOrWhiteSpace(CampeaoDaEdicao))
+                    {
+                        <span class="liga-campeao"><Icone Nome="trophy" Tamanho="14" Classe="text-acento" /> Campeão: <strong>@CampeaoDaEdicao</strong></span>
+                    }
+                </p>
+            </div>
+            <div class="liga-acoes">
             @if (_ligas is not null && _ligas.Count > 1)
             {
-                <select class="form-select form-select-sm w-auto" @onchange="OnLigaChanged">
+                <select class="form-select form-select-sm w-auto" aria-label="Competição" @onchange="OnLigaChanged">
                     @if (_ligas.Any(l => l.Status != LigaStatus.Encerrada))
                     {
                         <optgroup label="Em andamento">
@@ -64,22 +74,16 @@
                     }
                 </select>
             }
-            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary">📚 Edições</a>
-            <a href="/liga/historico" class="btn btn-sm btn-outline-secondary">📊 Histórico</a>
+            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary"><Icone Nome="library" Tamanho="14" /> Edições</a>
+            <a href="/liga/historico" class="btn btn-sm btn-outline-secondary"><Icone Nome="history" Tamanho="14" /> Histórico</a>
             @if (_liga.Tipo == TipoCompetition.Liga)
             {
-                <a href="@($"/liga/reta-final?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🏁 Reta final</a>
+                <a href="@($"/liga/reta-final?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary"><Icone Nome="flag" Tamanho="14" /> Reta final</a>
             }
-            <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary">🧮 Simulação</a>
+            <a href="@($"/liga/simulacao?liga={_liga.LigaId}")" class="btn btn-sm btn-outline-secondary"><Icone Nome="calculator" Tamanho="14" /> Simulação</a>
+            </div>
         </div>
-        <p class="text-muted small mb-3">
-            Status: <strong>@LigaLabels.Status(_liga.Status, _liga.Tipo)</strong>
-            @if (_liga.Status == LigaStatus.Encerrada && !string.IsNullOrWhiteSpace(CampeaoDaEdicao))
-            {
-                <span> — 🏆 Campeão: <strong>@CampeaoDaEdicao</strong></span>
-            }
-        </p>
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="liga-abas">
             <ul class="nav nav-tabs mb-0">
                 <li class="nav-item">
                     <button class="nav-link @(_tab == "classif" ? "active" : "")" @onclick='() => _tab = "classif"'>
@@ -108,7 +112,7 @@
 
             @if (_tab == "classif" && _classif.Any() && !EhSupercopa)
             {
-                <button type="button" class="btn btn-sm btn-success" @onclick="CompartilharClassificacao" disabled="@_sharingClassif">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CompartilharClassificacao" disabled="@_sharingClassif">
                     @if (_sharingClassif)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -116,7 +120,7 @@
                     }
                     else
                     {
-                        <span>📷 Compartilhar</span>
+                        <Icone Nome="share-2" Tamanho="14" /><span>Compartilhar</span>
                     }
                 </button>
             }
@@ -174,8 +178,8 @@
                                    Arquivo='@($"cbfv-grupo-{_grupoSelecionado}.png")'
                                    MostrarBotao="false"
                                    @ref="_classifCardRef">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                        <div class="table-responsive painel mb-3">
+                            <table class="table table-hover align-middle tabela-liga">
                                 <thead class="table-dark">
                                     <tr>
                                         <th style="width:40px;">#</th>
@@ -194,20 +198,20 @@
                                 <tbody>
                                     @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = posicoesGrupo[i], EmDecisao = posicoesGrupo.Count(p => p == posicoesGrupo[i]) > 1 }))
                                     {
-                                        <tr class="@CopaRowClass(item.Position, item.EmDecisao)" style="height:44px;" title="@(item.EmDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
-                                            <td style="width:40px;"><span class="badge @CopaBadgeClass(item.Position, item.EmDecisao)">@item.Position</span></td>
+                                        <tr class="@CopaRowClass(item.Position, item.EmDecisao)" title="@(item.EmDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
+                                            <td><span class="@CopaBadgeClass(item.Position, item.EmDecisao)">@item.Position</span></td>
                                             <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                                                <img src="@EscudoUrl(item.Item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                                                <span class="fw-semibold">@item.Item.TimeNome</span>
+                                                <img src="@EscudoUrl(item.Item.TimeNome)" alt="" width="22" height="22" class="escudo-tabela" onerror="this.src='/images/escudos/escudo.png'" />
+                                                <span class="time-nome">@item.Item.TimeNome</span>
                                             </td>
-                                            <td class="text-center fw-bold" style="width:40px;">@item.Item.Pontos</td>
+                                            <td class="text-center pontos" style="width:40px;">@item.Item.Pontos</td>
                                             <td class="text-center" style="width:35px;">@item.Item.Jogos</td>
                                             <td class="text-center" style="width:35px;">@item.Item.Vitorias</td>
                                             <td class="text-center" style="width:35px;">@item.Item.Empates</td>
                                             <td class="text-center" style="width:35px;">@item.Item.Derrotas</td>
                                             <td class="text-center" style="width:35px;">@item.Item.GolsPro</td>
                                             <td class="text-center" style="width:35px;">@item.Item.GolsContra</td>
-                                            <td class="text-center @(item.Item.SaldoGols > 0 ? "text-success" : item.Item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
+                                            <td class="text-center @(item.Item.SaldoGols > 0 ? "saldo-positivo" : item.Item.SaldoGols < 0 ? "saldo-negativo" : "")" style="width:35px;">
                                                 @(item.Item.SaldoGols > 0 ? "+" : "")@item.Item.SaldoGols
                                             </td>
                                             <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.Item.TimeId)" /></td>
@@ -234,11 +238,11 @@
                                Arquivo="cbfv-classificacao.png"
                                MostrarBotao="false"
                                @ref="_classifCardRef">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
                             <thead class="table-dark">
                                 <tr>
-                                    <th style="width:64px;" title="Posição e quanto mudou desde a rodada passada">#</th>
+                                    <th style="width:76px;" title="Posição e quanto mudou desde a rodada passada">#</th>
                                     <th>Time</th>
                                     <th class="text-center" title="Pontos" style="width:40px;">Pts</th>
                                     <th class="text-center" title="Jogos" style="width:35px;">J</th>
@@ -254,27 +258,27 @@
                             <tbody>
                                 @foreach (var item in _classif)
                                 {
-                                    <tr class="@GetRowClass(item)" style="height:44px;">
-                                        <td class="text-nowrap" style="width:64px;">
-                                            <span class="badge @GetBadgeClass(item)">@Posicao(item)</span>
+                                    <tr class="@GetRowClass(item)">
+                                        <td class="text-nowrap">
+                                            <span class="@GetBadgeClass(item)">@Posicao(item)</span>
                                             @if (Variacao(item.TimeId) is int v && v != 0)
                                             {
-                                                <span class="fw-bold ms-1 @(v > 0 ? "text-success" : "text-danger")" style="font-size:.7rem;"
-                                                      title="@(v > 0 ? "Subiu" : "Caiu") @Math.Abs(v) @(Math.Abs(v) == 1 ? "posição" : "posições") desde a rodada passada">@(v > 0 ? "▲" : "▼")@Math.Abs(v)</span>
+                                                <span class="variacao @(v > 0 ? "subiu" : "caiu")"
+                                                      title="@(v > 0 ? "Subiu" : "Caiu") @Math.Abs(v) @(Math.Abs(v) == 1 ? "posição" : "posições") desde a rodada passada"><Icone Nome="@(v > 0 ? "chevron-up" : "chevron-down")" Tamanho="12" />@Math.Abs(v)</span>
                                             }
                                         </td>
                                         <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                                            <img src="@EscudoUrl(item.TimeNome)" alt="" width="22" height="22" class="me-1 rounded-circle" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
-                                            <span class="fw-semibold">@item.TimeNome</span>
+                                            <img src="@EscudoUrl(item.TimeNome)" alt="" width="22" height="22" class="escudo-tabela" onerror="this.src='/images/escudos/escudo.png'" />
+                                            <span class="time-nome">@item.TimeNome</span>
                                         </td>
-                                        <td class="text-center fw-bold" style="width:40px;">@item.Pontos</td>
+                                        <td class="text-center pontos" style="width:40px;">@item.Pontos</td>
                                         <td class="text-center" style="width:35px;">@item.Jogos</td>
                                         <td class="text-center" style="width:35px;">@item.Vitorias</td>
                                         <td class="text-center" style="width:35px;">@item.Empates</td>
                                         <td class="text-center" style="width:35px;">@item.Derrotas</td>
                                         <td class="text-center" style="width:35px;">@item.GolsPro</td>
                                         <td class="text-center" style="width:35px;">@item.GolsContra</td>
-                                        <td class="text-center @(item.SaldoGols > 0 ? "text-success" : item.SaldoGols < 0 ? "text-danger" : "")" style="width:35px;">
+                                        <td class="text-center @(item.SaldoGols > 0 ? "saldo-positivo" : item.SaldoGols < 0 ? "saldo-negativo" : "")" style="width:35px;">
                                             @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                                         </td>
                                         <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.TimeId)" /></td>
@@ -284,14 +288,14 @@
                         </table>
                     </div>
 
-                    <div class="d-flex gap-3 flex-wrap mb-1 small">
+                    <div class="legenda-zonas">
                         @foreach (var zona in ZonasDaLegenda())
                         {
-                            <span><span class="badge @ZonaEstilo.Badge(zona) px-2">&nbsp;</span> @LigaZonas.Rotulo(zona)</span>
+                            <span><span class="legenda-cor @ZonaEstilo.Linha(zona)"></span>@LigaZonas.Rotulo(zona)</span>
                         }
                         @if (_classif.Any(EmpateNoTopo))
                         {
-                            <span><span class="badge @ZonaEstilo.BadgeEmpateTopo px-2">&nbsp;</span> @(_regra.DesempateSerieB ? "Empate em posição de zona — jogo decisivo ou mini liga no fim da temporada" : "Empate no topo — jogo decisivo ou mini liga")</span>
+                            <span><span class="legenda-cor @ZonaEstilo.LinhaEmpateTopo"></span> @(_regra.DesempateSerieB ? "Empate em posição de zona — jogo decisivo ou mini liga no fim da temporada" : "Empate no topo — jogo decisivo ou mini liga")</span>
                         }
                     </div>
                 </ShareableCard>
@@ -302,8 +306,9 @@
             <!-- Matches/Rounds -->
             @if (_rodadas.Any())
             {
-                <hr class="my-4" />
-                <h5 class="text-uppercase text-muted small fw-bold mb-3">@(EhSupercopa && JogoUnico ? "A decisão" : "Partidas")</h5>
+                <div class="secao-titulo mt-5">
+                    <h2>@(EhSupercopa && JogoUnico ? "A decisão" : "Partidas")</h2>
+                </div>
 
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                     <div class="d-flex align-items-center gap-2">
@@ -313,25 +318,25 @@
                         }
                         else
                         {
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)">‹ Anterior</button>
-                            <span class="fw-bold px-2">
+                            <button class="btn btn-sm btn-outline-secondary btn-icone" @onclick="RodadaAnterior" disabled="@(_rodadaIdx == 0)" aria-label="Rodada anterior" title="Rodada anterior"><Icone Nome="chevron-left" /></button>
+                            <span class="rodada-atual">
                                 @(_rodadaAtual?.Titulo ?? $"Rodada {_rodadaAtual?.Numero}")
                                 @if (_rodadaAtual?.DataHora is DateTime quando)
                                 {
-                                    <span class="text-muted fw-normal ms-1">· @quando.ToString("ddd dd/MM", Br) · @HoraCurta(quando)</span>
+                                    <span class="rodada-quando">@quando.ToString("ddd dd/MM", Br) · @HoraCurta(quando)</span>
                                 }
                                 @if (_rodadaAtual is { Desempate: true, Titulo: null })
                                 {
-                                    <span class="badge bg-primary ms-1" title="Não vale pontos na classificação">Jogo Decisivo</span>
+                                    <span class="etiqueta ms-1" title="Não vale pontos na classificação">Jogo decisivo</span>
                                 }
                             </span>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)">Próxima ›</button>
+                            <button class="btn btn-sm btn-outline-secondary btn-icone" @onclick="RodadaProxima" disabled="@(_rodadaIdx == _rodadas.Count - 1)" aria-label="Próxima rodada" title="Próxima rodada"><Icone Nome="chevron-right" /></button>
                         }
                     </div>
 
                     @if (_rodadaAtual is not null)
                     {
-                        <button type="button" class="btn btn-sm btn-success" @onclick="CompartilharRodada" disabled="@_sharingRodada">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CompartilharRodada" disabled="@_sharingRodada">
                             @if (_sharingRodada)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -339,7 +344,7 @@
                             }
                             else
                             {
-                                <span>📷 Compartilhar</span>
+                                <Icone Nome="share-2" Tamanho="14" /><span>Compartilhar</span>
                             }
                         </button>
                     }
@@ -360,19 +365,19 @@
                                    Arquivo='@(EhSupercopa ? "cbfv-supercopa.png" : _rodadaAtual.Titulo is null ? $"cbfv-rodada-{_rodadaAtual.Numero}.png" : "cbfv-decisao.png")'
                                    MostrarBotao="false"
                                    @ref="_rodadaCardRef">
-                        <div class="list-group">
+                        <div class="painel jogos">
                             @foreach (var p in _rodadaAtual.Partidas)
                             {
-                            <div class="list-group-item py-3 d-flex align-items-center gap-2 gap-md-3" style="cursor:pointer;" @onclick="() => AbrirDetalhesPartida(p)">
+                            <div class="jogo d-flex align-items-center gap-2 gap-md-3" role="button" tabindex="0" @onclick="() => AbrirDetalhesPartida(p)">
                                 @* A chance de cada resultado fica dentro da coluna dos times: assim o empate cai embaixo do "vs",
                                    e não no meio da linha inteira (que inclui os selos da direita). *@
                                 <div class="flex-grow-1" style="min-width:0;">
                                 <div class="d-flex align-items-center justify-content-between gap-1 gap-md-3">
                                     <div class="d-flex align-items-center justify-content-end gap-1" style="flex:1;min-width:0;">
-                                        <span class="fw-semibold text-end d-none d-md-inline small">@p.TimeCasaNome</span>
-                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="jogo-time text-end d-none d-md-inline">@p.TimeCasaNome</span>
+                                        <img src="@EscudoUrl(p.TimeCasaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
                                     </div>
-                                    <div class="text-center fw-bold" style="flex:0 0 auto;min-width:45px;">
+                                    <div class="jogo-placar text-center" style="flex:0 0 auto;min-width:56px;">
                                         @if (p.Status == PartidaStatus.Agendada)
                                         {
                                             @* Com os jogos em horários diferentes, o meio mostra a hora de cada um. *@
@@ -387,12 +392,12 @@
                                         }
                                         else
                                         {
-                                            <span class="small">@p.GolsCasa <span class="text-muted fw-normal">–</span> @p.GolsFora</span>
+                                            <span class="placar">@p.GolsCasa<span class="placar-traco">–</span>@p.GolsFora</span>
                                         }
                                     </div>
                                     <div class="d-flex align-items-center gap-1 justify-content-start" style="flex:1;min-width:0;justify-content:flex-end;">
-                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
-                                        <span class="fw-semibold d-none d-md-inline small">@p.TimeForaNome</span>
+                                        <img src="@EscudoUrl(p.TimeForaNome)" alt="" width="24" height="24" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
+                                        <span class="jogo-time d-none d-md-inline">@p.TimeForaNome</span>
                                     </div>
                                 </div>
                                 @* Sem jogo disputado o favorito não aparece: a linha vazia deixaria o jogo colado no topo. *@
@@ -405,9 +410,9 @@
                                 }
                                 </div>
                                 <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
-                                    <span class="badge @StatusBadge(p.Status)" style="font-size:0.7rem;">@StatusLabel(p.Status)</span>
-                                    @if (p.TemPenaltis) { <span class="badge bg-info text-dark" style="font-size:0.7rem;">Pen</span> }
-                                    @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span title="Tem vídeo no telão" style="font-size:0.85rem;">📺</span> }
+                                    <span class="@StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
+                                    @if (p.TemPenaltis) { <span class="etiqueta" title="Decidido nos pênaltis">Pên.</span> }
+                                    @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span class="text-body-tertiary" title="Tem vídeo no telão"><Icone Nome="tv" Tamanho="14" /></span> }
                                 </div>
                             </div>
                             }
@@ -418,7 +423,7 @@
                     @if (suspensosDaRodada.Count > 0)
                     {
                         <div class="card mt-3">
-                            <div class="card-header fw-bold">🟥 Suspensos nesta rodada</div>
+                            <div class="card-header fw-semibold"><span class="cartao-icone vermelho me-1"></span> Suspensos nesta rodada</div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var s in suspensosDaRodada)
                                 {
@@ -428,7 +433,7 @@
                                         <span class="text-muted small">@s.TimeNome · @s.Motivo (@s.JogoDoCartao)</span>
                                         @if (s.Cumprida)
                                         {
-                                            <span class="badge bg-secondary ms-auto">cumprida</span>
+                                            <span class="etiqueta ms-auto">cumprida</span>
                                         }
                                     </li>
                                 }
@@ -444,21 +449,21 @@
                                        Subtitulo='@($"Seleção da {(_rodadaAtual.Titulo ?? $"rodada {_rodadaAtual.Numero}")}")'
                                        Arquivo='@($"cbfv-selecao-{_rodadaAtual.Numero}.png")'>
                             <div class="card">
-                                <div class="card-header fw-bold">
-                                    ⭐ Seleção da rodada
+                                <div class="card-header fw-semibold">
+                                    Seleção da rodada
                                     <span class="text-muted small fw-normal">· 4-3-3 pelas notas do PES</span>
                                 </div>
                                 <ul class="list-group list-group-flush">
                                     @foreach (var j in selecao)
                                     {
                                         <li class="list-group-item d-flex align-items-center gap-2 py-1">
-                                            <span class="badge bg-light text-dark border" style="min-width:2.7rem">@j.Posicao</span>
+                                            <span class="sigla-posicao">@j.Posicao</span>
                                             <img src="@EscudoUrl(j.TimeNome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" onerror="this.src='/images/escudos/escudo.png'" />
                                             <a class="fw-semibold text-body text-decoration-none text-truncate" href="/players/details/@j.JogadorId">@j.JogadorNome</a>
                                             <span class="text-muted small text-truncate d-none d-sm-inline">@j.TimeNome</span>
                                             @if (j.MelhorEmCampo)
                                             {
-                                                <span title="Melhor em campo">⭐</span>
+                                                <span title="Melhor em campo" aria-label="Melhor em campo"><Icone Nome="star" Tamanho="14" Classe="text-acento" /></span>
                                             }
                                             <span class="badge ms-auto @NotaPes.Cor(j.Nota)">@NotaPes.Texto(j.Nota)</span>
                                         </li>
@@ -594,7 +599,7 @@
                 }
                 else
                 {
-                    <h6 class="fw-bold mb-1">⚡ Gols decisivos</h6>
+                    <h6 class="fw-semibold mb-1">Gols decisivos</h6>
                     <p class="small text-muted mb-2">
                         Gol da vitória: o que deixou o time na frente de vez num jogo ganho por um gol. Gol do empate: o que deixou o jogo igual no fim. Gol contra não entra.
                     </p>
@@ -658,7 +663,7 @@
                         </div>
                     }
 
-                    <h6 class="fw-bold mb-1">🔄 Viradas</h6>
+                    <h6 class="fw-semibold mb-1">Viradas</h6>
                     <p class="small text-muted mb-2">
                         Pontos buscados depois de sair atrás (virada vale 3, empate 1) e pontos que escaparam depois de estar na frente (empate tira 2, derrota 3).
                     </p>
@@ -817,7 +822,7 @@
                                     {
                                         var c = coluna;
                                         <th role="button" title="@c.Dica" @onclick="() => OrdenarTimes(c.Chave)" class="text-nowrap">
-                                            @c.Titulo@(_ordemTimes == c.Chave ? (_ordemTimesDesc ? " ▼" : " ▲") : "")
+                                            @c.Titulo@if (_ordemTimes == c.Chave) { <Icone Nome="@(_ordemTimesDesc ? "chevron-down" : "chevron-up")" Tamanho="12" /> }
                                         </th>
                                     }
                                 </tr>
@@ -860,8 +865,8 @@
                             </label>
                         </div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="width:35px;">#</th>
@@ -870,7 +875,7 @@
                                     <th class="text-center" style="width:45px;">J</th>
                                     <th class="text-center" style="width:65px;">Média</th>
                                     <th class="text-center d-none d-sm-table-cell" style="width:65px;" title="Melhor nota">Máx.</th>
-                                    <th class="text-center" style="width:40px;" title="Melhor em campo">⭐</th>
+                                    <th class="text-center" style="width:40px;" title="Melhor em campo"><Icone Nome="star" Tamanho="14" /></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -907,14 +912,14 @@
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="width:35px;">#</th>
                                     <th>Jogador</th>
                                     <th class="d-none d-md-table-cell">Time</th>
-                                    <th class="text-center" style="width:50px;">⚽</th>
+                                    <th class="text-center" style="width:50px;">Gols</th>
                                     <th class="text-center" style="width:45px;">A</th>
                                 </tr>
                             </thead>
@@ -954,8 +959,8 @@
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="width:35px;">#</th>
@@ -999,7 +1004,7 @@
                     <div class="row g-3 mb-3">
                         <div class="col-12 col-lg-6">
                             <div class="card h-100">
-                                <div class="card-header fw-bold">🟥 Suspensos <span class="text-muted small fw-normal">· 3 amarelos ou vermelho = 1 jogo</span></div>
+                                <div class="card-header fw-semibold"><span class="cartao-icone vermelho me-1"></span> Suspensos <span class="text-muted small fw-normal">· 3 amarelos ou vermelho = 1 jogo</span></div>
                                 <ul class="list-group list-group-flush">
                                     @foreach (var s in aCumprir)
                                     {
@@ -1017,7 +1022,7 @@
                         </div>
                         <div class="col-12 col-lg-6">
                             <div class="card h-100">
-                                <div class="card-header fw-bold">🟨 Pendurados <span class="text-muted small fw-normal">· 2 amarelos</span></div>
+                                <div class="card-header fw-semibold"><span class="cartao-icone amarelo me-1"></span> Pendurados <span class="text-muted small fw-normal">· 2 amarelos</span></div>
                                 <ul class="list-group list-group-flush">
                                     @foreach (var p in _disciplina.Pendurados)
                                     {
@@ -1041,15 +1046,15 @@
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="width:35px;">#</th>
                                     <th>Jogador</th>
                                     <th class="d-none d-md-table-cell">Time</th>
-                                    <th class="text-center" style="width:45px;">🟨</th>
-                                    <th class="text-center" style="width:45px;">🟥</th>
+                                    <th class="text-center" style="width:45px;" title="Amarelos"><span class="cartao-icone amarelo"></span></th>
+                                    <th class="text-center" style="width:45px;" title="Vermelhos"><span class="cartao-icone vermelho"></span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1131,19 +1136,19 @@
                 <div class="modal-footer">
                     @if (_showEditor)
                     {
-                        <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false">← Voltar</button>
+                        <button type="button" class="btn btn-outline-secondary me-auto" @onclick="() => _showEditor = false"><Icone Nome="arrow-left" Tamanho="14" /> Voltar</button>
                     }
                     else if (AdminAuth.IsAdmin)
                     {
                         <div class="me-auto d-flex gap-2 flex-wrap align-items-center">
-                            <button type="button" class="btn btn-primary" @onclick="EditarStats">✏️ Editar stats</button>
+                            <button type="button" class="btn btn-primary" @onclick="EditarStats"><Icone Nome="pencil" Tamanho="14" /> Editar stats</button>
                             @if (_partidaDetalhes.Status == PartidaStatus.Agendada)
                             {
-                                <button type="button" class="btn btn-success" @onclick="IniciarPartida" disabled="@_salvandoPartida">▶️ Iniciar partida</button>
+                                <button type="button" class="btn btn-success" @onclick="IniciarPartida" disabled="@_salvandoPartida"><Icone Nome="play" Tamanho="14" /> Iniciar partida</button>
                             }
                             else if (_partidaDetalhes.Status == PartidaStatus.EmAndamento && !_confirmandoEncerrar)
                             {
-                                <button type="button" class="btn btn-warning" @onclick="() => _confirmandoEncerrar = true">⏹️ Encerrar partida</button>
+                                <button type="button" class="btn btn-warning" @onclick="() => _confirmandoEncerrar = true"><Icone Nome="square" Tamanho="14" /> Encerrar partida</button>
                             }
                             else if (_partidaDetalhes.Status == PartidaStatus.EmAndamento)
                             {
@@ -1604,9 +1609,8 @@
 
     private static string StatusBadge(PartidaStatus s) => s switch
     {
-        PartidaStatus.EmAndamento => "bg-warning text-dark",
-        PartidaStatus.Encerrada => "bg-success",
-        _ => "bg-secondary"
+        PartidaStatus.EmAndamento => "status-jogo ao-vivo",
+        _ => "status-jogo"
     };
 
     private static string StatusLabel(PartidaStatus s) => s switch
@@ -1633,10 +1637,10 @@
         new(c.Pontos, c.Vitorias, c.SaldoGols, c.GolsPro);
 
     private static string CopaRowClass(int pos, bool emDecisao) =>
-        emDecisao ? "table-primary" : pos <= 2 ? "table-success" : "table-danger";
+        emDecisao ? ZonaEstilo.LinhaEmpateTopo : pos <= 2 ? "linha-zona zona-titulo" : "linha-zona zona-rebaixamento";
 
     private static string CopaBadgeClass(int pos, bool emDecisao) =>
-        emDecisao ? "bg-primary" : pos <= 2 ? "bg-success" : "bg-danger";
+        emDecisao ? ZonaEstilo.BadgeEmpateTopo : pos <= 2 ? "posicao zona-titulo" : "posicao zona-rebaixamento";
 
     private static string EscudoUrl(string? teamName)
     {

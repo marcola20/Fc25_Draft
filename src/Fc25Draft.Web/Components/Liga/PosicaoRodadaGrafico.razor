@@ -14,7 +14,7 @@
 
     <div class="card mt-3 grafico-posicao">
         <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
-            <strong>📈 Posição rodada a rodada</strong>
+            <strong>Posição rodada a rodada</strong>
             <span class="small text-muted">Toque num time para destacar (até 3)</span>
         </div>
         <div class="card-body">
@@ -98,7 +98,7 @@
             <div class="d-flex gap-3 flex-wrap mt-2 small text-muted">
                 @foreach (var zona in Faixas(total).Select(f => f.Zona).Distinct())
                 {
-                    <span><span class="badge @ZonaEstilo.Badge(zona) px-2">&nbsp;</span> @LigaZonas.Rotulo(zona)</span>
+                    <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor @ZonaEstilo.Linha(zona)"></span>@LigaZonas.Rotulo(zona)</span>
                 }
             </div>
 
