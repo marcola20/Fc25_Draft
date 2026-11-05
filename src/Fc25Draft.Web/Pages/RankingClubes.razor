@@ -5,7 +5,7 @@
 
 <PageTitle>Ranking de Clubes</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -21,8 +21,8 @@
     else
     {
         <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary">📚 Edições</a>
-            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary">🏆 Hall da Fama</a>
+            <a href="/liga/edicoes" class="btn btn-sm btn-outline-secondary"><Icone Nome="library" Tamanho="14" /> Edições</a>
+            <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary"><Icone Nome="trophy" Tamanho="14" /> Hall da Fama</a>
         </div>
         <p class="text-muted small mb-3">
             Soma de todas as temporadas e competições (Série A, Série B, Copa, Supercopa e playoff de acesso).
@@ -41,7 +41,7 @@
                         <th class="text-center" title="Empates">E</th>
                         <th class="text-center" title="Derrotas">D</th>
                         <th class="text-center d-none d-md-table-cell" title="Saldo de gols">SG</th>
-                        <th class="text-center" title="Títulos">🏆</th>
+                        <th class="text-center" title="Títulos"><Icone Nome="trophy" Tamanho="14" /></th>
                         <th class="text-center d-none d-md-table-cell" title="Finais disputadas">Finais</th>
                         <th class="text-center d-none d-md-table-cell" title="Semifinais disputadas">Semis</th>
                         <th class="text-center d-none d-lg-table-cell" title="Melhor posição na Série A">Melhor A</th>
@@ -53,7 +53,7 @@
                     {
                         <tr>
                             <td class="text-center">
-                                <span class="badge @(r.Posicao <= 3 ? "bg-warning text-dark" : "bg-secondary")">@r.Posicao</span>
+                                <span class="num-posicao @(r.Posicao <= 3 ? "podio" : "zona-neutra")">@r.Posicao</span>
                             </td>
                             <td>
                                 <a href="@($"/teams/details/{r.TimeId}")" class="d-flex align-items-center gap-2 text-decoration-none text-reset">

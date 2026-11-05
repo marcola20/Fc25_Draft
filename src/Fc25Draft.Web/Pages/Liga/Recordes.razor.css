@@ -1,0 +1,15 @@
+.recorde-titulo {
+    margin: 0 0 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+/* O número do recorde: forte, alinhado, sem cápsula colorida. */
+.recorde-valor {
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    white-space: nowrap;
+}

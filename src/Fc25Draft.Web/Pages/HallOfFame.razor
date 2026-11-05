@@ -11,7 +11,7 @@
 
 <PageTitle>Hall da Fama - Campeões</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -34,22 +34,22 @@
                 if (!doTipo.Any()) { continue; }
 
                 <div class="mb-4">
-                    <h2 class="h5 border-bottom pb-2 mb-3">@TipoLabel(tipo) <span class="text-muted">(@doTipo.Count)</span></h2>
+                    <div class="secao-titulo"><h2>@TipoLabel(tipo) <span class="numero text-body-tertiary">@doTipo.Count</span></h2></div>
                     <div class="row g-3">
                         @foreach (var entrada in doTipo)
                         {
                             <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                                <div class="card h-100 shadow-sm text-center">
+                                <div class="card h-100 text-center">
                                     <div class="card-body">
                                         <img src="@EscudoService.GetEscudo(entrada.TimeCampeao)"
                                              alt="Escudo @entrada.TimeCampeao"
                                              style="width:72px;height:72px;object-fit:contain;"
                                              class="mb-2" />
-                                        <h3 class="h6 mb-1">@entrada.TimeCampeao</h3>
+                                        <h3 class="h6 mb-1 fw-medium">@entrada.TimeCampeao</h3>
                                         @if (!string.IsNullOrWhiteSpace(entrada.Tecnico))
                                         {
-                                            <p class="small mb-1">
-                                                👤
+                                            <p class="small mb-1 text-body-secondary">
+                                                Técnico
                                                 @if (entrada.TreinadorId is { } treinadorId)
                                                 {
                                                     <a href="/treinadores/@treinadorId" class="text-decoration-none">@entrada.Tecnico</a>
@@ -62,14 +62,14 @@
                                         }
                                         <p class="text-muted small mb-2">@entrada.Descricao</p>
                                         <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
-                                            <span class="badge bg-dark">@LigaLabels.Competicao(entrada.Tipo, entrada.Divisao)</span>
+                                            <span class="etiqueta acento">@LigaLabels.Competicao(entrada.Tipo, entrada.Divisao)</span>
                                             @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
                                             {
-                                                <span class="badge bg-secondary text-wrap">@TemporadaLabel(entrada.Temporada)</span>
+                                                <span class="etiqueta">@TemporadaLabel(entrada.Temporada)</span>
                                             }
                                             else if (entrada.Ano.HasValue)
                                             {
-                                                <span class="badge bg-secondary">@entrada.Ano</span>
+                                                <span class="etiqueta numero">@entrada.Ano</span>
                                             }
                                         </div>
                                     </div>
@@ -85,12 +85,12 @@
         @if (_lendas.Count > 0)
         {
             <div class="mb-4" id="lendas">
-                <h2 class="h5 border-bottom pb-2 mb-3">🎖️ Lendas aposentadas <span class="text-muted">(@_lendas.Count)</span></h2>
+                <div class="secao-titulo"><h2>Lendas aposentadas <span class="numero text-body-tertiary">@_lendas.Count</span></h2></div>
                 <div class="row g-3">
                     @foreach (var l in _lendas)
                     {
                         <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                            <div class="card h-100 shadow-sm text-center">
+                            <div class="card h-100 text-center">
                                 <div class="card-body">
                                     <FotoJogador PlayerId="@l.PlayerId" Tamanho="72" Alt="@l.Nome" />
                                     <h3 class="h6 mb-1 mt-2">
@@ -100,9 +100,9 @@
                                         @l.Posicao · última temporada @l.UltimaTemporada@(l.UltimoClube is null ? "" : $" pelo {l.UltimoClube}")
                                     </p>
                                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                                        <span class="badge bg-dark">@l.Overall de overall</span>
-                                        @if (l.Jogos > 0) { <span class="badge bg-secondary">@l.Jogos jogos</span> }
-                                        @if (l.Gols > 0) { <span class="badge bg-success">@l.Gols gols</span> }
+                                        <span class="etiqueta">OVR <span class="numero">@l.Overall</span></span>
+                                        @if (l.Jogos > 0) { <span class="etiqueta"><span class="numero">@l.Jogos</span> jogos</span> }
+                                        @if (l.Gols > 0) { <span class="etiqueta"><span class="numero">@l.Gols</span> gols</span> }
                                     </div>
                                 </div>
                             </div>
@@ -116,14 +116,14 @@
         @if (_colecionadores.Count > 0)
         {
             <div class="mb-4" id="colecionadores">
-                <h2 class="h5 border-bottom pb-2 mb-3">🎴 Colecionadores <span class="text-muted">(@_colecionadores.Count)</span></h2>
+                <div class="secao-titulo"><h2>Colecionadores <span class="numero text-body-tertiary">@_colecionadores.Count</span></h2></div>
                 <div class="row g-3">
                     @foreach (var c in _colecionadores)
                     {
                         <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                            <div class="card h-100 shadow-sm text-center">
+                            <div class="card h-100 text-center">
                                 <div class="card-body">
-                                    <div style="font-size: 2.6rem; line-height: 1;" class="mb-2">@(c.Ordem == 1 ? "🏆" : "🎴")</div>
+                                    <div class="hall-icone @(c.Ordem == 1 ? "primeiro" : "")"><Icone Nome="@(c.Ordem == 1 ? "trophy" : "images")" Tamanho="24" /></div>
                                     <h3 class="h6 mb-1">
                                         <a href="/treinadores/@c.TreinadorId" class="text-decoration-none">@c.Nome</a>
                                     </h3>
@@ -132,8 +132,8 @@
                                         @(c.Ordem == 1 ? " — o primeiro!" : $" — {c.Ordem}º a completar")
                                     </p>
                                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                                        <span class="badge bg-dark">@c.AlbumNome</span>
-                                        <span class="badge bg-secondary">@c.Temporada</span>
+                                        <span class="etiqueta">@c.AlbumNome</span>
+                                        <span class="etiqueta numero">@c.Temporada</span>
                                     </div>
                                 </div>
                             </div>

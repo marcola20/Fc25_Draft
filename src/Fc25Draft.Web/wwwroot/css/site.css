@@ -1291,3 +1291,6 @@ a.text-primary:hover {
 }
 
 .texto-aviso { color: var(--zona-playoff-rebaixamento) !important; }
+
+.num-posicao.zona-neutra { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.num-posicao.podio { background: var(--cbfv-acento); color: #1a1405; }
