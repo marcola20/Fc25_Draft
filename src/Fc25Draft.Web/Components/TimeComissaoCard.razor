@@ -9,7 +9,7 @@
 {
     <div class="card mb-3">
         <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-            <span class="fw-bold">💼 Comissão técnica</span>
+            <span class="fw-semibold">Comissão técnica</span>
             @if (dados.Vale && dados.ContrataAte is { } ate)
             {
                 <span class="text-muted small">
@@ -30,8 +30,8 @@
                 @foreach (var c in dados.Cargos)
                 {
                     <div class="col-12 col-md-4">
-                        <div class="border rounded p-2 h-100 d-flex flex-column @(c.Contratado ? "border-success" : "")">
-                            <div class="fw-semibold">@ComissaoDoClube.Emoji(c.Cargo) @ComissaoDoClube.Nome(c.Cargo)</div>
+                        <div class="border rounded p-2 h-100 d-flex flex-column @(c.Contratado ? "contratado" : "")">
+                            <div class="fw-semibold d-flex align-items-center gap-2"><Icone Nome="@IconeDoCargo(c.Cargo)" Tamanho="16" Classe="text-body-tertiary" /> @ComissaoDoClube.Nome(c.Cargo)</div>
                             <div class="small text-muted flex-grow-1">@ComissaoDoClube.OQueFaz(c.Cargo).</div>
                             <div class="d-flex align-items-center gap-2 mt-2">
                                 <span class="small fw-semibold">@Dinheiro.Curto(c.Preco)</span>
@@ -71,6 +71,14 @@
 
 @code {
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    // O Core marca o cargo com um emoji; aqui ele vira um ícone do lucide.
+    private static string IconeDoCargo(CargoDaComissao cargo) => cargo switch
+    {
+        CargoDaComissao.TreinadorDaBase => "sprout",
+        CargoDaComissao.PreparadorFisico => "activity",
+        _ => "hand"
+    };
 
     [Parameter, EditorRequired] public Guid TeamId { get; set; }
 

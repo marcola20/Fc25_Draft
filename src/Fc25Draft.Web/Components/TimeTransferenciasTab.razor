@@ -71,7 +71,7 @@ else
                     <tr>
                         <td class="text-nowrap">@BrazilTime.ConvertFromUtc(m.Data).ToString("dd/MM/yyyy")</td>
                         <td>
-                            <span class="badge @(m.Entrada ? "bg-success" : "bg-danger")">@(m.Entrada ? "Chegou" : "Saiu")</span>
+                            <span class="etiqueta @(m.Entrada ? "sucesso" : "perigo")"><Icone Nome="@(m.Entrada ? "arrow-down" : "arrow-up")" Tamanho="12" />@(m.Entrada ? "Chegou" : "Saiu")</span>
                         </td>
                         <td class="text-nowrap"><FotoJogador PlayerId="@m.PlayerId" Tamanho="28" Classe="me-2" /><a href="/players/details/@m.PlayerId" class="text-body">@m.JogadorNome</a></td>
                         <td class="text-nowrap">@m.Tipo.ToDisplayName()</td>

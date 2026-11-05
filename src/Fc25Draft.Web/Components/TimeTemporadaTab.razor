@@ -29,15 +29,13 @@ else
             @foreach (var comp in _dados.Competicoes)
             {
                 <div class="col-12 col-lg-6">
-                    <div class="card h-100 @(comp.Tipo == TipoCompetition.Copa ? "border-warning" : "border-primary")">
+                    <div class="card h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
                                     <h5 class="card-title mb-0">@comp.Nome</h5>
-                                    <span class="badge @(comp.Tipo == TipoCompetition.Copa ? "bg-warning text-dark" : "bg-primary")">
-                                        @TipoLabel(comp.Tipo)
-                                    </span>
-                                    <span class="badge bg-light text-dark">@StatusLabel(comp.Status)</span>
+                                    <span class="etiqueta">@TipoLabel(comp.Tipo)</span>
+                                    <span class="etiqueta">@StatusLabel(comp.Status)</span>
                                 </div>
                                 <div class="text-end">
                                     <div class="display-6 mb-0 lh-1">@(comp.Posicao?.ToString() ?? "—")º</div>
@@ -145,22 +143,22 @@ else
                             Posição @SortIcon("posicao")
                         </th>
                         <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" title="Clean sheets" @onclick='() => SetSort("cs")'>
-                            🧤 CS @SortIcon("cs")
+                            CS @SortIcon("cs")
                         </th>
                         <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" title="Jogos" @onclick='() => SetSort("jogos")'>
                             J @SortIcon("jogos")
                         </th>
                         <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
-                            ⚽ Gols @SortIcon("gols")
+                            Gols @SortIcon("gols")
                         </th>
                         <th class="text-center" style="width:100px;cursor:pointer;user-select:none;" @onclick='() => SetSort("assistencias")'>
-                            🅰️ Assist. @SortIcon("assistencias")
+                            Assist. @SortIcon("assistencias")
                         </th>
                         <th class="text-center" style="width:80px;cursor:pointer;user-select:none;" @onclick='() => SetSort("ga")'>
                             G/A @SortIcon("ga")
                         </th>
-                        <th class="text-center" style="width:70px;" title="Cartões amarelos">🟨</th>
-                        <th class="text-center" style="width:70px;" title="Cartões vermelhos">🟥</th>
+                        <th class="text-center" style="width:70px;" title="Cartões amarelos"><span class="cartao-icone amarelo"></span></th>
+                        <th class="text-center" style="width:70px;" title="Cartões vermelhos"><span class="cartao-icone vermelho"></span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -247,7 +245,7 @@ else
 
     private string SortIcon(string col)
     {
-        if (_sortBy != col) return "⇅";
+        if (_sortBy != col) return "";
         return _sortAsc ? "↑" : "↓";
     }
 

@@ -20,7 +20,7 @@
 
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-baseline gap-2">
-            <strong>📈 Valor do elenco ao longo do tempo</strong>
+            <strong>Valor do elenco ao longo do tempo</strong>
             @if (variacao is decimal v)
             {
                 <span class="small @(v >= 0 ? "text-success" : "text-danger") fw-semibold">
@@ -31,12 +31,12 @@
         <div class="card-body">
             <svg viewBox="0 0 @Num(largura) @Num(altura)" class="w-100" style="max-height: 240px;" role="img"
                  aria-label="Valor do elenco de @Dinheiro.Curto(primeiro.Valor) para @Dinheiro.Curto(ultimo.Valor)">
-                <polyline fill="none" stroke="var(--cbfv-azul)" stroke-width="2.5"
+                <polyline fill="none" stroke="var(--cbfv-acento-texto)" stroke-width="2"
                           points="@string.Join(" ", pontos.Select((p, i) => $"{Num(X(i))},{Num(Y(p.Valor))}"))" />
                 @for (var i = 0; i < pontos.Count; i++)
                 {
                     var p = pontos[i];
-                    <circle cx="@Num(X(i))" cy="@Num(Y(p.Valor))" r="5" fill="var(--cbfv-azul)">
+                    <circle cx="@Num(X(i))" cy="@Num(Y(p.Valor))" r="4" fill="var(--cbfv-acento-texto)">
                         <title>@p.Rotulo · @Dinheiro.Curto(p.Valor) · @p.Jogadores jogadores · overall médio @p.OverallMedio.ToString("0.0", Brasil)</title>
                     </circle>
                     <g><text x="@Num(X(i))" y="@Num(Y(p.Valor) - 10)" text-anchor="middle" font-size="12" font-weight="600"

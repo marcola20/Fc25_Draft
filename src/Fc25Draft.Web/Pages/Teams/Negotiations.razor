@@ -168,7 +168,7 @@
         {
             @if (_recompras.Count > 0)
             {
-                <h6 class="mt-2">🔁 Cláusulas de recompra</h6>
+                <h6 class="mt-2">Cláusulas de recompra</h6>
                 <ul class="list-group mb-4">
                     @foreach (var r in _recompras)
                     {
@@ -366,7 +366,7 @@
                                 {
                                     var sel = _selectedTargetPicks.Contains(pk.Ref);
                                     <button type="button" class="btn btn-sm @(sel ? "btn-danger" : "btn-outline-secondary")"
-                                            @onclick="() => TogglePick(_selectedTargetPicks, pk.Ref)">🔄 @pk.Rotulo</button>
+                                            @onclick="() => TogglePick(_selectedTargetPicks, pk.Ref)">@pk.Rotulo</button>
                                 }
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -376,7 +376,7 @@
                                 {
                                     var sel = _selectedOfferedPicks.Contains(pk.Ref);
                                     <button type="button" class="btn btn-sm @(sel ? "btn-success" : "btn-outline-secondary")"
-                                            @onclick="() => TogglePick(_selectedOfferedPicks, pk.Ref)">🔄 @pk.Rotulo</button>
+                                            @onclick="() => TogglePick(_selectedOfferedPicks, pk.Ref)">@pk.Rotulo</button>
                                 }
                             </div>
                             @foreach (var pk in escolhidas)
@@ -385,7 +385,7 @@
                                 @if (pk.Posicao is null && (pk.ProtegidaAte is null || pk.ProtecaoAcionada is not null))
                                 {
                                     <div class="d-flex flex-wrap gap-2 align-items-center mt-2 small">
-                                        <span>🛡️ Proteção da <strong>@pk.Rotulo</strong>:</span>
+                                        <span><Icone Nome="shield" Tamanho="14" /> Proteção da <strong>@pk.Rotulo</strong>:</span>
                                         <select class="form-select form-select-sm w-auto"
                                                 value="@(_protecaoAte.GetValueOrDefault(refPk).ToString(CultureInfo.InvariantCulture))"
                                                 @onchange="e => DefinirProtecao(refPk, e.Value?.ToString())">
@@ -406,7 +406,7 @@
                                 }
                                 else if (pk.ProtegidaAte is int jaProtegida && pk.ProtecaoAcionada is null)
                                 {
-                                    <div class="small text-muted mt-2">🛡️ A @pk.Rotulo já é protegida até a #@jaProtegida (volta para o @pk.ProtetorNome se cair até lá).</div>
+                                    <div class="small text-muted mt-2"><Icone Nome="shield" Tamanho="14" /> A @pk.Rotulo já é protegida até a #@jaProtegida (volta para o @pk.ProtetorNome se cair até lá).</div>
                                 }
                             }
                         </div>
@@ -466,7 +466,7 @@
                     {
                         <div class="row g-3 mt-1">
                             <div class="col-md-5">
-                                <label class="form-label">🔁 Recompra (opcional)</label>
+                                <label class="form-label">Recompra (opcional)</label>
                                 <div class="input-group">
                                     <span class="input-group-text">R$</span>
                                     <input type="text" class="form-control" inputmode="decimal"
@@ -572,11 +572,11 @@
                             <div class="col-sm-8">
                                 @foreach (var pk in _detailOffer.TargetPicks ?? [])
                                 {
-                                    <span class="badge bg-danger me-1 mb-1">🔄 @pk.Rotulo (pedida)@(pk.ProtegidaAte is int a3 ? $" · 🛡️ protegida até a #{a3}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
+                                    <span class="badge bg-danger me-1 mb-1">@pk.Rotulo (pedida)@(pk.ProtegidaAte is int a3 ? $" · protegida até a #{a3}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
                                 }
                                 @foreach (var pk in _detailOffer.OfferedPicks ?? [])
                                 {
-                                    <span class="badge bg-success me-1 mb-1">🔄 @pk.Rotulo (oferecida)@(pk.ProtegidaAte is int a4 ? $" · 🛡️ protegida até a #{a4}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
+                                    <span class="badge bg-success me-1 mb-1">@pk.Rotulo (oferecida)@(pk.ProtegidaAte is int a4 ? $" · protegida até a #{a4}, devolve {FormatCurrency(pk.Compensacao ?? 0m)}" : "")</span>
                                 }
                             </div>
                         </div>
@@ -672,7 +672,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" @onclick="CloseAcceptConfirmModal" disabled="@_processing">Cancelar</button>
-                    <button type="button" class="btn btn-success" @onclick="ConfirmAcceptAsync" disabled="@_processing">
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmAcceptAsync" disabled="@_processing">
                         @if (_processing)
                         {
                             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -1178,11 +1178,11 @@
                         <strong>Picks do draft:</strong>
                         @foreach (var pk in offer.TargetPicks ?? [])
                         {
-                            <span class="badge bg-danger me-1" title="Pedida (vai para o @offer.FromTeamName)">🔄 @pk.Rotulo@(pk.ProtegidaAte is int a1 ? $" · 🛡️ até #{a1}" : "")</span>
+                            <span class="badge bg-danger me-1" title="Pedida (vai para o @offer.FromTeamName)">@pk.Rotulo@(pk.ProtegidaAte is int a1 ? $" · protegida até #{a1}" : "")</span>
                         }
                         @foreach (var pk in offer.OfferedPicks ?? [])
                         {
-                            <span class="badge bg-success me-1" title="Oferecida (vai para o @offer.ToTeamName)">🔄 @pk.Rotulo@(pk.ProtegidaAte is int a2 ? $" · 🛡️ até #{a2}" : "")</span>
+                            <span class="badge bg-success me-1" title="Oferecida (vai para o @offer.ToTeamName)">@pk.Rotulo@(pk.ProtegidaAte is int a2 ? $" · protegida até #{a2}" : "")</span>
                         }
                     </div>
                 }
@@ -1205,7 +1205,7 @@
 
                 @if (offer.BuybackPrice is decimal recompraCard)
                 {
-                    <div class="mt-1"><strong>🔁 Recompra:</strong> @FormatCurrency(recompraCard) <span class="text-muted small">(quem vende pode comprar de volta até o fim da temporada)</span></div>
+                    <div class="mt-1"><strong>Recompra:</strong> @FormatCurrency(recompraCard) <span class="text-muted small">(quem vende pode comprar de volta até o fim da temporada)</span></div>
                 }
 
                 @if (offer.SellOnPercentage > 0)
@@ -1290,7 +1290,7 @@
         try
         {
             await OffersApi.RecomprarAsync(direito.DireitoId, TeamToken);
-            _success = $"🔁 {direito.PlayerName} voltou para o seu time por {FormatCurrency(direito.Preco)}.";
+            _success = $"{direito.PlayerName} voltou para o seu time por {FormatCurrency(direito.Preco)}.";
             await LoadDataAsync();
         }
         catch (Exception ex)

@@ -30,7 +30,7 @@ else
     <h5 class="mb-2">Recordes</h5>
     <div class="row g-2 mb-4">
         <div class="col-6 col-lg-3">
-            <div class="card h-100 border-success">
+            <div class="card h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted">Maior vitória</div>
                     @if (Perfil.MaiorVitoria is { } v)
@@ -47,7 +47,7 @@ else
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card h-100 border-danger">
+            <div class="card h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted">Maior derrota</div>
                     @if (Perfil.MaiorDerrota is { } d)
@@ -244,8 +244,8 @@ else
             <div class="col-12 col-md-5">
                 <div class="small fw-semibold text-muted mb-1">Maiores placares</div>
                 <ul class="list-unstyled small mb-3">
-                    <li>🟢 Vitória: @(maiorVitoria is null ? "—" : $"{TimeJogoEstilo.Placar(maiorVitoria)} ({maiorVitoria.Competicao})")</li>
-                    <li>🔴 Derrota: @(maiorDerrota is null ? "—" : $"{TimeJogoEstilo.Placar(maiorDerrota)} ({maiorDerrota.Competicao})")</li>
+                    <li><span class="texto-vitoria">Vitória:</span> @(maiorVitoria is null ? "—" : $"{TimeJogoEstilo.Placar(maiorVitoria)} ({maiorVitoria.Competicao})")</li>
+                    <li><span class="texto-derrota">Derrota:</span> @(maiorDerrota is null ? "—" : $"{TimeJogoEstilo.Placar(maiorDerrota)} ({maiorDerrota.Competicao})")</li>
                 </ul>
                 <div class="small fw-semibold text-muted mb-1">Artilheiros do confronto</div>
                 @if (artilheiros is null)
@@ -262,7 +262,7 @@ else
                         @foreach (var a in artilheiros)
                         {
                             <li>
-                                ⚽ <a href="/players/details/@a.JogadorId">@a.Nome</a>
+                                <a href="/players/details/@a.JogadorId">@a.Nome</a>
                                 <span class="text-muted">(@a.TimeNome)</span>
                                 <strong class="ms-1">@a.Gols</strong>
                             </li>

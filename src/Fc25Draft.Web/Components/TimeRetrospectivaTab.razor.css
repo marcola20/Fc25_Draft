@@ -21,7 +21,7 @@
 
 .retro-time {
     font-size: 1.5rem;
-    font-weight: 800;
+    font-weight: 600;
     line-height: 1.1;
 }
 
@@ -33,9 +33,7 @@
 .retro-secao {
     margin-top: 0.5rem;
     font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: 500;
     color: var(--bs-secondary-color);
 }
 
@@ -71,7 +69,7 @@
 
 .retro-numero-valor {
     font-size: 1.25rem;
-    font-weight: 800;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
 
@@ -97,7 +95,7 @@
 
 .retro-destaque-titulo {
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 400;
     color: var(--bs-secondary-color);
 }
 
@@ -113,4 +111,13 @@
     .retro-numeros {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+.retro-icone {
+    display: inline-flex;
+    color: var(--bs-tertiary-color);
+}
+
+.retro-icone.campeao {
+    color: var(--cbfv-acento-texto);
 }

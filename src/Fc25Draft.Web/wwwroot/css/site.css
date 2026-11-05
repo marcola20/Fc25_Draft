@@ -678,6 +678,100 @@ h6.text-uppercase.text-muted {
 .texto-vitoria { color: var(--cbfv-vitoria) !important; }
 .texto-derrota { color: var(--cbfv-derrota) !important; }
 
+/* Badges do Bootstrap: a cor sólida vira uma tinta suave com o texto na cor (o significado fica, o grito sai). */
+.badge {
+    --bs-badge-font-weight: 500;
+    --bs-badge-padding-y: 0.25em;
+    --bs-badge-padding-x: 0.5em;
+    border-radius: 0.375rem;
+}
+
+.badge.bg-success, .badge.text-bg-success { background-color: rgba(47, 158, 106, 0.16) !important; color: var(--cbfv-vitoria) !important; }
+.badge.bg-danger, .badge.text-bg-danger { background-color: rgba(208, 82, 74, 0.16) !important; color: var(--cbfv-derrota) !important; }
+.badge.bg-warning, .badge.text-bg-warning { background-color: rgba(201, 148, 40, 0.18) !important; color: var(--zona-playoff-rebaixamento) !important; }
+.badge.bg-info, .badge.text-bg-info { background-color: rgba(61, 143, 196, 0.16) !important; color: var(--zona-playoff-acesso) !important; }
+.badge.bg-primary, .badge.text-bg-primary,
+.badge.bg-secondary, .badge.text-bg-secondary,
+.badge.bg-light, .badge.text-bg-light,
+.badge.bg-dark, .badge.text-bg-dark { background-color: var(--bs-secondary-bg) !important; color: var(--bs-secondary-color) !important; border: 0 !important; }
+
+/* Links marcados como text-primary: texto normal, dourado no hover (o azul do Bootstrap sai). */
+a.text-primary {
+    color: var(--bs-emphasis-color) !important;
+}
+
+a.text-primary:hover {
+    color: var(--bs-link-hover-color) !important;
+}
+
+/* Botões de cor: tons da paleta, sem o verde/azul puros do Bootstrap. */
+.btn-success {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #2a8c5e;
+    --bs-btn-border-color: #2a8c5e;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #247a52;
+    --bs-btn-hover-border-color: #247a52;
+    --bs-btn-active-bg: #247a52;
+    --bs-btn-active-border-color: #247a52;
+    --bs-btn-disabled-bg: #2a8c5e;
+    --bs-btn-disabled-border-color: #2a8c5e;
+}
+
+.btn-danger {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #c0473f;
+    --bs-btn-border-color: #c0473f;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #a83d36;
+    --bs-btn-hover-border-color: #a83d36;
+    --bs-btn-active-bg: #a83d36;
+    --bs-btn-active-border-color: #a83d36;
+    --bs-btn-disabled-bg: #c0473f;
+    --bs-btn-disabled-border-color: #c0473f;
+}
+
+.btn-warning {
+    --bs-btn-color: #1a1405;
+    --bs-btn-bg: var(--cbfv-acento);
+    --bs-btn-border-color: var(--cbfv-acento);
+    --bs-btn-hover-color: #1a1405;
+    --bs-btn-hover-bg: #e6bf4c;
+    --bs-btn-hover-border-color: #e6bf4c;
+    --bs-btn-active-bg: #e6bf4c;
+    --bs-btn-active-border-color: #e6bf4c;
+}
+
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-info {
+    --bs-btn-color: var(--bs-body-color);
+    --bs-btn-bg: var(--bs-body-bg);
+    --bs-btn-border-color: var(--bs-border-color);
+    --bs-btn-hover-color: var(--bs-emphasis-color);
+    --bs-btn-hover-bg: var(--bs-secondary-bg);
+    --bs-btn-hover-border-color: var(--bs-border-color);
+    --bs-btn-active-color: var(--bs-emphasis-color);
+    --bs-btn-active-bg: var(--bs-secondary-bg);
+    --bs-btn-active-border-color: var(--bs-border-color);
+}
+
+.btn-outline-danger {
+    --bs-btn-color: var(--cbfv-derrota);
+    --bs-btn-border-color: rgba(208, 82, 74, 0.45);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #c0473f;
+    --bs-btn-hover-border-color: #c0473f;
+}
+
+.btn-outline-warning {
+    --bs-btn-color: var(--cbfv-acento-texto);
+    --bs-btn-border-color: rgba(201, 148, 40, 0.5);
+    --bs-btn-hover-color: #1a1405;
+    --bs-btn-hover-bg: var(--cbfv-acento);
+    --bs-btn-hover-border-color: var(--cbfv-acento);
+}
+
 /* Rótulo de seção ("Destaques", "Plantão CBFV"): frase normal, discreto, colado no que vem embaixo. */
 .secao-titulo {
     display: flex;
@@ -1122,4 +1216,9 @@ h6.text-uppercase.text-muted {
 
 @media (max-width: 575.98px) {
     .grade-cartas { justify-content: center; gap: .9rem .6rem; --w-max: calc((100vw - 7.5rem) / 2); }
+}
+
+/* Profissional contratado (comissão técnica do clube): linha fina verde. */
+.contratado {
+    border-color: rgba(47, 158, 106, 0.45) !important;
 }

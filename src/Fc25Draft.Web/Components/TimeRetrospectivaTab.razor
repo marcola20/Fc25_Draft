@@ -46,7 +46,7 @@ else
                                 Temporada @_r.Temporada
                                 @if (_r.EmAndamento)
                                 {
-                                    <span class="badge bg-warning text-dark ms-1">em andamento</span>
+                                    <span class="etiqueta aviso ms-1">em andamento</span>
                                 }
                             </div>
                             @if (_r.Tecnico is not null)
@@ -61,9 +61,9 @@ else
                         @foreach (var c in _r.Competicoes)
                         {
                             <div class="retro-competicao">
-                                <span class="me-2">@IconeCompeticao(c)</span>
+                                <span class="me-2 retro-icone @(c.Campeao ? "campeao" : "")"><Icone Nome="@IconeCompeticao(c)" Tamanho="16" /></span>
                                 <span class="me-auto">@c.Nome</span>
-                                <strong class="@(c.Campeao ? "text-success" : "")">@c.Resultado</strong>
+                                <strong class="@(c.Campeao ? "text-acento" : "")">@c.Resultado</strong>
                             </div>
                         }
                     </div>
@@ -85,15 +85,15 @@ else
                         <div class="retro-grade">
                             @if (_r.Artilheiro is { } art)
                             {
-                                @Destaque("⚽ Artilheiro", art.PlayerId, art.Nome, $"{art.Valor:0} gol{(art.Valor == 1 ? "" : "s")}")
+                                @Destaque("Artilheiro", art.PlayerId, art.Nome, $"{art.Valor:0} gol{(art.Valor == 1 ? "" : "s")}")
                             }
                             @if (_r.Garcom is { } gar)
                             {
-                                @Destaque("🎯 Garçom", gar.PlayerId, gar.Nome, $"{gar.Valor:0} assistência{(gar.Valor == 1 ? "" : "s")}")
+                                @Destaque("Garçom", gar.PlayerId, gar.Nome, $"{gar.Valor:0} assistência{(gar.Valor == 1 ? "" : "s")}")
                             }
                             @if (_r.MelhorNota is { } nota)
                             {
-                                @Destaque("⭐ Melhor nota", nota.PlayerId, nota.Nome, $"média {nota.Valor.ToString("0.00", Brasil)} em {nota.Jogos} jogo{(nota.Jogos == 1 ? "" : "s")}")
+                                @Destaque("Melhor nota", nota.PlayerId, nota.Nome, $"média {nota.Valor.ToString("0.00", Brasil)} em {nota.Jogos} jogo{(nota.Jogos == 1 ? "" : "s")}")
                             }
                         </div>
                     }
@@ -103,11 +103,11 @@ else
                         <div class="retro-grade mt-2">
                             @if (_r.MaiorVitoria is { } v)
                             {
-                                @Jogo("💥 Maior vitória", v)
+                                @Jogo("Maior vitória", v)
                             }
                             @if (_r.PiorDerrota is { } d)
                             {
-                                @Jogo("😖 Pior derrota", d)
+                                @Jogo("Pior derrota", d)
                             }
                         </div>
                     }
@@ -118,12 +118,12 @@ else
                         <div class="retro-grade">
                             @if (_r.MaiorContratacao is { } contr)
                             {
-                                @Destaque("💸 Maior contratação", contr.PlayerId, contr.Nome,
+                                @Destaque("Maior contratação", contr.PlayerId, contr.Nome,
                                     Dinheiro.Curto(contr.Valor) + (contr.OutroTime is null ? "" : $" · {contr.OutroTime}"))
                             }
                             @if (_r.MaiorVenda is { } venda)
                             {
-                                @Destaque("💰 Maior venda", venda.PlayerId, venda.Nome,
+                                @Destaque("Maior venda", venda.PlayerId, venda.Nome,
                                     Dinheiro.Curto(venda.Valor) + (venda.OutroTime is null ? "" : $" · {venda.OutroTime}"))
                             }
                         </div>
@@ -183,11 +183,11 @@ else
         }
     }
 
-    private static string IconeCompeticao(RetrospectivaCompeticaoDto c) => c.Campeao ? "🏆" : c.Tipo switch
+    private static string IconeCompeticao(RetrospectivaCompeticaoDto c) => c.Campeao ? "trophy" : c.Tipo switch
     {
-        TipoCompetition.Liga => "📊",
-        TipoCompetition.Copa => "🏟️",
-        _ => "🥇"
+        TipoCompetition.Liga => "list-ordered",
+        TipoCompetition.Copa => "shield",
+        _ => "award"
     };
 
     private static RenderFragment Numero(string valor, string rotulo) => __builder =>

@@ -22,12 +22,12 @@ else if (_dados is { } dados)
 
     <div class="card mb-3">
         <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-            <span class="fw-bold">🏋️ Treino da semana</span>
+            <span class="fw-semibold">Treino da semana</span>
             <span class="text-muted small">
                 @dados.Semana.ToString("dd/MM", Br) a @dados.FechaEm.AddDays(-1).ToString("dd/MM", Br) ·
                 o treino acontece domingo à meia-noite
             </span>
-            <span class="badge @(dados.Escolhidos >= Math.Min(dados.Vagas, podem.Count) && podem.Count > 0 ? "bg-success" : "bg-warning text-dark") ms-auto">
+            <span class="etiqueta numero @(dados.Escolhidos >= Math.Min(dados.Vagas, podem.Count) && podem.Count > 0 ? "sucesso" : "aviso") ms-auto">
                 @dados.Escolhidos de @dados.Vagas
             </span>
         </div>
@@ -66,7 +66,7 @@ else if (_dados is { } dados)
                                         <a href="/players/details/@j.PlayerId">@j.Nome</a>
                                         @if (dados.Padrinho?.AfilhadoId == j.PlayerId)
                                         {
-                                            <span class="ms-1" title="Afilhado de @dados.Padrinho.PadrinhoNome: rende +@PadrinhoCriterios.ExtraNoTreino a mais no treino">🤝</span>
+                                            <span class="ms-1" title="Afilhado de @dados.Padrinho.PadrinhoNome: rende +@PadrinhoCriterios.ExtraNoTreino a mais no treino"><Icone Nome="handshake" Tamanho="14" Classe="text-body-tertiary" /></span>
                                         }
                                         <span class="text-muted small ms-2">@j.Posicao</span>
                                     </td>
@@ -111,7 +111,7 @@ else if (_dados is { } dados)
                         @if (Repetiveis(dados).Count > 0 && escolhidos == 0)
                         {
                             <button class="btn btn-outline-secondary btn-sm" @onclick="RepetirAsync" disabled="@_salvando">
-                                🔁 Repetir o da semana passada
+                                <Icone Nome="repeat" Tamanho="14" /> Repetir o da semana passada
                             </button>
                         }
                         @if (_ok is not null)
@@ -129,7 +129,7 @@ else if (_dados is { } dados)
     </div>
 
     <div class="card mb-3">
-        <div class="card-header fw-bold">🤝 Padrinho</div>
+        <div class="card-header fw-semibold">Padrinho</div>
         <div class="card-body">
             <p class="small text-muted mb-2">
                 Um veterano de @PadrinhoCriterios.IdadeMinima anos ou mais adota um jovem da mesma posição que pode treinar.
@@ -143,7 +143,7 @@ else if (_dados is { } dados)
                 <div>
                     <a href="/players/details/@par.PadrinhoId" class="fw-semibold">@par.PadrinhoNome</a> é padrinho de
                     <a href="/players/details/@par.AfilhadoId" class="fw-semibold">@par.AfilhadoNome</a>
-                    <span class="badge @(par.Treinos >= PadrinhoCriterios.TreinosParaOBonus ? "bg-success" : "bg-secondary") ms-1"
+                    <span class="etiqueta numero @(par.Treinos >= PadrinhoCriterios.TreinosParaOBonus ? "sucesso" : "") ms-1"
                           title="Semanas que o afilhado treinou com o padrinho">
                         @Math.Min(par.Treinos, PadrinhoCriterios.TreinosParaOBonus)/@PadrinhoCriterios.TreinosParaOBonus treinos
                     </span>
@@ -155,7 +155,7 @@ else if (_dados is { } dados)
                 @if (dados.Jogadores.FirstOrDefault(j => j.PlayerId == par.AfilhadoId) is { PorQueNaoTreina: null, Foco: null })
                 {
                     <div class="small text-warning mt-1">
-                        ⚠️ @par.AfilhadoNome não está no treino desta semana: escolha ele lá em cima para o padrinho render.
+                        <Icone Nome="triangle-alert" Tamanho="14" /> @par.AfilhadoNome não está no treino desta semana: escolha ele lá em cima para o padrinho render.
                     </div>
                 }
             }
@@ -202,7 +202,7 @@ else if (_dados is { } dados)
                         </div>
                         <div class="col-12 col-md-2">
                             <button class="btn btn-primary btn-sm w-100" @onclick="ApadrinharAsync"
-                                    disabled="@(_salvando || _padrinhoId is null || _afilhadoId is null)">🤝 Apadrinhar</button>
+                                    disabled="@(_salvando || _padrinhoId is null || _afilhadoId is null)">Apadrinhar</button>
                         </div>
                     </div>
                     @if (_erroPadrinho is not null)
@@ -254,7 +254,7 @@ else if (_dados is { } dados)
     @if (formados.Count > 0)
     {
         <p class="small text-muted mb-1">
-            🎓 Já saíram do treino nesta temporada: @string.Join(", ", formados.Select(j => $"{j.Nome} (+{j.GanhosNaTemporada}, {j.PorQueNaoTreina})")).
+            Já saíram do treino nesta temporada: @string.Join(", ", formados.Select(j => $"{j.Nome} (+{j.GanhosNaTemporada}, {j.PorQueNaoTreina})")).
         </p>
     }
     @if (naoPodem.Count > 0)
@@ -342,7 +342,7 @@ else if (_dados is { } dados)
         {
             await TreinoApi.ApadrinharAsync(padrinho, afilhado, TeamToken);
             await CarregarAsync();
-            _ok = "🤝 Padrinho escolhido.";
+            _ok = "Padrinho escolhido.";
         }
         catch (Exception ex) { _erroPadrinho = ex.Message; }
         finally { _salvando = false; }
@@ -361,7 +361,7 @@ else if (_dados is { } dados)
                 .ToList();
             await TreinoApi.SalvarAsync(escolhas, TeamToken);
             await CarregarAsync();
-            _ok = escolhas.Count == 0 ? "Treino desta semana limpo." : "✅ Treino salvo.";
+            _ok = escolhas.Count == 0 ? "Treino desta semana limpo." : "Treino salvo.";
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }
