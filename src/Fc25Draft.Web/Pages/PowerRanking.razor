@@ -6,7 +6,7 @@
 
 <PageTitle>Power Ranking</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     @if (_loading)
     {
         <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
@@ -21,10 +21,8 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-            <a href="/ranking-clubes" class="btn btn-sm btn-outline-secondary">📊 Ranking de Clubes</a>
-        </div>
-        <p class="text-muted small mb-3">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
+        <p class="text-body-secondary small mb-0" style="max-width: 48rem;">
             Quem está mais forte agora, juntando Série A e Série B: elenco, rating dos resultados e forma recente.
             Clique em Nota, XI, Rating ou Forma para ordenar; o # continua sendo a posição no Power Ranking.
             @if (_ranking.AtualizadoAte is DateOnly ate)
@@ -32,19 +30,41 @@
                 <span>Jogos até @ate.ToString("dd/MM")@(_ranking.ComparadoCom is DateOnly antes ? $"; setas comparam com {antes:dd/MM}" : "").</span>
             }
         </p>
+            <a href="/ranking-clubes" class="btn btn-sm btn-outline-secondary flex-shrink-0"><Icone Nome="chart-column" Tamanho="14" /> Ranking de clubes</a>
+        </div>
 
         <ShareableCard Id="cap-power-ranking" Titulo="Power Ranking" Subtitulo="@Subtitulo" Arquivo="cbfv-power-ranking.png">
-            <div class="table-responsive mb-4">
-                <table class="table table-sm table-hover align-middle">
+            <div class="table-responsive painel mb-4">
+                <table class="table table-sm table-hover align-middle mb-0 power-tabela">
                     <thead class="table-dark">
                         <tr>
                             <th class="text-center">#</th>
                             <th class="text-center" title="Posições ganhas ou perdidas desde o dia de jogos anterior">±</th>
                             <th>Clube</th>
-                            <th class="text-center" role="button" title="Nota final (0 a 100)" @onclick="() => OrdenarPor(Coluna.Nota)">Nota@(Seta(Coluna.Nota))</th>
-                            <th class="text-center" role="button" title="Média de overall dos @PowerRankingCriterios.JogadoresNoXI melhores" @onclick="() => OrdenarPor(Coluna.XI)">XI@(Seta(Coluna.XI))</th>
-                            <th class="text-center d-none d-md-table-cell" role="button" title="Rating Elo de todos os jogos" @onclick="() => OrdenarPor(Coluna.Rating)">Rating@(Seta(Coluna.Rating))</th>
-                            <th class="d-none d-sm-table-cell" role="button" title="Últimos jogos, do mais recente para o mais antigo (ordena pelo aproveitamento)" @onclick="() => OrdenarPor(Coluna.Forma)">Forma@(Seta(Coluna.Forma))</th>
+                            <th class="text-center" title="Nota final (0 a 100)">
+                                <button type="button" class="ordenar @(_coluna == Coluna.Nota ? "ativo" : "")" @onclick="() => OrdenarPor(Coluna.Nota)">
+                                    Nota
+                                    @if (_coluna == Coluna.Nota) { <Icone Nome="@(_crescente ? "arrow-up" : "arrow-down")" Tamanho="12" /> }
+                                </button>
+                            </th>
+                            <th class="text-center" title="Média de overall dos @PowerRankingCriterios.JogadoresNoXI melhores">
+                                <button type="button" class="ordenar @(_coluna == Coluna.XI ? "ativo" : "")" @onclick="() => OrdenarPor(Coluna.XI)">
+                                    XI
+                                    @if (_coluna == Coluna.XI) { <Icone Nome="@(_crescente ? "arrow-up" : "arrow-down")" Tamanho="12" /> }
+                                </button>
+                            </th>
+                            <th class="text-center d-none d-md-table-cell" title="Rating Elo de todos os jogos">
+                                <button type="button" class="ordenar @(_coluna == Coluna.Rating ? "ativo" : "")" @onclick="() => OrdenarPor(Coluna.Rating)">
+                                    Rating
+                                    @if (_coluna == Coluna.Rating) { <Icone Nome="@(_crescente ? "arrow-up" : "arrow-down")" Tamanho="12" /> }
+                                </button>
+                            </th>
+                            <th class="d-none d-sm-table-cell" title="Últimos jogos, do mais recente para o mais antigo (ordena pelo aproveitamento)">
+                                <button type="button" class="ordenar @(_coluna == Coluna.Forma ? "ativo" : "")" @onclick="() => OrdenarPor(Coluna.Forma)">
+                                    Forma
+                                    @if (_coluna == Coluna.Forma) { <Icone Nome="@(_crescente ? "arrow-up" : "arrow-down")" Tamanho="12" /> }
+                                </button>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -52,39 +72,39 @@
                         {
                             <tr>
                                 <td class="text-center">
-                                    <span class="badge @(r.Posicao <= 3 ? "bg-warning text-dark" : "bg-secondary")">@r.Posicao</span>
+                                    <span class="num-posicao @(r.Posicao <= 3 ? "podio" : "zona-neutra")">@r.Posicao</span>
                                 </td>
                                 <td class="text-center small text-nowrap">
                                     @if (r.Variacao is int v && v != 0)
                                     {
-                                        <span class="@(v > 0 ? "text-success" : "text-danger") fw-semibold">@(v > 0 ? "▲" : "▼")@Math.Abs(v)</span>
+                                        <span class="d-inline-flex align-items-center gap-1 numero @(v > 0 ? "texto-vitoria" : "texto-derrota")"><Icone Nome="@(v > 0 ? "arrow-up" : "arrow-down")" Tamanho="12" />@Math.Abs(v)</span>
                                     }
                                     else if (r.Variacao is not null)
                                     {
-                                        <span class="text-muted">–</span>
+                                        <span class="text-body-tertiary">–</span>
                                     }
                                 </td>
                                 <td>
                                     <a href="@($"/teams/details/{r.TimeId}")" class="d-flex align-items-center gap-2 text-decoration-none text-reset">
                                         <img src="@EscudoService.GetEscudo(r.TimeNome)" alt="Escudo @r.TimeNome"
                                              style="width:24px;height:24px;object-fit:contain;" />
-                                        <span class="fw-semibold">@r.TimeNome</span>
+                                        <span class="fw-medium">@r.TimeNome</span>
                                         @if (r.Divisao is Divisao d)
                                         {
-                                            <span class="badge @(d == Divisao.SerieA ? "bg-primary" : "bg-info text-dark")">@(d == Divisao.SerieA ? "A" : "B")</span>
+                                            <span class="etiqueta" title="@(d == Divisao.SerieA ? "Série A" : "Série B")">@(d == Divisao.SerieA ? "A" : "B")</span>
                                         }
                                     </a>
                                 </td>
-                                <td class="text-center fw-bold" title="@Composicao(r)">@r.Nota.ToString("0.0")</td>
-                                <td class="text-center" title="Nota do elenco: @r.NotaElenco.ToString("0")">@r.ForcaXI.ToString("0.0")</td>
-                                <td class="text-center d-none d-md-table-cell" title="Nota do rating: @r.NotaRating.ToString("0")">@r.Rating</td>
+                                <td class="text-center numero fw-semibold text-body-emphasis" title="@Composicao(r)">@r.Nota.ToString("0.0")</td>
+                                <td class="text-center numero text-body-secondary" title="Nota do elenco: @r.NotaElenco.ToString("0")">@r.ForcaXI.ToString("0.0")</td>
+                                <td class="text-center numero text-body-secondary d-none d-md-table-cell" title="Nota do rating: @r.NotaRating.ToString("0")">@r.Rating</td>
                                 <td class="d-none d-sm-table-cell">
-                                    <div class="d-flex gap-1">
+                                    <span class="sequencia" aria-label="Últimos jogos, do mais recente para o mais antigo">
                                         @foreach (var resultado in r.Forma)
                                         {
-                                            <span class="badge rounded-pill @TimeJogoEstilo.Badge(resultado)" style="width: 1.6rem;">@resultado</span>
+                                            <span class="@resultado?.ToLowerInvariant()">@resultado</span>
                                         }
-                                    </div>
+                                    </span>
                                 </td>
                             </tr>
                         }
@@ -93,20 +113,20 @@
             </div>
         </ShareableCard>
 
-        <div class="card">
-            <div class="card-body small">
-                <h2 class="h6">Como a nota é calculada</h2>
+        <div class="secao-titulo"><h2>Como a nota é calculada</h2></div>
+        <div class="painel p-3">
+            <div class="small">
                 <div class="row g-3">
                     <div class="col-12 col-md-4">
-                        <strong>Elenco — @PowerRankingCriterios.PesoElenco%</strong>
-                        <ul class="mb-0 ps-3">
+                        <div class="criterio">Elenco <span class="numero">@PowerRankingCriterios.PesoElenco%</span></div>
+                        <ul class="mb-0 ps-3 text-body-secondary">
                             <li>Média de overall dos @PowerRankingCriterios.JogadoresNoXI melhores do elenco atual.</li>
                             <li>O melhor XI da liga fica com 100 e o pior com 0.</li>
                         </ul>
                     </div>
                     <div class="col-12 col-md-4">
-                        <strong>Rating — @PowerRankingCriterios.PesoRating%</strong>
-                        <ul class="mb-0 ps-3">
+                        <div class="criterio">Rating <span class="numero">@PowerRankingCriterios.PesoRating%</span></div>
+                        <ul class="mb-0 ps-3 text-body-secondary">
                             <li>Elo de todos os jogos, de todas as competições: todo time começa com @PowerRankingCriterios.RatingInicial.</li>
                             <li>Ganhar de time forte rende mais que ganhar de time fraco; goleada pesa mais.</li>
                             <li>A cada temporada nova o rating volta 1/3 do caminho até @PowerRankingCriterios.RatingInicial.</li>
@@ -114,14 +134,14 @@
                         </ul>
                     </div>
                     <div class="col-12 col-md-4">
-                        <strong>Forma — @PowerRankingCriterios.PesoForma%</strong>
-                        <ul class="mb-0 ps-3">
+                        <div class="criterio">Forma <span class="numero">@PowerRankingCriterios.PesoForma%</span></div>
+                        <ul class="mb-0 ps-3 text-body-secondary">
                             <li>Aproveitamento nos últimos @PowerRankingCriterios.JogosNaForma jogos (todas as competições).</li>
                             <li>Com menos de @PowerRankingCriterios.JogosNaForma jogos, os que faltam contam como 50%.</li>
                         </ul>
                     </div>
                 </div>
-                <p class="text-muted mb-0 mt-2">
+                <p class="text-body-tertiary mb-0 mt-3">
                     Jogo decidido nos pênaltis conta como empate; W.O. não entra.
                     As setas comparam com o ranking antes do último dia de jogos (com o elenco de hoje).
                 </p>
@@ -166,8 +186,6 @@
         _crescente = _coluna == coluna && !_crescente;
         _coluna = coluna;
     }
-
-    private string Seta(Coluna coluna) => _coluna != coluna ? "" : _crescente ? " ▲" : " ▼";
 
     private string Subtitulo => _ranking?.AtualizadoAte is DateOnly ate ? $"Jogos até {ate:dd/MM}" : "Elenco atual";
 
