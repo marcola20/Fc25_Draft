@@ -33,7 +33,7 @@
 }
 
 .lado { min-width: 0; }
-.lado-titulo { font-size: .75rem; text-transform: uppercase; color: var(--bs-secondary-color); margin-bottom: .2rem; }
+.lado-titulo { font-size: .75rem; color: var(--bs-tertiary-color); margin-bottom: .25rem; }
 .seta { font-size: 1.4rem; color: var(--bs-secondary-color); }
 
 /* Repetidas: a figurinha é um botão no modo reciclar. */

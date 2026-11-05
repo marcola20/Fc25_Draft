@@ -44,41 +44,41 @@
         <div class="card capa mb-3">
             <div class="card-body d-flex flex-wrap gap-4 align-items-center">
                 <div class="flex-grow-1" style="min-width: 240px;">
-                    <div class="text-muted small text-uppercase fw-semibold">Temporada @a.Album.Temporada</div>
+                    <div class="text-body-tertiary small">Temporada @a.Album.Temporada</div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <h1 class="h3 mb-0">🎴 @a.Album.Nome</h1>
-                        <a href="/album/trocas" class="btn btn-sm btn-outline-primary ms-auto position-relative">
-                            🔁 Trocas
+                        <h1 class="h3 mb-0">@a.Album.Nome</h1>
+                        <a href="/album/trocas" class="btn btn-sm btn-outline-secondary ms-auto position-relative">
+                            <Icone Nome="arrow-left-right" Tamanho="14" /> Trocas
                             @if (a.TrocasEsperando > 0)
                             {
-                                <span class="badge rounded-pill text-bg-danger" title="Propostas esperando a sua resposta">@a.TrocasEsperando</span>
+                                <span class="sino-contador numero" title="Propostas esperando a sua resposta">@a.TrocasEsperando</span>
                             }
                         </a>
-                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary">🏅 Colecionadores</a>
+                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary"><Icone Nome="award" Tamanho="14" /> Colecionadores</a>
                     </div>
                     @if (a.AlbumCompleto is { } completo)
                     {
-                        <div class="album-completo mb-2">🏆 Álbum completo em @BrazilTime.FormatDateTime(completo.Em, "dd/MM/yyyy") — seu nome está no <a href="/hall-of-fame#colecionadores">Hall da Fama</a>.</div>
+                        <div class="album-completo mb-2"><Icone Nome="trophy" Tamanho="14" /> Álbum completo em @BrazilTime.FormatDateTime(completo.Em, "dd/MM/yyyy") — seu nome está no <a href="/hall-of-fame#colecionadores">Hall da Fama</a>.</div>
                     }
                     <div class="d-flex justify-content-between small mb-1">
                         <span><strong>@a.Coladas</strong> de @a.Total figurinhas</span>
                         <span class="fw-semibold">@a.Percentual%</span>
                     </div>
                     <div class="progress" role="progressbar" aria-valuenow="@a.Percentual" aria-valuemin="0" aria-valuemax="100" style="height: .7rem;">
-                        <div class="progress-bar bg-success" style="width: @(a.Percentual)%"></div>
+                        <div class="progress-bar" style="width: @(a.Percentual)%; background: var(--cbfv-acento);"></div>
                     </div>
                     <div class="d-flex flex-wrap gap-3 mt-2 small">
                         <span class="raridade-chip comum">Comuns <strong>@a.ColadasPorRaridade.Comuns</strong>/@a.TotalPorRaridade.Comuns</span>
-                        <span class="raridade-chip brilhante">✨ Brilhantes <strong>@a.ColadasPorRaridade.Brilhantes</strong>/@a.TotalPorRaridade.Brilhantes</span>
+                        <span class="raridade-chip brilhante">Brilhantes <strong>@a.ColadasPorRaridade.Brilhantes</strong>/@a.TotalPorRaridade.Brilhantes</span>
                         @if (a.TotalPorRaridade.Lendarias > 0)
                         {
                             <span class="raridade-chip lendaria">★ Lendárias <strong>@a.ColadasPorRaridade.Lendarias</strong>/@a.TotalPorRaridade.Lendarias</span>
                         }
-                        <span class="text-muted">🔁 @a.Repetidas repetida@(a.Repetidas == 1 ? "" : "s")</span>
+                        <span class="text-muted">@a.Repetidas repetida@(a.Repetidas == 1 ? "" : "s")</span>
                     </div>
                 </div>
                 <div class="text-center pacotes">
-                    <div class="pacote-icone" aria-hidden="true">🎁</div>
+                    <div class="pacote-icone" aria-hidden="true"><Icone Nome="package" Tamanho="28" /></div>
                     <div class="fw-bold fs-4 lh-1">@a.PacotesParaAbrir</div>
                     <div class="small text-muted mb-2">pacote@(a.PacotesParaAbrir == 1 ? "" : "s") para abrir</div>
                     <button class="btn btn-primary" disabled="@(a.PacotesParaAbrir == 0 || _abrindo)" @onclick="AbrirAsync">
@@ -86,13 +86,13 @@
                     </button>
                     @if (a.PacoteDoDiaDisponivel)
                     {
-                        <button class="btn btn-outline-success d-block w-100 mt-2" disabled="@_pegandoDoDia" @onclick="PegarDoDiaAsync">
-                            🌅 Pegar os @AlbumFigurinhas.PacotesDoDia pacotes do dia
+                        <button class="btn btn-outline-secondary d-block w-100 mt-2" disabled="@_pegandoDoDia" @onclick="PegarDoDiaAsync">
+                            Pegar os @AlbumFigurinhas.PacotesDoDia pacotes do dia
                         </button>
                     }
                     else if (a.Album.Ativo)
                     {
-                        <div class="small text-muted mt-2">Pacotes do dia pegos ✓<br />Amanhã tem mais.</div>
+                        <div class="small text-muted mt-2">Pacotes do dia pegos<br />Amanhã tem mais.</div>
                     }
                 </div>
             </div>
@@ -107,7 +107,7 @@
                     <span class="text-muted me-1">Fechados:</span>
                     @foreach (var g in grupos.Take(MaximoDeOrigens))
                     {
-                        <span class="pacote-origem @g.Origem">@(g.Estrelas ? "🌟" : IconeDaOrigem(g.Origem)) @g.Texto@(g.Quantos > 1 ? $" ×{g.Quantos}" : "")</span>
+                        <span class="pacote-origem @g.Origem"><Icone Nome="@(g.Estrelas ? "star" : IconeDaOrigem(g.Origem))" Tamanho="12" /> @g.Texto@(g.Quantos > 1 ? $" ×{g.Quantos}" : "")</span>
                     }
                     @if (grupos.Count > MaximoDeOrigens)
                     {
@@ -132,7 +132,7 @@
         {
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-baseline gap-2">
-                    <strong>✨ Últimas raras tiradas</strong>
+                    <strong>Últimas raras tiradas</strong>
                     <span class="small text-muted">brilhantes e lendárias que saíram nos pacotes</span>
                 </div>
                 <div class="card-body py-2">
@@ -160,7 +160,7 @@
             </div>
             @if (_pagina is not null)
             {
-                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Índice</a>
+                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="arrow-left" Tamanho="14" /> Índice</a>
             }
         </div>
 
@@ -191,11 +191,11 @@
                             @pg.Coladas de @pg.Total · @pg.Percentual%
                             @if (a.SeloDaPagina(pg.TeamId) is { } seloDaPagina)
                             {
-                                <span class="badge selo-badge ms-1" title="Completa em @BrazilTime.FormatDateTime(seloDaPagina.Em, "dd/MM/yyyy")">🏅 Página completa</span>
+                                <span class="badge selo-badge ms-1" title="Completa em @BrazilTime.FormatDateTime(seloDaPagina.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="12" /> Página completa</span>
                             }
                             else if (pg.Completa)
                             {
-                                <span class="badge text-bg-success ms-1">✓ Página completa</span>
+                                <span class="etiqueta sucesso ms-1"><Icone Nome="check" Tamanho="12" /> Página completa</span>
                             }
                         </div>
                     </div>
@@ -212,7 +212,7 @@
                     @{ var vagas = Filtrar(pg.Vagas).ToList(); }
                     @if (vagas.Count == 0)
                     {
-                        <div class="text-muted">Não falta nenhuma. 🎉</div>
+                        <div class="text-muted">Não falta nenhuma.</div>
                     }
                     <div class="grade-cartas">
                         @foreach (var v in vagas)
@@ -250,17 +250,17 @@
                             <div class="flex-grow-1 min-w-0">
                                 <div class="fw-semibold text-truncate">@pagina.TimeNome</div>
                                 <div class="progress mt-1" style="height: .35rem;">
-                                    <div class="progress-bar @(pagina.Completa ? "bg-success" : "")" style="width: @(pagina.Percentual)%"></div>
+                                    <div class="progress-bar" style="width: @(pagina.Percentual)%; background: @(pagina.Completa ? "var(--cbfv-acento)" : "var(--bs-tertiary-color)");"></div>
                                 </div>
                                 <div class="small text-muted mt-1">@pagina.Coladas/@pagina.Total</div>
                             </div>
                             @if (selo is not null)
                             {
-                                <span class="selo-pagina" title="Página completa em @BrazilTime.FormatDateTime(selo.Em, "dd/MM/yyyy")">🏅</span>
+                                <span class="selo-pagina" title="Página completa em @BrazilTime.FormatDateTime(selo.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="14" /></span>
                             }
                             else if (pagina.Completa)
                             {
-                                <span class="selo-completa" title="Página completa">✓</span>
+                                <span class="selo-completa" title="Página completa"><Icone Nome="check" Tamanho="14" /></span>
                             }
                         </div>
                     </a>
@@ -272,9 +272,9 @@
                 @* ---- Figurinhas de quem saiu dos clubes da liga ---- *@
                 <div class="card mt-4">
                     <div class="card-header d-flex flex-wrap align-items-center gap-2">
-                        <span class="fw-bold">📦 Saíram do álbum</span>
+                        <span class="fw-semibold">Saíram do álbum</span>
                         <span class="small text-muted">@fora.Sum(v => v.Quantidade) cópia@(fora.Sum(v => v.Quantidade) == 1 ? "" : "s")</span>
-                        <a href="/album/trocas?aba=repetidas" class="btn btn-sm btn-outline-success ms-auto">♻️ Reciclar</a>
+                        <a href="/album/trocas?aba=repetidas" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="refresh-cw" Tamanho="14" /> Reciclar</a>
                     </div>
                     <div class="card-body">
                         <p class="small text-muted">
@@ -399,12 +399,12 @@
 
     private static string IconeDaOrigem(string origem) => origem switch
     {
-        PacoteGanho.OrigemDiario => "🌅",
-        PacoteGanho.OrigemJogo => "🏆",
-        PacoteGanho.OrigemDiaDeJogo => "⚽",
-        PacoteGanho.OrigemBolao => "🎯",
-        PacoteGanho.OrigemAdmin => "🎁",
-        _ => "🎴"
+        PacoteGanho.OrigemDiario => "sun",
+        PacoteGanho.OrigemJogo => "trophy",
+        PacoteGanho.OrigemDiaDeJogo => "goal",
+        PacoteGanho.OrigemBolao => "target",
+        PacoteGanho.OrigemAdmin => "package",
+        _ => "images"
     };
 
     private async Task AbrirAsync()

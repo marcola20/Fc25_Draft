@@ -8,7 +8,7 @@
 <div class="abertura-fundo @(_festa ? "festa" : "")" role="dialog" aria-modal="true" aria-label="Pacote aberto">
     <div class="abertura">
         <div class="abertura-topo">
-            <span class="small">@(Pacote.Estrelas ? "🌟" : "🎁") @AlbumFigurinhas.DeOndeVeio(Pacote.Origem, Pacote.Motivo)</span>
+            <span class="small">@(Pacote.Estrelas ? "★" : "") @AlbumFigurinhas.DeOndeVeio(Pacote.Origem, Pacote.Motivo)</span>
             <button type="button" class="btn-close btn-close-white ms-auto" aria-label="Fechar" @onclick="OnFechar"></button>
         </div>
 
@@ -28,7 +28,7 @@
                         <span class="pacote-qtd">@Pacote.Figurinhas.Count figurinhas</span>
                     </span>
                 </button>
-                <div class="dica">@(Pacote.Estrelas ? "🌟 Pacote de estrelas! Toque para rasgar" : "Toque no pacote para rasgar")</div>
+                <div class="dica">@(Pacote.Estrelas ? "Pacote de estrelas · toque para rasgar" : "Toque no pacote para rasgar")</div>
             </div>
         }
         else
@@ -68,7 +68,7 @@
                         <div class="legenda @(virada ? "visivel" : "")">
                             @if (EuId is { } eu && t.Figurinha.TreinadorId == eu)
                             {
-                                <span class="voce-se-tirou">🤳 Você se tirou!</span>
+                                <span class="voce-se-tirou">Você se tirou</span>
                             }
                             else if (t.Nova)
                             {
@@ -97,16 +97,16 @@
                     <div class="conquista">
                         @if (c.Tipo == TipoConquistaAlbum.AlbumCompleto)
                         {
-                            <span>🏆 Você completou o @AlbumNome! Seu nome está no Hall da Fama.</span>
+                            <span><Icone Nome="trophy" Tamanho="14" /> Você completou o @AlbumNome. Seu nome está no Hall da Fama.</span>
                         }
                         else
                         {
-                            <span>🏅 Página do @c.TimeNome completa!</span>
+                            <span><Icone Nome="award" Tamanho="14" /> Página do @c.TimeNome completa</span>
                         }
                     </div>
                 }
                 <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
-                    <button type="button" class="btn btn-success" @onclick="CompartilharAsync">📷 Compartilhar a melhor</button>
+                    <button type="button" class="btn btn-primary" @onclick="CompartilharAsync"><Icone Nome="share-2" Tamanho="14" /> Compartilhar a melhor</button>
                     @if (Pacote.PacotesRestantes > 0)
                     {
                         <button type="button" class="btn btn-primary" disabled="@Abrindo" @onclick="OnProximo">

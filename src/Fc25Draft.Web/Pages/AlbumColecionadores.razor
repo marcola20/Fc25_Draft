@@ -25,13 +25,13 @@
     else
     {
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <h1 class="h4 mb-0">🏅 @_dados.Album.Nome</h1>
-            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Meu álbum</a>
+            <h1 class="h4 mb-0">Colecionadores · @_dados.Album.Nome</h1>
+            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="arrow-left" Tamanho="14" /> Meu álbum</a>
         </div>
         <p class="small text-muted">
             Quem completou o álbum fica na frente, na ordem em que completou. Depois, quem tem mais figurinhas
             diferentes coladas, mais lendárias e mais figurinhas no total (com as repetidas).
-            🏅 é página completa; 🏆, álbum completo.
+            A medalha é página completa; o troféu, álbum completo.
         </p>
 
         @if (_dados.Linhas.Count == 0)
@@ -57,26 +57,26 @@
                                         </span>
                                         @if (eu)
                                         {
-                                            <span class="badge text-bg-primary">você</span>
+                                            <span class="etiqueta acento">você</span>
                                         }
                                         @if (l.AlbumCompletoEm is { } em)
                                         {
-                                            <span class="badge selo-trofeu" title="Álbum completo em @BrazilTime.FormatDateTime(em, "dd/MM/yyyy")">🏆 Completo</span>
+                                            <span class="badge selo-trofeu" title="Álbum completo em @BrazilTime.FormatDateTime(em, "dd/MM/yyyy")"><Icone Nome="trophy" Tamanho="12" /> Completo</span>
                                         }
                                         <span class="small text-muted text-truncate">@l.TimeAtual</span>
                                     </div>
                                     <div class="progress mt-1" style="height: .4rem;" role="progressbar" aria-label="Progresso de @l.Nome"
                                          aria-valuenow="@l.Percentual" aria-valuemin="0" aria-valuemax="100">
-                                        <div class="progress-bar @(l.AlbumCompletoEm is null ? "" : "bg-warning")" style="width: @(l.Percentual)%"></div>
+                                        <div class="progress-bar" style="width: @(l.Percentual)%; background: @(l.AlbumCompletoEm is null ? "var(--bs-tertiary-color)" : "var(--cbfv-acento)");"></div>
                                     </div>
                                     <div class="d-flex flex-wrap gap-3 small text-muted mt-1">
                                         <span><strong class="text-body">@l.Percentual%</strong> · @l.Coladas/@l.TotalDoAlbum</span>
-                                        <span title="Figurinhas no total, com as repetidas">🎴 @l.TotalDeFigurinhas</span>
+                                        <span title="Figurinhas no total, com as repetidas"><Icone Nome="images" Tamanho="12" /> @l.TotalDeFigurinhas</span>
                                         <span title="Lendárias coladas">★ @l.Lendarias</span>
                                         @if (l.PaginasCompletas.Count > 0)
                                         {
                                             <span class="selos" title="Páginas completas: @string.Join(", ", l.PaginasCompletas.Select(p => p.TimeNome))">
-                                                🏅 @l.PaginasCompletas.Count
+                                                <Icone Nome="award" Tamanho="12" /> @l.PaginasCompletas.Count
                                                 @foreach (var p in l.PaginasCompletas.Take(6))
                                                 {
                                                     <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" width="16" height="16" loading="lazy" />

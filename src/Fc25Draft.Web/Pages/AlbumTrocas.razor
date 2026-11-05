@@ -31,7 +31,7 @@
             }
             @foreach (var c in _selosNaTroca)
             {
-                <div class="fw-semibold mt-2">@(c.Tipo == TipoConquistaAlbum.AlbumCompleto ? "🏆 Você completou o álbum!" : $"🏅 Página do {c.TimeNome} completa!")</div>
+                <div class="fw-semibold mt-2">@(c.Tipo == TipoConquistaAlbum.AlbumCompleto ? "Você completou o álbum" : $"Página do {c.TimeNome} completa")</div>
             }
             <button type="button" class="btn-close" @onclick="LimparOk"></button>
         </div>
@@ -53,8 +53,8 @@
     {
         var d = _dados;
         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <h1 class="h4 mb-0">🔁 Trocas · @d.Album.Nome</h1>
-            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto">← Meu álbum</a>
+            <h1 class="h4 mb-0">Trocas · @d.Album.Nome</h1>
+            <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="arrow-left" Tamanho="14" /> Meu álbum</a>
         </div>
         <p class="small text-muted">
             Só repetida entra em troca: a figurinha colada no seu álbum nunca sai. Dá para mandar de presente, sem pedir nada. A proposta vale por 48 horas.
@@ -65,7 +65,7 @@
                 Propostas
                 @if (d.Recebidas.Count > 0)
                 {
-                    <span class="badge text-bg-danger">@d.Recebidas.Count</span>
+                    <span class="sino-contador numero position-static">@d.Recebidas.Count</span>
                 }
             </button>
             <button type="button" role="tab" class="aba @(_aba == Aba.Sugestoes ? "ativa" : "")" @onclick="() => _aba = Aba.Sugestoes">Sugestões</button>
@@ -101,16 +101,16 @@
                                 <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Oferecidas)</div>
                                 @if (!Doacao(t))
                                 {
-                                    <div class="seta" aria-hidden="true">⇄</div>
+                                    <div class="seta" aria-hidden="true"><Icone Nome="arrow-left-right" Tamanho="18" /></div>
                                     <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Pedidas)</div>
                                 }
                             </div>
                             <div class="d-flex flex-wrap gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-success" disabled="@_ocupado" @onclick="() => AceitarAsync(troca)">@(Doacao(t) ? "Aceitar presente" : "Aceitar")</button>
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@_ocupado" @onclick="() => AceitarAsync(troca)">@(Doacao(t) ? "Aceitar presente" : "Aceitar")</button>
                                 <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_ocupado" @onclick="() => RecusarAsync(troca)">Recusar</button>
                                 @if (!Doacao(t))
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="() => ContrapropostaAsync(troca)">Contraproposta</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_ocupado" @onclick="() => ContrapropostaAsync(troca)">Contraproposta</button>
                                 }
                             </div>
                         </div>
@@ -127,12 +127,12 @@
                     var troca = t;
                     <div class="card mb-2 proposta">
                         <div class="card-body p-2">
-                            <div class="small mb-1">@(Doacao(t) ? "🎁 Presente para" : "Para") @Quem(t.Para) · expira @Prazo(t.ExpiraEm)</div>
+                            <div class="small mb-1">@(Doacao(t) ? "Presente para" : "Para") @Quem(t.Para) · expira @Prazo(t.ExpiraEm)</div>
                             <div class="lados">
                                 <div class="lado"><div class="lado-titulo">Você dá</div>@Cartas(t.Oferecidas)</div>
                                 @if (!Doacao(t))
                                 {
-                                    <div class="seta" aria-hidden="true">⇄</div>
+                                    <div class="seta" aria-hidden="true"><Icone Nome="arrow-left-right" Tamanho="18" /></div>
                                     <div class="lado"><div class="lado-titulo">Você recebe</div>@Cartas(t.Pedidas)</div>
                                 }
                             </div>
@@ -157,7 +157,7 @@
                                     <span class="badge @StatusClasse(t.Status)">@StatusTexto(t.Status)</span>
                                     <span>@if (eu) { <span>Você → </span>@Quem(t.Para) } else { @Quem(t.De)<span> → você</span> }</span>
                                     <span class="text-muted">
-                                        @(Doacao(t) ? $"🎁 presente de {t.Oferecidas.Count}"
+                                        @(Doacao(t) ? $"presente de {t.Oferecidas.Count}"
                                           : eu ? $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count}" : $"dava {t.Oferecidas.Count}, pedia {t.Pedidas.Count} suas")
                                     </span>
                                     <span class="text-muted ms-auto">@AvisosSino.Quando(t.RespondidaEm ?? t.CriadaEm)</span>
@@ -263,7 +263,7 @@
                     <div class="card-body p-2">
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <div class="flex-grow-1 small">
-                                ♻️ <strong>Reciclar:</strong> @AlbumFigurinhas.RepetidasPorPacote repetidas quaisquer viram 1 pacote novo.
+                                <strong>Reciclar:</strong> @AlbumFigurinhas.RepetidasPorPacote repetidas quaisquer viram 1 pacote novo.
                                 @if (_reciclando)
                                 {
                                     <span>Toque nas repetidas para escolher — <strong>@_reciclar.Values.Sum()/@AlbumFigurinhas.RepetidasPorPacote</strong>.</span>
@@ -271,12 +271,12 @@
                             </div>
                             @if (!_reciclando)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-success" disabled="@(d.RepetidasSobrando < AlbumFigurinhas.RepetidasPorPacote)"
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(d.RepetidasSobrando < AlbumFigurinhas.RepetidasPorPacote)"
                                         @onclick="() => { _reciclando = true; _reciclar.Clear(); }">Escolher repetidas</button>
                             }
                             else
                             {
-                                <button type="button" class="btn btn-sm btn-success" disabled="@(_ocupado || _reciclar.Values.Sum() != AlbumFigurinhas.RepetidasPorPacote)" @onclick="ReciclarAsync">
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@(_ocupado || _reciclar.Values.Sum() != AlbumFigurinhas.RepetidasPorPacote)" @onclick="ReciclarAsync">
                                     Reciclar por 1 pacote
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => { _reciclando = false; _reciclar.Clear(); }">Cancelar</button>
@@ -305,7 +305,7 @@
                             <div class="small text-muted text-center">
                                 @if (escolhidas > 0)
                                 {
-                                    <span class="text-success fw-semibold">♻️ @escolhidas</span>
+                                    <span class="text-success fw-semibold">@escolhidas</span>
                                     <button type="button" class="btn btn-link btn-sm p-0 ms-1" @onclick="() => TirarDaReciclagem(rep)">tirar</button>
                                 }
                                 else
@@ -325,7 +325,7 @@
             case Aba.Faltam:
                 @if (d.Faltam.Count == 0)
                 {
-                    <p class="small text-muted">Não falta nenhuma. 🎉</p>
+                    <p class="small text-muted">Não falta nenhuma.</p>
                 }
                 else
                 {
@@ -348,7 +348,7 @@
                                     @foreach (var p in f.QuemTemRepetida.Take(3))
                                     {
                                         var pessoa = p;
-                                        <button type="button" class="btn btn-sm btn-outline-primary py-0" title="Pedir para @p.Nome"
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0" title="Pedir para @p.Nome"
                                                 @onclick="() => PedirAsync(pessoa, falta.Figurinha)">@NomeCurto(p)</button>
                                     }
                                     @if (f.QuemTemRepetida.Count > 3)
@@ -388,8 +388,8 @@
                             @if (_montar is not null)
                             {
                                 <div class="small">Você dá <strong>@_dar.Count</strong> · pede <strong>@_pedir.Count</strong></div>
-                                <button type="button" class="btn btn-sm btn-success ms-auto" disabled="@(_ocupado || _dar.Count == 0)" @onclick="EnviarAsync">
-                                    @(_pedir.Count == 0 ? "🎁 Enviar de presente" : "Enviar proposta")
+                                <button type="button" class="btn btn-sm btn-primary ms-auto" disabled="@(_ocupado || _dar.Count == 0)" @onclick="EnviarAsync">
+                                    @(_pedir.Count == 0 ? "Enviar de presente" : "Enviar proposta")
                                 </button>
                             }
                         </div>
@@ -689,7 +689,7 @@
     {
         var m = _montar!;
         await AlbumSvc.ProporTrocaAsync(_eu!.TreinadorId, m.Outro.TreinadorId, _dar.ToList(), _pedir.ToList(), _contraDe?.TrocaId, CancellationToken.None);
-        _ok = _pedir.Count == 0 ? $"🎁 Presente enviado para {m.Outro.Nome}. Ele só precisa aceitar."
+        _ok = _pedir.Count == 0 ? $"Presente enviado para {m.Outro.Nome}. Ele só precisa aceitar."
             : _contraDe is null ? $"Proposta enviada para {m.Outro.Nome}." : $"Contraproposta enviada para {m.Outro.Nome}.";
         _montar = null;
         _contraDe = null;
@@ -719,7 +719,7 @@
         await AlbumSvc.ReciclarAsync(_eu!.TreinadorId, lista, CancellationToken.None);
         _reciclando = false;
         _reciclar.Clear();
-        _ok = "♻️ Reciclado! 1 pacote novo esperando no álbum.";
+        _ok = "Reciclado: 1 pacote novo esperando no álbum.";
     });
 
     // ---- Apoio de tela
@@ -738,11 +738,11 @@
     {
         @if (f.Raridade == RaridadeFigurinha.Lendaria)
         {
-            <span class="badge text-bg-dark ms-1">★</span>
+            <span class="etiqueta ms-1">★</span>
         }
         else if (f.Raridade == RaridadeFigurinha.Brilhante)
         {
-            <span class="badge text-bg-warning ms-1">✨</span>
+            <span class="etiqueta acento ms-1">brilhante</span>
         }
     };
 

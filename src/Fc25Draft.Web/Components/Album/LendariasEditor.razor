@@ -34,11 +34,11 @@
                                 <div class="small text-muted">@c?.PosicaoSigla · @c?.TimeNome</div>
                                 @if (Fixas.Contains(e.PlayerId))
                                 {
-                                    <div class="small text-muted">🔒 já saiu para @Pessoas(c?.Donos ?? 0)</div>
+                                    <div class="small text-muted"><Icone Nome="lock" Tamanho="12" /> já saiu para @Pessoas(c?.Donos ?? 0)</div>
                                 }
                                 else if (c?.Donos > 0)
                                 {
-                                    <div class="small text-warning-emphasis">⚠️ @Pessoas(c.Donos) já @(c.Donos == 1 ? "tem" : "têm") esse jogador: vira lendária para @(c.Donos == 1 ? "ela" : "elas")</div>
+                                    <div class="small text-warning-emphasis"><Icone Nome="triangle-alert" Tamanho="12" /> @Pessoas(c.Donos) já @(c.Donos == 1 ? "tem" : "têm") esse jogador: vira lendária para @(c.Donos == 1 ? "ela" : "elas")</div>
                                 }
                             </td>
                             <td class="text-center">@c?.Overall</td>
@@ -52,7 +52,7 @@
                                 <td class="text-end">
                                     @if (!Fixas.Contains(e.PlayerId))
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Tirar" @onclick="() => Tirar(e)">✕</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Tirar" aria-label="Tirar" @onclick="() => Tirar(e)"><Icone Nome="x" Tamanho="14" /></button>
                                     }
                                 </td>
                             }

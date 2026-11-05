@@ -1,11 +1,9 @@
 .capa {
-    background:
-        radial-gradient(circle at 100% 0%, rgba(25, 135, 84, .12), transparent 55%),
-        var(--bs-card-bg, var(--bs-body-bg));
+    background: var(--bs-card-bg, var(--bs-body-bg));
 }
 
 .pacotes { min-width: 150px; }
-.pacote-icone { font-size: 2.2rem; line-height: 1; margin-bottom: .2rem; }
+.pacote-icone { display: inline-flex; margin-bottom: .25rem; color: var(--cbfv-acento-texto); }
 
 .raridade-chip {
     padding: .1rem .55rem;
@@ -25,9 +23,9 @@
     gap: .6rem;
 }
 
-.indice-item { transition: transform .12s ease, box-shadow .12s ease; }
-.indice-item:hover { transform: translateY(-2px); box-shadow: 0 .3rem .8rem rgba(0, 0, 0, .12); }
-.indice-item.completa { border-color: var(--bs-success); }
+.indice-item { transition: background-color var(--cbfv-rapido) var(--cbfv-curva); }
+.indice-item:hover { background: var(--bs-secondary-bg); }
+.indice-item.completa { border-color: rgba(201, 148, 40, .5); }
 
 .selo-completa {
     display: inline-flex;
@@ -36,9 +34,8 @@
     width: 1.6rem;
     height: 1.6rem;
     border-radius: 50%;
-    background: var(--bs-success);
+    background: var(--cbfv-vitoria);
     color: #fff;
-    font-weight: 800;
     flex-shrink: 0;
 }
 
@@ -68,18 +65,22 @@
     width: 1.8rem;
     height: 1.8rem;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff3c4, #e9c46a 55%, #b8860b);
-    box-shadow: 0 0 0 2px rgba(184, 134, 11, .35);
+    background: var(--cbfv-acento);
+    color: #1a1405;
     flex-shrink: 0;
 }
 
-.selo-badge { background: linear-gradient(90deg, #b8860b, #f5d36b, #b8860b); color: #2a1a00; }
+.selo-badge { display: inline-flex; align-items: center; gap: .25rem; background: var(--cbfv-acento); color: #1a1405; }
 
 .album-completo {
     padding: .35rem .7rem;
     border-radius: .5rem;
-    font-weight: 600;
-    background: linear-gradient(90deg, rgba(184, 134, 11, .18), rgba(245, 211, 107, .3), rgba(184, 134, 11, .18));
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    font-weight: 500;
+    border: 1px solid rgba(201, 148, 40, .45);
+    background: rgba(242, 205, 92, .1);
     border: 1px solid #c9971c;
 }
 

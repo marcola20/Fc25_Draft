@@ -7,7 +7,7 @@
    na página do último clube, com número no fim do álbum. *@
 <div class="card mb-3">
     <div class="card-header fw-bold d-flex align-items-center gap-2">
-        🎖️ Lendas aposentadas
+        Lendas aposentadas
         @if (_dados is not null)
         {
             <span class="badge text-bg-secondary">@_dados.NoAlbum.Count/@AlbumFigurinhas.MaximoLendasPorAlbum</span>
@@ -39,7 +39,7 @@
                             <CartaFigurinha Figurinha="@l.Figurinha" Largura="120" />
                             @if (l.Donos > 0)
                             {
-                                <span class="small text-muted">🔒 saiu para @l.Donos</span>
+                                <span class="small text-muted"><Icone Nome="lock" Tamanho="12" /> saiu para @l.Donos</span>
                             }
                             else
                             {
@@ -80,7 +80,7 @@
                             <input class="form-control" maxlength="@AlbumFigurinhas.TamanhoDestaque" @bind="_destaque"
                                    placeholder="@AlbumFigurinhas.DestaqueDaLenda(Escolhida?.AposentadoNaTemporada ?? Temporada - 1)" />
                         </div>
-                        <button class="btn btn-success" disabled="@(_salvando || _playerId == 0)" @onclick="ColocarAsync">🎖️ Colocar no álbum</button>
+                        <button class="btn btn-success" disabled="@(_salvando || _playerId == 0)" @onclick="ColocarAsync">Colocar no álbum</button>
                     </div>
                     @if (disponiveis.Count == 0)
                     {
