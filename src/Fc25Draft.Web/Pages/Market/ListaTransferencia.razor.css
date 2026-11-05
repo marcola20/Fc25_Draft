@@ -1,0 +1,59 @@
+/* O seu time em uma faixa: caixa, transferências usadas e o atalho para colocar alguém à venda. */
+.lista-meu-time {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.lista-meu-time a {
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+}
+
+.lista-meu-time a:hover {
+    color: var(--bs-emphasis-color);
+}
+
+.campo-busca {
+    position: relative;
+}
+
+.campo-busca ::deep .campo-busca-icone {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    color: var(--bs-tertiary-color);
+    pointer-events: none;
+}
+
+.campo-busca input {
+    padding-left: 2.25rem;
+}
+
+.lista-tabela {
+    font-size: 0.875rem;
+}
+
+.lista-tabela > tbody > tr > td {
+    height: 3rem;
+}
+
+.lista-nome {
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.lista-nome:hover {
+    color: var(--bs-link-hover-color);
+}
+
+::deep .lista-foto {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}

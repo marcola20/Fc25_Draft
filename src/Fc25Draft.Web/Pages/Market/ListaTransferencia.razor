@@ -4,6 +4,7 @@
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Services
 @using Fc25Draft.Web.Utilities
+@using Fc25Draft.Core.Utilities
 @inject TransferOffersApiClient OffersApi
 @inject TeamsApiClient TeamsApi
 @inject TeamAccessService TeamAccess
@@ -37,26 +38,31 @@
 @if (_myTeam is null && !_loading)
 {
     <div class="alert alert-secondary py-2 small" role="status">
-        Entre com o seu token para comprar ou fazer propostas. Para colocar um jogador seu à venda, use o botão 🏷️ no elenco do seu time.
+        Entre com o seu token para comprar ou fazer propostas. Para colocar um jogador seu à venda, use o botão <Icone Nome="tag" Tamanho="12" /> no elenco do seu time.
     </div>
 }
 else if (_myTeam is not null)
 {
-    <div class="d-flex flex-wrap gap-3 small text-muted mb-3">
-        <span><strong>@_myTeam.TeamName</strong></span>
-        <span>Caixa: <strong>@_myTeam.Caixa</strong></span>
-        <span>Transferências: <strong>@_myTeam.TransferCount / @_maxTransfers</strong></span>
-        <a href="/teams/details/@_myTeam.TeamId" class="text-primary">Colocar jogador à venda (🏷️ no elenco)</a>
+    <div class="painel lista-meu-time mb-3">
+        <span class="d-inline-flex align-items-center gap-2 fw-medium text-body-emphasis">
+            <img src="@Escudos.GetEscudo(_myTeam.TeamName)" alt="" width="20" height="20" style="object-fit: contain;" />@_myTeam.TeamName
+        </span>
+        <span>Caixa <span class="numero text-body-emphasis">@_myTeam.Caixa</span></span>
+        <span>Transferências <span class="numero text-body-emphasis">@_myTeam.TransferCount/@_maxTransfers</span></span>
+        <a href="/teams/details/@_myTeam.TeamId" class="ms-md-auto d-inline-flex align-items-center gap-1"><Icone Nome="tag" Tamanho="14" /> Colocar jogador à venda</a>
     </div>
 }
 
 <div class="row g-2 mb-3">
-    <div class="col-12 col-md-4">
-        <input class="form-control" placeholder="Buscar jogador..." @bind="_busca" @bind:event="oninput" />
+    <div class="col-12 col-md-3">
+        <div class="campo-busca">
+            <Icone Nome="search" Tamanho="14" Classe="campo-busca-icone" />
+            <input class="form-control" placeholder="Jogador" @bind="_busca" @bind:event="oninput" />
+        </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-6 col-md-3">
         <select class="form-select" @bind="_posicao">
-            <option value="">Todas as posições</option>
+            <option value="">Posição</option>
             @foreach (var pos in _itens.OrderBy(i => i.PositionId).Select(i => i.Position).Distinct())
             {
                 <option value="@pos">@pos</option>
@@ -65,7 +71,7 @@ else if (_myTeam is not null)
     </div>
     <div class="col-6 col-md-3">
         <select class="form-select" @bind="_time">
-            <option value="">Todos os times</option>
+            <option value="">Time</option>
             @foreach (var nome in _itens.Select(i => i.TeamName).Distinct().OrderBy(n => n))
             {
                 <option value="@nome">@nome</option>
@@ -84,20 +90,20 @@ else if (_myTeam is not null)
 
 @if (_loading)
 {
-    <p><em>Carregando...</em></p>
+    <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
 }
 else if (_itens.Count == 0)
 {
-    <p class="text-muted">Nenhum jogador na lista de transferência no momento.</p>
+    <div class="painel p-3 small text-body-secondary">Nenhum jogador na lista de transferência no momento.</div>
 }
 else if (Filtrados.Count == 0)
 {
-    <p class="text-muted">Nenhum jogador com esses filtros.</p>
+    <div class="painel p-3 small text-body-secondary">Nenhum jogador com esses filtros.</div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped table-sm align-middle">
+    <div class="table-responsive painel">
+        <table class="table table-hover align-middle mb-0 lista-tabela">
             <thead>
                 <tr>
                     <th>Jogador</th>
@@ -113,36 +119,36 @@ else
                 @foreach (var item in Filtrados)
                 {
                     <tr>
-                        <td class="text-nowrap"><FotoJogador PlayerId="@item.PlayerId" Tamanho="28" Classe="me-2" /><a href="/players/details/@item.PlayerId" class="text-primary">@item.Name</a>
+                        <td class="text-nowrap"><FotoJogador PlayerId="@item.PlayerId" Tamanho="28" Classe="me-2 lista-foto" /><a href="/players/details/@item.PlayerId" class="lista-nome">@item.Name</a>
                             @if (item.PediuParaSair)
                             {
-                                <span class="badge bg-danger ms-1"
-                                      title="@(item.PromessaQuebrada ? "Promessa quebrada: na lista pela metade da venda rápida" : "Pediu para sair: na lista pelo preço da venda rápida")">🚪 Pediu para sair</span>
+                                <span class="etiqueta perigo ms-1"
+                                      title="@(item.PromessaQuebrada ? "Promessa quebrada: na lista pela metade da venda rápida" : "Pediu para sair: na lista pelo preço da venda rápida")"><Icone Nome="door-open" Tamanho="12" /> Pediu para sair</span>
                             }
                         </td>
-                        <td class="text-center">@item.Position</td>
-                        <td class="text-center">@item.Overall</td>
-                        <td class="text-center">@(item.Age?.ToString(CultureInfo.InvariantCulture) ?? "-")</td>
+                        <td class="text-center text-body-secondary">@item.Position</td>
+                        <td class="text-center"><span class="ovr @AtributosPes.Faixa(item.Overall)">@item.Overall</span></td>
+                        <td class="text-center numero text-body-secondary">@(item.Age?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
                         <td class="text-nowrap">
                             <img src="@Escudos.GetEscudo(item.TeamName)" alt="" width="20" height="20" class="me-1" style="object-fit: contain;" />
-                            <a href="/teams/details/@item.TeamId" class="text-primary">@item.TeamName</a>
+                            <a href="/teams/details/@item.TeamId" class="text-body">@item.TeamName</a>
                         </td>
-                        <td class="text-end text-nowrap fw-semibold">@FormatCurrency(item.AskingPrice)</td>
+                        <td class="text-end text-nowrap fw-medium numero text-body-emphasis">@FormatCurrency(item.AskingPrice)</td>
                         <td class="text-end text-nowrap">
                             @if (_myTeam is null)
                             {
-                                <span class="text-muted small">—</span>
+                                <span class="text-body-tertiary small">—</span>
                             }
                             else if (item.TeamId == _myTeam.TeamId)
                             {
-                                <span class="badge bg-secondary">Seu jogador</span>
+                                <span class="etiqueta">Seu jogador</span>
                             }
                             else
                             {
                                 <button class="btn btn-success btn-sm me-1" disabled="@(_processing || _mercadoFechado)" @onclick="() => _comprar = item">
                                     Comprar
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" disabled="@(_processing || _mercadoFechado)" @onclick="() => FazerProposta(item)">
+                                <button class="btn btn-outline-secondary btn-sm" disabled="@(_processing || _mercadoFechado)" @onclick="() => FazerProposta(item)">
                                     Proposta
                                 </button>
                             }
