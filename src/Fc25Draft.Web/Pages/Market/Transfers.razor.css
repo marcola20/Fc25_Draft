@@ -1,0 +1,22 @@
+.transf-tabela {
+    font-size: 0.875rem;
+}
+
+.transf-tabela > tbody > tr > td {
+    height: 3rem;
+}
+
+.transf-nome {
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.transf-nome:hover {
+    color: var(--bs-link-hover-color);
+}
+
+::deep .transf-foto {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}
