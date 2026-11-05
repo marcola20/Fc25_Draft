@@ -1,22 +1,31 @@
-/* Telão do draft: pensado para TV/projetor (16:9), fundo escuro e letras grandes. */
+/* Telão do draft: para TV/projetor (16:9). Sempre escuro, na moldura grafite do site, com o dourado só em quem
+   está na vez, no relógio e na escolha que acabou de sair. Letras grandes medidas pela altura da tela. */
 .telao {
-    --fundo: #0b1622;
-    --painel: #13243a;
-    --borda: #1f3a5c;
-    --texto: #f1f5f9;
-    --suave: #94a3b8;
-    --destaque: #f4d35e;
-    --perigo: #ef4444;
+    --fundo: #0e1013;
+    --painel: #17191c;
+    --painel-2: #1e2125;
+    --borda: rgba(232, 234, 237, 0.09);
+    --texto: #e8eaed;
+    --suave: #a2a7ae;
+    --apagado: #6f757d;
+    --destaque: #f2cd5c;
+    --perigo: #d0524a;
     /* Altura travada na tela: no telão nada pode ficar para baixo (sem rolagem). */
     height: 100vh;
     overflow: hidden;
-    background: radial-gradient(circle at top, #16304f 0%, var(--fundo) 60%);
+    background: var(--fundo);
     color: var(--texto);
     display: flex;
     flex-direction: column;
-    padding: 1.5vh 2vw;
-    gap: 1.5vh;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 2vh 2vw;
+    gap: 1.6vh;
+    font-family: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Os ícones acompanham o tamanho da letra em volta. */
+.telao ::deep .icone {
+    width: 1em;
+    height: 1em;
 }
 
 .vazio {
@@ -25,15 +34,16 @@
     color: var(--suave);
 }
 
-.rotulo, .rotulo-pequeno {
-    text-transform: uppercase;
-    letter-spacing: .15em;
-    color: var(--destaque);
-    font-weight: 700;
+.rotulo,
+.rotulo-pequeno {
+    display: flex;
+    align-items: center;
+    gap: 0.6vw;
+    font-weight: 500;
 }
 
-.rotulo { font-size: 2.4vh; }
-.rotulo-pequeno { font-size: 1.6vh; margin-bottom: 1vh; }
+.rotulo { font-size: 2.6vh; color: var(--destaque); }
+.rotulo-pequeno { font-size: 1.8vh; color: var(--suave); margin-bottom: 1.2vh; }
 
 /* ── Topo ── */
 .topo {
@@ -44,13 +54,13 @@
 
 .logo { height: 7vh; }
 
-.titulo .nome { font-size: 3.2vh; font-weight: 800; }
-.titulo .sub { font-size: 2vh; color: var(--suave); }
+.titulo .nome { font-size: 3.2vh; font-weight: 600; }
+.titulo .sub { font-size: 2vh; color: var(--suave); font-variant-numeric: tabular-nums; }
 
 .progresso {
     flex: 1;
-    height: 1vh;
-    background: var(--painel);
+    height: 0.8vh;
+    background: var(--painel-2);
     border-radius: 1vh;
     overflow: hidden;
 }
@@ -62,13 +72,17 @@
     }
 
 .tela-cheia {
+    display: inline-flex;
+    align-items: center;
     background: transparent;
     border: 1px solid var(--borda);
     color: var(--suave);
-    border-radius: .6vh;
+    border-radius: .8vh;
     font-size: 2.4vh;
-    padding: .2vh 1vw;
+    padding: .8vh .8vw;
 }
+
+    .tela-cheia:hover { color: var(--texto); }
 
 /* ── Corpo ── */
 .corpo {
@@ -83,8 +97,8 @@
 .vez, .ultimas, .rodada {
     background: var(--painel);
     border: 1px solid var(--borda);
-    border-radius: 1.5vh;
-    padding: 2vh 1.5vw;
+    border-radius: 1.6vh;
+    padding: 2.4vh 1.6vw;
 }
 
 .vez {
@@ -93,14 +107,14 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: 1vh;
+    gap: 1.2vh;
     overflow: hidden;
-    transition: border-color .3s, box-shadow .3s;
+    transition: border-color .3s;
 }
 
+    /* Tempo estourando: borda e relógio em vermelho, sem brilho em volta. */
     .vez.estourando {
         border-color: var(--perigo);
-        box-shadow: 0 0 4vh rgba(239, 68, 68, .35);
     }
 
 .escudo-grande {
@@ -110,26 +124,33 @@
     filter: drop-shadow(0 1vh 2vh rgba(0, 0, 0, .5));
 }
 
-.time-nome { font-size: 6vh; font-weight: 900; line-height: 1.05; }
+.time-nome { font-size: 6.4vh; font-weight: 600; line-height: 1.05; color: #f6f7f8; }
 .tecnico { font-size: 2.4vh; color: var(--suave); }
 
 .relogio {
-    font-size: 10vh;
-    font-weight: 900;
+    margin-top: 1.2vh;
+    font-family: 'Geist Mono', ui-monospace, Consolas, monospace;
+    font-size: 11vh;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    margin-top: 1vh;
+    color: var(--destaque);
 }
+
+.relogio .pausado { display: inline-flex; align-items: center; gap: 1.5vw; color: var(--suave); }
+.relogio .espera { color: var(--apagado); }
 
 .vez.estourando .relogio {
     color: var(--perigo);
     animation: pulsar 1s ease-in-out infinite;
 }
 
-.relogio .espera { color: var(--suave); }
-
 @keyframes pulsar {
     50% { opacity: .55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vez.estourando .relogio { animation: none; }
 }
 
 .proximos {
@@ -137,25 +158,27 @@
     margin-top: auto;
 }
 
+    .proximos .rotulo-pequeno { justify-content: center; }
+
 .lista-proximos {
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 1vw;
+    gap: .8vw;
 }
 
 .proximo {
     display: flex;
     align-items: center;
     gap: .6vw;
-    background: rgba(255, 255, 255, .05);
+    background: var(--painel-2);
     border-radius: 1vh;
-    padding: .8vh .8vw;
+    padding: .8vh .9vw;
     font-size: 2vh;
 }
 
     .proximo img { height: 3.6vh; width: 3.6vh; object-fit: contain; }
-    .proximo small { color: var(--suave); }
+    .proximo small { color: var(--apagado); font-family: 'Geist Mono', ui-monospace, monospace; }
 
 /* ── Últimas escolhas ── */
 .ultimas {
@@ -171,17 +194,18 @@
     display: flex;
     align-items: center;
     gap: 1vw;
-    background: rgba(255, 255, 255, .04);
-    border-radius: 1vh;
-    padding: 1vh 1vw;
+    background: var(--painel-2);
+    border: 1px solid transparent;
+    border-radius: 1.2vh;
+    padding: 1.1vh 1vw;
 }
 
     .escolha img { height: 5vh; width: 5vh; object-fit: contain; }
 
-    /* A escolha mais recente entra deslizando e fica destacada. */
+    /* A escolha mais recente entra deslizando e fica com o traço dourado. */
     .escolha.nova {
-        background: rgba(244, 211, 94, .14);
-        border: 1px solid var(--destaque);
+        background: rgba(242, 205, 92, .1);
+        border-color: rgba(242, 205, 92, .55);
         animation: entrar .7s ease-out;
     }
 
@@ -190,11 +214,15 @@
     to { transform: none; opacity: 1; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .escolha.nova { animation: none; }
+}
+
 .escolha-texto { flex: 1; min-width: 0; }
-.jogador { font-size: 2.6vh; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jogador { display: flex; align-items: center; gap: .6vw; font-size: 2.6vh; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .detalhe { font-size: 1.8vh; color: var(--suave); }
-.selo { font-size: 2vh; }
-.numero { font-size: 2vh; color: var(--suave); font-weight: 700; }
+.selo { display: inline-flex; font-size: 2vh; color: var(--apagado); }
+.numero { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 2vh; color: var(--apagado); }
 
 /* ── Rodada atual ── */
 .grade {
@@ -208,18 +236,19 @@
     align-items: center;
     gap: .5vw;
     border-radius: .8vh;
-    padding: .6vh .5vw;
-    background: rgba(255, 255, 255, .04);
+    padding: .7vh .6vw;
+    background: var(--painel-2);
+    border: 1px solid transparent;
     min-width: 0;
 }
 
     .celula img { height: 3.4vh; width: 3.4vh; object-fit: contain; }
-    .celula.pendente { opacity: .55; }
-    .celula.atual { outline: 2px solid var(--destaque); background: rgba(244, 211, 94, .1); }
+    .celula.pendente { opacity: .5; }
+    .celula.atual { border-color: rgba(242, 205, 92, .7); background: rgba(242, 205, 92, .08); }
 
 .celula-texto { min-width: 0; }
 .celula-time { font-size: 1.4vh; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.celula-jogador { font-size: 1.7vh; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.celula-jogador { font-size: 1.7vh; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Tela estreita (celular/tablet em pé): uma coluna. */
 @media (max-width: 900px) {

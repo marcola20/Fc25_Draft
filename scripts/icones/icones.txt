@@ -120,3 +120,4 @@ vote
 bot
 copy
 minus
+maximize

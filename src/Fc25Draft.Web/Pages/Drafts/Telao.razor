@@ -44,19 +44,19 @@
             <div class="progresso" title="@s.CompletedPicks de @s.TotalPicks escolhas">
                 <div style="width: @(s.TotalPicks == 0 ? 0 : s.CompletedPicks * 100 / s.TotalPicks)%;"></div>
             </div>
-            <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia">⛶</button>
+            <button type="button" class="tela-cheia" @onclick="TelaCheiaAsync" title="Tela cheia"><Icone Nome="maximize" Tamanho="18" /></button>
         </header>
 
         <main class="corpo">
             <section class="vez @(Estourando ? "estourando" : "")">
                 @if (s.DraftCompleted)
                 {
-                    <div class="rotulo">🏁 Fim do draft</div>
+                    <div class="rotulo"><Icone Nome="flag" Tamanho="18" /> Fim do draft</div>
                     <div class="time-nome">Obrigado, técnicos!</div>
                 }
                 else if (s.AguardandoProtecao)
                 {
-                    <div class="rotulo">🛡️ Aguardando as listas de protegidos</div>
+                    <div class="rotulo"><Icone Nome="shield" Tamanho="18" /> Aguardando as listas de protegidos</div>
                 }
                 else
                 {
@@ -73,11 +73,11 @@
                         <div class="relogio">
                             @if (s.Pausado)
                             {
-                                <span>⏸️ @Relogio.Formatar(Restante)</span>
+                                <span class="pausado"><Icone Nome="pause" Tamanho="18" />@Relogio.Formatar(Restante)</span>
                             }
                             else if (s.PrazoUtc is null)
                             {
-                                <span class="espera">⏱️ @s.TempoPorEscolhaMinutos:00</span>
+                                <span class="espera">@s.TempoPorEscolhaMinutos:00</span>
                             }
                             else
                             {
@@ -120,11 +120,11 @@
                                 @p.PlayerName
                                 @if (p.TempoEsgotado)
                                 {
-                                    <span class="selo" title="Tempo esgotado: o site escolheu">⏱️</span>
+                                    <span class="selo" title="Tempo esgotado: o site escolheu"><Icone Nome="clock" Tamanho="16" /></span>
                                 }
                                 else if (p.Automatica)
                                 {
-                                    <span class="selo" title="Escolha automática">🤖</span>
+                                    <span class="selo" title="Escolha automática"><Icone Nome="bot" Tamanho="16" /></span>
                                 }
                             </div>
                             <div class="detalhe">@p.PositionName · @p.Overall · @p.TeamName</div>
