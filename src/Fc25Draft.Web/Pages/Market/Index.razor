@@ -31,7 +31,7 @@
 <PageTitle>Mercado de Transferências</PageTitle>
 
 <PageHeader Title="Mercado de Transferências"
-            Subtitle="Negocie jogadores disponíveis e acompanhe o mercado em tempo real."
+            Subtitle="Leilões abertos e lances em tempo real"
             Actions="@HeaderActions" />
 
 <ul class="nav nav-tabs mb-3" role="tablist">
@@ -85,7 +85,7 @@
     }
     else
     {
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-2">
             @foreach (var item in PageData.Items)
             {
                 <div class="col">
@@ -148,11 +148,11 @@ else
         }
         else
         {
-            <div class="border-start border-2 ps-3 mt-3">
+            <div class="ps-3 mt-3" style="border-left: 2px solid var(--bs-border-color);">
                 @foreach (var entry in _historyEvents)
                 {
                     <article class="mb-4 position-relative" @key="entry.TransactionId">
-                        <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width: 12px; height: 12px;"></span>
+                        <span class="position-absolute start-0 translate-middle rounded-circle" style="width: 10px; height: 10px; background: var(--bs-tertiary-color); box-shadow: 0 0 0 3px var(--bs-tertiary-bg);"></span>
                         <div class="ms-4">
                             <div class="fw-semibold">@entry.TypeName</div>
                             <div class="text-muted small">@FormatHistoryTimestamp(entry.OccurredAtUtc)</div>
@@ -294,50 +294,22 @@ else
     private DateTime? _historyLatestUtc;
     private int _historyNextPage = 1;
 
-    private RenderFragment HeaderActions => builder =>
-    {
-        var seq = 0;
-        builder.OpenElement(seq++, "div");
-        builder.AddAttribute(seq++, "class", "d-flex flex-wrap gap-2");
-
-        builder.OpenElement(seq++, "button");
-        builder.AddAttribute(seq++, "type", "button");
-        builder.AddAttribute(seq++, "class", "btn btn-outline-primary btn-sm");
-        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, OpenTeamTokenModal));
-        builder.AddContent(seq++, "Seu token");
-        var badgeClass = _teamTokenConfigured ? "bg-success" : "bg-warning text-dark";
-        builder.OpenElement(seq++, "span");
-        builder.AddAttribute(seq++, "class", $"badge {badgeClass} ms-2");
-        builder.AddContent(seq++, _teamTokenConfigured ? "Configurado" : "Não configurado");
-        builder.CloseElement();
-        builder.CloseElement();
-
-        builder.OpenComponent<NavLink>(seq++);
-        builder.AddAttribute(seq++, "class", "btn btn-outline-secondary btn-sm");
-        builder.AddAttribute(seq++, "href", "/mercado/historico");
-        builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(builder2 =>
-        {
-            builder2.AddContent(0, "Histórico do Mercado");
-        }));
-        builder.CloseComponent();
-
-        builder.OpenComponent<NavLink>(seq++);
-        builder.AddAttribute(seq++, "class", "btn btn-outline-secondary btn-sm");
-        builder.AddAttribute(seq++, "href", "/admin/transferencias/historico");
-        builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(builder2 =>
-        {
-            builder2.AddContent(0, "Histórico de Transferências");
-        }));
-        builder.CloseComponent();
-
-        builder.CloseElement();
-    };
+    // Token do time e atalhos dos históricos, no cabeçalho da página.
+    private RenderFragment HeaderActions => @<div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="OpenTeamTokenModal">
+            <Icone Nome="key" Tamanho="14" />
+            Seu token
+            <span class="estado-token @(_teamTokenConfigured ? "ok" : "pendente")">@(_teamTokenConfigured ? "configurado" : "não configurado")</span>
+        </button>
+        <NavLink class="btn btn-outline-secondary btn-sm" href="/mercado/historico"><Icone Nome="history" Tamanho="14" /> Histórico do mercado</NavLink>
+        <NavLink class="btn btn-outline-secondary btn-sm" href="/admin/transferencias/historico"><Icone Nome="arrow-left-right" Tamanho="14" /> Histórico de transferências</NavLink>
+    </div>;
 
     private void RefreshLayoutHeader()
     {
         LayoutState.SetPage(
             NavigationService.GetPageDefinition("/mercado"),
-            subtitle: "Negocie jogadores disponíveis e acompanhe o mercado em tempo real.");
+            subtitle: "Leilões abertos e lances em tempo real");
     }
 
     private int TotalPages

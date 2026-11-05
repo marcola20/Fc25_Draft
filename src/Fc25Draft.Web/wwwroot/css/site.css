@@ -330,6 +330,87 @@ a:hover, .btn-link:hover {
     --bs-btn-border-radius: 0.5rem;
 }
 
+/* Campos: rótulo pequeno e discreto, borda um pouco mais visível que a linha dos painéis. */
+.form-label {
+    margin-bottom: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--bs-secondary-color);
+}
+
+.form-control,
+.form-select {
+    border-color: rgba(var(--bs-emphasis-color-rgb), 0.14);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: border-color var(--cbfv-rapido) var(--cbfv-curva), box-shadow var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+.form-control::placeholder {
+    color: var(--bs-tertiary-color);
+}
+
+.form-control-sm,
+.form-select-sm {
+    min-height: 2rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.input-group-sm > .form-control,
+.input-group-sm > .form-select,
+.input-group-sm > .input-group-text {
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.input-group-text {
+    border-color: rgba(var(--bs-emphasis-color-rgb), 0.14);
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
+}
+
+/* Paginação: números discretos, a página atual com o degrau de superfície. */
+.pagination {
+    --bs-pagination-bg: transparent;
+    --bs-pagination-color: var(--bs-secondary-color);
+    --bs-pagination-border-color: var(--bs-border-color);
+    --bs-pagination-hover-bg: var(--bs-secondary-bg);
+    --bs-pagination-hover-color: var(--bs-emphasis-color);
+    --bs-pagination-hover-border-color: var(--bs-border-color);
+    --bs-pagination-focus-box-shadow: 0 0 0 2px rgba(242, 205, 92, 0.6);
+    --bs-pagination-active-bg: var(--bs-secondary-bg);
+    --bs-pagination-active-color: var(--bs-emphasis-color);
+    --bs-pagination-active-border-color: var(--bs-border-color);
+    --bs-pagination-disabled-bg: transparent;
+    --bs-pagination-disabled-color: var(--bs-tertiary-color);
+    --bs-pagination-disabled-border-color: var(--bs-border-color);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Avisos (alert): fundo do degrau, linha fina e um traço de cor à esquerda no lugar da caixa colorida. */
+.alert {
+    --bs-alert-border-radius: 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-left-width: 3px;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font-size: 0.875rem;
+}
+
+.alert-info { border-left-color: var(--zona-playoff-acesso, #3d8fc4); }
+.alert-success { border-left-color: var(--cbfv-vitoria); }
+.alert-warning { border-left-color: var(--zona-playoff-rebaixamento, #c99428); }
+.alert-danger { border-left-color: var(--cbfv-derrota); }
+.alert-secondary,
+.alert-light,
+.alert-dark,
+.alert-primary { border-left-color: var(--bs-tertiary-color); }
+
+.alert .alert-link {
+    color: var(--bs-emphasis-color);
+}
+
 /* Tabelas: fundo da superfície, linhas finas, cabeçalho discreto (nada de faixa preta). */
 .table {
     --bs-table-bg: transparent;
@@ -468,6 +549,28 @@ h6.text-uppercase.text-muted {
 
 .text-acento {
     color: var(--cbfv-acento-texto) !important;
+}
+
+/* Estado do token do time no botão do Mercado. */
+.estado-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--bs-tertiary-color);
+}
+
+.estado-token::before {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--zona-playoff-rebaixamento);
+}
+
+.estado-token.ok::before {
+    background: var(--cbfv-vitoria);
 }
 
 /* Rótulo de seção ("Destaques", "Plantão CBFV"): frase normal, discreto, colado no que vem embaixo. */

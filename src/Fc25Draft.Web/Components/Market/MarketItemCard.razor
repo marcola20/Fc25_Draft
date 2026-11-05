@@ -16,194 +16,166 @@
 @inject ILogger<MarketItemCard> Logger
 @implements IAsyncDisposable
 
-<div class="card h-100 border-0 shadow-sm">
-    <div class="card-body d-flex flex-column gap-3">
-        <div class="d-flex justify-content-between flex-wrap gap-2 align-items-start">
-            <div class="d-flex align-items-center gap-3">
-                <FotoJogador PlayerId="@Item.PlayerId" Tamanho="56" Classe="" />
-                <div>
-                    <h3 class="h5 mb-1"><a href="/players/details/@Item.PlayerId" class="text-body text-decoration-none">@Item.PlayerName</a></h3>
-
-                    <div class="d-flex gap-2">
-                        <span class="badge bg-primary">@Item.PositionId.ToPositionName()</span>
-                        <span class="badge bg-secondary">OVR @Item.Overall</span>
-                    </div>
-                </div>
-            </div>
-
-            <span class="badge @StatusBadgeClass">@StatusDisplay</span>
+<div class="leilao @(TreatAsSoldVisual ? "vendido" : IsExpired ? "encerrado" : "aberto")">
+    <div class="leilao-topo">
+        <FotoJogador PlayerId="@Item.PlayerId" Tamanho="48" />
+        <div class="leilao-jogador">
+            <a href="/players/details/@Item.PlayerId" class="leilao-nome">@Item.PlayerName</a>
+            <span class="leilao-posicao">@Item.PositionId.ToPositionName() · OVR <span class="numero">@Item.Overall</span></span>
         </div>
+        @if (!IsExpired && !TreatAsSoldVisual)
+        {
+            <span class="leilao-relogio" aria-live="polite" title="Tempo restante">
+                <Icone Nome="clock" Tamanho="14" /><span class="placar">@CountdownText</span>
+            </span>
+        }
+        else if (!ShowWinnerSummary && !ShowExpiredNoBids)
+        {
+            @* Vendido e encerrado sem lance já aparecem no meio do cartão. *@
+            <span class="leilao-status @StatusBadgeClass">@StatusDisplay</span>
+        }
+    </div>
 
-        <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
-            @if (ShowWinnerSummary)
+    @if (ShowWinnerSummary)
+    {
+        <div class="leilao-valor">
+            <span class="leilao-rotulo vendido">Vendido para @WinnerDisplay</span>
+            <span class="leilao-figura">@FormatCurrency(FinalSoldAmount)</span>
+        </div>
+    }
+    else if (ShowExpiredNoBids)
+    {
+        <div class="leilao-valor">
+            <span class="leilao-rotulo">Encerrado sem lances</span>
+        </div>
+    }
+    else
+    {
+        <div class="leilao-valor">
+            @if (Item.CurrentLeaderAmount.HasValue)
             {
-                <div class="d-flex flex-column gap-2 mt-2">
-                    <div class="text-muted small">
-                        Adquirido por @((MarkupString)$"<strong>{WinnerDisplay}</strong>")
-                    </div>
-                    <div>
-                        <span class="text-muted small">pelo valor de </span>
-                        <span class="fw-semibold text-body">@FormatCurrency(FinalSoldAmount)</span>
-                    </div>
+                <span class="leilao-rotulo">Lance atual@(string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName) ? "" : $" · {Item.CurrentLeaderTeamName}")</span>
+                <span class="leilao-figura">@FormatCurrency(Item.CurrentLeaderAmount.Value)</span>
+            }
+            else
+            {
+                <span class="leilao-rotulo">Nenhum lance ainda</span>
+                <span class="leilao-figura vazio">—</span>
+            }
+        </div>
+        <dl class="leilao-numeros">
+            <div>
+                <dt title="@MinIncrementTooltip">Lance mínimo</dt>
+                <dd>@FormatCurrency(Item.RequiredMinBid)</dd>
+            </div>
+            @if (CanBuyNow)
+            {
+                <div>
+                    <dt>Comprar agora</dt>
+                    <dd>@FormatCurrency(Item.BuyNowPrice!.Value)</dd>
                 </div>
             }
-            else if (ShowExpiredNoBids)
+        </dl>
+    }
+
+    @if (!IsExpired && !IsSold)
+    {
+        <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync" class="leilao-lance">
+            <label class="visually-hidden" for="@BidInputId">Valor do lance</label>
+            <InputText @key="Item.ItemId"
+                       @bind-Value="_model.AmountText"
+                       @bind-Value:event="@oninput"
+                       class="form-control form-control-sm"
+                       id="@BidInputId"
+                       inputmode="decimal"
+                       placeholder="Valor do lance, ex.: 30.000.000"
+                       @onfocus="BeginEditing"
+                       @onblur="EndEditing" />
+            <button type="submit"
+                    class="btn btn-primary btn-sm"
+                    disabled="@IsBidDisabled"
+                    title="@LeaderTooltip">
+                Dar lance
+            </button>
+        </EditForm>
+
+        @if (CanBuyNow)
+        {
+            @if (_showBuyConfirm)
             {
-                <div class="d-flex flex-column gap-2 mt-2">
-                    <div class="fw-semibold text-body">Nenhum lance recebido.</div>
+                <div class="leilao-confirmar" role="alert">
+                    <span class="me-auto">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)?</span>
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            disabled="@_isSubmitting"
+                            @onclick="ConfirmBuyNowAsync">
+                        Confirmar
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            disabled="@_isSubmitting"
+                            @onclick="CancelBuyNow">
+                        Cancelar
+                    </button>
                 </div>
             }
             else
             {
-                <div class="d-flex flex-column gap-3">
-                    <div>
-                        <div class="text-muted small">Líder atual</div>
-                        @if (Item.CurrentLeaderAmount.HasValue)
-                        {
-                            <div class="fw-semibold text-body">@FormatCurrency(Item.CurrentLeaderAmount.Value)</div>
-                            @if (!string.IsNullOrWhiteSpace(Item.CurrentLeaderTeamName))
-                            {
-                                <div class="small text-muted">por @Item.CurrentLeaderTeamName</div>
-                            }
-                        }
-                        else
-                        {
-                            <div class="fw-semibold text-body">Nenhum lance ainda</div>
-                            <div class="small text-muted">Seja o primeiro a dar um lance.</div>
-                        }
-                    </div>
-                    <div>
-                        <div class="text-muted small" title="@MinIncrementTooltip">Lance mínimo</div>
-                        <div class="fw-semibold text-body">@FormatCurrency(Item.RequiredMinBid)</div>
-                    </div>
-                    @if (CanBuyNow)
-                    {
-                        <div>
-                            <div class="text-muted small">Comprar agora</div>
-                            <div class="fw-semibold text-body">@FormatCurrency(Item.BuyNowPrice!.Value)</div>
-                        </div>
-                    }
-                </div>
-            }
-
-            @if (!IsExpired && !TreatAsSoldVisual)
-            {
-                <div class="text-end" aria-live="polite">
-                    <span class="fw-semibold">Tempo restante: @CountdownText</span>
-                </div>
-            }
-        </div>
-
-        @if (!IsExpired && !IsSold)
-        {
-            <EditForm EditContext="_editContext" OnValidSubmit="HandleBidSubmitAsync">
-                <div class="mb-2">
-                    <label class="form-label" for="@BidInputId">Valor do lance</label>
-                    <div class="input-group input-group-sm">
-                        <InputText @key="Item.ItemId"
-                                   @bind-Value="_model.AmountText"
-                                   @bind-Value:event="@oninput"
-                                   class="form-control me-2"
-                                   id="@BidInputId"
-                                   inputmode="decimal"
-                                   placeholder="Ex.: R$ 30.000.000,00"
-                                   @onfocus="BeginEditing"
-                                   @onblur="EndEditing" />
-                        <button type="submit"
-                                class="btn btn-primary"
-                                disabled="@IsBidDisabled"
-                                title="@LeaderTooltip">
-                            Dar lance
-                        </button>
-                    </div>
-                </div>
-            </EditForm>
-
-            @if (CanBuyNow)
-            {
-                <div class="d-flex flex-column gap-2">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="text-muted small">Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)</span>
-                        <button type="button"
-                                class="btn btn-outline-success btn-sm ms-auto"
-                                disabled="@IsBuyNowDisabled"
-                                @onclick="ShowBuyNowConfirm">
-                            Comprar agora
-                        </button>
-                    </div>
-
-                    @if (_showBuyConfirm)
-                    {
-                        <div class="alert alert-warning py-2 mb-0" role="alert">
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <span class="me-auto">Confirmar compra imediata?</span>
-                                <button type="button"
-                                        class="btn btn-warning btn-sm"
-                                        disabled="@_isSubmitting"
-                                        @onclick="ConfirmBuyNowAsync">
-                                    Confirmar
-                                </button>
-                                <button type="button"
-                                        class="btn btn-outline-secondary btn-sm"
-                                        disabled="@_isSubmitting"
-                                        @onclick="CancelBuyNow">
-                                    Cancelar
-                                </button>
-                            </div>
-                        </div>
-                    }
-                </div>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm w-100"
+                        disabled="@IsBuyNowDisabled"
+                        @onclick="ShowBuyNowConfirm">
+                    Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)
+                </button>
             }
         }
+    }
 
-        @if (CanResetBids)
-        {
-            <div class="d-flex flex-column gap-2 border-top pt-2">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="text-muted small">Admin</span>
+    @if (CanResetBids)
+    {
+        <div class="leilao-admin">
+            @if (_showResetConfirm)
+            {
+                <div class="leilao-confirmar perigo" role="alert">
+                    <span class="me-auto small">
+                        Zerar todos os lances em @Item.PlayerName? @FormatCurrency(Item.CurrentLeaderAmount!.Value) volta ao caixa de @(Item.CurrentLeaderTeamName ?? "time líder").
+                    </span>
                     <button type="button"
-                            class="btn btn-outline-danger btn-sm ms-auto"
+                            class="btn btn-danger btn-sm"
                             disabled="@_isSubmitting"
-                            @onclick="ShowResetBidsConfirm">
-                        Zerar lances
+                            @onclick="ConfirmResetBidsAsync">
+                        Confirmar
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            disabled="@_isSubmitting"
+                            @onclick="CancelResetBids">
+                        Cancelar
                     </button>
                 </div>
+            }
+            else
+            {
+                <span class="small text-body-tertiary me-auto">Admin</span>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        disabled="@_isSubmitting"
+                        @onclick="ShowResetBidsConfirm">
+                    Zerar lances
+                </button>
+            }
+        </div>
+    }
 
-                @if (_showResetConfirm)
-                {
-                    <div class="alert alert-danger py-2 mb-0" role="alert">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <span class="me-auto small">
-                                Zerar todos os lances em @Item.PlayerName? @FormatCurrency(Item.CurrentLeaderAmount!.Value) volta ao caixa de @(Item.CurrentLeaderTeamName ?? "time líder").
-                            </span>
-                            <button type="button"
-                                    class="btn btn-danger btn-sm"
-                                    disabled="@_isSubmitting"
-                                    @onclick="ConfirmResetBidsAsync">
-                                Confirmar
-                            </button>
-                            <button type="button"
-                                    class="btn btn-outline-secondary btn-sm"
-                                    disabled="@_isSubmitting"
-                                    @onclick="CancelResetBids">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                }
-            </div>
-        }
+    @if (!string.IsNullOrEmpty(_infoMessage))
+    {
+        <div class="alert alert-info mb-0 py-2 small" role="status">@_infoMessage</div>
+    }
 
-        @if (!string.IsNullOrEmpty(_infoMessage))
-        {
-            <div class="alert alert-info mb-0" role="status">@_infoMessage</div>
-        }
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <div class="alert alert-danger mb-0" role="alert">@_errorMessage</div>
-        }
-    </div>
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mb-0 py-2 small" role="alert">@_errorMessage</div>
+    }
 </div>
 
 @code {
@@ -347,17 +319,15 @@
     {
         get
         {
-            if (TreatAsSoldVisual) return "bg-danger"; 
+            if (TreatAsSoldVisual) return "status-vendido";
 
             var rawStatus = IsExpired ? "encerrado" : Item.Status ?? string.Empty;
             var status = rawStatus.ToLowerInvariant();
             return status switch
             {
-                "active" or "published" or "ativo" or "publicado" => "bg-success",
-                "sold" or "settled" or "vendido" or "finalizado" => "bg-danger",
-                "closed" or "encerrado" => "bg-secondary",
-                "canceled" or "cancelled" or "cancelado" => "bg-secondary",
-                _ => "bg-secondary"
+                "active" or "published" or "ativo" or "publicado" => "status-aberto",
+                "sold" or "settled" or "vendido" or "finalizado" => "status-vendido",
+                _ => ""
             };
         }
     }
@@ -580,7 +550,9 @@
         }
     }
 
-    private static string FormatCurrency(decimal value) => value.ToString("C", CurrencyCulture);
+    // Valores redondos sem os centavos ("R$ 33.041.500"); com centavos, o formato completo.
+    private static string FormatCurrency(decimal value) =>
+        value.ToString(value == decimal.Truncate(value) ? "C0" : "C", CurrencyCulture);
 
     private static bool AreAmountsEqual(decimal left, decimal right) => Math.Abs(left - right) < 0.01m;
 

@@ -74,3 +74,5 @@ trending-up
 circle-check
 circle-x
 hand
+clock
+sliders-horizontal

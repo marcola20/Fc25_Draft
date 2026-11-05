@@ -7,93 +7,81 @@
 @using Fc25Draft.Web.Models.Market
 @using CoreQueryVm = Fc25Draft.Core.DTOs.MarketQueryVm
 
-<style>
-    .market-filters label.form-label {
-        color: white !important;
-    }
-</style>
-
+@* Filtros numa linha só no computador (empilham no celular); os botões e a contagem ficam no fim. *@
 <EditForm Model="Model" OnValidSubmit="ApplyAsync">
-    <div class="market-filters border rounded-3 p-3 bg-body">
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="market-filter-name">Nome do jogador</label>
-                <InputText id="market-filter-name"
-                           class="form-control form-control-sm"
-                           @bind-Value="Model.Name"
-                           placeholder="Filtrar pelo nome"
-                           aria-label="Filtrar pelo nome" />
-            </div>
+    @* No celular os filtros ficam recolhidos atrás deste botão; no computador ele some e os filtros ficam abertos. *@
+    <button type="button" class="btn btn-outline-secondary btn-sm filtros-alternar" aria-expanded="@_abertoNoCelular"
+            @onclick="() => _abertoNoCelular = !_abertoNoCelular">
+        <Icone Nome="sliders-horizontal" Tamanho="14" /> Filtros
+        <Icone Nome="@(_abertoNoCelular ? "chevron-up" : "chevron-down")" Tamanho="14" />
+    </button>
+    <div class="filtros-mercado @(_abertoNoCelular ? "aberto" : "")">
+        <div class="filtro filtro-nome">
+            <label class="form-label" for="market-filter-name">Jogador</label>
+            <InputText id="market-filter-name"
+                       class="form-control form-control-sm"
+                       @bind-Value="Model.Name"
+                       placeholder="Nome"
+                       aria-label="Filtrar pelo nome" />
+        </div>
 
-            <div class="col-12 col-md-6">
-                <PositionMultiSelect Label="Posições"
-                                     WrapperClass="w-100"
-                                     ToggleClass="form-select form-select-sm text-start"
-                                     IdPrefix="market-pos"
-                                     Options="@(PositionOptions.Select(p => new PositionMultiSelect.OptionItem(p.Id, p.Name)).ToList())"
-                                     @bind-SelectedIds="Model.Positions" />
+        <div class="filtro">
+            <PositionMultiSelect Label="Posições"
+                                 WrapperClass="w-100"
+                                 ToggleClass="form-select form-select-sm text-start d-flex"
+                                 IdPrefix="market-pos"
+                                 Options="@(PositionOptions.Select(p => new PositionMultiSelect.OptionItem(p.Id, p.Name)).ToList())"
+                                 @bind-SelectedIds="Model.Positions" />
+        </div>
 
+        <div class="filtro">
+            <label class="form-label" for="market-filter-status">Status</label>
+            <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
+                <option value="">Todos</option>
+                @foreach (var status in StatusOptions)
+                {
+                    <option value="@status">@status</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="filtro">
+            <label class="form-label" for="market-filter-sort">Ordenar por</label>
+            <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
+                <option value="">Padrão</option>
+                @foreach (var option in SortOptions)
+                {
+                    <option value="@option.Value">@option.DisplayName</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="filtro filtro-overall">
+            <label class="form-label" for="market-filter-overall-min">Overall</label>
+            <div class="input-group input-group-sm">
+                <InputNumber TValue="int?" id="market-filter-overall-min" class="form-control"
+                             @bind-Value="Model.OverallMin" min="0" placeholder="de" aria-label="Overall mínimo" />
+                <InputNumber TValue="int?" id="market-filter-overall-max" class="form-control"
+                             @bind-Value="Model.OverallMax" min="0" placeholder="até" aria-label="Overall máximo" />
             </div>
         </div>
 
-        <div class="row g-2 align-items-end mt-2">
-            <div class="col-12 col-md">
-                <label class="form-label" for="market-filter-status">Status</label>
-                <InputSelect class="form-select form-select-sm" id="market-filter-status" @bind-Value="Model.Status">
-                    <option value="">Todos</option>
-                    @foreach (var status in StatusOptions)
-                    {
-                        <option value="@status">@status</option>
-                    }
-                </InputSelect>
-            </div>
-
-            <div class="col-12 col-md">
-                <label class="form-label" for="market-filter-sort">Ordenar por</label>
-                <InputSelect class="form-select form-select-sm" id="market-filter-sort" @bind-Value="Model.Sort">
-                    <option value="">Padrão</option>
-                    @foreach (var option in SortOptions)
-                    {
-                        <option value="@option.Value">@option.DisplayName</option>
-                    }
-                </InputSelect>
-            </div>
-
-            <div class="col-12 col-md">
-                <label class="form-label" for="market-filter-overall-min">Overall</label>
-                <div class="input-group input-group-sm">
-                    <InputNumber TValue="int?" id="market-filter-overall-min" class="form-control"
-                                 @bind-Value="Model.OverallMin" min="0" aria-label="Overall mínimo" />
-                    <span class="input-group-text">até</span>
-                    <InputNumber TValue="int?" id="market-filter-overall-max" class="form-control"
-                                 @bind-Value="Model.OverallMax" min="0" aria-label="Overall máximo" />
-                </div>
-            </div>
+        <div class="filtro-acoes">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
         </div>
-
-        <div class="row mt-2">
-            <div class="col-12">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm">Aplicar filtros</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Limpar</button>
-                </div>
-            </div>
-        </div>
-
-        @if (!string.IsNullOrWhiteSpace(ResultsSummary))
-        {
-            <div class="row mt-1">
-                <div class="col-12">
-                    <span class="text-muted small float-end">@ResultsSummary</span>
-                </div>
-            </div>
-        }
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(ResultsSummary))
+    {
+        <p class="filtros-resumo">@ResultsSummary</p>
+    }
 </EditForm>
 
 @code {
     private static readonly IReadOnlyList<int> PageSizeOptions = new[] { 20, 50, 100 };
     private CoreQueryVm Model = new() { Page = 1, PageSize = 20 };
+    private bool _abertoNoCelular;
 
     [Parameter]
     public EventCallback<CoreQueryVm> OnApply { get; set; }

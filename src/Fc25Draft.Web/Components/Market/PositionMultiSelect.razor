@@ -14,8 +14,8 @@
             @onclick="Toggle"
             @onkeydown="HandleKeyDown"
             aria-expanded="@IsOpen">
+        @* A seta é a do próprio form-select. *@
         <span class="flex-grow-1 text-truncate">@DisplayText</span>
-        <span class="ms-2" aria-hidden="true">▾</span>
     </button>
 
     @code {
