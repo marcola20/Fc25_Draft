@@ -10,9 +10,9 @@
 
 <PageTitle>Ranking do bolão</PageTitle>
 
-<div class="container-fluid py-3">
+<div>
     <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
-        <a href="/bolao" class="btn btn-sm btn-outline-secondary">🎯 Palpitar</a>
+        <a href="/bolao" class="btn btn-sm btn-outline-secondary"><Icone Nome="target" Tamanho="14" /> Palpitar</a>
     </div>
     <p class="text-muted small mb-4">Quem chuta melhor a rodada da CBFV.</p>
 
@@ -51,7 +51,7 @@
             @if (_temporada >= BolaoPremios.ValeAPartirDaTemporada)
             {
                 <div class="card-body py-2 small text-muted border-bottom">
-                    💰 No fim da temporada, o geral paga ao clube:
+                    <Icone Nome="banknote" Tamanho="14" Classe="text-body-tertiary me-1" />No fim da temporada, o geral paga ao clube:
                     @string.Join(", ", BolaoPremios.Geral.Select((v, i) => $"{i + 1}º {BolaoPremios.Rotulo(v)}")).
                     Cada rodada paga @BolaoPremios.Rotulo(BolaoPremios.PorRodada) a quem fizer mais pontos.
                 </div>
@@ -62,7 +62,7 @@
         @if (_premios.Count > 0)
         {
             <div class="card mt-4">
-                <div class="card-header fw-bold">💰 Prêmios pagos@(_temporada is null ? "" : $" em {_temporada}")</div>
+                <div class="card-header fw-semibold">Prêmios pagos@(_temporada is null ? "" : $" em {_temporada}")</div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <tbody>
@@ -175,7 +175,7 @@
                         @foreach (var linha in linhas)
                         {
                             <tr>
-                                <td class="fw-bold">@linha.Posicao</td>
+                                <td class="numero text-body-secondary">@linha.Posicao</td>
                                 <td>
                                     @if (linha.TimeNome is { Length: > 0 } time)
                                     {
@@ -186,11 +186,11 @@
                                     <a href="/treinadores/@linha.TreinadorId"><NomeTreinador Nome="@linha.Nome" Apelido="@perfil?.Apelido" /></a>
                                     <span class="text-muted small">@(linha.TimeNome ?? "sem clube")</span>
                                 </td>
-                                <td class="text-center fw-bold">
+                                <td class="text-center fw-semibold numero">
                                     @linha.Pontos
                                     @if (levaria.TryGetValue(linha.TreinadorId, out var valor))
                                     {
-                                        <span class="badge bg-success-subtle text-success-emphasis ms-1" title="Quanto o clube leva se a temporada acabar assim">💰 @BolaoPremios.Rotulo(valor)</span>
+                                        <span class="etiqueta sucesso ms-1" title="Quanto o clube leva se a temporada acabar assim">@BolaoPremios.Rotulo(valor)</span>
                                     }
                                 </td>
                                 <td class="text-center">@linha.Cravadas</td>

@@ -96,3 +96,5 @@ pause
 scale
 medal
 info
+eye
+eye-off

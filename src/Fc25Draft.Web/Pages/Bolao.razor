@@ -13,7 +13,7 @@
 
 <PageTitle>Bolão da rodada</PageTitle>
 
-<div class="container-fluid py-3">
+<div class="bolao">
     @if (_erro is not null)
     {
         <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
@@ -24,7 +24,7 @@
     }
 
     <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
-        <a href="/bolao/ranking" class="btn btn-sm btn-outline-secondary">🏅 Ranking</a>
+        <a href="/bolao/ranking" class="btn btn-sm btn-outline-secondary"><Icone Nome="chart-column" Tamanho="14" /> Ranking</a>
     </div>
 
     @if (_carregando)
@@ -51,26 +51,24 @@
     }
     else
     {
-        <div class="card mb-4">
-            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
-                <div>
-                    <div class="fw-semibold">@_eu.Nome</div>
-                    <div class="text-muted small">@(_eu.Hoje is null ? "Sem clube" : _eu.TimeAtual)</div>
-                </div>
-                @if (_resumo is { Palpites: > 0 } r)
-                {
-                    <div class="ms-auto d-flex gap-4 text-center">
-                        <div><div class="h5 mb-0">@r.Pontos</div><div class="text-muted small">pontos</div></div>
-                        <div><div class="h5 mb-0">@r.Cravadas</div><div class="text-muted small">cravadas</div></div>
-                        <div><div class="h5 mb-0">@r.RodadasVencidas</div><div class="text-muted small">rodadas ganhas</div></div>
-                        @if (r.PosicaoGeral is { } pos)
-                        {
-                            <div><div class="h5 mb-0">@pos<span class="text-muted small">º</span></div><div class="text-muted small">no geral</div></div>
-                        }
-                    </div>
-                }
+        <section class="bolao-eu">
+            <div class="bolao-eu-quem">
+                <span class="bolao-eu-nome">@_eu.Nome</span>
+                <span class="bolao-eu-time">@(_eu.Hoje is null ? "Sem clube" : _eu.TimeAtual)</span>
             </div>
-        </div>
+            @if (_resumo is { Palpites: > 0 } r)
+            {
+                <dl class="bolao-eu-numeros">
+                    <div><dt>Pontos</dt><dd class="numero">@r.Pontos</dd></div>
+                    <div><dt>Cravadas</dt><dd class="numero">@r.Cravadas</dd></div>
+                    <div><dt>Rodadas ganhas</dt><dd class="numero">@r.RodadasVencidas</dd></div>
+                    @if (r.PosicaoGeral is { } pos)
+                    {
+                        <div><dt>No geral</dt><dd class="numero">@(pos)º</dd></div>
+                    }
+                </dl>
+            }
+        </section>
 
         @if (_abertas.Count == 0)
         {
@@ -81,22 +79,22 @@
         {
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                    <span class="fw-bold">@rodada.Titulo</span>
+                    <span class="fw-semibold">@rodada.Titulo</span>
                     @if (rodada.Quando is { } quando)
                     {
-                        <span class="text-muted small">@quando.ToString("ddd dd/MM", Br) · @HoraCurta(quando)</span>
+                        <span class="text-body-secondary small">@quando.ToString("ddd dd/MM", Br) · @HoraCurta(quando)</span>
                     }
                     @if (rodada.Faltam == 0 && rodada.Palpitados > 0)
                     {
-                        <span class="badge bg-success">palpites enviados</span>
+                        <span class="etiqueta sucesso ms-auto"><Icone Nome="check" Tamanho="12" /> palpites enviados</span>
                     }
                     else if (rodada.Palpitados > 0)
                     {
-                        <span class="badge bg-warning text-dark">@rodada.Palpitados de @rodada.Jogos.Count</span>
+                        <span class="etiqueta aviso ms-auto numero">@rodada.Palpitados de @rodada.Jogos.Count</span>
                     }
                     @if (rodada.Jogos.Any(j => !j.Aberto))
                     {
-                        <span class="badge bg-info text-dark" title="Os jogos que já começaram fecharam; os outros ainda aceitam palpite">rodada em andamento</span>
+                        <span class="etiqueta" title="Os jogos que já começaram fecharam; os outros ainda aceitam palpite">rodada em andamento</span>
                     }
                 </div>
                 <div class="card-body">
@@ -112,20 +110,22 @@
                         var palpite = Palpite(rodada.RodadaId, jogo.PartidaId);
                         @if (horariosDiferentes && jogo.Quando is DateTime hora)
                         {
-                            <div class="text-center text-muted small mb-1">🕒 @HoraCurta(hora)</div>
+                            <div class="bolao-hora"><Icone Nome="clock" Tamanho="12" /> @HoraCurta(hora)</div>
                         }
-                        <div class="d-flex align-items-center justify-content-center gap-2 mb-2 flex-wrap">
-                            <span class="text-end" style="min-width:9rem;">@jogo.TimeCasa</span>
-                            <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" style="width:26px;height:26px;object-fit:contain;" />
-                            <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
+                        <div class="palpite">
+                            <span class="palpite-time casa">@jogo.TimeCasa</span>
+                            <img src="@EscudoService.GetEscudo(jogo.TimeCasa)" alt="" class="palpite-escudo" />
+                            <input type="number" min="0" max="99" class="form-control palpite-placar" inputmode="numeric"
+                                   aria-label="Gols do @jogo.TimeCasa"
                                    value="@palpite.Casa"
                                    @onchange="e => palpite.Casa = Numero(e.Value?.ToString())" />
-                            <span class="text-muted">x</span>
-                            <input type="number" min="0" max="99" class="form-control form-control-sm text-center" style="width:4rem;"
+                            <span class="palpite-x">x</span>
+                            <input type="number" min="0" max="99" class="form-control palpite-placar" inputmode="numeric"
+                                   aria-label="Gols do @jogo.TimeFora"
                                    value="@palpite.Fora"
                                    @onchange="e => palpite.Fora = Numero(e.Value?.ToString())" />
-                            <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
-                            <span style="min-width:9rem;">@jogo.TimeFora</span>
+                            <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" class="palpite-escudo" />
+                            <span class="palpite-time">@jogo.TimeFora</span>
                         </div>
                         @if (jogo.Eliminatorio && palpite.Casa is not null && palpite.Casa == palpite.Fora)
                         {
@@ -147,7 +147,7 @@
                     }
 
                     <div class="d-flex justify-content-end gap-2 mt-3">
-                        <button class="btn btn-success" @onclick="() => Salvar(rodada)" disabled="@_salvando">
+                        <button class="btn btn-primary" @onclick="() => Salvar(rodada)" disabled="@_salvando">
                             @(rodada.Jogos.Any(j => j.Aberto && j.PalpiteCasa is not null) ? "Atualizar palpites" : "Enviar palpites")
                         </button>
                     </div>
@@ -167,18 +167,20 @@
 
         @if (_fechadas.Count > 0)
         {
-            <h2 class="h5 border-bottom pb-2 mb-3 mt-4">Rodadas que já rolaram</h2>
+            <div class="secao-titulo mt-5">
+                <h2>Rodadas que já rolaram</h2>
+            </div>
 
             @foreach (var rodada in _fechadas)
             {
                 <div class="card mb-3">
                     <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                        <span class="fw-bold">@rodada.Titulo</span>
+                        <span class="fw-semibold">@rodada.Titulo</span>
                         @if (rodada.Quando is { } quando)
                         {
-                            <span class="text-muted small">@quando.ToString("dd/MM", Br)</span>
+                            <span class="text-body-secondary small">@quando.ToString("dd/MM", Br)</span>
                         }
-                        <span class="badge bg-dark ms-auto">@rodada.Pontos pontos seus</span>
+                        <span class="etiqueta acento ms-auto"><span class="numero">@rodada.Pontos</span> pontos seus</span>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
@@ -187,7 +189,7 @@
                                 {
                                     <tr>
                                         <td class="text-end">@jogo.TimeCasa</td>
-                                        <td class="text-center fw-bold text-nowrap" style="width:5rem;">
+                                        <td class="text-center text-nowrap placar" style="width:5rem;">
                                             @if (jogo.Encerrado)
                                             {
                                                 <span>@jogo.GolsCasa x @jogo.GolsFora</span>
@@ -228,15 +230,15 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="card-footer bg-white">
+                    <div class="card-footer">
                         @foreach (var premio in _premiosDasRodadas[rodada.RodadaId])
                         {
                             <div class="small mb-1">
-                                🎯 <strong>@premio.Nome</strong> ganhou a rodada com @premio.Pontos pontos:
+                                <Icone Nome="trophy" Tamanho="14" Classe="text-acento me-1" /><strong>@premio.Nome</strong> ganhou a rodada com @premio.Pontos pontos:
                                 @(premio.TimeNome is { } clube ? $"{BolaoPremios.Rotulo(premio.Valor)} para o caixa do {clube}" : "estava sem clube e não recebeu")
                             </div>
                         }
-                        <a href="/bolao/ranking?rodada=@rodada.RodadaId" class="small">Ver o que o pessoal chutou nessa rodada →</a>
+                        <a href="/bolao/ranking?rodada=@rodada.RodadaId" class="small text-body-secondary">Ver o que o pessoal chutou nessa rodada <Icone Nome="arrow-right" Tamanho="12" /></a>
                         @if (AdminAuth.IsAdmin)
                         {
                             <div class="mt-2">@PainelDoAdm(rodada)</div>
@@ -386,11 +388,11 @@
         <div style="width:15rem;">
             @if (gols is null)
             {
-                <div class="form-control form-control-sm text-muted small text-truncate" title="Chute o placar primeiro">⚽ G/A do @time</div>
+                <div class="form-control form-control-sm text-muted small text-truncate" title="Chute o placar primeiro">G/A do @time</div>
             }
             else if (gols == 0)
             {
-                <div class="form-control form-control-sm small text-truncate" title="Você chutou que o @time não marca">🧤 clean sheet do @adversario</div>
+                <div class="form-control form-control-sm small text-truncate" title="Você chutou que o @time não marca">Clean sheet do @adversario</div>
             }
             else
             {
@@ -400,7 +402,7 @@
                 <select class="form-select form-select-sm" title="Jogador do @time que faz gol ou dá assistência"
                         value="@(escolhido?.ToString(CultureInfo.InvariantCulture) ?? "")"
                         @onchange="e => Escolher(palpite, casa, e.Value?.ToString())">
-                    <option value="">⚽ G/A do @time: ninguém</option>
+                    <option value="">G/A do @time: ninguém</option>
                     @if (salvo.Item1 is int saiu && elenco.All(j => j.JogadorId != saiu))
                     {
                         <option value="@saiu">@salvo.Item2</option>
@@ -425,7 +427,7 @@
     private RenderFragment QuemPassa(BolaoJogoDto jogo, Rascunho palpite) => __builder =>
     {
         <div class="d-flex justify-content-center align-items-center gap-2 mb-2 flex-wrap small">
-            <span class="text-muted">🥅 Quem passa nos pênaltis? <span class="text-nowrap">(@Sinal(BolaoPontuacao.PenaltisAcerto))</span></span>
+            <span class="text-muted">Quem passa nos pênaltis? <span class="text-nowrap">(@Sinal(BolaoPontuacao.PenaltisAcerto))</span></span>
             @foreach (var (timeId, time) in new[] { (jogo.TimeCasaId, jogo.TimeCasa), (jogo.TimeForaId, jogo.TimeFora) })
             {
                 var escolhido = palpite.Penaltis == timeId;
@@ -446,7 +448,7 @@
         var time = escolhido == jogo.TimeCasaId ? jogo.TimeCasa : jogo.TimeFora;
 
         <div class="small text-nowrap">
-            <span class="text-muted">🥅 @time nos pênaltis</span>
+            <span class="text-muted">@time nos pênaltis</span>
             @if (jogo.Encerrado && jogo.PontosPenaltis is int p)
             {
                 <span class="fw-semibold ms-1 @(p > 0 ? "text-success" : "text-muted")"
@@ -464,7 +466,7 @@
         var jogador = casa ? jogo.JogadorCasa : jogo.JogadorFora;
         var pontos = casa ? jogo.ExtraCasa : jogo.ExtraFora;
 
-        var texto = chute == 0 ? $"🧤 {(casa ? jogo.TimeFora : jogo.TimeCasa)}" : jogador is null ? null : $"⚽ {jogador}";
+        var texto = chute == 0 ? $"clean sheet: {(casa ? jogo.TimeFora : jogo.TimeCasa)}" : jogador is null ? null : $"G/A: {jogador}";
         if (texto is null) return;
 
         <div class="small text-nowrap">
@@ -496,7 +498,7 @@
                 }
                 else
                 {
-                    <span class="badge bg-secondary" title="O horário do jogo passou: o palpite dele fechou">🔒 fechado</span>
+                    <span class="etiqueta" title="O horário do jogo passou: o palpite dele fechou"><Icone Nome="lock" Tamanho="12" /> fechado</span>
                 }
             </span>
             <img src="@EscudoService.GetEscudo(jogo.TimeFora)" alt="" style="width:26px;height:26px;object-fit:contain;" />
@@ -546,7 +548,7 @@
         var aberto = _painelAberto.Contains(rodada.RodadaId);
 
         <button class="btn btn-sm btn-outline-secondary" @onclick="() => AlternarPainel(rodada.RodadaId)">
-            👁 @(aberto ? "Esconder" : "Ver") os palpites do pessoal <span class="text-muted small">(só o adm vê)</span>
+            <Icone Nome="@(aberto ? "eye-off" : "eye")" Tamanho="14" /> @(aberto ? "Esconder" : "Ver") os palpites do pessoal <span class="text-muted small">(só o adm vê)</span>
         </button>
 
         @if (aberto && _doPessoal.GetValueOrDefault(rodada.RodadaId) is { } pessoal)
@@ -597,7 +599,7 @@
                                         <td class="text-center">
                                             @if (porJogo.GetValueOrDefault(jogo.PartidaId) is { } p)
                                             {
-                                                <div class="fw-bold text-nowrap">
+                                                <div class="placar text-nowrap">
                                                     @p.GolsCasa x @p.GolsFora
                                                     @if (p.Pontos is int pts)
                                                     {
@@ -606,11 +608,11 @@
                                                 </div>
                                                 @foreach (var nome in new[] { p.JogadorCasa, p.JogadorFora }.Where(n => n is not null))
                                                 {
-                                                    <div class="text-muted text-nowrap">⚽ @nome</div>
+                                                    <div class="text-muted text-nowrap">G/A: @nome</div>
                                                 }
                                                 @if (p.Penaltis is { } pen)
                                                 {
-                                                    <div class="text-muted text-nowrap">🥅 @pen</div>
+                                                    <div class="text-muted text-nowrap">pênaltis: @pen</div>
                                                 }
                                             }
                                             else
