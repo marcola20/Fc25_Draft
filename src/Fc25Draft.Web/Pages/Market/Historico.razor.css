@@ -1,0 +1,8 @@
+.lances-tabela {
+    font-size: 0.875rem;
+}
+
+::deep .lances-foto {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bs-border-color);
+}
