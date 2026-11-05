@@ -106,13 +106,15 @@
     private static string Retrospecto(DestaqueFaseDto f) => string.Join(" ",
         new[] { (f.Vitorias, "V"), (f.Empates, "E"), (f.Derrotas, "D") }.Where(x => x.Item1 > 0).Select(x => $"{x.Item1}{x.Item2}"));
 
-    /// <summary>Os jogos da sequência em quadradinhos, agrupados por resultado (a ordem dos jogos não vem no resumo).</summary>
+    /// <summary>Os jogos da sequência em quadradinhos, na ordem em que aconteceram (o mais recente à direita,
+    /// como a coluna "Últimos 5" da classificação).</summary>
     private static RenderFragment Sequencia(DestaqueFaseDto f) => __builder =>
     {
-        <span class="sequencia" role="img" aria-label="@Retrospecto(f)" title="@Retrospecto(f)">
-            @for (var i = 0; i < f.Vitorias; i++) { <span class="v">V</span> }
-            @for (var i = 0; i < f.Empates; i++) { <span class="e">E</span> }
-            @for (var i = 0; i < f.Derrotas; i++) { <span class="d">D</span> }
+        <span class="sequencia" role="img" aria-label="@Retrospecto(f), o mais recente à direita" title="@Retrospecto(f) · o mais recente à direita">
+            @foreach (var r in f.Resultados)
+            {
+                <span class="@r.ToLowerInvariant()">@r</span>
+            }
         </span>
     };
 

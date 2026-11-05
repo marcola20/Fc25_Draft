@@ -5,8 +5,10 @@ namespace Fc25Draft.Core.DTOs;
 
 public record DestaqueLiderDto(Guid LigaId, string LigaNome, Guid TimeId, string TimeNome, int Pontos, int Jogos);
 
-/// <summary>Sequência que está valendo: Jogos sem perder (melhor fase) ou sem vencer (pior), com o retrospecto nela.</summary>
-public record DestaqueFaseDto(Guid TimeId, string TimeNome, int Jogos, int Vitorias, int Empates, int Derrotas);
+/// <summary>Sequência que está valendo: Jogos sem perder (melhor fase) ou sem vencer (pior), com o retrospecto nela.
+/// Resultados traz os jogos da sequência ("V", "E", "D") na ordem em que aconteceram, o mais recente por último.</summary>
+public record DestaqueFaseDto(Guid TimeId, string TimeNome, int Jogos, int Vitorias, int Empates, int Derrotas,
+    IReadOnlyList<string> Resultados);
 
 /// <summary>Quem lidera uma contagem da temporada (gols, assistências, clean sheets): Total é o número dele.</summary>
 public record DestaqueJogadorDto(int JogadorId, string Nome, string TimeNome, int Total);

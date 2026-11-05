@@ -1528,9 +1528,11 @@ public class LigaPublicService : ILigaPublicService
         var partidas = await CarregarPartidasPerfilAsync(null, ct);
         DestaqueFaseDto Sequencia(Guid timeId, IReadOnlyList<string> resultados, Func<string, bool> condicao)
         {
+            // resultados vem do mais recente para o mais antigo; a capa mostra na ordem em que os jogos aconteceram.
             var jogos = resultados.TakeWhile(condicao).ToList();
             return new DestaqueFaseDto(timeId, nomes.GetValueOrDefault(timeId, "?"), jogos.Count,
-                jogos.Count(r => r == "V"), jogos.Count(r => r == "E"), jogos.Count(r => r == "D"));
+                jogos.Count(r => r == "V"), jogos.Count(r => r == "E"), jogos.Count(r => r == "D"),
+                Enumerable.Reverse(jogos).ToList());
         }
         var resultadosPorTime = timesAtivos
             .Select(t => (TimeId: t, Resultados: TimePerfil.ResultadosRecentes(t, partidas)))
