@@ -48,6 +48,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<ISobeEDesceService, SobeEDesceService>();
             services.AddComConexaoPropria<IValorDoJogadorService, ValorDoJogadorService>();
             services.AddScoped<IPricingService, PricingService>();
+            services.AddTambemComConexaoPropria<IPricingService, PricingService>();
             services.AddComConexaoPropria<IPricingConfigService, PricingConfigService>();
             services.AddComConexaoPropria<ITransferConfigService, TransferConfigService>();
             services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
@@ -66,6 +67,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddScoped<ITeamQuickSellService, TeamQuickSellService>();
             services.AddScoped<ITeamLineupService, TeamLineupService>();
             services.AddScoped<ITransferOfferService, TransferOfferService>();
+            services.AddTambemComConexaoPropria<ITransferOfferService, TransferOfferService>();
             services.AddComConexaoPropria<IEmprestimoService, EmprestimoService>();
             services.AddScoped<ILigaAdminService, LigaAdminService>();
             // Divide o DbContext (e a transação) com o LigaAdminService para recalcular a classificação.

@@ -46,6 +46,18 @@ namespace Fc25Draft.Web.Extensions.DI
             => services.AddTransient<TService>(sp => ActivatorUtilities.CreateInstance<TImpl>(
                 sp, sp.GetRequiredService<IDbContextFactory<DraftDbContext>>().CreateDbContext()));
 
+        /// <summary>
+        /// Para um serviço que continua AddScoped (divide transação com outro), registra também
+        /// <see cref="Fc25Draft.Web.Services.ConexaoPropria{TService}"/>: a mesma implementação com uma
+        /// conexão só dela, para páginas e o layout consultarem sem disputar o DbContext do circuito.
+        /// </summary>
+        public static IServiceCollection AddTambemComConexaoPropria<TService, TImpl>(this IServiceCollection services)
+            where TService : class
+            where TImpl : class, TService
+            => services.AddTransient(sp => new Fc25Draft.Web.Services.ConexaoPropria<TService>(
+                ActivatorUtilities.CreateInstance<TImpl>(
+                    sp, sp.GetRequiredService<IDbContextFactory<DraftDbContext>>().CreateDbContext())));
+
         private static string ResolveConnectionStringFrom(IConfiguration cfg, IHostEnvironment env)
         {
             var raw = Environment.GetEnvironmentVariable("DATABASE_URL")

@@ -1,5 +1,6 @@
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Infra.Data;
+using Fc25Draft.Infra.Services;
 using Fc25Draft.Web.Utilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,7 @@ public class PreviaDosLinks
     private readonly LayoutNavigationService _navegacao;
     private readonly IDbContextFactory<DraftDbContext> _bancos;
     private readonly ILigaPublicService _liga;
-    private readonly IPricingService _precos;
+    private readonly IServiceProvider _servicos;
     private readonly EscudoService _escudos;
     private readonly ILogger<PreviaDosLinks> _logger;
 
@@ -26,14 +27,14 @@ public class PreviaDosLinks
         LayoutNavigationService navegacao,
         IDbContextFactory<DraftDbContext> bancos,
         ILigaPublicService liga,
-        IPricingService precos,
+        IServiceProvider servicos,
         EscudoService escudos,
         ILogger<PreviaDosLinks> logger)
     {
         _navegacao = navegacao;
         _bancos = bancos;
         _liga = liga;
-        _precos = precos;
+        _servicos = servicos;
         _escudos = escudos;
         _logger = logger;
     }
@@ -97,7 +98,10 @@ public class PreviaDosLinks
             .FirstOrDefaultAsync(ct);
         if (jogador is null) return null;
 
-        var valor = (await _precos.CalculateForPlayerAsync(jogadorId, ct)).BasePrice;
+        // O preço no mesmo contexto curto desta prévia: o IPricingService scoped usa o DbContext do
+        // circuito, que a página do jogador está usando nesse mesmo instante (dava "A second operation...").
+        var precos = ActivatorUtilities.CreateInstance<PricingService>(_servicos, db);
+        var valor = (await precos.CalculateForPlayerAsync(jogadorId, ct)).BasePrice;
         var partes = new List<string> { jogador.Posicao };
         if (jogador.Age is int idade) partes.Add($"{idade} anos");
         partes.Add(jogador.Time ?? "sem time");

@@ -7,10 +7,10 @@
 @inject NavigationManager Navigation
 @inject AdminAuthService AdminAuth
 @inject IMinhaAreaService MinhaArea
-@inject IPricingService Pricing
+@inject ConexaoPropria<IPricingService> Pricing
 @inject IParticipacaoService ParticipacaoSvc
 @inject ITreinoService TreinoSvc
-@inject ITransferOfferService OffersSvc
+@inject ConexaoPropria<ITransferOfferService> OffersSvc
 @inject IFotosJogadoresService Fotos
 @inject IJSRuntime JS
 @inject EscudoService Escudos
@@ -372,11 +372,31 @@ else
         }
 
         _carregadoId = Id;
-        await LoadPlayerAsync();
-        // Abre nos atributos quando o jogador tem; senão, na carreira.
-        _aba = player?.Atributos is not null ? Aba.Atributos : Aba.Carreira;
-        await CarregarObservacaoAsync();
+        var id = Id;
+
+        // Uma carga por vez: trocando de jogador rápido, o Blazor chama de novo antes da carga anterior
+        // terminar, e as duas usariam a mesma conexão da página ("A second operation was started...").
+        await _umaCargaPorVez.WaitAsync();
+        try
+        {
+            // Enquanto esperava, já pediram outro jogador: a carga dele é que vale.
+            if (id != Id)
+            {
+                return;
+            }
+
+            await LoadPlayerAsync();
+            // Abre nos atributos quando o jogador tem; senão, na carreira.
+            _aba = player?.Atributos is not null ? Aba.Atributos : Aba.Carreira;
+            await CarregarObservacaoAsync();
+        }
+        finally
+        {
+            _umaCargaPorVez.Release();
+        }
     }
+
+    private readonly SemaphoreSlim _umaCargaPorVez = new(1, 1);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -417,11 +437,11 @@ else
             }
             else
             {
-                _valorDeMercado = (await Pricing.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
+                _valorDeMercado = (await Pricing.Servico.CalculateForPlayerAsync(player.PlayerId, CancellationToken.None)).BasePrice;
                 _participacao = player.TeamId is null ? null : await ParticipacaoSvc.GetAsync(player.PlayerId, CancellationToken.None);
                 _treinos = await TreinoSvc.DoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _padrinho = await TreinoSvc.PadrinhoDoJogadorAsync(player.PlayerId, CancellationToken.None);
-                _recompra = await OffersSvc.RecompraDoJogadorAsync(player.PlayerId, CancellationToken.None);
+                _recompra = await OffersSvc.Servico.RecompraDoJogadorAsync(player.PlayerId, CancellationToken.None);
                 _foto = await Fotos.InfoAsync(player.PlayerId, CancellationToken.None);
                 _versaoFoto = _foto.Versao;
             }
@@ -446,7 +466,15 @@ else
         // Entrou ou saiu um time: o botão de observar depende de quem está logado.
         _ = InvokeAsync(async () =>
         {
-            await CarregarObservacaoAsync();
+            await _umaCargaPorVez.WaitAsync();
+            try
+            {
+                await CarregarObservacaoAsync();
+            }
+            finally
+            {
+                _umaCargaPorVez.Release();
+            }
             StateHasChanged();
         });
     }
