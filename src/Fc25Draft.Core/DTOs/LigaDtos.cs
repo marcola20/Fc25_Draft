@@ -373,7 +373,10 @@ public record HistoricoArtilheiroDto(
     string JogadorNome,
     int TotalGols,
     int TotalAssistencias,
-    IReadOnlyList<ArtilheiroCompetitionDetalheDto> Competicoes);
+    IReadOnlyList<ArtilheiroCompetitionDetalheDto> Competicoes,
+    int TotalJogos = 0,
+    // true quando alguma competição dele não tem contador nem jogos anotados (o total fica menor que o real).
+    bool JogosParcial = false);
 
 public record ArtilheiroCompetitionDetalheDto(
     Guid LigaId,
@@ -388,13 +391,17 @@ public record HistoricoGoleiroDto(
     int JogadorId,
     string JogadorNome,
     int CleanSheets,
-    IReadOnlyList<GoleiroCompeticaoDetalheDto> Competicoes);
+    IReadOnlyList<GoleiroCompeticaoDetalheDto> Competicoes,
+    int Jogos = 0,
+    bool JogosParcial = false);
 
 public record GoleiroCompeticaoDetalheDto(
     Guid LigaId,
     string NomeCompeticao,
     TipoCompetition TipoCompeticao,
-    int CleanSheets);
+    int CleanSheets,
+    // Null quando a competição é anterior ao contador e os jogos não foram anotados.
+    int? Jogos = null);
 
 public record HistoricoAssistenciaDto(
     int JogadorId,
@@ -421,7 +428,9 @@ public record TimeHistoricoJogadorDto(
     string JogadorNome,
     bool NoElencoAtual,
     int Gols,
-    int Assistencias);
+    int Assistencias,
+    // Jogos por este time (nas competições antes do contador, só os anotados à mão).
+    int Jogos = 0);
 
 /// <summary>Uma temporada na trajetória do time: onde jogou, como terminou e se subiu ou desceu.</summary>
 public record TimeTrajetoriaDto(

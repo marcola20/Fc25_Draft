@@ -13,7 +13,7 @@ else if (_erro is not null)
 }
 else if (_dados is null || _dados.Jogadores.Count == 0)
 {
-    <div class="alert alert-info mb-0">Nenhum gol ou assistência registrado por este time.</div>
+    <div class="alert alert-info mb-0">Nenhum jogo, gol ou assistência registrado por este time.</div>
 }
 else
 {
@@ -71,8 +71,9 @@ else
     </div>
 
     <p class="text-muted small">
-        Só contam gols e assistências feitos <strong>por este time</strong> — o que o jogador fez em
-        outros clubes não entra. Quem já saiu continua listado.
+        Só contam jogos, gols e assistências <strong>por este time</strong> — o que o jogador fez em
+        outros clubes não entra. Quem já saiu continua listado. Nas competições antes do contador de jogos,
+        só entram os jogos anotados pelo admin.
     </p>
 
     @if (!Filtrados.Any())
@@ -87,6 +88,9 @@ else
                     <tr>
                         <th style="width:40px;">#</th>
                         <th>Jogador</th>
+                        <th class="text-center" style="width:70px;cursor:pointer;user-select:none;" title="Jogos" @onclick='() => SetSort("jogos")'>
+                            J @SortIcon("jogos")
+                        </th>
                         <th class="text-center" style="width:90px;cursor:pointer;user-select:none;" @onclick='() => SetSort("gols")'>
                             Gols @SortIcon("gols")
                         </th>
@@ -112,6 +116,7 @@ else
                                     <span class="badge bg-secondary ms-2" title="Não está mais no elenco">ex-jogador</span>
                                 }
                             </td>
+                            <td class="text-center text-muted">@(j.Jogos > 0 ? j.Jogos.ToString() : "—")</td>
                             <td class="text-center fw-bold">@j.Gols</td>
                             <td class="text-center text-muted">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "—")</td>
                             <td class="text-center fw-bold">@(j.Gols + j.Assistencias)</td>
@@ -164,6 +169,9 @@ else
         "assistencias" => _sortAsc
             ? Filtrados.OrderBy(x => x.Assistencias).ThenBy(x => x.Gols)
             : Filtrados.OrderByDescending(x => x.Assistencias).ThenByDescending(x => x.Gols),
+        "jogos" => _sortAsc
+            ? Filtrados.OrderBy(x => x.Jogos).ThenBy(x => x.Gols)
+            : Filtrados.OrderByDescending(x => x.Jogos).ThenByDescending(x => x.Gols),
         _ => _sortAsc
             ? Filtrados.OrderBy(x => x.Gols + x.Assistencias).ThenBy(x => x.Gols)
             : Filtrados.OrderByDescending(x => x.Gols + x.Assistencias).ThenByDescending(x => x.Gols),

@@ -41,7 +41,9 @@ public record RecordesLigaDto(
     IReadOnlyList<RecordeJogadorDto> Artilheiros,
     IReadOnlyList<RecordeJogadorDto> Garcons,
     IReadOnlyList<RecordeJogadorEdicaoDto> MaisGolsNumaEdicao,
-    IReadOnlyList<RecordeHattrickDto> Hattricks);
+    IReadOnlyList<RecordeHattrickDto> Hattricks,
+    // Preenchido pelo serviço (escalações + jogos anotados à mão nas competições antes do contador).
+    IReadOnlyList<RecordeJogadorDto>? MaisJogos = null);
 
 /// <summary>Gol a favor (não conta gol contra), com a competição para os recordes por edição.</summary>
 public record RecordeGolInput(

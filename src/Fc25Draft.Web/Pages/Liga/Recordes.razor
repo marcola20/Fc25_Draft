@@ -111,7 +111,11 @@
                 <h2 class="recorde-titulo">Garçons históricos</h2>
                 @Jogadores(_r.Garcons, "assist.")
             </div>
-            <div class="col-12 col-xl-4">
+            <div class="col-12 col-md-6 col-xl-4">
+                <h2 class="recorde-titulo">Mais jogos</h2>
+                @Jogadores(_r.MaisJogos ?? Array.Empty<RecordeJogadorDto>(), "jogos")
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
                 <h2 class="recorde-titulo">Mais gols numa edição</h2>
                 @if (_r.MaisGolsNumaEdicao.Count == 0)
                 {

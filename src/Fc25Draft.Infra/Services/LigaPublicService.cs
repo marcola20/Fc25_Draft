@@ -978,6 +978,32 @@ public class LigaPublicService : ILigaPublicService
         return await query.Select(j => new JogosAnotadosFlat(j.JogadorId, j.LigaId, j.TimeId, j.Jogos)).ToListAsync(ct);
     }
 
+    private sealed record JogosFlat(int JogadorId, Guid TimeId, Guid LigaId, int Jogos);
+
+    /// <summary>Competições que já tinham o contador de jogos (alguma escalação registrada).</summary>
+    private async Task<HashSet<Guid>> GetLigasComContagemAsync(CancellationToken ct) =>
+        (await _db.Ligas.AsNoTracking()
+            .Where(l => _db.LigaEscalacoes.Any(e => e.Partida.Rodada.LigaId == l.LigaId))
+            .Select(l => l.LigaId)
+            .ToListAsync(ct))
+        .ToHashSet();
+
+    /// <summary>
+    /// Jogos por (jogador, time, competição): pelas escalações onde há contador e pelos anotados à mão onde não há.
+    /// </summary>
+    private async Task<List<JogosFlat>> GetJogosAsync(Guid[]? ligaIds, Guid? timeId, HashSet<Guid> comContagem, CancellationToken ct)
+    {
+        var lista = (await GetParticipacoesAsync(ligaIds, timeId, ct))
+            .GroupBy(p => (p.JogadorId, p.TimeId, p.LigaId))
+            .Select(g => new JogosFlat(g.Key.JogadorId, g.Key.TimeId, g.Key.LigaId, g.Select(p => p.PartidaId).Distinct().Count()))
+            .ToList();
+
+        lista.AddRange((await GetJogosAnotadosAsync(ligaIds, ct))
+            .Where(a => !comContagem.Contains(a.LigaId) && (timeId is null || a.TimeId == timeId))
+            .Select(a => new JogosFlat(a.JogadorId, a.TimeId, a.LigaId, a.Jogos)));
+        return lista;
+    }
+
     public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(int? temporada, CancellationToken ct)
     {
         // Projeta apenas os campos necessários dos gols (evita carregar entidades inteiras).
@@ -1017,22 +1043,25 @@ public class LigaPublicService : ILigaPublicService
             .GroupBy(g => (JogadorId: g.AssistenteId!.Value, g.LigaId))
             .ToDictionary(g => g.Key, g => g.Count());
 
-        // Jogos só existem nas competições que já tinham o contador; nas demais fica null.
-        var participacoes = await GetParticipacoesAsync(await LigasDaTemporadaAsync(temporada, ct), null, ct);
-        var ligasComContagem = participacoes.Select(p => p.LigaId).ToHashSet();
-        var jogosPorJogadorLiga = participacoes
-            .GroupBy(p => (p.JogadorId, p.LigaId))
-            .ToDictionary(g => g.Key, g => g.Select(p => p.PartidaId).Distinct().Count());
-
-        // Nas competições sem contador valem os jogos anotados à mão.
-        var anotadosPorJogadorLiga = (await GetJogosAnotadosAsync(await LigasDaTemporadaAsync(temporada, ct), ct))
-            .Where(a => !ligasComContagem.Contains(a.LigaId))
-            .GroupBy(a => (a.JogadorId, a.LigaId))
-            .ToDictionary(g => g.Key, g => g.Sum(a => a.Jogos));
+        // Jogos: pelo contador onde ele existe, anotados à mão onde não; sem os dois fica null.
+        var ligasComContagem = await GetLigasComContagemAsync(ct);
+        var jogosPorJogadorLiga = (await GetJogosAsync(await LigasDaTemporadaAsync(temporada, ct), null, ligasComContagem, ct))
+            .GroupBy(j => (j.JogadorId, j.LigaId))
+            .ToDictionary(g => g.Key, g => g.Sum(j => j.Jogos));
 
         // União das chaves (jogador, liga) vindas de gols OU assistências, para não
         // perder competições em que o jogador só deu assistência (sem marcar gol).
-        var chavesJogadorLiga = golsPorJogadorLiga.Keys.Concat(assistPorJogadorLiga.Keys).Distinct();
+        // Quem está na lista também mostra as competições em que jogou sem marcar nem dar assistência.
+        var naLista = golsPorJogadorLiga.Keys.Concat(assistPorJogadorLiga.Keys).Select(k => k.JogadorId).ToHashSet();
+        var chavesJogadorLiga = golsPorJogadorLiga.Keys.Concat(assistPorJogadorLiga.Keys)
+            .Concat(jogosPorJogadorLiga.Where(j => j.Value > 0 && naLista.Contains(j.Key.JogadorId)).Select(j => j.Key))
+            .Distinct()
+            .ToList();
+
+        var semNome = chavesJogadorLiga.Select(k => k.LigaId).Where(id => !ligaInfoPorId.ContainsKey(id)).Distinct().ToList();
+        foreach (var l in await _db.Ligas.AsNoTracking().Where(l => semNome.Contains(l.LigaId))
+                     .Select(l => new { l.LigaId, l.Nome, l.Tipo }).ToListAsync(ct))
+            ligaInfoPorId[l.LigaId] = (l.Nome, l.Tipo);
 
         var resultado = chavesJogadorLiga
             .GroupBy(k => k.JogadorId)
@@ -1051,10 +1080,11 @@ public class LigaPublicService : ILigaPublicService
                             assistPorJogadorLiga.GetValueOrDefault(k, 0),
                             ligasComContagem.Contains(k.LigaId)
                                 ? jogosPorJogadorLiga.GetValueOrDefault(k, 0)
-                                : anotadosPorJogadorLiga.TryGetValue(k, out var anotado) ? anotado : null);
+                                : jogosPorJogadorLiga.TryGetValue(k, out var anotado) ? anotado : null);
                     })
                     .OrderByDescending(x => x.Gols)
                     .ThenByDescending(x => x.Assistencias)
+                    .ThenByDescending(x => x.Jogos)
                     .ToArray();
 
                 return new HistoricoArtilheiroDto(
@@ -1062,7 +1092,9 @@ public class LigaPublicService : ILigaPublicService
                     nomesPorJogador.GetValueOrDefault(jogadorId, "?"),
                     competicoes.Sum(c => c.Gols),
                     competicoes.Sum(c => c.Assistencias),
-                    competicoes);
+                    competicoes,
+                    competicoes.Sum(c => c.Jogos ?? 0),
+                    competicoes.Any(c => c.Jogos is null));
             })
             .OrderByDescending(x => x.TotalGols)
             .ThenByDescending(x => x.TotalAssistencias)
@@ -1137,23 +1169,48 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(int? temporada, CancellationToken ct)
     {
-        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(await LigasDaTemporadaAsync(temporada, ct), ct);
-        var ligaIds = cleanSheets.Select(c => c.LigaId).Distinct().ToList();
+        var daTemporada = await LigasDaTemporadaAsync(temporada, ct);
+        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(daTemporada, ct);
+        var goleiroIds = cleanSheets.Select(c => c.JogadorId).ToHashSet();
+
+        // Jogos dos mesmos goleiros, inclusive nas competições em que não fizeram clean sheet.
+        var ligasComContagem = await GetLigasComContagemAsync(ct);
+        var jogos = (await GetJogosAsync(daTemporada, null, ligasComContagem, ct))
+            .Where(j => goleiroIds.Contains(j.JogadorId) && j.Jogos > 0)
+            .GroupBy(j => (j.JogadorId, j.LigaId))
+            .ToDictionary(g => g.Key, g => g.Sum(j => j.Jogos));
+
+        var ligaIds = cleanSheets.Select(c => c.LigaId).Concat(jogos.Keys.Select(k => k.LigaId)).Distinct().ToList();
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => ligaIds.Contains(l.LigaId))
             .ToDictionaryAsync(l => l.LigaId, l => (l.Nome, l.Tipo), ct);
 
+        int? JogosNa(int jogadorId, Guid ligaId) =>
+            jogos.TryGetValue((jogadorId, ligaId), out var n) ? n : ligasComContagem.Contains(ligaId) ? 0 : null;
+
         return cleanSheets
             .GroupBy(c => c.JogadorId)
-            .Select(g => new HistoricoGoleiroDto(
-                g.Key,
-                g.First().JogadorNome,
-                g.Count(),
-                g.GroupBy(c => c.LigaId)
-                    .Select(l => new GoleiroCompeticaoDetalheDto(l.Key, ligas[l.Key].Nome, ligas[l.Key].Tipo, l.Count()))
+            .Select(g =>
+            {
+                var porLiga = g.GroupBy(c => c.LigaId).ToDictionary(l => l.Key, l => l.Count());
+                var competicoes = porLiga.Keys
+                    .Concat(jogos.Keys.Where(k => k.JogadorId == g.Key).Select(k => k.LigaId))
+                    .Distinct()
+                    .Select(l => new GoleiroCompeticaoDetalheDto(
+                        l, ligas[l].Nome, ligas[l].Tipo, porLiga.GetValueOrDefault(l), JogosNa(g.Key, l)))
                     .OrderByDescending(l => l.CleanSheets)
+                    .ThenByDescending(l => l.Jogos)
                     .ThenBy(l => l.NomeCompeticao, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()))
+                    .ToArray();
+
+                return new HistoricoGoleiroDto(
+                    g.Key,
+                    g.First().JogadorNome,
+                    g.Count(),
+                    competicoes,
+                    competicoes.Sum(c => c.Jogos ?? 0),
+                    competicoes.Any(c => c.Jogos is null));
+            })
             .OrderByDescending(g => g.CleanSheets)
             .ThenBy(g => g.JogadorNome, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -1218,13 +1275,23 @@ public class LigaPublicService : ILigaPublicService
 
         var elencoSet = elencoAtual.ToHashSet();
 
+        // Jogos por este time; quem jogou sem marcar nem dar assistência também entra na lista.
+        var jogosPorJogador = (await GetJogosAsync(null, timeId, await GetLigasComContagemAsync(ct), ct))
+            .GroupBy(j => j.JogadorId)
+            .ToDictionary(g => g.Key, g => g.Sum(j => j.Jogos));
+        var semNome = jogosPorJogador.Where(j => j.Value > 0 && !nomes.ContainsKey(j.Key)).Select(j => j.Key).ToList();
+        foreach (var p in await _db.Players.AsNoTracking().Where(p => semNome.Contains(p.PlayerId))
+                     .Select(p => new { p.PlayerId, p.Name }).ToListAsync(ct))
+            nomes[p.PlayerId] = p.Name;
+
         var jogadores = nomes.Keys
             .Select(id => new TimeHistoricoJogadorDto(
                 id,
                 nomes[id],
                 elencoSet.Contains(id),
                 golsPorJogador.GetValueOrDefault(id, 0),
-                assistPorJogador.GetValueOrDefault(id, 0)))
+                assistPorJogador.GetValueOrDefault(id, 0),
+                jogosPorJogador.GetValueOrDefault(id, 0)))
             .OrderByDescending(j => j.Gols + j.Assistencias)
             .ThenByDescending(j => j.Gols)
             .ThenBy(j => j.JogadorNome)
@@ -1514,7 +1581,24 @@ public class LigaPublicService : ILigaPublicService
                 c.TimeId, c.Liga.Nome, c.Pontos, c.Jogos, c.Vitorias, c.Empates, c.Derrotas, c.GolsPro, c.GolsContra))
             .ToListAsync(ct);
 
-        return RecordesLiga.Calcular(partidas, gols, campanhas, nomes);
+        var jogos = (await GetJogosAsync(null, null, await GetLigasComContagemAsync(ct), ct))
+            .GroupBy(j => j.JogadorId)
+            .Select(g => (JogadorId: g.Key, Jogos: g.Sum(j => j.Jogos)))
+            .Where(j => j.Jogos > 0)
+            .OrderByDescending(j => j.Jogos)
+            .Take(RecordesLiga.TopJogadores)
+            .ToList();
+        var ids = jogos.Select(j => j.JogadorId).ToList();
+        var nomesJogadores = await _db.Players.AsNoTracking()
+            .Where(p => ids.Contains(p.PlayerId))
+            .ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
+
+        return RecordesLiga.Calcular(partidas, gols, campanhas, nomes) with
+        {
+            MaisJogos = jogos
+                .Select(j => new RecordeJogadorDto(j.JogadorId, nomesJogadores.GetValueOrDefault(j.JogadorId, "?"), j.Jogos))
+                .ToList()
+        };
     }
 
     public async Task<DestaquesDto> GetDestaquesAsync(CancellationToken ct)

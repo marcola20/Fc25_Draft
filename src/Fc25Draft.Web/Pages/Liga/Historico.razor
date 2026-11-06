@@ -96,6 +96,7 @@
                             <tr>
                                 <th style="width:40px;">#</th>
                                 <th>Goleiro</th>
+                                <th class="text-center" style="width:70px;" title="Jogos">J</th>
                                 <th class="text-center" style="width:130px;">Clean sheets</th>
                             </tr>
                         </thead>
@@ -105,17 +106,19 @@
                                 <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarGoleiro(item)'>
                                     <td class="numero text-body-tertiary">@idx</td>
                                     <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
+                                    <td class="text-center numero text-body-secondary">@JogosTotal(item.Jogos, item.JogosParcial)</td>
                                     <td class="text-center fw-semibold numero">@item.CleanSheets</td>
                                 </tr>
                                 @if (_goleiroSelecionado == item)
                                 {
                                     <tr>
-                                        <td colspan="3" class="p-0 border-0">
+                                        <td colspan="4" class="p-0 border-0">
                                             <div class="historico-detalhe">
                                                 <table class="table table-sm mb-0">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Competição</th>
+                                                            <th class="text-center" style="width:70px;" title="Jogos">J</th>
                                                             <th class="text-center" style="width:110px;">Clean sheets</th>
                                                         </tr>
                                                     </thead>
@@ -128,6 +131,7 @@
                                                                     <br />
                                                                     <small class="text-body-tertiary">@(comp.TipoCompeticao == TipoCompetition.Copa ? "Copa" : "Liga")</small>
                                                                 </td>
+                                                                <td class="text-center numero">@(comp.Jogos?.ToString() ?? "—")</td>
                                                                 <td class="text-center fw-semibold numero">@comp.CleanSheets</td>
                                                             </tr>
                                                         }
@@ -159,6 +163,15 @@
                         <tr>
                             <th style="width:40px;">#</th>
                             <th>Jogador</th>
+                            <th class="text-center" style="width:70px;">
+                                <button type="button" class="ordenar @(_sortBy == "jogos" ? "ativo" : "")" @onclick='() => SetSort("jogos")' title="Jogos">
+                                J
+                                @if (_sortBy == "jogos")
+                                {
+                                    <Icone Nome="@(_sortAsc ? "arrow-up" : "arrow-down")" Tamanho="12" />
+                                }
+                                </button>
+                            </th>
                             <th class="text-center" style="width:90px;">
                                 <button type="button" class="ordenar @(_sortBy == "gols" ? "ativo" : "")" @onclick='() => SetSort("gols")'>
                                 Gols
@@ -194,6 +207,7 @@
                             <tr style="cursor:pointer;height:44px;" @onclick='() => SelecionarJogador(item)'>
                                 <td style="width:40px;" class="numero text-body-tertiary">@idx</td>
                                 <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><FotoJogador PlayerId="@item.JogadorId" Tamanho="28" Classe="me-2" />@item.JogadorNome</td>
+                                <td class="text-center numero text-body-secondary" style="width:70px;">@JogosTotal(item.TotalJogos, item.JogosParcial)</td>
                                 <td class="text-center fw-semibold numero" style="width:90px;">@item.TotalGols</td>
                                 <td class="text-center text-body-secondary numero" style="width:130px;">@(item.TotalAssistencias > 0 ? item.TotalAssistencias.ToString() : "—")</td>
                                 <td class="text-center numero" style="width:90px;">@(item.TotalGols + item.TotalAssistencias)</td>
@@ -201,7 +215,7 @@
                             @if (_jogadorSelecionado == item)
                             {
                                 <tr>
-                                    <td colspan="5" class="p-0 border-0">
+                                    <td colspan="6" class="p-0 border-0">
                                         <div class="historico-detalhe">
                                             <div class="table-responsive">
                                                 <table class="table table-sm mb-0">
@@ -334,9 +348,27 @@
         "ga" => _sortAsc
             ? FilteredItems.OrderBy(x => x.TotalGols + x.TotalAssistencias).ThenBy(x => x.TotalGols)
             : FilteredItems.OrderByDescending(x => x.TotalGols + x.TotalAssistencias).ThenByDescending(x => x.TotalGols),
+        "jogos" => _sortAsc
+            ? FilteredItems.OrderBy(x => x.TotalJogos).ThenBy(x => x.TotalGols)
+            : FilteredItems.OrderByDescending(x => x.TotalJogos).ThenByDescending(x => x.TotalGols),
         _ => _sortAsc
             ? FilteredItems.OrderBy(x => x.TotalGols).ThenBy(x => x.TotalAssistencias)
             : FilteredItems.OrderByDescending(x => x.TotalGols).ThenByDescending(x => x.TotalAssistencias),
+    };
+
+    /// <summary>Total de jogos; o "+" avisa que falta competição antes do contador sem jogos anotados.</summary>
+    private RenderFragment JogosTotal(int jogos, bool parcial) => __builder =>
+    {
+        if (jogos == 0 && parcial)
+        {
+            <span title="Jogos de competições antes do contador ainda não anotados">—</span>
+            return;
+        }
+        <span>@jogos</span>
+        @if (parcial)
+        {
+            <span class="text-body-tertiary" title="Faltam jogos de competições antes do contador, ainda não anotados">+</span>
+        }
     };
 
     private IEnumerable<HistoricoArtilheiroDto> PagedItems =>
