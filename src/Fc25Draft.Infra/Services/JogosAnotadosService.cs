@@ -111,16 +111,19 @@ public class JogosAnotadosService : IJogosAnotadosService
             .Where(t => t.TeamId == timeId).Select(t => t.TeamName).FirstOrDefaultAsync(ct);
         if (timeNome is null) return null;
 
-        // Competições sem contador que o time jogou, com o período (primeiro e último jogo encerrado dele ali).
+        // Competições sem contador que o time jogou, com o período (primeiro e último jogo dele ali). Os jogos do
+        // mata-mata de 2008 ficaram "em andamento" e sem data de encerramento: contam, e a data vem da rodada.
         var ligas = await LigasSemContagemAsync(ct);
         var ligaIds = ligas.Select(l => l.LigaId).ToList();
         var jogosDoTime = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada && p.EncerradaEm != null
+            .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status != PartidaStatus.Agendada
                         && (p.TimeCasaId == timeId || p.TimeForaId == timeId))
-            .Select(p => new { p.Rodada.LigaId, EncerradaEm = p.EncerradaEm!.Value })
+            .Select(p => new { p.Rodada.LigaId, Data = p.EncerradaEm ?? p.Rodada.DataHora })
             .ToListAsync(ct);
         var periodo = jogosDoTime.GroupBy(j => j.LigaId).ToDictionary(g => g.Key, g => (
-            Inicio: g.Min(j => j.EncerradaEm), Fim: g.Max(j => j.EncerradaEm), Jogos: g.Count()));
+            Inicio: g.Min(j => j.Data) ?? DateTime.MaxValue,
+            Fim: g.Max(j => j.Data) ?? DateTime.MinValue,
+            Jogos: g.Count()));
 
         var colunas = ligas.Where(l => periodo.ContainsKey(l.LigaId))
             .Select(l => new JogosAnotadosColunaDto(l.LigaId, l.Nome, l.Temporada, periodo[l.LigaId].Jogos))
@@ -264,11 +267,11 @@ public class JogosAnotadosService : IJogosAnotadosService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Jogos encerrados de cada time em cada competição.</summary>
+    /// <summary>Jogos de cada time em cada competição (os com resultado: o mata-mata de 2008 ficou "em andamento").</summary>
     private async Task<Dictionary<(Guid LigaId, Guid TimeId), int>> JogosDosTimesAsync(List<Guid> ligaIds, CancellationToken ct)
     {
         var partidas = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada)
+            .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status != PartidaStatus.Agendada)
             .Select(p => new { p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId })
             .ToListAsync(ct);
 
