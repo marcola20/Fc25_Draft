@@ -29,6 +29,87 @@
         Aqui dá para anotar quantos jogos o jogador fez em cada uma, por time. Campo vazio = sem anotação.
     </p>
 
+    <div class="btn-group mb-3" role="group">
+        <button type="button" class="btn btn-sm @(_porTime ? "btn-primary" : "btn-outline-primary")" @onclick="() => _porTime = true">Por time</button>
+        <button type="button" class="btn btn-sm @(!_porTime ? "btn-primary" : "btn-outline-primary")" @onclick="() => _porTime = false">Por jogador</button>
+    </div>
+
+    @if (_porTime)
+    {
+        <div class="mb-3" style="max-width: 320px;">
+            <select class="form-select" value="@(_grade?.TimeId.ToString() ?? "")" @onchange="e => CarregarTimeAsync(e.Value?.ToString())">
+                <option value="">Escolha o time…</option>
+                @foreach (var t in _times)
+                {
+                    <option value="@t.TimeId">@t.TimeNome</option>
+                }
+            </select>
+        </div>
+
+        @if (_carregandoTime)
+        {
+            <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+        }
+        else if (_grade is not null)
+        {
+            @if (_grade.Jogadores.Count == 0)
+            {
+                <div class="alert alert-info">Ninguém encontrado nesse time nas competições sem contador.</div>
+            }
+            else
+            {
+                <p class="small text-muted mb-2">
+                    Quem passou pelo @_grade.TimeNome enquanto cada competição era jogada (pelo draft, transferências e gols).
+                    Campo apagado = ele não estava no time naquela competição, mas dá para anotar mesmo assim.
+                </p>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Jogador</th>
+                                @foreach (var c in _grade.Competicoes)
+                                {
+                                    <th class="text-center">
+                                        @c.Nome
+                                        <div class="small fw-normal text-muted">@c.JogosDoTime jogos do time</div>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in _linhasTime)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">
+                                        <a href="/players/details/@j.PlayerId">@j.Nome</a>
+                                        <span class="small text-muted">@j.Posicao</span>
+                                    </td>
+                                    @foreach (var cel in j.Celulas)
+                                    {
+                                        var teto = _grade.Competicoes.First(c => c.LigaId == cel.LigaId).JogosDoTime;
+                                        <td class="text-center" style="@(cel.NoPeriodo ? "" : "opacity: .45;")">
+                                            <input type="number" min="0" max="@teto"
+                                                   class="form-control form-control-sm text-end mx-auto @(cel.Jogos > teto ? "is-invalid" : "")"
+                                                   style="width: 80px;" placeholder="—" @bind="cel.Jogos" />
+                                            @if (cel.Gols + cel.Assistencias > 0)
+                                            {
+                                                <div class="small text-muted">@cel.Gols G · @cel.Assistencias A</div>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" disabled="@_salvando" @onclick="SalvarTimeAsync">
+                    @(_salvando ? "Salvando…" : "Salvar jogos do time")
+                </button>
+            }
+        }
+    }
+    else
+    {
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="mb-3" style="max-width: 420px;">
@@ -129,6 +210,7 @@
             </div>
         </div>
     </div>
+    }
 </div>
 
 @code {
@@ -151,6 +233,30 @@
         public IReadOnlyList<JogosAnotadosTimeDto> Participantes { get; init; } = Array.Empty<JogosAnotadosTimeDto>();
     }
 
+    private sealed class CelulaEdit
+    {
+        public Guid LigaId { get; init; }
+        public bool NoPeriodo { get; init; }
+        public int? Original { get; init; }
+        public int? Jogos { get; set; }
+        public int Gols { get; init; }
+        public int Assistencias { get; init; }
+    }
+
+    private sealed class JogadorDoTimeEdit
+    {
+        public int PlayerId { get; init; }
+        public string Nome { get; init; } = "";
+        public string Posicao { get; init; } = "";
+        public List<CelulaEdit> Celulas { get; init; } = new();
+    }
+
+    private bool _porTime = true;
+    private IReadOnlyList<JogosAnotadosTimeDto> _times = Array.Empty<JogosAnotadosTimeDto>();
+    private JogosAnotadosTimeGradeDto? _grade;
+    private List<JogadorDoTimeEdit> _linhasTime = new();
+    private bool _carregandoTime;
+
     private JogosAnotadosJogadorDto? _jogador;
     private List<CompeticaoEdit> _competicoes = new();
     private IReadOnlyList<JogosAnotadosResumoDto>? _resumo;
@@ -164,7 +270,69 @@
         LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/jogos-anotados"));
     }
 
-    protected override async Task OnInitializedAsync() => await CarregarResumoAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarResumoAsync();
+        try { _times = await JogosSvc.TimesAsync(CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task CarregarTimeAsync(string? valor)
+    {
+        _ok = null;
+        _erro = null;
+        if (!Guid.TryParse(valor, out var timeId))
+        {
+            _grade = null;
+            _linhasTime = new();
+            return;
+        }
+
+        _carregandoTime = true;
+        try
+        {
+            _grade = await JogosSvc.DoTimeAsync(timeId, CancellationToken.None);
+            _linhasTime = _grade?.Jogadores
+                .Select(j => new JogadorDoTimeEdit
+                {
+                    PlayerId = j.PlayerId,
+                    Nome = j.Nome,
+                    Posicao = j.Posicao,
+                    Celulas = j.Celulas.Select(c => new CelulaEdit
+                    {
+                        LigaId = c.LigaId, NoPeriodo = c.NoPeriodo, Original = c.Jogos, Jogos = c.Jogos,
+                        Gols = c.Gols, Assistencias = c.Assistencias
+                    }).ToList()
+                })
+                .ToList() ?? new();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregandoTime = false; }
+    }
+
+    private async Task SalvarTimeAsync()
+    {
+        if (_grade is null) return;
+        _salvando = true;
+        _ok = null;
+        _erro = null;
+        try
+        {
+            // Só o que mudou: o resto fica como está.
+            var linhas = _linhasTime
+                .SelectMany(j => j.Celulas.Where(c => c.Jogos != c.Original)
+                    .Select(c => new JogosAnotadosDoTimeSalvarDto(j.PlayerId, c.LigaId, c.Jogos)))
+                .ToList();
+            var time = _grade.TimeNome;
+            if (linhas.Count > 0)
+                await JogosSvc.SalvarDoTimeAsync(_grade.TimeId, linhas, CancellationToken.None);
+            await CarregarTimeAsync(_grade.TimeId.ToString());
+            _ok = linhas.Count == 0 ? "Nada mudou." : $"Jogos do {time} salvos ({linhas.Count} alteração(ões)).";
+            await CarregarResumoAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
 
     private async Task CarregarResumoAsync()
     {
@@ -174,6 +342,7 @@
 
     private async Task CarregarAsync(int playerId)
     {
+        _porTime = false;
         _carregando = true;
         _ok = null;
         _erro = null;

@@ -28,3 +28,26 @@ public record JogosAnotadosJogadorDto(
 public record JogosAnotadosResumoDto(int PlayerId, string Nome, int Jogos, int Competicoes, DateTime AtualizadoEmUtc);
 
 public record JogosAnotadosSalvarDto(Guid LigaId, Guid TimeId, int? Jogos);
+
+// ---- Por time: todos que passaram pelo time nas competições sem contador ----
+
+/// <summary>Competição sem contador que o time disputou; JogosDoTime = jogos encerrados dele ali (o teto da anotação).</summary>
+public record JogosAnotadosColunaDto(Guid LigaId, string Nome, int? Temporada, int JogosDoTime);
+
+/// <summary>Uma competição na linha do jogador. NoPeriodo = estava no elenco (ou marcou) pelo time enquanto ela era jogada.</summary>
+public record JogosAnotadosCelulaDto(Guid LigaId, bool NoPeriodo, int? Jogos, int Gols, int Assistencias);
+
+public record JogosAnotadosJogadorDoTimeDto(
+    int PlayerId,
+    string Nome,
+    short PositionId,
+    string Posicao,
+    IReadOnlyList<JogosAnotadosCelulaDto> Celulas);
+
+public record JogosAnotadosTimeGradeDto(
+    Guid TimeId,
+    string TimeNome,
+    IReadOnlyList<JogosAnotadosColunaDto> Competicoes,
+    IReadOnlyList<JogosAnotadosJogadorDoTimeDto> Jogadores);
+
+public record JogosAnotadosDoTimeSalvarDto(int PlayerId, Guid LigaId, int? Jogos);
