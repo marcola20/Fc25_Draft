@@ -698,6 +698,9 @@ public class PremiosService : IPremiosService
                 .Union(_db.LigaEventos.AsNoTracking()
                     .Where(e => e.Partida.Rodada.Liga.Temporada < temporada && e.Tipo == TipoEvento.Gol && e.AssistenteId != null)
                     .Select(e => e.AssistenteId!.Value))
+                .Union(_db.JogosAnotados.AsNoTracking()
+                    .Where(j => j.Liga.Temporada < temporada && j.Jogos > 0)
+                    .Select(j => j.JogadorId))
                 .ToListAsync(ct))
             .ToHashSet();
         var estreantes = linhas.Keys.Where(id => !jaJogaram.Contains(id)).ToHashSet();

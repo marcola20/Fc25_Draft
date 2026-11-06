@@ -1314,6 +1314,32 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("InscricoesPush", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.JogosAnotados", b =>
+                {
+                    b.Property<int>("JogadorId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("LigaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadoEmUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Jogos")
+                        .HasColumnType("integer");
+
+                    b.HasKey("JogadorId", "LigaId", "TimeId");
+
+                    b.HasIndex("LigaId");
+
+                    b.HasIndex("TimeId");
+
+                    b.ToTable("LigaJogosAnotados", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Liga", b =>
                 {
                     b.Property<Guid>("LigaId")
@@ -4423,6 +4449,33 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.JogosAnotados", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Jogador")
+                        .WithMany()
+                        .HasForeignKey("JogadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Liga", "Liga")
+                        .WithMany()
+                        .HasForeignKey("LigaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Jogador");
+
+                    b.Navigation("Liga");
+
+                    b.Navigation("Time");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Liga", b =>

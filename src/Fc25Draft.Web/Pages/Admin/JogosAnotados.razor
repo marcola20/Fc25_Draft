@@ -1,0 +1,228 @@
+@page "/admin/jogos-anotados"
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IJogosAnotadosService JogosSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Jogos Anotados — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_erro
+            <button type="button" class="btn-close" @onclick="() => _erro = null"></button>
+        </div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_ok
+            <button type="button" class="btn-close" @onclick="() => _ok = null"></button>
+        </div>
+    }
+
+    <p class="text-muted small mb-3">
+        As competições antes do contador não têm escalação registrada, então os jogos delas ficam em branco na carreira.
+        Aqui dá para anotar quantos jogos o jogador fez em cada uma, por time. Campo vazio = sem anotação.
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="mb-3" style="max-width: 420px;">
+                <JogadorBusca Placeholder="Buscar jogador para anotar os jogos" OnEscolhido="p => CarregarAsync(p.PlayerId)" />
+            </div>
+
+            @if (_carregando)
+            {
+                <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+            }
+            else if (_jogador is not null)
+            {
+                <div class="d-flex align-items-baseline gap-2 flex-wrap mb-3">
+                    <a class="h5 mb-0" href="/players/details/@_jogador.PlayerId">@_jogador.Nome</a>
+                    <span class="text-muted small">@_jogador.Posicao@(_jogador.TimeAtual is null ? "" : $" · {_jogador.TimeAtual}")</span>
+                </div>
+
+                @if (_competicoes.Count == 0)
+                {
+                    <div class="alert alert-info">Não há competição sem contador de jogos.</div>
+                }
+
+                @foreach (var c in _competicoes)
+                {
+                    var foraDaLista = c.Participantes.Where(p => c.Linhas.All(l => l.TimeId != p.TimeId)).ToList();
+                    <div class="card mb-3">
+                        <div class="card-header d-flex align-items-baseline gap-2 flex-wrap">
+                            <span class="fw-semibold">@c.Nome</span>
+                            @if (c.Gols + c.Assistencias > 0)
+                            {
+                                <span class="small text-muted ms-auto">registrado: @c.Gols gol(s), @c.Assistencias assistência(s)</span>
+                            }
+                        </div>
+                        <div class="card-body py-2">
+                            @if (c.Linhas.Count == 0)
+                            {
+                                <div class="small text-muted mb-2">A carreira não acha ele nesta competição. Se jogou, escolha o time abaixo.</div>
+                            }
+                            @foreach (var l in c.Linhas)
+                            {
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="flex-grow-1">@l.TimeNome</span>
+                                    <input type="number" min="0" max="200" class="form-control form-control-sm text-end"
+                                           style="width: 90px;" placeholder="—" @bind="l.Jogos" />
+                                    <span class="small text-muted" style="width: 40px;">jogos</span>
+                                </div>
+                            }
+                            @if (foraDaLista.Count > 0)
+                            {
+                                <select class="form-select form-select-sm mt-1" style="max-width: 280px;" value=""
+                                        @onchange="e => AdicionarTime(c, e.Value?.ToString())">
+                                    <option value="">+ outro time…</option>
+                                    @foreach (var t in foraDaLista)
+                                    {
+                                        <option value="@t.TimeId">@t.TimeNome</option>
+                                    }
+                                </select>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (_competicoes.Count > 0)
+                {
+                    <button class="btn btn-primary" disabled="@_salvando" @onclick="SalvarAsync">
+                        @(_salvando ? "Salvando…" : "Salvar jogos")
+                    </button>
+                }
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">Já anotados</div>
+                @if (_resumo is null)
+                {
+                    <div class="card-body text-center"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+                }
+                else if (_resumo.Count == 0)
+                {
+                    <div class="card-body small text-muted">Nenhum jogador anotado ainda.</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var r in _resumo)
+                        {
+                            <li class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                                role="button" @onclick="() => CarregarAsync(r.PlayerId)">
+                                <span class="flex-grow-1">@r.Nome</span>
+                                <span class="small text-muted" title="@r.Competicoes competição(ões) · @r.AtualizadoEmUtc.ToLocalTime().ToString("dd/MM HH:mm", Br)">
+                                    @r.Jogos jogos
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private sealed class LinhaEdit
+    {
+        public Guid TimeId { get; init; }
+        public string TimeNome { get; init; } = "";
+        public int? Jogos { get; set; }
+    }
+
+    private sealed class CompeticaoEdit
+    {
+        public Guid LigaId { get; init; }
+        public string Nome { get; init; } = "";
+        public int Gols { get; init; }
+        public int Assistencias { get; init; }
+        public List<LinhaEdit> Linhas { get; init; } = new();
+        public IReadOnlyList<JogosAnotadosTimeDto> Participantes { get; init; } = Array.Empty<JogosAnotadosTimeDto>();
+    }
+
+    private JogosAnotadosJogadorDto? _jogador;
+    private List<CompeticaoEdit> _competicoes = new();
+    private IReadOnlyList<JogosAnotadosResumoDto>? _resumo;
+    private bool _carregando;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/jogos-anotados"));
+    }
+
+    protected override async Task OnInitializedAsync() => await CarregarResumoAsync();
+
+    private async Task CarregarResumoAsync()
+    {
+        try { _resumo = await JogosSvc.ListarAsync(CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task CarregarAsync(int playerId)
+    {
+        _carregando = true;
+        _ok = null;
+        _erro = null;
+        try
+        {
+            _jogador = await JogosSvc.DoJogadorAsync(playerId, CancellationToken.None);
+            _competicoes = _jogador?.Competicoes
+                .Select(c => new CompeticaoEdit
+                {
+                    LigaId = c.LigaId,
+                    Nome = c.Nome,
+                    Gols = c.Gols,
+                    Assistencias = c.Assistencias,
+                    Participantes = c.Participantes,
+                    Linhas = c.Linhas.Select(l => new LinhaEdit { TimeId = l.TimeId, TimeNome = l.TimeNome, Jogos = l.Jogos }).ToList()
+                })
+                .ToList() ?? new();
+            if (_jogador is null) _erro = "Jogador não encontrado.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private void AdicionarTime(CompeticaoEdit c, string? valor)
+    {
+        if (!Guid.TryParse(valor, out var timeId) || c.Linhas.Any(l => l.TimeId == timeId)) return;
+        var time = c.Participantes.FirstOrDefault(p => p.TimeId == timeId);
+        if (time is null) return;
+        c.Linhas.Add(new LinhaEdit { TimeId = time.TimeId, TimeNome = time.TimeNome });
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (_jogador is null) return;
+        _salvando = true;
+        _ok = null;
+        _erro = null;
+        try
+        {
+            var linhas = _competicoes
+                .SelectMany(c => c.Linhas.Select(l => new JogosAnotadosSalvarDto(c.LigaId, l.TimeId, l.Jogos)))
+                .ToList();
+            await JogosSvc.SalvarAsync(_jogador.PlayerId, linhas, CancellationToken.None);
+            var nome = _jogador.Nome;
+            await CarregarAsync(_jogador.PlayerId);
+            _ok = $"Jogos de {nome} salvos.";
+            await CarregarResumoAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

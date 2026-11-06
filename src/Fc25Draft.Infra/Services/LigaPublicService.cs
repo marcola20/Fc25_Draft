@@ -964,6 +964,20 @@ public class LigaPublicService : ILigaPublicService
         return lista.Distinct().ToList();
     }
 
+    private sealed record JogosAnotadosFlat(int JogadorId, Guid LigaId, Guid TimeId, int Jogos);
+
+    /// <summary>
+    /// Jogos anotados à mão (competições anteriores ao contador). Quem usa descarta os das competições que têm
+    /// contador, onde o número sai das escalações.
+    /// </summary>
+    private async Task<List<JogosAnotadosFlat>> GetJogosAnotadosAsync(Guid[]? ligaIds, CancellationToken ct)
+    {
+        var query = _db.JogosAnotados.AsNoTracking();
+        if (ligaIds is not null)
+            query = query.Where(j => ligaIds.Contains(j.LigaId));
+        return await query.Select(j => new JogosAnotadosFlat(j.JogadorId, j.LigaId, j.TimeId, j.Jogos)).ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<HistoricoArtilheiroDto>> GetHistoricoArtilheirosAsync(int? temporada, CancellationToken ct)
     {
         // Projeta apenas os campos necessários dos gols (evita carregar entidades inteiras).
@@ -1010,6 +1024,12 @@ public class LigaPublicService : ILigaPublicService
             .GroupBy(p => (p.JogadorId, p.LigaId))
             .ToDictionary(g => g.Key, g => g.Select(p => p.PartidaId).Distinct().Count());
 
+        // Nas competições sem contador valem os jogos anotados à mão.
+        var anotadosPorJogadorLiga = (await GetJogosAnotadosAsync(await LigasDaTemporadaAsync(temporada, ct), ct))
+            .Where(a => !ligasComContagem.Contains(a.LigaId))
+            .GroupBy(a => (a.JogadorId, a.LigaId))
+            .ToDictionary(g => g.Key, g => g.Sum(a => a.Jogos));
+
         // União das chaves (jogador, liga) vindas de gols OU assistências, para não
         // perder competições em que o jogador só deu assistência (sem marcar gol).
         var chavesJogadorLiga = golsPorJogadorLiga.Keys.Concat(assistPorJogadorLiga.Keys).Distinct();
@@ -1031,7 +1051,7 @@ public class LigaPublicService : ILigaPublicService
                             assistPorJogadorLiga.GetValueOrDefault(k, 0),
                             ligasComContagem.Contains(k.LigaId)
                                 ? jogosPorJogadorLiga.GetValueOrDefault(k, 0)
-                                : null);
+                                : anotadosPorJogadorLiga.TryGetValue(k, out var anotado) ? anotado : null);
                     })
                     .OrderByDescending(x => x.Gols)
                     .ThenByDescending(x => x.Assistencias)
@@ -1909,8 +1929,15 @@ public class LigaPublicService : ILigaPublicService
             Fim: g.Max(p => p.EncerradaEm),
             Participantes: (IReadOnlyCollection<Guid>)g.SelectMany(p => new[] { p.TimeCasaId, p.TimeForaId }).ToHashSet()));
 
+        // Jogos anotados à mão nas competições sem contador.
+        var jogosAnotados = (await _db.JogosAnotados.AsNoTracking()
+                .Where(j => j.JogadorId == jogadorId)
+                .Select(j => new { j.LigaId, j.TimeId, j.Jogos })
+                .ToListAsync(ct))
+            .ToDictionary(j => (j.LigaId, j.TimeId), j => j.Jogos);
+
         var ligaIds = eventos.Select(e => e.LigaId).Concat(participacoes.Select(p => p.LigaId))
-            .Concat(periodoLiga.Keys).Distinct().ToList();
+            .Concat(periodoLiga.Keys).Concat(jogosAnotados.Keys.Select(k => k.LigaId)).Distinct().ToList();
         var ligasComContagem = (await _db.LigaEscalacoes.AsNoTracking()
                 .Where(t => ligaIds.Contains(t.Partida.Rodada.LigaId))
                 .Select(t => t.Partida.Rodada.LigaId)
@@ -1934,7 +1961,8 @@ public class LigaPublicService : ILigaPublicService
                 per.Participantes));
 
         var estatisticas = CarreiraJogador.Calcular(
-            jogadorId, PosicoesDefensivas.Contains(jogador.PositionId), ligas, eventos, participacoes, nomesTimes, vinculos);
+            jogadorId, PosicoesDefensivas.Contains(jogador.PositionId), ligas, eventos, participacoes, nomesTimes, vinculos,
+            jogosAnotados);
 
         // A escolha do draft de expansão também vira transferência: aparece só como escolha.
         var transferencias = todasTransferencias.Where(t => t.Type != TransferType.ExpansionDraft).ToList();

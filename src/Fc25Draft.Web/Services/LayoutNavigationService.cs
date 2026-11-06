@@ -81,6 +81,7 @@ public class LayoutNavigationService
             new("Resultados Pendentes", "/admin/resultados-pendentes", "lock"),
             new("Resumo da Rodada", "/admin/resumo-rodada", "message-square"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "award"),
+            new("Jogos Anotados", "/admin/jogos-anotados", "clipboard-list"),
             new("Gerenciar Premiação", "/admin/premiacao", "banknote"),
             new("Metas da Diretoria", "/admin/diretoria", "briefcase"),
             new("Treino da Semana", "/admin/treinos", "activity"),
@@ -615,6 +616,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Liga"),
                 new("Diretoria")
+            }
+        },
+        ["/admin/jogos-anotados"] = new PageDefinition
+        {
+            Route = "/admin/jogos-anotados",
+            Title = "Jogos Anotados",
+            Subtitle = "Jogos das temporadas antes do contador, anotados à mão — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Jogos Anotados")
             }
         },
         ["/admin/treinos"] = new PageDefinition

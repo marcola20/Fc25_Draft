@@ -249,6 +249,15 @@ public class AposentadoriaService : IAposentadoriaService
             .GroupBy(x => x.JogadorId)
             .ToDictionary(g => g.Key, g => g.Count());
 
+        // Mais os jogos anotados à mão nas competições anteriores ao contador.
+        var anotados = await _db.JogosAnotados.AsNoTracking()
+            .Where(j => ids.Contains(j.JogadorId) && !_db.LigaEscalacoes.Any(e => e.Partida.Rodada.LigaId == j.LigaId))
+            .GroupBy(j => j.JogadorId)
+            .Select(g => new { g.Key, Jogos = g.Sum(j => j.Jogos) })
+            .ToListAsync(ct);
+        foreach (var a in anotados)
+            jogos[a.Key] = jogos.GetValueOrDefault(a.Key) + a.Jogos;
+
         return aposentados
             .OrderByDescending(a => a.Ultima).ThenByDescending(a => a.Overall)
             .Select(a => new LendaAposentadaDto(a.PlayerId, a.Name, a.Posicao, a.Ultima, a.Clube, a.Overall,

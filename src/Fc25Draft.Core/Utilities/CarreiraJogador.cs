@@ -39,9 +39,14 @@ public static class CarreiraJogador
         IEnumerable<CarreiraEventoInput> eventos,
         IEnumerable<CarreiraParticipacaoInput> participacoes,
         IReadOnlyDictionary<Guid, string> nomesTimes,
-        IEnumerable<CarreiraVinculoInput>? vinculos = null)
+        IEnumerable<CarreiraVinculoInput>? vinculos = null,
+        // Jogos anotados à mão por (competição, time), só usados onde não há contador.
+        IReadOnlyDictionary<(Guid LigaId, Guid TimeId), int>? jogosAnotados = null)
     {
         var periodos = vinculos?.ToList() ?? new List<CarreiraVinculoInput>();
+        var anotados = (jogosAnotados ?? new Dictionary<(Guid LigaId, Guid TimeId), int>())
+            .Where(a => ligas.TryGetValue(a.Key.LigaId, out var l) && !l.TemContagem)
+            .ToDictionary(a => a.Key, a => a.Value);
         var evs = eventos.Where(e => ligas.ContainsKey(e.LigaId)).ToList();
         var parts = participacoes.Where(p => ligas.ContainsKey(p.LigaId)).DistinctBy(p => (p.TimeId, p.PartidaId)).ToList();
 
@@ -53,6 +58,7 @@ public static class CarreiraJogador
         // Toda (competição, time) em que o jogador jogou ou deixou marca.
         var emCampo = parts.Select(p => (p.LigaId, p.TimeId))
             .Concat(gols.Concat(assistencias).Concat(amarelos).Concat(vermelhos).Select(e => (e.LigaId, e.TimeId)))
+            .Concat(anotados.Where(a => a.Value > 0).Select(a => a.Key))
             .ToHashSet();
 
         // Competições antigas não têm escalação: quem não marcou nem levou cartão sumia (goleiro, reserva).
@@ -68,7 +74,7 @@ public static class CarreiraJogador
         bool NoElencoNoFim(CarreiraLigaInput l, Guid timeId) =>
             l.Fim is DateTime fim && periodos.Any(v => v.TimeId == timeId && v.De <= fim && v.Ate >= fim);
 
-        var chaves = emCampo.Union(noElenco);
+        var chaves = emCampo.Union(noElenco).Union(anotados.Keys);
 
         var competicoes = chaves
             .Select(k =>
@@ -85,7 +91,7 @@ public static class CarreiraJogador
                     liga.Temporada,
                     k.TimeId,
                     nomesTimes.TryGetValue(k.TimeId, out var nome) ? nome : "?",
-                    liga.TemContagem ? jogou.Count : null,
+                    liga.TemContagem ? jogou.Count : anotados.TryGetValue(k, out var anotado) ? anotado : null,
                     gols.Count(Da),
                     assistencias.Count(Da),
                     amarelos.Count(Da),
