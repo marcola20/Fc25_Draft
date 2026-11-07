@@ -1960,12 +1960,14 @@ public class LigaPublicService : ILigaPublicService
             .ToListAsync(ct);
 
         // Mesmo critério do contador de jogos: titular no encerramento ou entrou por substituição.
+        // Clean sheet só conta com o jogo encerrado e sem W.O., como no Paredão da temporada.
         var titular = await _db.LigaEscalacoes.AsNoTracking()
             .Where(t => t.JogadorId == jogadorId && t.Titular)
             .Select(t => new
             {
                 t.TimeId, t.PartidaId, t.Partida.Rodada.LigaId,
-                GolsSofridos = t.TimeId == t.Partida.TimeCasaId ? t.Partida.GolsFora : t.Partida.GolsCasa
+                GolsSofridos = t.TimeId == t.Partida.TimeCasaId ? t.Partida.GolsFora : t.Partida.GolsCasa,
+                Valida = t.Partida.Status == PartidaStatus.Encerrada && !t.Partida.IsWO
             })
             .ToListAsync(ct);
         var entrou = await _db.LigaEventos.AsNoTracking()
@@ -1973,11 +1975,12 @@ public class LigaPublicService : ILigaPublicService
             .Select(e => new
             {
                 e.TimeId, e.PartidaId, e.Partida.Rodada.LigaId,
-                GolsSofridos = e.TimeId == e.Partida.TimeCasaId ? e.Partida.GolsFora : e.Partida.GolsCasa
+                GolsSofridos = e.TimeId == e.Partida.TimeCasaId ? e.Partida.GolsFora : e.Partida.GolsCasa,
+                Valida = e.Partida.Status == PartidaStatus.Encerrada && !e.Partida.IsWO
             })
             .ToListAsync(ct);
         var participacoes = titular.Concat(entrou)
-            .Select(p => new CarreiraParticipacaoInput(p.TimeId, p.PartidaId, p.LigaId, p.GolsSofridos == 0))
+            .Select(p => new CarreiraParticipacaoInput(p.TimeId, p.PartidaId, p.LigaId, p.Valida && p.GolsSofridos == 0))
             .ToList();
 
         var picks = await _db.DraftPicks.AsNoTracking()
