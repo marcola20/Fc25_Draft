@@ -65,11 +65,31 @@
     private DestaquesDto? _destaques;
     private IReadOnlyList<Fc25Draft.Core.Utilities.PlantaoNoticiaDto> _noticias = Array.Empty<Fc25Draft.Core.Utilities.PlantaoNoticiaDto>();
 
-    // Uma consulta de cada vez: no Blazor Server a página toda divide a mesma conexão com o banco.
-    // Destaques e Plantão são complementares: se um falhar, a página segue com o resto.
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
+    // A Central fica aberta (e viva na aba) por horas: quando o banco grava algo, ela se atualiza sozinha.
+    // Espera uns segundos para juntar as gravações em sequência (um jogo encerrando grava várias vezes).
+    private static readonly TimeSpan EsperaParaAtualizar = TimeSpan.FromSeconds(5);
+    private bool _agendada;
+    private bool _carregando;
+    private bool _deNovo;
+    private bool _pendenteNaAba;
+    private bool _disposed;
+
     protected override async Task OnInitializedAsync()
     {
-        try { _destaques = await LigaService.GetDestaquesAsync(CancellationToken.None); } catch { _destaques = null; }
+        Fc25Draft.Infra.Data.DraftDbContext.DadosGravados += OnDadosGravados;
+        if (AbaAberta is not null) AbaAberta.Mostrada += OnAbaMostrada;
+        await AtualizarAsync(primeiraVez: true);
+    }
+
+    // Uma consulta de cada vez: no Blazor Server a página toda divide a mesma conexão com o banco.
+    // Destaques e Plantão são complementares: se um falhar, a página segue com o resto (e, ao atualizar,
+    // com o que já mostrava).
+    private async Task CarregarAsync(bool primeiraVez)
+    {
+        try { _destaques = await LigaService.GetDestaquesAsync(CancellationToken.None); }
+        catch { if (primeiraVez) _destaques = null; }
         try
         {
             var noticias = (await LigaService.GetPlantaoAsync(CancellationToken.None)).ToList();
@@ -83,6 +103,55 @@
             _noticias = noticias.OrderByDescending(n => n.Data).Take(NoticiasNaPaginaInicial).ToList();
         }
         catch { }
+    }
+
+    /// <summary>Uma carga por vez; o que pedir atualização no meio dela ganha mais uma volta no fim.</summary>
+    private async Task AtualizarAsync(bool primeiraVez = false)
+    {
+        if (_carregando) { _deNovo = true; return; }
+        _carregando = true;
+        try
+        {
+            do
+            {
+                _deNovo = false;
+                await CarregarAsync(primeiraVez);
+                primeiraVez = false;
+                if (_disposed) return;
+                StateHasChanged();
+            } while (_deNovo);
+        }
+        finally { _carregando = false; }
+    }
+
+    // Vem da thread de quem gravou: só passa para a página, sem esperar.
+    private void OnDadosGravados()
+    {
+        if (_disposed) return;
+        try { _ = InvokeAsync(AgendarAtualizacao); } catch { }
+    }
+
+    private async Task AgendarAtualizacao()
+    {
+        if (_disposed || _agendada) return;
+        _agendada = true;
+        try
+        {
+            await Task.Delay(EsperaParaAtualizar);
+            _agendada = false;
+            if (_disposed) return;
+            // Escondida atrás de outra aba: atualiza quando voltar para a frente.
+            if (AbaAberta?.Escondida == true) { _pendenteNaAba = true; return; }
+            await AtualizarAsync();
+        }
+        catch { _agendada = false; }
+    }
+
+    private void OnAbaMostrada()
+    {
+        if (_disposed || !_pendenteNaAba) return;
+        _pendenteNaAba = false;
+        try { _ = InvokeAsync(() => AtualizarAsync()); } catch { }
     }
 
     protected override void OnInitialized()
@@ -115,6 +184,9 @@
 
     public void Dispose()
     {
+        _disposed = true;
+        Fc25Draft.Infra.Data.DraftDbContext.DadosGravados -= OnDadosGravados;
+        if (AbaAberta is not null) AbaAberta.Mostrada -= OnAbaMostrada;
         AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
     }
 }

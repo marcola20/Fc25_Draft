@@ -9,8 +9,9 @@ public class DraftDbContext : DbContext
     public DraftDbContext(DbContextOptions<DraftDbContext> options) : base(options)
     {
         // Avisos novos gravados: as telas abertas desses times atualizam o sino na hora.
-        SavedChanges += (_, _) =>
+        SavedChanges += (_, e) =>
         {
+            if (e.EntitiesSavedCount > 0) DadosGravados?.Invoke();
             if (TimesComAvisoNovo.Count == 0) return;
             var times = TimesComAvisoNovo.ToArray();
             TimesComAvisoNovo.Clear();
@@ -24,6 +25,12 @@ public class DraftDbContext : DbContext
 
     /// <summary>Disparado depois de gravar avisos, com os times que os receberam.</summary>
     public static event Action<IReadOnlyCollection<Guid>>? AvisosGravados;
+
+    /// <summary>
+    /// Disparado depois de qualquer gravação que mudou algo. Telas que ficam abertas só lendo (a Central CBFV)
+    /// usam para se atualizar; quem assina não pode demorar nem lançar exceção, porque roda dentro do save.
+    /// </summary>
+    public static event Action? DadosGravados;
 
     // No mesmo save: quem sai do elenco sai das escalações do time (EscalacoesDeQuemSaiu) e a competição
     // encerrada com campeão entra no Hall da Fama (HallDaFamaAutomatico).
