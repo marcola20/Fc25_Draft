@@ -10,7 +10,7 @@ public sealed record ResultadoForma(char Resultado, string Descricao);
 public static class FormaDosTimes
 {
     public static IReadOnlyDictionary<Guid, IReadOnlyList<ResultadoForma>> Calcular(
-        IEnumerable<LigaRodadaComPartidasDto> rodadas, int quantidade = 5)
+        IEnumerable<LigaRodadaComPartidasDto> rodadas, int quantidade = 5, Mando mando = Mando.Geral)
     {
         var jogos = rodadas
             .SelectMany(r => r.Partidas)
@@ -22,8 +22,10 @@ public static class FormaDosTimes
         var forma = new Dictionary<Guid, List<ResultadoForma>>();
         foreach (var p in jogos)
         {
-            Anotar(p.TimeCasaId, p.GolsCasa, p.GolsFora, p.TimeForaNome, p.TemPenaltis ? p.PenaltisVencedorId : null);
-            Anotar(p.TimeForaId, p.GolsFora, p.GolsCasa, p.TimeCasaNome, p.TemPenaltis ? p.PenaltisVencedorId : null);
+            if (mando != Mando.Fora)
+                Anotar(p.TimeCasaId, p.GolsCasa, p.GolsFora, p.TimeForaNome, p.TemPenaltis ? p.PenaltisVencedorId : null);
+            if (mando != Mando.Casa)
+                Anotar(p.TimeForaId, p.GolsFora, p.GolsCasa, p.TimeCasaNome, p.TemPenaltis ? p.PenaltisVencedorId : null);
         }
 
         return forma.ToDictionary(f => f.Key, f => (IReadOnlyList<ResultadoForma>)f.Value.TakeLast(quantidade).ToList());

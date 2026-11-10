@@ -232,10 +232,21 @@
             }
             else
             {
-                <!-- Liga: tabela única -->
+                <!-- Liga: tabela única (Geral, ou só os jogos em casa / fora) -->
+                var tabela = TabelaDoMando;
+                var recorte = _mando != Mando.Geral;
+
+                <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Recorte da classificação">
+                    @foreach (var opcao in new[] { Mando.Geral, Mando.Casa, Mando.Fora })
+                    {
+                        var atual = opcao;
+                        <button type="button" class="btn btn-outline-secondary @(_mando == atual ? "active" : "")" @onclick="() => _mando = atual">@atual</button>
+                    }
+                </div>
+
                 <ShareableCard Id="cap-tabela-liga"
                                Titulo="@LigaNome"
-                               Subtitulo="Classificação"
+                               Subtitulo='@(recorte ? $"Classificação — jogos {(_mando == Mando.Casa ? "em casa" : "fora")}" : "Classificação")'
                                Arquivo="cbfv-classificacao.png"
                                MostrarBotao="false"
                                @ref="_classifCardRef">
@@ -253,16 +264,16 @@
                                     <th class="text-center" title="Gols Pró" style="width:35px;">GP</th>
                                     <th class="text-center" title="Gols Contra" style="width:35px;">GC</th>
                                     <th class="text-center" title="Saldo de Gols" style="width:35px;">SG</th>
-                                    <th class="text-center" title="Últimos 5 jogos (o mais recente à direita)">Últimos 5</th>
+                                    <th class="text-center" title="@(recorte ? $"Últimos 5 jogos {(_mando == Mando.Casa ? "em casa" : "fora")} (o mais recente à direita)" : "Últimos 5 jogos (o mais recente à direita)")">Últimos 5</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var item in _classif)
+                                @foreach (var item in tabela)
                                 {
-                                    <tr class="@GetRowClass(item)">
+                                    <tr class="@(recorte ? "" : GetRowClass(item))">
                                         <td class="text-nowrap">
-                                            <span class="@GetBadgeClass(item)">@Posicao(item)</span>
-                                            @if (Variacao(item.TimeId) is int v && v != 0)
+                                            <span class="@(recorte ? ZonaEstilo.Badge(ZonaClassificacao.Nenhuma) : GetBadgeClass(item))">@(recorte ? item.Posicao : Posicao(item))</span>
+                                            @if (!recorte && Variacao(item.TimeId) is int v && v != 0)
                                             {
                                                 <span class="variacao @(v > 0 ? "subiu" : "caiu")"
                                                       title="@(v > 0 ? "Subiu" : "Caiu") @Math.Abs(v) @(Math.Abs(v) == 1 ? "posição" : "posições") desde a rodada passada"><Icone Nome="@(v > 0 ? "chevron-up" : "chevron-down")" Tamanho="12" />@Math.Abs(v)</span>
@@ -282,23 +293,32 @@
                                         <td class="text-center @(item.SaldoGols > 0 ? "saldo-positivo" : item.SaldoGols < 0 ? "saldo-negativo" : "")" style="width:35px;">
                                             @(item.SaldoGols > 0 ? "+" : "")@item.SaldoGols
                                         </td>
-                                        <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.TimeId)" /></td>
+                                        <td class="text-center text-nowrap"><FormaBolinhas Jogos="@Forma(item.TimeId, _mando)" /></td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="legenda-zonas">
-                        @foreach (var zona in ZonasDaLegenda())
-                        {
-                            <span><span class="legenda-cor @ZonaEstilo.Linha(zona)"></span>@LigaZonas.Rotulo(zona)</span>
-                        }
-                        @if (_classif.Any(EmpateNoTopo))
-                        {
-                            <span><span class="legenda-cor @ZonaEstilo.LinhaEmpateTopo"></span> @(_regra.DesempateSerieB ? "Empate em posição de zona — jogo decisivo ou mini liga no fim da temporada" : "Empate no topo — jogo decisivo ou mini liga")</span>
-                        }
-                    </div>
+                    @if (recorte)
+                    {
+                        <div class="legenda-zonas">
+                            <span>Só os jogos @(_mando == Mando.Casa ? "em casa" : "fora") de cada time. Punições e zonas valem só na tabela geral.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="legenda-zonas">
+                            @foreach (var zona in ZonasDaLegenda())
+                            {
+                                <span><span class="legenda-cor @ZonaEstilo.Linha(zona)"></span>@LigaZonas.Rotulo(zona)</span>
+                            }
+                            @if (_classif.Any(EmpateNoTopo))
+                            {
+                                <span><span class="legenda-cor @ZonaEstilo.LinhaEmpateTopo"></span> @(_regra.DesempateSerieB ? "Empate em posição de zona — jogo decisivo ou mini liga no fim da temporada" : "Empate no topo — jogo decisivo ou mini liga")</span>
+                            }
+                        </div>
+                    }
                 </ShareableCard>
 
                 <PosicaoRodadaGrafico Posicoes="_posicoesPorRodada" Tabela="_classif" Regra="_regra" />
@@ -1211,18 +1231,35 @@
     private IReadOnlyList<LigaClassificacaoItemDto> _classif = Array.Empty<LigaClassificacaoItemDto>();
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
 
-    // Forma recente (últimos 5) de cada time, recalculada quando as rodadas mudam.
-    private IReadOnlyDictionary<Guid, IReadOnlyList<ResultadoForma>> _forma = new Dictionary<Guid, IReadOnlyList<ResultadoForma>>();
+    // Forma recente (últimos 5) de cada time — geral, em casa e fora —, recalculada quando as rodadas mudam.
+    private Dictionary<Mando, IReadOnlyDictionary<Guid, IReadOnlyList<ResultadoForma>>> _forma = new();
     private object? _formaDasRodadas;
 
-    private IReadOnlyList<ResultadoForma> Forma(Guid timeId)
+    private IReadOnlyList<ResultadoForma> Forma(Guid timeId, Mando mando = Mando.Geral)
     {
         if (!ReferenceEquals(_formaDasRodadas, _rodadas))
         {
-            _forma = FormaDosTimes.Calcular(_rodadas);
+            _forma.Clear();
             _formaDasRodadas = _rodadas;
         }
-        return _forma.TryGetValue(timeId, out var jogos) ? jogos : Array.Empty<ResultadoForma>();
+        if (!_forma.TryGetValue(mando, out var porTime))
+            _forma[mando] = porTime = FormaDosTimes.Calcular(_rodadas, mando: mando);
+        return porTime.TryGetValue(timeId, out var jogos) ? jogos : Array.Empty<ResultadoForma>();
+    }
+
+    // Classificação da Liga: Geral (a oficial) ou só com os jogos em casa / fora.
+    private Mando _mando = Mando.Geral;
+    private (Mando Mando, object Rodadas, object Tabela, IReadOnlyList<LigaClassificacaoItemDto> Itens)? _tabelaMando;
+
+    private IReadOnlyList<LigaClassificacaoItemDto> TabelaDoMando
+    {
+        get
+        {
+            if (_mando == Mando.Geral) return _classif;
+            if (_tabelaMando is not { } t || t.Mando != _mando || !ReferenceEquals(t.Rodadas, _rodadas) || !ReferenceEquals(t.Tabela, _classif))
+                _tabelaMando = t = (_mando, _rodadas, _classif, TabelaPorMando.Calcular(_rodadas, _classif, _mando));
+            return t.Itens;
+        }
     }
 
     private LigaClassificacaoItemDto? NaTabela(Guid timeId) => _classif.FirstOrDefault(c => c.TimeId == timeId);
