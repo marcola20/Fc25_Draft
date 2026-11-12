@@ -65,12 +65,12 @@
                     <thead class="table-light" style="position: sticky; top: 0;">
                         <tr>
                             <th>Jogador</th>
-                            <th>Clube</th>
-                            <th class="text-center">Idade</th>
-                            <th class="text-center" title="Pontos da evolução: ± em cada atributo afetado">Pontos</th>
-                            <th class="text-center">Overall</th>
-                            <th class="text-center" title="Titular / jogos do clube com escalação gravada">Titular</th>
-                            <th class="text-center">Nota</th>
+                            <th>@Cabecalho(Coluna.Clube, "Clube")</th>
+                            <th class="text-center">@Cabecalho(Coluna.Idade, "Idade")</th>
+                            <th class="text-center" title="Pontos da evolução: ± em cada atributo afetado">@Cabecalho(Coluna.Pontos, "Pontos")</th>
+                            <th class="text-center">@Cabecalho(Coluna.Overall, "Overall")</th>
+                            <th class="text-center" title="Titular / jogos do clube com escalação gravada">@Cabecalho(Coluna.Titular, "Titular")</th>
+                            <th class="text-center">@Cabecalho(Coluna.Nota, "Nota")</th>
                             <th>Conta</th>
                         </tr>
                     </thead>
@@ -146,11 +146,72 @@
     private string? _ok;
     private int _temporadaCarregada;
 
-    private IEnumerable<EvolucaoLinhaDto> Linhas =>
-        (_previa?.Linhas ?? Array.Empty<EvolucaoLinhaDto>())
-            .Where(l => string.IsNullOrWhiteSpace(_busca)
-                        || l.Nome.Contains(_busca, StringComparison.CurrentCultureIgnoreCase)
-                        || (l.TimeNome?.Contains(_busca, StringComparison.CurrentCultureIgnoreCase) ?? false));
+    private enum Coluna { Nenhuma, Clube, Idade, Pontos, Overall, Titular, Nota }
+
+    // Ordem escolhida clicando no cabeçalho; sem clique fica a ordem que o serviço devolve.
+    private Coluna _ordem = Coluna.Nenhuma;
+    private bool _decrescente;
+
+    private IEnumerable<EvolucaoLinhaDto> Linhas
+    {
+        get
+        {
+            var linhas = (_previa?.Linhas ?? Array.Empty<EvolucaoLinhaDto>())
+                .Where(l => string.IsNullOrWhiteSpace(_busca)
+                            || l.Nome.Contains(_busca, StringComparison.CurrentCultureIgnoreCase)
+                            || (l.TimeNome?.Contains(_busca, StringComparison.CurrentCultureIgnoreCase) ?? false));
+
+            if (_ordem == Coluna.Clube)
+            {
+                // Sem clube vai sempre para o fim, nos dois sentidos.
+                var comClube = linhas.Where(l => l.TimeNome is not null);
+                var ordenado = _decrescente
+                    ? comClube.OrderByDescending(l => l.TimeNome, StringComparer.CurrentCultureIgnoreCase)
+                    : comClube.OrderBy(l => l.TimeNome, StringComparer.CurrentCultureIgnoreCase);
+                return ordenado.ThenByDescending(l => l.OverallDepois).ThenBy(l => l.Nome)
+                    .Concat(linhas.Where(l => l.TimeNome is null).OrderByDescending(l => l.OverallDepois).ThenBy(l => l.Nome));
+            }
+
+            Func<EvolucaoLinhaDto, double>? chave = _ordem switch
+            {
+                Coluna.Idade => l => l.Idade,
+                Coluna.Pontos => l => l.Pontos,
+                // Overall de depois; empate desempata pela variação.
+                Coluna.Overall => l => l.OverallDepois * 100 + l.Variacao,
+                Coluna.Titular => l => l.JogosDoClube == 0 ? -1 : (double)l.Titular / l.JogosDoClube,
+                // Sem nota fica no fim nos dois sentidos.
+                Coluna.Nota => l => (double)(l.NotaMedia ?? (_decrescente ? -1 : 99)),
+                _ => null
+            };
+            if (chave is null) return linhas;
+
+            return (_decrescente ? linhas.OrderByDescending(chave) : linhas.OrderBy(chave)).ThenBy(l => l.Nome);
+        }
+    }
+
+    private void Ordenar(Coluna coluna)
+    {
+        if (_ordem == coluna)
+            _decrescente = !_decrescente;
+        else
+        {
+            _ordem = coluna;
+            // Número começa do maior; clube começa de A a Z.
+            _decrescente = coluna != Coluna.Clube;
+        }
+    }
+
+    private RenderFragment Cabecalho(Coluna coluna, string texto) => __builder =>
+    {
+        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-nowrap text-reset @(_ordem == coluna ? "fw-semibold" : "")"
+                style="font-size: inherit; vertical-align: baseline;" @onclick="() => Ordenar(coluna)" title="Ordenar por @texto.ToLowerInvariant()">
+            @texto
+            @if (_ordem == coluna)
+            {
+                <Icone Nome="@(_decrescente ? "arrow-down" : "arrow-up")" Tamanho="12" />
+            }
+        </button>
+    };
 
     protected override void OnParametersSet()
     {
