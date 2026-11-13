@@ -86,7 +86,8 @@ public class LayoutNavigationService
             new("Metas da Diretoria", "/admin/diretoria", "briefcase"),
             new("Treino da Semana", "/admin/treinos", "activity"),
             new("Prêmios da Temporada", "/admin/premios", "star"),
-            new("Gerenciar Regulamento", "/admin/regulamento", "file-text")
+            new("Gerenciar Regulamento", "/admin/regulamento", "file-text"),
+            new("Anúncios", "/admin/anuncios", "megaphone")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
         {
@@ -267,6 +268,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Regulamento")
+            }
+        },
+        ["/admin/anuncios"] = new PageDefinition
+        {
+            Route = "/admin/anuncios",
+            Title = "Anúncios",
+            Subtitle = "Textos das novidades para o grupo e a explicação de cada regra — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Anúncios")
             }
         },
         ["/admin/premiacao"] = new PageDefinition

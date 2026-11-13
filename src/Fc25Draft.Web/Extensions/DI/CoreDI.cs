@@ -93,6 +93,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IEvolucaoTemporadaService, EvolucaoTemporadaService>();
             services.AddComConexaoPropria<IAposentadoriaService, AposentadoriaService>();
             services.AddComConexaoPropria<IRegulamentoService, RegulamentoService>();
+            services.AddComConexaoPropria<IAnuncioService, AnuncioService>();
             services.AddComConexaoPropria<IHallOfFameService, HallOfFameService>();
             services.AddComConexaoPropria<ITreinadorService, TreinadorService>();
             services.AddComConexaoPropria<IAdministradorService, AdministradorService>();

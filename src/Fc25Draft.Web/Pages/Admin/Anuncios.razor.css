@@ -1,0 +1,46 @@
+.anuncios-grupo {
+    margin-bottom: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+}
+
+.anuncios-rotulo {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+}
+
+.anuncios-campo {
+    min-height: 40vh;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Prévia no jeito de uma mensagem do WhatsApp: quebras de linha mantidas, negrito do asterisco. */
+.anuncios-balao {
+    max-width: 34rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0 0.75rem 0.75rem 0.75rem;
+    background: var(--bs-tertiary-bg);
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.anuncios-explicacao {
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--bs-border-color);
+    border-left: 3px solid var(--cbfv-acento);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

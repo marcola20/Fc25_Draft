@@ -190,6 +190,47 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("AlbumConquistas", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Anuncio", b =>
+                {
+                    b.Property<Guid>("AnuncioId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("EnviadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Explicacao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Grupo")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.HasKey("AnuncioId");
+
+                    b.ToTable("Anuncios", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Apadrinhamento", b =>
                 {
                     b.Property<Guid>("ApadrinhamentoId")

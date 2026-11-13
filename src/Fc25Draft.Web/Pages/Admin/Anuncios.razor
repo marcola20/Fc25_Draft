@@ -1,0 +1,382 @@
+@page "/admin/anuncios"
+@using System.Net
+@using System.Text.RegularExpressions
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IAnuncioService AnuncioSvc
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Anúncios — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    <p class="text-muted small mb-3">
+        O texto de cada novidade pronto para colar no grupo do WhatsApp (<code>*negrito*</code>, <code>_itálico_</code>),
+        e ao lado a explicação completa da regra, com o que o anúncio não conta, para responder as dúvidas.
+    </p>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-lg-4 col-xxl-3">
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <button class="btn btn-primary btn-sm" @onclick="NovoAsync"><Icone Nome="plus" Tamanho="14" /> Novo anúncio</button>
+                    <div class="form-check form-switch mb-0 ms-auto">
+                        <input class="form-check-input" type="checkbox" id="mostrar-enviados" @bind="_mostrarEnviados" />
+                        <label class="form-check-label small" for="mostrar-enviados">Mostrar enviados</label>
+                    </div>
+                </div>
+
+                @if (_anuncios.Count == 0)
+                {
+                    <div class="alert alert-info">Nenhum anúncio ainda. Crie o primeiro.</div>
+                }
+                else if (!Visiveis.Any())
+                {
+                    <div class="text-muted small">Todos já foram enviados. Ligue "Mostrar enviados" para ver.</div>
+                }
+
+                @foreach (var grupo in Visiveis.GroupBy(a => a.Grupo))
+                {
+                    <div class="anuncios-grupo">@grupo.Key</div>
+                    <div class="list-group mb-3">
+                        @foreach (var a in grupo)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2 @(a.AnuncioId == _atualId ? "active" : "")"
+                                    @onclick="() => SelecionarAsync(a.AnuncioId)">
+                                <span class="flex-grow-1 text-truncate">@a.Titulo</span>
+                                @if (a.EnviadoEm is { } em)
+                                {
+                                    <span class="etiqueta sucesso" title="Enviado no grupo"><Icone Nome="check" Tamanho="11" /> @BrazilTime.ConvertFromUtc(em).ToString("dd/MM")</span>
+                                }
+                                else
+                                {
+                                    <span class="etiqueta aviso">a enviar</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-8 col-xxl-9">
+                @if (_atualId is null && !_novo)
+                {
+                    <div class="text-muted">Escolha um anúncio na lista.</div>
+                }
+                else
+                {
+                    @if (_editando)
+                    {
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Título</label>
+                                <input class="form-control" @bind="_titulo" maxlength="160" placeholder="Ex.: Cláusula de recompra" />
+                            </div>
+                            <div class="col-8 col-md-4">
+                                <label class="form-label">Grupo</label>
+                                <input class="form-control" list="anuncios-grupos" @bind="_grupo" maxlength="80" placeholder="Ex.: Virada 2012" />
+                                <datalist id="anuncios-grupos">
+                                    @foreach (var g in _anuncios.Select(a => a.Grupo).Distinct())
+                                    {
+                                        <option value="@g"></option>
+                                    }
+                                </datalist>
+                            </div>
+                            <div class="col-4 col-md-2">
+                                <label class="form-label">Ordem</label>
+                                <input type="number" class="form-control" @bind="_ordem" />
+                            </div>
+                        </div>
+                    }
+                    else if (Atual is { } atual)
+                    {
+                        <div class="d-flex align-items-start gap-2 mb-3 flex-wrap">
+                            <div class="me-auto">
+                                <h5 class="mb-1">@atual.Titulo</h5>
+                                <div class="small text-muted">
+                                    @atual.Grupo ·
+                                    @if (atual.EnviadoEm is { } em)
+                                    {
+                                        <span>enviado no grupo em @BrazilTime.ConvertFromUtc(em).ToString("dd/MM/yyyy")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>ainda não enviado</span>
+                                    }
+                                    · atualizado em @BrazilTime.ConvertFromUtc(atual.AtualizadoEm).ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                            <button class="btn btn-success btn-sm" @onclick="CopiarAsync" disabled="@(atual.Texto.Length == 0)"><Icone Nome="copy" Tamanho="14" /> Copiar texto</button>
+                            @if (atual.EnviadoEm is null)
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => MarcarEnviadoAsync(true)" disabled="@_salvando"><Icone Nome="check" Tamanho="14" /> Marcar como enviado</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => MarcarEnviadoAsync(false)" disabled="@_salvando">Desmarcar enviado</button>
+                            }
+                            <button class="btn btn-outline-primary btn-sm" @onclick="Editar"><Icone Nome="pencil" Tamanho="14" /> Editar</button>
+                        </div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-xl-6">
+                            <div class="anuncios-rotulo"><Icone Nome="message-circle" Tamanho="14" /> Texto para o grupo</div>
+                            @if (_editando)
+                            {
+                                <textarea class="form-control anuncios-campo" spellcheck="true" @bind="_texto" @bind:event="oninput"
+                                          placeholder="*Novidade no site da CBFV: ...*"></textarea>
+                                <div class="anuncios-rotulo mt-3">Prévia</div>
+                            }
+                            <div class="anuncios-balao">
+                                @if (string.IsNullOrWhiteSpace(_texto))
+                                {
+                                    <span class="text-muted">Sem texto ainda.</span>
+                                }
+                                else
+                                {
+                                    @Formatar(_texto)
+                                }
+                            </div>
+                        </div>
+                        <div class="col-xl-6">
+                            <div class="anuncios-rotulo"><Icone Nome="info" Tamanho="14" /> Explicação</div>
+                            @if (_editando)
+                            {
+                                <textarea class="form-control anuncios-campo" spellcheck="true" @bind="_explicacao"
+                                          placeholder="A regra completa: números, casos de borda, onde fica no site..."></textarea>
+                            }
+                            else
+                            {
+                                <div class="anuncios-explicacao">
+                                    @if (string.IsNullOrWhiteSpace(_explicacao))
+                                    {
+                                        <span class="text-muted">Sem explicação ainda. Clique em Editar para escrever.</span>
+                                    }
+                                    else
+                                    {
+                                        @Formatar(_explicacao)
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (_editando)
+                    {
+                        <div class="d-flex gap-2 mt-3 flex-wrap">
+                            <button class="btn btn-success" @onclick="SalvarAsync" disabled="@_salvando"><Icone Nome="save" Tamanho="14" /> Salvar</button>
+                            <button class="btn btn-outline-secondary" @onclick="CancelarEdicao" disabled="@_salvando">Cancelar</button>
+                            @if (!_novo)
+                            {
+                                <button class="btn btn-outline-danger ms-auto" @onclick="ExcluirAsync" disabled="@_salvando">Excluir</button>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    private IReadOnlyList<AnuncioDto> _anuncios = Array.Empty<AnuncioDto>();
+    private bool _mostrarEnviados;
+    private Guid? _atualId;
+    private bool _novo;
+    private bool _editando;
+
+    private string _titulo = "";
+    private string _grupo = "";
+    private int _ordem;
+    private string _texto = "";
+    private string _explicacao = "";
+
+    private AnuncioDto? Atual => _anuncios.FirstOrDefault(a => a.AnuncioId == _atualId);
+
+    /// <summary>Os já enviados somem da lista (menos o aberto), a não ser que o admin peça para ver.</summary>
+    private IEnumerable<AnuncioDto> Visiveis =>
+        _anuncios.Where(a => _mostrarEnviados || a.EnviadoEm is null || a.AnuncioId == _atualId);
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/anuncios"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        var primeiro = _anuncios.FirstOrDefault(a => a.EnviadoEm is null) ?? _anuncios.FirstOrDefault();
+        if (primeiro is not null) Abrir(primeiro);
+        _carregando = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _anuncios = await AnuncioSvc.ListAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private void Abrir(AnuncioDto a)
+    {
+        _atualId = a.AnuncioId;
+        _novo = false;
+        _editando = false;
+        _titulo = a.Titulo;
+        _grupo = a.Grupo;
+        _ordem = a.Ordem;
+        _texto = a.Texto;
+        _explicacao = a.Explicacao;
+    }
+
+    /// <summary>Mudou alguma coisa no formulário desde que abriu.</summary>
+    private bool TemAlteracao =>
+        _editando && (_novo
+            ? _titulo.Length + _texto.Length + _explicacao.Length > 0
+            : Atual is { } a && (a.Titulo != _titulo || a.Grupo != _grupo || a.Ordem != _ordem || a.Texto != _texto || a.Explicacao != _explicacao));
+
+    private async Task<bool> PodeDescartarAsync() =>
+        !TemAlteracao || await JSRuntime.InvokeAsync<bool>("confirm", "Descartar as alterações que não foram salvas?");
+
+    private async Task SelecionarAsync(Guid id)
+    {
+        if (id == _atualId && !_novo) return;
+        if (!await PodeDescartarAsync()) return;
+
+        var a = _anuncios.FirstOrDefault(x => x.AnuncioId == id);
+        if (a is not null) Abrir(a);
+    }
+
+    private async Task NovoAsync()
+    {
+        if (!await PodeDescartarAsync()) return;
+
+        var grupo = Atual?.Grupo ?? _anuncios.FirstOrDefault()?.Grupo ?? "";
+        _atualId = null;
+        _novo = true;
+        _editando = true;
+        _titulo = "";
+        _grupo = grupo;
+        _ordem = _anuncios.Where(a => a.Grupo == grupo).Select(a => a.Ordem).DefaultIfEmpty(0).Max() + 1;
+        _texto = "";
+        _explicacao = "";
+    }
+
+    private void Editar() => _editando = true;
+
+    private void CancelarEdicao()
+    {
+        if (Atual is { } a) Abrir(a);
+        else
+        {
+            _novo = false;
+            _editando = false;
+        }
+    }
+
+    private async Task SalvarAsync()
+    {
+        _salvando = true;
+        try
+        {
+            var request = new AnuncioSalvarRequest(_grupo, _titulo, _texto, _explicacao, _ordem);
+            var salvo = _novo
+                ? await AnuncioSvc.CriarAsync(request, CancellationToken.None)
+                : await AnuncioSvc.SalvarAsync(_atualId!.Value, request, CancellationToken.None);
+
+            await CarregarAsync();
+            Abrir(salvo);
+            _ok = $"\"{salvo.Titulo}\" salvo.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task MarcarEnviadoAsync(bool enviado)
+    {
+        if (_atualId is not Guid id) return;
+        _salvando = true;
+        try
+        {
+            await AnuncioSvc.MarcarEnviadoAsync(id, enviado, CancellationToken.None);
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task ExcluirAsync()
+    {
+        if (Atual is not { } a) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Excluir o anúncio \"{a.Titulo}\"? Não dá para desfazer.")) return;
+
+        _salvando = true;
+        try
+        {
+            await AnuncioSvc.ExcluirAsync(a.AnuncioId, CancellationToken.None);
+            await CarregarAsync();
+            _atualId = null;
+            _editando = false;
+            var proximo = _anuncios.FirstOrDefault(x => x.EnviadoEm is null) ?? _anuncios.FirstOrDefault();
+            if (proximo is not null) Abrir(proximo);
+            _ok = "Anúncio excluído.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task CopiarAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _texto);
+            _ok = "Texto copiado. É só colar no grupo.";
+        }
+        catch
+        {
+            _erro = "O navegador não deixou copiar sozinho. Clique em Editar, selecione o texto e copie na mão.";
+        }
+    }
+
+    // Formatação do WhatsApp: *negrito*, _itálico_, ~riscado~. O texto é escapado antes, então nada de HTML passa.
+    private static readonly Regex Negrito = new(@"(?<![\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])", RegexOptions.Compiled);
+    private static readonly Regex Italico = new(@"(?<![\w_])_(?=\S)([^_\n]*?\S)_(?![\w_])", RegexOptions.Compiled);
+    private static readonly Regex Riscado = new(@"(?<![\w~])~(?=\S)([^~\n]*?\S)~(?![\w~])", RegexOptions.Compiled);
+
+    private static MarkupString Formatar(string texto)
+    {
+        var html = WebUtility.HtmlEncode(texto);
+        html = Negrito.Replace(html, "<strong>$1</strong>");
+        html = Italico.Replace(html, "<em>$1</em>");
+        html = Riscado.Replace(html, "<s>$1</s>");
+        return new MarkupString(html);
+    }
+}
