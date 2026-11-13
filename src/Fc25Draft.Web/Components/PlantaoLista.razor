@@ -9,7 +9,11 @@
     {
         <li>
             <a href="@n.Link" class="plantao-item">
-                @if (n.JogadorId is int jogadorId)
+                @if (n.Categoria == PlantaoCategoria.Novidade)
+                {
+                    <span class="plantao-selo" aria-hidden="true"><Icone Nome="sparkles" Tamanho="16" /></span>
+                }
+                else if (n.JogadorId is int jogadorId)
                 {
                     <FotoJogador PlayerId="jogadorId" Tamanho="32" />
                 }

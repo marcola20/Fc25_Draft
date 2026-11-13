@@ -19,6 +19,18 @@ public class Anuncio
     /// <summary>Explicação para o admin: regra completa, casos de borda e onde fica no site.</summary>
     public string Explicacao { get; set; } = "";
 
+    /// <summary>Linha fina do anúncio no site: aparece no Plantão e na lista de novidades.</summary>
+    public string Resumo { get; set; } = "";
+
+    /// <summary>
+    /// Versão do site, mais explicada e com exemplos, para os técnicos. Markdown simples:
+    /// "## título", "- item", "1. item", "&gt; exemplo" e *negrito*.
+    /// </summary>
+    public string TextoSite { get; set; } = "";
+
+    /// <summary>Quando foi publicado no site (nulo = não está no site). Vira notícia no Plantão.</summary>
+    public DateTime? PublicadoEm { get; set; }
+
     /// <summary>Ordem dentro do grupo.</summary>
     public int Ordem { get; set; }
 

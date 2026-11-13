@@ -3,6 +3,7 @@
 @using System.Text.RegularExpressions
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IAnuncioService AnuncioSvc
@@ -24,7 +25,8 @@
 
     <p class="text-muted small mb-3">
         O texto de cada novidade pronto para colar no grupo do WhatsApp (<code>*negrito*</code>, <code>_itálico_</code>),
-        e ao lado a explicação completa da regra, com o que o anúncio não conta, para responder as dúvidas.
+        a explicação completa da regra para responder as dúvidas e, na aba Site, a versão com exemplos que os técnicos
+        leem em <a href="/anuncios" target="_blank">Novidades do Site</a>. Publicar no site também põe a novidade no Plantão.
     </p>
 
     @if (_carregando)
@@ -61,6 +63,10 @@
                             <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2 @(a.AnuncioId == _atualId ? "active" : "")"
                                     @onclick="() => SelecionarAsync(a.AnuncioId)">
                                 <span class="flex-grow-1 text-truncate">@a.Titulo</span>
+                                @if (a.PublicadoEm is not null)
+                                {
+                                    <span class="etiqueta acento" title="Publicado no site"><Icone Nome="sparkles" Tamanho="11" /> site</span>
+                                }
                                 @if (a.EnviadoEm is { } em)
                                 {
                                     <span class="etiqueta sucesso" title="Enviado no grupo"><Icone Nome="check" Tamanho="11" /> @BrazilTime.ConvertFromUtc(em).ToString("dd/MM")</span>
@@ -120,6 +126,15 @@
                                     {
                                         <span>ainda não enviado</span>
                                     }
+                                    ·
+                                    @if (atual.PublicadoEm is { } pub)
+                                    {
+                                        <span>no site desde @BrazilTime.ConvertFromUtc(pub).ToString("dd/MM/yyyy") (<a href="/anuncios/@atual.AnuncioId" target="_blank">ver</a>)</span>
+                                    }
+                                    else
+                                    {
+                                        <span>fora do site</span>
+                                    }
                                     · atualizado em @BrazilTime.ConvertFromUtc(atual.AtualizadoEm).ToString("dd/MM/yyyy HH:mm")
                                 </div>
                             </div>
@@ -132,10 +147,66 @@
                             {
                                 <button class="btn btn-outline-secondary btn-sm" @onclick="() => MarcarEnviadoAsync(false)" disabled="@_salvando">Desmarcar enviado</button>
                             }
+                            @if (atual.PublicadoEm is null)
+                            {
+                                <button class="btn btn-primary btn-sm" @onclick="() => PublicarAsync(true)" disabled="@_salvando"><Icone Nome="sparkles" Tamanho="14" /> Publicar no site</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => PublicarAsync(false)" disabled="@_salvando">Tirar do site</button>
+                            }
                             <button class="btn btn-outline-primary btn-sm" @onclick="Editar"><Icone Nome="pencil" Tamanho="14" /> Editar</button>
                         </div>
                     }
 
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item"><button type="button" class="nav-link @(_aba == "grupo" ? "active" : "")" @onclick="@(() => _aba = "grupo")">WhatsApp e explicação</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link @(_aba == "site" ? "active" : "")" @onclick="@(() => _aba = "site")">Site</button></li>
+                    </ul>
+
+                    @if (_aba == "site")
+                    {
+                        <div class="row g-3">
+                            @if (_editando)
+                            {
+                                <div class="col-xl-6">
+                                    <label class="form-label">Resumo <span class="text-muted small">(linha que aparece no Plantão e na lista de novidades)</span></label>
+                                    <textarea class="form-control mb-3" rows="2" maxlength="300" @bind="_resumo" @bind:event="oninput"
+                                              placeholder="Uma frase dizendo o que mudou."></textarea>
+                                    <label class="form-label">Texto do site</label>
+                                    <textarea class="form-control anuncios-campo anuncios-campo-site" spellcheck="true" @bind="_textoSite" @bind:event="oninput"
+                                              placeholder="Explique com calma e com exemplos."></textarea>
+                                    <div class="small text-muted mt-1">
+                                        <code>## Título</code> · <code>- item</code> · <code>1. passo</code> ·
+                                        <code>&gt; Exemplo: ...</code> (quadro de exemplo) · <code>*negrito*</code> · linha em branco separa parágrafos
+                                    </div>
+                                </div>
+                            }
+                            <div class="@(_editando ? "col-xl-6" : "col-12")">
+                                @if (_editando)
+                                {
+                                    <div class="anuncios-rotulo">Prévia</div>
+                                }
+                                <div class="anuncios-site">
+                                    @if (string.IsNullOrWhiteSpace(_textoSite))
+                                    {
+                                        <span class="text-muted">Sem texto do site ainda. Clique em Editar para escrever; sem ele não dá para publicar.</span>
+                                    }
+                                    else
+                                    {
+                                        <h4 class="mb-2">@_titulo</h4>
+                                        @if (!string.IsNullOrWhiteSpace(_resumo))
+                                        {
+                                            <p class="text-body-secondary">@_resumo</p>
+                                        }
+                                        <div class="texto-site">@((MarkupString)TextoDoSite.ParaHtml(_textoSite))</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
                     <div class="row g-3">
                         <div class="col-xl-6">
                             <div class="anuncios-rotulo"><Icone Nome="message-circle" Tamanho="14" /> Texto para o grupo</div>
@@ -178,6 +249,7 @@
                             }
                         </div>
                     </div>
+                    }
 
                     @if (_editando)
                     {
@@ -213,6 +285,9 @@
     private int _ordem;
     private string _texto = "";
     private string _explicacao = "";
+    private string _resumo = "";
+    private string _textoSite = "";
+    private string _aba = "grupo";
 
     private AnuncioDto? Atual => _anuncios.FirstOrDefault(a => a.AnuncioId == _atualId);
 
@@ -255,13 +330,16 @@
         _ordem = a.Ordem;
         _texto = a.Texto;
         _explicacao = a.Explicacao;
+        _resumo = a.Resumo;
+        _textoSite = a.TextoSite;
     }
 
     /// <summary>Mudou alguma coisa no formulário desde que abriu.</summary>
     private bool TemAlteracao =>
         _editando && (_novo
-            ? _titulo.Length + _texto.Length + _explicacao.Length > 0
-            : Atual is { } a && (a.Titulo != _titulo || a.Grupo != _grupo || a.Ordem != _ordem || a.Texto != _texto || a.Explicacao != _explicacao));
+            ? _titulo.Length + _texto.Length + _explicacao.Length + _resumo.Length + _textoSite.Length > 0
+            : Atual is { } a && (a.Titulo != _titulo || a.Grupo != _grupo || a.Ordem != _ordem || a.Texto != _texto
+                || a.Explicacao != _explicacao || a.Resumo != _resumo || a.TextoSite != _textoSite));
 
     private async Task<bool> PodeDescartarAsync() =>
         !TemAlteracao || await JSRuntime.InvokeAsync<bool>("confirm", "Descartar as alterações que não foram salvas?");
@@ -288,6 +366,8 @@
         _ordem = _anuncios.Where(a => a.Grupo == grupo).Select(a => a.Ordem).DefaultIfEmpty(0).Max() + 1;
         _texto = "";
         _explicacao = "";
+        _resumo = "";
+        _textoSite = "";
     }
 
     private void Editar() => _editando = true;
@@ -307,7 +387,7 @@
         _salvando = true;
         try
         {
-            var request = new AnuncioSalvarRequest(_grupo, _titulo, _texto, _explicacao, _ordem);
+            var request = new AnuncioSalvarRequest(_grupo, _titulo, _texto, _explicacao, _ordem, _resumo, _textoSite);
             var salvo = _novo
                 ? await AnuncioSvc.CriarAsync(request, CancellationToken.None)
                 : await AnuncioSvc.SalvarAsync(_atualId!.Value, request, CancellationToken.None);
@@ -330,6 +410,29 @@
             await CarregarAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task PublicarAsync(bool publicar)
+    {
+        if (Atual is not { } a) return;
+        var pergunta = publicar
+            ? $"Publicar \"{a.Titulo}\" no site? Vira notícia no Plantão para todo mundo."
+            : $"Tirar \"{a.Titulo}\" do site? Some da página de novidades e do Plantão.";
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", pergunta)) return;
+
+        _salvando = true;
+        try
+        {
+            await AnuncioSvc.PublicarAsync(a.AnuncioId, publicar, CancellationToken.None);
+            await CarregarAsync();
+            _ok = publicar ? "Publicado no site e no Plantão." : "Tirado do site.";
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+            if (publicar) _aba = "site";
+        }
         finally { _salvando = false; }
     }
 

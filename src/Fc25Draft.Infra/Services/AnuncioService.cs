@@ -1,6 +1,7 @@
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,6 +56,9 @@ public class AnuncioService : IAnuncioService
         Validar(request);
 
         var anuncio = await BuscarAsync(anuncioId, ct);
+        if (anuncio.PublicadoEm is not null && (string.IsNullOrWhiteSpace(request.Resumo) || string.IsNullOrWhiteSpace(request.TextoSite)))
+            throw new InvalidOperationException("Este anúncio está no site: o resumo e o texto do site não podem ficar vazios. Tire do site antes, se quiser.");
+
         Aplicar(anuncio, request, _time.GetUtcNow().UtcDateTime);
         await _db.SaveChangesAsync(ct);
 
@@ -69,6 +73,42 @@ public class AnuncioService : IAnuncioService
 
         return ToDto(anuncio);
     }
+
+    public async Task<AnuncioDto> PublicarAsync(Guid anuncioId, bool publicar, CancellationToken ct)
+    {
+        var anuncio = await BuscarAsync(anuncioId, ct);
+        if (publicar)
+        {
+            if (string.IsNullOrWhiteSpace(anuncio.Resumo))
+                throw new InvalidOperationException("Escreva o resumo antes de publicar: é a linha que aparece no Plantão.");
+            if (string.IsNullOrWhiteSpace(anuncio.TextoSite))
+                throw new InvalidOperationException("Escreva o texto do site antes de publicar.");
+        }
+
+        anuncio.PublicadoEm = publicar ? _time.GetUtcNow().UtcDateTime : null;
+        await _db.SaveChangesAsync(ct);
+
+        return ToDto(anuncio);
+    }
+
+    public async Task<IReadOnlyList<AnuncioPublicadoDto>> ListPublicadosAsync(CancellationToken ct) =>
+        await _db.Anuncios.AsNoTracking()
+            .Where(a => a.PublicadoEm != null)
+            .OrderByDescending(a => a.PublicadoEm)
+            .Select(a => new AnuncioPublicadoDto(a.AnuncioId, a.Titulo, a.Resumo, a.TextoSite, a.PublicadoEm!.Value))
+            .ToListAsync(ct);
+
+    public async Task<AnuncioPublicadoDto?> GetPublicadoAsync(Guid anuncioId, CancellationToken ct) =>
+        await _db.Anuncios.AsNoTracking()
+            .Where(a => a.AnuncioId == anuncioId && a.PublicadoEm != null)
+            .Select(a => new AnuncioPublicadoDto(a.AnuncioId, a.Titulo, a.Resumo, a.TextoSite, a.PublicadoEm!.Value))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct) =>
+        (await ListPublicadosAsync(ct))
+            .Select(a => new PlantaoNoticiaDto(a.PublicadoEm, PlantaoCategoria.Novidade, "📣",
+                $"Novidade no site: {a.Titulo}", a.Resumo, $"/anuncios/{a.AnuncioId}", null))
+            .ToList();
 
     public async Task ExcluirAsync(Guid anuncioId, CancellationToken ct)
     {
@@ -87,6 +127,7 @@ public class AnuncioService : IAnuncioService
         if (string.IsNullOrWhiteSpace(request.Grupo)) throw new ArgumentException("Informe o grupo (ex.: Virada 2012).");
         if (request.Titulo.Trim().Length > 160) throw new ArgumentException("Título muito longo (máximo 160 letras).");
         if (request.Grupo.Trim().Length > 80) throw new ArgumentException("Grupo muito longo (máximo 80 letras).");
+        if ((request.Resumo ?? "").Trim().Length > 300) throw new ArgumentException("Resumo muito longo (máximo 300 letras).");
     }
 
     private static void Aplicar(Anuncio anuncio, AnuncioSalvarRequest request, DateTime agora)
@@ -95,10 +136,13 @@ public class AnuncioService : IAnuncioService
         anuncio.Titulo = request.Titulo.Trim();
         anuncio.Texto = (request.Texto ?? "").TrimEnd();
         anuncio.Explicacao = (request.Explicacao ?? "").TrimEnd();
+        anuncio.Resumo = (request.Resumo ?? "").Trim();
+        anuncio.TextoSite = (request.TextoSite ?? "").TrimEnd();
         anuncio.Ordem = request.Ordem;
         anuncio.AtualizadoEm = agora;
     }
 
     private static AnuncioDto ToDto(Anuncio a) =>
-        new(a.AnuncioId, a.Grupo, a.Titulo, a.Texto, a.Explicacao, a.Ordem, a.EnviadoEm, a.AtualizadoEm);
+        new(a.AnuncioId, a.Grupo, a.Titulo, a.Texto, a.Explicacao, a.Resumo, a.TextoSite, a.Ordem, a.EnviadoEm,
+            a.PublicadoEm, a.AtualizadoEm);
 }

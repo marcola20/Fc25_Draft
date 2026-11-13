@@ -1,0 +1,57 @@
+@page "/anuncios"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@inject IAnuncioService AnuncioSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Novidades do Site</PageTitle>
+
+<div class="novidades">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger">@_erro</div>
+    }
+    else if (_publicados.Count == 0)
+    {
+        <div class="alert alert-secondary">Nenhuma novidade publicada ainda.</div>
+    }
+    else
+    {
+        <p class="text-body-secondary small mb-3">
+            O que mudou no site e nas regras, explicado com exemplos. A mais nova fica em cima.
+        </p>
+        <NovidadesLista Itens="_publicados" />
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private string? _erro;
+    private IReadOnlyList<AnuncioPublicadoDto> _publicados = Array.Empty<AnuncioPublicadoDto>();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/anuncios"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _publicados = await AnuncioSvc.ListPublicadosAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+}

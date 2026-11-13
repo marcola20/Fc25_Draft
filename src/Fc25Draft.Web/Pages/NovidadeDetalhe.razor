@@ -1,0 +1,94 @@
+@page "/anuncios/{AnuncioId:guid}"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Models.Navigation
+@inject IAnuncioService AnuncioSvc
+@inject LayoutState LayoutState
+
+<PageTitle>@(_aberto?.Titulo ?? "Novidade")</PageTitle>
+
+<div class="novidades">
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_erro is not null)
+    {
+        <div class="alert alert-danger">@_erro</div>
+    }
+    else if (_aberto is not { } a)
+    {
+        <div class="alert alert-secondary">Esse anúncio não está mais no site.</div>
+        <a href="/anuncios" class="btn btn-outline-secondary btn-sm"><Icone Nome="arrow-left" Tamanho="14" /> Todas as novidades</a>
+    }
+    else
+    {
+        <article>
+            <a href="/anuncios" class="novidade-voltar"><Icone Nome="arrow-left" Tamanho="14" /> Todas as novidades</a>
+            <div class="novidade-data">@Data(a.PublicadoEm)</div>
+            <h1 class="novidade-titulo">@a.Titulo</h1>
+            @if (!string.IsNullOrWhiteSpace(a.Resumo))
+            {
+                <p class="novidade-resumo">@a.Resumo</p>
+            }
+            <div class="texto-site">@((MarkupString)TextoDoSite.ParaHtml(a.TextoSite))</div>
+        </article>
+
+        @if (_outras.Count > 0)
+        {
+            <div class="secao-titulo mt-5"><h2>Outras novidades</h2></div>
+            <NovidadesLista Itens="_outras" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid AnuncioId { get; set; }
+
+    // Com várias abas vivas, a escondida não recarrega nem troca o cabeçalho da aba da frente.
+    [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
+
+    private bool _carregando = true;
+    private string? _erro;
+    private AnuncioPublicadoDto? _aberto;
+    private List<AnuncioPublicadoDto> _outras = new();
+    private Guid? _carregadoPara;
+
+    private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    private static string Data(DateTime utc) => BrazilTime.ConvertFromUtc(utc).ToString("d 'de' MMMM 'de' yyyy", Br);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AbaAberta?.Escondida == true || _carregadoPara == AnuncioId) return;
+        _carregadoPara = AnuncioId;
+
+        _carregando = true;
+        _erro = null;
+        try
+        {
+            var publicados = await AnuncioSvc.ListPublicadosAsync(CancellationToken.None);
+            _aberto = publicados.FirstOrDefault(p => p.AnuncioId == AnuncioId);
+            _outras = publicados.Where(p => p.AnuncioId != AnuncioId).Take(5).ToList();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+
+        LayoutState.SetPage(
+            new PageDefinition { Route = "/anuncios", Title = _aberto?.Titulo ?? "Novidade" },
+            breadcrumbs: new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Novidades do Site", "/anuncios"),
+                new(_aberto?.Titulo ?? "Novidade")
+            },
+            subtitle: _aberto is null ? null : $"Novidade publicada em {Data(_aberto.PublicadoEm)}");
+    }
+}

@@ -8,7 +8,9 @@ public enum PlantaoCategoria
     Jogo,
     Mercado,
     Diretoria,
-    Carreira
+    Carreira,
+    // Anúncio de novidade do site publicado pelo admin.
+    Novidade
 }
 
 /// <summary>Uma notícia do Plantão: manchete, linha fina e para onde o clique leva.</summary>

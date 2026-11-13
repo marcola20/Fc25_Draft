@@ -1,4 +1,5 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Core.Interfaces;
 
@@ -15,5 +16,16 @@ public interface IAnuncioService
     /// <summary>Marca (ou desmarca) como mandado no grupo.</summary>
     Task<AnuncioDto> MarcarEnviadoAsync(Guid anuncioId, bool enviado, CancellationToken ct);
 
+    /// <summary>Põe (ou tira) o anúncio do site. Publicar pede resumo e texto do site.</summary>
+    Task<AnuncioDto> PublicarAsync(Guid anuncioId, bool publicar, CancellationToken ct);
+
     Task ExcluirAsync(Guid anuncioId, CancellationToken ct);
+
+    /// <summary>Os publicados no site, do mais novo para o mais antigo.</summary>
+    Task<IReadOnlyList<AnuncioPublicadoDto>> ListPublicadosAsync(CancellationToken ct);
+
+    Task<AnuncioPublicadoDto?> GetPublicadoAsync(Guid anuncioId, CancellationToken ct);
+
+    /// <summary>Cada anúncio publicado vira uma notícia no Plantão.</summary>
+    Task<IReadOnlyList<PlantaoNoticiaDto>> GetNoticiasAsync(CancellationToken ct);
 }

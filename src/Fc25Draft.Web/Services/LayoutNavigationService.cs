@@ -15,6 +15,7 @@ public class LayoutNavigationService
         {
             new("Central CBFV", "/home", "house", MatchPrefix: true),
             new("Plantão CBFV", "/plantao", "megaphone"),
+            new("Novidades do Site", "/anuncios", "sparkles"),
             new("Minha Área", "/minha-area", "user"),
             new("Manual do Técnico", "/manual", "book-open")
         }),
@@ -269,6 +270,12 @@ public class LayoutNavigationService
                 new("Admin"),
                 new("Regulamento")
             }
+        },
+        ["/anuncios"] = new PageDefinition
+        {
+            Route = "/anuncios",
+            Title = "Novidades do Site",
+            Subtitle = "O que mudou no site e nas regras, explicado com exemplos"
         },
         ["/admin/anuncios"] = new PageDefinition
         {

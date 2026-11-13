@@ -217,9 +217,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Ordem")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PublicadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Resumo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("Texto")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("TextoSite")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
@@ -227,6 +243,8 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("character varying(160)");
 
                     b.HasKey("AnuncioId");
+
+                    b.HasIndex("PublicadoEm");
 
                     b.ToTable("Anuncios", (string)null);
                 });

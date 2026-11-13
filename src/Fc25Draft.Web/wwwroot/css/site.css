@@ -1291,3 +1291,58 @@ a.text-primary:hover {
 
 .num-posicao.zona-neutra { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
 .num-posicao.podio { background: var(--cbfv-acento); color: #1a1405; }
+
+/* Texto dos anúncios do site (TextoDoSite.ParaHtml): página de novidades e prévia do admin. */
+.texto-site {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--bs-body-color);
+}
+
+.texto-site p,
+.texto-site ul,
+.texto-site ol {
+    margin-bottom: 1rem;
+}
+
+.texto-site ul,
+.texto-site ol {
+    padding-left: 1.375rem;
+}
+
+.texto-site li + li {
+    margin-top: 0.25rem;
+}
+
+.texto-site h3 {
+    margin: 2rem 0 0.625rem;
+    font-size: 1.125rem;
+    font-weight: 650;
+    color: var(--bs-emphasis-color);
+}
+
+.texto-site > :first-child {
+    margin-top: 0;
+}
+
+.texto-site strong {
+    font-weight: 600;
+    color: var(--bs-emphasis-color);
+}
+
+.texto-site-exemplo {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--cbfv-acento);
+    border-radius: 0 0.5rem 0.5rem 0;
+    background: var(--bs-tertiary-bg);
+    font-size: 0.9375rem;
+}
+
+.texto-site-exemplo p {
+    margin-bottom: 0.5rem;
+}
+
+.texto-site-exemplo p:last-child {
+    margin-bottom: 0;
+}

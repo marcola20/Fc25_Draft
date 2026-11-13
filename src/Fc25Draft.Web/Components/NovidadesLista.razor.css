@@ -1,0 +1,88 @@
+/* Lista: mesmo desenho do Plantão, com o resumo em duas linhas. */
+.novidades-lista {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    list-style: none;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-body-bg);
+}
+
+.novidades-lista li + li {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.novidades-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    padding: 0.875rem 1.25rem;
+    color: var(--bs-body-color);
+    text-decoration: none;
+    transition: background-color var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+.novidades-item:hover {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+.novidades-selo {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 0.5rem;
+    background: var(--cbfv-acento);
+    color: var(--cbfv-acento-tinta);
+}
+
+.novidades-item-texto {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.novidades-item-titulo {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.375rem;
+    color: var(--bs-emphasis-color);
+}
+
+.novidades-item-resumo {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--bs-secondary-color);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.novidades-item-data {
+    flex-shrink: 0;
+    padding-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 575.98px) {
+    .novidades-item {
+        flex-wrap: wrap;
+        padding: 0.75rem 1rem;
+    }
+
+    .novidades-item-data {
+        order: -1;
+        width: 100%;
+        padding-top: 0;
+        padding-left: calc(32px + 0.875rem);
+    }
+}

@@ -44,3 +44,17 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+.anuncios-campo-site {
+    min-height: 55vh;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.8125rem;
+}
+
+.anuncios-site {
+    max-width: 760px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-body-bg);
+}

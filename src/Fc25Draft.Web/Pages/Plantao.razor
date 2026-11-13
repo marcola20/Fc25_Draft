@@ -8,12 +8,13 @@
 @inject IParticipacaoService ParticipacaoSvc
 @inject ITreinoService TreinoSvc
 @inject IPicksDoDraftService PicksSvc
+@inject IAnuncioService AnuncioSvc
 
 <PageTitle>Plantão CBFV</PageTitle>
 
 <div style="max-width: 900px;">
     <p class="text-body-secondary small mb-3">
-        Notícias sobre jogos, gols, títulos, transferências, diretoria e jogadores. Clique para ver o time ou o jogador.
+        Notícias sobre jogos, gols, títulos, transferências, diretoria, jogadores e novidades do site. Clique para ver o time ou o jogador.
     </p>
     <ul class="nav nav-pills mb-4" role="tablist" aria-label="Filtro">
         <li class="nav-item"><button type="button" class="nav-link @(_filtro is null ? "active" : "")" @onclick="() => Filtrar(null)">Tudo</button></li>
@@ -21,6 +22,7 @@
         <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Mercado ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Mercado)">Mercado</button></li>
         <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Diretoria ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Diretoria)">Diretoria</button></li>
         <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Carreira ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Carreira)">Carreira</button></li>
+        <li class="nav-item"><button type="button" class="nav-link @(_filtro == PlantaoCategoria.Novidade ? "active" : "")" @onclick="() => Filtrar(PlantaoCategoria.Novidade)">Novidades do site</button></li>
     </ul>
 
     @if (_loading)
@@ -91,6 +93,7 @@
             try { noticias.AddRange(await ParticipacaoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await TreinoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await PicksSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await AnuncioSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).ToList();
         }
         catch (Exception ex)

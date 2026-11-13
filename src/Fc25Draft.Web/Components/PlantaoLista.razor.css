@@ -39,6 +39,19 @@
     object-fit: contain;
 }
 
+/* Novidade do site: selo dourado no lugar do escudo. */
+.plantao-selo {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 0.5rem;
+    background: var(--cbfv-acento);
+    color: var(--cbfv-acento-tinta);
+}
+
 .plantao-texto {
     display: flex;
     flex: 1;

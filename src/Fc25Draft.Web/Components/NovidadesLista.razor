@@ -1,0 +1,26 @@
+@using Fc25Draft.Core.DTOs
+
+@* Lista das novidades publicadas: selo, título, resumo e data. Usada na página de novidades e embaixo de cada anúncio. *@
+
+<ul class="novidades-lista">
+    @foreach (var a in Itens)
+    {
+        <li>
+            <a href="/anuncios/@a.AnuncioId" class="novidades-item">
+                <span class="novidades-selo" aria-hidden="true"><Icone Nome="sparkles" Tamanho="16" /></span>
+                <span class="novidades-item-texto">
+                    <span class="novidades-item-titulo">@a.Titulo</span>
+                    @if (!string.IsNullOrWhiteSpace(a.Resumo))
+                    {
+                        <span class="novidades-item-resumo">@a.Resumo</span>
+                    }
+                </span>
+                <span class="novidades-item-data">@BrazilTime.ConvertFromUtc(a.PublicadoEm).ToString("dd/MM/yyyy")</span>
+            </a>
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<AnuncioPublicadoDto> Itens { get; set; } = Array.Empty<AnuncioPublicadoDto>();
+}
