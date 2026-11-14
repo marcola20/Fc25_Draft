@@ -591,6 +591,9 @@
                     <button class="nav-link @(_statsTab == "assistencias" ? "active" : "")" @onclick='() => _statsTab = "assistencias"'>Assistências</button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "cleansheets" ? "active" : "")" @onclick='() => _statsTab = "cleansheets"'>Clean sheets</button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link @(_statsTab == "cartoes" ? "active" : "")" @onclick='() => _statsTab = "cartoes"'>Cartões</button>
                 </li>
                 <li class="nav-item">
@@ -1020,6 +1023,61 @@
                 }
             }
 
+            @if (_statsTab == "cleansheets")
+            {
+                @if (!_cleanSheets.Any())
+                {
+                    <div class="text-muted">Nenhum goleiro passou um jogo sem sofrer gol ainda.</div>
+                }
+                else
+                {
+                    var comJogos = _cleanSheets.Any(c => c.Jogos is not null);
+                    <div class="table-responsive painel mb-3">
+                        <table class="table table-hover align-middle tabela-liga">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width:35px;">#</th>
+                                    <th>Goleiro</th>
+                                    <th class="d-none d-md-table-cell">Time</th>
+                                    @if (comJogos)
+                                    {
+                                        <th class="text-center" style="width:45px;" title="Jogos na competição">J</th>
+                                    }
+                                    <th class="text-center" style="width:60px;" title="Jogos sem sofrer gol">CS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int rc = 0; }
+                                @foreach (var c in _cleanSheets)
+                                {
+                                    rc++;
+                                    <tr style="height:40px;">
+                                        <td style="width:35px;" class="numero text-body-tertiary">@rc</td>
+                                        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            <FotoJogador PlayerId="@c.JogadorId" Tamanho="28" Classe="me-2" />
+                                            <a href="/players/details/@c.JogadorId" class="text-body">@c.JogadorNome</a>
+                                        </td>
+                                        <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                            @if (c.TimeId != Guid.Empty)
+                                            {
+                                                <img src="@EscudoUrl(c.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                            }
+                                            <span class="@(c.TimeId == Guid.Empty ? "fst-italic" : "")">@c.TimeNome</span>
+                                        </td>
+                                        @if (comJogos)
+                                        {
+                                            <td class="text-center text-muted numero" style="width:45px;">@(c.Jogos?.ToString() ?? "—")</td>
+                                        }
+                                        <td class="text-center fw-semibold numero" style="width:60px;">@c.CleanSheets</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted mb-3">Conta o goleiro que esteve em campo num jogo encerrado em que o time não sofreu gol. W.O. não entra.</div>
+                }
+            }
+
             @if (_statsTab == "cartoes")
             {
                 @if (_disciplina is not null)
@@ -1277,6 +1335,7 @@
     private LigaRegraZonas _regra => _liga is null ? LigaRegraZonas.SoCampeao : LigaRegraZonas.De(_liga);
     private IReadOnlyList<LigaArtilheiroDto> _artilheiros = Array.Empty<LigaArtilheiroDto>();
     private IReadOnlyList<LigaArtilheiroDto> _assistencias = Array.Empty<LigaArtilheiroDto>();
+    private IReadOnlyList<LigaCleanSheetDto> _cleanSheets = Array.Empty<LigaCleanSheetDto>();
     private IReadOnlyList<LigaCartaoEstatDto> _cartoes = Array.Empty<LigaCartaoEstatDto>();
 
     // ── Números do PES por time (aba Estatísticas › Times) ──
@@ -1529,6 +1588,7 @@
         _tituloNoMataMata = _liga?.Tipo == TipoCompetition.Liga && _knockoutJogos.Count > 0;
         _artilheiros = await LigaService.GetArtilheirosAsync(ligaId, CancellationToken.None);
         _assistencias = await LigaService.GetAssistenciasAsync(ligaId, CancellationToken.None);
+        _cleanSheets = await LigaService.GetCleanSheetsAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);

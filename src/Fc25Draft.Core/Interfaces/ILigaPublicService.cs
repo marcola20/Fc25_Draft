@@ -14,6 +14,8 @@ public interface ILigaPublicService
     Task<IReadOnlyList<LigaClassificacaoItemDto>> GetClassificacaoAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaArtilheiroDto>> GetAssistenciasAsync(Guid ligaId, CancellationToken ct);
+    /// <summary>Clean sheets dos goleiros na competição, do que mais tem para o que menos tem.</summary>
+    Task<IReadOnlyList<LigaCleanSheetDto>> GetCleanSheetsAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaCartaoEstatDto>> GetCartoesEstatAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaKnockoutJogoDto>> GetKnockoutAsync(Guid ligaId, CancellationToken ct);
     Task<IReadOnlyList<LigaRodadaComPartidasDto>> GetRodadasComPartidasAsync(Guid ligaId, CancellationToken ct);

@@ -360,6 +360,16 @@ public record LigaArtilheiroDto(
     int Gols,
     int Assistencias);
 
+/// <summary>Goleiro com jogos sem sofrer gol na competição (esteve em campo e o time não levou gol).</summary>
+public record LigaCleanSheetDto(
+    int JogadorId,
+    string JogadorNome,
+    Guid TimeId,
+    string TimeNome,
+    int CleanSheets,
+    // Null quando a competição não tem contador de jogos nem jogos anotados dele.
+    int? Jogos);
+
 public record LigaCartaoEstatDto(
     int JogadorId,
     string JogadorNome,

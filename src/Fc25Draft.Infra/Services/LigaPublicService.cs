@@ -1167,6 +1167,40 @@ public class LigaPublicService : ILigaPublicService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<LigaCleanSheetDto>> GetCleanSheetsAsync(Guid ligaId, CancellationToken ct)
+    {
+        var ligaIds = new[] { ligaId };
+        var cleanSheets = await GetCleanSheetsDeGoleirosAsync(ligaIds, ct);
+        if (cleanSheets.Count == 0) return Array.Empty<LigaCleanSheetDto>();
+
+        var partidaIds = cleanSheets.Select(c => c.PartidaId).Distinct().ToList();
+        var quando = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => partidaIds.Contains(p.PartidaId))
+            .ToDictionaryAsync(p => p.PartidaId, p => p.EncerradaEm ?? DateTime.MinValue, ct);
+        var timesAtuais = await GetTimesNaCompeticaoAsync(ligaId,
+            cleanSheets.Select(c => (c.JogadorId, c.TimeId, quando.GetValueOrDefault(c.PartidaId))).ToList(), ct);
+
+        var comContagem = await GetLigasComContagemAsync(ct);
+        var jogos = (await GetJogosAsync(ligaIds, null, comContagem, ct))
+            .GroupBy(j => j.JogadorId)
+            .ToDictionary(g => g.Key, g => g.Sum(j => j.Jogos));
+        int? JogosDe(int jogadorId) =>
+            jogos.TryGetValue(jogadorId, out var n) ? n : comContagem.Contains(ligaId) ? 0 : null;
+
+        return cleanSheets
+            .GroupBy(c => c.JogadorId)
+            .Select(g =>
+            {
+                var (timeId, timeNome) = ResolveTimeAtual(timesAtuais, g.Key);
+                return new LigaCleanSheetDto(g.Key, g.First().JogadorNome, timeId, timeNome,
+                    g.Select(c => c.PartidaId).Distinct().Count(), JogosDe(g.Key));
+            })
+            .OrderByDescending(x => x.CleanSheets)
+            .ThenBy(x => x.Jogos ?? int.MaxValue)
+            .ThenBy(x => x.JogadorNome, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<HistoricoGoleiroDto>> GetHistoricoGoleirosAsync(int? temporada, CancellationToken ct)
     {
         var daTemporada = await LigasDaTemporadaAsync(temporada, ct);
