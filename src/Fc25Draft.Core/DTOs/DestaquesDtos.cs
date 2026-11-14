@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 namespace Fc25Draft.Core.DTOs;
 
-public record DestaqueLiderDto(Guid LigaId, string LigaNome, Guid TimeId, string TimeNome, int Pontos, int Jogos);
+/// <summary>Líder de uma liga da temporada; Campeao quando ela já foi encerrada (aí o time é o campeão).</summary>
+public record DestaqueLiderDto(Guid LigaId, string LigaNome, Guid TimeId, string TimeNome, int Pontos, int Jogos, bool Campeao = false);
 
 /// <summary>Sequência que está valendo: Jogos sem perder (melhor fase) ou sem vencer (pior), com o retrospecto nela.
 /// Resultados traz os jogos da sequência ("V", "E", "D") na ordem em que aconteceram, o mais recente por último.</summary>

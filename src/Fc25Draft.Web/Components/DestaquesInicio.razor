@@ -22,7 +22,7 @@
                         <a href="/liga?liga=@lider.LigaId" class="capa-item capa-lider">
                             <img src="@Escudos.GetEscudo(lider.TimeNome)" alt="" class="capa-escudo" width="44" height="44" />
                             <span class="capa-texto">
-                                <span class="capa-rotulo">Líder · @lider.LigaNome</span>
+                                <span class="capa-rotulo">@(lider.Campeao ? "Campeão" : "Líder") · @lider.LigaNome</span>
                                 <span class="capa-nome">@lider.TimeNome</span>
                                 <span class="capa-meta"><span class="numero">@lider.Pontos</span> pontos em <span class="numero">@lider.Jogos</span> jogos</span>
                             </span>

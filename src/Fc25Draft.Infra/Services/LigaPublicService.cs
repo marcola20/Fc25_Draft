@@ -1640,21 +1640,31 @@ public class LigaPublicService : ILigaPublicService
         var nomes = await _db.Teams.AsNoTracking()
             .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
 
-        var ativas = await _db.Ligas.AsNoTracking()
-            .Where(l => l.Status != LigaStatus.Encerrada)
+        // Temporada atual = a última que já teve jogo encerrado. Competição encerrada dela continua valendo
+        // (a Liga acaba antes da Copa e os gols, notas e clean sheets dela seguem na temporada); a da temporada
+        // seguinte, criada e ainda sem jogo, não tira a atual da capa.
+        var temporada = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Status == PartidaStatus.Encerrada && p.Rodada.Liga.Temporada != null)
+            .MaxAsync(p => p.Rodada.Liga.Temporada, ct)
+            ?? await _db.Ligas.AsNoTracking().MaxAsync(l => l.Temporada, ct);
+        var daTemporada = await _db.Ligas.AsNoTracking()
+            .Where(l => temporada != null ? l.Temporada == temporada : l.Status != LigaStatus.Encerrada)
             .OrderBy(l => l.Divisao)
             .ThenByDescending(l => l.CriadoEm)
-            .Select(l => new { l.LigaId, l.Nome, l.Tipo })
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Status, l.CampeaoTimeId })
             .ToListAsync(ct);
-        var ativaIds = ativas.Select(l => l.LigaId).ToList();
+        var ativaIds = daTemporada.Select(l => l.LigaId).ToList();
 
-        // Líder de cada liga (na Copa a tabela é por grupo; na Supercopa não há tabela).
+        // Líder de cada liga (na Copa a tabela é por grupo; na Supercopa não há tabela); a já encerrada mostra o campeão.
         var lideres = new List<DestaqueLiderDto>();
-        foreach (var liga in ativas.Where(l => l.Tipo == TipoCompetition.Liga))
+        foreach (var liga in daTemporada.Where(l => l.Tipo == TipoCompetition.Liga))
         {
-            var lider = (await GetClassificacaoAsync(liga.LigaId, ct)).FirstOrDefault();
+            var tabela = await GetClassificacaoAsync(liga.LigaId, ct);
+            var encerrada = liga.Status == LigaStatus.Encerrada;
+            var lider = (encerrada && liga.CampeaoTimeId is Guid campeao ? tabela.FirstOrDefault(c => c.TimeId == campeao) : null)
+                        ?? tabela.FirstOrDefault();
             if (lider is not null && lider.Jogos > 0)
-                lideres.Add(new DestaqueLiderDto(liga.LigaId, liga.Nome, lider.TimeId, lider.TimeNome, lider.Pontos, lider.Jogos));
+                lideres.Add(new DestaqueLiderDto(liga.LigaId, liga.Nome, lider.TimeId, lider.TimeNome, lider.Pontos, lider.Jogos, encerrada));
         }
 
         // Melhor fase: maior invencibilidade atual; empatados aparecem todos, mais vitórias primeiro.
@@ -1699,7 +1709,7 @@ public class LigaPublicService : ILigaPublicService
             .ThenBy(f => f.TimeNome, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Artilheiro e garçom da temporada = gols e assistências nas competições em andamento.
+        // Artilheiro e garçom da temporada = gols e assistências nas competições da temporada.
         var golsTemporada = await _db.LigaEventos.AsNoTracking()
             .Where(e => e.Tipo == TipoEvento.Gol && ativaIds.Contains(e.Partida.Rodada.LigaId))
             .Select(e => new
@@ -1733,7 +1743,7 @@ public class LigaPublicService : ILigaPublicService
             .ThenByDescending(m => m.Jogos)
             .FirstOrDefault();
 
-        // Paredão: goleiro com mais clean sheets nas competições em andamento.
+        // Paredão: goleiro com mais clean sheets nas competições da temporada.
         var paredoes = LideresDaContagem((await GetCleanSheetsDeGoleirosAsync(ativaIds.ToArray(), ct))
             .Select(c => (c.JogadorId, c.JogadorNome, c.TimeId)), nomes);
 
