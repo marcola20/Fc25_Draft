@@ -182,6 +182,38 @@ public class BolaoService : IBolaoService
             .ToArray();
     }
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<BolaoPalpiteDeAlguemDto>>> PalpitesDosJogosAsync(
+        IReadOnlyCollection<Guid> partidaIds, CancellationToken ct)
+    {
+        var pedidos = partidaIds.ToHashSet();
+        var jogos = (await CarregarAsync(ct)).SelectMany(r => r.Jogos)
+            .Where(j => pedidos.Contains(j.PartidaId) && !JogoAberto(j))
+            .GroupBy(j => j.PartidaId)
+            .ToDictionary(g => g.Key, g => g.First());
+        if (jogos.Count == 0) return new Dictionary<Guid, IReadOnlyList<BolaoPalpiteDeAlguemDto>>();
+
+        var palpites = await PalpitesAsync(jogos.Keys, null, ct);
+        var lances = await LancesAsync(jogos.Values, ct);
+        var clubes = await ClubesAtuaisAsync(ct);
+
+        return palpites
+            .GroupBy(p => p.PartidaId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var jogo = jogos[g.Key];
+                    return (IReadOnlyList<BolaoPalpiteDeAlguemDto>)g
+                        .Select(p => new BolaoPalpiteDeAlguemDto(
+                            p.TreinadorId, p.Nome, clubes.GetValueOrDefault(p.TreinadorId),
+                            p.GolsCasa, p.GolsFora,
+                            jogo.Encerrado ? Apurar(p, jogo, lances).Total : null,
+                            p.JogadorCasa, p.JogadorFora, NomeDoTime(jogo, p.PenaltisId)))
+                        .OrderByDescending(p => p.Pontos ?? 0).ThenBy(p => p.Nome)
+                        .ToArray();
+                });
+    }
+
     public async Task<BolaoPalpitesDaRodadaDto> PalpitesDaRodadaAsync(Guid rodadaId, CancellationToken ct)
     {
         var rodada = (await CarregarAsync(ct)).FirstOrDefault(r => r.RodadaId == rodadaId);

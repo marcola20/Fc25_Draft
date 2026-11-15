@@ -13,13 +13,18 @@ public class PartidaReacaoService : IPartidaReacaoService
 
     public PartidaReacaoService(DraftDbContext db) => _db = db;
 
-    public async Task<IReadOnlyList<PartidaReacaoDto>> ListarAsync(Guid partidaId, Guid? treinadorId, CancellationToken ct)
+    public async Task<IReadOnlyList<PartidaReacaoDto>> ListarAsync(Guid salaId, Guid? treinadorId, CancellationToken ct)
     {
-        var reacoes = await _db.PartidaReacoes.AsNoTracking()
-            .Where(r => r.PartidaId == partidaId)
-            .OrderBy(r => r.CriadaEm)
-            .Select(r => new { r.Emoji, r.TreinadorId, r.Treinador.Nome })
+        // A sala é um jogo ou um mosaico: um dos dois lados volta vazio.
+        var doJogo = await _db.PartidaReacoes.AsNoTracking()
+            .Where(r => r.PartidaId == salaId)
+            .Select(r => new { r.Emoji, r.TreinadorId, r.Treinador.Nome, r.CriadaEm })
             .ToListAsync(ct);
+        var doMosaico = await _db.MosaicoReacoes.AsNoTracking()
+            .Where(r => r.MosaicoId == salaId)
+            .Select(r => new { r.Emoji, r.TreinadorId, r.Treinador.Nome, r.CriadaEm })
+            .ToListAsync(ct);
+        var reacoes = doJogo.Concat(doMosaico).OrderBy(r => r.CriadaEm).ToList();
 
         return reacoes
             .GroupBy(r => r.Emoji)
@@ -30,22 +35,28 @@ public class PartidaReacaoService : IPartidaReacaoService
             .ToArray();
     }
 
-    public async Task AlternarAsync(Guid partidaId, Guid treinadorId, string emoji, CancellationToken ct)
+    public async Task AlternarAsync(Guid salaId, Guid treinadorId, string emoji, CancellationToken ct)
     {
         if (!ReacoesPartida.Permitido(emoji))
             throw new InvalidOperationException("Emoji não disponível.");
 
+        if (await _db.Mosaicos.AnyAsync(m => m.MosaicoId == salaId, ct))
+        {
+            await AlternarNoMosaicoAsync(salaId, treinadorId, emoji, ct);
+            return;
+        }
+
         var apagadas = await _db.PartidaReacoes
-            .Where(r => r.PartidaId == partidaId && r.TreinadorId == treinadorId && r.Emoji == emoji)
+            .Where(r => r.PartidaId == salaId && r.TreinadorId == treinadorId && r.Emoji == emoji)
             .ExecuteDeleteAsync(ct);
         if (apagadas > 0) return;
 
-        if (!await _db.LigaPartidas.AnyAsync(p => p.PartidaId == partidaId, ct))
+        if (!await _db.LigaPartidas.AnyAsync(p => p.PartidaId == salaId, ct))
             throw new InvalidOperationException("Jogo não encontrado.");
 
         _db.PartidaReacoes.Add(new PartidaReacao
         {
-            PartidaId = partidaId,
+            PartidaId = salaId,
             TreinadorId = treinadorId,
             Emoji = emoji,
             CriadaEm = DateTime.UtcNow
@@ -53,6 +64,25 @@ public class PartidaReacaoService : IPartidaReacaoService
 
         try { await _db.SaveChangesAsync(ct); }
         // Clique duplo: a mesma reação chegou duas vezes, a primeira já gravou.
+        catch (DbUpdateException) { _db.ChangeTracker.Clear(); }
+    }
+
+    private async Task AlternarNoMosaicoAsync(Guid mosaicoId, Guid treinadorId, string emoji, CancellationToken ct)
+    {
+        var apagadas = await _db.MosaicoReacoes
+            .Where(r => r.MosaicoId == mosaicoId && r.TreinadorId == treinadorId && r.Emoji == emoji)
+            .ExecuteDeleteAsync(ct);
+        if (apagadas > 0) return;
+
+        _db.MosaicoReacoes.Add(new MosaicoReacao
+        {
+            MosaicoId = mosaicoId,
+            TreinadorId = treinadorId,
+            Emoji = emoji,
+            CriadaEm = DateTime.UtcNow
+        });
+
+        try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateException) { _db.ChangeTracker.Clear(); }
     }
 

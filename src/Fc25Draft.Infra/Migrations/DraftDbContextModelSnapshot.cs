@@ -2232,6 +2232,68 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("MetasDiretoria", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Mosaico", b =>
+                {
+                    b.Property<Guid>("MosaicoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("YoutubeVideoId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("MosaicoId");
+
+                    b.HasIndex("CriadoEm");
+
+                    b.ToTable("Mosaicos", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MosaicoReacao", b =>
+                {
+                    b.Property<Guid>("MosaicoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Emoji")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("MosaicoId", "TreinadorId", "Emoji");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.ToTable("MosaicoReacoes", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MosaicoRodada", b =>
+                {
+                    b.Property<Guid>("MosaicoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RodadaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("MosaicoId", "RodadaId");
+
+                    b.HasIndex("RodadaId");
+
+                    b.ToTable("MosaicoRodadas", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.NotificacaoEnviada", b =>
                 {
                     b.Property<string>("Chave")
@@ -2307,7 +2369,10 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("EnviadaEm")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<Guid>("PartidaId")
+                    b.Property<Guid?>("MosaicoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PartidaId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Texto")
@@ -2322,9 +2387,14 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("TreinadorId");
 
+                    b.HasIndex("MosaicoId", "EnviadaEm");
+
                     b.HasIndex("PartidaId", "EnviadaEm");
 
-                    b.ToTable("PartidaChatMensagens", (string)null);
+                    b.ToTable("PartidaChatMensagens", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PartidaChatMensagens_Sala", "(\"PartidaId\" IS NULL) <> (\"MosaicoId\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.PartidaReacao", b =>
@@ -4941,6 +5011,44 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Time");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MosaicoReacao", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Mosaico", "Mosaico")
+                        .WithMany()
+                        .HasForeignKey("MosaicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Mosaico");
+
+                    b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.MosaicoRodada", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Mosaico", "Mosaico")
+                        .WithMany("Rodadas")
+                        .HasForeignKey("MosaicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.LigaRodada", "Rodada")
+                        .WithMany()
+                        .HasForeignKey("RodadaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Mosaico");
+
+                    b.Navigation("Rodada");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.PacoteGanho", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Album", "Album")
@@ -4961,17 +5069,23 @@ namespace Fc25Draft.Infra.Migrations
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.PartidaChatMensagem", b =>
                 {
+                    b.HasOne("Fc25Draft.Core.Entities.Mosaico", "Mosaico")
+                        .WithMany()
+                        .HasForeignKey("MosaicoId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
                         .WithMany()
                         .HasForeignKey("PartidaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
                         .WithMany()
                         .HasForeignKey("TreinadorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Mosaico");
 
                     b.Navigation("Partida");
 
@@ -5635,6 +5749,11 @@ namespace Fc25Draft.Infra.Migrations
             modelBuilder.Entity("Fc25Draft.Core.Entities.MarketItem", b =>
                 {
                     b.Navigation("Bids");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Mosaico", b =>
+                {
+                    b.Navigation("Rodadas");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Player", b =>

@@ -22,6 +22,7 @@ public record TelaoJogoDto(
     DateTime? DataHora,
     string? YoutubeVideoId);
 
+/// <param name="PartidaId">A sala da mensagem: o jogo ou, no telão do mosaico, o mosaico.</param>
 public record PartidaChatMensagemDto(
     Guid MensagemId,
     Guid PartidaId,

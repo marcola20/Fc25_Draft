@@ -130,6 +130,9 @@ public class DraftDbContext : DbContext
     public DbSet<FotoJogador> FotosJogadores => Set<FotoJogador>();
     public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
     public DbSet<PartidaReacao> PartidaReacoes => Set<PartidaReacao>();
+    public DbSet<Mosaico> Mosaicos => Set<Mosaico>();
+    public DbSet<MosaicoRodada> MosaicoRodadas => Set<MosaicoRodada>();
+    public DbSet<MosaicoReacao> MosaicoReacoes => Set<MosaicoReacao>();
     public DbSet<LigaClassificacao> LigaClassificacoes => Set<LigaClassificacao>();
     public DbSet<LigaPunicao> LigaPunicoes => Set<LigaPunicao>();
     public DbSet<LigaKnockoutJogo> LigaKnockoutJogos => Set<LigaKnockoutJogo>();

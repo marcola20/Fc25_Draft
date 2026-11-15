@@ -1,0 +1,30 @@
+@using Fc25Draft.Core.DTOs
+
+@* O mosaico da rodada no topo da Central: a capa do vídeo e o atalho para o telão, com chat e palpites. *@
+
+@if (Mosaico?.YoutubeVideoId is { } video)
+{
+    <section class="mosaico-inicio" aria-labelledby="mosaico-titulo">
+        <div class="secao-titulo">
+            <h2 id="mosaico-titulo">Mosaico da rodada</h2>
+        </div>
+
+        <a class="mosaico-card" href="/telao/mosaico/@Mosaico.MosaicoId">
+            <span class="mosaico-capa">
+                <img src="https://i.ytimg.com/vi/@video/hqdefault.jpg" alt="" loading="lazy" />
+                <span class="mosaico-play"><Icone Nome="play" Tamanho="22" /></span>
+            </span>
+            <span class="mosaico-texto">
+                <span class="mosaico-rotulo">@string.Join(" · ", Mosaico.Rodadas.Select(r => r.Rotulo))</span>
+                <span class="mosaico-nome">@Mosaico.Titulo</span>
+                <span class="mosaico-meta">Todos os jogos num vídeo só, com o chat e os palpites da rodada.</span>
+                <span class="mosaico-botao"><Icone Nome="tv" Tamanho="14" /> Assistir no telão</span>
+            </span>
+        </a>
+    </section>
+}
+
+@code {
+    // Carregado pela página inicial, junto com os Destaques e o Plantão.
+    [Parameter] public MosaicoDto? Mosaico { get; set; }
+}

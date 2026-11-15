@@ -12,8 +12,11 @@
 @inject ITreinoService TreinoSvc
 @inject IPicksDoDraftService PicksSvc
 @inject IAnuncioService AnuncioSvc
+@inject IMosaicoService MosaicoSvc
 
 @implements IDisposable
+
+<MosaicoInicio Mosaico="@_mosaico" />
 
 <DestaquesInicio Dados="@_destaques" />
 
@@ -64,6 +67,7 @@
     private const int NoticiasNaPaginaInicial = 6;
 
     private DestaquesDto? _destaques;
+    private MosaicoDto? _mosaico;
     private IReadOnlyList<Fc25Draft.Core.Utilities.PlantaoNoticiaDto> _noticias = Array.Empty<Fc25Draft.Core.Utilities.PlantaoNoticiaDto>();
 
     [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
@@ -89,6 +93,8 @@
     // com o que já mostrava).
     private async Task CarregarAsync(bool primeiraVez)
     {
+        try { _mosaico = await MosaicoSvc.NaCentralAsync(CancellationToken.None); }
+        catch { if (primeiraVez) _mosaico = null; }
         try { _destaques = await LigaService.GetDestaquesAsync(CancellationToken.None); }
         catch { if (primeiraVez) _destaques = null; }
         try

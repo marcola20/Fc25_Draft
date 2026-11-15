@@ -1,4 +1,5 @@
 @page "/telao/jogo/{PartidaId:guid}"
+@page "/telao/mosaico/{MosaicoId:guid}"
 @layout TelaoLayout
 @using System.Globalization
 @using Fc25Draft.Core.DTOs
@@ -9,6 +10,7 @@
 @inject ILigaPublicService LigaService
 @inject IPartidaChatService ChatSvc
 @inject IBolaoService BolaoSvc
+@inject IMosaicoService MosaicoSvc
 @inject ITreinadorService TreinadorSvc
 @inject IPerfilTreinadorService PerfilSvc
 @inject AdminAuthService AdminAuth
@@ -27,23 +29,45 @@
                   Descricao="@($"{_jogo.LigaNome} · {_jogo.Rotulo} · {(_jogo.Status switch { PartidaStatus.Encerrada => "encerrado", PartidaStatus.EmAndamento => "ao vivo", _ => "a jogar" })}.")"
                   Imagem="@Escudos.GetEscudo(_jogo.TimeCasaNome)" />
 }
+else if (_mosaico is not null)
+{
+    <PreviaDoLink Titulo="@_mosaico.Titulo"
+                  Descricao="@($"Mosaico · {string.Join(" · ", _mosaico.Rodadas.Select(r => r.Rotulo))}.")"
+                  Imagem="@(_mosaico.YoutubeVideoId is { } v ? $"https://i.ytimg.com/vi/{v}/hqdefault.jpg" : null)" />
+}
 
 <div class="telao-jogo">
     @if (_carregando)
     {
         <div class="vazio">Carregando o jogo...</div>
     }
-    else if (_jogo is null)
+    else if (!Carregado)
     {
-        <div class="vazio">Jogo não encontrado. <a href="/liga">Voltar para a liga</a></div>
+        <div class="vazio">@(EhMosaico ? "Mosaico não encontrado." : "Jogo não encontrado.") <a href="/liga">Voltar para a liga</a></div>
     }
     else
     {
         <header class="topo">
             <a href="/liga" class="voltar" title="Voltar para a liga">‹</a>
             <img src="/images/logobranca.png" alt="CBFV" class="logo" />
+            @if (_mosaico is not null)
+            {
+                <div class="competicao">
+                    <div class="nome">@_mosaico.Titulo</div>
+                    <div class="sub mosaico-sub">Mosaico · @_mosaico.Jogos.Count jogos</div>
+                </div>
+
+                <div class="placar mosaico-rodadas">
+                    @foreach (var r in _mosaico.Rodadas)
+                    {
+                        <span class="rodada-chip">@r.Rotulo</span>
+                    }
+                </div>
+            }
+            else
+            {
             <div class="competicao">
-                <div class="nome">@_jogo.LigaNome</div>
+                <div class="nome">@_jogo!.LigaNome</div>
                 <div class="sub">
                     @_jogo.Rotulo
                     @if (_jogo.DataHora is DateTime quando)
@@ -73,6 +97,7 @@
                     <span class="time-nome">@_jogo.TimeForaNome</span>
                 </div>
             </div>
+            }
 
             <div class="acoes">
                 <span class="publico" title="Pessoas com o telão aberto agora"><Icone Nome="eye" Tamanho="14" /> @_assistindo</span>
@@ -82,28 +107,28 @@
 
         <main class="corpo">
             <section class="video">
-                @if (string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId))
+                @if (string.IsNullOrWhiteSpace(VideoId))
                 {
                     <div class="sem-video">
                         <div class="icone"><Icone Nome="tv" Tamanho="14" /></div>
-                        <div>O vídeo deste jogo ainda não foi publicado.</div>
+                        <div>@(EhMosaico ? "O vídeo do mosaico ainda não foi publicado." : "O vídeo deste jogo ainda não foi publicado.")</div>
                         <div class="suave">Deixe a página aberta e recarregue quando a estreia for marcada.</div>
                     </div>
                 }
                 else
                 {
                     <div class="player">
-                        <iframe src="https://www.youtube.com/embed/@(_jogo.YoutubeVideoId)?autoplay=1&rel=0&modestbranding=1&playsinline=1"
-                                title="@_jogo.TimeCasaNome x @_jogo.TimeForaNome"
+                        <iframe src="https://www.youtube.com/embed/@(VideoId)?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+                                title="@Titulo"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                 allowfullscreen></iframe>
                     </div>
                 }
-                <div class="sob-video @(string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId) ? "sem-video-link" : "")">
-                    <ReacoesJogo PartidaId="PartidaId" />
-                    @if (!string.IsNullOrWhiteSpace(_jogo.YoutubeVideoId))
+                <div class="sob-video @(string.IsNullOrWhiteSpace(VideoId) ? "sem-video-link" : "")">
+                    <ReacoesJogo PartidaId="Sala" />
+                    @if (!string.IsNullOrWhiteSpace(VideoId))
                     {
-                        <a class="abrir-youtube" href="@YoutubeLink.Assistir(_jogo.YoutubeVideoId)" target="_blank" rel="noopener">Abrir no YouTube ↗</a>
+                        <a class="abrir-youtube" href="@YoutubeLink.Assistir(VideoId)" target="_blank" rel="noopener">Abrir no YouTube ↗</a>
                     }
                 </div>
             </section>
@@ -112,7 +137,11 @@
                 <nav class="abas">
                     <button type="button" class="@(_aba == Aba.Chat ? "ativa" : "")" @onclick="() => { _aba = Aba.Chat; _rolarChat = true; }"><Icone Nome="message-circle" Tamanho="14" /> Chat</button>
                     <button type="button" class="@(_aba == Aba.Palpites ? "ativa" : "")" @onclick="AbrirPalpites"><Icone Nome="target" Tamanho="14" /> Palpites</button>
-                    <button type="button" class="@(_aba == Aba.Times ? "ativa" : "")" @onclick="AbrirTimes"><Icone Nome="users" Tamanho="14" /> Times</button>
+                    @* No mosaico não tem escalação: são os jogos todos juntos. *@
+                    @if (!EhMosaico)
+                    {
+                        <button type="button" class="@(_aba == Aba.Times ? "ativa" : "")" @onclick="AbrirTimes"><Icone Nome="users" Tamanho="14" /> Times</button>
+                    }
                 </nav>
 
                 @if (_aba == Aba.Chat)
@@ -192,6 +221,47 @@
                         }
                     </div>
                 }
+                else if (_mosaico is not null)
+                {
+                    <div class="palpites">
+                        @if (_palpitesMosaico is null)
+                        {
+                            <div class="suave centro">Carregando...</div>
+                        }
+                        else if (_palpitesMosaico.Count == 0)
+                        {
+                            <div class="suave centro">
+                                Os palpites aparecem aqui quando o bolão da rodada fechar.
+                                <div><a href="/bolao">Ir para o bolão</a></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <select class="filtro-jogo" @bind="_jogoFiltrado">
+                                <option value="">Todos os jogos (@_palpitesMosaico.Count)</option>
+                                @foreach (var j in JogosComPalpite)
+                                {
+                                    <option value="@j.PartidaId">@j.Competicao · @j.TimeCasaNome x @j.TimeForaNome</option>
+                                }
+                            </select>
+                            @foreach (var j in JogosComPalpite.Where(j => _jogoFiltrado == "" || j.PartidaId.ToString() == _jogoFiltrado))
+                            {
+                                <div class="jogo-palpites">
+                                    <div class="jogo-cabeca">
+                                        <span class="jogo-competicao">@j.Competicao</span>
+                                        <span class="jogo-time casa"><span class="time-nome">@j.TimeCasaNome</span><img src="@Escudos.GetEscudo(j.TimeCasaNome)" alt="" /></span>
+                                        <span class="jogo-placar">@(j.Status == PartidaStatus.Encerrada ? $"{j.GolsCasa} – {j.GolsFora}" : "x")</span>
+                                        <span class="jogo-time fora"><img src="@Escudos.GetEscudo(j.TimeForaNome)" alt="" /><span class="time-nome">@j.TimeForaNome</span></span>
+                                    </div>
+                                    @foreach (var p in _palpitesMosaico[j.PartidaId])
+                                    {
+                                        @Palpite(p)
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
                 else
                 {
                     <div class="palpites">
@@ -210,18 +280,7 @@
                         {
                             @foreach (var p in _palpites)
                             {
-                                <div class="palpite">
-                                    @if (!string.IsNullOrWhiteSpace(p.TimeNome))
-                                    {
-                                        <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
-                                    }
-                                    <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · {ga}" : "")</span></span>
-                                    <span class="chute">@p.GolsCasa – @p.GolsFora@(p.Penaltis is { } pen ? $" (pên. {pen})" : "")</span>
-                                    @if (p.Pontos is int pts)
-                                    {
-                                        <span class="pontos">@(pts > 0 ? $"+{pts}" : pts.ToString())</span>
-                                    }
-                                </div>
+                                @Palpite(p)
                             }
                         }
                     </div>
@@ -238,13 +297,47 @@
 
     private enum Aba { Chat, Palpites, Times }
 
+    /// <summary>A linha de um palpite: igual no jogo e em cada jogo do mosaico.</summary>
+    private RenderFragment Palpite(BolaoPalpiteDeAlguemDto p) => __builder =>
+    {
+        <div class="palpite">
+            @if (!string.IsNullOrWhiteSpace(p.TimeNome))
+            {
+                <img src="@Escudos.GetEscudo(p.TimeNome)" alt="" title="@p.TimeNome" />
+            }
+            <span class="autor" title="@ApostasG_A(p)">@p.Nome<span class="suave">@(ApostasG_A(p) is { Length: > 0 } ga ? $" · {ga}" : "")</span></span>
+            <span class="chute">@p.GolsCasa – @p.GolsFora@(p.Penaltis is { } pen ? $" (pên. {pen})" : "")</span>
+            @if (p.Pontos is int pts)
+            {
+                <span class="pontos">@(pts > 0 ? $"+{pts}" : pts.ToString())</span>
+            }
+        </div>
+    };
+
     private static string ApostasG_A(BolaoPalpiteDeAlguemDto p) =>
         string.Join(", ", new[] { p.JogadorCasa, p.JogadorFora }.Where(n => !string.IsNullOrEmpty(n)));
 
     [Parameter] public Guid PartidaId { get; set; }
 
+    /// <summary>Telão do mosaico (/telao/mosaico/{id}): os jogos da rodada juntos num vídeo só.</summary>
+    [Parameter] public Guid MosaicoId { get; set; }
+
+    private bool EhMosaico => MosaicoId != Guid.Empty;
+
+    /// <summary>Onde ficam o chat, as reações e o público: o jogo ou o mosaico.</summary>
+    private Guid Sala => EhMosaico ? MosaicoId : PartidaId;
+
+    private string? VideoId => EhMosaico ? _mosaico?.YoutubeVideoId : _jogo?.YoutubeVideoId;
+
+    private IEnumerable<MosaicoJogoDto> JogosComPalpite =>
+        _mosaico!.Jogos.Where(j => _palpitesMosaico!.ContainsKey(j.PartidaId));
+
     private bool _carregando = true;
+    private bool Carregado => _jogo is not null || _mosaico is not null;
     private TelaoJogoDto? _jogo;
+    private TelaoMosaicoDto? _mosaico;
+    private IReadOnlyDictionary<Guid, IReadOnlyList<BolaoPalpiteDeAlguemDto>>? _palpitesMosaico;
+    private string _jogoFiltrado = "";
     private TreinadorDto? _eu;
     private List<PartidaChatMensagemDto> _mensagens = new();
     private IReadOnlyList<BolaoPalpiteDeAlguemDto>? _palpites;
@@ -263,17 +356,21 @@
     private bool _entrou;
     private bool _rolarChat;
 
-    private string Titulo => _jogo is null ? "Telão" : $"{_jogo.TimeCasaNome} x {_jogo.TimeForaNome} · Telão";
+    private string Titulo => _mosaico is not null ? $"{_mosaico.Titulo} · Telão"
+        : _jogo is null ? "Telão" : $"{_jogo.TimeCasaNome} x {_jogo.TimeForaNome} · Telão";
 
     protected override async Task OnInitializedAsync()
     {
-        _jogo = await LigaService.GetTelaoJogoAsync(PartidaId, CancellationToken.None);
-        if (_jogo is not null)
+        if (EhMosaico)
+            _mosaico = await MosaicoSvc.TelaoAsync(MosaicoId, CancellationToken.None);
+        else
+            _jogo = await LigaService.GetTelaoJogoAsync(PartidaId, CancellationToken.None);
+        if (Carregado)
         {
-            _mensagens = (await ChatSvc.ListarAsync(PartidaId, MensagensNaTela, CancellationToken.None)).ToList();
+            _mensagens = (await ChatSvc.ListarAsync(Sala, MensagensNaTela, CancellationToken.None)).ToList();
             await CarregarPerfisAsync(_mensagens.Select(m => m.TreinadorId));
         }
-        _assistindo = AoVivo.Assistindo(PartidaId);
+        _assistindo = AoVivo.Assistindo(Sala);
         _carregando = false;
         _rolarChat = true;
     }
@@ -282,12 +379,12 @@
     {
         // Não dá para usar firstRender: a primeira renderização sai antes do jogo carregar.
         // OnAfterRender não roda no pré-render, então aqui só conta quem abriu de verdade.
-        if (!_entrou && _jogo is not null)
+        if (!_entrou && Carregado)
         {
             AoVivo.MensagemEnviada += AoReceberMensagem;
             AoVivo.MensagemApagada += AoApagarMensagem;
             AoVivo.PublicoMudou += AoMudarPublico;
-            AoVivo.Entrar(PartidaId);
+            AoVivo.Entrar(Sala);
             _entrou = true;
 
             // Inicializa antes de assinar: a primeira inicialização dispara AuthenticationChanged,
@@ -323,7 +420,7 @@
 
     private void AoReceberMensagem(PartidaChatMensagemDto m)
     {
-        if (m.PartidaId != PartidaId) return;
+        if (m.PartidaId != Sala) return;
         _ = InvokeAsync(async () =>
         {
             if (_mensagens.Any(x => x.MensagemId == m.MensagemId)) return;
@@ -363,7 +460,7 @@
 
     private void AoApagarMensagem(Guid partidaId, Guid mensagemId)
     {
-        if (partidaId != PartidaId) return;
+        if (partidaId != Sala) return;
         _ = InvokeAsync(() =>
         {
             _mensagens.RemoveAll(x => x.MensagemId == mensagemId);
@@ -373,10 +470,10 @@
 
     private void AoMudarPublico(Guid partidaId)
     {
-        if (partidaId != PartidaId) return;
+        if (partidaId != Sala) return;
         _ = InvokeAsync(() =>
         {
-            _assistindo = AoVivo.Assistindo(PartidaId);
+            _assistindo = AoVivo.Assistindo(Sala);
             StateHasChanged();
         });
     }
@@ -396,7 +493,7 @@
         var enviado = _texto;
         try
         {
-            var mensagem = await ChatSvc.EnviarAsync(PartidaId, _eu.TreinadorId, enviado, CancellationToken.None);
+            var mensagem = await ChatSvc.EnviarAsync(Sala, _eu.TreinadorId, enviado, CancellationToken.None);
             _ultimoEnvio = DateTime.UtcNow;
             // O campo segue liberado durante o envio: guarda o que foi digitado nesse meio tempo.
             _texto = _texto.StartsWith(enviado, StringComparison.Ordinal) ? _texto[enviado.Length..].TrimStart() : _texto;
@@ -431,7 +528,7 @@
     {
         if (!AdminAuth.IsAdmin) return;
         await ChatSvc.ApagarAsync(m.MensagemId, CancellationToken.None);
-        AoVivo.Apagar(PartidaId, m.MensagemId);
+        AoVivo.Apagar(Sala, m.MensagemId);
     }
 
     // Dois toques rápidos na aba esperam a mesma busca: duas buscas ao mesmo tempo no mesmo DbContext
@@ -450,9 +547,24 @@
         _escalacoes = await _buscandoEscalacoes;
     }
 
+    private Task<IReadOnlyDictionary<Guid, IReadOnlyList<BolaoPalpiteDeAlguemDto>>>? _buscandoPalpitesMosaico;
+
     private async Task AbrirPalpites()
     {
         _aba = Aba.Palpites;
+        if (_mosaico is not null)
+        {
+            if (_palpitesMosaico is not null) return;
+            _buscandoPalpitesMosaico ??= BolaoSvc.PalpitesDosJogosAsync(
+                _mosaico.Jogos.Select(j => j.PartidaId).ToList(), CancellationToken.None);
+            try { _palpitesMosaico = await _buscandoPalpitesMosaico; }
+            catch
+            {
+                _buscandoPalpitesMosaico = null; // deixa tentar de novo no próximo toque
+                throw;
+            }
+            return;
+        }
         if (_palpites is not null) return;
         _buscandoPalpites ??= BolaoSvc.PalpitesDoJogoAsync(PartidaId, CancellationToken.None);
         try { _palpites = await _buscandoPalpites; }
@@ -475,7 +587,7 @@
         AoVivo.MensagemApagada -= AoApagarMensagem;
         AoVivo.PublicoMudou -= AoMudarPublico;
         AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
-        if (_entrou) AoVivo.Sair(PartidaId);
+        if (_entrou) AoVivo.Sair(Sala);
         _buscandoEu.Dispose();
     }
 }

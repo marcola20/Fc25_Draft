@@ -20,6 +20,13 @@ public interface IBolaoService
     Task<IReadOnlyList<BolaoPalpiteDeAlguemDto>> PalpitesDoJogoAsync(Guid partidaId, CancellationToken ct);
 
     /// <summary>
+    /// O mesmo de <see cref="PalpitesDoJogoAsync"/> para vários jogos de uma vez (o telão do mosaico).
+    /// Jogo que ainda aceita palpite fica de fora.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<BolaoPalpiteDeAlguemDto>>> PalpitesDosJogosAsync(
+        IReadOnlyCollection<Guid> partidaIds, CancellationToken ct);
+
+    /// <summary>
     /// Tudo o que foi chutado na rodada, mesmo aberta, e quem ainda não palpitou. Só para o adm:
     /// quem chama confere a permissão.
     /// </summary>

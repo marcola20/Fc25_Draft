@@ -81,6 +81,7 @@ public class LayoutNavigationService
             new("Virada de Temporada", "/admin/temporada", "refresh-cw"),
             new("Resultados Pendentes", "/admin/resultados-pendentes", "lock"),
             new("Resumo da Rodada", "/admin/resumo-rodada", "message-square"),
+            new("Mosaicos", "/admin/mosaicos", "layout-grid"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "award"),
             new("Jogos Anotados", "/admin/jogos-anotados", "clipboard-list"),
             new("Gerenciar Premiação", "/admin/premiacao", "banknote"),
@@ -276,6 +277,18 @@ public class LayoutNavigationService
             Route = "/anuncios",
             Title = "Novidades do Site",
             Subtitle = "O que mudou no site e nas regras, explicado com exemplos"
+        },
+        ["/admin/mosaicos"] = new PageDefinition
+        {
+            Route = "/admin/mosaicos",
+            Title = "Mosaicos",
+            Subtitle = "Vídeo com os jogos da rodada juntos, com telão próprio e destaque na Central — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Mosaicos")
+            }
         },
         ["/admin/anuncios"] = new PageDefinition
         {

@@ -102,6 +102,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IResumoRodadaService, ResumoRodadaService>();
             services.AddComConexaoPropria<IPartidaChatService, PartidaChatService>();
             services.AddComConexaoPropria<IPartidaReacaoService, PartidaReacaoService>();
+            services.AddComConexaoPropria<IMosaicoService, MosaicoService>();
             services.AddComConexaoPropria<IAlbumService, AlbumService>();
             services.AddComConexaoPropria<IPerfilTreinadorService, PerfilTreinadorService>();
             services.AddScoped<IDraftWishlistService, DraftWishlistService>();
