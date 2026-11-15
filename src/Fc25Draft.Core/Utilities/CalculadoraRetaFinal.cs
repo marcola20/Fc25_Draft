@@ -30,7 +30,9 @@ public sealed record RetaFinalResultado(IReadOnlyList<RetaFinalObjetivo> Objetiv
 /// <summary>
 /// Calculadora da reta final de uma liga de pontos corridos.
 /// <para>
-/// <b>Contas exatas</b> (só pontos): garantido quando no máximo <c>Ate − 1</c> rivais ainda alcançam a pontuação
+/// <b>Contas exatas</b> (só pontos): com até <see cref="MaxJogosNaContaExata"/> jogos faltando, testa todas as
+/// combinações de resultado, então leva em conta os confrontos entre os rivais (Grêmio x Flamengo não deixa os dois
+/// vencerem). Com mais jogos, usa a conta simples pelo máximo de cada um: garantido quando no máximo <c>Ate − 1</c> rivais ainda alcançam a pontuação
 /// atual do time; impossível quando <c>Ate</c> rivais já têm mais pontos do que o máximo dele. "Garante com X pontos"
 /// é passar o máximo do <c>Ate</c>º rival: vale mesmo com os outros vencendo tudo (empate em pontos não conta como
 /// garantido, porque vira desempate ou jogo decisivo).
@@ -84,13 +86,100 @@ public static class CalculadoraRetaFinal
         var maximo = tabela.Select((t, i) => t.Pontos + 3 * faltam[i]).ToArray();
 
         var chances = Simular(tabela, jogos, objetivos, simulacoes, semente);
+        var exato = jogos.Length <= MaxJogosNaContaExata ? Enumerar(tabela, jogos, faltam) : null;
 
         var linhas = tabela.Select((t, i) => new RetaFinalLinha(
                 t, i + 1, faltam[i], maximo[i],
-                objetivos.Select((o, k) => Meta(tabela, maximo, faltam, i, o.Ate, chances[i, k])).ToList()))
+                objetivos.Select((o, k) => exato is null
+                    ? Meta(tabela, maximo, faltam, i, o.Ate, chances[i, k])
+                    : MetaExata(exato, tabela[i].Pontos, i, o.Ate, chances[i, k])).ToList()))
             .ToList();
 
         return new RetaFinalResultado(objetivos, linhas, jogos.Length, jogos.Length == 0 ? 0 : simulacoes);
+    }
+
+    /// <summary>
+    /// Até aqui dá para testar todas as combinações de resultado (3^12 ≈ 530 mil), levando em conta quem joga
+    /// contra quem: dois rivais que se enfrentam não podem vencer os dois.
+    /// </summary>
+    private const int MaxJogosNaContaExata = 12;
+
+    /// <summary>
+    /// Pior e melhor cenário de cada time em todas as combinações dos jogos que faltam.
+    /// <c>PiorComPontos[i][p]</c>: o máximo de rivais com pontos ≥ os dele quando ele soma <c>p</c> pontos nos jogos
+    /// que faltam (−1 = ele não consegue somar exatamente <c>p</c>). <c>MelhorAcima[i]</c>: o mínimo de rivais com
+    /// mais pontos do que ele, em qualquer cenário.
+    /// </summary>
+    private sealed record ContaExata(int[][] PiorComPontos, int[] MelhorAcima);
+
+    private static ContaExata Enumerar(IReadOnlyList<RetaFinalTime> tabela, (int Casa, int Fora)[] jogos, int[] faltam)
+    {
+        var n = tabela.Count;
+        var pior = Enumerable.Range(0, n).Select(i => Enumerable.Repeat(-1, 3 * faltam[i] + 1).ToArray()).ToArray();
+        var melhorAcima = Enumerable.Repeat(int.MaxValue, n).ToArray();
+        var pontos = new int[n];
+        var resultado = new int[jogos.Length]; // 0 = mandante vence, 1 = empate, 2 = visitante vence
+
+        while (true)
+        {
+            for (var t = 0; t < n; t++) pontos[t] = tabela[t].Pontos;
+            for (var j = 0; j < jogos.Length; j++)
+            {
+                var (casa, fora) = jogos[j];
+                switch (resultado[j])
+                {
+                    case 0: pontos[casa] += 3; break;
+                    case 1: pontos[casa]++; pontos[fora]++; break;
+                    default: pontos[fora] += 3; break;
+                }
+            }
+
+            for (var i = 0; i < n; i++)
+            {
+                int maisOuIgual = 0, mais = 0;
+                for (var o = 0; o < n; o++)
+                {
+                    if (o == i) continue;
+                    if (pontos[o] >= pontos[i]) maisOuIgual++;
+                    if (pontos[o] > pontos[i]) mais++;
+                }
+
+                var somou = pontos[i] - tabela[i].Pontos;
+                if (maisOuIgual > pior[i][somou]) pior[i][somou] = maisOuIgual;
+                if (mais < melhorAcima[i]) melhorAcima[i] = mais;
+            }
+
+            // Próxima combinação (contador em base 3).
+            var k = 0;
+            while (k < resultado.Length && ++resultado[k] == 3) resultado[k++] = 0;
+            if (k == resultado.Length) break;
+        }
+
+        return new ContaExata(pior, melhorAcima);
+    }
+
+    private static RetaFinalMeta MetaExata(ContaExata conta, int pontos, int i, int ate, double chance)
+    {
+        var pior = conta.PiorComPontos[i];
+
+        // Mesmo perdendo tudo e com os rivais somando o máximo possível entre si, no máximo ate − 1 chegam aos pontos dele.
+        if (pior.All(p => p <= ate - 1))
+            return new RetaFinalMeta(SituacaoObjetivo.Garantido, null, 1);
+        if (conta.MelhorAcima[i] >= ate)
+            return new RetaFinalMeta(SituacaoObjetivo.Impossivel, null, 0);
+
+        // Menor pontuação que garante: dali para cima, todo cenário possível deixa no máximo ate − 1 rivais empatados ou à frente.
+        int? precisa = null;
+        for (var p = pior.Length - 1; p >= 0; p--)
+        {
+            if (pior[p] < 0) continue;
+            if (pior[p] > ate - 1) break;
+            precisa = p;
+        }
+
+        return precisa is int x
+            ? new RetaFinalMeta(SituacaoObjetivo.DependeDeSi, x, chance)
+            : new RetaFinalMeta(SituacaoObjetivo.PrecisaDeAjuda, null, chance);
     }
 
     private static RetaFinalMeta Meta(IReadOnlyList<RetaFinalTime> tabela, int[] maximo, int[] faltam, int i, int ate, double chance)
