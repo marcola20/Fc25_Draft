@@ -21,8 +21,8 @@ public interface IMosaicoService
     Task<TelaoMosaicoDto?> TelaoAsync(Guid mosaicoId, CancellationToken ct);
 
     /// <summary>
-    /// O mosaico que aparece na Central: o mais novo com vídeo, enquanto tiver menos de
-    /// <see cref="DiasNaCentral"/> dias. Null quando não tem.
+    /// O mosaico atual (o último escolhido no admin), que aparece na Central quando tem vídeo e tem
+    /// menos de <see cref="DiasNaCentral"/> dias. Null quando não tem.
     /// </summary>
     Task<MosaicoDto?> NaCentralAsync(CancellationToken ct);
 

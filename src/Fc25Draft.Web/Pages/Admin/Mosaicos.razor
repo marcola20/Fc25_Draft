@@ -11,7 +11,11 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-<PageTitle>Mosaicos — Admin</PageTitle>
+<PageTitle>Mosaico — Admin</PageTitle>
+
+@* Um lugar só para o mosaico: escolhe a série e a rodada, cola o link e salva. Quando quiser, troca
+   (da Série B para a Série A) e o novo entra no lugar do anterior na Central. O anterior fica guardado,
+   com o chat e os palpites dele, na lista de baixo. *@
 
 <div>
     @if (_erro is not null)
@@ -30,94 +34,100 @@
     else
     {
         <div class="card mb-4">
-            <div class="card-header fw-semibold">
-                @(_editando is null ? "Novo mosaico" : "Editando mosaico")
+            <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-semibold">Mosaico na Central</span>
+                @if (_atual is null)
+                {
+                    <span class="badge text-bg-secondary">Nenhum ainda</span>
+                }
+                else
+                {
+                    <span class="small text-muted">agora: @_atual.Titulo</span>
+                    @if (_atual.YoutubeVideoId is null)
+                    {
+                        <span class="badge text-bg-secondary">Sem vídeo — não aparece</span>
+                    }
+                    else if (!_naCentral)
+                    {
+                        <span class="badge text-bg-secondary">Saiu da Central (mais de @IMosaicoService.DiasNaCentral dias)</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-warning">Na Central</span>
+                    }
+                    <span class="ms-auto d-flex gap-2">
+                        <a class="btn btn-sm btn-warning" href="/telao/mosaico/@_atual.MosaicoId" target="_blank"><Icone Nome="tv" Tamanho="14" /> Telão</a>
+                        <button class="btn btn-sm btn-outline-success" @onclick="() => CopiarLinkAsync(_atual)"><Icone Nome="copy" Tamanho="14" /> Link</button>
+                    </span>
+                }
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    O mosaico ganha um telão igual ao dos jogos: vídeo, chat, reações e os palpites de todos os jogos das rodadas
-                    marcadas. Com vídeo, aparece na Central por @IMosaicoService.DiasNaCentral dias.
+                    Escolha a série e a rodada e cole o link do YouTube. Para passar para outra série, é só trocar aqui e salvar:
+                    o novo mosaico entra no lugar do anterior na Central, e o anterior fica guardado lá embaixo com o chat e os
+                    palpites dele. O telão tem vídeo, chat, reações e os palpites de todos os jogos da rodada.
                 </p>
 
                 <div class="row g-3">
-                    <div class="col-12 col-lg-6">
-                        <label class="form-label mb-1">Título</label>
-                        <input type="text" class="form-control" maxlength="120" @bind="_titulo" />
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label mb-1">Série</label>
+                        <select class="form-select" value="@(_ligaId?.ToString() ?? "")" @onchange="e => EscolherLiga(e.Value?.ToString())">
+                            @foreach (var c in _opcoes)
+                            {
+                                <option value="@c.LigaId">@c.Competicao@(c.Temporada is int t ? $" {t}" : "")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label mb-1">Rodada</label>
+                        <select class="form-select" value="@(_rodadaId?.ToString() ?? "")" @onchange="e => EscolherRodada(e.Value?.ToString())">
+                            @foreach (var r in LigaEscolhida?.Rodadas.OrderByDescending(r => r.Numero) ?? Enumerable.Empty<MosaicoRodadaOpcaoDto>())
+                            {
+                                <option value="@r.RodadaId">@NomeDaRodada(r.Numero)@(r.Quando is DateTime q ? $" — {q.ToString("dd/MM", Br)}" : "")</option>
+                            }
+                        </select>
                     </div>
                     <div class="col-12 col-lg-6">
+                        <label class="form-label mb-1">Título</label>
+                        <input type="text" class="form-control" maxlength="120" value="@_titulo"
+                               @onchange="e => { _titulo = e.Value?.ToString() ?? string.Empty; _tituloManual = true; }" />
+                    </div>
+                    <div class="col-12">
                         <label class="form-label mb-1">Link do YouTube</label>
                         <input type="text" class="form-control" placeholder="https://youtube.com/live/... (pode deixar para depois)" @bind="_link" />
                     </div>
-
-                    @foreach (var c in _opcoes)
-                    {
-                        <div class="col-12 col-sm-6 col-lg-3">
-                            <label class="form-label mb-1">@c.Competicao@(c.Temporada is int t ? $" {t}" : "")</label>
-                            <select class="form-select" value="@(_escolhidas.GetValueOrDefault(c.LigaId)?.ToString() ?? "")"
-                                    @onchange="e => Escolher(c.LigaId, e.Value?.ToString())">
-                                <option value="">Fora do mosaico</option>
-                                @foreach (var r in c.Rodadas.OrderByDescending(r => r.Numero))
-                                {
-                                    <option value="@r.RodadaId">@(r.Numero == 0 ? "Jogo decisivo" : $"Rodada {r.Numero}")@(r.Quando is DateTime q ? $" — {q.ToString("dd/MM", Br)}" : "")</option>
-                                }
-                            </select>
-                        </div>
-                    }
                 </div>
 
-                @if (_rodadasDeFora.Count > 0)
-                {
-                    <div class="small text-muted mt-2">
-                        Continua no mosaico (de outra temporada): @string.Join(" · ", _rodadasDeFora.Select(r => r.Rotulo))
-                    </div>
-                }
-
-                <div class="d-flex gap-2 mt-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
                     <button class="btn btn-primary" @onclick="SalvarAsync" disabled="@_salvando">
-                        <Icone Nome="check" Tamanho="14" /> @(_editando is null ? "Criar mosaico" : "Salvar")
+                        <Icone Nome="check" Tamanho="14" /> @(TrocaDeMosaico ? "Colocar na Central" : "Salvar")
                     </button>
-                    @if (_editando is not null)
+                    @if (TrocaDeMosaico && _atual is not null)
                     {
-                        <button class="btn btn-outline-secondary" @onclick="Limpar">Cancelar</button>
+                        <span class="small text-muted">Vai tirar "@_atual.Titulo" da Central e pôr este no lugar.</span>
                     }
                 </div>
             </div>
         </div>
 
-        <div class="secao-titulo">
-            <h2>Mosaicos</h2>
-        </div>
-
-        @if (_mosaicos.Count == 0)
+        @if (_anteriores.Count > 0)
         {
-            <div class="alert alert-info">Nenhum mosaico ainda.</div>
-        }
-        else
-        {
+            <div class="secao-titulo">
+                <h2>Mosaicos anteriores</h2>
+            </div>
             <div class="list-group">
-                @foreach (var m in _mosaicos)
+                @foreach (var m in _anteriores)
                 {
                     <div class="list-group-item">
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <div class="me-auto">
-                                <div class="fw-semibold">
-                                    @m.Titulo
-                                    @if (m.MosaicoId == _naCentral)
-                                    {
-                                        <span class="badge text-bg-warning ms-1">Na Central</span>
-                                    }
-                                    @if (m.YoutubeVideoId is null)
-                                    {
-                                        <span class="badge text-bg-secondary ms-1">Sem vídeo</span>
-                                    }
-                                </div>
+                                <div class="fw-semibold">@m.Titulo</div>
                                 <div class="small text-muted">
-                                    @string.Join(" · ", m.Rodadas.Select(r => r.Rotulo)) · criado em @BrazilTime.FormatDateTime(m.CriadoEm, "dd/MM HH:mm")
+                                    @string.Join(" · ", m.Rodadas.Select(r => r.Rotulo)) · @BrazilTime.FormatDateTime(m.CriadoEm, "dd/MM HH:mm")
                                 </div>
                             </div>
-                            <a class="btn btn-sm btn-warning" href="/telao/mosaico/@m.MosaicoId" target="_blank"><Icone Nome="tv" Tamanho="14" /> Telão</a>
+                            <a class="btn btn-sm btn-outline-warning" href="/telao/mosaico/@m.MosaicoId" target="_blank"><Icone Nome="tv" Tamanho="14" /> Telão</a>
                             <button class="btn btn-sm btn-outline-success" @onclick="() => CopiarLinkAsync(m)"><Icone Nome="copy" Tamanho="14" /> Link</button>
-                            <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(m)"><Icone Nome="pencil" Tamanho="14" /> Editar</button>
                             @if (_apagando == m.MosaicoId)
                             {
                                 <button class="btn btn-sm btn-danger" @onclick="() => ApagarAsync(m)">Apagar mesmo (chat junto)</button>
@@ -137,23 +147,32 @@
 
 @code {
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
-    private const string TituloPadrao = "Mosaico da última rodada";
 
     private bool _carregando = true;
     private bool _salvando;
     private string? _erro, _ok;
 
-    private IReadOnlyList<MosaicoDto> _mosaicos = Array.Empty<MosaicoDto>();
     private IReadOnlyList<MosaicoCompeticaoOpcaoDto> _opcoes = Array.Empty<MosaicoCompeticaoOpcaoDto>();
-    private Guid? _naCentral;
 
-    // Formulário
-    private MosaicoDto? _editando;
-    private string _titulo = TituloPadrao;
+    /// <summary>O mosaico atual: o último escolhido. É ele que a Central mostra (quando tem vídeo).</summary>
+    private MosaicoDto? _atual;
+    private bool _naCentral;
+    private List<MosaicoDto> _anteriores = new();
+
+    // Formulário. O título acompanha a série e a rodada até alguém escrever o próprio.
+    private Guid? _ligaId;
+    private Guid? _rodadaId;
+    private string _titulo = "";
+    private bool _tituloManual;
     private string? _link;
-    private readonly Dictionary<Guid, Guid?> _escolhidas = new();
-    private List<MosaicoRodadaDto> _rodadasDeFora = new();
     private Guid? _apagando;
+
+    private MosaicoCompeticaoOpcaoDto? LigaEscolhida => _opcoes.FirstOrDefault(c => c.LigaId == _ligaId);
+
+    /// <summary>Escolheu outra rodada (outra série): salvar põe um mosaico novo no lugar do atual.</summary>
+    private bool TrocaDeMosaico => _atual is null || _atual.Rodadas.All(r => r.RodadaId != _rodadaId);
+
+    private static string NomeDaRodada(int numero) => numero == 0 ? "Jogo decisivo" : $"Rodada {numero}";
 
     protected override void OnInitialized()
     {
@@ -165,46 +184,86 @@
         try
         {
             _opcoes = await MosaicoSvc.OpcoesAsync(CancellationToken.None);
-            await RecarregarListaAsync();
-            Limpar();
+            await RecarregarAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _carregando = false; }
     }
 
-    private async Task RecarregarListaAsync()
+    private async Task RecarregarAsync()
     {
-        _mosaicos = await MosaicoSvc.ListarAsync(CancellationToken.None);
-        _naCentral = (await MosaicoSvc.NaCentralAsync(CancellationToken.None))?.MosaicoId;
+        var todos = await MosaicoSvc.ListarAsync(CancellationToken.None);
+        _atual = todos.FirstOrDefault();
+        _anteriores = todos.Skip(1).ToList();
+        _naCentral = _atual is not null
+                     && (await MosaicoSvc.NaCentralAsync(CancellationToken.None))?.MosaicoId == _atual.MosaicoId;
+        PreencherComAtual();
     }
 
-    private void Limpar()
+    /// <summary>
+    /// O formulário mostra o mosaico atual. Sem nenhum ainda, já vem na última rodada da Série B
+    /// (o mosaico da B sai primeiro).
+    /// </summary>
+    private void PreencherComAtual()
     {
-        _editando = null;
-        _titulo = TituloPadrao;
+        var rodada = _atual?.Rodadas.FirstOrDefault();
+        var liga = rodada is null ? null : _opcoes.FirstOrDefault(c => c.LigaId == rodada.LigaId);
+        if (_atual is not null && rodada is not null && liga is not null)
+        {
+            _ligaId = liga.LigaId;
+            _rodadaId = rodada.RodadaId;
+            _titulo = _atual.Titulo;
+            _tituloManual = true;
+            _link = _atual.YoutubeVideoId is null ? null : YoutubeLink.Assistir(_atual.YoutubeVideoId);
+            return;
+        }
+
+        var sugestao = _opcoes.Where(c => c.Sugerida is not null).OrderByDescending(c => c.Competicao == "Série B").FirstOrDefault()
+                       ?? _opcoes.FirstOrDefault();
+        _ligaId = sugestao?.LigaId;
+        _rodadaId = sugestao?.Sugerida ?? sugestao?.Rodadas.OrderByDescending(r => r.Numero).FirstOrDefault()?.RodadaId;
         _link = null;
-        _rodadasDeFora = new();
-        _escolhidas.Clear();
-        foreach (var c in _opcoes)
-            _escolhidas[c.LigaId] = c.Sugerida;
+        _tituloManual = false;
+        AtualizarTitulo();
     }
 
-    private void Editar(MosaicoDto m)
+    private void EscolherLiga(string? valor)
     {
-        _editando = m;
-        _titulo = m.Titulo;
-        _link = m.YoutubeVideoId is null ? null : YoutubeLink.Assistir(m.YoutubeVideoId);
-        _escolhidas.Clear();
-        foreach (var c in _opcoes)
-            _escolhidas[c.LigaId] = m.Rodadas.FirstOrDefault(r => r.LigaId == c.LigaId)?.RodadaId;
-        var ligas = _opcoes.Select(c => c.LigaId).ToHashSet();
-        _rodadasDeFora = m.Rodadas.Where(r => !ligas.Contains(r.LigaId)).ToList();
-        _ok = null;
-        _erro = null;
+        _ligaId = Guid.TryParse(valor, out var id) ? id : null;
+        var liga = LigaEscolhida;
+        _rodadaId = liga?.Sugerida ?? liga?.Rodadas.OrderByDescending(r => r.Numero).FirstOrDefault()?.RodadaId;
+        AoTrocarRodada();
     }
 
-    private void Escolher(Guid ligaId, string? valor) =>
-        _escolhidas[ligaId] = Guid.TryParse(valor, out var id) ? id : null;
+    private void EscolherRodada(string? valor)
+    {
+        _rodadaId = Guid.TryParse(valor, out var id) ? id : null;
+        AoTrocarRodada();
+    }
+
+    // Trocou para outra série/rodada: o link e o título do atual não servem para o novo.
+    // Voltou para a do atual: mostra o dele de novo.
+    private void AoTrocarRodada()
+    {
+        if (!TrocaDeMosaico)
+        {
+            PreencherComAtual();
+            return;
+        }
+        _link = null;
+        _tituloManual = false;
+        AtualizarTitulo();
+    }
+
+    private void AtualizarTitulo()
+    {
+        if (_tituloManual) return;
+        var liga = LigaEscolhida;
+        var rodada = liga?.Rodadas.FirstOrDefault(r => r.RodadaId == _rodadaId);
+        _titulo = liga is null || rodada is null
+            ? "Mosaico da rodada"
+            : $"Mosaico da {liga.Competicao} · {NomeDaRodada(rodada.Numero)}";
+    }
 
     private async Task SalvarAsync()
     {
@@ -213,26 +272,18 @@
         _ok = null;
         try
         {
-            var rodadas = _escolhidas.Values.OfType<Guid>()
-                .Concat(_rodadasDeFora.Select(r => r.RodadaId))
-                .ToList();
-            var request = new MosaicoSalvarRequest(_titulo, _link, rodadas);
+            if (_rodadaId is not Guid rodada)
+                throw new InvalidOperationException("Escolha a rodada.");
+            var request = new MosaicoSalvarRequest(_titulo, _link, new[] { rodada });
 
-            if (_editando is null)
-            {
-                var novo = await MosaicoSvc.CriarAsync(request, CancellationToken.None);
-                _ok = novo.YoutubeVideoId is null
-                    ? "Mosaico criado. Cole o link do vídeo quando ele subir para aparecer na Central."
-                    : "Mosaico criado e já aparece na Central.";
-            }
-            else
-            {
-                await MosaicoSvc.AtualizarAsync(_editando.MosaicoId, request, CancellationToken.None);
-                _ok = "Mosaico salvo.";
-            }
+            var salvo = TrocaDeMosaico
+                ? await MosaicoSvc.CriarAsync(request, CancellationToken.None)
+                : await MosaicoSvc.AtualizarAsync(_atual!.MosaicoId, request, CancellationToken.None);
 
-            await RecarregarListaAsync();
-            Limpar();
+            _ok = salvo.YoutubeVideoId is null
+                ? $"{salvo.Titulo} salvo. Cole o link do vídeo quando ele subir para aparecer na Central."
+                : $"{salvo.Titulo} está na Central.";
+            await RecarregarAsync();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _salvando = false; }
@@ -245,8 +296,7 @@
         {
             await MosaicoSvc.ApagarAsync(m.MosaicoId, CancellationToken.None);
             _apagando = null;
-            if (_editando?.MosaicoId == m.MosaicoId) Limpar();
-            await RecarregarListaAsync();
+            await RecarregarAsync();
             _ok = "Mosaico apagado.";
         }
         catch (Exception ex) { _erro = ex.Message; }

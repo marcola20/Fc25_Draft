@@ -150,11 +150,12 @@ public class MosaicoService : IMosaicoService
     public async Task<MosaicoDto?> NaCentralAsync(CancellationToken ct)
     {
         var desde = _time.GetUtcNow().UtcDateTime.AddDays(-IMosaicoService.DiasNaCentral);
+        // O atual é o último escolhido no admin: trocar da Série B para a A tira o da B da Central,
+        // mesmo enquanto o link da A não foi colado.
         var mosaico = await _db.Mosaicos.AsNoTracking()
-            .Where(m => m.YoutubeVideoId != null && m.CriadoEm >= desde)
             .OrderByDescending(m => m.CriadoEm)
             .FirstOrDefaultAsync(ct);
-        if (mosaico is null) return null;
+        if (mosaico is null || mosaico.YoutubeVideoId is null || mosaico.CriadoEm < desde) return null;
 
         return ToDto(mosaico, await RodadasAsync(new List<Guid> { mosaico.MosaicoId }, ct));
     }

@@ -81,7 +81,7 @@ public class LayoutNavigationService
             new("Virada de Temporada", "/admin/temporada", "refresh-cw"),
             new("Resultados Pendentes", "/admin/resultados-pendentes", "lock"),
             new("Resumo da Rodada", "/admin/resumo-rodada", "message-square"),
-            new("Mosaicos", "/admin/mosaicos", "layout-grid"),
+            new("Mosaico", "/admin/mosaicos", "layout-grid"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "award"),
             new("Jogos Anotados", "/admin/jogos-anotados", "clipboard-list"),
             new("Gerenciar Premiação", "/admin/premiacao", "banknote"),
@@ -281,13 +281,13 @@ public class LayoutNavigationService
         ["/admin/mosaicos"] = new PageDefinition
         {
             Route = "/admin/mosaicos",
-            Title = "Mosaicos",
-            Subtitle = "Vídeo com os jogos da rodada juntos, com telão próprio e destaque na Central — Admin",
+            Title = "Mosaico",
+            Subtitle = "O vídeo mosaico da rodada (Série B ou Série A) no telão e na Central — Admin",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),
                 new("Admin"),
-                new("Mosaicos")
+                new("Mosaico")
             }
         },
         ["/admin/anuncios"] = new PageDefinition
