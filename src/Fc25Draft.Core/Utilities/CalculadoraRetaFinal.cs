@@ -18,8 +18,12 @@ public sealed record RetaFinalTime(Guid TimeId, string Nome, int Pontos, int Jog
 /// <summary>Um jogo que ainda falta.</summary>
 public sealed record RetaFinalJogo(Guid CasaId, Guid ForaId);
 
-/// <summary>Objetivo de tabela: terminar entre os <paramref name="Ate"/> primeiros.</summary>
-public sealed record RetaFinalObjetivo(string Nome, int Ate);
+/// <summary>
+/// Objetivo de tabela: terminar entre os <paramref name="Ate"/> primeiros. Com <paramref name="EmpateEmPontosVaiAJogo"/>,
+/// quem empata em pontos na fronteira não se separa por vitórias nem saldo: a vaga sai em jogo decisivo (2 times) ou
+/// mini liga (3+), e no sorteio cada empatado fica com a mesma fração dela (título da Série A).
+/// </summary>
+public sealed record RetaFinalObjetivo(string Nome, int Ate, bool EmpateEmPontosVaiAJogo = false);
 
 public sealed record RetaFinalMeta(SituacaoObjetivo Situacao, int? PontosParaGarantir, double Chance);
 
@@ -39,7 +43,9 @@ public sealed record RetaFinalResultado(IReadOnlyList<RetaFinalObjetivo> Objetiv
 /// </para>
 /// <para>
 /// <b>Chances</b>: sorteia os jogos que faltam milhares de vezes. Cada jogo pende para quem tem a melhor campanha
-/// (aproveitamento); empate em pontos é desfeito por vitórias, saldo e, por fim, sorteio.
+/// (aproveitamento); empate em pontos é desfeito por vitórias, saldo e, por fim, sorteio — menos no objetivo
+/// marcado com <see cref="RetaFinalObjetivo.EmpateEmPontosVaiAJogo"/> (título da Série A), em que os empatados
+/// dividem a vaga, como num jogo decisivo / mini liga.
 /// </para>
 /// </summary>
 public static class CalculadoraRetaFinal
@@ -49,7 +55,9 @@ public static class CalculadoraRetaFinal
     /// <summary>Os objetivos que fazem sentido na liga: título e as zonas de acesso ou de rebaixamento.</summary>
     public static IReadOnlyList<RetaFinalObjetivo> Objetivos(LigaRegraZonas regra, int totalTimes)
     {
-        var objetivos = new List<RetaFinalObjetivo> { new("Título", 1) };
+        // Série A: empate em pontos no topo decide o título em jogo decisivo / mini liga. Na Série B o título segue o
+        // desempate da tabela (vitórias, saldo, confronto direto), que o sorteio já aproxima.
+        var objetivos = new List<RetaFinalObjetivo> { new("Título", 1, EmpateEmPontosVaiAJogo: !regra.DesempateSerieB) };
         if (!regra.TemAcessoRebaixamento) return objetivos;
 
         if (regra.DesempateSerieB)
@@ -243,7 +251,7 @@ public static class CalculadoraRetaFinal
         var saldo = new int[n];
         var desempate = new double[n];
         var ordem = new int[n];
-        var contagem = new int[n, objetivos.Count];
+        var contagem = new double[n, objetivos.Count];
 
         for (var s = 0; s < simulacoes; s++)
         {
@@ -271,14 +279,29 @@ public static class CalculadoraRetaFinal
                 : saldo[a] != saldo[b] ? saldo[b].CompareTo(saldo[a])
                 : desempate[b].CompareTo(desempate[a]));
 
-            for (var posicao = 0; posicao < n; posicao++)
-                for (var k = 0; k < objetivos.Count; k++)
-                    if (posicao < objetivos[k].Ate) contagem[ordem[posicao], k]++;
+            for (var k = 0; k < objetivos.Count; k++)
+            {
+                var ate = Math.Min(objetivos[k].Ate, n);
+                for (var posicao = 0; posicao < ate; posicao++) contagem[ordem[posicao], k]++;
+
+                if (!objetivos[k].EmpateEmPontosVaiAJogo) continue;
+
+                // Bloco empatado em pontos que cruza a fronteira: as vagas que sobram nele são divididas por igual.
+                var inicio = ate - 1;
+                while (inicio > 0 && pontos[ordem[inicio - 1]] == pontos[ordem[ate - 1]]) inicio--;
+                var fim = ate;
+                while (fim < n && pontos[ordem[fim]] == pontos[ordem[ate - 1]]) fim++;
+                if (fim == ate) continue;
+
+                var fracao = (double)(ate - inicio) / (fim - inicio);
+                for (var posicao = inicio; posicao < fim; posicao++)
+                    contagem[ordem[posicao], k] += fracao - (posicao < ate ? 1 : 0);
+            }
         }
 
         for (var t = 0; t < n; t++)
             for (var k = 0; k < objetivos.Count; k++)
-                chances[t, k] = (double)contagem[t, k] / simulacoes;
+                chances[t, k] = contagem[t, k] / simulacoes;
         return chances;
 
         void Vitoria(int vencedor, int perdedor)
