@@ -26,25 +26,18 @@
             <a href="/hall-of-fame" class="btn btn-sm btn-outline-secondary"><Icone Nome="trophy" Tamanho="14" /> Hall da Fama</a>
         </div>
 
-        @foreach (var temporada in _emAndamento)
+        @foreach (var temporada in _temporadas)
         {
             <div class="secao-titulo justify-content-start align-items-center gap-2">
                 <h2>@TemporadaTitulo(temporada.Key)</h2>
-                <span class="etiqueta sucesso">Em andamento</span>
-            </div>
-            <div class="row g-3 mb-4">
-                @foreach (var edicao in temporada)
+                @if (temporada.Any(e => !e.Encerrada))
                 {
-                    <div class="col-12 col-md-6 col-xl-4">@CardEdicao(edicao)</div>
+                    <span class="etiqueta sucesso">Em andamento</span>
                 }
-            </div>
-        }
-
-        @foreach (var temporada in _encerradas)
-        {
-            <div class="secao-titulo justify-content-start align-items-center gap-2">
-                <h2>@TemporadaTitulo(temporada.Key)</h2>
-                <span class="etiqueta">Encerrada</span>
+                else
+                {
+                    <span class="etiqueta">Encerrada</span>
+                }
             </div>
             <div class="row g-3 mb-4">
                 @foreach (var edicao in temporada)
@@ -61,16 +54,15 @@
     private string? _erro;
 
     private IReadOnlyList<LigaEdicaoDto> _edicoes = Array.Empty<LigaEdicaoDto>();
-    private List<IGrouping<int?, LigaEdicaoDto>> _emAndamento = new();
-    private List<IGrouping<int?, LigaEdicaoDto>> _encerradas = new();
+    // Uma seção por temporada, com tudo dela: a Copa que já acabou fica junto das Séries que ainda rolam.
+    private List<IGrouping<int?, LigaEdicaoDto>> _temporadas = new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _edicoes = await LigaService.ListEdicoesAsync(CancellationToken.None);
-            _emAndamento = PorTemporada(_edicoes.Where(e => !e.Encerrada));
-            _encerradas = PorTemporada(_edicoes.Where(e => e.Encerrada));
+            _temporadas = PorTemporada(_edicoes);
         }
         catch (Exception ex)
         {
@@ -83,7 +75,11 @@
     }
 
     private static List<IGrouping<int?, LigaEdicaoDto>> PorTemporada(IEnumerable<LigaEdicaoDto> edicoes) =>
-        edicoes.GroupBy(e => e.Temporada).OrderByDescending(g => g.Key ?? 0).ToList();
+        edicoes
+            .OrderBy(e => e.Encerrada) // dentro da temporada, o que ainda rola vem primeiro
+            .GroupBy(e => e.Temporada)
+            .OrderByDescending(g => g.Key ?? 0)
+            .ToList();
 
     // O cartão inteiro é o link da edição. O campeão é o destaque; edição rolando mostra o andamento.
     private RenderFragment CardEdicao(LigaEdicaoDto e) =>
