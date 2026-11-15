@@ -1347,6 +1347,22 @@ public class LigaPublicService : ILigaPublicService
         (short)PositionType.LateralDireito
     };
 
+    /// <summary>
+    /// Competições da temporada atual = a última que já teve jogo encerrado. A encerrada dela continua valendo
+    /// (a Liga acaba antes da Copa e os números dela seguem na temporada); a da temporada seguinte, criada e
+    /// ainda sem jogo, não tira a atual. Sem temporada marcada, ficam as competições não encerradas.
+    /// </summary>
+    private async Task<List<Liga>> GetLigasDaTemporadaAtualAsync(CancellationToken ct)
+    {
+        var temporada = await _db.LigaPartidas.AsNoTracking()
+                            .Where(p => p.Status == PartidaStatus.Encerrada && p.Rodada.Liga.Temporada != null)
+                            .MaxAsync(p => p.Rodada.Liga.Temporada, ct)
+                        ?? await _db.Ligas.AsNoTracking().MaxAsync(l => l.Temporada, ct);
+        return await _db.Ligas.AsNoTracking()
+            .Where(l => temporada != null ? l.Temporada == temporada : l.Status != LigaStatus.Encerrada)
+            .ToListAsync(ct);
+    }
+
     public async Task<TimeTemporadaDto?> GetTemporadaTimeAsync(Guid timeId, CancellationToken ct)
     {
         var timeNome = await _db.Teams
@@ -1357,17 +1373,15 @@ public class LigaPublicService : ILigaPublicService
 
         if (timeNome is null) return null;
 
-        // Temporada = competições ainda não encerradas.
-        var ligas = await _db.Ligas
-            .AsNoTracking()
-            .Where(l => l.Status != LigaStatus.Encerrada)
+        // Temporada = todas as competições da temporada atual, inclusive as já encerradas.
+        var ligas = (await GetLigasDaTemporadaAtualAsync(ct))
             .OrderBy(l => l.Tipo)
             .ThenByDescending(l => l.CriadoEm)
-            .ToListAsync(ct);
+            .ToList();
 
         var ligaIds = ligas.Select(l => l.LigaId).ToArray();
 
-        // Traz a classificação inteira das ligas ativas: a posição na Copa é
+        // Traz a classificação inteira das ligas da temporada: a posição na Copa é
         // relativa ao grupo, então precisamos dos adversários para calculá-la.
         var classifs = await _db.LigaClassificacoes
             .AsNoTracking()
@@ -1444,7 +1458,7 @@ public class LigaPublicService : ILigaPublicService
                     .Select(k => (k.Fase, k.VencedorId)), timeId)));
         }
 
-        // Clean sheet é apurado por partida encerrada do time nas competições ativas.
+        // Clean sheet é apurado por partida encerrada do time nas competições da temporada.
         var partidas = await _db.LigaPartidas
             .AsNoTracking()
             .Where(p => ligaIds.Contains(p.Rodada.LigaId)
@@ -1640,19 +1654,10 @@ public class LigaPublicService : ILigaPublicService
         var nomes = await _db.Teams.AsNoTracking()
             .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
 
-        // Temporada atual = a última que já teve jogo encerrado. Competição encerrada dela continua valendo
-        // (a Liga acaba antes da Copa e os gols, notas e clean sheets dela seguem na temporada); a da temporada
-        // seguinte, criada e ainda sem jogo, não tira a atual da capa.
-        var temporada = await _db.LigaPartidas.AsNoTracking()
-            .Where(p => p.Status == PartidaStatus.Encerrada && p.Rodada.Liga.Temporada != null)
-            .MaxAsync(p => p.Rodada.Liga.Temporada, ct)
-            ?? await _db.Ligas.AsNoTracking().MaxAsync(l => l.Temporada, ct);
-        var daTemporada = await _db.Ligas.AsNoTracking()
-            .Where(l => temporada != null ? l.Temporada == temporada : l.Status != LigaStatus.Encerrada)
+        var daTemporada = (await GetLigasDaTemporadaAtualAsync(ct))
             .OrderBy(l => l.Divisao)
             .ThenByDescending(l => l.CriadoEm)
-            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Status, l.CampeaoTimeId })
-            .ToListAsync(ct);
+            .ToList();
         var ativaIds = daTemporada.Select(l => l.LigaId).ToList();
 
         // Líder de cada liga (na Copa a tabela é por grupo; na Supercopa não há tabela); a já encerrada mostra o campeão.
