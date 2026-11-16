@@ -1,0 +1,308 @@
+/* Montagem da escalação: o campo em pé (ataque no alto, goleiro embaixo) com os titulares nos lugares da
+   formação, o banco e quem está fora ao lado. As cores do gramado são do mundo do jogo (iguais ao campo dos
+   jogos); o resto segue os tokens do site. */
+
+/* Clique fora da montagem fecha a lista aberta. A montagem fica acima dele (o campo, por ter container-type,
+   é uma camada própria: a lista dentro dele não consegue passar por cima de nada fora). */
+.montagem-fundo {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+}
+
+.montagem {
+    position: relative;
+    z-index: 6;
+}
+
+.montagem-aviso {
+    margin-bottom: .5rem;
+    padding: .35rem .6rem;
+    border-radius: .4rem;
+    border: 1px solid var(--bs-warning-border-subtle);
+    background: var(--bs-warning-bg-subtle);
+    font-size: .85rem;
+}
+
+/* ── Campo ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+.campo-montagem {
+    container-type: inline-size;
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    aspect-ratio: 100 / 145;
+    border-radius: .75rem;
+    background: repeating-linear-gradient(to bottom, #2f7d35 0 7.25%, #37893d 7.25% 14.5%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25);
+    user-select: none;
+}
+
+.campo-linhas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: rgba(255, 255, 255, .5);
+    stroke-width: 1.5px;
+    pointer-events: none;
+}
+
+.campo-linhas * { vector-effect: non-scaling-stroke; }
+
+.lugar {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 6em;
+    font-size: clamp(10px, 3cqw, 14px);
+    text-align: center;
+    cursor: pointer;
+    z-index: 2;
+    border-radius: .6em;
+    padding: .2em 0;
+    transition: transform .12s ease, opacity .12s ease;
+}
+
+.lugar:hover { transform: translate(-50%, -50%) scale(1.06); }
+.lugar:focus-visible { outline: 2px solid #f2cd5c; outline-offset: 2px; }
+.lugar.aberto { z-index: 25; }
+
+.lugar .rosto {
+    position: relative;
+    width: 3.4em;
+    height: 3.4em;
+    line-height: 0;
+}
+
+/* A foto não é arrastada sozinha: quem arrasta é o lugar inteiro. */
+.lugar .rosto ::deep .foto-jogador,
+.banco-lugar ::deep .foto-jogador,
+.fora-jogador ::deep .foto-jogador {
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+.lugar .rosto ::deep .foto-jogador {
+    width: 3.4em !important;
+    height: 3.4em !important;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #1b1f24;
+    box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, .45);
+}
+
+.lugar.aberto .rosto ::deep .foto-jogador { box-shadow: 0 0 0 3px #f2cd5c, 0 2px 6px rgba(0, 0, 0, .45); }
+
+.lugar .ovr {
+    position: absolute;
+    right: -.55em;
+    bottom: -.2em;
+    min-width: 1.9em;
+    padding: .2em .3em;
+    border-radius: .35em;
+    background: #1b1f24;
+    color: #fff;
+    font-family: "Geist Mono", ui-monospace, monospace;
+    font-size: .78em;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.lugar .mais {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px dashed rgba(255, 255, 255, .75);
+    background: rgba(0, 0, 0, .18);
+    color: #fff;
+}
+
+.lugar.aberto .mais { border-color: #f2cd5c; color: #f2cd5c; }
+
+.lugar .nome {
+    margin-top: .3em;
+    max-width: 100%;
+    padding: 0 .4em;
+    border-radius: .3em;
+    background: rgba(0, 0, 0, .55);
+    color: #fff;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.lugar.vazio .nome { background: transparent; font-style: italic; opacity: .85; }
+
+.lugar .sigla {
+    margin-top: .15em;
+    color: rgba(255, 255, 255, .85);
+    font-size: .78em;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+    line-height: 1;
+}
+
+/* Enquanto arrasta (ou escolhe um de fora): onde dá para soltar acende, onde não dá apaga. */
+.escolhendo-lugar .lugar.destino-ok .rosto ::deep .foto-jogador,
+.escolhendo-lugar .lugar.destino-ok .mais {
+    box-shadow: 0 0 0 3px #f2cd5c, 0 0 14px rgba(242, 205, 92, .6);
+    border-color: #f2cd5c;
+}
+
+.escolhendo-lugar .lugar.destino-nao { opacity: .35; }
+.lugar.saindo, .banco-lugar.saindo, .fora-jogador.saindo { opacity: .4; }
+
+/* ── Lista de escolha (abre no lugar tocado) ───────────────────────────────────────────────────────── */
+
+.escolha {
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font-size: .85rem;
+}
+
+.escolha-campo {
+    position: absolute;
+    z-index: 30;
+    --meia: min(9.5rem, 48%);
+    width: calc(var(--meia) * 2);
+    /* Abre em cima do lugar, mas sem passar das bordas do campo. */
+    left: clamp(var(--meia), var(--x, 50%), calc(100% - var(--meia)));
+    transform: translateX(-50%);
+    border: 1px solid var(--bs-border-color);
+    border-radius: .6rem;
+    box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .35);
+    overflow: hidden;
+}
+
+.escolha-banco { border-top: 1px solid var(--bs-border-color); }
+
+.escolha-topo {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .4rem .6rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.escolha-lista {
+    max-height: 15rem;
+    overflow-y: auto;
+}
+
+.escolha-item {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    width: 100%;
+    padding: .3rem .6rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+}
+
+.escolha-item:hover:not(:disabled) { background: var(--bs-tertiary-bg); }
+.escolha-item:disabled { opacity: 1; }
+.escolha-item.atual { background: var(--bs-secondary-bg); }
+
+.escolha-item ::deep .foto-jogador { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+.escolha-onde {
+    font-size: .72rem;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+}
+
+.escolha-tirar {
+    display: block;
+    width: 100%;
+    padding: .4rem .6rem;
+    border: 0;
+    border-top: 1px solid var(--bs-border-color);
+    background: transparent;
+    color: var(--bs-danger-text-emphasis);
+    font-size: .8rem;
+    text-align: left;
+}
+
+.escolha-tirar:hover { background: var(--bs-tertiary-bg); }
+
+/* ── Banco e quem está fora ────────────────────────────────────────────────────────────────────────── */
+
+.chip-pos, .chip-ovr {
+    flex-shrink: 0;
+    min-width: 2.2em;
+    padding: .1em .35em;
+    border-radius: .3em;
+    font-size: .72rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.chip-pos { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.chip-ovr { background: var(--bs-tertiary-bg); font-family: "Geist Mono", ui-monospace, monospace; }
+
+.banco-lugar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .4rem .75rem;
+    cursor: pointer;
+    font-size: .9rem;
+}
+
+.banco-lugar:hover { background: var(--bs-tertiary-bg); }
+.banco-lugar.aberto { background: var(--bs-secondary-bg); }
+.banco-lugar ::deep .foto-jogador { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+.escolhendo-lugar .banco-lugar.destino-ok { box-shadow: inset 3px 0 0 #f2cd5c; }
+
+.banco-num {
+    width: 1.4em;
+    flex-shrink: 0;
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    text-align: center;
+}
+
+.fora-do-time { transition: box-shadow .12s ease; }
+.fora-do-time.destino-ok { box-shadow: 0 0 0 2px #f2cd5c; }
+
+.fora-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: .35rem;
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.fora-jogador {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .25rem .4rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .45rem;
+    cursor: grab;
+    font-size: .82rem;
+    background: var(--bs-body-bg);
+}
+
+.fora-jogador > span.text-truncate { flex: 1; min-width: 0; }
+.fora-jogador:hover { background: var(--bs-tertiary-bg); }
+.fora-jogador.selecionado { border-color: #f2cd5c; box-shadow: 0 0 0 1px #f2cd5c; }
+.fora-jogador ::deep .foto-jogador { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+.lugar[draggable="true"], .banco-lugar[draggable="true"] { cursor: grab; }

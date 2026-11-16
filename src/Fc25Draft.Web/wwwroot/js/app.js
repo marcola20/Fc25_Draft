@@ -683,3 +683,12 @@ window.cbfvAbas = (function () {
         }
     };
 })();
+
+// Arrastar jogador na montagem da escalação: o Firefox só começa a arrastar se o dataTransfer tiver algum dado,
+// e o Blazor não preenche. O resto (onde soltou) fica com o Blazor.
+document.addEventListener('dragstart', (e) => {
+    if (e.target instanceof Element && e.target.closest('[data-arrastavel]') && e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', 'jogador'); } catch { /* ignorado */ }
+    }
+}, true);
