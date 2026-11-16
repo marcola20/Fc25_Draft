@@ -23,7 +23,7 @@ public static class LineupTemplateCatalog
     private static readonly short[] MAT  = { 6, 7, 8, 9, 10, 11, 12, 13 };
     private static readonly short[] PE   = { 7, 8, 9, 10, 11, 12, 13 };
     private static readonly short[] PD   = { 7, 8, 9, 10, 11, 12, 13 };
-    private static readonly short[] CA   = { 7, 9, 11, 12, 13 };
+    private static readonly short[] CA   = { 7, 8, 9, 10, 11, 12, 13 };
     private static readonly short[] SA   = { 7, 8, 9, 10, 11, 12, 13 };
 
     private static readonly IReadOnlyDictionary<string, LineupTemplate> Templates = BuildTemplates();
