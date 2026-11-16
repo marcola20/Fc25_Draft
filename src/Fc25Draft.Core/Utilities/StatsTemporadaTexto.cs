@@ -31,9 +31,9 @@ public static class StatsTemporadaTexto
         if (!encerrada)
             texto.AppendLine("_(competição em andamento)_");
 
-        Secao(texto, "⚽ *ARTILHARIA*", gols, v => Contagem(v, "gol", "gols"));
-        Secao(texto, "🅰️ *ASSISTÊNCIAS*", assistencias, v => Contagem(v, "assistência", "assistências"));
-        Secao(texto, "🧤 *CLEAN SHEETS*", cleanSheets, v => Contagem(v, "jogo", "jogos"));
+        Secao(texto, "⚽ *ARTILHARIA*", gols, v => $"{(int)v}G");
+        Secao(texto, "🅰️ *ASSISTÊNCIAS*", assistencias, v => $"{(int)v}A");
+        Secao(texto, "🧤 *CLEAN SHEETS*", cleanSheets, v => $"{(int)v}CS");
 
         var tituloNota = minimoDeJogosComNota > 1
             ? $"⭐ *MELHOR NOTA* _(mín. {minimoDeJogosComNota} jogos)_"
@@ -75,15 +75,9 @@ public static class StatsTemporadaTexto
         texto.AppendLine(titulo);
         foreach (var (posicao, valor, jogadores) in top)
         {
-            texto.Append(Medalhas[posicao - 1]).Append(' ')
-                 .Append(string.Join(", ", jogadores.Select(j => $"{j.Nome} ({j.TimeNome})")))
-                 .Append(" — ").AppendLine(formatar(valor));
+            foreach (var j in jogadores)
+                texto.Append(Medalhas[posicao - 1]).Append(' ').Append(formatar(valor))
+                     .Append(" | ").Append(j.Nome).Append(" (").Append(j.TimeNome).AppendLine(")");
         }
-    }
-
-    private static string Contagem(decimal valor, string singular, string plural)
-    {
-        var n = (int)valor;
-        return $"{n} {(n == 1 ? singular : plural)}";
     }
 }
