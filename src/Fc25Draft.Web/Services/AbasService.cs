@@ -189,6 +189,22 @@ public sealed class AbasService
         return destino;
     }
 
+    /// <summary>Fecha todas as abas menos a Central. Se a ativa fechou, devolve a Central para ir.</summary>
+    public Aba? FecharTodas()
+    {
+        var fechadas = _abas.Where(a => !a.Fixa).ToList();
+        if (fechadas.Count == 0) return null;
+
+        foreach (var aba in fechadas)
+        {
+            _abas.Remove(aba);
+            aba.Instancia = null;
+        }
+
+        Mudou?.Invoke();
+        return Ativa is not null && fechadas.Contains(Ativa) ? _abas[0] : null;
+    }
+
     /// <summary>O login mudou: as páginas escondidas dormem, para nenhuma de admin ficar viva depois de sair.</summary>
     public void AoMudarLogin()
     {

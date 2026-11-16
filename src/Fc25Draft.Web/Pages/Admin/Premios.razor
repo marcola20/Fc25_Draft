@@ -219,9 +219,11 @@
                             }
                             else
                             {
-                                var termo = _busca.GetValueOrDefault(regra.Categoria) ?? "";
-                                <input class="form-control form-control-sm" style="max-width:20rem;" placeholder="Buscar jogador para adicionar…"
-                                       value="@termo" @oninput="e => Buscar(regra.Categoria, e.Value?.ToString())" />
+                                @* Sem value="@..." de propósito: o servidor reescrevendo o campo no meio da digitação
+                                   embaralhava as letras. Para limpar depois de adicionar, o @key troca e o campo nasce vazio. *@
+                                <input @key="@($"{regra.Categoria}-{_limpezas.GetValueOrDefault(regra.Categoria)}")"
+                                       class="form-control form-control-sm" style="max-width:20rem;" placeholder="Buscar jogador para adicionar…"
+                                       autocomplete="off" @oninput="e => Buscar(regra.Categoria, e.Value?.ToString())" />
                                 @if (_achados.GetValueOrDefault(regra.Categoria) is { Count: > 0 } achados)
                                 {
                                     <div class="list-group mt-1" style="max-width:28rem;">
@@ -261,6 +263,7 @@
     private string? _treinadorEscolhido;
     private readonly Dictionary<CategoriaPremio, string> _busca = new();
     private readonly Dictionary<CategoriaPremio, IReadOnlyList<PremioJogadorOpcaoDto>> _achados = new();
+    private readonly Dictionary<CategoriaPremio, int> _limpezas = new();
 
     // +1 over: quem recebe (o próprio vencedor ou um companheiro) e os companheiros de cada vencedor.
     private readonly Dictionary<Guid, int?> _overPara = new();
@@ -288,7 +291,8 @@
     {
         if (!int.TryParse(e.Value?.ToString(), out var t)) return;
         _temporada = t;
-        _busca.Clear(); _achados.Clear(); _companheiros.Clear(); _overPara.Clear();
+        foreach (var c in _busca.Keys.ToList()) LimparBusca(c);
+        _achados.Clear(); _companheiros.Clear(); _overPara.Clear();
         await Carregar();
     }
 
@@ -358,9 +362,14 @@
         _busca[categoria] = termo ?? "";
         if ((termo?.Trim().Length ?? 0) < 2) { _achados.Remove(categoria); return; }
 
+        // Espera a pessoa parar de digitar: busca só o último termo, não uma por letra.
+        await Task.Delay(250);
+        if (_busca.GetValueOrDefault(categoria) != termo) return;
+
         await _umaPorVez.WaitAsync();
         try
         {
+            if (_busca.GetValueOrDefault(categoria) != termo) return;
             var achados = await PremiosSvc.BuscarJogadoresAsync(termo!, CancellationToken.None);
             // Só vale a resposta da última busca digitada.
             if (_busca.GetValueOrDefault(categoria) == termo) _achados[categoria] = achados;
@@ -371,7 +380,14 @@
     private async Task Adicionar(CategoriaPremio categoria, int playerId)
     {
         await Fazer(() => PremiosSvc.AdicionarJogadorAsync(_temporada, categoria, playerId, default));
-        if (_erro is null) { _busca.Remove(categoria); _achados.Remove(categoria); }
+        if (_erro is null) LimparBusca(categoria);
+    }
+
+    private void LimparBusca(CategoriaPremio categoria)
+    {
+        _busca.Remove(categoria);
+        _achados.Remove(categoria);
+        _limpezas[categoria] = _limpezas.GetValueOrDefault(categoria) + 1;
     }
 
     private static string Etapa(SituacaoVotacao s) => s switch

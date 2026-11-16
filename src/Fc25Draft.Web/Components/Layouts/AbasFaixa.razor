@@ -54,6 +54,14 @@
             </ul>
         }
     </div>
+
+    @if (Abas.Abas.Count(a => !a.Fixa) >= 2)
+    {
+        <button type="button" class="abas-fechar-todas" title="Fechar todas as abas (fica só a Central)" @onclick="FecharTodas">
+            <Icone Nome="x" Tamanho="14" />
+            <span>Fechar todas</span>
+        </button>
+    }
 </nav>
 
 @code {
@@ -146,6 +154,13 @@
     {
         var vizinha = Abas.Fechar(aba);
         if (vizinha is not null) Ir(vizinha);
+    }
+
+    private void FecharTodas()
+    {
+        _menuAberto = false;
+        var destino = Abas.FecharTodas();
+        if (destino is not null) Ir(destino);
     }
 
     private void AoMudar() => _ = InvokeAsync(StateHasChanged);
