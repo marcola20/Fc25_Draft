@@ -1,0 +1,58 @@
+.formacoes-lista {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Metade de baixo do campo dos jogos: o gol embaixo, a linha do meio em cima. */
+.campo-previa {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: 6px;
+    background: #2f7d3b;
+    background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, .05) 0 12.5%, transparent 12.5% 25%);
+    overflow: hidden;
+}
+
+.campo-area {
+    position: absolute;
+    left: 25%;
+    right: 25%;
+    bottom: 0;
+    height: 22%;
+    border: 2px solid rgba(255, 255, 255, .55);
+    border-bottom: 0;
+}
+
+.campo-previa::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    border-top: 2px solid rgba(255, 255, 255, .55);
+}
+
+.campo-ponto {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: auto;
+}
+
+.campo-bola {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #1d4d25;
+}
+
+.campo-rotulo {
+    font-size: .65rem;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}

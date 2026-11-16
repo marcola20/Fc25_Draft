@@ -52,6 +52,16 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
     await db.Database.MigrateAsync();
 
+    // Formações e posições da escalação editadas em /admin/formacoes (sem nada salvo, vale o catálogo de fábrica).
+    try
+    {
+        await scope.ServiceProvider.GetRequiredService<ICatalogoEscalacaoService>().CarregarAsync(CancellationToken.None);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao carregar o catálogo da escalação; seguindo com o de fábrica");
+    }
+
     // País dos jogadores que ainda não têm (vem da nacionalidade na base do PES).
     try
     {

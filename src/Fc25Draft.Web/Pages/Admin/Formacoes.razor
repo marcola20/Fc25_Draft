@@ -1,0 +1,528 @@
+@page "/admin/formacoes"
+@using System.Text.Json
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Extensions
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ICatalogoEscalacaoService CatalogoSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Formações e Posições — Admin</PageTitle>
+
+<div>
+    @if (_erros.Count > 0)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            <div class="fw-semibold mb-1">Não deu para salvar:</div>
+            <ul class="mb-0 ps-3">
+                @foreach (var e in _erros) { <li>@e</li> }
+            </ul>
+            <button type="button" class="btn-close" @onclick="() => _erros.Clear()"></button>
+        </div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        var problemas = Problemas();
+        var alterado = Alterado();
+
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+            <ul class="nav nav-tabs flex-grow-1">
+                <li class="nav-item">
+                    <button class="nav-link @(_aba == "formacoes" ? "active" : "")" @onclick='() => _aba = "formacoes"'>
+                        Formações <span class="badge bg-secondary">@_formacoes.Count</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_aba == "posicoes" ? "active" : "")" @onclick='() => _aba = "posicoes"'>
+                        Posições <span class="badge bg-secondary">@_posicoes.Count</span>
+                    </button>
+                </li>
+            </ul>
+            @if (alterado)
+            {
+                <span class="badge bg-warning text-dark">Alterações não salvas</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="Descartar" disabled="@_salvando">
+                    <Icone Nome="rotate-ccw" Tamanho="14" /> Descartar
+                </button>
+            }
+            <button class="btn btn-sm btn-primary" @onclick="SalvarAsync" disabled="@(_salvando || !alterado || problemas.Count > 0)">
+                <Icone Nome="save" Tamanho="14" /> @(_salvando ? "Salvando..." : "Salvar")
+            </button>
+        </div>
+
+        @if (problemas.Count > 0)
+        {
+            <div class="alert alert-warning small py-2">
+                <div class="fw-semibold">Arrume antes de salvar:</div>
+                <ul class="mb-0 ps-3">
+                    @foreach (var p in problemas.Take(8)) { <li>@p</li> }
+                    @if (problemas.Count > 8) { <li>e mais @(problemas.Count - 8)...</li> }
+                </ul>
+            </div>
+        }
+
+        @if (_aba == "formacoes")
+        {
+            <div class="row g-3">
+                <div class="col-lg-3">
+                    <div class="list-group small formacoes-lista">
+                        @foreach (var item in _formacoes.OrderBy(x => x.Nome, StringComparer.OrdinalIgnoreCase))
+                        {
+                            var usoItem = EmUso(item);
+                            <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-1 @(item == _sel ? "active" : "")"
+                                    @onclick="() => _sel = item">
+                                <span class="flex-grow-1 text-truncate @(item.Ativa ? "" : "text-decoration-line-through opacity-75")">@(string.IsNullOrWhiteSpace(item.Nome) ? "(sem nome)" : item.Nome)</span>
+                                @if (EhPadrao(item)) { <span title="Formação padrão"><Icone Nome="star" Tamanho="13" /></span> }
+                                @if (usoItem > 0) { <span class="badge @(item == _sel ? "bg-light text-dark" : "bg-secondary")" title="Escalações salvas que usam">@usoItem</span> }
+                            </button>
+                        }
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary w-100 mt-2" @onclick="NovaFormacao">
+                        <Icone Nome="plus" Tamanho="14" /> Nova formação
+                    </button>
+                </div>
+
+                <div class="col-lg-9">
+                    @if (_sel is { } f)
+                    {
+                        var uso = EmUso(f);
+                        var travada = uso > 0;
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row g-2 align-items-end mb-3">
+                                    <div class="col-md-5">
+                                        <label class="form-label small mb-0">Nome</label>
+                                        <input class="form-control form-control-sm" @bind="f.Nome" @bind:event="oninput"
+                                               maxlength="@LineupTemplateCatalog.MaxNomeFormacao" disabled="@travada"
+                                               title="@(travada ? "Usada por escalações salvas: o nome não pode mudar" : null)" />
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="form-check form-switch mb-1">
+                                            <input class="form-check-input" type="checkbox" id="ativa" @bind="f.Ativa" disabled="@EhPadrao(f)" />
+                                            <label class="form-check-label small" for="ativa">Ativa (aparece para os times)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto ms-auto d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => _padrao = f" disabled="@(EhPadrao(f) || !f.Ativa)"
+                                                title="Formação que uma escalação nova começa usando">
+                                            <Icone Nome="star" Tamanho="14" /> @(EhPadrao(f) ? "É a padrão" : "Tornar padrão")
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => Duplicar(f)">
+                                            <Icone Nome="copy" Tamanho="14" /> Duplicar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(f)" disabled="@(travada || EhPadrao(f))"
+                                                title="@(travada ? "Usada por escalações salvas: só dá para desativar" : EhPadrao(f) ? "Escolha outra padrão antes" : "Excluir")">
+                                            <Icone Nome="x" Tamanho="14" /> Excluir
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if (travada)
+                                {
+                                    <div class="small text-muted mb-2">
+                                        <Icone Nome="lock" Tamanho="13" />
+                                        Usada por @uso escalação(ões) salva(s): dá para mudar o nome dos lugares, a posição e a ordem,
+                                        mas não o nome da formação nem os códigos. Para outro desenho, duplique.
+                                    </div>
+                                }
+
+                                <div class="row g-3">
+                                    <div class="col-xl-8">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-1">
+                                                <thead class="table-light small">
+                                                    <tr>
+                                                        <th>Código</th>
+                                                        <th>Nome do lugar</th>
+                                                        <th style="width:11rem">Posição</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @for (var i = 0; i < f.Lugares.Count; i++)
+                                                    {
+                                                        var idx = i;
+                                                        var l = f.Lugares[i];
+                                                        var pos = _posicoes.FirstOrDefault(p => Igual(p.Codigo, l.Posicao));
+                                                        <tr>
+                                                            <td>
+                                                                <input style="min-width:4.5rem" class="form-control form-control-sm text-uppercase @(CampoDaEscalacao.ConheceOCodigo(l.Codigo) ? "" : "border-warning")"
+                                                                       list="codigos-lugar" @bind="l.Codigo" @bind:event="oninput"
+                                                                       maxlength="@LineupTemplateCatalog.MaxCodigoLugar" disabled="@travada"
+                                                                       title="@(CampoDaEscalacao.ConheceOCodigo(l.Codigo) ? "Onde aparece no campo" : "Código sem lugar no campo desenhado: o jogador aparece pela posição natural dele")" />
+                                                            </td>
+                                                            <td>
+                                                                <input class="form-control form-control-sm" @bind="l.Nome" @bind:event="oninput" maxlength="@LineupTemplateCatalog.MaxNomeLugar" />
+                                                                <div class="small text-muted mt-1">
+                                                                    @if (pos is null) { <span class="text-danger">escolha a posição</span> }
+                                                                    else { <span>Podem jogar: @Siglas(pos.PodemJogar)</span> }
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="l.Posicao">
+                                                                    @if (pos is null) { <option value="">—</option> }
+                                                                    @foreach (var p in _posicoes)
+                                                                    {
+                                                                        <option value="@p.Codigo">@p.Codigo — @p.Nome</option>
+                                                                    }
+                                                                </select>
+                                                            </td>
+                                                            <td class="text-nowrap text-end">
+                                                                <button class="btn btn-sm btn-link p-0 px-1" @onclick="() => Mover(f, idx, -1)" disabled="@(idx == 0)" title="Subir"><Icone Nome="arrow-up" Tamanho="14" /></button>
+                                                                <button class="btn btn-sm btn-link p-0 px-1" @onclick="() => Mover(f, idx, 1)" disabled="@(idx == f.Lugares.Count - 1)" title="Descer"><Icone Nome="arrow-down" Tamanho="14" /></button>
+                                                                <button class="btn btn-sm btn-link text-danger p-0 px-1" @onclick="() => f.Lugares.RemoveAt(idx)" disabled="@travada" title="Tirar o lugar"><Icone Nome="x" Tamanho="14" /></button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => f.Lugares.Add(new LugarEdit { Posicao = _posicoes.FirstOrDefault()?.Codigo ?? string.Empty })"
+                                                    disabled="@(travada || f.Lugares.Count >= LineupTemplateCatalog.TitularesPorFormacao)">
+                                                <Icone Nome="plus" Tamanho="14" /> Lugar
+                                            </button>
+                                            <span class="small @(f.Lugares.Count == LineupTemplateCatalog.TitularesPorFormacao ? "text-muted" : "text-danger")">
+                                                @f.Lugares.Count de @LineupTemplateCatalog.TitularesPorFormacao lugares · mais @LineupTemplateCatalog.ReservasPorFormacao reservas (fixos)
+                                            </span>
+                                        </div>
+                                        <div class="small text-muted mt-2">
+                                            O código (GK, LCB, CDM1...) fica gravado na escalação e diz onde o jogador aparece no campo;
+                                            números vão da esquerda para a direita. A ordem da lista é a ordem na tela do time.
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-4">
+                                        <div class="campo-previa">
+                                            <div class="campo-area"></div>
+                                            @foreach (var ponto in Previa(f))
+                                            {
+                                                <div class="campo-ponto" style="left:@ponto.X.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%;top:@ponto.Y.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"
+                                                     title="@ponto.Nome">
+                                                    <span class="campo-bola"></span>
+                                                    <span class="campo-rotulo">@ponto.Rotulo</span>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="small text-muted text-center mt-1">Como aparece no campo dos jogos</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">Escolha uma formação.</div>
+                    }
+                </div>
+            </div>
+
+            <datalist id="codigos-lugar">
+                @foreach (var c in CodigosSugeridos) { <option value="@c"></option> }
+            </datalist>
+        }
+        else
+        {
+            <p class="small text-muted">
+                Cada lugar das formações usa uma posição; aqui você diz quais posições do PES podem jogar nela.
+                Para um lugar com regra própria, crie uma posição nova e escolha-a no lugar.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Código</th>
+                            <th style="min-width:10rem">Nome</th>
+                            @foreach (var (id, sigla) in LineupTemplateCatalog.SiglasPes)
+                            {
+                                <th class="text-center px-1" title="@(((int)id).ToPositionName())">@sigla</th>
+                            }
+                            <th>Usada em</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _posicoes)
+                        {
+                            var usos = UsosDaPosicao(p);
+                            <tr>
+                                <td>
+                                    <input class="form-control form-control-sm text-uppercase" style="min-width:4.5rem" value="@p.Codigo"
+                                           @onchange="e => RenomearPosicao(p, e.Value?.ToString())"
+                                           maxlength="@LineupTemplateCatalog.MaxCodigoPosicao" disabled="@(!p.Nova)"
+                                           title="@(p.Nova ? null : "O código de uma posição salva não muda")" />
+                                </td>
+                                <td><input class="form-control form-control-sm" @bind="p.Nome" @bind:event="oninput" maxlength="@LineupTemplateCatalog.MaxNomePosicao" /></td>
+                                @foreach (var id in LineupTemplateCatalog.SiglasPes.Keys)
+                                {
+                                    var pid = id;
+                                    <td class="text-center px-1">
+                                        <input class="form-check-input" type="checkbox" checked="@p.PodemJogar.Contains(pid)"
+                                               @onchange="e => Marcar(p, pid, e.Value is true)" />
+                                    </td>
+                                }
+                                <td class="small text-muted text-nowrap" title="@(usos.Lugares == 0 ? null : $"{usos.Lugares} lugar(es) em {usos.Formacoes} formação(ões)")">
+                                    @(usos.Lugares == 0 ? "—" : $"{usos.Formacoes} form.")
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => _posicoes.Remove(p)" disabled="@(usos.Lugares > 0)"
+                                            title="@(usos.Lugares > 0 ? "Em uso nas formações" : "Excluir")"><Icone Nome="x" Tamanho="14" /></button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" @onclick="() => _posicoes.Add(new PosicaoEdit { Nova = true })">
+                <Icone Nome="plus" Tamanho="14" /> Nova posição
+            </button>
+        }
+
+        @if (_atualizadoEm is { } quando)
+        {
+            <div class="small text-muted mt-3">Última alteração salva em @quando.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</div>
+        }
+        else
+        {
+            <div class="small text-muted mt-3">Ainda vale o catálogo de fábrica (nada salvo por aqui).</div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly string[] CodigosSugeridos =
+    {
+        "GK", "LB", "ADE", "LCB", "CCB", "RCB", "RB", "ADD", "CDM", "CDM1", "CDM2", "CDM3", "LM", "CM", "CM1", "CM2", "CM3", "RM",
+        "CAM", "CAM1", "CAM2", "CAM3", "MAT", "MAT1", "MAT2", "SA", "SA1", "SA2", "LW", "ST", "ST1", "ST2", "CA1", "CA2", "RW"
+    };
+
+    private sealed class PosicaoEdit
+    {
+        public string Codigo { get; set; } = string.Empty;
+        public string Nome { get; set; } = string.Empty;
+        public SortedSet<short> PodemJogar { get; set; } = new();
+        public bool Nova { get; set; }
+    }
+
+    private sealed class LugarEdit
+    {
+        public string Codigo { get; set; } = string.Empty;
+        public string Nome { get; set; } = string.Empty;
+        public string Posicao { get; set; } = string.Empty;
+    }
+
+    private sealed class FormacaoEdit
+    {
+        public string Nome { get; set; } = string.Empty;
+        /// <summary>Nome com que está salva (nulo se nova): é por ele que as escalações a acham.</summary>
+        public string? NomeSalvo { get; set; }
+        public bool Ativa { get; set; } = true;
+        public List<LugarEdit> Lugares { get; set; } = new();
+    }
+
+    private sealed record PontoPrevia(double X, double Y, string Rotulo, string Nome);
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string _aba = "formacoes";
+    private string? _ok;
+    private readonly List<string> _erros = new();
+
+    private List<PosicaoEdit> _posicoes = new();
+    private List<FormacaoEdit> _formacoes = new();
+    private FormacaoEdit? _sel;
+    private FormacaoEdit? _padrao;
+    private IReadOnlyDictionary<string, int> _emUso = new Dictionary<string, int>();
+    private DateTime? _atualizadoEm;
+    private string _salvoJson = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/formacoes"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await CarregarAsync(); }
+        catch (Exception ex) { _erros.Add(ex.Message); }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarAsync()
+    {
+        var dados = await CatalogoSvc.ObterAsync(CancellationToken.None);
+        _emUso = dados.EscalacoesPorFormacao;
+        _atualizadoEm = dados.AtualizadoEm;
+        Preencher(dados.Catalogo);
+    }
+
+    private void Preencher(CatalogoEscalacao catalogo)
+    {
+        var nomeSel = _sel?.NomeSalvo;
+        _posicoes = catalogo.Posicoes
+            .Select(p => new PosicaoEdit { Codigo = p.Codigo, Nome = p.Nome, PodemJogar = new SortedSet<short>(p.PodemJogar) })
+            .ToList();
+        _formacoes = catalogo.Formacoes
+            .Select(f => new FormacaoEdit
+            {
+                Nome = f.Nome,
+                NomeSalvo = f.Nome,
+                Ativa = f.Ativa,
+                Lugares = f.Lugares.Select(l => new LugarEdit { Codigo = l.Codigo, Nome = l.Nome, Posicao = l.Posicao }).ToList()
+            })
+            .ToList();
+        _padrao = _formacoes.FirstOrDefault(f => Igual(f.Nome, catalogo.Padrao));
+        _sel = _formacoes.FirstOrDefault(f => Igual(f.NomeSalvo, nomeSel)) ?? _padrao ?? _formacoes.FirstOrDefault();
+        _salvoJson = JsonSerializer.Serialize(LineupTemplateCatalog.Normalizar(Montar()));
+    }
+
+    private CatalogoEscalacao Montar() => new(
+        _padrao?.Nome ?? string.Empty,
+        _posicoes.Select(p => new PosicaoDaEscalacao(p.Codigo, p.Nome, p.PodemJogar.ToArray())).ToList(),
+        _formacoes.Select(f => new FormacaoDaEscalacao(f.Nome, f.Ativa,
+            f.Lugares.Select(l => new LugarDaFormacao(l.Codigo, l.Nome, l.Posicao)).ToList())).ToList());
+
+    private bool Alterado() => JsonSerializer.Serialize(LineupTemplateCatalog.Normalizar(Montar())) != _salvoJson;
+
+    private IReadOnlyList<string> Problemas() => LineupTemplateCatalog.Validar(LineupTemplateCatalog.Normalizar(Montar()));
+
+    private async Task SalvarAsync()
+    {
+        _erros.Clear();
+        _ok = null;
+        _salvando = true;
+        try
+        {
+            await CatalogoSvc.SalvarAsync(Montar(), CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Formações e posições salvas. Já valem para as escalações dos times.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            _erros.AddRange(ex.Message.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+        }
+        catch (Exception ex)
+        {
+            _erros.Add(ex.Message);
+        }
+        finally { _salvando = false; }
+    }
+
+    private void Descartar()
+    {
+        _erros.Clear();
+        _ok = null;
+        Preencher(LineupTemplateCatalog.Atual);
+    }
+
+    private int EmUso(FormacaoEdit f)
+        => f.NomeSalvo is not null && _emUso.TryGetValue(f.NomeSalvo, out var n) ? n : 0;
+
+    private bool EhPadrao(FormacaoEdit f) => ReferenceEquals(f, _padrao);
+
+    private void NovaFormacao()
+    {
+        var modelo = _padrao ?? _formacoes.FirstOrDefault();
+        var nova = new FormacaoEdit
+        {
+            Nome = NomeLivre("Nova formação"),
+            Lugares = modelo?.Lugares.Select(l => new LugarEdit { Codigo = l.Codigo, Nome = l.Nome, Posicao = l.Posicao }).ToList() ?? new()
+        };
+        _formacoes.Add(nova);
+        _sel = nova;
+    }
+
+    private void Duplicar(FormacaoEdit f)
+    {
+        var copia = new FormacaoEdit
+        {
+            Nome = NomeLivre(f.Nome),
+            Ativa = f.Ativa,
+            Lugares = f.Lugares.Select(l => new LugarEdit { Codigo = l.Codigo, Nome = l.Nome, Posicao = l.Posicao }).ToList()
+        };
+        _formacoes.Add(copia);
+        _sel = copia;
+    }
+
+    private void Excluir(FormacaoEdit f)
+    {
+        _formacoes.Remove(f);
+        if (_sel == f) _sel = _padrao ?? _formacoes.FirstOrDefault();
+    }
+
+    // "4-3-3 (P)" vira "4-3-3 (P) 2", "... 3"...; cabe no limite de caracteres do nome.
+    private string NomeLivre(string baseNome)
+    {
+        baseNome = baseNome.Trim();
+        if (!_formacoes.Any(f => Igual(f.Nome, baseNome)) && baseNome.Length <= LineupTemplateCatalog.MaxNomeFormacao)
+            return baseNome;
+        for (var n = 2; ; n++)
+        {
+            var sufixo = $" {n}";
+            var corpo = baseNome.Length + sufixo.Length > LineupTemplateCatalog.MaxNomeFormacao
+                ? baseNome[..(LineupTemplateCatalog.MaxNomeFormacao - sufixo.Length)].TrimEnd()
+                : baseNome;
+            var nome = corpo + sufixo;
+            if (!_formacoes.Any(f => Igual(f.Nome, nome))) return nome;
+        }
+    }
+
+    private static void Mover(FormacaoEdit f, int i, int passo)
+    {
+        var j = i + passo;
+        if (j < 0 || j >= f.Lugares.Count) return;
+        (f.Lugares[i], f.Lugares[j]) = (f.Lugares[j], f.Lugares[i]);
+    }
+
+    private (int Lugares, int Formacoes) UsosDaPosicao(PosicaoEdit p)
+    {
+        var formacoes = _formacoes.Where(f => f.Lugares.Any(l => Igual(l.Posicao, p.Codigo))).ToList();
+        return (formacoes.Sum(f => f.Lugares.Count(l => Igual(l.Posicao, p.Codigo))), formacoes.Count);
+    }
+
+    // Só posição nova muda de código; os lugares que já apontavam para ela vão junto.
+    private void RenomearPosicao(PosicaoEdit p, string? codigo)
+    {
+        var novo = (codigo ?? string.Empty).Trim().ToUpperInvariant();
+        foreach (var l in _formacoes.SelectMany(f => f.Lugares).Where(l => !string.IsNullOrEmpty(p.Codigo) && Igual(l.Posicao, p.Codigo)))
+            l.Posicao = novo;
+        p.Codigo = novo;
+    }
+
+    private static void Marcar(PosicaoEdit p, short id, bool marcado)
+    {
+        if (marcado) p.PodemJogar.Add(id);
+        else p.PodemJogar.Remove(id);
+    }
+
+    private static string Siglas(IEnumerable<short> ids)
+    {
+        var lista = ids.Select(id => LineupTemplateCatalog.SiglasPes.TryGetValue(id, out var s) ? s : id.ToString()).ToList();
+        return lista.Count == 0 ? "ninguém" : string.Join(" · ", lista);
+    }
+
+    // O campo dos jogos mostra o mandante na metade de baixo (Y de 50 a 100); aqui essa metade ocupa o quadro todo.
+    private static IEnumerable<PontoPrevia> Previa(FormacaoEdit f)
+    {
+        var lugares = f.Lugares.Select((l, i) => (JogadorId: i, SlotCode: (string?)l.Codigo, PositionId: 0)).ToList();
+        foreach (var p in CampoDaEscalacao.Posicionar(lugares, mandante: true))
+        {
+            var l = f.Lugares[p.JogadorId];
+            var y = Math.Clamp((p.Y - 50) * 2, 4, 96);
+            yield return new PontoPrevia(p.X, y, string.IsNullOrWhiteSpace(l.Codigo) ? "?" : l.Codigo.ToUpperInvariant(), l.Nome);
+        }
+    }
+
+    private static bool Igual(string? a, string? b) => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
+}

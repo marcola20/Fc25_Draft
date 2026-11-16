@@ -114,6 +114,7 @@ public class LayoutNavigationService
             new("Gerenciar Treinadores", "/admin/treinadores", "user"),
             new("Cadastro de Times", "/teams", "plus"),
             new("Gerenciar Escalações", "/admin/escalacoes", "users"),
+            new("Formações e Posições", "/admin/formacoes", "goal"),
             new("Configurações", "/admin/configuracoes", "settings"),
             new("Administradores", "/admin/administradores", "key", RequiredRole: "AdminPrincipal")
         }, RequiredRole: "Admin", CollapseByDefault: true)
@@ -434,6 +435,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Draft de Expansão")
+            }
+        },
+        ["/admin/formacoes"] = new PageDefinition
+        {
+            Route = "/admin/formacoes",
+            Title = "Formações e Posições",
+            Subtitle = "As formações da escalação e quem pode jogar em cada lugar — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Formações e Posições")
             }
         },
         ["/admin/configuracoes"] = new PageDefinition

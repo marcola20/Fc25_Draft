@@ -48,6 +48,9 @@ public static class CampoDaEscalacao
         return resultado;
     }
 
+    /// <summary>Se o código do lugar tem posição no campo desenhado (senão vale a posição natural do jogador).</summary>
+    public static bool ConheceOCodigo(string? codigo) => PeloCodigo(codigo) is not null;
+
     private readonly record struct Lugar(int Linha, double Lado);
 
     /// <summary>Pelo código do lugar na escalação. Números (CDM1, CAM2...) vão da esquerda para a direita.</summary>

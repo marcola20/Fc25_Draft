@@ -1,654 +1,178 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Fc25Draft.Core.DTOs;
 
 namespace Fc25Draft.Core.Utilities;
 
-// Position IDs (PES 2021):
-//  1=GOL  2=ZAG  3=LE   4=LD   5=VOL
-//  6=MLG  7=MAT  8=ME   9=PE   10=MD  11=PD  12=CA  13=SA
-
+/// <summary>
+/// As formações da escalação e quem pode jogar em cada lugar. Os dados vêm do <see cref="CatalogoEscalacao"/>
+/// salvo no banco (editado em /admin/formacoes, carregado na subida do site); sem nada salvo, vale o
+/// <see cref="CatalogoEscalacaoPadrao"/>. Fica em memória: quem salva o catálogo chama <see cref="Usar"/>.
+/// </summary>
 public static class LineupTemplateCatalog
 {
-    public const string DefaultFormation = "4-3-3 (4-2-1-3)";
+    public const int TitularesPorFormacao = 11;
+    public const int ReservasPorFormacao = 7;
 
-    private static readonly short[] GOL  = { 1 };
-    private static readonly short[] ZAG  = { 2, 3, 4, 5 };
-    private static readonly short[] LE   = { 2, 3, 4, 5, 6, 8, 9 };
-    private static readonly short[] LD   = { 2, 3, 4, 5, 6, 10, 11 };
-    private static readonly short[] VOL  = { 3, 4, 5, 6, 7 };
-    private static readonly short[] MLG  = { 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-    private static readonly short[] ME   = { 3, 4, 7, 8, 9, 13 };
-    private static readonly short[] MD   = { 3, 4, 7, 10, 11, 13 };
-    private static readonly short[] MAT  = { 6, 7, 8, 9, 10, 11, 12, 13 };
-    private static readonly short[] PE   = { 7, 8, 9, 10, 11, 12, 13 };
-    private static readonly short[] PD   = { 7, 8, 9, 10, 11, 12, 13 };
-    private static readonly short[] CA   = { 7, 8, 9, 10, 11, 12, 13 };
-    private static readonly short[] SA   = { 7, 8, 9, 10, 11, 12, 13 };
+    /// <summary>Limites das colunas onde a escalação grava a formação e o lugar.</summary>
+    public const int MaxNomeFormacao = 20, MaxCodigoLugar = 20, MaxNomeLugar = 80;
+    public const int MaxCodigoPosicao = 10, MaxNomePosicao = 40;
 
-    private static readonly IReadOnlyDictionary<string, LineupTemplate> Templates = BuildTemplates();
+    /// <summary>Sigla de cada posição do PES 2021 pelo id (1=GOL ... 13=SA).</summary>
+    public static readonly IReadOnlyDictionary<short, string> SiglasPes = new Dictionary<short, string>
+    {
+        [1] = "GOL", [2] = "ZAG", [3] = "LE", [4] = "LD", [5] = "VOL", [6] = "MLG", [7] = "MAT",
+        [8] = "ME", [9] = "PE", [10] = "MD", [11] = "PD", [12] = "CA", [13] = "SA"
+    };
 
-    private static readonly LineupTemplate DefaultTemplate = Templates[DefaultFormation];
+    private static Snapshot _atual = new(Normalizar(CatalogoEscalacaoPadrao.Criar()));
 
+    /// <summary>O catálogo em uso.</summary>
+    public static CatalogoEscalacao Atual => _atual.Catalogo;
+
+    public static string DefaultFormation => _atual.Padrao.Formation;
+
+    /// <summary>Troca o catálogo em uso. Lança se ele não passar em <see cref="Validar"/>.</summary>
+    public static void Usar(CatalogoEscalacao catalogo)
+    {
+        catalogo = Normalizar(catalogo);
+        var erros = Validar(catalogo);
+        if (erros.Count > 0)
+            throw new InvalidOperationException(string.Join(" ", erros));
+        _atual = new Snapshot(catalogo);
+    }
+
+    /// <summary>A formação pelo nome (inclusive desativada, para quem já usa); vazio dá a padrão.</summary>
     public static LineupTemplate GetTemplateOrDefault(string? formation)
     {
+        var atual = _atual;
         if (string.IsNullOrWhiteSpace(formation))
-        {
-            return DefaultTemplate;
-        }
+            return atual.Padrao;
 
-        if (Templates.TryGetValue(formation.Trim(), out var template))
-        {
+        if (atual.Templates.TryGetValue(formation.Trim(), out var template))
             return template;
-        }
 
         throw new InvalidOperationException($"Formação '{formation}' não é suportada.");
     }
 
+    /// <summary>As formações que um time pode escolher (as ativas), em ordem alfabética.</summary>
     public static IReadOnlyList<string> GetSupportedFormations()
-    {
-        var formations = Templates.Values
-            .Select(t => t.Formation)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        => _atual.Catalogo.Formacoes
+            .Where(f => f.Ativa)
+            .Select(f => f.Nome)
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return Array.AsReadOnly(formations);
+    /// <summary>Tira espaços das pontas, põe os códigos em maiúsculas e ordena quem pode jogar.</summary>
+    public static CatalogoEscalacao Normalizar(CatalogoEscalacao catalogo)
+    {
+        ArgumentNullException.ThrowIfNull(catalogo);
+        static string T(string? s) => (s ?? string.Empty).Trim();
+        static string C(string? s) => T(s).ToUpperInvariant();
+
+        return new CatalogoEscalacao(
+            T(catalogo.Padrao),
+            (catalogo.Posicoes ?? Array.Empty<PosicaoDaEscalacao>())
+                .Select(p => new PosicaoDaEscalacao(C(p.Codigo), T(p.Nome),
+                    (p.PodemJogar ?? Array.Empty<short>()).Distinct().OrderBy(id => id).ToArray()))
+                .ToList(),
+            (catalogo.Formacoes ?? Array.Empty<FormacaoDaEscalacao>())
+                .Select(f => new FormacaoDaEscalacao(T(f.Nome), f.Ativa,
+                    (f.Lugares ?? Array.Empty<LugarDaFormacao>())
+                        .Select(l => new LugarDaFormacao(C(l.Codigo), T(l.Nome), C(l.Posicao)))
+                        .ToList()))
+                .ToList());
     }
 
-    private static IReadOnlyDictionary<string, LineupTemplate> BuildTemplates()
+    /// <summary>Os problemas do catálogo (já normalizado), em frases para mostrar ao admin. Vazio = pode usar.</summary>
+    public static IReadOnlyList<string> Validar(CatalogoEscalacao catalogo)
     {
-        return new Dictionary<string, LineupTemplate>(StringComparer.OrdinalIgnoreCase)
+        var erros = new List<string>();
+        var posicoes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (catalogo.Posicoes.Count == 0)
+            erros.Add("Cadastre pelo menos uma posição.");
+
+        foreach (var p in catalogo.Posicoes)
         {
-            ["4-4-2 (4-2-2-2) Padrão"] = new LineupTemplate(
-                "4-4-2 (4-2-2-2) Padrão",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                 false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",         false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",        false,  7, VOL),
-                    new("LM",   "Meia Esquerda (ME)",           false,  8, ME),
-                    new("RM",   "Meia Direita (MD)",            false,  9, MD),
-                    new("ST1",  "Centroavante (CA)",            false, 10, CA),
-                    new("ST2",  "Centroavante (CA)",            false, 11, CA)
-                },
-                CreateBenchTemplate()),
+            var nome = string.IsNullOrEmpty(p.Codigo) ? "Uma posição" : $"A posição {p.Codigo}";
+            if (string.IsNullOrEmpty(p.Codigo)) erros.Add("Toda posição precisa de um código.");
+            else if (p.Codigo.Length > MaxCodigoPosicao) erros.Add($"{nome}: o código vai até {MaxCodigoPosicao} letras.");
+            else if (!posicoes.Add(p.Codigo)) erros.Add($"O código de posição {p.Codigo} aparece mais de uma vez.");
 
-            ["4-5-1 (4-2-3-1)"] = new LineupTemplate(
-                "4-5-1 (4-2-3-1)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                 false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",         false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",        false,  7, VOL),
-                    new("LM",   "Meia Esquerda (ME)",           false,  8, ME),
-                    new("RM",   "Meia Direita (MD)",            false,  9, MD),
-                    new("CAM",  "Meia Atacante (MAT)",          false, 10, MAT),
-                    new("ST",   "Centroavante (CA)",            false, 11, CA)
-                },
-                CreateBenchTemplate()),
+            if (string.IsNullOrEmpty(p.Nome)) erros.Add($"{nome} precisa de um nome.");
+            else if (p.Nome.Length > MaxNomePosicao) erros.Add($"{nome}: o nome vai até {MaxNomePosicao} letras.");
 
-            ["4-5-1 (4-1-4-1)"] = new LineupTemplate(
-                "4-5-1 (4-1-4-1)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("LM",   "Meia Esquerda (ME)",               false,  7, ME),
-                    new("RM",   "Meia Direita (MD)",                false,  8, MD),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, MAT),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+            if (p.PodemJogar.Count == 0) erros.Add($"{nome}: marque quem pode jogar nela.");
+            if (p.PodemJogar.Any(id => !SiglasPes.ContainsKey(id))) erros.Add($"{nome}: posição do PES inválida.");
+        }
 
-            ["4-5-1 (4-3-2-1)"] = new LineupTemplate(
-                "4-5-1 (4-3-2-1)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, MLG),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, MAT),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+        var formacoes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!catalogo.Formacoes.Any(f => f.Ativa))
+            erros.Add("Deixe pelo menos uma formação ativa.");
 
-            ["4-4-2 (4-2-2-2)"] = new LineupTemplate(
-                "4-4-2 (4-2-2-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("LM",   "Meia Esquerda (ME)",               false,  8, ME),
-                    new("RM",   "Meia Direita (MD)",                false,  9, MD),
-                    new("ST1",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+        foreach (var f in catalogo.Formacoes)
+        {
+            var nome = string.IsNullOrEmpty(f.Nome) ? "Uma formação" : $"A formação {f.Nome}";
+            if (string.IsNullOrEmpty(f.Nome)) erros.Add("Toda formação precisa de um nome.");
+            else if (f.Nome.Length > MaxNomeFormacao) erros.Add($"{nome}: o nome vai até {MaxNomeFormacao} caracteres.");
+            else if (!formacoes.Add(f.Nome)) erros.Add($"Há duas formações chamadas {f.Nome}.");
 
-            ["4-4-2 (4-3-1-2)"] = new LineupTemplate(
-                "4-4-2 (4-3-1-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  9, MAT),
-                    new("ST1",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+            if (f.Lugares.Count != TitularesPorFormacao)
+                erros.Add($"{nome} tem {f.Lugares.Count} lugares; precisa de {TitularesPorFormacao}.");
+            if (f.Lugares.Count(l => l.Codigo == "GK") != 1)
+                erros.Add($"{nome} precisa de exatamente um lugar com o código GK (o goleiro).");
 
-            ["4-3-3 (4-2-1-3)"] = new LineupTemplate(
-                "4-3-3 (4-2-1-3)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",               false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",       false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",        false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",      false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",       false,  7, VOL),
-                    new("CAM",  "Meia Atacante (MAT)",         false,  8, MAT),
-                    new("LW",   "Ponta Esquerda (PE)",         false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",          false, 10, PD),
-                    new("ST",   "Centroavante (CA)",           false, 11, CA)
-                },
-                CreateBenchTemplate()),
+            var codigos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var l in f.Lugares)
+            {
+                if (string.IsNullOrEmpty(l.Codigo)) erros.Add($"{nome}: todo lugar precisa de um código.");
+                else if (l.Codigo.Length > MaxCodigoLugar) erros.Add($"{nome}: o código {l.Codigo} passa de {MaxCodigoLugar} letras.");
+                else if (l.Codigo.StartsWith("SUB", StringComparison.OrdinalIgnoreCase)) erros.Add($"{nome}: o código {l.Codigo} é reservado para os reservas.");
+                else if (!codigos.Add(l.Codigo)) erros.Add($"{nome}: o código {l.Codigo} aparece em dois lugares.");
 
-            ["4-3-3 (4-1-2-3)"] = new LineupTemplate(
-                "4-3-3 (4-1-2-3)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  7, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false,  8, MAT),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+                if (string.IsNullOrEmpty(l.Nome)) erros.Add($"{nome}: o lugar {l.Codigo} precisa de um nome.");
+                else if (l.Nome.Length > MaxNomeLugar) erros.Add($"{nome}: o nome do lugar {l.Codigo} passa de {MaxNomeLugar} letras.");
 
-            ["3-6-1 (3-2-4-1)"] = new LineupTemplate(
-                "3-6-1 (3-2-4-1)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",                false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",                 false,  4, ZAG),
-                    new("CDM1", "Volante Esquerdo (VOL)",           false,  5, VOL),
-                    new("CDM2", "Volante Direito (VOL)",            false,  6, VOL),
-                    new("LM",   "Meia Esquerda (ME)",               false,  7, ME),
-                    new("RM",   "Meia Direita (MD)",                false,  8, MD),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  9, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false, 10, MAT),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+                if (!posicoes.Contains(l.Posicao))
+                    erros.Add($"{nome}: o lugar {l.Codigo} usa a posição {(string.IsNullOrEmpty(l.Posicao) ? "(nenhuma)" : l.Posicao)}, que não existe.");
+            }
+        }
 
-            ["3-5-2 (3-2-3-2)"] = new LineupTemplate(
-                "3-5-2 (3-2-3-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",          false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",           false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",           false,  4, ZAG),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  5, VOL),
-                    new("CDM2", "Volante Direito (VOL)",      false,  6, VOL),
-                    new("LM",   "Meia Esquerda (ME)",         false,  7, ME),
-                    new("RM",   "Meia Direita (MD)",          false,  8, MD),
-                    new("CAM",  "Meia Atacante (MAT)",        false,  9, MAT),
-                    new("ST1",  "Segundo Atacante (SA)",      false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",          false, 11, CA)
-                },
-                CreateBenchTemplate()),
+        var padrao = catalogo.Formacoes.FirstOrDefault(f => string.Equals(f.Nome, catalogo.Padrao, StringComparison.OrdinalIgnoreCase));
+        if (padrao is null) erros.Add("Escolha a formação padrão (a das escalações novas).");
+        else if (!padrao.Ativa) erros.Add($"A formação padrão ({padrao.Nome}) precisa estar ativa.");
 
-            ["3-5-2 (3-3-2-2)"] = new LineupTemplate(
-                "3-5-2 (3-3-2-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",                false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",                 false,  4, ZAG),
-                    new("CDM",  "Volante (VOL)",                    false,  5, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("LM",   "Meia Esquerda (ME)",               false,  8, ME),
-                    new("RM",   "Meia Direita (MD)",                false,  9, MD),
-                    new("ST1",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+        return erros.Distinct().ToList();
+    }
 
-            ["3-4-3 (3-2-2-3)"] = new LineupTemplate(
-                "3-4-3 (3-2-2-3)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",                false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",                 false,  4, ZAG),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  5, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  6, MLG),
-                    new("LM",   "Meia Esquerda (ME)",               false,  7, ME),
-                    new("RM",   "Meia Direita (MD)",                false,  8, MD),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
+    private sealed class Snapshot
+    {
+        public Snapshot(CatalogoEscalacao catalogo)
+        {
+            Catalogo = catalogo;
+            var posicoes = catalogo.Posicoes.ToDictionary(p => p.Codigo, StringComparer.OrdinalIgnoreCase);
+            Templates = catalogo.Formacoes.ToDictionary(
+                f => f.Nome,
+                f => new LineupTemplate(
+                    f.Nome,
+                    f.Lugares.Select((l, i) => new LineupSlotTemplate(
+                        l.Codigo, l.Nome, false, i + 1, posicoes[l.Posicao].PodemJogar.ToArray())).ToList(),
+                    CreateBenchTemplate()),
+                StringComparer.OrdinalIgnoreCase);
+            Padrao = Templates[catalogo.Padrao];
+        }
 
-            ["5-4-1 (5-2-2-1)"] = new LineupTemplate(
-                "5-4-1 (5-2-2-1)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",          false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",           false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",           false,  4, ZAG),
-                    new("ADE",  "Ala Esquerdo (LE)",          false,  5, LE),
-                    new("ADD",  "Ala Direito (LD)",           false,  6, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  7, VOL),
-                    new("CDM2", "Volante Direito (VOL)",      false,  8, VOL),
-                    new("LM",   "Meia Esquerda (ME)",         false,  9, ME),
-                    new("RM",   "Meia Direita (MD)",          false, 10, MD),
-                    new("ST",   "Centroavante (CA)",          false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["5-3-2 (5-2-1-2)"] = new LineupTemplate(
-                "5-3-2 (5-2-1-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",              false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",          false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",           false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",           false,  4, ZAG),
-                    new("ADE",  "Ala Esquerdo (LE)",          false,  5, LE),
-                    new("ADD",  "Ala Direito (LD)",           false,  6, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",     false,  7, VOL),
-                    new("CDM2", "Volante Direito (VOL)",      false,  8, VOL),
-                    new("CAM",  "Meia Atacante (MAT)",        false,  9, MAT),
-                    new("ST1",  "Segundo Atacante (SA)",      false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",          false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["5-3-2 (5-3-2)"] = new LineupTemplate(
-                "5-3-2 (5-3-2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LCB",  "Zagueiro Esquerdo",                false,  2, ZAG),
-                    new("CCB",  "Zagueiro Central",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro Direito",                 false,  4, ZAG),
-                    new("ADE",  "Ala Esquerdo (LE)",                false,  5, LE),
-                    new("ADD",  "Ala Direito (LD)",                 false,  6, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  7, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  8, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  9, MLG),
-                    new("ST1",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-1-3 (P)"] = new LineupTemplate(
-                "4-2-1-3 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",               false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",       false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",        false,  5, LD),
-                    new("CDM",  "Volante (VOL)",               false,  6, VOL),
-                    new("CM",   "Meia de Ligação (MLG)",       false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",         false,  8, MAT),
-                    new("LW",   "Ponta Esquerda (PE)",         false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",          false, 10, PD),
-                    new("ST",   "Centroavante (CA)",           false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-2-2 (P)"] = new LineupTemplate(
-                "4-2-2-2 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                 false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",         false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",        false,  7, VOL),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)", false,  8, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",  false,  9, MAT),
-                    new("ST1",  "Centroavante Esquerda (CA)",   false, 10, CA),
-                    new("ST2",  "Centroavante Direita (CA)",    false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P)"] = new LineupTemplate(
-                "4-3-3 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P2)"] = new LineupTemplate(
-                "4-3-3 (P2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("SA",   "Segundo Atacante (SA)",            false,  9, SA),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P3)"] = new LineupTemplate(
-                "4-3-3 (P3)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("SA",   "Segundo Atacante (SA)",            false,  9, SA),
-                    new("LW",   "Ponta Esquerda (PE)",              false, 10, PE),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-1-2-3 (P)"] = new LineupTemplate(
-                "4-1-2-3 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  7, MAT),
-                    new("CAM2", "Meia Atacante Direito (MAT)",      false,  8, MAT),
-                    new("SA",   "Segundo Atacante (SA)",            false,  9, SA),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-3-1 (P)"] = new LineupTemplate(
-                "4-2-3-1 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM",   "Meia de Ligação (MLG)",            false,  6, MLG),
-                    new("CAM1", "Meia Atacante Esquerdo (MAT)",     false,  8, MAT),
-                    new("CAM2", "Meia Atacante Central (MAT)",      false,  9, MAT),
-                    new("CAM3", "Meia Atacante Direito (MAT)",      false, 10, MAT),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P4)"] = new LineupTemplate(
-                "4-3-3 (P4)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
-                    new("SA2",  "Segundo Atacante (SA)",            false,  10, SA),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P5)"] = new LineupTemplate(
-                "4-3-3 (P5)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",           false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",            false,  7, VOL),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
-                    new("SA2",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-1-2 (P)"] = new LineupTemplate(
-                "4-3-1-2 (P)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  9, MAT),
-                    new("ST1",  "Centroavante Esquerdo (CA)",       false, 10, CA),
-                    new("ST2",  "Centroavante Direito (CA)",        false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P6)"] = new LineupTemplate(
-                "4-3-3 (P6)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM",   "Meia de Ligação (MLG)",            false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
-                    new("SA2",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST",   "Centroavante Direito (CA)",        false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P7)"] = new LineupTemplate(
-                "4-3-3 (P7)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, MLG),
-                    new("SA1",  "Segundo Atacante (SA)",            false,  9, SA),
-                    new("SA2",  "Segundo Atacante (SA)",            false, 10, SA),
-                    new("ST",   "Centroavante Direito (CA)",        false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P8)"] = new LineupTemplate(
-                "4-3-3 (P8)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("CAM",  "Meia Atacante (MAT)",              false,  8, MAT),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",               false, 10, PD),
-                    new("SA",   "Segundo Atacante (SA)",            false, 11, SA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-4"] = new LineupTemplate(
-                "4-2-4",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  7, MLG),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  8, PE),
-                    new("RW",   "Ponta Direita (PD)",               false,  9, PD),
-                    new("CA1",  "Atacante Esuqerdo (CA)",           false, 10, CA),
-                    new("CA2",  "Atacante Direito (CA)",            false, 11, CA),
-                },
-                CreateBenchTemplate()),
-
-            ["4-3-3 (P9)"] = new LineupTemplate(
-                "4-3-3 (P9)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",            false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",             false,  5, LD),
-                    new("CDM",  "Volante (VOL)",                    false,  6, VOL),
-                    new("CM1",  "Meia de Ligação Esquerdo (MLG)",   false,  7, MLG),
-                    new("CM2",  "Meia de Ligação Direito (MLG)",    false,  8, MLG),
-                    new("LW",   "Ponta Esquerda (PE)",              false,  9, PE),
-                    new("RW",   "Ponta Direita (PD)",               false,  10, PD),
-                    new("ST",   "Centroavante (CA)",                false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["3-4-1-2"] = new LineupTemplate(
-                "3-4-1-2",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                    false,  1, GOL),
-                    new("LCB",  "Zagueiro (E)",                     false,  2, ZAG),
-                    new("CCB",  "Zagueiro (C)",                     false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                     false,  4, ZAG),
-                    new("CDM",  "Volante (VOL)",                    false,  5, VOL),
-                    new("CM",   "Meia de Ligação Esquerdo (MLG)",   false,  6, MLG),
-                    new("MAT",  "Meia Atacante",                    false,  7, MAT),
-                    new("LW",   "Meia Esquerda (PE)",               false,  8, ME),
-                    new("RW",   "Meia Direita (PD)",                false,  9, MD),
-                    new("ST1",  "Centroavante Esquerdo (CA)",       false, 10, CA),
-                    new("ST2",  "Centroavante Direito (CA)",        false, 11, CA)
-                },
-                CreateBenchTemplate()),
-
-            ["4-2-2-2 (P2)"] = new LineupTemplate(
-                "4-2-2-2 (P2)",
-                new List<LineupSlotTemplate>
-                {
-                    new("GK",   "Goleiro (GOL)",                false,  1, GOL),
-                    new("LB",   "Lateral Esquerdo (LE)",        false,  2, LE),
-                    new("LCB",  "Zagueiro (E)",                 false,  3, ZAG),
-                    new("RCB",  "Zagueiro (D)",                 false,  4, ZAG),
-                    new("RB",   "Lateral Direito (LD)",         false,  5, LD),
-                    new("CDM1", "Volante Esquerdo (VOL)",       false,  6, VOL),
-                    new("CDM2", "Volante Direito (VOL)",        false,  7, VOL),
-                    new("MAT1", "Meia Atacante (E)",            false,  8, MAT),
-                    new("MAT2", "Meia Atacante (D)",            false,  9, MAT),
-                    new("SA",   "Segundo Atacante (SA)",        false, 10, SA),
-                    new("ST2",  "Centroavante (CA)",            false, 11, CA)
-                },
-                CreateBenchTemplate())
-        };
+        public CatalogoEscalacao Catalogo { get; }
+        public IReadOnlyDictionary<string, LineupTemplate> Templates { get; }
+        public LineupTemplate Padrao { get; }
     }
 
     private static List<LineupSlotTemplate> CreateBenchTemplate()
-        => new()
-        {
-            new("SUB1", "Reserva 1", true, 1, Array.Empty<short>()),
-            new("SUB2", "Reserva 2", true, 2, Array.Empty<short>()),
-            new("SUB3", "Reserva 3", true, 3, Array.Empty<short>()),
-            new("SUB4", "Reserva 4", true, 4, Array.Empty<short>()),
-            new("SUB5", "Reserva 5", true, 5, Array.Empty<short>()),
-            new("SUB6", "Reserva 6", true, 6, Array.Empty<short>()),
-            new("SUB7", "Reserva 7", true, 7, Array.Empty<short>())
-        };
+        => Enumerable.Range(1, ReservasPorFormacao)
+            .Select(i => new LineupSlotTemplate($"SUB{i}", $"Reserva {i}", true, i, Array.Empty<short>()))
+            .ToList();
 }
 
 public sealed class LineupTemplate

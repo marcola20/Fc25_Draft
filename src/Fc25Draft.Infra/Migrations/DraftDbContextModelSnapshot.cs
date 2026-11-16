@@ -467,6 +467,23 @@ namespace Fc25Draft.Infra.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.CatalogoEscalacaoSalvo", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CatalogoEscalacao", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.ChavePush", b =>
                 {
                     b.Property<int>("ChavePushId")

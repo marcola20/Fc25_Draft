@@ -179,7 +179,7 @@ else
                                 value="@currentEditor.Formation"
                                 @onchange="OnFormationChanged"
                                 disabled="@isSaving">
-                            @foreach (var formation in FormationOptions)
+                            @foreach (var formation in FormationOptionsFor(currentEditor.Formation))
                             {
                                 <option value="@formation">@formation</option>
                             }
@@ -803,7 +803,15 @@ else
 @code {
     private const int MaxLineupsPerTeam = 3;
     private const string NewLineupValue = "__new__";
-    private static readonly IReadOnlyList<string> FormationOptions = LineupTemplateCatalog.GetSupportedFormations();
+    // As formações ativas do catálogo (editado em /admin/formacoes). Uma desativada continua na lista para a
+    // escalação que já a usa, senão o select mostraria outra.
+    private static IReadOnlyList<string> FormationOptionsFor(string? current)
+    {
+        var options = LineupTemplateCatalog.GetSupportedFormations();
+        return string.IsNullOrWhiteSpace(current) || options.Contains(current, StringComparer.OrdinalIgnoreCase)
+            ? options
+            : options.Prepend(current).ToList();
+    }
 
     private enum Tab { Lineup, Roles, Offensive, Defensive, Advanced }
 
