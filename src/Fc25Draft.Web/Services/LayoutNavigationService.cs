@@ -81,6 +81,7 @@ public class LayoutNavigationService
             new("Virada de Temporada", "/admin/temporada", "refresh-cw"),
             new("Resultados Pendentes", "/admin/resultados-pendentes", "lock"),
             new("Resumo da Rodada", "/admin/resumo-rodada", "message-square"),
+            new("Stats da Temporada", "/admin/stats-temporada", "chart-column"),
             new("Mosaico", "/admin/mosaicos", "layout-grid"),
             new("Gerenciar Hall da Fama", "/admin/hall-of-fame", "award"),
             new("Jogos Anotados", "/admin/jogos-anotados", "clipboard-list"),
@@ -483,6 +484,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Resumo da rodada")
+            }
+        },
+        ["/admin/stats-temporada"] = new PageDefinition
+        {
+            Route = "/admin/stats-temporada",
+            Title = "Stats da Temporada",
+            Subtitle = "Top 3 de gols, assistências, clean sheets e nota para o grupo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Stats da temporada")
             }
         },
         ["/bolao"] = new PageDefinition

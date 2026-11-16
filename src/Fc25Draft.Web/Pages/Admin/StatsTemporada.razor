@@ -1,0 +1,164 @@
+@page "/admin/stats-temporada"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ILigaPublicService LigaService
+@inject IJSRuntime JSRuntime
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Stats da temporada</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_edicoes.Count == 0)
+    {
+        <div class="alert alert-info">Nenhuma competição ainda.</div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-body d-flex align-items-end gap-3 flex-wrap">
+                <div>
+                    <label class="form-label mb-0 small">Competição</label>
+                    <select class="form-select" style="min-width:22rem;" value="@_ligaId" @onchange="Trocar">
+                        @foreach (var e in _edicoes)
+                        {
+                            <option value="@e.LigaId">@e.Nome@(e.Encerrada ? "" : " (em andamento)")</option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-success" @onclick="Copiar" disabled="@(_texto.Length == 0)"><Icone Nome="copy" Tamanho="14" /> Copiar para o WhatsApp</button>
+                <button class="btn btn-outline-secondary" @onclick="() => Carregar(_ligaId)">Recarregar</button>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span class="fw-bold">Texto</span>
+                        <span class="text-muted small">top 3 com empates juntos · dá para editar antes de copiar</span>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control font-monospace" style="min-height:26rem; font-size:.85rem;"
+                                  @bind="_texto" @bind:event="oninput"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header fw-medium">Como vai chegar</div>
+                    <div class="card-body" style="background:#e5ddd5;">
+                        <div class="p-3 rounded shadow-sm" style="background:var(--bs-body-bg); white-space:pre-wrap; font-size:.9rem;">
+                            @((MarkupString)Prever(_texto))
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<LigaEdicaoDto> _edicoes = Array.Empty<LigaEdicaoDto>();
+    private Guid _ligaId;
+    private string _texto = "";
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/stats-temporada"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Já vem da temporada mais recente para a mais antiga, Série A na frente.
+            _edicoes = await LigaService.ListEdicoesAsync(CancellationToken.None);
+            if (_edicoes.Count > 0) await Carregar(_edicoes[0].LigaId);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task Trocar(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) await Carregar(id);
+    }
+
+    private async Task Carregar(Guid ligaId)
+    {
+        _erro = null; _ok = null;
+        try
+        {
+            _ligaId = ligaId;
+            var ct = CancellationToken.None;
+            var edicao = _edicoes.First(e => e.LigaId == ligaId);
+
+            var artilheiros = await LigaService.GetArtilheirosAsync(ligaId, ct);
+            var assistencias = await LigaService.GetAssistenciasAsync(ligaId, ct);
+            var cleanSheets = await LigaService.GetCleanSheetsAsync(ligaId, ct);
+            var notas = await LigaService.GetMediasNotasAsync(ligaId, ct);
+
+            // Mesmo corte da página da competição: metade dos jogos de quem mais jogou com nota.
+            var minimo = notas.Count == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(notas.Max(n => n.Jogos) / 2.0));
+
+            _texto = StatsTemporadaTexto.Montar(
+                edicao.Nome,
+                edicao.Encerrada,
+                artilheiros.Select(a => new StatJogador(a.JogadorNome, a.TimeNome, a.Gols)).ToList(),
+                assistencias.Select(a => new StatJogador(a.JogadorNome, a.TimeNome, a.Assistencias)).ToList(),
+                cleanSheets.Select(c => new StatJogador(c.JogadorNome, c.TimeNome, c.CleanSheets)).ToList(),
+                // Arredonda como aparece no texto, para quem mostra a mesma nota ficar empatado.
+                notas.Where(n => n.Jogos >= minimo)
+                     .Select(n => new StatJogador(n.JogadorNome, n.TimeNome, Math.Round(n.Media, 2)))
+                     .ToList(),
+                minimo);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task Copiar()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _texto);
+            _ok = "Copiado. É só colar no grupo.";
+        }
+        catch (Exception)
+        {
+            _erro = "O navegador não deixou copiar sozinho — selecione o texto e copie na mão.";
+        }
+    }
+
+    /// <summary>Mostra o negrito e o itálico como o WhatsApp mostra.</summary>
+    private static string Prever(string texto)
+    {
+        var seguro = System.Net.WebUtility.HtmlEncode(texto);
+
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"\*([^*\n]+)\*", "<strong>$1</strong>");
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"_([^_\n]+)_", "<em>$1</em>");
+
+        return seguro;
+    }
+}
