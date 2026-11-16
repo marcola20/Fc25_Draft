@@ -161,7 +161,7 @@ public class PremiosService : IPremiosService
             Categoria = categoria,
             PlayerId = playerId,
             TimeId = linha?.TimeId ?? jogador.CurrentTeamId,
-            Resumo = linha is null ? null : Resumo(categoria, linha, numeros.Ganho.GetValueOrDefault(playerId)),
+            Resumo = linha is null ? null : Resumo(categoria, linha, numeros),
         });
         await _db.SaveChangesAsync(ct);
     }
@@ -622,15 +622,28 @@ public class PremiosService : IPremiosService
     /// defesa sai dos clubes que menos sofreram gol (<see cref="Defesas"/>: gols sofridos e jogos de cada clube).
     /// </summary>
     private sealed record Numeros(
+        int Temporada,
         IReadOnlyDictionary<int, Linha> Jogadores,
-        IReadOnlyDictionary<int, (int Antes, int Depois)> Ganho,
+        IReadOnlyDictionary<int, Base> Anterior,
         HashSet<int> Estreantes,
         int MinimoDeJogos,
         bool TemNotas,
         IReadOnlyDictionary<Guid, (int Sofridos, int Jogos)> Defesas);
 
+    /// <summary>
+    /// A temporada anterior de um jogador, base do MIP. <see cref="Jogos"/> soma os com nota e os anotados à mão
+    /// (competições sem contador); média e jogos sem sofrer gol só existem nos jogos com nota.
+    /// </summary>
+    private sealed record Base(int Jogos, int JogosComNota, decimal Media, int GolsEAssistencias, int SemSofrer);
+
+    /// <summary>Quanto o jogador melhorou da temporada anterior para esta.</summary>
+    private sealed record Evolucao(decimal Pontos, decimal? NotaAntes, decimal? NotaAgora, decimal? TaxaAntes, decimal? TaxaAgora, bool Defensor);
+
+    /// <summary>Base mínima de jogos na temporada anterior para entrar no MIP.</summary>
+    private const int JogosMinimosDaBase = 3;
+
     /// <summary>Os números da temporada: Liga e Copa (a Supercopa com o ano dela abre a temporada seguinte).</summary>
-    private async Task<Numeros> NumerosAsync(int temporada, CancellationToken ct)
+    private async Task<Numeros> NumerosAsync(int temporada, CancellationToken ct, bool comAnterior = true)
     {
         var partidas = await _db.LigaPartidas.AsNoTracking()
             .Where(p => p.Rodada.Liga.Temporada == temporada && p.Rodada.Liga.Tipo != TipoCompetition.Supercopa
@@ -705,23 +718,25 @@ public class PremiosService : IPremiosService
             .ToHashSet();
         var estreantes = linhas.Keys.Where(id => !jaJogaram.Contains(id)).ToHashSet();
 
-        // Overall que subiu durante a temporada (venda rápida, ajustes), sem a evolução da virada e sem prêmio.
-        var inicio = partidas.Count == 0 ? (DateTime?)null : partidas.Min(p => p.Quando);
-        var ganho = new Dictionary<int, (int Antes, int Depois)>();
-        if (inicio is DateTime desde)
+        // Base do MIP: a temporada anterior de cada um (com os jogos anotados à mão onde não havia contador).
+        var anterior = new Dictionary<int, Base>();
+        if (comAnterior)
         {
-            var desdeUtc = desde.AddHours(3); // horário de Brasília → UTC
-            var evolucoes = await _db.EvolucoesPes.AsNoTracking()
-                .Where(e => e.CriadaEmUtc >= desdeUtc && !e.Motivo.StartsWith("Temporada ") && !e.Motivo.StartsWith("Prêmio"))
-                .OrderBy(e => e.CriadaEmUtc)
-                .Select(e => new { e.PlayerId, e.OverallAntes, e.OverallDepois })
-                .ToListAsync(ct);
+            var antes = await NumerosAsync(temporada - 1, ct, comAnterior: false);
+            var anotados = (await _db.JogosAnotados.AsNoTracking()
+                    .Where(j => j.Liga.Temporada == temporada - 1 && j.Liga.Tipo != TipoCompetition.Supercopa && j.Jogos > 0)
+                    .Select(j => new { j.JogadorId, j.Jogos })
+                    .ToListAsync(ct))
+                .GroupBy(j => j.JogadorId)
+                .ToDictionary(g => g.Key, g => g.Sum(j => j.Jogos));
 
-            ganho = evolucoes
-                .GroupBy(e => e.PlayerId)
-                .Select(g => (g.Key, Antes: g.First().OverallAntes, Depois: g.Last().OverallDepois))
-                .Where(x => x.Depois > x.Antes)
-                .ToDictionary(x => x.Key, x => (x.Antes, x.Depois));
+            foreach (var id in antes.Jogadores.Keys.Union(anotados.Keys))
+            {
+                var l = antes.Jogadores.GetValueOrDefault(id);
+                anterior[id] = new Base(
+                    (l?.Jogos ?? 0) + anotados.GetValueOrDefault(id), l?.Jogos ?? 0, l?.Media ?? 0,
+                    (l?.Gols ?? 0) + (l?.Assistencias ?? 0), l?.SemSofrer ?? 0);
+            }
         }
 
         var defesas = sofreu
@@ -730,7 +745,7 @@ public class PremiosService : IPremiosService
 
         var temNotas = notas.Count > 0;
         var maisJogos = linhas.Count == 0 ? 0 : linhas.Values.Max(l => l.Jogos);
-        return new Numeros(linhas, ganho, estreantes, temNotas ? Math.Max(3, (int)Math.Ceiling(maisJogos * 0.4)) : 0, temNotas, defesas);
+        return new Numeros(temporada, linhas, anterior, estreantes, temNotas ? Math.Max(3, (int)Math.Ceiling(maisJogos * 0.4)) : 0, temNotas, defesas);
     }
 
     private async Task<IReadOnlyList<PremioCandidato>> SugerirAsync(int temporada, CategoriaPremio categoria, Numeros n, CancellationToken ct)
@@ -752,11 +767,13 @@ public class PremiosService : IPremiosService
             CategoriaPremio.ROY => n.Jogadores.Values
                 .Where(l => n.Estreantes.Contains(l.PlayerId) && l.Overall <= PremiosTemporada.OverallMaximoRoy && l.Jogos >= n.MinimoDeJogos / 2)
                 .OrderByDescending(l => l.Media).Take(quantos),
-            CategoriaPremio.MIP => n.Ganho
-                .OrderByDescending(g => g.Value.Depois - g.Value.Antes)
-                .ThenByDescending(g => n.Jogadores.GetValueOrDefault(g.Key)?.Media ?? 0)
-                .Select(g => n.Jogadores.GetValueOrDefault(g.Key))
-                .OfType<Linha>()
+            // Quem mais melhorou da temporada passada para esta: nota + G/A por jogo (goleiro e defensor: jogos
+            // sem sofrer gol). Overall não conta. Sem base na temporada anterior fica de fora.
+            CategoriaPremio.MIP => comJogos
+                .Select(l => (Linha: l, Evolucao: Evoluiu(l, n)))
+                .Where(x => x.Evolucao is { Pontos: > 0 })
+                .OrderByDescending(x => x.Evolucao!.Pontos).ThenByDescending(x => x.Linha.Media)
+                .Select(x => x.Linha)
                 .Take(quantos),
             CategoriaPremio.DPOY => comJogos
                 .Where(l => (PositionType)l.PositionId is PositionType.Zagueiro or PositionType.LateralEsquerdo or PositionType.LateralDireito)
@@ -774,7 +791,7 @@ public class PremiosService : IPremiosService
             Categoria = categoria,
             PlayerId = l.PlayerId,
             TimeId = l.TimeId,
-            Resumo = Resumo(categoria, l, n.Ganho.GetValueOrDefault(l.PlayerId)),
+            Resumo = Resumo(categoria, l, n),
         }).ToList();
     }
 
@@ -804,11 +821,14 @@ public class PremiosService : IPremiosService
                     .OrderByDescending(l => l.Gols + l.Assistencias)
                     .Take(quantos).Select(l => Novo(l.PlayerId, l.TimeId, Ga(l))).ToList();
             case CategoriaPremio.MIP:
-                var ids = n.Ganho.Keys.ToList();
-                var clubeAtual = await _db.Players.AsNoTracking().Where(p => ids.Contains(p.PlayerId))
-                    .Select(p => new { p.PlayerId, p.CurrentTeamId }).ToDictionaryAsync(p => p.PlayerId, p => p.CurrentTeamId, ct);
-                return n.Ganho.OrderByDescending(g => g.Value.Depois - g.Value.Antes).Take(quantos)
-                    .Select(g => Novo(g.Key, clubeAtual.GetValueOrDefault(g.Key), $"overall {g.Value.Antes} → {g.Value.Depois}")).ToList();
+                // Sem notas: quem mais aumentou gols + assistências em relação à temporada anterior.
+                return n.Jogadores.Values
+                    .Where(l => n.Anterior.TryGetValue(l.PlayerId, out var b) && l.Gols + l.Assistencias > b.GolsEAssistencias)
+                    .OrderByDescending(l => l.Gols + l.Assistencias - n.Anterior[l.PlayerId].GolsEAssistencias)
+                    .Take(quantos)
+                    .Select(l => Novo(l.PlayerId, l.TimeId,
+                        $"G+A {n.Anterior[l.PlayerId].GolsEAssistencias} em {n.Temporada - 1} → {l.Gols + l.Assistencias} · {Ga(l)}"))
+                    .ToList();
         }
 
         var goleiro = categoria == CategoriaPremio.GKOY;
@@ -864,19 +884,69 @@ public class PremiosService : IPremiosService
             .ToList();
     }
 
-    private static string Resumo(CategoriaPremio categoria, Linha l, (int Antes, int Depois) ganho)
+    private static bool Defensor(Linha l) =>
+        (PositionType)l.PositionId is PositionType.Goleiro or PositionType.Zagueiro or PositionType.LateralEsquerdo or PositionType.LateralDireito;
+
+    /// <summary>
+    /// Melhora em relação à temporada anterior: diferença da nota média + diferença da taxa por jogo (G+A; para
+    /// goleiro e defensor, jogos sem sofrer gol). Nota e jogos sem sofrer gol só comparam se a base tem jogos com nota.
+    /// Nulo = sem base para comparar.
+    /// </summary>
+    private static Evolucao? Evoluiu(Linha l, Numeros n)
+    {
+        if (l.Jogos == 0 || !n.Anterior.TryGetValue(l.PlayerId, out var b) || b.Jogos < JogosMinimosDaBase) return null;
+
+        var comNota = b.JogosComNota >= JogosMinimosDaBase;
+        decimal? notaAntes = comNota ? b.Media : null;
+        decimal? notaAgora = comNota ? l.Media : null;
+
+        var defensor = Defensor(l);
+        decimal? taxaAntes, taxaAgora;
+        if (defensor)
+        {
+            taxaAntes = comNota ? (decimal)b.SemSofrer / b.JogosComNota : null;
+            taxaAgora = comNota ? (decimal)l.SemSofrer / l.Jogos : null;
+        }
+        else
+        {
+            taxaAntes = (decimal)b.GolsEAssistencias / b.Jogos;
+            taxaAgora = (decimal)(l.Gols + l.Assistencias) / l.Jogos;
+        }
+
+        if (notaAntes is null && taxaAntes is null) return null;
+        var pontos = (notaAgora - notaAntes ?? 0) + (taxaAgora - taxaAntes ?? 0);
+        return new Evolucao(Math.Round(pontos, 2), notaAntes, notaAgora, taxaAntes, taxaAgora, defensor);
+    }
+
+    private static string Resumo(CategoriaPremio categoria, Linha l, Numeros n)
     {
         if (l.Jogos == 0)
-            return categoria == CategoriaPremio.MIP && ganho.Depois > ganho.Antes
-                ? $"overall {ganho.Antes} → {ganho.Depois}"
-                : $"{l.Gols} G · {l.Assistencias} A";
+            return $"{l.Gols} G · {l.Assistencias} A";
 
         var nota = $"nota {l.Media.ToString("0.0", Br)} · {l.Jogos} jogos";
         return categoria switch
         {
             CategoriaPremio.GKOY or CategoriaPremio.DPOY => $"{nota} · {l.SemSofrer} sem sofrer gol",
-            CategoriaPremio.MIP when ganho.Depois > ganho.Antes => $"overall {ganho.Antes} → {ganho.Depois} · {nota}",
+            CategoriaPremio.MIP => ResumoMip(l, n),
             _ => $"{nota} · {l.Gols} G · {l.Assistencias} A"
         };
+    }
+
+    /// <summary>"nota 5,8 → 6,9 · G+A por jogo 0,20 → 0,75 · 8 jogos · 4 G · 2 A (vs 2009)".</summary>
+    private static string ResumoMip(Linha l, Numeros n)
+    {
+        var anterior = n.Temporada - 1;
+        if (Evoluiu(l, n) is not { } e)
+            return $"sem base em {anterior} · nota {l.Media.ToString("0.0", Br)} · {l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A";
+
+        var partes = new List<string>();
+        if (e.NotaAntes is { } na && e.NotaAgora is { } nd)
+            partes.Add($"nota {na.ToString("0.0", Br)} → {nd.ToString("0.0", Br)}");
+        if (e.TaxaAntes is { } ta && e.TaxaAgora is { } td)
+            partes.Add(e.Defensor
+                ? $"sem sofrer gol {Math.Round(ta * 100)}% → {Math.Round(td * 100)}%"
+                : $"G+A por jogo {ta.ToString("0.00", Br)} → {td.ToString("0.00", Br)}");
+        partes.Add($"{l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A (vs {anterior})");
+        return string.Join(" · ", partes);
     }
 }
