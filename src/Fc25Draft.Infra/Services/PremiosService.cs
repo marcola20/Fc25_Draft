@@ -767,14 +767,7 @@ public class PremiosService : IPremiosService
             CategoriaPremio.ROY => n.Jogadores.Values
                 .Where(l => n.Estreantes.Contains(l.PlayerId) && l.Overall <= PremiosTemporada.OverallMaximoRoy && l.Jogos >= n.MinimoDeJogos / 2)
                 .OrderByDescending(l => l.Media).Take(quantos),
-            // Quem mais melhorou da temporada passada para esta: nota + G/A por jogo (goleiro e defensor: jogos
-            // sem sofrer gol). Overall não conta. Sem base na temporada anterior fica de fora.
-            CategoriaPremio.MIP => comJogos
-                .Select(l => (Linha: l, Evolucao: Evoluiu(l, n)))
-                .Where(x => x.Evolucao is { Pontos: > 0 })
-                .OrderByDescending(x => x.Evolucao!.Pontos).ThenByDescending(x => x.Linha.Media)
-                .Select(x => x.Linha)
-                .Take(quantos),
+            CategoriaPremio.MIP => SugerirMip(comJogos, n).Take(quantos),
             CategoriaPremio.DPOY => comJogos
                 .Where(l => (PositionType)l.PositionId is PositionType.Zagueiro or PositionType.LateralEsquerdo or PositionType.LateralDireito)
                 .OrderByDescending(l => l.Media).ThenByDescending(l => l.SemSofrer).Take(quantos),
@@ -882,6 +875,40 @@ public class PremiosService : IPremiosService
                 Resumo = $"{c.Posicao}º na {LigaLabels.Competicao(c.Tipo, c.Divisao)} · {c.Pontos} pts em {c.Jogos} jogos",
             })
             .ToList();
+    }
+
+    /// <summary>
+    /// MIP: quem foi mal na temporada passada e melhorou nesta. "Foi mal" = na metade de baixo, entre os que jogaram
+    /// as duas, em cada número que a base tem (nota; G+A por jogo, ou jogos sem sofrer gol para goleiro e defensor).
+    /// Entre esses, ganha quem mais subiu: nota + taxa por jogo. Overall não conta; sem base fica de fora.
+    /// </summary>
+    private static IEnumerable<Linha> SugerirMip(IReadOnlyList<Linha> comJogos, Numeros n)
+    {
+        var comBase = comJogos
+            .Select(l => (Linha: l, Evolucao: Evoluiu(l, n)))
+            .Where(x => x.Evolucao is not null)
+            .ToList();
+
+        var notaMediana = Mediana(comBase.Select(x => x.Evolucao!.NotaAntes));
+        var taxaMediana = comBase.GroupBy(x => x.Evolucao!.Defensor)
+            .ToDictionary(g => g.Key, g => Mediana(g.Select(x => x.Evolucao!.TaxaAntes)));
+
+        bool FoiMal(Evolucao e) =>
+            (e.NotaAntes is not { } nota || nota <= notaMediana)
+            && (e.TaxaAntes is not { } taxa || taxa <= taxaMediana.GetValueOrDefault(e.Defensor));
+
+        return comBase
+            .Where(x => x.Evolucao is { Pontos: > 0 } e && FoiMal(e))
+            .OrderByDescending(x => x.Evolucao!.Pontos).ThenByDescending(x => x.Linha.Media)
+            .Select(x => x.Linha);
+    }
+
+    private static decimal Mediana(IEnumerable<decimal?> valores)
+    {
+        var lista = valores.OfType<decimal>().Order().ToList();
+        if (lista.Count == 0) return 0;
+        var meio = lista.Count / 2;
+        return lista.Count % 2 == 1 ? lista[meio] : (lista[meio - 1] + lista[meio]) / 2;
     }
 
     private static bool Defensor(Linha l) =>
