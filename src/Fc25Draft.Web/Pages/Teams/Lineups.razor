@@ -800,6 +800,33 @@ else
     </div>
 }
 
+@if (perguntarSeAtiva && currentEditor is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Salvar como ativa?</h5>
+                    <button type="button" class="btn-close" aria-label="Fechar" @onclick="() => perguntarSeAtiva = false" disabled="@isSaving"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2"><strong>@currentEditor.Name</strong> está inativa. Quer salvar e já deixá-la como a escalação ativa?</p>
+                    @if (lineups.FirstOrDefault(l => l.IsActive) is { } ativaAtual)
+                    {
+                        <p class="small text-muted mb-0">Se sim, <strong>@ativaAtual.Name</strong> passa a ser inativa.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => perguntarSeAtiva = false" disabled="@isSaving">Cancelar</button>
+                    <button type="button" class="btn btn-outline-primary" @onclick="() => ResponderSeAtivaAsync(false)" disabled="@isSaving">Não, só salvar</button>
+                    <button type="button" class="btn btn-primary" @onclick="() => ResponderSeAtivaAsync(true)" disabled="@isSaving">Sim, deixar ativa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     private const int MaxLineupsPerTeam = 3;
     private const string NewLineupValue = "__new__";
@@ -837,6 +864,8 @@ else
     private bool isLoading = true;
     private bool isSaving;
     private bool isDeleting;
+    // Salvar uma escalação que já existe e está inativa pergunta antes se ela deve virar a ativa.
+    private bool perguntarSeAtiva;
     private bool hasAccess;
     private string? accessMessage;
     private string? currentTeamToken;
@@ -1300,6 +1329,33 @@ else
             activeTab = Tab.Offensive;
             return;
         }
+
+        // Editando uma escalação salva que está inativa (e o "Definir como ativa" não foi marcado): pergunta se
+        // ela deve virar a ativa. O servidor já desativa as outras quando uma é salva como ativa.
+        var editandoInativa = !isNewLineup && currentEditor.LineupId != Guid.Empty && !currentEditor.IsActive
+            && lineups.FirstOrDefault(l => l.LineupId == currentEditor.LineupId) is { IsActive: false };
+        if (editandoInativa)
+        {
+            perguntarSeAtiva = true;
+            return;
+        }
+
+        await SalvarAsync();
+    }
+
+    private async Task ResponderSeAtivaAsync(bool deixarAtiva)
+    {
+        if (currentEditor is null) { perguntarSeAtiva = false; return; }
+        if (deixarAtiva)
+            currentEditor = currentEditor with { IsActive = true };
+
+        await SalvarAsync();
+        perguntarSeAtiva = false;
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (currentEditor is null) return;
 
         saveCts?.Cancel();
         saveCts = new CancellationTokenSource();
