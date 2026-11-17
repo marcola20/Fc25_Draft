@@ -49,7 +49,20 @@ public partial class ResultadoPesService : IResultadoPesService
         ResultadoPesRequest request, string jsonBruto, Guid? partidaAnterior, JogoFixo? fixo, bool simular, CancellationToken ct)
     {
         Validar(request);
-        var alvo = await AcharPartidaAsync(request, partidaAnterior, fixo, ct);
+        Alvo alvo;
+        try
+        {
+            alvo = await AcharPartidaAsync(request, partidaAnterior, fixo, ct);
+        }
+        catch (ResultadoPesException ex) when (ex.Erro == ResultadoPesErro.NaoEncontrado)
+        {
+            // O playoff de acesso é jogo único e o mando do site é só de cadastro (Série A em casa):
+            // simulado com o mando trocado no PES, os lados do JSON são invertidos para casar com ele.
+            if (!await PlayoffComMandoTrocadoAsync(request, ct)) throw;
+            jsonBruto = InverterMando(jsonBruto);
+            request = System.Text.Json.JsonSerializer.Deserialize<ResultadoPesRequest>(jsonBruto)!;
+            alvo = await AcharPartidaAsync(request, partidaAnterior, fixo, ct);
+        }
 
         ResultadoPesRespostaDto resposta = null!;
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -67,6 +80,49 @@ public partial class ResultadoPesService : IResultadoPesService
         // Simulação: o que ficou no change tracker foi desfeito no banco.
         if (simular) _db.ChangeTracker.Clear();
         return (resposta, alvo);
+    }
+
+    /// <summary>Existe playoff de acesso em aberto com o visitante do JSON como mandante no site?</summary>
+    private async Task<bool> PlayoffComMandoTrocadoAsync(ResultadoPesRequest r, CancellationToken ct)
+    {
+        var playoffs = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.Rodada.Numero == NumeroPlayoffAcesso && p.Rodada.Liga.Tipo == TipoCompetition.Liga
+                        && !_db.Ligas.Any(l => l.Tipo == TipoCompetition.Liga && l.Temporada == p.Rodada.Liga.Temporada + 1))
+            .Select(p => new { Casa = p.TimeCasa.TeamName, Fora = p.TimeFora.TeamName })
+            .ToListAsync(ct);
+        return playoffs.Any(p => NomesPes.MesmoTime(r.Fora!.Time!, p.Casa) && NomesPes.MesmoTime(r.Casa!.Time!, p.Fora));
+    }
+
+    /// <summary>Troca casa e fora no JSON do PES: placar, lado dos eventos, notas e estatísticas.</summary>
+    internal static string InverterMando(string json)
+    {
+        var raiz = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+
+        static void Trocar(System.Text.Json.Nodes.JsonObject o)
+        {
+            var casa = o["casa"];
+            var fora = o["fora"];
+            o.Remove("casa");
+            o.Remove("fora");
+            o["casa"] = fora;
+            o["fora"] = casa;
+        }
+
+        Trocar(raiz);
+        if (raiz["eventos"] is System.Text.Json.Nodes.JsonArray eventos)
+            foreach (var e in eventos.OfType<System.Text.Json.Nodes.JsonObject>())
+                e["lado"] = (string?)e["lado"] switch { Casa => Fora, Fora => Casa, var outro => outro };
+        if (raiz["notas"] is System.Text.Json.Nodes.JsonObject notas)
+            Trocar(notas);
+        if (raiz["estatisticas"] is System.Text.Json.Nodes.JsonObject estatisticas)
+            foreach (var (_, valor) in estatisticas)
+                if (valor is System.Text.Json.Nodes.JsonObject numeros) Trocar(numeros);
+
+        return raiz.ToJsonString(new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 
     // ── Validação ─────────────────────────────────────────────────────────────

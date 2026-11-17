@@ -146,8 +146,9 @@ public partial class ResultadoPesService
         p.DataHora = alvo?.DataHora;
         p.Casa = previa?.Casa ?? r.Casa!.Time!;
         p.Fora = previa?.Fora ?? r.Fora!.Time!;
-        p.GolsCasa = r.Casa!.Gols!.Value;
-        p.GolsFora = r.Fora!.Gols!.Value;
+        // Pela prévia quando houver: no playoff com mando trocado ela já vem com os lados do site.
+        p.GolsCasa = previa?.GolsCasa ?? r.Casa!.Gols!.Value;
+        p.GolsFora = previa?.GolsFora ?? r.Fora!.Gols!.Value;
         p.Erro = erro;
         p.Avisos = previa is null
             ? null
