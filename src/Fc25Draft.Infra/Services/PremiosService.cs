@@ -955,16 +955,19 @@ public class PremiosService : IPremiosService
         {
             CategoriaPremio.GKOY or CategoriaPremio.DPOY => $"{nota} · {l.SemSofrer} sem sofrer gol",
             CategoriaPremio.MIP => ResumoMip(l, n),
-            _ => $"{nota} · {l.Gols} G · {l.Assistencias} A"
+            _ => $"{nota} · {l.Gols} G · {l.Assistencias} A{Cs(l)}"
         };
     }
+
+    /// <summary>Goleiro e defensor também mostram os jogos sem sofrer gol: " · 4 CS".</summary>
+    private static string Cs(Linha l) => Defensor(l) ? $" · {l.SemSofrer} CS" : "";
 
     /// <summary>"nota 5,8 → 6,9 · G+A por jogo 0,20 → 0,75 · 8 jogos · 4 G · 2 A (vs 2009)".</summary>
     private static string ResumoMip(Linha l, Numeros n)
     {
         var anterior = n.Temporada - 1;
         if (Evoluiu(l, n) is not { } e)
-            return $"sem base em {anterior} · nota {l.Media.ToString("0.0", Br)} · {l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A";
+            return $"sem base em {anterior} · nota {l.Media.ToString("0.0", Br)} · {l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A{Cs(l)}";
 
         var partes = new List<string>();
         if (e.NotaAntes is { } na && e.NotaAgora is { } nd)
@@ -973,7 +976,7 @@ public class PremiosService : IPremiosService
             partes.Add(e.Defensor
                 ? $"sem sofrer gol {Math.Round(ta * 100)}% → {Math.Round(td * 100)}%"
                 : $"G+A por jogo {ta.ToString("0.00", Br)} → {td.ToString("0.00", Br)}");
-        partes.Add($"{l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A (vs {anterior})");
+        partes.Add($"{l.Jogos} jogos · {l.Gols} G · {l.Assistencias} A{Cs(l)} (vs {anterior})");
         return string.Join(" · ", partes);
     }
 }
