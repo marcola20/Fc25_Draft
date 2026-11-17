@@ -577,6 +577,9 @@
                 : new Dictionary<(int Rodada, Guid TimeOriginal), Guid>();
             Guid Dono(int rodada, Guid time) => donos.GetValueOrDefault((rodada, time), time);
 
+            // O draft é de jovens: a idade máxima vem das configurações (o admin pode mudar depois no draft).
+            var idadeMaxima = await Db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync();
+
             var draft = new Draft
             {
                 DraftId      = Guid.NewGuid(),
@@ -585,7 +588,8 @@
                 TotalTeams   = totalTeams,
                 TotalRounds  = totalRounds,
                 CreatedAtUtc = DateTime.UtcNow,
-                Temporada    = temporada
+                Temporada    = temporada,
+                IdadeMaxima  = idadeMaxima
             };
 
             draft.Rounds.Add(new DraftRound

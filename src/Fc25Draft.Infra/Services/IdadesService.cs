@@ -13,8 +13,6 @@ namespace Fc25Draft.Infra.Services;
 /// </summary>
 public class IdadesService : IIdadesService
 {
-    /// <summary>Até esta idade o jogador entra no draft (ver docs/ciclo-de-vida-dos-jogadores.md).</summary>
-    private const int IdadeMaximaDoDraft = 23;
     private const int IdadeDeFimDeCarreira = 34;
 
     /// <summary>O save e o banco do PES têm as idades de 2008, quando a liga começou.</summary>
@@ -49,6 +47,7 @@ public class IdadesService : IIdadesService
 
         var idades = await _db.Players.AsNoTracking().Select(p => p.Age).ToListAsync(ct);
         var comIdade = idades.Where(a => a is not null).Select(a => a!.Value).ToList();
+        var idadeMaximaDraft = await _db.TransferConfigs.AsNoTracking().Select(c => c.IdadeMaximaDraft).FirstOrDefaultAsync(ct);
 
         return new EnvelhecimentoSituacaoDto(
             temporada,
@@ -57,10 +56,11 @@ public class IdadesService : IIdadesService
             comIdade.Count,
             idades.Count - comIdade.Count,
             comIdade.Count == 0 ? 0 : Math.Round(comIdade.Average(), 1),
-            comIdade.Count(a => a == IdadeMaximaDoDraft),
+            idadeMaximaDraft is int maxima ? comIdade.Count(a => a == maxima) : 0,
             comIdade.Count(a => a == IdadeDeFimDeCarreira - 1),
             ultimo?.Temporada,
-            desta is not null && ultimo?.Temporada == temporada);
+            desta is not null && ultimo?.Temporada == temporada,
+            idadeMaximaDraft);
     }
 
     public async Task<IdadeDaLigaDto> GetIdadeDaLigaAsync(CancellationToken ct)

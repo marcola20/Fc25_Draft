@@ -7,9 +7,10 @@ public record IdadeDaLigaDto(int TemporadaDasIdades, int AnosASomar);
 /// <summary>Como estão as idades na temporada atual e o que o "envelhecer" vai fazer.</summary>
 /// <param name="Temporada">Temporada mais recente com liga; nulo sem temporada.</param>
 /// <param name="AplicadoEm">Quando os jogadores fizeram aniversário nesta temporada; nulo se ainda não.</param>
-/// <param name="SaemDoSub23">Quem tem 23 hoje e passa a 24 (sai do draft sub-23).</param>
+/// <param name="SaemDoDraft">Quem está na idade máxima do draft hoje e passa dela no aniversário.</param>
 /// <param name="Chegam34">Quem tem 33 hoje e passa a 34 (a idade em que a aposentadoria começa a rondar).</param>
 /// <param name="PodeDesfazer">Só o envelhecimento da temporada atual, e se for o último, pode ser desfeito.</param>
+/// <param name="IdadeMaximaDraft">Idade máxima do draft nas configurações; nulo = qualquer idade.</param>
 public record EnvelhecimentoSituacaoDto(
     int? Temporada,
     DateTime? AplicadoEm,
@@ -17,10 +18,11 @@ public record EnvelhecimentoSituacaoDto(
     int Jogadores,
     int SemIdade,
     double IdadeMedia,
-    int SaemDoSub23,
+    int SaemDoDraft,
     int Chegam34,
     int? UltimaTemporadaEnvelhecida,
-    bool PodeDesfazer)
+    bool PodeDesfazer,
+    int? IdadeMaximaDraft = null)
 {
     public bool JaEnvelhecida => AplicadoEm is not null;
 }

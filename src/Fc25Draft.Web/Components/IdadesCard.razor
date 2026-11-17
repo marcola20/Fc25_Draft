@@ -48,7 +48,10 @@
             {
                 <ul class="small mb-2">
                     <li>@_situacao.Jogadores jogadores ganham 1 ano (idade média @_situacao.IdadeMedia.ToString("0.0") → @((_situacao.IdadeMedia + 1).ToString("0.0"))).</li>
-                    <li>@_situacao.SaemDoSub23 fazem 24 e saem da idade do draft (sub-23).</li>
+                    @if (_situacao.IdadeMaximaDraft is int maxDraft)
+                    {
+                        <li>@_situacao.SaemDoDraft fazem @(maxDraft + 1) e saem da idade do draft (sub-@(maxDraft)).</li>
+                    }
                     <li>@_situacao.Chegam34 chegam aos 34, a idade em que a aposentadoria começa a rondar.</li>
                     @if (_situacao.SemIdade > 0)
                     {
