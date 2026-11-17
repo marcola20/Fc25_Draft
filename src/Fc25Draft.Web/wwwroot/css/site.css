@@ -980,11 +980,8 @@ a.text-primary:hover {
 
 /* Cartão capturado pelo html2canvas. Na tela é transparente/sem borda;
    quando renderizado para imagem ganha fundo branco + moldura. */
-.share-capture {
-    background: var(--bs-body-bg);
-}
-
 .share-capture.share-rendering {
+    background: var(--bs-body-bg);
     padding: 16px 18px 12px;
     border-radius: 14px;
     border: 1px solid var(--bs-border-color);

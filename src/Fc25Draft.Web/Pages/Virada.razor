@@ -31,11 +31,26 @@
             </div>
         }
 
-        <p class="text-body-secondary small mb-4" style="max-width: 48rem;">
-            No fim de cada temporada os jogadores envelhecem e evoluem: os jovens sobem, os veteranos caem, e o desempenho
-            (ser titular, a nota do PES) pesa na conta. De vez em quando alguém explode ou entra em queda de rendimento.
-            Os mais velhos anunciam a despedida e se aposentam na virada seguinte.
-        </p>
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+            <p class="text-body-secondary small mb-0" style="max-width: 48rem;">
+                No fim de cada temporada os jogadores envelhecem e evoluem: os jovens sobem, os veteranos caem, e o desempenho
+                (ser titular, a nota do PES) pesa na conta. De vez em quando alguém explode ou entra em queda de rendimento.
+                Os mais velhos anunciam a despedida e se aposentam na virada seguinte.
+            </p>
+            @if (_previa is not null)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 text-nowrap" @onclick="CompartilharAsync" disabled="@_compartilhando">
+                    @if (_compartilhando)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span><span>Gerando…</span>
+                    }
+                    else
+                    {
+                        <Icone Nome="share-2" Tamanho="14" /><span>Compartilhar</span>
+                    }
+                </button>
+            }
+        </div>
 
         @if (_previa is null)
         {
@@ -43,7 +58,8 @@
         }
         else
         {
-            <ShareableCard Id="cap-virada" Titulo="@($"Virada {_temporada} → {_temporada + 1}")" Subtitulo="Quem subiu e quem caiu" Arquivo="@($"cbfv-virada-{_temporada}.png")">
+            <ShareableCard @ref="_card" MostrarBotao="false" Link="/virada"
+                           Id="cap-virada" Titulo="@($"Virada {_temporada} → {_temporada + 1}")" Subtitulo="Quem subiu e quem caiu" Arquivo="@($"cbfv-virada-{_temporada}.png")">
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-6">
                         <div class="secao-titulo"><h2>Quem mais subiu</h2></div>
@@ -108,6 +124,16 @@
     private AposentadoriaPainelDto? _aposentadoria;
     private bool _carregando = true;
     private string? _erro;
+    private ShareableCard? _card;
+    private bool _compartilhando;
+
+    private async Task CompartilharAsync()
+    {
+        if (_compartilhando || _card is null) return;
+        _compartilhando = true;
+        try { await _card.Share(); }
+        finally { _compartilhando = false; }
+    }
 
     private IEnumerable<EvolucaoLinhaDto> MaisSubiram =>
         _previa!.Linhas.Where(l => l.Variacao > 0).OrderByDescending(l => l.Variacao).ThenByDescending(l => l.OverallDepois).Take(QuantosNaLista);
