@@ -460,9 +460,10 @@ public class LigaPublicService : ILigaPublicService
 
     public async Task<IReadOnlyList<LigaArtilheiroDto>> GetArtilheirosAsync(Guid ligaId, CancellationToken ct)
     {
+        // O playoff de acesso fica guardado na Série A, mas não conta nas estatísticas dela (só no histórico).
         var eventos = await _db.LigaEventos
             .AsNoTracking()
-            .Where(x => x.Partida.Rodada.LigaId == ligaId)
+            .Where(x => x.Partida.Rodada.LigaId == ligaId && x.Partida.Rodada.Numero != NumeroPlayoffAcesso)
             .Include(x => x.Jogador)
             .ToListAsync(ct);
 
@@ -497,7 +498,7 @@ public class LigaPublicService : ILigaPublicService
         var eventos = await _db.LigaEventos
             .AsNoTracking()
             .Where(x => x.Tipo == TipoEvento.Gol && x.AssistenteId != null
-                        && x.Partida.Rodada.LigaId == ligaId)
+                        && x.Partida.Rodada.LigaId == ligaId && x.Partida.Rodada.Numero != NumeroPlayoffAcesso)
             .Include(x => x.Assistente)
             .ToListAsync(ct);
 
@@ -609,7 +610,7 @@ public class LigaPublicService : ILigaPublicService
         var eventos = await _db.LigaEventos
             .AsNoTracking()
             .Where(x => (x.Tipo == TipoEvento.CartaoAmarelo || x.Tipo == TipoEvento.CartaoVermelho)
-                        && x.Partida.Rodada.LigaId == ligaId)
+                        && x.Partida.Rodada.LigaId == ligaId && x.Partida.Rodada.Numero != NumeroPlayoffAcesso)
             .Include(x => x.Jogador)
             .ToListAsync(ct);
 
@@ -712,7 +713,7 @@ public class LigaPublicService : ILigaPublicService
     public async Task<IReadOnlyList<NotaMediaJogadorDto>> GetMediasNotasAsync(Guid ligaId, CancellationToken ct)
     {
         var notas = await _db.LigaNotasJogadores.AsNoTracking()
-            .Where(n => n.Partida.Rodada.LigaId == ligaId)
+            .Where(n => n.Partida.Rodada.LigaId == ligaId && n.Partida.Rodada.Numero != NumeroPlayoffAcesso)
             .Select(n => new
             {
                 n.JogadorId, n.Jogador.Name, n.Jogador.PositionId, TimeNome = n.Time.TeamName,

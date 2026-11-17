@@ -184,12 +184,16 @@ public partial class ResultadoPesService : IResultadoPesService
         var foraId = AcharTime(r.Fora!.Time!, Fora);
 
         // Partidas de competições não encerradas, de qualquer rodada, e os jogos de mata-mata
-        // com os times definidos que ainda não têm partida criada.
+        // com os times definidos que ainda não têm partida criada. O playoff de acesso só é criado
+        // com a Série A encerrada: vale até a temporada seguinte ser gerada.
         async Task<List<Alvo>> Buscar(Guid mandante, Guid visitante)
         {
             var partidas = await _db.LigaPartidas.AsNoTracking()
                 .Where(p => p.TimeCasaId == mandante && p.TimeForaId == visitante
-                            && p.Rodada.Liga.Status != LigaStatus.Encerrada)
+                            && (p.Rodada.Liga.Status != LigaStatus.Encerrada
+                                || (p.Rodada.Numero == NumeroPlayoffAcesso
+                                    && !_db.Ligas.Any(l => l.Tipo == TipoCompetition.Liga
+                                                           && l.Temporada == p.Rodada.Liga.Temporada + 1))))
                 .Select(p => new { p.PartidaId, p.Status, p.Rodada.Numero, p.Rodada.Desempate, DataHora = p.DataHora ?? p.Rodada.DataHora, p.Rodada.Liga.Nome, p.Rodada.Liga.Tipo, p.Rodada.Liga.Divisao })
                 .ToListAsync(ct);
 
