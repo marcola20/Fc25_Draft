@@ -145,6 +145,23 @@ public static class OverallPes
     public static double? CalcularDoJogador(PlayerAtributosDto? a) =>
         a?.PosicaoPes is int pos and >= 0 and < 13 ? Calcular(Valores(a), pos, a.PeFracoUso, a.PeFracoPrecisao) : null;
 
+    /// <summary>Índice da fórmula (0 = GK … 12 = CF) para o id de posição do site (1 = GOL … 13 = SA).</summary>
+    private static readonly int[] IndiceDoSite = [-1, 0, 1, 2, 3, 4, 5, 8, 6, 9, 7, 10, 12, 11];
+
+    /// <summary>
+    /// Overall do jogador em cada posição do site (id 1 = GOL … 13 = SA), como o jogo mostra quando ele é escalado
+    /// ali: Rivaldo 87 de MAT pode dar 88 de MLG, um centroavante dá 70 de zagueiro. Null se não há atributos do jogo.
+    /// </summary>
+    public static IReadOnlyDictionary<short, int>? PorPosicaoDoSite(PlayerAtributosDto? a)
+    {
+        if (a?.PosicaoPes is not (>= 0 and < 13)) return null;
+        var valores = Valores(a);
+        var resultado = new Dictionary<short, int>(IndiceDoSite.Length - 1);
+        for (short id = 1; id < IndiceDoSite.Length; id++)
+            resultado[id] = Math.Clamp(Arredondar(Calcular(valores, IndiceDoSite[id], a.PeFracoUso, a.PeFracoPrecisao)), 1, 99);
+        return resultado;
+    }
+
     /// <summary>Acerta <c>Player.Overall</c> pela fórmula quando o jogador tem atributos do jogo (precisa de
     /// <c>Atributos</c> carregado). Devolve true se o overall mudou.</summary>
     public static bool Recalcular(Player jogador)

@@ -2,6 +2,7 @@
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Exceptions;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Fc25Draft.Infra.Services;
 using Microsoft.AspNetCore.Http;
@@ -194,7 +195,25 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         t.AuxiliarName))
                     .FirstOrDefaultAsync(ct);
 
-                return roster is null ? Results.NotFound() : Results.Ok(roster);
+                if (roster is null) return Results.NotFound();
+
+                // Overall em cada posição (a escalação mostra o do lugar onde o jogador foi posto).
+                var ids = roster.Jogadores.Select(j => j.PlayerId).ToList();
+                var atributos = await db.PlayerAtributos
+                    .AsNoTracking()
+                    .Where(a => ids.Contains(a.PlayerId) && a.PosicaoPes != null)
+                    .ToDictionaryAsync(a => a.PlayerId, ct);
+                if (atributos.Count > 0)
+                    roster = roster with
+                    {
+                        Jogadores = roster.Jogadores
+                            .Select(j => atributos.TryGetValue(j.PlayerId, out var a)
+                                ? j with { OverallPorPosicao = OverallPes.PorPosicaoDoSite(AtributosPes.ParaDto(a)) }
+                                : j)
+                            .ToList()
+                    };
+
+                return Results.Ok(roster);
             });
 
             var lineupsApi = teamsApi.MapGroup("/{teamId:guid}/lineups");

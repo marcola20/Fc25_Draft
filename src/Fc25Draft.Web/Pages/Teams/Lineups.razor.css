@@ -113,6 +113,10 @@
     line-height: 1;
 }
 
+/* Overall no lugar acima / abaixo do da posição do jogador. */
+.lugar .ovr.ovr-mais { background: #1e7b3c; }
+.lugar .ovr.ovr-menos { background: #b02a37; }
+
 .lugar .mais {
     display: flex;
     align-items: center;
@@ -252,6 +256,8 @@
 
 .chip-pos { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
 .chip-ovr { background: var(--bs-tertiary-bg); font-family: "Geist Mono", ui-monospace, monospace; }
+.chip-ovr.ovr-mais { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.chip-ovr.ovr-menos { background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
 
 .banco-lugar {
     display: flex;

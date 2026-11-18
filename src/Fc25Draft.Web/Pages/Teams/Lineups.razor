@@ -263,7 +263,7 @@ else
                                 <div class="lugar @(jogador is null ? "vazio" : "") @(aberto ? "aberto" : "") @ClasseDeDestino(slot, escolhendoLugar) @(_arrastando is not null && _arrastando.PlayerId == jogador?.PlayerId ? "saindo" : "")"
                                      style="left: @Pct(ponto.X); top: @Pct(ponto.Y);"
                                      role="button" tabindex="0"
-                                     title="@(jogador is null ? $"{slot.DisplayName}: vazio" : $"{slot.DisplayName}: {FormatPlayerOption(jogador)}")"
+                                     title="@(jogador is null ? $"{slot.DisplayName}: vazio" : $"{slot.DisplayName}: {DescreverNoLugar(slot, jogador)}")"
                                      draggable="@(jogador is not null && !isSaving ? "true" : "false")"
                                      data-arrastavel
                                      @ondragstart="() => ComecarArrastar(jogador)"
@@ -276,9 +276,9 @@ else
                                         @if (jogador is not null)
                                         {
                                             <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="44" Lazy="false" Alt="@jogador.Name" />
-                                            @if (jogador.Overall > 0)
+                                            @if (OverallNoLugar(slot, jogador) is var ovrLugar && ovrLugar > 0)
                                             {
-                                                <span class="ovr">@jogador.Overall</span>
+                                                <span class="ovr @ClasseDoOverall(ovrLugar, jogador)">@ovrLugar</span>
                                             }
                                         }
                                         else
@@ -1070,7 +1070,7 @@ else
 
                 rosterPlayers.Clear();
                 rosterPlayers.AddRange(adminRoster.Jogadores
-                    .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall))
+                    .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall, p.OverallPorPosicao))
                     .OrderByDescending(p => p.Overall)
                     .ThenBy(p => p.Name));
 
@@ -1180,7 +1180,7 @@ else
 
             rosterPlayers.Clear();
             rosterPlayers.AddRange(roster.Jogadores
-                .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall))
+                .Select(p => new PlayerOption(p.PlayerId, p.PlayerGuid, p.Nome, p.Posicao, p.PositionId, p.Overall, p.OverallPorPosicao))
                 .OrderByDescending(p => p.Overall)
                 .ThenBy(p => p.Name));
 
@@ -2038,9 +2038,10 @@ else
             {
                 <div class="small text-muted p-2">Ninguém do elenco joga aqui.</div>
             }
-            @foreach (var opcao in slot.AvailablePlayers)
+            @foreach (var opcao in OpcoesDoLugar(slot))
             {
                 var atual = slot.SelectedPlayer?.PlayerId == opcao.PlayerId;
+                var ovrLugar = OverallNoLugar(slot, opcao);
                 var onde = atual ? null : OndeEsta(opcao);
                 <button type="button" class="escolha-item @(atual ? "atual" : "")"
                         @onclick="() => EscolherNaLista(slot.SlotId, opcao)" disabled="@(atual || isSaving)">
@@ -2055,7 +2056,8 @@ else
                         <span class="escolha-onde">@onde</span>
                     }
                     <span class="chip-pos">@SiglaPes(opcao)</span>
-                    <span class="chip-ovr">@opcao.Overall</span>
+                    <span class="chip-ovr @ClasseDoOverall(ovrLugar, opcao)"
+                          title="@(ovrLugar != opcao.Overall ? $"{ovrLugar} de {SiglaDoLugar(slot)} ({opcao.Overall} de {SiglaPes(opcao)})" : null)">@ovrLugar</span>
                 </button>
             }
         </div>
@@ -2096,7 +2098,7 @@ else
     {
         var overalls = currentEditor?.Slots
             .Where(s => !s.IsBench && s.SelectedPlayer is { Overall: > 0 })
-            .Select(s => s.SelectedPlayer!.Overall)
+            .Select(s => OverallNoLugar(s, s.SelectedPlayer!))
             .ToList();
         return overalls is { Count: > 0 } ? (int)Math.Round(overalls.Average()) : null;
     }
@@ -2114,6 +2116,38 @@ else
     private static string SiglaPes(PlayerOption jogador)
         => LineupTemplateCatalog.SiglasPes.TryGetValue(jogador.PositionId, out var sigla) ? sigla : jogador.PositionName;
 
+    /// <summary>
+    /// Overall do jogador no lugar, como o jogo mostra: pela fórmula do PES na posição do lugar (Rivaldo 87 de MAT
+    /// pode dar 88 de MLG; centroavante de zagueiro cai). No banco, ou sem atributos do jogo, o overall dele.
+    /// </summary>
+    private int OverallNoLugar(LineupSlotState slot, PlayerOption jogador)
+    {
+        if (slot.IsBench || jogador.OverallPorPosicao is not { } porPosicao) return jogador.Overall;
+        var sigla = SiglaDoLugar(slot);
+        foreach (var (id, s) in LineupTemplateCatalog.SiglasPes)
+            if (string.Equals(s, sigla, StringComparison.OrdinalIgnoreCase))
+                return porPosicao.TryGetValue(id, out var ovr) ? ovr : jogador.Overall;
+        return jogador.Overall;
+    }
+
+    /// <summary>Verde se rende mais no lugar do que na posição dele, vermelho se rende menos.</summary>
+    private static string ClasseDoOverall(int noLugar, PlayerOption jogador)
+        => jogador.Overall <= 0 || noLugar == jogador.Overall ? "" : noLugar > jogador.Overall ? "ovr-mais" : "ovr-menos";
+
+    private string DescreverNoLugar(LineupSlotState slot, PlayerOption jogador)
+    {
+        var noLugar = OverallNoLugar(slot, jogador);
+        return noLugar == jogador.Overall
+            ? FormatPlayerOption(jogador)
+            : $"{jogador.Name} ({noLugar} de {SiglaDoLugar(slot)}; {jogador.Overall} de {SiglaPes(jogador)})";
+    }
+
+    /// <summary>Quem pode ir para o lugar, do maior overall ali para o menor.</summary>
+    private IEnumerable<PlayerOption> OpcoesDoLugar(LineupSlotState slot)
+        => slot.IsBench
+            ? slot.AvailablePlayers
+            : slot.AvailablePlayers.OrderByDescending(p => OverallNoLugar(slot, p)).ThenBy(p => p.Name);
+
     private static string NomeCurto(string nome)
     {
         if (nome.Length <= 12) return nome;
@@ -2125,7 +2159,8 @@ else
 
     private static string Pct(double v) => v.ToString("0.##", CultureInfo.InvariantCulture) + "%";
 
-    private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall);
+    private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall,
+        IReadOnlyDictionary<short, int>? OverallPorPosicao = null);
 
     private sealed record LineupSlotState(
         Guid SlotId, string SlotCode, string DisplayName, bool IsBench, int Order,

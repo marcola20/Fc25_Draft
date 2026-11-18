@@ -52,7 +52,11 @@ public record TeamRosterPlayerDto(
     int? Rodada,
     int? Escolha,
     decimal? PrecoPedido = null,
-    string? EmprestadoPor = null);
+    string? EmprestadoPor = null)
+{
+    /// <summary>Overall em cada posição (id do site 1 = GOL … 13 = SA) pela fórmula do PES; null sem atributos do jogo.</summary>
+    public IReadOnlyDictionary<short, int>? OverallPorPosicao { get; init; }
+}
 
 public record TeamExportDto(
     string Time,
