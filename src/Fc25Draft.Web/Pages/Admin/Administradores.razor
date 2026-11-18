@@ -43,10 +43,18 @@
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Token de acesso</label>
-                        <input class="form-control font-monospace" @bind="_token" placeholder="deixe vazio para gerar" />
+                        @if (string.IsNullOrEmpty(_treinadorSel))
+                        {
+                            <input class="form-control font-monospace" @bind="_token" placeholder="deixe vazio para gerar" />
+                        }
+                        else
+                        {
+                            <input class="form-control" disabled value="o mesmo do treinador" />
+                            <div class="form-text">Ligado a um treinador, ele entra com um token só.</div>
+                        }
                     </div>
                     <div class="col-12 col-md-3">
-                        <label class="form-label">Treinador (para o bolão)</label>
+                        <label class="form-label">Treinador</label>
                         <select class="form-select" @bind="_treinadorSel">
                             <option value="">— nenhum —</option>
                             @foreach (var t in _treinadores)

@@ -77,7 +77,11 @@ public class TreinadorService : ITreinadorService
 
         var repetido = await _db.Treinadores
             .AnyAsync(t => t.Token.ToUpper() == token.ToUpper() && t.TreinadorId != request.TreinadorId, ct);
-        if (repetido)
+        // Também não pode bater com o token de um admin de outra pessoa.
+        var deAdmin = await _db.AdminTokens
+            .AnyAsync(a => a.Token.ToUpper() == token.ToUpper()
+                && (request.TreinadorId == null || a.TreinadorId != request.TreinadorId), ct);
+        if (repetido || deAdmin)
             throw new InvalidOperationException("Já existe alguém com esse token.");
 
         Treinador treinador;
@@ -96,6 +100,7 @@ public class TreinadorService : ITreinadorService
         treinador.Nome = request.Nome.Trim();
         treinador.Token = token;
         treinador.Ativo = request.Ativo;
+        await SincronizarTokenDoAdminAsync(treinador, ct);
 
         await _db.SaveChangesAsync(ct);
         await AtualizarNomesDosTimesAsync(treinador.Passagens.Select(p => p.TimeId), ct);
@@ -110,9 +115,18 @@ public class TreinadorService : ITreinadorService
             ?? throw new InvalidOperationException("Treinador não encontrado.");
 
         treinador.Token = GerarToken(treinador.Nome);
+        await SincronizarTokenDoAdminAsync(treinador, ct);
         await _db.SaveChangesAsync(ct);
 
         return (await GetAsync(treinadorId, ct))!;
+    }
+
+    /// <summary>Quem é treinador e admin tem um token só: o admin ligado a ele acompanha o token novo.</summary>
+    private async Task SincronizarTokenDoAdminAsync(Treinador treinador, CancellationToken ct)
+    {
+        var admins = await _db.AdminTokens.Where(a => a.TreinadorId == treinador.TreinadorId).ToListAsync(ct);
+        foreach (var admin in admins)
+            admin.Token = treinador.Token;
     }
 
     public async Task ExcluirAsync(Guid treinadorId, CancellationToken ct)

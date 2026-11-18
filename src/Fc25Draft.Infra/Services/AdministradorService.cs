@@ -73,13 +73,20 @@ public class AdministradorService : IAdministradorService
         if (admin.IsPrincipal && !request.Ativo)
             throw new InvalidOperationException("O administrador principal não pode ser desativado.");
 
-        var token = string.IsNullOrWhiteSpace(request.Token) ? await GerarTokenUnicoAsync(nome, ct) : request.Token.Trim();
-        if (token != admin.Token)
-            await ExigirTokenLivreAsync(token, admin.AdminTokenId, ct);
+        string token;
+        if (request.TreinadorId is Guid treinadorId)
+        {
+            // Ligado a um treinador, a pessoa tem um token só: o de treinador vale também como admin.
+            token = await _db.Treinadores.Where(t => t.TreinadorId == treinadorId).Select(t => t.Token).FirstOrDefaultAsync(ct)
+                ?? throw new InvalidOperationException("Treinador não encontrado.");
+        }
+        else
+        {
+            token = string.IsNullOrWhiteSpace(request.Token) ? await GerarTokenUnicoAsync(nome, ct) : request.Token.Trim();
+        }
 
-        if (request.TreinadorId is Guid treinadorId
-            && !await _db.Treinadores.AnyAsync(t => t.TreinadorId == treinadorId, ct))
-            throw new InvalidOperationException("Treinador não encontrado.");
+        if (token != admin.Token)
+            await ExigirTokenLivreAsync(token, admin.AdminTokenId, request.TreinadorId, ct);
 
         admin.Description = nome;
         admin.Token = token;
@@ -103,6 +110,12 @@ public class AdministradorService : IAdministradorService
             ?? throw new InvalidOperationException("Administrador não encontrado.");
 
         admin.Token = await GerarTokenUnicoAsync(admin.Description ?? "", ct);
+
+        // Admin ligado a um treinador: o token novo vale para os dois, continua sendo um só.
+        if (admin.TreinadorId is Guid treinadorId
+            && await _db.Treinadores.FirstOrDefaultAsync(t => t.TreinadorId == treinadorId, ct) is { } treinador)
+            treinador.Token = admin.Token;
+
         await _db.SaveChangesAsync(ct);
 
         return await GetDtoAsync(admin.AdminTokenId, ct);
@@ -131,15 +144,16 @@ public class AdministradorService : IAdministradorService
     /// <summary>
     /// O token de admin é conferido antes do de treinador na hora de entrar, então ele não
     /// pode bater com o de ninguém — senão um treinador viraria administrador sem querer.
+    /// A exceção é o treinador ligado a este admin: é a mesma pessoa, com o mesmo token.
     /// </summary>
-    private async Task ExigirTokenLivreAsync(string token, Guid adminTokenId, CancellationToken ct)
+    private async Task ExigirTokenLivreAsync(string token, Guid adminTokenId, Guid? treinadorLigado, CancellationToken ct)
     {
         var maiusculo = token.ToUpper();
 
         var deOutroAdmin = await _db.AdminTokens
             .AnyAsync(t => t.AdminTokenId != adminTokenId && t.Token.ToUpper() == maiusculo, ct);
         var deTreinador = await _db.Treinadores
-            .AnyAsync(t => t.Token.ToUpper() == maiusculo, ct);
+            .AnyAsync(t => t.TreinadorId != treinadorLigado && t.Token.ToUpper() == maiusculo, ct);
 
         if (deOutroAdmin || deTreinador)
             throw new InvalidOperationException("Esse token já é usado por outra pessoa.");

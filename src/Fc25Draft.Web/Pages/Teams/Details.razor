@@ -961,9 +961,8 @@ else
         if (string.IsNullOrWhiteSpace(token))
             return;
 
+        // O admin também passa por aqui: se ele for treinador deste time, comanda o time como qualquer técnico.
         await AdminAuth.EnsureInitializedAsync();
-        if (AdminAuth.IsAdmin)
-            return;
 
         _currentTeamToken = token.Trim();
 

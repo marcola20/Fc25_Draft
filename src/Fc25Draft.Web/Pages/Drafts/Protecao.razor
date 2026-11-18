@@ -162,6 +162,10 @@
             if (AdminAuth.IsAdmin)
             {
                 _times = await ExpansaoService.ListarTimesAsync(CancellationToken.None);
+
+                // Admin que também é treinador já abre no próprio time (dá para trocar no seletor).
+                _teamId = (await ExpansaoService.ResolverTimeAsync(AdminAuth.Token, CancellationToken.None))?.TeamId;
+                await CarregarProtecaoAsync();
                 return;
             }
 

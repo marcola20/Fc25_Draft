@@ -341,9 +341,12 @@
     private string GetAccessLabel()
     {
         if (!AdminAuth.IsAuthenticated) return "Modo somente leitura";
-        if (AdminAuth.IsAdmin) return "Administrador";
-
         // Quem entrou é a pessoa; o clube vem da passagem em aberto dela.
+        if (AdminAuth.IsAdmin)
+            return quemEntrou is null
+                ? "Administrador"
+                : $"{quemEntrou.Treinador} · {quemEntrou.TeamName} · Admin";
+
         return quemEntrou is null
             ? "Sem clube"
             : $"{quemEntrou.Treinador} · {quemEntrou.TeamName}";
@@ -353,7 +356,8 @@
     {
         quemEntrou = null;
 
-        if (!AdminAuth.IsAuthenticated || AdminAuth.IsAdmin) return;
+        // O admin também pode ser treinador de um clube: aí ele vê o clube e os avisos dele.
+        if (!AdminAuth.IsAuthenticated) return;
 
         try
         {
@@ -398,7 +402,9 @@
             {
                 await AtualizarQuemEntrouAsync();
                 adminBannerMessage = AdminAuth.IsAdmin
-                    ? "Modo administrador ativado."
+                    ? quemEntrou is null
+                        ? "Modo administrador ativado."
+                        : $"Modo administrador ativado. {quemEntrou.Treinador}, {quemEntrou.Papel} do {quemEntrou.TeamName}."
                     : quemEntrou is null
                         ? "Você entrou, mas não está em nenhum clube no momento."
                         : $"{quemEntrou.Treinador}, {quemEntrou.Papel} do {quemEntrou.TeamName}.";
