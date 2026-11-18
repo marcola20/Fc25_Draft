@@ -59,12 +59,14 @@ public record PremioConquistadoDto(int Temporada, CategoriaPremio Categoria, str
 }
 
 /// <summary>
-/// Premiações de estatística da temporada (Série A, Série B e Copa somadas): as já dadas ou a prévia do que vai
-/// ser dado. <c>Competicoes</c> são as que entram na soma.
+/// Premiações de estatística de uma competição: as já dadas ou a prévia do que vai ser dado. <c>Antigos</c>: a
+/// temporada tem prêmios dados pela regra da temporada somada, que precisam ser desfeitos antes.
 /// </summary>
 public record PremiosEstatisticaDto(
-    int Temporada,
-    IReadOnlyList<string> Competicoes,
+    Guid LigaId,
+    string LigaNome,
+    int? Temporada,
+    bool Antigos,
     bool Encerrada,
     bool JaDado,
     DateTime? DadoEm,

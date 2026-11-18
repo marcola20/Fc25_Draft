@@ -81,8 +81,8 @@
             <div class="card mt-3">
                 <div class="card-header d-flex flex-wrap align-items-center gap-2">
                     <Icone Nome="award" Tamanho="16" />
-                    <span class="fw-bold">Prêmios de estatística da temporada @pr.Temporada</span>
-                    <span class="text-muted small">soma @string.Join(", ", pr.Competicoes) · top 3 · dinheiro para o clube e +1 over para o jogador · quem entra em duas repassa um over (o treinador escolhe na Minha Área, overall até @PremiosEstatistica.OverallMaximoDoRepasse)</span>
+                    <span class="fw-bold">Prêmios de estatística — @(pr.Antigos ? $"temporada {pr.Temporada} somada" : pr.LigaNome)</span>
+                    <span class="text-muted small">top 3 da competição · dinheiro para o clube e +1 over para o jogador · quem entra em duas listas na temporada repassa um over (o treinador escolhe na Minha Área, overall até @PremiosEstatistica.OverallMaximoDoRepasse)</span>
                     <div class="ms-auto d-flex gap-2">
                         @if (pr.JaDado)
                         {
@@ -97,6 +97,13 @@
                         }
                     </div>
                 </div>
+                @if (pr.Antigos)
+                {
+                    <div class="alert alert-warning m-3 mb-0 py-2 small">
+                        Estes prêmios foram dados pela temporada somada (Série A + Série B + Copa). Para premiar cada competição,
+                        clique em <strong>Desfazer</strong> e depois dê os prêmios da Série A, da Série B e da Copa, uma de cada vez.
+                    </div>
+                }
                 @if (pr.Impedimento is not null && !pr.JaDado)
                 {
                     <div class="alert alert-warning m-3 mb-0 py-2 small">@pr.Impedimento</div>
@@ -232,11 +239,7 @@
 
     private async Task CarregarPremios()
     {
-        _premios = null;
-        _companheiros.Clear();
-        if (_edicoes.FirstOrDefault(e => e.LigaId == _ligaId)?.Temporada is not int temporada) return;
-
-        _premios = await PremiosEstatSvc.GetAsync(temporada, CancellationToken.None);
+        _premios = await PremiosEstatSvc.GetAsync(_ligaId, CancellationToken.None);
         _companheiros.Clear();
         _escolhido.Clear();
         foreach (var l in _premios.Linhas.Where(l => l.PremioId is not null && l.Repasse && !l.OverDado))
@@ -244,12 +247,14 @@
     }
 
     private Task DarPremios() => Acao(
-        $"Dar os prêmios de estatística da temporada {_premios?.Temporada} (Série A, Série B e Copa somadas)? Os clubes recebem o dinheiro e os jogadores o +1 over agora.",
-        () => PremiosEstatSvc.DarAsync(_premios!.Temporada, CancellationToken.None));
+        $"Dar os prêmios de estatística da {_premios?.LigaNome}? Os clubes recebem o dinheiro e os jogadores o +1 over agora.",
+        () => PremiosEstatSvc.DarAsync(_ligaId, CancellationToken.None));
 
     private Task DesfazerPremios() => Acao(
-        $"Desfazer os prêmios de estatística da temporada {_premios?.Temporada}? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou).",
-        () => PremiosEstatSvc.DesfazerAsync(_premios!.Temporada, CancellationToken.None));
+        _premios?.Antigos == true
+            ? $"Desfazer os prêmios da temporada {_premios.Temporada} somada? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou)."
+            : $"Desfazer os prêmios de estatística da {_premios?.LigaNome}? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou).",
+        () => PremiosEstatSvc.DesfazerAsync(_ligaId, CancellationToken.None));
 
     private Task DarOver(PremioEstatisticaLinhaDto l)
     {

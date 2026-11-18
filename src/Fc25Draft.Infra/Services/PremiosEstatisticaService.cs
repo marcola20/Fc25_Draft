@@ -11,10 +11,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Fc25Draft.Infra.Services;
 
 /// <summary>
-/// Premiações individuais de estatística: top 3 de artilharia, assistências e clean sheets da temporada, somando
-/// Série A, Série B e Copa. O clube recebe o dinheiro e o jogador o +1 over (pelos atributos, para o Editor PES
-/// levar ao save). Quem entra em duas estatísticas fica com um over; o outro é repassado a um companheiro (overall
-/// até 87) que o treinador escolhe.
+/// Premiações individuais de estatística: top 3 de artilharia, assistências e clean sheets de cada competição
+/// (Série A, Série B e Copa). O clube recebe o dinheiro e o jogador o +1 over (pelos atributos, para o Editor PES
+/// levar ao save). Quem entra em duas listas na temporada fica com um over; o outro é repassado a um companheiro
+/// (overall até 87) que o treinador escolhe.
 /// </summary>
 public class PremiosEstatisticaService : IPremiosEstatisticaService
 {
@@ -34,20 +34,25 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
 
     private DateTime AgoraUtc => _time.GetUtcNow().UtcDateTime;
 
-    private static string Titulo(CategoriaEstatistica categoria, int posicao, int temporada) =>
-        $"{PremiosEstatistica.Titulo(categoria, posicao)} da temporada {temporada}";
+    /// <summary>"vice-artilheiro (Brasileirão — Série A 2010)"; nos prêmios antigos, "(temporada 2010)".</summary>
+    private static string Titulo(CategoriaEstatistica categoria, int posicao, string onde) =>
+        $"{PremiosEstatistica.Titulo(categoria, posicao)} ({onde})";
+
+    private static string Onde(string? ligaNome, int temporada) => ligaNome ?? $"temporada {temporada}";
 
     // ── Admin ────────────────────────────────────────────────────────────────
 
-    public async Task<PremiosEstatisticaDto> GetAsync(int temporada, CancellationToken ct)
+    public async Task<PremiosEstatisticaDto> GetAsync(Guid ligaId, CancellationToken ct)
     {
-        var ligas = await LigasDaTemporadaAsync(temporada, ct);
-        var nomes = ligas.Select(l => l.Nome).ToList();
-        var abertas = ligas.Where(l => l.Status != LigaStatus.Encerrada).Select(l => l.Nome).ToList();
-        var encerrada = ligas.Count > 0 && abertas.Count == 0;
+        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(l => l.LigaId == ligaId, ct)
+                   ?? throw new InvalidOperationException("Competição não encontrada.");
+        var encerrada = liga.Status == LigaStatus.Encerrada;
+
+        // Prêmios dados pela temporada somada (regra antiga) travam a temporada até serem desfeitos.
+        var antigos = liga.Temporada is int t && await _db.PremiosEstatistica.AnyAsync(p => p.Temporada == t && p.LigaId == null, ct);
 
         var dados = await _db.PremiosEstatistica.AsNoTracking()
-            .Where(p => p.Temporada == temporada)
+            .Where(p => antigos ? p.Temporada == liga.Temporada && p.LigaId == null : p.LigaId == ligaId)
             .Select(p => new
             {
                 p.PremioId, p.Categoria, p.Posicao, p.Numero, p.Detalhe, p.PlayerId, Nome = p.Player.Name, p.TimeId,
@@ -58,27 +63,33 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
             .ToListAsync(ct);
 
         if (dados.Count > 0)
-            return new PremiosEstatisticaDto(temporada, nomes, encerrada, true, dados.Max(d => d.PagoEm), null,
+            return new PremiosEstatisticaDto(liga.LigaId, liga.Nome, liga.Temporada, antigos, encerrada, true, dados.Max(d => d.PagoEm), null,
                 dados.OrderBy(d => d.Categoria).ThenBy(d => d.Posicao).ThenBy(d => d.Nome, StringComparer.Create(Br, true))
                     .Select(d => new PremioEstatisticaLinhaDto(d.PremioId, d.Categoria, d.Posicao, d.Numero, d.Detalhe, d.PlayerId, d.Nome,
                         d.TimeId, d.TimeNome, d.Valor, d.Repasse, d.OverParaPlayerId, d.OverParaNome, d.OverAplicadoEm is not null, d.NoSave))
                     .ToList());
 
-        var linhas = await CalcularAsync(ligas, ct);
-        string? impedimento = ligas.Count == 0 ? $"A temporada {temporada} não tem Série nem Copa."
-            : abertas.Count > 0 ? $"Ainda não encerrada{(abertas.Count == 1 ? "" : "s")}: {string.Join(", ", abertas)}. Os números podem mudar."
-            : linhas.Count == 0 ? "Ninguém fez gol, assistência ou clean sheet na temporada."
+        var premiavel = liga.Tipo is TipoCompetition.Liga or TipoCompetition.Copa;
+        var linhas = premiavel ? await CalcularAsync(liga, ct) : Array.Empty<PremioEstatisticaLinhaDto>();
+        string? impedimento = !premiavel ? "Só a Série A, a Série B e a Copa têm prêmio de estatística."
+            : liga.Temporada is null ? "A competição não tem temporada definida."
+            : !encerrada ? "A competição ainda não foi encerrada: os números podem mudar."
+            : linhas.Count == 0 ? "Ninguém fez gol, assistência ou clean sheet nessa competição."
             : null;
 
-        return new PremiosEstatisticaDto(temporada, nomes, encerrada, false, null, impedimento, linhas);
+        return new PremiosEstatisticaDto(liga.LigaId, liga.Nome, liga.Temporada, false, encerrada, false, null, impedimento, linhas);
     }
 
-    public async Task<string> DarAsync(int temporada, CancellationToken ct)
+    public async Task<string> DarAsync(Guid ligaId, CancellationToken ct)
     {
-        var previa = await GetAsync(temporada, ct);
-        if (previa.JaDado) throw new InvalidOperationException("Os prêmios de estatística dessa temporada já foram dados (desfaça antes para dar de novo).");
+        var previa = await GetAsync(ligaId, ct);
+        if (previa.JaDado)
+            throw new InvalidOperationException(previa.Antigos
+                ? "A temporada tem prêmios dados pela soma das competições: desfaça antes."
+                : "Os prêmios de estatística dessa competição já foram dados.");
         if (previa.Impedimento is not null) throw new InvalidOperationException(previa.Impedimento);
 
+        var temporada = previa.Temporada!.Value;
         var agora = AgoraUtc;
         var quando = HorarioDeBrasilia.Agora(_time);
 
@@ -96,16 +107,16 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
         foreach (var linha in previa.Linhas)
         {
             var jogador = jogadores[linha.PlayerId];
-            var titulo = Titulo(linha.Categoria, linha.Posicao, temporada);
+            var titulo = Titulo(linha.Categoria, linha.Posicao, previa.LigaNome);
 
             var premio = new PremioEstatistica
             {
                 PremioId = Guid.NewGuid(),
+                LigaId = ligaId,
                 Temporada = temporada,
                 Categoria = linha.Categoria,
                 Posicao = linha.Posicao,
                 Numero = linha.Numero,
-                Detalhe = linha.Detalhe,
                 PlayerId = linha.PlayerId,
                 TimeId = linha.TimeId,
                 Valor = linha.Valor,
@@ -134,7 +145,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
                 repasses.Add($"{jogador.Name} ({PremiosEstatistica.Titulo(linha.Categoria, linha.Posicao)})");
                 if (jogador.CurrentTeamId is Guid clube)
                     AvisosDoTime.Criar(_db, clube, AvisosDoTime.Premio,
-                        $"{jogador.Name} foi {titulo} (+{Mi(linha.Valor)}), mas já levou over por outra estatística: escolha na Minha Área o companheiro (overall até {PremiosEstatistica.OverallMaximoDoRepasse}) que recebe o +1 over.",
+                        $"{jogador.Name} foi {titulo} (+{Mi(linha.Valor)}), mas já levou over por outra estatística na temporada: escolha na Minha Área o companheiro (overall até {PremiosEstatistica.OverallMaximoDoRepasse}) que recebe o +1 over.",
                         "/minha-area", agora);
                 continue;
             }
@@ -168,12 +179,15 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
         return texto;
     }
 
-    public async Task<string> DesfazerAsync(int temporada, CancellationToken ct)
+    public async Task<string> DesfazerAsync(Guid ligaId, CancellationToken ct)
     {
-        var premios = await _db.PremiosEstatistica.Include(p => p.Evolucao)
-            .Where(p => p.Temporada == temporada)
+        var previa = await GetAsync(ligaId, ct);
+        var ids = previa.Linhas.Where(l => l.PremioId is not null).Select(l => l.PremioId!.Value).ToList();
+
+        var premios = await _db.PremiosEstatistica.Include(p => p.Evolucao).Include(p => p.Liga)
+            .Where(p => ids.Contains(p.PremioId))
             .ToListAsync(ct);
-        if (premios.Count == 0) throw new InvalidOperationException("Essa temporada não tem prêmios de estatística dados.");
+        if (premios.Count == 0) throw new InvalidOperationException("Essa competição não tem prêmios de estatística dados.");
 
         var comOver = premios.Where(p => p.OverAplicadoEm is not null && p.OverParaPlayerId is not null).ToList();
         var noSave = comOver.Where(p => p.Evolucao?.AplicadaNoJogoEmUtc is not null).Select(p => p.OverParaPlayerId!.Value).ToList();
@@ -203,7 +217,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
                 Tipo = "DEBIT",
                 Origem = OrigemLedger,
                 Valor = p.Valor,
-                Descricao = $"Estorno — {Titulo(p.Categoria, p.Posicao, temporada)}"
+                Descricao = $"Estorno — {Titulo(p.Categoria, p.Posicao, Onde(p.Liga?.Nome, p.Temporada))}"
             });
         }
 
@@ -246,7 +260,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
     {
         var pendentes = await _db.PremiosEstatistica.AsNoTracking()
             .Where(p => p.Repasse && p.OverAplicadoEm == null && p.Player.CurrentTeamId == teamId)
-            .Select(p => new { p.PremioId, p.PlayerId, Nome = p.Player.Name, p.Categoria, p.Posicao, p.Temporada })
+            .Select(p => new { p.PremioId, p.PlayerId, Nome = p.Player.Name, p.Categoria, p.Posicao, p.Temporada, Liga = p.Liga != null ? p.Liga.Nome : null })
             .ToListAsync(ct);
         if (pendentes.Count == 0) return Array.Empty<RepasseDeOverDto>();
 
@@ -255,7 +269,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
         var temporadas = pendentes.Select(p => p.Temporada).Distinct().ToList();
         var levados = await _db.PremiosEstatistica.AsNoTracking()
             .Where(p => !p.Repasse && ids.Contains(p.PlayerId) && temporadas.Contains(p.Temporada))
-            .Select(p => new { p.PlayerId, p.Temporada, p.Categoria, p.Posicao })
+            .Select(p => new { p.PlayerId, p.Temporada, p.Categoria, p.Posicao, Liga = p.Liga != null ? p.Liga.Nome : null })
             .ToListAsync(ct);
 
         var companheiros = new Dictionary<int, IReadOnlyList<PremioJogadorOpcaoDto>>();
@@ -268,9 +282,9 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
             {
                 var levou = levados.Where(l => l.PlayerId == p.PlayerId && l.Temporada == p.Temporada)
                     .OrderBy(l => l.Categoria)
-                    .Select(l => PremiosEstatistica.Titulo(l.Categoria, l.Posicao));
+                    .Select(l => Titulo(l.Categoria, l.Posicao, Onde(l.Liga, l.Temporada)));
                 return new RepasseDeOverDto(p.PremioId, p.PlayerId, p.Nome,
-                    Titulo(p.Categoria, p.Posicao, p.Temporada),
+                    Titulo(p.Categoria, p.Posicao, Onde(p.Liga, p.Temporada)),
                     string.Join(" e ", levou),
                     companheiros[p.PlayerId]);
             })
@@ -294,70 +308,39 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
 
     // ── Apoio ────────────────────────────────────────────────────────────────
 
-    /// <summary>Séries e Copa da temporada (a Supercopa fica fora: é jogada no começo da temporada seguinte).</summary>
-    private async Task<List<Liga>> LigasDaTemporadaAsync(int temporada, CancellationToken ct) =>
-        (await _db.Ligas.AsNoTracking()
-            .Where(l => l.Temporada == temporada && (l.Tipo == TipoCompetition.Liga || l.Tipo == TipoCompetition.Copa))
-            .ToListAsync(ct))
-        .OrderBy(l => l.Tipo).ThenBy(l => l.Divisao)
-        .ToList();
-
-    private sealed record Soma(int JogadorId, string Nome, int Numero, string Detalhe, Guid? TimeDaStat);
-
     /// <summary>
-    /// Top 3 de cada estatística com os números das competições somados, com o repasse já marcado: o primeiro over
-    /// do jogador na temporada é dele (ordem Artilharia → Assistências → Clean sheets).
+    /// Top 3 de cada estatística da competição, com o repasse já marcado: o primeiro over do jogador na temporada é
+    /// dele (de outra competição já premiada ou, nesta, na ordem Artilharia → Assistências → Clean sheets).
     /// </summary>
-    private async Task<IReadOnlyList<PremioEstatisticaLinhaDto>> CalcularAsync(IReadOnlyList<Liga> ligas, CancellationToken ct)
+    private async Task<IReadOnlyList<PremioEstatisticaLinhaDto>> CalcularAsync(Liga liga, CancellationToken ct)
     {
         var stats = new LigaPublicService(_db);
-        var porCategoria = PremiosEstatistica.Todas.ToDictionary(r => r.Categoria,
-            _ => new List<(int JogadorId, string Nome, Guid TimeId, int Numero, string Competicao)>());
-
-        foreach (var liga in ligas)
+        var rankings = new Dictionary<CategoriaEstatistica, IReadOnlyList<(int JogadorId, string Nome, Guid TimeId, string TimeNome, int Numero)>>
         {
-            var competicao = LigaLabels.Competicao(liga.Tipo, liga.Divisao);
-            porCategoria[CategoriaEstatistica.Artilharia].AddRange((await stats.GetArtilheirosAsync(liga.LigaId, ct))
-                .Select(a => (a.JogadorId, a.JogadorNome, a.TimeId, a.Gols, competicao)));
-            porCategoria[CategoriaEstatistica.Assistencias].AddRange((await stats.GetAssistenciasAsync(liga.LigaId, ct))
-                .Select(a => (a.JogadorId, a.JogadorNome, a.TimeId, a.Assistencias, competicao)));
-            porCategoria[CategoriaEstatistica.CleanSheets].AddRange((await stats.GetCleanSheetsAsync(liga.LigaId, ct))
-                .Select(c => (c.JogadorId, c.JogadorNome, c.TimeId, c.CleanSheets, competicao)));
-        }
+            [CategoriaEstatistica.Artilharia] = (await stats.GetArtilheirosAsync(liga.LigaId, ct))
+                .Select(a => (a.JogadorId, a.JogadorNome, a.TimeId, a.TimeNome, a.Gols)).ToList(),
+            [CategoriaEstatistica.Assistencias] = (await stats.GetAssistenciasAsync(liga.LigaId, ct))
+                .Select(a => (a.JogadorId, a.JogadorNome, a.TimeId, a.TimeNome, a.Assistencias)).ToList(),
+            [CategoriaEstatistica.CleanSheets] = (await stats.GetCleanSheetsAsync(liga.LigaId, ct))
+                .Select(c => (c.JogadorId, c.JogadorNome, c.TimeId, c.TimeNome, c.CleanSheets)).ToList(),
+        };
 
-        var tops = new Dictionary<CategoriaEstatistica, IReadOnlyList<(int Posicao, Soma Item)>>();
-        foreach (var (categoria, linhasDaStat) in porCategoria)
-        {
-            var somas = linhasDaStat
-                .Where(x => x.Numero > 0)
-                .GroupBy(x => x.JogadorId)
-                .Select(g => new Soma(g.Key, g.First().Nome, g.Sum(x => x.Numero),
-                    string.Join(" · ", g.Select(x => $"{x.Competicao} {x.Numero}")),
-                    // O time da competição em que ele mais fez (o mais recente em empate fica com a ordem da lista).
-                    g.OrderByDescending(x => x.Numero).Select(x => (Guid?)x.TimeId).FirstOrDefault(t => t != Guid.Empty)));
-            tops[categoria] = PremiosEstatistica.Top3(somas, s => s.Numero);
-        }
+        // Quem já levou over de estatística em outra competição da temporada.
+        var jaLevaram = liga.Temporada is int temporada
+            ? (await _db.PremiosEstatistica.AsNoTracking()
+                .Where(p => p.Temporada == temporada && !p.Repasse && p.LigaId != liga.LigaId)
+                .Select(p => p.PlayerId).ToListAsync(ct)).ToHashSet()
+            : new HashSet<int>();
 
-        // O dinheiro vai para o clube em que o jogador está agora (quem saiu no meio da temporada leva junto).
-        var ids = tops.Values.SelectMany(t => t.Select(x => x.Item.JogadorId)).Distinct().ToList();
-        var clubes = await _db.Players.AsNoTracking()
-            .Where(p => ids.Contains(p.PlayerId))
-            .Select(p => new { p.PlayerId, p.CurrentTeamId, Time = p.CurrentTeam != null ? p.CurrentTeam.TeamName : null })
-            .ToDictionaryAsync(p => p.PlayerId, ct);
-        var nomesTimes = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
-
-        var jaLevaram = new HashSet<int>();
         var linhas = new List<PremioEstatisticaLinhaDto>();
         foreach (var regra in PremiosEstatistica.Todas)
         {
-            foreach (var (posicao, j) in tops[regra.Categoria]
+            foreach (var (posicao, j) in PremiosEstatistica.Top3(rankings[regra.Categoria], x => x.Numero)
                          .OrderBy(x => x.Posicao).ThenBy(x => x.Item.Nome, StringComparer.Create(Br, true)))
             {
                 var repasse = !jaLevaram.Add(j.JogadorId);
-                var timeId = clubes.TryGetValue(j.JogadorId, out var c) && c.CurrentTeamId is Guid atual ? atual : j.TimeDaStat;
-                var timeNome = timeId is Guid t && nomesTimes.TryGetValue(t, out var n) ? n : null;
-                linhas.Add(new PremioEstatisticaLinhaDto(null, regra.Categoria, posicao, j.Numero, j.Detalhe, j.JogadorId, j.Nome,
-                    timeId, timeNome, regra.ValorDa(posicao), repasse, null, null, false, false));
+                linhas.Add(new PremioEstatisticaLinhaDto(null, regra.Categoria, posicao, j.Numero, null, j.JogadorId, j.Nome,
+                    j.TimeId == Guid.Empty ? null : j.TimeId, j.TimeNome, regra.ValorDa(posicao), repasse, null, null, false, false));
             }
         }
 
@@ -366,7 +349,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
 
     private async Task<PremioEstatistica> CarregarParaDarAsync(Guid premioId, CancellationToken ct)
     {
-        var premio = await _db.PremiosEstatistica.Include(p => p.Player)
+        var premio = await _db.PremiosEstatistica.Include(p => p.Player).Include(p => p.Liga)
                          .FirstOrDefaultAsync(p => p.PremioId == premioId, ct)
                      ?? throw new InvalidOperationException("Prêmio não encontrado.");
         if (premio.OverAplicadoEm is not null) throw new InvalidOperationException("O over desse prêmio já foi dado.");
@@ -394,7 +377,7 @@ public class PremiosEstatisticaService : IPremiosEstatisticaService
         var jogador = await _db.Players.Include(p => p.Atributos).FirstOrDefaultAsync(p => p.PlayerId == alvoId, ct)
                       ?? throw new InvalidOperationException("Jogador não encontrado.");
 
-        var titulo = Titulo(premio.Categoria, premio.Posicao, premio.Temporada);
+        var titulo = Titulo(premio.Categoria, premio.Posicao, Onde(premio.Liga?.Nome, premio.Temporada));
         var repasse = alvoId != premio.PlayerId;
         var motivo = repasse
             ? $"Prêmio {PremiosEstatistica.Titulo(premio.Categoria, premio.Posicao)} (repasse de {premio.Player.Name})"

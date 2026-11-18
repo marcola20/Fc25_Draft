@@ -3098,6 +3098,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int?>("EvolucaoPesId")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("LigaId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Numero")
                         .HasColumnType("integer");
 
@@ -3137,6 +3140,8 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("PlayerId");
 
                     b.HasIndex("TimeId");
+
+                    b.HasIndex("LigaId", "Categoria");
 
                     b.HasIndex("Temporada", "Categoria");
 
@@ -5434,6 +5439,11 @@ namespace Fc25Draft.Infra.Migrations
                         .HasForeignKey("EvolucaoPesId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Fc25Draft.Core.Entities.Liga", "Liga")
+                        .WithMany()
+                        .HasForeignKey("LigaId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Fc25Draft.Core.Entities.Player", "OverPara")
                         .WithMany()
                         .HasForeignKey("OverParaPlayerId")
@@ -5451,6 +5461,8 @@ namespace Fc25Draft.Infra.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Evolucao");
+
+                    b.Navigation("Liga");
 
                     b.Navigation("OverPara");
 
