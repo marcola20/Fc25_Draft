@@ -10,7 +10,12 @@ public record PedidoArteDto(
     PremioArteDto? Premio,
     ContratacaoArteDto? Contratacao,
     DraftArteDto? Draft = null,
-    SelecaoArteDto? Selecao = null);
+    SelecaoArteDto? Selecao = null,
+    AposentadoriaArteDto? Aposentadoria = null,
+    HatTrickArteDto? HatTrick = null,
+    CampeaoArteDto? Campeao = null,
+    AcessoArteDto? Acesso = null,
+    ArtilhariaArteDto? Artilharia = null);
 
 public record PremioArteDto(
     string Sigla,         // "MVP"
@@ -67,6 +72,27 @@ public record JogadorSelecaoDto(
     bool Craque,          // a maior nota da seleção
     int? Numero,
     string? FotoUrl);
+
+public record AposentadoriaArteDto(
+    string Nome, string? Clube, int? Idade, int Temporadas, int Jogos, int Gols, int Assistencias,
+    IReadOnlyList<string> Clubes, IReadOnlyList<string> Titulos, string? FotoUrl, int Temporada);
+
+public record HatTrickArteDto(
+    string Nome, string Clube, int Gols, IReadOnlyList<int?> Minutos, string Casa, string Fora, int GolsCasa,
+    int GolsFora, string Competicao, int? Numero, string? FotoUrl, int? Temporada);
+
+public record JogadorCampeaoDto(string Nome, int? Numero, string? FotoUrl);
+public record CampanhaDto(int Vitorias, int Empates, int Derrotas, int GolsPro, int GolsContra);
+public record CampeaoArteDto(
+    string Competicao, int? Temporada, string Clube, IReadOnlyList<JogadorCampeaoDto> Jogadores, CampanhaDto? Campanha,
+    string? Destaque);
+
+public record TimeMovimentoDto(string Clube, string? Detalhe);
+public record AcessoArteDto(int Temporada, IReadOnlyList<TimeMovimentoDto> Sobem, IReadOnlyList<TimeMovimentoDto> Caem);
+
+public record DestaqueEstatDto(int Posicao, string Nome, string? Clube, int Valor, int? Numero, string? FotoUrl);
+public record ArtilhariaArteDto(
+    string Competicao, int? Temporada, IReadOnlyList<DestaqueEstatDto> Artilheiros, IReadOnlyList<DestaqueEstatDto> Garcons);
 
 /// <summary>O agente avisa o que aconteceu com o pedido.</summary>
 public record ConcluirPedidoArteRequest(bool Ok, string? Erro);

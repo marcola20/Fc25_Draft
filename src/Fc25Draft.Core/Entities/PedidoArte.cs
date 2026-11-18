@@ -11,7 +11,17 @@ public enum TipoPedidoArte
     /// <summary>As escolhas 4 a 8 de um draft, numa arte só, quando a 8ª sai. ReferenciaId = DraftId.</summary>
     DraftGrupo = 4,
     /// <summary>Seleção da rodada (4-3-3 pela nota do PES) de uma liga, quando todos os jogos dela encerram. ReferenciaId = RodadaId.</summary>
-    SelecaoRodada = 5
+    SelecaoRodada = 5,
+    /// <summary>Jogador que se aposentou (na virada). ReferenciaId = PlayerGuid.</summary>
+    Aposentadoria = 7,
+    /// <summary>3+ gols de um jogador num jogo encerrado. ReferenciaId = PartidaId; o jogador vai na chave.</summary>
+    HatTrick = 8,
+    /// <summary>Campeão de uma competição (entrada automática do Hall da Fama). ReferenciaId = LigaId.</summary>
+    Campeao = 9,
+    /// <summary>Quem sobe e quem cai entre Série A e B, com tudo decidido. ReferenciaId = LigaId da Série A.</summary>
+    Acesso = 10,
+    /// <summary>Artilheiro e garçom (top 3) de uma competição, quando os prêmios de estatística são pagos. ReferenciaId = LigaId.</summary>
+    Artilharia = 11
 }
 
 public enum SituacaoPedidoArte

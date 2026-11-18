@@ -23,11 +23,13 @@ public class ArtesService : IArtesService
         [TransferType.MarketAuction, TransferType.TeamSale, TransferType.TeamTrade, TransferType.Loan, TransferType.LoanPurchase];
 
     private readonly DraftDbContext _db;
+    private readonly ILigaTemporadaService? _temporadas;
     private readonly TimeProvider _time;
 
-    public ArtesService(DraftDbContext db, TimeProvider? time = null)
+    public ArtesService(DraftDbContext db, ILigaTemporadaService? temporadas = null, TimeProvider? time = null)
     {
         _db = db;
+        _temporadas = temporadas;
         _time = time ?? TimeProvider.System;
     }
 
@@ -60,6 +62,11 @@ public class ArtesService : IArtesService
                 TipoPedidoArte.Premio => await MontarPremioAsync(pedido, ct),
                 TipoPedidoArte.Contratacao => await MontarContratacaoAsync(pedido, ct),
                 TipoPedidoArte.SelecaoRodada => await MontarSelecaoAsync(pedido, ct),
+                TipoPedidoArte.Aposentadoria => await MontarAposentadoriaAsync(pedido, ct),
+                TipoPedidoArte.HatTrick => await MontarHatTrickAsync(pedido, ct),
+                TipoPedidoArte.Campeao => await MontarCampeaoAsync(pedido, ct),
+                TipoPedidoArte.Acesso => await MontarAcessoAsync(pedido, ct),
+                TipoPedidoArte.Artilharia => await MontarArtilhariaAsync(pedido, ct),
                 _ => await MontarDraftAsync(pedido, ct)
             };
             if (dto is null)
@@ -177,7 +184,7 @@ public class ArtesService : IArtesService
 
         // Seleção da rodada: rodada de liga (Série A, Série B) com todos os jogos encerrados, o último depois de ligar.
         var rodadas = await _db.LigaRodadas.AsNoTracking()
-            .Where(r => r.Liga.Tipo == TipoCompetition.Liga && r.Partidas.Any()
+            .Where(r => r.Liga.Tipo == TipoCompetition.Liga && r.Numero > 0 && r.Partidas.Any()  // -2 = playoff de acesso
                         && r.Partidas.All(p => p.Status == PartidaStatus.Encerrada)
                         && r.Partidas.Max(p => p.EncerradaEm) >= desde)
             .Select(r => new
@@ -194,6 +201,8 @@ public class ArtesService : IArtesService
             if (chaves.Contains(chave)) continue;
             novos.Add(Novo(TipoPedidoArte.SelecaoRodada, chave, r.RodadaId, $"Seleção da {r.Numero}ª rodada · {r.Liga}"));
         }
+
+        await ProcurarMaisAsync(desde, chaves, novos, ct);
 
         if (novos.Count == 0) return 0;
         _db.PedidosArte.AddRange(novos);
@@ -420,6 +429,212 @@ public class ArtesService : IArtesService
 
         return new PedidoArteDto(pedido.PedidoArteId, "selecao", pedido.Titulo, null, null, null,
             new SelecaoArteDto(rodada.Liga, rodada.Numero, rodada.Temporada, jogadores));
+    }
+
+    // ── Aposentadoria, hat-trick, campeão, acesso e artilharia ───────────────
+
+    private async Task ProcurarMaisAsync(DateTime desde, HashSet<string> chaves, List<PedidoArte> novos, CancellationToken ct)
+    {
+        void Pedir(TipoPedidoArte tipo, string chave, Guid referencia, string titulo)
+        {
+            if (chaves.Add(chave)) novos.Add(Novo(tipo, chave, referencia, titulo));
+        }
+
+        // Aposentadoria: quem se aposentou na virada depois de ligar.
+        var aposentados = await _db.Players.AsNoTracking()
+            .Where(p => p.AposentadoEm != null && p.AposentadoEm >= desde && p.AposentadoNaTemporada != null)
+            .Select(p => new { p.PlayerGuid, p.PlayerId, p.Name, p.AposentadoNaTemporada })
+            .ToListAsync(ct);
+        foreach (var p in aposentados.OrderBy(p => p.Name))
+            Pedir(TipoPedidoArte.Aposentadoria, $"aposentadoria:{p.PlayerId}:{p.AposentadoNaTemporada}", p.PlayerGuid,
+                $"Aposentadoria · {p.Name}");
+
+        // Hat-trick: 3+ gols (gol contra não conta) num jogo encerrado depois de ligar.
+        var hatTricks = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Tipo == TipoEvento.Gol && e.Partida.Status == PartidaStatus.Encerrada && e.Partida.EncerradaEm >= desde)
+            .GroupBy(e => new { e.PartidaId, e.JogadorId })
+            .Where(g => g.Count() >= 3)
+            .Select(g => new { g.Key.PartidaId, g.Key.JogadorId, Gols = g.Count() })
+            .ToListAsync(ct);
+        if (hatTricks.Count > 0)
+        {
+            var ids = hatTricks.Select(h => h.JogadorId).Distinct().ToList();
+            var nomes = await _db.Players.AsNoTracking().Where(p => ids.Contains(p.PlayerId)).ToDictionaryAsync(p => p.PlayerId, p => p.Name, ct);
+            foreach (var h in hatTricks)
+                Pedir(TipoPedidoArte.HatTrick, $"hattrick:{h.PartidaId}:{h.JogadorId}", h.PartidaId,
+                    $"Hat-trick · {nomes.GetValueOrDefault(h.JogadorId, "?")} ({h.Gols} gols)");
+        }
+
+        // Campeão: a entrada automática do Hall da Fama (a competição encerrou com campeão).
+        var titulos = await _db.HallOfFame.AsNoTracking()
+            .Where(h => h.LigaId != null && h.CriadoEm >= desde)
+            .Join(_db.Ligas, h => h.LigaId, l => l.LigaId, (h, l) => new { l.LigaId, l.Nome, h.TimeCampeao, l.Temporada, l.Divisao })
+            .ToListAsync(ct);
+        foreach (var t in titulos)
+            Pedir(TipoPedidoArte.Campeao, $"campeao:{t.LigaId}", t.LigaId, $"Campeão · {t.Nome} · {t.TimeCampeao}");
+
+        // Acesso e rebaixamento: temporada com a Série A ou a B encerrada depois de ligar e tudo decidido.
+        if (_temporadas is not null)
+        {
+            foreach (var temporada in titulos.Where(t => t.Divisao != null && t.Temporada != null).Select(t => t.Temporada!.Value).Distinct())
+            {
+                var chave = $"acesso:{temporada}";
+                if (chaves.Contains(chave)) continue;
+                var resumo = await _temporadas.GetResumoAsync(temporada, ct);
+                if (resumo?.SerieA is null || resumo.SerieB is null) continue;
+                if (resumo.SerieA.Status != LigaStatus.Encerrada || resumo.SerieB.Status != LigaStatus.Encerrada) continue;
+                if (resumo.Times.Any(x => x.DivisaoProxima == null)) continue; // playoff sem decisão
+                Pedir(TipoPedidoArte.Acesso, chave, resumo.SerieA.LigaId, $"Acesso e rebaixamento · temporada {temporada}");
+            }
+        }
+
+        // Artilheiro e garçom: prêmios de estatística pagos depois de ligar (PagoEm é hora de Brasília).
+        var desdeLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(desde, DateTimeKind.Utc), HorarioDeBrasilia.Fuso);
+        var pagos = await _db.PremiosEstatistica.AsNoTracking()
+            .Where(p => p.LigaId != null && p.Categoria != CategoriaEstatistica.CleanSheets && p.PagoEm >= desdeLocal)
+            .Select(p => new { LigaId = p.LigaId!.Value, Liga = p.Liga!.Nome })
+            .Distinct()
+            .ToListAsync(ct);
+        foreach (var p in pagos)
+            Pedir(TipoPedidoArte.Artilharia, $"artilharia:{p.LigaId}", p.LigaId, $"Artilheiro e garçom · {p.Liga}");
+    }
+
+    private async Task<string?> FotoAsync(int playerId, CancellationToken ct) =>
+        await _db.FotosJogadores.AnyAsync(f => f.PlayerId == playerId, ct) ? $"/fotos/jogadores/{playerId}" : null;
+
+    private async Task<string?> NomeDoTimeAsync(Guid? timeId, CancellationToken ct) =>
+        timeId is Guid id ? await _db.Teams.AsNoTracking().Where(t => t.TeamId == id).Select(t => t.TeamName).FirstOrDefaultAsync(ct) : null;
+
+    private async Task<PedidoArteDto?> MontarAposentadoriaAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var p = await _db.Players.AsNoTracking()
+            .Where(x => x.PlayerGuid == pedido.ReferenciaId && x.AposentadoEm != null)
+            .Select(x => new { x.PlayerId, x.Name, x.Age, x.TimeAoSeAposentar, x.AposentadoNaTemporada })
+            .FirstOrDefaultAsync(ct);
+        if (p is null) return null;
+        var carreira = await new LigaPublicService(_db).GetCarreiraJogadorAsync(p.PlayerId, ct);
+        var est = carreira?.Estatisticas;
+        var competicoes = est?.Competicoes ?? [];
+        var clubes = competicoes.OrderBy(c => c.Temporada ?? 0).Select(c => c.TimeNome).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+        var ultimo = await NomeDoTimeAsync(p.TimeAoSeAposentar, ct) ?? clubes.LastOrDefault();
+        if (ultimo is not null && !clubes.Contains(ultimo)) clubes.Add(ultimo);
+        var titulos = (est?.Titulos ?? []).Select(t => t.Competicao).Distinct().ToList();
+        var dto = new AposentadoriaArteDto(p.Name, ultimo, p.Age,
+            competicoes.Select(c => c.Temporada).Where(t => t != null).Distinct().Count(),
+            est?.Jogos ?? 0, est?.Gols ?? 0, est?.Assistencias ?? 0, clubes, titulos,
+            await FotoAsync(p.PlayerId, ct), p.AposentadoNaTemporada ?? 0);
+        return new PedidoArteDto(pedido.PedidoArteId, "aposentadoria", pedido.Titulo, null, null, Aposentadoria: dto);
+    }
+
+    private async Task<PedidoArteDto?> MontarHatTrickAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        if (!int.TryParse(pedido.Chave.Split(':').Last(), out var jogadorId)) return null;
+        var partida = await _db.LigaPartidas.AsNoTracking()
+            .Where(x => x.PartidaId == pedido.ReferenciaId)
+            .Select(x => new
+            {
+                Casa = x.TimeCasa.TeamName,
+                Fora = x.TimeFora.TeamName,
+                x.GolsCasa,
+                x.GolsFora,
+                Rodada = x.Rodada.Numero,
+                Liga = x.Rodada.Liga.Nome,
+                x.Rodada.Liga.Tipo,
+                x.Rodada.Liga.Temporada
+            })
+            .FirstOrDefaultAsync(ct);
+        if (partida is null) return null;
+        var gols = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.PartidaId == pedido.ReferenciaId && e.JogadorId == jogadorId && e.Tipo == TipoEvento.Gol)
+            .OrderBy(e => e.Minuto)
+            .Select(e => new { e.Minuto, e.TimeId, Nome = e.Jogador.Name, Time = e.Time.TeamName })
+            .ToListAsync(ct);
+        if (gols.Count < 3) return null;
+        var competicao = partida.Tipo == TipoCompetition.Liga && partida.Rodada > 0 ? $"{partida.Liga} · {partida.Rodada}ª rodada" : partida.Liga;
+        var dto = new HatTrickArteDto(gols[0].Nome, gols[0].Time, gols.Count, gols.Select(g => g.Minuto).ToList(),
+            partida.Casa, partida.Fora, partida.GolsCasa, partida.GolsFora, competicao,
+            await NumeroAsync(jogadorId, gols[0].TimeId, ct), await FotoAsync(jogadorId, ct), partida.Temporada);
+        return new PedidoArteDto(pedido.PedidoArteId, "hattrick", pedido.Titulo, null, null, HatTrick: dto);
+    }
+
+    private async Task<PedidoArteDto?> MontarCampeaoAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var liga = await _db.Ligas.AsNoTracking()
+            .Where(l => l.LigaId == pedido.ReferenciaId && l.CampeaoTimeId != null)
+            .Select(l => new { l.Nome, l.Temporada, TimeId = l.CampeaoTimeId!.Value, Clube = l.Campeao!.TeamName })
+            .FirstOrDefaultAsync(ct);
+        if (liga is null) return null;
+
+        // campanha: os jogos encerrados do campeão nesta competição (pênaltis contam como empate)
+        var jogos = await _db.LigaPartidas.AsNoTracking()
+            .Where(x => x.Rodada.LigaId == pedido.ReferenciaId && x.Status == PartidaStatus.Encerrada
+                        && (x.TimeCasaId == liga.TimeId || x.TimeForaId == liga.TimeId))
+            .Select(x => new { Pro = x.TimeCasaId == liga.TimeId ? x.GolsCasa : x.GolsFora, Contra = x.TimeCasaId == liga.TimeId ? x.GolsFora : x.GolsCasa })
+            .ToListAsync(ct);
+        var campanha = jogos.Count == 0 ? null : new CampanhaDto(
+            jogos.Count(j => j.Pro > j.Contra), jogos.Count(j => j.Pro == j.Contra), jogos.Count(j => j.Pro < j.Contra),
+            jogos.Sum(j => j.Pro), jogos.Sum(j => j.Contra));
+
+        // jogadores: o artilheiro do time na competição primeiro, depois os de maior overall do elenco
+        var artilheiros = await _db.LigaEventos.AsNoTracking()
+            .Where(e => e.Tipo == TipoEvento.Gol && e.TimeId == liga.TimeId && e.Partida.Rodada.LigaId == pedido.ReferenciaId)
+            .GroupBy(e => new { e.JogadorId, e.Jogador.Name })
+            .Select(g => new { g.Key.JogadorId, g.Key.Name, Gols = g.Count() })
+            .OrderByDescending(g => g.Gols)
+            .Take(1)
+            .ToListAsync(ct);
+        var elenco = await _db.TeamRosters.AsNoTracking()
+            .Where(r => r.TeamId == liga.TimeId)
+            .OrderByDescending(r => r.Player.Overall)
+            .Select(r => new { r.PlayerId, r.Player.Name })
+            .Take(8)
+            .ToListAsync(ct);
+        var ids = artilheiros.Select(a => (a.JogadorId, a.Name)).Concat(elenco.Select(e => (e.PlayerId, e.Name)))
+            .DistinctBy(x => x.Item1).Take(5).ToList();
+        var jogadores = new List<JogadorCampeaoDto>();
+        foreach (var (id, nome) in ids)
+            jogadores.Add(new JogadorCampeaoDto(nome, await NumeroAsync(id, liga.TimeId, ct), await FotoAsync(id, ct)));
+        var destaque = artilheiros.FirstOrDefault() is { Gols: > 0 } a0 ? $"Artilheiro do time: {a0.Name}, {a0.Gols} gol{(a0.Gols == 1 ? "" : "s")}" : null;
+
+        var dto = new CampeaoArteDto(liga.Nome, liga.Temporada, liga.Clube, jogadores, campanha, destaque);
+        return new PedidoArteDto(pedido.PedidoArteId, "campeao", pedido.Titulo, null, null, Campeao: dto);
+    }
+
+    private async Task<PedidoArteDto?> MontarAcessoAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        if (_temporadas is null || !int.TryParse(pedido.Chave.Split(':').Last(), out var temporada)) return null;
+        var resumo = await _temporadas.GetResumoAsync(temporada, ct);
+        if (resumo is null) return null;
+        TimeMovimentoDto Movimento(TemporadaTimeDto t, string divisao) =>
+            new(t.Nome, t.Zona == ZonaClassificacao.CampeaoComAcesso ? "Campeão da Série B" : $"{t.Posicao}º da {divisao}");
+        var sobem = resumo.Times.Where(t => t.Divisao == Divisao.SerieB && t.DivisaoProxima == Divisao.SerieA)
+            .OrderBy(t => t.Posicao).Select(t => Movimento(t, "Série B")).ToList();
+        var caem = resumo.Times.Where(t => t.Divisao == Divisao.SerieA && t.DivisaoProxima == Divisao.SerieB)
+            .OrderByDescending(t => t.Posicao).Select(t => Movimento(t, "Série A")).ToList();
+        if (sobem.Count == 0 && caem.Count == 0) return null;
+        return new PedidoArteDto(pedido.PedidoArteId, "acesso", pedido.Titulo, null, null,
+            Acesso: new AcessoArteDto(temporada, sobem, caem));
+    }
+
+    private async Task<PedidoArteDto?> MontarArtilhariaAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var linhas = await _db.PremiosEstatistica.AsNoTracking()
+            .Where(p => p.LigaId == pedido.ReferenciaId && p.Categoria != CategoriaEstatistica.CleanSheets && p.Posicao <= 3)
+            .OrderBy(p => p.Posicao).ThenByDescending(p => p.Numero)
+            .Select(p => new { p.Categoria, p.Posicao, p.Numero, p.PlayerId, Nome = p.Player.Name, p.TimeId, Clube = p.Time != null ? p.Time.TeamName : null, Liga = p.Liga!.Nome, p.Temporada })
+            .ToListAsync(ct);
+        if (linhas.Count == 0) return null;
+        async Task<List<DestaqueEstatDto>> Lista(CategoriaEstatistica categoria)
+        {
+            var lista = new List<DestaqueEstatDto>();
+            foreach (var l in linhas.Where(l => l.Categoria == categoria).Take(3))
+                lista.Add(new DestaqueEstatDto(l.Posicao, l.Nome, l.Clube, l.Numero,
+                    l.TimeId is Guid t ? await NumeroAsync(l.PlayerId, t, ct) : null, await FotoAsync(l.PlayerId, ct)));
+            return lista;
+        }
+        var dto = new ArtilhariaArteDto(linhas[0].Liga, linhas[0].Temporada,
+            await Lista(CategoriaEstatistica.Artilharia), await Lista(CategoriaEstatistica.Assistencias));
+        return new PedidoArteDto(pedido.PedidoArteId, "artilharia", pedido.Titulo, null, null, Artilharia: dto);
     }
 
     /// <summary>O número da camisa no clube (aba Camisas); nulo se ainda não escolheram.</summary>
