@@ -11,7 +11,9 @@ public enum TipoPedidoArte
     /// <summary>As escolhas 4 a 8 de um draft, numa arte só, quando a 8ª sai. ReferenciaId = DraftId.</summary>
     DraftGrupo = 4,
     /// <summary>Seleção da rodada (4-3-3 pela nota do PES) de uma liga, quando todos os jogos dela encerram. ReferenciaId = RodadaId.</summary>
-    SelecaoRodada = 5
+    SelecaoRodada = 5,
+    /// <summary>Resultado da loteria do draft, quando o admin termina o sorteio. ReferenciaId = LoteraiaId.</summary>
+    LoteriaDraft = 6
 }
 
 public enum SituacaoPedidoArte
@@ -36,7 +38,7 @@ public class PedidoArte
 
     /// <summary>
     /// "premio:{CandidatoId}", "transferencia:{TransferId}", "draft:{DraftId}:{escolha}", "draft:{DraftId}:4-8" ou
-    /// "selecao:{RodadaId}":
+    /// "selecao:{RodadaId}" ou "loteria:{LoteraiaId}":
     /// o mesmo fato nunca gera dois pedidos.
     /// </summary>
     public string Chave { get; set; } = null!;

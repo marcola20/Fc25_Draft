@@ -60,6 +60,7 @@ public class ArtesService : IArtesService
                 TipoPedidoArte.Premio => await MontarPremioAsync(pedido, ct),
                 TipoPedidoArte.Contratacao => await MontarContratacaoAsync(pedido, ct),
                 TipoPedidoArte.SelecaoRodada => await MontarSelecaoAsync(pedido, ct),
+                TipoPedidoArte.LoteriaDraft => await MontarLoteriaAsync(pedido, ct),
                 _ => await MontarDraftAsync(pedido, ct)
             };
             if (dto is null)
@@ -193,6 +194,18 @@ public class ArtesService : IArtesService
             var chave = $"selecao:{r.RodadaId}";
             if (chaves.Contains(chave)) continue;
             novos.Add(Novo(TipoPedidoArte.SelecaoRodada, chave, r.RodadaId, $"Seleção da {r.Numero}ª rodada · {r.Liga}"));
+        }
+
+        // Loteria do draft: sorteio terminado depois de ligar (refazer o sorteio gera outra loteria, outra arte).
+        var loterias = await _db.LigaLoterias.AsNoTracking()
+            .Where(l => l.IsFinished && l.CriadoEm >= desde)
+            .Select(l => new { l.LoteraiaId, l.LigaNome, l.CriadoEm })
+            .ToListAsync(ct);
+        foreach (var l in loterias.OrderBy(l => l.CriadoEm))
+        {
+            var chave = $"loteria:{l.LoteraiaId}";
+            if (chaves.Contains(chave)) continue;
+            novos.Add(Novo(TipoPedidoArte.LoteriaDraft, chave, l.LoteraiaId, $"Loteria do draft · {l.LigaNome}"));
         }
 
         if (novos.Count == 0) return 0;
@@ -420,6 +433,23 @@ public class ArtesService : IArtesService
 
         return new PedidoArteDto(pedido.PedidoArteId, "selecao", pedido.Titulo, null, null, null,
             new SelecaoArteDto(rodada.Liga, rodada.Numero, rodada.Temporada, jogadores));
+    }
+
+    private async Task<PedidoArteDto?> MontarLoteriaAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var loteria = await _db.LigaLoterias.AsNoTracking()
+            .Where(l => l.LoteraiaId == pedido.ReferenciaId)
+            .Select(l => new
+            {
+                l.LigaNome,
+                Picks = l.Picks.OrderBy(p => p.Rodada).ThenBy(p => p.PickNumero)
+                    .Select(p => new PickLoteriaArteDto(p.Rodada, p.PickNumero, p.TimeNome, p.Posicao, p.Origem))
+                    .ToList()
+            })
+            .FirstOrDefaultAsync(ct);
+        if (loteria is null || loteria.Picks.Count == 0) return null;
+        return new PedidoArteDto(pedido.PedidoArteId, "loteria", pedido.Titulo, null, null, null, null,
+            new LoteriaArteDto(loteria.LigaNome, loteria.Picks));
     }
 
     /// <summary>O número da camisa no clube (aba Camisas); nulo se ainda não escolheram.</summary>
