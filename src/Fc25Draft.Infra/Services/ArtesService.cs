@@ -1,0 +1,288 @@
+using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
+using Fc25Draft.Infra.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace Fc25Draft.Infra.Services;
+
+/// <inheritdoc cref="IArtesService"/>
+public class ArtesService : IArtesService
+{
+    /// <summary>Um pedido entregue tantas vezes sem resposta do agente vira "falhou" (o admin manda refazer).</summary>
+    private const int MaximoDeEntregas = 3;
+
+    private static readonly TransferType[] TiposDeContratacao =
+        [TransferType.MarketAuction, TransferType.TeamSale, TransferType.TeamTrade, TransferType.Loan, TransferType.LoanPurchase];
+
+    private readonly DraftDbContext _db;
+    private readonly TimeProvider _time;
+
+    public ArtesService(DraftDbContext db, TimeProvider? time = null)
+    {
+        _db = db;
+        _time = time ?? TimeProvider.System;
+    }
+
+    private DateTime AgoraUtc => _time.GetUtcNow().UtcDateTime;
+
+    // ── Para o agente ────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PedidoArteDto>> PendentesAsync(CancellationToken ct)
+    {
+        await ProcurarAsync(ct);
+
+        var pedidos = await _db.PedidosArte
+            .Where(p => p.Situacao == SituacaoPedidoArte.Pendente)
+            .OrderBy(p => p.CriadoEmUtc)
+            .Take(10)
+            .ToListAsync(ct);
+
+        var saida = new List<PedidoArteDto>();
+        foreach (var pedido in pedidos)
+        {
+            if (pedido.Tentativas >= MaximoDeEntregas)
+            {
+                pedido.Situacao = SituacaoPedidoArte.Falhou;
+                pedido.Erro ??= $"Entregue {pedido.Tentativas} vezes ao agente sem resposta.";
+                continue;
+            }
+
+            var dto = pedido.Tipo == TipoPedidoArte.Premio
+                ? await MontarPremioAsync(pedido, ct)
+                : await MontarContratacaoAsync(pedido, ct);
+            if (dto is null)
+            {
+                pedido.Situacao = SituacaoPedidoArte.Descartado;
+                pedido.Erro = "O prêmio ou a transferência não existe mais.";
+                continue;
+            }
+
+            pedido.Tentativas++;
+            pedido.EntregueEmUtc = AgoraUtc;
+            saida.Add(dto);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return saida;
+    }
+
+    public async Task ConcluirAsync(Guid pedidoId, bool ok, string? erro, CancellationToken ct)
+    {
+        var pedido = await AcharAsync(pedidoId, ct);
+        pedido.Situacao = ok ? SituacaoPedidoArte.Feito : SituacaoPedidoArte.Falhou;
+        pedido.Erro = ok ? null : Cortar(erro ?? "O agente não disse o motivo.", 1000);
+        pedido.ConcluidoEmUtc = AgoraUtc;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Achar o que merece arte ──────────────────────────────────────────────
+
+    public async Task<int> ProcurarAsync(CancellationToken ct)
+    {
+        var cfg = await _db.ArtesConfig.AsNoTracking().FirstOrDefaultAsync(ct);
+        if (cfg is null || !cfg.Ligado) return 0;
+
+        var chaves = (await _db.PedidosArte.AsNoTracking().Select(p => p.Chave).ToListAsync(ct)).ToHashSet();
+        var novos = new List<PedidoArte>();
+
+        // Prêmios: os vencedores da última temporada publicada.
+        var ultimaPublicada = await _db.VotacoesPremios.AsNoTracking()
+            .Where(v => v.Situacao == SituacaoVotacao.Publicada)
+            .OrderByDescending(v => v.Temporada)
+            .Select(v => (int?)v.Temporada)
+            .FirstOrDefaultAsync(ct);
+        if (ultimaPublicada is int temporada)
+        {
+            var vencedores = await _db.PremiosCandidatos.AsNoTracking()
+                .Where(c => c.Temporada == temporada && c.Vencedor)
+                .Select(c => new
+                {
+                    c.CandidatoId,
+                    c.Categoria,
+                    Nome = c.Player != null ? c.Player.Name : c.Treinador != null ? c.Treinador.Nome : "?"
+                })
+                .ToListAsync(ct);
+            var ordem = PremiosTemporada.Todas.Select(r => r.Categoria).ToList();
+            foreach (var v in vencedores.OrderBy(v => ordem.IndexOf(v.Categoria)))
+            {
+                var chave = $"premio:{v.CandidatoId}";
+                if (chaves.Contains(chave)) continue;
+                novos.Add(Novo(TipoPedidoArte.Premio, chave, v.CandidatoId,
+                    $"{PremiosTemporada.De(v.Categoria).Sigla} {temporada} · {v.Nome}"));
+            }
+        }
+
+        // Contratações: depois de ligado, as que passam do valor ou do over mínimo.
+        var desde = cfg.TransferenciasDesdeUtc ?? AgoraUtc;
+        var transferencias = await _db.TransferHistories.AsNoTracking()
+            .Where(t => t.PerformedAtUtc >= desde && TiposDeContratacao.Contains(t.Type) && t.ToTeamId != null)
+            .Select(t => new
+            {
+                t.TransferId,
+                t.Type,
+                t.Amount,
+                t.PerformedAtUtc,
+                Jogador = t.Player.Name,
+                Over = t.Player.Overall,
+                Para = t.ToTeam != null ? t.ToTeam.TeamName : "?"
+            })
+            .ToListAsync(ct);
+        foreach (var t in transferencias.OrderBy(t => t.PerformedAtUtc))
+        {
+            if (!ArtesRegras.ContratacaoMereceArte(t.Amount, t.Over, cfg.ValorMinimo, cfg.OverMinimo)) continue;
+            var chave = $"transferencia:{t.TransferId}";
+            if (chaves.Contains(chave)) continue;
+            var valor = t.Amount is decimal a && a > 0 ? $" ({ArtesRegras.Valor(a)})" : "";
+            var seta = t.Type == TransferType.Loan ? "⇢" : "→";
+            novos.Add(Novo(TipoPedidoArte.Contratacao, chave, t.TransferId, $"{t.Jogador} {seta} {t.Para}{valor} · over {t.Over}"));
+        }
+
+        if (novos.Count == 0) return 0;
+        _db.PedidosArte.AddRange(novos);
+        await _db.SaveChangesAsync(ct);
+        return novos.Count;
+    }
+
+    private PedidoArte Novo(TipoPedidoArte tipo, string chave, Guid referencia, string titulo) => new()
+    {
+        PedidoArteId = Guid.NewGuid(),
+        Chave = chave,
+        Tipo = tipo,
+        ReferenciaId = referencia,
+        Titulo = Cortar(titulo, 200),
+        Situacao = SituacaoPedidoArte.Pendente,
+        CriadoEmUtc = AgoraUtc
+    };
+
+    // ── Montar os dados da arte ──────────────────────────────────────────────
+
+    private async Task<PedidoArteDto?> MontarPremioAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var c = await _db.PremiosCandidatos.AsNoTracking()
+            .Where(x => x.CandidatoId == pedido.ReferenciaId)
+            .Select(x => new
+            {
+                x.Categoria,
+                x.Temporada,
+                x.PlayerId,
+                x.TreinadorId,
+                x.Resumo,
+                Jogador = x.Player != null ? x.Player.Name : null,
+                Treinador = x.Treinador != null ? x.Treinador.Nome : null,
+                x.TimeId,
+                Clube = x.Time != null ? x.Time.TeamName : null
+            })
+            .FirstOrDefaultAsync(ct);
+        if (c is null) return null;
+
+        var votos = await _db.PremiosVotos.CountAsync(v => v.CandidatoId == pedido.ReferenciaId, ct);
+        var regra = PremiosTemporada.De(c.Categoria);
+        string? foto = null;
+        if (c.PlayerId is int playerId && await _db.FotosJogadores.AnyAsync(f => f.PlayerId == playerId, ct))
+            foto = $"/fotos/jogadores/{playerId}";
+        else if (c.TreinadorId is Guid treinadorId
+                 && await _db.PerfisTreinadores.AnyAsync(p => p.TreinadorId == treinadorId && p.Imagem != null, ct))
+            foto = $"/fotos/treinadores/{treinadorId}";
+
+        var numero = c.PlayerId is int jogadorId && c.TimeId is Guid timeId ? await NumeroAsync(jogadorId, timeId, ct) : null;
+        var premio = new PremioArteDto(
+            regra.Sigla, regra.Nome, c.Temporada, c.Jogador ?? c.Treinador ?? "?", c.Clube,
+            numero, votos, c.Resumo, Treinador: c.TreinadorId is not null, foto);
+        return new PedidoArteDto(pedido.PedidoArteId, "premio", pedido.Titulo, premio, null);
+    }
+
+    private async Task<PedidoArteDto?> MontarContratacaoAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var t = await _db.TransferHistories.AsNoTracking()
+            .Where(x => x.TransferId == pedido.ReferenciaId)
+            .Select(x => new
+            {
+                x.Type,
+                x.Amount,
+                x.PlayerId,
+                x.ToTeamId,
+                Nome = x.Player.Name,
+                Over = x.Player.Overall,
+                Posicao = x.Player.Position.Name,
+                De = x.FromTeam != null ? x.FromTeam.TeamName : null,
+                Para = x.ToTeam != null ? x.ToTeam.TeamName : null
+            })
+            .FirstOrDefaultAsync(ct);
+        if (t?.Para is null) return null;
+
+        var foto = await _db.FotosJogadores.AnyAsync(f => f.PlayerId == t.PlayerId, ct) ? $"/fotos/jogadores/{t.PlayerId}" : null;
+        var numero = t.ToTeamId is Guid para ? await NumeroAsync(t.PlayerId, para, ct) : null;
+        var contratacao = new ContratacaoArteDto(
+            Emprestimo: t.Type == TransferType.Loan, t.Nome, t.Para, t.De,
+            t.Amount is decimal a && a > 0 ? a : null, numero, t.Over, t.Posicao, foto);
+        return new PedidoArteDto(pedido.PedidoArteId, "contratacao", pedido.Titulo, null, contratacao);
+    }
+
+    /// <summary>O número da camisa no clube (aba Camisas); nulo se ainda não escolheram.</summary>
+    private async Task<int?> NumeroAsync(int playerId, Guid teamId, CancellationToken ct) =>
+        await _db.TeamRosters.AsNoTracking()
+            .Where(r => r.PlayerId == playerId && r.TeamId == teamId)
+            .Select(r => (int?)r.NumeroCamisa)
+            .FirstOrDefaultAsync(ct);
+
+    // ── Admin ────────────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PedidoArteResumoDto>> ListarAsync(int quantos, CancellationToken ct) =>
+        await _db.PedidosArte.AsNoTracking()
+            .OrderByDescending(p => p.CriadoEmUtc)
+            .Take(quantos)
+            .Select(p => new PedidoArteResumoDto(p.PedidoArteId, p.Tipo, p.Titulo, p.Situacao, p.Tentativas, p.Erro,
+                p.CriadoEmUtc, p.EntregueEmUtc, p.ConcluidoEmUtc))
+            .ToListAsync(ct);
+
+    public async Task RefazerAsync(Guid pedidoId, CancellationToken ct)
+    {
+        var pedido = await AcharAsync(pedidoId, ct);
+        pedido.Situacao = SituacaoPedidoArte.Pendente;
+        pedido.Tentativas = 0;
+        pedido.Erro = null;
+        pedido.ConcluidoEmUtc = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task DescartarAsync(Guid pedidoId, CancellationToken ct)
+    {
+        var pedido = await AcharAsync(pedidoId, ct);
+        pedido.Situacao = SituacaoPedidoArte.Descartado;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<ArtesConfigDto> ConfigAsync(CancellationToken ct)
+    {
+        var cfg = await _db.ArtesConfig.AsNoTracking().FirstOrDefaultAsync(ct) ?? new ArtesConfig();
+        return new ArtesConfigDto(cfg.Ligado, cfg.ValorMinimo, cfg.OverMinimo, cfg.TransferenciasDesdeUtc);
+    }
+
+    public async Task SalvarConfigAsync(bool ligado, decimal valorMinimo, int overMinimo, CancellationToken ct)
+    {
+        if (valorMinimo < 0) throw new InvalidOperationException("O valor mínimo não pode ser negativo.");
+        if (overMinimo is < 40 or > 99) throw new InvalidOperationException("O over mínimo vai de 40 a 99.");
+
+        var cfg = await _db.ArtesConfig.FirstOrDefaultAsync(ct);
+        if (cfg is null)
+        {
+            cfg = new ArtesConfig { Id = 1 };
+            _db.ArtesConfig.Add(cfg);
+        }
+
+        cfg.Ligado = ligado;
+        cfg.ValorMinimo = valorMinimo;
+        cfg.OverMinimo = overMinimo;
+        // Liga pela primeira vez: as contratações contam a partir de agora.
+        if (ligado && cfg.TransferenciasDesdeUtc is null) cfg.TransferenciasDesdeUtc = AgoraUtc;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<PedidoArte> AcharAsync(Guid id, CancellationToken ct) =>
+        await _db.PedidosArte.FirstOrDefaultAsync(p => p.PedidoArteId == id, ct)
+        ?? throw new KeyNotFoundException("Pedido de arte não encontrado.");
+
+    private static string Cortar(string texto, int maximo) => texto.Length <= maximo ? texto : texto[..maximo];
+}

@@ -129,6 +129,8 @@ public class DraftDbContext : DbContext
     public DbSet<ChavePush> ChavesPush => Set<ChavePush>();
     public DbSet<NotificacaoEnviada> NotificacoesEnviadas => Set<NotificacaoEnviada>();
     public DbSet<FotoJogador> FotosJogadores => Set<FotoJogador>();
+    public DbSet<PedidoArte> PedidosArte => Set<PedidoArte>();
+    public DbSet<ArtesConfig> ArtesConfig => Set<ArtesConfig>();
     public DbSet<PartidaChatMensagem> PartidaChatMensagens => Set<PartidaChatMensagem>();
     public DbSet<PartidaReacao> PartidaReacoes => Set<PartidaReacao>();
     public DbSet<Mosaico> Mosaicos => Set<Mosaico>();

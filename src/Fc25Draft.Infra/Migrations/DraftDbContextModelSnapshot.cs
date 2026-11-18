@@ -281,6 +281,29 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("Apadrinhamentos", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ArtesConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Ligado")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("OverMinimo")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("TransferenciasDesdeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("ValorMinimo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ArtesConfig", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.AvisoTime", b =>
                 {
                     b.Property<Guid>("AvisoId")
@@ -2434,6 +2457,57 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("TreinadorId");
 
                     b.ToTable("PartidaReacoes", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.PedidoArte", b =>
+                {
+                    b.Property<Guid>("PedidoArteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime?>("ConcluidoEmUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("CriadoEmUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("EntregueEmUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Erro")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ReferenciaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Situacao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("PedidoArteId");
+
+                    b.HasIndex("Chave")
+                        .IsUnique();
+
+                    b.HasIndex("Situacao", "CriadoEmUtc");
+
+                    b.ToTable("PedidosArte", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.PedidoDemissao", b =>

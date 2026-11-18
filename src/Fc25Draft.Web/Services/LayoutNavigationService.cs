@@ -90,7 +90,8 @@ public class LayoutNavigationService
             new("Treino da Semana", "/admin/treinos", "activity"),
             new("Prêmios da Temporada", "/admin/premios", "star"),
             new("Gerenciar Regulamento", "/admin/regulamento", "file-text"),
-            new("Anúncios", "/admin/anuncios", "megaphone")
+            new("Anúncios", "/admin/anuncios", "megaphone"),
+            new("Artes automáticas", "/admin/artes", "camera")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
         {
@@ -290,6 +291,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Mosaico")
+            }
+        },
+        ["/admin/artes"] = new PageDefinition
+        {
+            Route = "/admin/artes",
+            Title = "Artes automáticas",
+            Subtitle = "Prêmios e contratações viram vídeo no Telegram pelo Artista CBFV — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Artes automáticas")
             }
         },
         ["/admin/anuncios"] = new PageDefinition

@@ -1,0 +1,204 @@
+@page "/admin/artes"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IArtesService ArtesSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Artes automáticas — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    <p class="text-muted small mb-3">
+        O site acha o que merece arte e põe na fila: o vencedor de cada prêmio quando a temporada é publicada e as
+        contratações que passam do valor ou do over abaixo. O <strong>Artista CBFV</strong>, no seu PC, busca a fila a
+        cada 15 minutos (com o token de admin), faz o vídeo e a imagem e manda no seu Telegram. Com o PC desligado,
+        o pedido espera aqui.
+    </p>
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="artes-ligado" @bind="_ligado" />
+                            <label class="form-check-label" for="artes-ligado"><strong>Artes automáticas ligadas</strong></label>
+                        </div>
+                        <label class="form-label small mb-1" for="artes-valor">Contratação a partir de (mi)</label>
+                        <input class="form-control form-control-sm mb-3" id="artes-valor" type="number" min="0" step="1" @bind="_valorMi" />
+                        <label class="form-label small mb-1" for="artes-over">Ou jogador com over a partir de</label>
+                        <input class="form-control form-control-sm mb-2" id="artes-over" type="number" min="40" max="99" @bind="_over" />
+                        <p class="text-muted small mb-3">
+                            Valem leilão, venda entre times e compra do empréstimo pelo valor; troca e empréstimo, que não
+                            têm valor, só pelo over.
+                            @if (_config?.TransferenciasDesdeUtc is { } desde)
+                            {
+                                <span> Contam as transferências desde @BrazilTime.ConvertFromUtc(desde).ToString("dd/MM/yyyy HH:mm").</span>
+                            }
+                            else
+                            {
+                                <span> Ao ligar, contam as transferências a partir de agora.</span>
+                            }
+                        </p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-primary btn-sm" disabled="@_salvando" @onclick="SalvarAsync">Salvar</button>
+                            <button class="btn btn-outline-secondary btn-sm" disabled="@(_salvando || !_ligado)" @onclick="ProcurarAsync"
+                                    title="Põe na fila o que já merece arte, sem esperar o agente">Procurar agora</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                @if (_pedidos.Count == 0)
+                {
+                    <div class="alert alert-info">Nenhum pedido de arte ainda.</div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var p in _pedidos)
+                        {
+                            <div class="list-group-item d-flex align-items-center gap-2 flex-wrap">
+                                <span class="etiqueta">@(p.Tipo == TipoPedidoArte.Premio ? "prêmio" : "contratação")</span>
+                                <span class="flex-grow-1">
+                                    @p.Titulo
+                                    @if (p.Erro is not null)
+                                    {
+                                        <span class="d-block small text-danger">@p.Erro</span>
+                                    }
+                                </span>
+                                <span class="small text-muted">@BrazilTime.ConvertFromUtc(p.CriadoEmUtc).ToString("dd/MM HH:mm")</span>
+                                @switch (p.Situacao)
+                                {
+                                    case SituacaoPedidoArte.Pendente:
+                                        <span class="etiqueta aviso">@(p.Tentativas > 0 ? "com o agente" : "na fila")</span>
+                                        break;
+                                    case SituacaoPedidoArte.Feito:
+                                        <span class="etiqueta sucesso">no Telegram</span>
+                                        break;
+                                    case SituacaoPedidoArte.Falhou:
+                                        <span class="etiqueta perigo">falhou</span>
+                                        break;
+                                    default:
+                                        <span class="etiqueta">descartado</span>
+                                        break;
+                                }
+                                @if (p.Situacao != SituacaoPedidoArte.Pendente)
+                                {
+                                    <button class="btn btn-outline-secondary btn-sm" disabled="@_salvando" @onclick="() => RefazerAsync(p.Id)">Refazer</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" disabled="@_salvando" @onclick="() => DescartarAsync(p.Id)">Descartar</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    private ArtesConfigDto? _config;
+    private bool _ligado;
+    private decimal _valorMi;
+    private int _over;
+    private IReadOnlyList<PedidoArteResumoDto> _pedidos = Array.Empty<PedidoArteResumoDto>();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/artes"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        _carregando = false;
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _config = await ArtesSvc.ConfigAsync(CancellationToken.None);
+            _ligado = _config.Ligado;
+            _valorMi = _config.ValorMinimo / 1_000_000m;
+            _over = _config.OverMinimo;
+            _pedidos = await ArtesSvc.ListarAsync(60, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    private Task SalvarAsync() => Fazer(async () =>
+    {
+        await ArtesSvc.SalvarConfigAsync(_ligado, _valorMi * 1_000_000m, _over, CancellationToken.None);
+        _ok = _ligado ? "Salvo. As artes automáticas estão ligadas." : "Salvo. As artes automáticas estão desligadas.";
+    });
+
+    private Task ProcurarAsync() => Fazer(async () =>
+    {
+        var novos = await ArtesSvc.ProcurarAsync(CancellationToken.None);
+        _ok = novos == 0 ? "Nada novo para pôr na fila." : $"{novos} pedido(s) novo(s) na fila.";
+    });
+
+    private Task RefazerAsync(Guid id) => Fazer(async () =>
+    {
+        await ArtesSvc.RefazerAsync(id, CancellationToken.None);
+        _ok = "Voltou para a fila: o agente refaz na próxima busca.";
+    });
+
+    private Task DescartarAsync(Guid id) => Fazer(async () =>
+    {
+        await ArtesSvc.DescartarAsync(id, CancellationToken.None);
+        _ok = "Tirado da fila.";
+    });
+
+    private async Task Fazer(Func<Task> acao)
+    {
+        _salvando = true;
+        _erro = null;
+        _ok = null;
+        try
+        {
+            await acao();
+            await CarregarAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

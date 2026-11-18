@@ -18,7 +18,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddInfra(builder.Configuration, builder.Environment)
     .AddCoreServices(builder.Configuration)
-    .AddMarketHistoryFeature();
+    .AddMarketHistoryFeature()
+    .AddArtesFeature();
 
 builder.Services
     .AddAuthentication(opts => {
@@ -253,7 +254,8 @@ api.MapDraftEndpoints()
    .MapDraftWishlistEndpoints()
    .MapAdminEndpoints()
    .MapPesEndpoints()
-   .MapLigaEndpoints();
+   .MapLigaEndpoints()
+   .MapArtesEndpoints();
 
 app.MapFotosEndpoints();
 app.MapCalendarioEndpoints();
