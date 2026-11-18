@@ -1,5 +1,6 @@
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
 using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
@@ -58,6 +59,7 @@ public class ArtesService : IArtesService
             {
                 TipoPedidoArte.Premio => await MontarPremioAsync(pedido, ct),
                 TipoPedidoArte.Contratacao => await MontarContratacaoAsync(pedido, ct),
+                TipoPedidoArte.SelecaoRodada => await MontarSelecaoAsync(pedido, ct),
                 _ => await MontarDraftAsync(pedido, ct)
             };
             if (dto is null)
@@ -171,6 +173,26 @@ public class ArtesService : IArtesService
             if (chaves.Contains(chave)) continue;
             var nome = escolhas.First(e => e.DraftId == f.DraftId).NomeDraft;
             novos.Add(Novo(TipoPedidoArte.DraftGrupo, chave, f.DraftId, $"{nome} · escolhas {PrimeiraDoGrupo} a {UltimaDoGrupo}"));
+        }
+
+        // Seleção da rodada: rodada de liga (Série A, Série B) com todos os jogos encerrados, o último depois de ligar.
+        var rodadas = await _db.LigaRodadas.AsNoTracking()
+            .Where(r => r.Liga.Tipo == TipoCompetition.Liga && r.Partidas.Any()
+                        && r.Partidas.All(p => p.Status == PartidaStatus.Encerrada)
+                        && r.Partidas.Max(p => p.EncerradaEm) >= desde)
+            .Select(r => new
+            {
+                r.RodadaId,
+                r.Numero,
+                Liga = r.Liga.Nome,
+                Notas = _db.LigaNotasJogadores.Count(n => n.Partida.RodadaId == r.RodadaId)
+            })
+            .ToListAsync(ct);
+        foreach (var r in rodadas.Where(r => r.Notas >= 11).OrderBy(r => r.Numero))
+        {
+            var chave = $"selecao:{r.RodadaId}";
+            if (chaves.Contains(chave)) continue;
+            novos.Add(Novo(TipoPedidoArte.SelecaoRodada, chave, r.RodadaId, $"Seleção da {r.Numero}ª rodada · {r.Liga}"));
         }
 
         if (novos.Count == 0) return 0;
@@ -299,6 +321,105 @@ public class ArtesService : IArtesService
         var tipo = pedido.Tipo == TipoPedidoArte.DraftGrupo ? "draft-grupo" : "draft";
         return new PedidoArteDto(pedido.PedidoArteId, tipo, pedido.Titulo, null, null,
             new DraftArteDto(draft.Name, draft.Temporada, lista));
+    }
+
+    // As vagas do 4-3-3 e, para cada uma, de que posições (na ordem de preferência) sai o jogador.
+    private static readonly (string Vaga, string[] Grupos)[] VagasDaSelecao =
+    [
+        ("GOL", ["GOL"]),
+        ("LD", ["LD", "LAT", "ZAG", "MEI"]),
+        ("ZAG", ["ZAG", "LAT", "MEI"]),
+        ("ZAG", ["ZAG", "LAT", "MEI"]),
+        ("LE", ["LE", "LAT", "ZAG", "MEI"]),
+        ("MEI", ["MEI", "ATA", "LAT"]),
+        ("MEI", ["MEI", "ATA", "LAT"]),
+        ("MEI", ["MEI", "ATA", "LAT"]),
+        ("PE", ["PE", "ATA", "MEI"]),
+        ("CA", ["CA", "ATA", "MEI"]),
+        ("PD", ["PD", "ATA", "MEI"]),
+    ];
+
+    /// <summary>Os grupos de uma posição do cadastro ("Lateral Direito" → LD e LAT; "Volante" → MEI...).</summary>
+    private static string[] GruposDaPosicao(string? posicao)
+    {
+        var p = (posicao ?? "").ToLowerInvariant();
+        if (p.Contains("goleiro")) return ["GOL"];
+        if (p.Contains("lateral direito") || p.Contains("ala direito")) return ["LD", "LAT"];
+        if (p.Contains("lateral esquerdo") || p.Contains("ala esquerdo")) return ["LE", "LAT"];
+        if (p.Contains("lateral")) return ["LAT"];
+        if (p.Contains("zagueiro") || p.Contains("líbero")) return ["ZAG"];
+        if (p.Contains("ponta esquerda")) return ["PE", "ATA"];
+        if (p.Contains("ponta direita")) return ["PD", "ATA"];
+        if (p.Contains("centroavante")) return ["CA", "ATA"];
+        if (p.Contains("atacante")) return ["ATA", "CA"];
+        return ["MEI"];
+    }
+
+    private async Task<PedidoArteDto?> MontarSelecaoAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var rodada = await _db.LigaRodadas.AsNoTracking()
+            .Where(r => r.RodadaId == pedido.ReferenciaId)
+            .Select(r => new { r.Numero, Liga = r.Liga.Nome, r.Liga.Temporada })
+            .FirstOrDefaultAsync(ct);
+        if (rodada is null) return null;
+
+        var notas = await _db.LigaNotasJogadores.AsNoTracking()
+            .Where(n => n.Partida.RodadaId == pedido.ReferenciaId)
+            .Select(n => new
+            {
+                n.JogadorId,
+                n.PartidaId,
+                n.TimeId,
+                n.Nota,
+                n.MelhorEmCampo,
+                Nome = n.Jogador.Name,
+                Posicao = n.Jogador.Position.Name,
+                Clube = n.Time.TeamName
+            })
+            .ToListAsync(ct);
+        var partidas = notas.Select(n => n.PartidaId).Distinct().ToList();
+        var eventos = await _db.LigaEventos.AsNoTracking()
+            .Where(e => partidas.Contains(e.PartidaId) && e.Tipo == TipoEvento.Gol)
+            .Select(e => new { e.JogadorId, e.AssistenteId })
+            .ToListAsync(ct);
+
+        // a melhor nota de cada jogador na rodada (quem jogou duas vezes, no desempate, vale a maior)
+        var candidatos = notas
+            .GroupBy(n => n.JogadorId)
+            .Select(g => g.OrderByDescending(n => n.Nota).First())
+            .OrderByDescending(n => n.Nota).ThenByDescending(n => n.MelhorEmCampo)
+            .ThenByDescending(n => eventos.Count(e => e.JogadorId == n.JogadorId))
+            .ToList();
+
+        var escolhidos = new List<(string Vaga, int JogadorId)>();
+        var usados = new HashSet<int>();
+        foreach (var (vaga, grupos) in VagasDaSelecao)
+        {
+            var jogador = grupos
+                .Select(g => candidatos.FirstOrDefault(c => !usados.Contains(c.JogadorId) && GruposDaPosicao(c.Posicao).Contains(g)))
+                .FirstOrDefault(c => c is not null)
+                ?? candidatos.FirstOrDefault(c => !usados.Contains(c.JogadorId) && vaga != "GOL" && !GruposDaPosicao(c.Posicao).Contains("GOL"));
+            if (jogador is null) return null;
+            usados.Add(jogador.JogadorId);
+            escolhidos.Add((vaga, jogador.JogadorId));
+        }
+
+        var comFoto = (await _db.FotosJogadores.AsNoTracking()
+            .Where(f => usados.Contains(f.PlayerId)).Select(f => f.PlayerId).ToListAsync(ct)).ToHashSet();
+        // craque: o primeiro da seleção na ordem dos candidatos (nota, melhor em campo do PES, gols)
+        var craqueId = candidatos.First(c => usados.Contains(c.JogadorId)).JogadorId;
+        var jogadores = new List<JogadorSelecaoDto>();
+        foreach (var (vaga, jogadorId) in escolhidos)
+        {
+            var c = candidatos.First(x => x.JogadorId == jogadorId);
+            jogadores.Add(new JogadorSelecaoDto(vaga, c.Nome, c.Clube, c.Nota,
+                eventos.Count(e => e.JogadorId == jogadorId), eventos.Count(e => e.AssistenteId == jogadorId),
+                Craque: jogadorId == craqueId,
+                await NumeroAsync(jogadorId, c.TimeId, ct), comFoto.Contains(jogadorId) ? $"/fotos/jogadores/{jogadorId}" : null));
+        }
+
+        return new PedidoArteDto(pedido.PedidoArteId, "selecao", pedido.Titulo, null, null, null,
+            new SelecaoArteDto(rodada.Liga, rodada.Numero, rodada.Temporada, jogadores));
     }
 
     /// <summary>O número da camisa no clube (aba Camisas); nulo se ainda não escolheram.</summary>
