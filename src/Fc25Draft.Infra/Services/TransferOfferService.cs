@@ -49,8 +49,9 @@ public class TransferOfferService : ITransferOfferService
             dto.MoneyPayerTeamId.Value != dto.FromTeamId && dto.MoneyPayerTeamId.Value != dto.ToTeamId)
             throw new ArgumentException("O time pagador deve ser um dos times envolvidos.");
 
-        if (dto.Type == OfferType.Loan && distinctTargets.Length > 0 && distinctOffered.Length > 0)
-            throw new ArgumentException("No empréstimo os jogadores vão para um time só: peça ou ofereça, não os dois.");
+        // Troca por empréstimo: jogadores dos dois lados, cada um volta para o dono na virada.
+        if (dto.Type == OfferType.Loan && distinctTargets.Length > 0 && distinctOffered.Length > 0 && dto.BuyOptionPrice is > 0)
+            throw new ArgumentException("Troca por empréstimo não tem opção de compra: ela vale para empréstimo de um lado só.");
 
         if (dto.BuyOptionPrice is < 0)
             throw new ArgumentException("A opção de compra não pode ser negativa.");
@@ -86,7 +87,8 @@ public class TransferOfferService : ITransferOfferService
 
             if (dto.Type == OfferType.Loan)
             {
-                EnsureLoanLimit(cfg, distinctTargets.Length > 0 ? fromTeam : toTeam);
+                foreach (var (tomador, conta) in TomadoresDoEmprestimo(fromTeam, toTeam, distinctTargets.Length, distinctOffered.Length))
+                    EnsureLoanLimit(cfg, tomador, conta);
             }
             else if (dto.Type == OfferType.Swap)
             {
@@ -289,7 +291,9 @@ public class TransferOfferService : ITransferOfferService
             await EnsurePicksAsync(offer, ct);
             if (offer.Type == OfferType.Loan)
             {
-                EnsureLoanLimit(cfg, LoanBorrower(offer) == offer.FromTeamId ? offer.FromTeam : offer.ToTeam);
+                foreach (var (tomador, conta) in TomadoresDoEmprestimo(offer.FromTeam, offer.ToTeam,
+                             offer.Players.Count(p => p.IsTarget), offer.Players.Count(p => !p.IsTarget)))
+                    EnsureLoanLimit(cfg, tomador, conta);
             }
             else if (offer.Type == OfferType.Swap)
             {
@@ -908,9 +912,10 @@ public class TransferOfferService : ITransferOfferService
             : (int?)null;
 
         var noteParts = new List<string>();
-        if (offer.Type == OfferType.Swap)
+        var trocaPorEmprestimo = isLoan && targetPlayers.Count > 0 && offeredPlayers.Count > 0;
+        if (offer.Type == OfferType.Swap || trocaPorEmprestimo)
         {
-            noteParts.Add($"Troca entre {fromTeam.TeamName} e {toTeam.TeamName}");
+            noteParts.Add($"{(trocaPorEmprestimo ? "Troca por empréstimo" : "Troca")} entre {fromTeam.TeamName} e {toTeam.TeamName}");
             if (targetPlayers.Count > 0)
                 noteParts.Add($"{toTeam.TeamName} envia: {FormatPlayerList(targetPlayers)}");
             if (offeredPlayers.Count > 0)
@@ -1086,25 +1091,25 @@ public class TransferOfferService : ITransferOfferService
 
     /// <summary>
     /// Registra o empréstimo de cada jogador que mudou de time e conta no limite de quem recebeu.
-    /// Chegando no limite, as outras propostas de empréstimo em que ele receberia jogador caem.
+    /// Na troca por empréstimo os dois lados recebem, e cada um conta os jogadores que recebeu.
+    /// Chegando no limite, as outras propostas de empréstimo em que o time receberia jogador caem.
     /// </summary>
     private async Task RegisterLoansAsync(
         TransferOffer offer, Team fromTeam, Team toTeam,
         IReadOnlyCollection<Player> targetPlayers, IReadOnlyCollection<Player> offeredPlayers,
         TransferConfig cfg, DateTime now, CancellationToken ct)
     {
-        var (owner, borrower, players) = targetPlayers.Count > 0
-            ? (toTeam, fromTeam, targetPlayers)
-            : (fromTeam, toTeam, offeredPlayers);
-
-        foreach (var player in players)
+        // Pedidos saem do destino para quem propôs; oferecidos, de quem propôs para o destino.
+        var lados = new[] { (Dono: toTeam, Tomador: fromTeam, Jogadores: targetPlayers), (Dono: fromTeam, Tomador: toTeam, Jogadores: offeredPlayers) };
+        foreach (var (dono, tomador, jogadores) in lados)
+        foreach (var player in jogadores)
         {
             await _db.Emprestimos.AddAsync(new Emprestimo
             {
                 EmprestimoId = Guid.NewGuid(),
                 PlayerId = player.PlayerId,
-                DonoTeamId = owner.TeamId,
-                TomadorTeamId = borrower.TeamId,
+                DonoTeamId = dono.TeamId,
+                TomadorTeamId = tomador.TeamId,
                 OfferId = offer.OfferId,
                 ValorOpcaoCompra = offer.BuyOptionPrice,
                 Status = EmprestimoStatus.Ativo,
@@ -1112,17 +1117,21 @@ public class TransferOfferService : ITransferOfferService
             }, ct);
         }
 
-        borrower.LoanCount++;
-        if (borrower.LoanCount < cfg.MaxLoans)
+        var noLimite = new List<Guid>();
+        foreach (var (tomador, conta) in TomadoresDoEmprestimo(fromTeam, toTeam, targetPlayers.Count, offeredPlayers.Count))
+        {
+            tomador.LoanCount += conta;
+            if (tomador.LoanCount >= cfg.MaxLoans) noLimite.Add(tomador.TeamId);
+        }
+        if (noLimite.Count == 0)
             return;
 
-        var borrowerId = borrower.TeamId;
         var offersToCancel = await _db.TransferOffers
             .Where(o => o.OfferId != offer.OfferId
                 && o.Status == OfferStatus.Pending
                 && o.Type == OfferType.Loan
-                && ((o.FromTeamId == borrowerId && o.Players.Any(p => p.IsTarget))
-                    || (o.ToTeamId == borrowerId && o.Players.Any(p => !p.IsTarget))))
+                && ((noLimite.Contains(o.FromTeamId) && o.Players.Any(p => p.IsTarget))
+                    || (noLimite.Contains(o.ToTeamId) && o.Players.Any(p => !p.IsTarget))))
             .ToListAsync(ct);
 
         foreach (var o in offersToCancel)
@@ -1132,9 +1141,16 @@ public class TransferOfferService : ITransferOfferService
         }
     }
 
-    /// <summary>Quem recebe o jogador no empréstimo: quem pediu (alvos) ou o outro time (oferecidos).</summary>
-    private static Guid LoanBorrower(TransferOffer offer)
-        => offer.Players.Any(p => p.IsTarget) ? offer.FromTeamId : offer.ToTeamId;
+    /// <summary>
+    /// Quem recebe jogador no empréstimo e quanto isso conta no limite. Empréstimo de um lado só conta 1
+    /// para quem recebe; troca por empréstimo conta, para cada time, os jogadores que ele recebe.
+    /// </summary>
+    private static List<(Team Tomador, int Conta)> TomadoresDoEmprestimo(Team fromTeam, Team toTeam, int pedidos, int oferecidos)
+    {
+        if (pedidos > 0 && oferecidos > 0)
+            return [(fromTeam, pedidos), (toTeam, oferecidos)];
+        return pedidos > 0 ? [(fromTeam, 1)] : [(toTeam, 1)];
+    }
 
     private static void EnsureMercadoAberto(TransferConfig cfg)
     {
@@ -1142,10 +1158,13 @@ public class TransferOfferService : ITransferOfferService
             throw new InvalidOperationException("Mercado fechado! As negociações estão bloqueadas até a próxima janela.");
     }
 
-    private static void EnsureLoanLimit(TransferConfig cfg, Team borrower)
+    private static void EnsureLoanLimit(TransferConfig cfg, Team borrower, int conta = 1)
     {
-        if (borrower.LoanCount >= cfg.MaxLoans)
-            throw new InvalidOperationException($"O time {borrower.TeamName} já atingiu o limite de empréstimos da janela ({borrower.LoanCount}/{cfg.MaxLoans}).");
+        if (borrower.LoanCount + conta <= cfg.MaxLoans)
+            return;
+        throw new InvalidOperationException(conta == 1 || borrower.LoanCount >= cfg.MaxLoans
+            ? $"O time {borrower.TeamName} já atingiu o limite de empréstimos da janela ({borrower.LoanCount}/{cfg.MaxLoans})."
+            : $"O time {borrower.TeamName} receberia {conta} jogadores emprestados e passaria do limite de empréstimos da janela ({borrower.LoanCount}/{cfg.MaxLoans}).");
     }
 
     /// <summary>Quem pediu para sair, com a variação do valor travada (o preço em baixa que vai junto para o clube novo).</summary>
