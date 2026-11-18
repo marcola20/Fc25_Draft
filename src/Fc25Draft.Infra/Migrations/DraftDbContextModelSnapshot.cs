@@ -3207,8 +3207,8 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AuxiliarName")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<decimal>("Budget")
                         .ValueGeneratedOnAdd()

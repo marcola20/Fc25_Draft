@@ -148,16 +148,26 @@ public class TreinadorService : ITreinadorService
                 $"{treinador.Nome} já está no {nomeDoOutro} nesse período (desde {conflito.Desde:dd/MM/yyyy}). Encerre essa passagem antes.");
         }
 
-        // Cada clube tem um treinador e um auxiliar por vez.
+        // Cada clube tem um treinador e até dois auxiliares por vez.
         var ocupado = await _db.TreinadorPassagens
             .Where(p => p.TimeId == request.TimeId && p.Papel == request.Papel && p.TreinadorId != request.TreinadorId)
             .ToListAsync(ct);
 
-        var jaTem = ocupado.FirstOrDefault(p => SePisam(p.Desde, p.Ate, request.Desde, request.Ate));
-        if (jaTem is not null)
+        var limite = VagasPorPapel(request.Papel);
+        var cruzam = ocupado.Where(p => SePisam(p.Desde, p.Ate, request.Desde, request.Ate)).ToList();
+
+        // A lotação só muda quando alguém chega: basta olhar a entrada dele e as entradas dos outros no período.
+        var lotado = cruzam
+            .Select(p => p.Desde.Date > request.Desde.Date ? p.Desde.Date : request.Desde.Date)
+            .Select(dia => cruzam.Where(p => p.Desde.Date <= dia && dia < (p.Ate?.Date ?? DateTime.MaxValue)).ToList())
+            .FirstOrDefault(naquele => naquele.Count >= limite);
+        if (lotado is not null)
         {
-            var nome = await _db.Treinadores.Where(t => t.TreinadorId == jaTem.TreinadorId).Select(t => t.Nome).FirstAsync(ct);
-            throw new InvalidOperationException($"O {time.TeamName} já tem {nome} como {Rotulo(request.Papel)} nesse período.");
+            var ids = lotado.Select(p => p.TreinadorId).ToList();
+            var nomes = await _db.Treinadores.Where(t => ids.Contains(t.TreinadorId)).Select(t => t.Nome).ToListAsync(ct);
+            throw new InvalidOperationException(limite == 1
+                ? $"O {time.TeamName} já tem {nomes[0]} como {Rotulo(request.Papel)} nesse período."
+                : $"O {time.TeamName} já tem {limite} auxiliares nesse período ({string.Join(" e ", nomes)}).");
         }
 
         _db.TreinadorPassagens.Add(new TreinadorPassagem
@@ -468,7 +478,8 @@ public class TreinadorService : ITreinadorService
         {
             var doTime = atuais.Where(a => a.TimeId == time.TeamId).ToList();
             time.OwnerName = doTime.FirstOrDefault(a => a.Papel == PapelTreinador.Treinador)?.Nome ?? time.OwnerName;
-            time.AuxiliarName = doTime.FirstOrDefault(a => a.Papel == PapelTreinador.Auxiliar)?.Nome;
+            var auxiliares = doTime.Where(a => a.Papel == PapelTreinador.Auxiliar).Select(a => a.Nome).OrderBy(n => n).ToList();
+            time.AuxiliarName = auxiliares.Count == 0 ? null : string.Join(" e ", auxiliares);
         }
 
         await _db.SaveChangesAsync(ct);
@@ -524,6 +535,9 @@ public class TreinadorService : ITreinadorService
         desdeA.Date < (ateB?.Date ?? DateTime.MaxValue) && desdeB.Date < (ateA?.Date ?? DateTime.MaxValue);
 
     private static string Rotulo(PapelTreinador papel) => papel == PapelTreinador.Auxiliar ? "auxiliar" : "treinador";
+
+    /// <summary>Quantos podem estar no clube ao mesmo tempo em cada papel.</summary>
+    public static int VagasPorPapel(PapelTreinador papel) => papel == PapelTreinador.Auxiliar ? 2 : 1;
 
     private static string GerarToken(string nome)
     {

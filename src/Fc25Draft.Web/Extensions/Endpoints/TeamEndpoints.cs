@@ -105,7 +105,9 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                     : new();
 
                 var teamToken = noComando.FirstOrDefault(p => p.Papel == PapelTreinador.Treinador)?.Token ?? string.Empty;
-                var auxToken = noComando.FirstOrDefault(p => p.Papel == PapelTreinador.Auxiliar)?.Token;
+                // Até dois auxiliares: os tokens vêm juntos, separados por vírgula.
+                var auxTokens = noComando.Where(p => p.Papel == PapelTreinador.Auxiliar).Select(p => p.Token).ToList();
+                var auxToken = auxTokens.Count == 0 ? null : string.Join(", ", auxTokens);
                 var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
 
                 var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken, team.LoanCount);

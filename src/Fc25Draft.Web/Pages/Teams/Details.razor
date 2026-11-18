@@ -51,7 +51,7 @@ else
                 <span>Técnico <strong>@(string.IsNullOrWhiteSpace(team.OwnerName) ? "—" : team.OwnerName)</strong></span>
                 @if (!string.IsNullOrWhiteSpace(team.AuxiliarName))
                 {
-                    <span>Auxiliar <strong>@team.AuxiliarName</strong></span>
+                    <span>@(team.AuxiliarName.Contains(" e ") ? "Auxiliares" : "Auxiliar") <strong>@team.AuxiliarName</strong></span>
                 }
             </p>
 
@@ -127,8 +127,13 @@ else
                 }
                 @if (!string.IsNullOrWhiteSpace(team.AuxToken))
                 {
-                    <dt>Auxiliar</dt>
-                    <dd><code>@team.AuxToken</code></dd>
+                    var auxTokens = team.AuxToken.Split(", ");
+                    <dt>@(auxTokens.Length > 1 ? "Auxiliares" : "Auxiliar")</dt>
+                    <dd>@for (var i = 0; i < auxTokens.Length; i++)
+                    {
+                        @if (i > 0) { <text> · </text> }
+                        <code>@auxTokens[i]</code>
+                    }</dd>
                 }
             </dl>
             <p class="small text-body-secondary mb-0">

@@ -11,7 +11,8 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
         e.HasKey(x => x.TeamId);
         e.Property(x => x.TeamName).IsRequired().HasMaxLength(80);
         e.Property(x => x.OwnerName).HasMaxLength(80);
-        e.Property(x => x.AuxiliarName).HasMaxLength(80);
+        // Até dois auxiliares, com os nomes juntos ("Fulano e Ciclano").
+        e.Property(x => x.AuxiliarName).HasMaxLength(250);
         e.Property(x => x.Budget).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
         e.Property(x => x.BudgetBlocked).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
         e.Property(x => x.IsAdmin).HasDefaultValue(false);

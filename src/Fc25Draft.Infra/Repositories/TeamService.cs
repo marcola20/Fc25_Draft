@@ -132,9 +132,9 @@ public class TeamService : ITeamService
             throw new ArgumentException("O nome do responsável deve ter no máximo 80 caracteres.", nameof(ownerName));
         }
 
-        if (!string.IsNullOrWhiteSpace(auxiliarName) && auxiliarName.Trim().Length > 80)
+        if (!string.IsNullOrWhiteSpace(auxiliarName) && auxiliarName.Trim().Length > 250)
         {
-            throw new ArgumentException("O nome do auxiliar deve ter no máximo 80 caracteres.", nameof(auxiliarName));
+            throw new ArgumentException("O nome dos auxiliares deve ter no máximo 250 caracteres.", nameof(auxiliarName));
         }
     }
 
