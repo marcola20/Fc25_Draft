@@ -210,6 +210,12 @@
             </div>
         }
 
+        @if (!s.IsFinished)
+        {
+            <GloboLoteria Pendentes="s.Pending.ToList()" Ultima="s.LastRevealed" Revelados="s.Revealed.Count"
+                          Rodada="s.Rodada" Girando="s.HasPending" />
+        }
+
         <!-- Preview ao vivo -->
         <div class="row g-3">
             @if (s.Round1Results.Count > 0 || (s.Rodada == 1 && s.Revealed.Count > 0))

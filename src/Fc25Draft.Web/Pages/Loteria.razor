@@ -94,6 +94,9 @@
         else
         {
             <div class="lottery-stage">
+                <GloboLoteria Pendentes="s.Pending.ToList()" Ultima="s.LastRevealed" Revelados="s.Revealed.Count"
+                              Rodada="s.Rodada" Girando="s.HasPending" />
+
                 <!-- Revealed picks -->
                 @if (s.Revealed.Count > 0)
                 {
@@ -113,7 +116,7 @@
                                            : isZone ? "lottery-card-done lottery-card-done-zone"
                                            : "lottery-card-done");
 
-                            <div class="lottery-card @cardClass">
+                            <div class="lottery-card @cardClass" @key="@($"{s.Rodada}-{pick.PickNumero}")">
                                 <div class="lottery-card-pick @(isPick1 && isLatest ? "lottery-pick-gold" : isZone && isLatest ? "lottery-pick-purple" : "")">
                                     @if (isPick1 && isLatest) { <Icone Nome="trophy" Tamanho="18" /> }
                                     #@pick.PickNumero
@@ -170,8 +173,8 @@
     }
 }
 
-@* Uma entrada só para cada pick revelada (sobe e aparece); a pick #1 entra um pouco mais devagar e fica
-   com o dourado. Sem tremida, brilho pulsando ou degradê. *@
+@* O globo sacode e solta a bolinha sorteada (GloboLoteria); depois o cartão da pick sobe e aparece. A pick #1
+   entra um pouco mais devagar e fica com o dourado. *@
 <style>
     .lottery-page {
         max-width: 760px;
@@ -268,7 +271,8 @@
     .lottery-card-latest {
         padding: 1rem 1.25rem;
         border-color: rgba(var(--bs-emphasis-color-rgb), 0.18);
-        animation: lotteryReveal 360ms var(--cbfv-curva) both;
+        /* espera a bolinha sair do globo (GloboLoteria.AtrasoDoCartao) */
+        animation: lotteryReveal 360ms var(--cbfv-curva) 1.4s both;
     }
 
     .lottery-card-done {
@@ -282,7 +286,7 @@
     }
 
     .lottery-card-pick1 {
-        animation: lotteryRevealGrand 600ms var(--cbfv-curva) both;
+        animation: lotteryRevealGrand 600ms var(--cbfv-curva) 1.4s both;
     }
 
     @@keyframes lotteryReveal {

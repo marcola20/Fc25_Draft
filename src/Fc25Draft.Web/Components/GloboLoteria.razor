@@ -1,0 +1,73 @@
+@using Fc25Draft.Web.Services
+
+@* Globo da loteria do draft, ao vivo. As bolinhas (o escudo de cada time que falta sortear) quicam lá dentro.
+   A cada pick revelada o globo sacode e a bolinha sorteada sobe pelo tubo e sai mostrando o escudo e o número
+   da pick; quem usa o componente mostra o cartão do time depois disso (AtrasoDoCartao). Tudo em CSS: cada
+   revelação monta elementos novos (@key), e a animação deles roda uma vez. *@
+
+<div class="globo-loteria @(Girando ? "girando" : "")" aria-hidden="true">
+    <div class="globo-tubo"></div>
+    <div class="globo-vidro">
+        @* @key na contagem: a cada revelação o miolo é montado de novo e sacode uma vez *@
+        <div class="globo-bolas" @key="Revelados">
+            @for (var i = 0; i < Pendentes.Count; i++)
+            {
+                var (x, y) = Lugar(i, Pendentes.Count);
+                <div class="globo-bola quica-@(i % 6)"
+                     style="left:@(x)%;top:@(y)%;animation-duration:@Css(1.6 + (i % 5) * 0.23)s;animation-delay:-@Css((i * 0.37) % 2)s">
+                    <img src="@EscudoUrl(Pendentes[i].TimeNome)" alt="" onerror="this.style.visibility='hidden'" />
+                </div>
+            }
+        </div>
+        <div class="globo-reflexo"></div>
+    </div>
+    <div class="globo-pe"></div>
+    <div class="globo-base"></div>
+
+    @if (Ultima is not null)
+    {
+        <div class="globo-sorteada @(Ultima.PickNumero == 1 && Rodada == 1 ? "primeira" : "")" @key="@($"{Rodada}-{Ultima.PickNumero}")">
+            <img src="@EscudoUrl(Ultima.TimeNome)" alt="" onerror="this.style.visibility='hidden'" />
+            <span class="globo-sorteada-num">@Ultima.PickNumero</span>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Os times que ainda estão no globo.</summary>
+    [Parameter] public IReadOnlyList<LotteryPickItem> Pendentes { get; set; } = Array.Empty<LotteryPickItem>();
+
+    /// <summary>A última pick revelada: a bolinha que sai do globo.</summary>
+    [Parameter] public LotteryPickItem? Ultima { get; set; }
+
+    /// <summary>Quantas picks já saíram nesta rodada (muda a cada revelação e faz o globo sacodir).</summary>
+    [Parameter] public int Revelados { get; set; }
+
+    [Parameter] public int Rodada { get; set; } = 1;
+
+    /// <summary>Ainda tem bolinha no globo.</summary>
+    [Parameter] public bool Girando { get; set; }
+
+    /// <summary>Quanto tempo a bolinha leva para sair: o cartão do time deve aparecer depois disso.</summary>
+    public const double AtrasoDoCartao = 1.5;
+
+    // espalha as bolinhas pelo globo (ângulo de ouro), dentro de um círculo de raio ~34% do centro
+    private static (int X, int Y) Lugar(int i, int total)
+    {
+        var raio = 34 * Math.Sqrt((i + 0.5) / Math.Max(1, total));
+        var angulo = i * 2.39996;
+        return ((int)Math.Round(50 + raio * Math.Cos(angulo)), (int)Math.Round(52 + raio * Math.Sin(angulo)));
+    }
+
+    // número para CSS sempre com ponto (o site roda em pt-BR, e "1,6s" o navegador ignora)
+    private static string Css(double valor) => valor.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string EscudoUrl(string teamName)
+    {
+        var normalized = string.Concat(
+            teamName.Normalize(System.Text.NormalizationForm.FormD)
+                    .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                                != System.Globalization.UnicodeCategory.NonSpacingMark));
+        return $"/images/escudos/{normalized}.png";
+    }
+}
