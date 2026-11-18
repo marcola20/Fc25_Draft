@@ -16,10 +16,24 @@ public static class AcessoPorToken
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
 
-        var limpo = token.Trim().ToUpperInvariant();
+        var exato = token.Trim();
+        var limpo = exato.ToUpperInvariant();
+
+        var doTreinador = await db.TreinadorPassagens.AsNoTracking()
+            .Where(p => p.Ate == null && p.Treinador.Ativo && p.Treinador.Token.ToUpper() == limpo)
+            .Select(p => new AcessoDoToken(p.TreinadorId, p.Treinador.Nome, p.Papel, p.TimeId, p.Time.TeamName))
+            .FirstOrDefaultAsync(ct);
+        if (doTreinador is not null) return doTreinador;
+
+        // Token de admin ligado a uma pessoa: vale o clube dela, como se fosse o token de treinador.
+        var pessoa = await db.AdminTokens.AsNoTracking()
+            .Where(a => a.IsActive && a.Token == exato && a.TreinadorId != null)
+            .Select(a => a.TreinadorId)
+            .FirstOrDefaultAsync(ct);
+        if (pessoa is null) return null;
 
         return await db.TreinadorPassagens.AsNoTracking()
-            .Where(p => p.Ate == null && p.Treinador.Ativo && p.Treinador.Token.ToUpper() == limpo)
+            .Where(p => p.Ate == null && p.Treinador.Ativo && p.TreinadorId == pessoa)
             .Select(p => new AcessoDoToken(p.TreinadorId, p.Treinador.Nome, p.Papel, p.TimeId, p.Time.TeamName))
             .FirstOrDefaultAsync(ct);
     }

@@ -52,8 +52,16 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         // O admin vem pelo token de admin ou pelo token de treinador da pessoa ligada a ele.
         var adminToken = await _db.AdminPorTokenAsync(providedToken, Context.RequestAborted);
 
-        // Token de admin em si: entra só como admin, sem clube.
-        if (adminToken is not null && adminToken.Token == providedToken)
+        var tokenDeAdmin = adminToken is not null && adminToken.Token == providedToken;
+        if (tokenDeAdmin)
+            MarcarUso(adminToken!.AdminTokenId);
+
+        // O token é da pessoa: o clube sai da passagem que está em aberto
+        // (o token de admin ligado a uma pessoa também leva ao clube dela).
+        var acesso = await _db.AcessoPorTokenAsync(providedToken, Context.RequestAborted);
+
+        // Token de admin sem clube por trás: entra só como admin.
+        if (tokenDeAdmin && acesso is null)
         {
             var claims = new List<Claim>
             {
@@ -61,39 +69,13 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
                 new(ClaimTypes.Role, "Admin"),
             };
 
-            if (adminToken.IsPrincipal)
+            if (adminToken!.IsPrincipal)
                 claims.Add(new Claim(ClaimTypes.Role, "AdminPrincipal"));
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
-            var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-            // Update LastUsedAtUtc in background — uses its own scope to avoid concurrent DbContext access
-            var adminTokenId = adminToken.AdminTokenId;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
-                    var tokenToUpdate = await db.AdminTokens.FirstOrDefaultAsync(t => t.AdminTokenId == adminTokenId);
-                    if (tokenToUpdate is not null)
-                    {
-                        tokenToUpdate.LastUsedAtUtc = DateTime.UtcNow;
-                        await db.SaveChangesAsync();
-                    }
-                }
-                catch
-                {
-                    // Silent fail — don't break authentication if update fails
-                }
-            });
-
-            return AuthenticateResult.Success(ticket);
+            return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
         }
-
-        // O token é da pessoa: o clube sai da passagem que está em aberto.
-        var acesso = await _db.AcessoPorTokenAsync(providedToken, Context.RequestAborted);
 
         if (acesso is null)
         {
@@ -143,6 +125,29 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         var teamTicket = new AuthenticationTicket(teamPrincipal, Scheme.Name);
 
         return AuthenticateResult.Success(teamTicket);
+    }
+
+    /// <summary>Anota em segundo plano quando o token de admin foi usado (escopo próprio, sem disputar o DbContext).</summary>
+    private void MarcarUso(Guid adminTokenId)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DraftDbContext>();
+                var tokenToUpdate = await db.AdminTokens.FirstOrDefaultAsync(t => t.AdminTokenId == adminTokenId);
+                if (tokenToUpdate is not null)
+                {
+                    tokenToUpdate.LastUsedAtUtc = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch
+            {
+                // Se falhar, não atrapalha o login.
+            }
+        });
     }
 
     /// <summary>Treinador que também é administrador: mesmo token, mais o papel de admin.</summary>
