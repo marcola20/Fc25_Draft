@@ -27,8 +27,13 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                         p.Age,
                         p.Overall,
                         p.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault(),
-                        p.Atributos == null ? null : p.Atributos.PesId))
+                        p.Atributos == null ? null : p.Atributos.PesId,
+                        p.TeamRosters.Select(r => r.NumeroCamisa).FirstOrDefault()))
                     .ToListAsync(ct)));
+
+            // Camisas que estão no jogo: preenche só quem ainda não tem número no site (nunca troca o do técnico).
+            pes.MapPut("/camisas", async (ICamisasService camisas, List<CamisaRequest> itens, CancellationToken ct) =>
+                Results.Ok(await camisas.PreencherDoPesAsync(itens, ct)));
 
             // Grava as ligações conferidas no editor; os atributos vêm da base do PES embutida.
             // ?atualizarAtributos=true: quem já estava ligado também recebe os atributos da base.

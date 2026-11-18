@@ -56,6 +56,9 @@ public record TeamRosterPlayerDto(
 {
     /// <summary>Overall em cada posição (id do site 1 = GOL … 13 = SA) pela fórmula do PES; null sem atributos do jogo.</summary>
     public IReadOnlyDictionary<short, int>? OverallPorPosicao { get; init; }
+
+    /// <summary>Número da camisa (aba Camisas do time); nulo = sem número.</summary>
+    public short? NumeroCamisa { get; init; }
 }
 
 public record TeamExportDto(

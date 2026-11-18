@@ -194,6 +194,12 @@ else
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link @(_activeMainTab == MainTab.Camisas ? "active" : "")"
+                    type="button" @onclick="() => _activeMainTab = MainTab.Camisas">
+                Camisas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link @(_activeMainTab == MainTab.Extrato ? "active" : "")"
                     type="button" @onclick="() => _activeMainTab = MainTab.Extrato">
                 Extrato
@@ -236,6 +242,10 @@ else
     else if (_activeMainTab == MainTab.Treino)
     {
         <TimeTreinoTab @key="@($"treino-{Id}")" TeamId="@Id" TeamToken="@(_canQuickSell ? _currentTeamToken : null)" />
+    }
+    else if (_activeMainTab == MainTab.Camisas)
+    {
+        <TimeCamisasTab @key="@($"camisas-{Id}")" TeamId="@Id" TeamToken="@(_canQuickSell ? _currentTeamToken : null)" />
     }
     else if (_activeMainTab == MainTab.Extrato)
     {
@@ -336,6 +346,10 @@ else
                             <tr class="align-middle text-center">
                                 <td class="text-start text-nowrap">
                                     <FotoJogador PlayerId="@player.PlayerId" Tamanho="28" Classe="me-2" />
+                                    @if (player.NumeroCamisa is short camisa)
+                                    {
+                                        <span class="camisa-numero numero" title="Camisa @camisa">@camisa</span>
+                                    }
                                     <a href="/players/details/@player.PlayerId" class="jogador-nome">@player.Name</a>
                                     @if (player.Participacao is { Papel: { } papel } comPapel)
                                     {
@@ -915,7 +929,8 @@ else
                 basePrice,
                 player.PrecoPedido,
                 player.EmprestadoPor,
-                participacoes.GetValueOrDefault(player.PlayerId) is { } part && part.TimeId == Id ? part : null));
+                participacoes.GetValueOrDefault(player.PlayerId) is { } part && part.TimeId == Id ? part : null,
+                player.NumeroCamisa));
         }
 
         teamAmount = _rosterPlayers.Sum(p => p.BasePrice);
@@ -1401,7 +1416,8 @@ else
         Transferencias,
         Negotiations,
         Extrato,
-        Treino
+        Treino,
+        Camisas
     }
 
     private enum RosterSortColumn
@@ -1423,5 +1439,6 @@ else
         decimal BasePrice,
         decimal? AskingPrice,
         string? EmprestadoPor = null,
-        ParticipacaoJogador? Participacao = null);
+        ParticipacaoJogador? Participacao = null,
+        short? NumeroCamisa = null);
 }

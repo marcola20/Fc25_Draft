@@ -1,0 +1,351 @@
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Extensions
+@using Fc25Draft.Core.Interfaces
+@inject ICamisasService CamisasSvc
+@inject TreinoApiClient Api
+
+@* Números das camisas: a grade de 1 a 99 com 5 por fila, igual à do PES. O técnico escolhe o jogador (na lista ou
+   numa camisa já usada) e toca no número; ou arrasta o jogador até o número. Número já usado troca com quem estava. *@
+
+@if (_loading)
+{
+    <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
+}
+else if (_dados is null)
+{
+    <div class="alert alert-danger"><strong>Erro ao carregar as camisas:</strong> @_erro</div>
+}
+else
+{
+    var porNumero = PorNumero();
+    var semNumero = _dados.Jogadores.Count(j => _numeros[j.PlayerId] is null);
+    var editavel = TeamToken is not null;
+    var selecionado = _selecionado is int sid ? _dados.Jogadores.FirstOrDefault(j => j.PlayerId == sid) : null;
+
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-semibold">Camisas</span>
+            <span class="etiqueta numero @(semNumero == 0 ? "sucesso" : "")">
+                @(_dados.Jogadores.Count - semNumero) de @_dados.Jogadores.Count com número
+            </span>
+            @if (editavel)
+            {
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    @if (Mudancas().Count > 0)
+                    {
+                        <span class="small text-body-secondary">@Mudancas().Count mudança@(Mudancas().Count > 1 ? "s" : "") sem salvar</span>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="Desfazer" disabled="@_salvando">Desfazer</button>
+                    }
+                    <button class="btn btn-primary btn-sm" @onclick="SalvarAsync" disabled="@(_salvando || Mudancas().Count == 0)">
+                        @if (_salvando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        Salvar as camisas
+                    </button>
+                </div>
+            }
+        </div>
+        <div class="card-body">
+            @if (editavel)
+            {
+                <p class="small text-body-secondary mb-3">
+                    Toque no jogador e depois no número (ou arraste o jogador até o número). Se o número já for de
+                    alguém, os dois trocam. Os números vão para o PES.
+                </p>
+            }
+
+            @if (_ok is not null)
+            {
+                <div class="alert alert-success py-2 small">@_ok</div>
+            }
+            @if (_erro is not null)
+            {
+                <div class="alert alert-danger py-2 small">@_erro</div>
+            }
+
+            <div class="camisas @(editavel ? "editavel" : "")">
+                <aside class="camisas-elenco" aria-label="Elenco">
+                    @foreach (var grupo in Grupos())
+                    {
+                        <div class="camisas-grupo">@grupo.Nome</div>
+                        @foreach (var j in grupo.Jogadores)
+                        {
+                            var numero = _numeros[j.PlayerId];
+                            if (editavel)
+                            {
+                                <button type="button"
+                                        class="camisas-jogador @(_selecionado == j.PlayerId ? "selecionado" : "") @(numero is null ? "sem-numero" : "") @(Mudou(j.PlayerId) ? "mudou" : "")"
+                                        draggable="true" data-arrastavel
+                                        @ondragstart="() => _arrastando = j.PlayerId"
+                                        @ondragend="() => _arrastando = null"
+                                        @onclick="() => Selecionar(j.PlayerId)">
+                                    <span class="camisas-num numero">@(numero?.ToString() ?? "–")</span>
+                                    <span class="camisas-nome">@j.Nome</span>
+                                    <span class="camisas-pos">@(((int)j.PositionId).ToPositionSigla())</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="camisas-jogador @(numero is null ? "sem-numero" : "")">
+                                    <span class="camisas-num numero">@(numero?.ToString() ?? "–")</span>
+                                    <span class="camisas-nome">@j.Nome</span>
+                                    <span class="camisas-pos">@(((int)j.PositionId).ToPositionSigla())</span>
+                                </div>
+                            }
+                        }
+                    }
+                </aside>
+
+                <div class="camisas-lado">
+                    @if (editavel)
+                    {
+                        <div class="camisas-barra @(selecionado is null ? "" : "ativa")" role="status">
+                            @if (selecionado is not null)
+                            {
+                                <span>
+                                    @if (_aviso is not null)
+                                    {
+                                        <span class="d-block small text-body-secondary">@_aviso</span>
+                                    }
+                                    Número de <strong>@selecionado.Nome</strong>?
+                                </span>
+                                <span class="ms-auto d-flex gap-2">
+                                    @if (_numeros[selecionado.PlayerId] is not null)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm text-nowrap" @onclick="TirarNumero">Tirar o número</button>
+                                    }
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="Cancelar">Cancelar</button>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">Escolha um jogador.</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="camisas-grade" role="grid" aria-label="Números de 1 a 99">
+                        @for (short n = ICamisasService.Menor; n <= ICamisasService.Maior; n++)
+                        {
+                            var numero = n;
+                            var dono = porNumero.TryGetValue(numero, out var d) ? d : null;
+                            var classe = $"camisa {(dono is null ? "livre" : "usada")} {(dono is not null && dono.PlayerId == _selecionado ? "selecionada" : "")} {(dono is not null && Mudou(dono.PlayerId) ? "mudou" : "")}";
+                            if (editavel)
+                            {
+                                <button type="button" class="@classe"
+                                        title="@(dono is null ? $"Camisa {numero} livre" : $"{numero} · {dono.Nome}")"
+                                        draggable="@(dono is null ? "false" : "true")" data-arrastavel
+                                        @ondragstart="() => _arrastando = dono?.PlayerId"
+                                        @ondragend="() => _arrastando = null"
+                                        @ondragover:preventDefault
+                                        @ondrop="() => Soltar(numero)"
+                                        @onclick="() => TocarNumero(numero)">
+                                    <span class="camisa-n numero">@numero</span>
+                                    <span class="camisa-dono">@(dono is null ? "" : Curto(dono.Nome))</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="@classe" title="@(dono is null ? "" : $"{numero} · {dono.Nome}")">
+                                    <span class="camisa-n numero">@numero</span>
+                                    <span class="camisa-dono">@(dono is null ? "" : Curto(dono.Nome))</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    /// <summary>Token do time (dono ou auxiliar); nulo = só olhar.</summary>
+    [Parameter] public string? TeamToken { get; set; }
+
+    private CamisasDoTimeDto? _dados;
+    private Dictionary<int, short?> _original = new();
+    private Dictionary<int, short?> _numeros = new();
+    private int? _selecionado;
+    private int? _arrastando;
+    private bool _loading = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+    private string? _aviso;
+    private Guid _carregado;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_carregado == TeamId && _dados is not null) return;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            _dados = await CamisasSvc.DoTimeAsync(TeamId, CancellationToken.None);
+            _original = _dados.Jogadores.ToDictionary(j => j.PlayerId, j => j.Numero);
+            _numeros = new Dictionary<int, short?>(_original);
+            _carregado = TeamId;
+            _erro = null;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private Dictionary<short, CamisaJogadorDto> PorNumero() =>
+        _dados!.Jogadores
+            .Where(j => _numeros[j.PlayerId] is not null)
+            .GroupBy(j => _numeros[j.PlayerId]!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+    /// <summary>Na casinha só cabe o sobrenome: tira o primeiro nome de quem tem mais de um.</summary>
+    private static string Curto(string nome)
+    {
+        var partes = nome.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return partes.Length > 1 ? string.Join(' ', partes.Skip(1)) : nome;
+    }
+
+    private bool Mudou(int playerId) => _original[playerId] != _numeros[playerId];
+
+    private List<CamisaRequest> Mudancas() =>
+        _numeros.Where(n => _original[n.Key] != n.Value).Select(n => new CamisaRequest(n.Key, n.Value)).ToList();
+
+    private sealed record Grupo(string Nome, List<CamisaJogadorDto> Jogadores);
+
+    private IEnumerable<Grupo> Grupos()
+    {
+        static int GrupoDe(short pos) => pos switch
+        {
+            1 => 0,
+            2 or 3 or 4 => 1,
+            5 or 6 or 7 or 8 or 10 => 2,
+            _ => 3
+        };
+        string[] nomes = { "Goleiros", "Defensores", "Meio-campo", "Atacantes" };
+        return _dados!.Jogadores
+            .GroupBy(j => GrupoDe(j.PositionId))
+            .OrderBy(g => g.Key)
+            .Select(g => new Grupo(nomes[g.Key], g.ToList()));
+    }
+
+    private void Selecionar(int playerId)
+    {
+        _ok = null;
+        _aviso = null;
+        _selecionado = _selecionado == playerId ? null : playerId;
+    }
+
+    private void Cancelar()
+    {
+        _selecionado = null;
+        _aviso = null;
+    }
+
+    private void TocarNumero(short numero)
+    {
+        _ok = null;
+        if (_selecionado is int quem)
+        {
+            Colocar(quem, numero);
+            return;
+        }
+        // Sem ninguém escolhido: tocar numa camisa usada escolhe o dono dela (para mudar de número).
+        if (PorNumero().TryGetValue(numero, out var dono))
+        {
+            _aviso = null;
+            _selecionado = dono.PlayerId;
+        }
+    }
+
+    private void Soltar(short numero)
+    {
+        if (_arrastando is int quem)
+        {
+            _ok = null;
+            Colocar(quem, numero);
+        }
+        _arrastando = null;
+    }
+
+    /// <summary>Põe o número no jogador; se era de outro, os dois trocam. Depois escolhe o próximo sem número.</summary>
+    private void Colocar(int quem, short numero)
+    {
+        _aviso = null;
+        var antigo = _numeros[quem];
+        if (antigo == numero)
+        {
+            _selecionado = null;
+            return;
+        }
+        var dono = PorNumero().TryGetValue(numero, out var d) ? d : null;
+        _numeros[quem] = numero;
+        if (dono is not null) _numeros[dono.PlayerId] = antigo;
+
+        if (dono is not null && antigo is null)
+        {
+            // Quem estava com o número ficou sem: já fica escolhido para ganhar outro.
+            _selecionado = dono.PlayerId;
+            _aviso = $"{dono.Nome} ficou sem número.";
+        }
+        else if (antigo is null)
+        {
+            _selecionado = ProximoSemNumero(quem);
+        }
+        else
+        {
+            _selecionado = null;
+        }
+    }
+
+    /// <summary>O próximo da lista (na ordem da tela) ainda sem número, depois de <paramref name="depoisDe"/>.</summary>
+    private int? ProximoSemNumero(int depoisDe)
+    {
+        var ordem = Grupos().SelectMany(g => g.Jogadores).Select(j => j.PlayerId).ToList();
+        var i = ordem.IndexOf(depoisDe);
+        return ordem.Skip(i + 1).Concat(ordem.Take(i + 1))
+            .Where(id => _numeros[id] is null)
+            .Select(id => (int?)id)
+            .FirstOrDefault();
+    }
+
+    private void TirarNumero()
+    {
+        if (_selecionado is int quem) _numeros[quem] = null;
+        _selecionado = null;
+        _aviso = null;
+    }
+
+    private void Desfazer()
+    {
+        _numeros = new Dictionary<int, short?>(_original);
+        _selecionado = null;
+        _aviso = null;
+        _erro = null;
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (TeamToken is null) return;
+        var mudancas = Mudancas();
+        if (mudancas.Count == 0) return;
+        _salvando = true;
+        _erro = null;
+        _ok = null;
+        try
+        {
+            await Api.SalvarCamisasAsync(mudancas, TeamToken);
+            _selecionado = null;
+            _aviso = null;
+            await CarregarAsync();
+            _ok = "Camisas salvas.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

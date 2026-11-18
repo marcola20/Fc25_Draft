@@ -22,6 +22,9 @@ public class TreinoApiClient
     public Task ContratarAsync(Fc25Draft.Core.Utilities.CargoDaComissao cargo, string teamToken, CancellationToken ct = default) =>
         EnviarAsync(HttpMethod.Post, $"api/comissao/{cargo}", new { }, teamToken, ct);
 
+    public Task SalvarCamisasAsync(IReadOnlyList<CamisaRequest> camisas, string teamToken, CancellationToken ct = default) =>
+        EnviarAsync(HttpMethod.Put, "api/camisas", camisas, teamToken, ct);
+
     private async Task EnviarAsync<T>(HttpMethod metodo, string url, T corpo, string teamToken, CancellationToken ct)
     {
         var client = await _clientFactory.CreateAsync();

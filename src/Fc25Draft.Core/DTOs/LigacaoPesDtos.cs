@@ -8,7 +8,8 @@ public record LigacaoPesDto(
     int? Age,
     int Overall,
     string? TeamName,
-    int? PesId);
+    int? PesId,
+    short? NumeroCamisa = null);
 
 /// <summary>Ligação conferida no Editor PES. PesId nulo = desligar (os atributos ficam, só perdem o ID).</summary>
 public record DefinirLigacaoPesDto(int PlayerId, int? PesId);

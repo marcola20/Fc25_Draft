@@ -14,6 +14,10 @@ public class TeamRosterConfiguration : IEntityTypeConfiguration<TeamRoster>
         e.Property(x => x.AskingPrice).HasColumnType("numeric(18,2)");
         e.Property(x => x.VariacaoCongelada).HasColumnType("numeric(6,4)");
         e.Property(x => x.Papel).HasConversion<short>();
+        e.HasIndex(x => new { x.TeamId, x.NumeroCamisa })
+         .IsUnique()
+         .HasFilter("\"NumeroCamisa\" IS NOT NULL");
+        e.ToTable(t => t.HasCheckConstraint("CK_TeamRosters_NumeroCamisa", "\"NumeroCamisa\" BETWEEN 1 AND 99"));
 
         e.HasOne(x => x.Team)
          .WithMany(t => t.Roster)

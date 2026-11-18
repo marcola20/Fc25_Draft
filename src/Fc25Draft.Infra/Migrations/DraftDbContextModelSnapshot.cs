@@ -3525,6 +3525,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime?>("ListedAtUtc")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<short?>("NumeroCamisa")
+                        .HasColumnType("smallint");
+
                     b.Property<short?>("Papel")
                         .HasColumnType("smallint");
 
@@ -3545,7 +3548,14 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("PlayerId")
                         .IsUnique();
 
-                    b.ToTable("TeamRosters");
+                    b.HasIndex("TeamId", "NumeroCamisa")
+                        .IsUnique()
+                        .HasFilter("\"NumeroCamisa\" IS NOT NULL");
+
+                    b.ToTable("TeamRosters", t =>
+                        {
+                            t.HasCheckConstraint("CK_TeamRosters_NumeroCamisa", "\"NumeroCamisa\" BETWEEN 1 AND 99");
+                        });
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.TransferConfig", b =>

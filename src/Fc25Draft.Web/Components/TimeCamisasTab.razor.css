@@ -1,0 +1,202 @@
+/* Aba Camisas: o elenco de um lado e a grade de 1 a 99 (5 por fila, como no PES) do outro. No celular, o elenco
+   fica em cima e a barra de "número de quem?" gruda no alto enquanto rola a grade. --camisas-topo = altura do topo
+   fixo do site (cabeçalho + faixa de abas), para nada ficar escondido atrás dele. */
+
+.camisas { --camisas-topo: 6.25rem; }
+
+.camisas {
+    display: grid;
+    grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+/* ── Elenco ──────────────────────────────────────────────────────────────────────────────────────── */
+
+.camisas-elenco {
+    position: sticky;
+    top: calc(var(--camisas-topo) + .75rem);
+    max-height: calc(100vh - var(--camisas-topo) - 1.5rem);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: .25rem;
+}
+
+.camisas-grupo {
+    margin: .5rem 0 .15rem;
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+.camisas-grupo:first-child { margin-top: 0; }
+
+.camisas-jogador {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+    padding: .3rem .45rem;
+    border: 1px solid transparent;
+    border-radius: .45rem;
+    background: transparent;
+    color: var(--bs-body-color);
+    font-size: .875rem;
+    text-align: left;
+}
+
+.editavel .camisas-jogador { cursor: pointer; }
+.editavel .camisas-jogador:hover { background: var(--bs-tertiary-bg); }
+
+.camisas-jogador.selecionado,
+.editavel .camisas-jogador.selecionado:hover {
+    border-color: var(--cbfv-acento);
+    background: color-mix(in srgb, var(--cbfv-acento) 18%, transparent);
+}
+
+.camisas-num {
+    flex: 0 0 auto;
+    width: 1.9rem;
+    border-radius: .3rem;
+    background: var(--bs-secondary-bg);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.5rem;
+}
+
+.camisas-jogador.sem-numero .camisas-num {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--bs-border-color);
+    color: var(--bs-tertiary-color);
+}
+
+.camisas-jogador.mudou .camisas-num { box-shadow: inset 0 0 0 2px var(--cbfv-acento); }
+
+.camisas-nome {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.camisas-pos {
+    flex: 0 0 auto;
+    color: var(--bs-tertiary-color);
+    font-size: .75rem;
+}
+
+/* ── Barra do escolhido ──────────────────────────────────────────────────────────────────────────── */
+
+.camisas-barra {
+    position: sticky;
+    top: var(--camisas-topo);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-height: 2.75rem;
+    margin-bottom: .5rem;
+    padding: .35rem .6rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .5rem;
+    background: var(--bs-body-bg);
+    font-size: .875rem;
+}
+
+.camisas-barra.ativa {
+    border-color: var(--cbfv-acento);
+    background: color-mix(in srgb, var(--cbfv-acento) 14%, var(--bs-body-bg));
+}
+
+/* ── Grade 1–99 ──────────────────────────────────────────────────────────────────────────────────── */
+
+.camisas-grade {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: .35rem;
+}
+
+.camisa {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 3.4rem;
+    padding: .25rem .2rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .45rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: background-color var(--cbfv-rapido) var(--cbfv-curva), border-color var(--cbfv-rapido) var(--cbfv-curva);
+}
+
+.camisa-n {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.camisa-dono {
+    max-width: 100%;
+    min-height: 1rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: .7rem;
+    line-height: 1rem;
+}
+
+.camisa.livre { background: var(--bs-tertiary-bg); }
+.camisa.livre .camisa-n { color: var(--bs-tertiary-color); font-weight: 500; }
+
+.camisa.usada {
+    border-color: color-mix(in srgb, var(--bs-body-color) 25%, transparent);
+}
+
+.camisa.usada .camisa-dono { color: var(--bs-secondary-color); }
+
+.camisa.mudou { box-shadow: inset 0 0 0 2px var(--cbfv-acento); }
+
+.camisa.selecionada {
+    border-color: var(--cbfv-acento);
+    background: color-mix(in srgb, var(--cbfv-acento) 22%, var(--bs-body-bg));
+}
+
+.editavel .camisa { cursor: pointer; }
+.editavel .camisa:hover { border-color: var(--cbfv-acento); }
+.editavel .camisa.livre:hover { background: color-mix(in srgb, var(--cbfv-acento) 12%, var(--bs-tertiary-bg)); }
+
+.camisa:focus-visible,
+.camisas-jogador:focus-visible {
+    outline: 2px solid var(--cbfv-acento);
+    outline-offset: 1px;
+}
+
+/* Até 992px o topo do site não gruda (AppLayout): a barra gruda no alto da tela. */
+@media (max-width: 992px) {
+    .camisas { --camisas-topo: 0px; }
+}
+
+/* ── Celular ─────────────────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 767.98px) {
+    .camisas {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .camisas-elenco {
+        position: static;
+        max-height: 16rem;
+        padding: .35rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: .5rem;
+    }
+
+    .camisa { min-height: 3rem; }
+    .camisa-n { font-size: 1rem; }
+    .camisa-dono { font-size: .65rem; }
+}

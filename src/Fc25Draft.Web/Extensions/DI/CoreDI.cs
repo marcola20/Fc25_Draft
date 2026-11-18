@@ -43,6 +43,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<IPedidoDeSaidaService, PedidoDeSaidaService>();
             services.AddComConexaoPropria<IPapelNoElencoService, PapelNoElencoService>();
             services.AddComConexaoPropria<ITreinoService, TreinoService>();
+            services.AddComConexaoPropria<ICamisasService, CamisasService>();
             services.AddComConexaoPropria<ICatalogoEscalacaoService, CatalogoEscalacaoService>();
             services.AddComConexaoPropria<IComissaoService, ComissaoService>();
             services.AddComConexaoPropria<IPicksDoDraftService, PicksDoDraftService>();

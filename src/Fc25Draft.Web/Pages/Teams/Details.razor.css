@@ -134,6 +134,21 @@
     color: var(--bs-link-hover-color);
 }
 
+/* Número da camisa (aba Camisas) antes do nome. */
+.camisa-numero {
+    display: inline-block;
+    min-width: 1.6rem;
+    margin-right: .35rem;
+    padding: 0 .25rem;
+    border-radius: .3rem;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.35rem;
+}
+
 .papel {
     color: var(--bs-tertiary-color);
 }

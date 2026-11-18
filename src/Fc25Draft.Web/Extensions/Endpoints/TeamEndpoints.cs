@@ -192,7 +192,8 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                                 db.Emprestimos
                                     .Where(e => e.PlayerId == r.PlayerId && e.Status == EmprestimoStatus.Ativo)
                                     .Select(e => e.DonoTeam.TeamName)
-                                    .FirstOrDefault()))
+                                    .FirstOrDefault())
+                            { NumeroCamisa = r.NumeroCamisa })
                             .ToList(),
                         t.AuxiliarName))
                     .FirstOrDefaultAsync(ct);

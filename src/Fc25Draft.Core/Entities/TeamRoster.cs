@@ -38,6 +38,12 @@ namespace Fc25Draft.Core.Entities
         /// <summary>O clube rebaixou o papel dele numa conversa (o valor cai um pouco por alguns jogos).</summary>
         public DateTime? ConversaEm { get; set; }
 
+        /// <summary>
+        /// Número da camisa (1 a 99), escolhido pelo técnico na aba Camisas. Único dentro do time. Fica no vínculo,
+        /// então some sozinho quando ele muda de clube. Nulo = sem número.
+        /// </summary>
+        public short? NumeroCamisa { get; set; }
+
         public Team Team { get; set; } = null!;
         public Player Player { get; set; } = null!;
     }
